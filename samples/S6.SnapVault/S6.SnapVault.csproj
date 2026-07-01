@@ -13,6 +13,9 @@
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
+    <!-- Server-Sent Events (D4): upload progress is streamed as SSE — a read-projection of the durable jobs
+         ledger — replacing the old SignalR PhotoProcessingHub (no hub, no groups, no client library). -->
+    <ProjectReference Include="..\..\src\Koan.Web.Sse\Koan.Web.Sse.csproj" />
 
     <!-- Multi-tenancy (Reference = Intent): every non-[HostScoped] Entity<T> auto-isolates by the
          ambient tenant across data, blob storage, cache, and the async-hop. SnapVault Phase 1. -->

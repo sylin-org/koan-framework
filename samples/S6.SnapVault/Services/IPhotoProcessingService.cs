@@ -10,9 +10,10 @@ public interface IPhotoProcessingService
     /// <summary>
     /// Process a single uploaded photo from a raw content stream: storage, derivatives, EXIF, AI analysis.
     /// If eventId is null, auto-creates a daily event based on EXIF capture date.
-    /// Emits SignalR events to notify clients of processing progress.
     /// Runs inside the durable, tenant-carrying <c>PhotoProcessingJob</c> (no fire-and-forget) — AI analysis
-    /// completes in the same tenant scope before the job settles.
+    /// completes in the same tenant scope before the job settles. Progress is surfaced by reporting through the
+    /// durable jobs ledger (<c>ctx.Progress</c>), which the SSE upload-progress projection reads — not SignalR.
+    /// (The per-stage progress reporter is threaded in when this service is rebuilt in step 5.)
     /// </summary>
     Task<PhotoAsset> ProcessUpload(string? eventId, Stream content, string fileName, string contentType, string jobId, CancellationToken ct = default);
 

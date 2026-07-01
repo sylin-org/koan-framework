@@ -1,7 +1,11 @@
 /**
  * Process Monitor Component
- * Floating progress card for background photo processing
- * Inspired by modern download managers and background task indicators
+ * Floating progress card for background photo processing.
+ *
+ * Transport (SnapVault D4): a browser-native EventSource over GET /api/photos/progress/{batchId} — the SSE
+ * replacement for the old SignalR hub. No client library, no hub connection, no subscribe/unsubscribe: the
+ * server streams a `PhotoProgress` frame per photo and a terminal `JobCompleted` frame (a read-projection of
+ * the durable jobs ledger), then closes. We close the EventSource on completion so it does not auto-reconnect.
  */
 
 import { escapeHtml } from '../utils/html.js';
@@ -14,7 +18,7 @@ export class ProcessMonitor {
     this.isExpanded = false;
     this.isMinimized = false;
     this.photoProgress = new Map();
-    this.signalRConnection = null;
+    this.eventSource = null;
     this.render();
   }
 
@@ -104,9 +108,9 @@ export class ProcessMonitor {
     closeBtn.addEventListener('click', () => this.hide());
   }
 
-  async startJob(jobId, totalFiles) {
+  startJob(batchId, totalFiles) {
     this.currentJob = {
-      id: jobId,
+      id: batchId,
       totalFiles: totalFiles,
       completedCount: 0,
       failedCount: 0
@@ -120,49 +124,38 @@ export class ProcessMonitor {
     this.container.querySelector('.completed-count').textContent = '0';
     this.container.querySelector('.badge-count').textContent = totalFiles;
 
-    // Connect to SignalR
-    await this.connectToSignalR(jobId);
+    // Open the SSE progress stream for this batch.
+    this.connectToProgress(batchId);
   }
 
-  async connectToSignalR(jobId) {
+  connectToProgress(batchId) {
     try {
-      // Create SignalR connection
-      const connection = new signalR.HubConnectionBuilder()
-        .withUrl('/hubs/processing')
-        .withAutomaticReconnect()
-        .build();
+      // Native SSE — same-origin, so the auth cookie (and thus the tenant/subject ambient) rides automatically.
+      const source = new EventSource(`/api/photos/progress/${encodeURIComponent(batchId)}`);
 
-      // Handle events
-      connection.on('PhotoQueued', (event) => this.handlePhotoQueued(event));
-      connection.on('PhotoProgress', (event) => this.handlePhotoProgress(event));
-      connection.on('JobCompleted', (event) => this.handleJobCompleted(event));
+      source.addEventListener('PhotoProgress', (e) => this.handlePhotoProgress(JSON.parse(e.data)));
+      source.addEventListener('JobCompleted', (e) => this.handleJobCompleted(JSON.parse(e.data)));
 
-      // Start connection
-      await connection.start();
-      await connection.invoke('SubscribeToJob', jobId);
+      // EventSource auto-reconnects on transient drops (its job). A hard error while we have no live job means
+      // the stream is done/unavailable — surface it once and stop reconnecting.
+      source.onerror = () => {
+        if (source.readyState === EventSource.CLOSED) {
+          this.disconnect();
+        }
+      };
 
-      this.signalRConnection = connection;
-
-      console.log(`Process monitor connected to job ${jobId}`);
+      this.eventSource = source;
     } catch (error) {
-      console.error('SignalR connection failed:', error);
+      console.error('SSE progress connection failed:', error);
       this.app.components.toast.show('Real-time updates unavailable', { icon: '⚠️', duration: 3000 });
     }
   }
 
-  handlePhotoQueued(event) {
-    const photoId = event.photoId || event.fileName;
-    this.photoProgress.set(photoId, {
-      fileName: event.fileName,
-      status: 'queued',
-      stage: 'queued'
-    });
-    this.updateUI();
-  }
-
   handlePhotoProgress(event) {
-    const photoId = event.photoId || event.fileName;
-    this.photoProgress.set(photoId, {
+    // Key on the stable work-item id (unique per file even before a photo id exists) so two identically-named
+    // uploads don't collapse into one row; fall back for resilience if the field is ever absent.
+    const key = event.workItemId || event.photoId || event.fileName;
+    this.photoProgress.set(key, {
       fileName: event.fileName,
       status: event.status,
       stage: event.stage,
@@ -172,8 +165,6 @@ export class ProcessMonitor {
   }
 
   handleJobCompleted(event) {
-    console.log('Job completed:', event);
-
     this.app.components.toast.show(
       `Processing complete: ${event.successCount} succeeded, ${event.failureCount} failed`,
       { icon: '✅', duration: 5000 }
@@ -188,8 +179,8 @@ export class ProcessMonitor {
     // Reload current view to show newly processed photos
     this.app.components.collectionView.loadPhotos();
 
-    // Disconnect SignalR safely
-    this.disconnectSignalR(event.jobId);
+    // Close the stream (prevents EventSource auto-reconnect after the server ends it).
+    this.disconnect();
 
     // Auto-hide after 3 seconds
     setTimeout(() => {
@@ -299,42 +290,24 @@ export class ProcessMonitor {
   }
 
   hide() {
-    const jobId = this.currentJob ? this.currentJob.id : null;
-
     this.container.classList.remove('visible', 'minimized');
     this.isExpanded = false;
     this.isMinimized = false;
     this.currentJob = null;
     this.photoProgress.clear();
 
-    // Disconnect SignalR if still connected
-    this.disconnectSignalR(jobId);
+    // Close the SSE stream if still open.
+    this.disconnect();
   }
 
-  async disconnectSignalR(jobId) {
-    if (!this.signalRConnection) return;
-
+  disconnect() {
+    if (!this.eventSource) return;
     try {
-      // Only invoke if connection is in Connected state
-      if (this.signalRConnection.state === signalR.HubConnectionState.Connected && jobId) {
-        await this.signalRConnection.invoke('UnsubscribeFromJob', jobId);
-      }
+      this.eventSource.close();
     } catch (error) {
-      // Ignore errors - connection might be closing
-      console.debug('UnsubscribeFromJob error (expected if connection closing):', error.message);
+      console.debug('EventSource close error (expected if already closed):', error.message);
     }
-
-    try {
-      // Stop connection if not already stopped
-      if (this.signalRConnection.state !== signalR.HubConnectionState.Disconnected) {
-        await this.signalRConnection.stop();
-      }
-    } catch (error) {
-      // Ignore errors - connection might already be stopped
-      console.debug('SignalR stop error (expected if already stopped):', error.message);
-    }
-
-    this.signalRConnection = null;
+    this.eventSource = null;
   }
 
   getStatusIcon(status) {
@@ -356,7 +329,7 @@ export class ProcessMonitor {
       case 'ai-description': return 'Analyzing with AI...';
       case 'embedding': return 'Generating embeddings...';
       case 'completed': return 'Complete';
-      default: return stage;
+      default: return escapeHtml(stage);   // unknown stage is a server string interpolated into innerHTML — escape it
     }
   }
 

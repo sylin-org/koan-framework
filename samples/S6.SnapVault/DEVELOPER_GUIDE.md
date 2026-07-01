@@ -18,7 +18,7 @@ Most framework samples show you how to build a todo list or basic CRUD app. Snap
 - **Semantic Search**: Natural language queries like "sunset at beach" or "people laughing" find relevant photos
 - **Production UX**: Professional dark-themed gallery with keyboard shortcuts, accessibility support, and responsive design
 - **Image Processing Pipeline**: Automatic generation of multiple derivatives (thumbnails, gallery views) with smart caching
-- **Real-time Progress**: SignalR streams upload progress and processing status to the browser
+- **Real-time Progress**: Server-Sent Events stream upload progress to the browser — a read-projection of the durable jobs ledger (no SignalR); see §7
 - **Intelligent Storage**: Three-tier architecture (hot-cdn, warm, cold) optimizes costs and performance
 - **Complete Feature Set**: Favorites, ratings, bulk operations, drag-drop upload, event organization, timeline views
 
@@ -97,7 +97,7 @@ Recent additions to SnapVault showcase sophisticated AI integration:
 - **Koan.Data**: Multi-provider data access (MongoDB in this sample)
 - **Koan.Data.Vector**: Semantic search via Weaviate
 - **ImageSharp 3.x**: EXIF extraction and image manipulation
-- **SignalR**: Real-time upload progress streaming
+- **Koan.Jobs + Koan.Web.Sse**: Durable background processing + Server-Sent-Events progress (replaced SignalR)
 
 ### Frontend (Vanilla JavaScript)
 
@@ -151,7 +151,7 @@ public async Task<ActionResult<UploadResponse>> Upload(
 }
 ```
 
-**Key Pattern**: Uploads return immediately with a job ID. Processing happens in background tasks that emit SignalR events.
+**Key Pattern**: Uploads return immediately with a batch id. Processing happens in durable, tenant-carried `PhotoProcessingJob`s (Koan.Jobs) that report progress via `ctx.Progress`, which the SSE endpoint projects (see §7) — no fire-and-forget `Task.Run`, no SignalR.
 
 **Why this approach?** Users shouldn't wait for image processing and AI analysis. Upload the file, show progress, let the user continue browsing.
 
@@ -461,58 +461,38 @@ Users can click "Regenerate" to re-analyze a photo:
 
 **Why polling?** The AI analysis can take 5-30 seconds depending on model speed. Polling keeps the UI responsive and handles failures gracefully.
 
-### 7. Real-Time Progress with SignalR
+### 7. Real-Time Progress with Server-Sent Events (a jobs-ledger projection)
 
-**Backend Hub** (Hubs/PhotoProcessingHub.cs):
+There is **no SignalR hub, no groups, no push fan-out, no client library, and no separate batch-tracker entity**.
+The durable jobs ledger already *is* the tenant-scoped progress store; the SSE endpoint is a pure read-projection
+of it (`Progress/UploadProgressProjection.cs`). The batch is not a stored thing — it's "the `PhotoProcessingJob`s
+that share a `BatchJobId`", each joined to its ledger `JobRecord` (the work-item carries identity — file name,
+photo id — the ledger carries lifecycle + `ctx.Progress`).
 
-```csharp
-public class PhotoProcessingHub : Hub
-{
-    public async Task JoinJob(string jobId)
-    {
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"job:{jobId}");
-    }
-
-    public async Task LeaveJob(string jobId)
-    {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"job:{jobId}");
-    }
-}
-```
-
-**Emitting Progress** (PhotoProcessingService.cs:46-64):
+**Backend endpoint** (Controllers/UploadProgressController.cs):
 
 ```csharp
-async Task EmitProgressAsync(string photoId, string status, string stage, string? error = null)
-{
-    await _hubContext.Clients.Group($"job:{jobId}").SendAsync("PhotoProgress", new PhotoProgressEvent
-    {
-        JobId = jobId,
-        PhotoId = photoId,
-        FileName = file.FileName,
-        Status = status,  // "processing", "completed", "failed"
-        Stage = stage,    // "upload", "exif", "thumbnails", "ai-description", "completed"
-        Error = error
-    });
-}
+[HttpGet("progress/{batchId}")]
+public IActionResult Progress(string batchId)
+    => SseActionResult.StreamEnvelopes(UploadProgressProjection.StreamAsync(batchId, HttpContext.RequestAborted));
 ```
 
-**Frontend Listener** (processMonitor.js:98-140):
+**Reporting progress** — the processing job writes it once, durably, via `ctx.Progress` (read by the projection):
+
+```csharp
+await ctx.Progress(0.4, "ai-description");   // upload → exif → thumbnails → ai-description → completed
+```
+
+**Frontend listener** (processMonitor.js) — the browser-native `EventSource`, no library:
 
 ```javascript
-async startJob(jobId, totalPhotos) {
-  // Join SignalR group
-  await this.connection.invoke('JoinJob', jobId);
-
-  // Listen for progress events
-  this.connection.on('PhotoProgress', (event) => {
-    this.handlePhotoProgress(event);
-  });
-
-  // Listen for completion
-  this.connection.on('JobCompleted', (event) => {
-    this.handleJobCompleted(event);
-    this.app.loadPhotos(); // Refresh gallery
+startJob(batchId, totalPhotos) {
+  const source = new EventSource(`/api/photos/progress/${batchId}`);
+  source.addEventListener('PhotoProgress', (e) => this.handlePhotoProgress(JSON.parse(e.data)));
+  source.addEventListener('JobCompleted', (e) => {
+    this.handleJobCompleted(JSON.parse(e.data));
+    this.app.loadPhotos();     // refresh gallery
+    source.close();            // server ended the stream — stop EventSource auto-reconnect
   });
 }
 ```
@@ -874,10 +854,10 @@ var masonry = await result.Branch().ResizeFit(300, 300);
 ```
 
 **Async Processing**:
-- Upload returns immediately with job ID
-- Image processing happens in background
-- AI analysis runs after upload completes
-- SignalR streams progress to browser
+- Upload returns immediately with the batch id
+- Image processing happens in a durable, tenant-carried `PhotoProcessingJob` (Koan.Jobs)
+- AI analysis runs inside the same job (in-scope, before it settles)
+- Server-Sent Events stream progress to the browser (a projection of the jobs ledger)
 
 ### Frontend Rendering
 
@@ -946,11 +926,11 @@ public async Task<ActionResult<PhotoListResponse>> GetPhotosByEvent(
 ### 2. Background Processing with Progress
 
 **Pattern**:
-1. Create job entity with total count
-2. Return job ID immediately
-3. Process items in background
-4. Emit SignalR events for progress
-5. Update job entity on completion
+1. Submit one durable `IKoanJob` per item, sharing a batch id
+2. Return the batch id immediately
+3. The job handler processes the item (tenant-carried, retried)
+4. The handler reports progress via `ctx.Progress` (durable, on the ledger)
+5. An SSE endpoint projects the ledger to the browser (no separate completion write)
 
 **Use Cases**:
 - Batch imports
@@ -1008,9 +988,8 @@ public async Task<ActionResult<PhotoListResponse>> GetPhotosByEvent(
 - Check browser console for 404 errors on media URLs
 
 **"Upload gets stuck at processing"**
-- Check SignalR connection: Look for `[SignalR] Connected` in browser console
-- Verify PhotoProcessingHub is registered in Program.cs
-- Check background task exceptions in server logs
+- Check the SSE stream in the browser Network tab (`/api/photos/progress/{batchId}`, an `EventSource`)
+- Check `PhotoProcessingJob` handler exceptions in server logs (the durable job records failures on the ledger)
 
 ### Debugging Tips
 
@@ -1056,8 +1035,8 @@ console.log('[Upload] Files selected:', files.length);
 **Initialization** (framework configuration):
 - `Initialization/KoanAutoRegistrar.cs` - Auto-registration (lines 1-150)
 
-**Hubs** (real-time communication):
-- `Hubs/PhotoProcessingHub.cs` - SignalR progress streaming (lines 1-30)
+**Progress** (real-time communication):
+- `Progress/UploadProgressProjection.cs` + `Controllers/UploadProgressController.cs` - SSE progress, a read-projection of the jobs ledger (see §7)
 
 ### Frontend (JavaScript)
 
@@ -1144,7 +1123,7 @@ console.log('[Upload] Files selected:', files.length);
 
 **AI Integration**: Review AI vision prompts, parsing strategies, and embedding generation
 
-**Real-time Features**: Explore SignalR integration between `PhotoProcessingHub` and `ProcessMonitor`
+**Real-time Features**: Explore the SSE progress projection (`UploadProgressProjection` → `UploadProgressController`) and its `EventSource` client (`ProcessMonitor`)
 
 **Frontend Architecture**: Analyze component communication patterns in `app.js` and component modules
 

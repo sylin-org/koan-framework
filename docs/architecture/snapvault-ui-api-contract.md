@@ -60,7 +60,7 @@
 
 | Kind | URL | Events / framing | Called from | Disposition |
 |---|---|---|---|---|
-| **SignalR** | `/hubs/processing` | S→C `PhotoQueued{photoId?,fileName}`, `PhotoProgress{photoId?,fileName,status,stage,error?}`, `JobCompleted{jobId,successCount,failureCount}`; C→S `SubscribeToJob(jobId)`, `UnsubscribeFromJob(jobId)`. CDN `microsoft-signalr@8.0.0`. | `processMonitor.js:130-200` | **CHANGE (D4):** → SSE `EventSource` on a per-batch stream endpoint; payload shapes preserved. |
+| **SSE** (was SignalR) | `GET /api/photos/progress/{batchId}` | Server-Sent Events: `PhotoProgress{jobId,photoId,fileName,status,stage,error?}` per photo state-change, then a terminal `JobCompleted{jobId,status,totalPhotos,successCount,failureCount,errors}`; the stream then closes. Browser-native `EventSource` (no library). | `processMonitor.js` | **DELIVERED (D4, read side):** a read-projection of the durable jobs ledger — no hub/groups/subscribe. `PhotoQueued` folded into `PhotoProgress` (`status:"queued"`); the preserved UI fields (`photoId`/`fileName`/`status`/`stage`/`error`/`successCount`/`failureCount`/`jobId`) are unchanged, the rest additive. Upload POST (row 8) that mints `batchId` + submits the jobs is step 5. |
 | Polling | `GET /api/photos/{id}` | 1 s up to 60 s after reroll, compares `aiAnalysis`/`detailedDescription` | `lightboxActions.js:217-255` | Keep (or replace with the SSE stream). |
 | Response-stream | `POST /api/maintenance/wipe-repository` | reads `response.body.getReader()`, parses NDJSON `{percentage,message}` | `settings.js:346-364` | Keep as NDJSON, or fold into the SSE pattern. |
 

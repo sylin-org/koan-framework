@@ -31,7 +31,7 @@ SnapVault is a **self-hosted photo management system** built with Koan Framework
 🔍 **Semantic Search** - Natural language queries like "sunset at beach" or "people laughing"
 🎨 **Modern Dark UI** - Professional gallery with keyboard shortcuts, accessibility, and responsive design
 ⚡ **Smart Processing** - Automatic generation of optimized derivatives (thumbnails, gallery views) with intelligent caching
-📊 **Real-time Progress** - SignalR streams upload progress and processing status
+📊 **Real-time Progress** - Server-Sent Events stream upload progress (a projection of the durable jobs ledger; no SignalR)
 💾 **Intelligent Storage** - Three-tier architecture (hot-cdn, warm, cold) optimizes costs and performance
 📱 **Complete Features** - Favorites, ratings, bulk actions, drag-drop upload, event organization, timeline views
 
@@ -148,23 +148,29 @@ public class PhotoThumbnail : MediaEntity<PhotoThumbnail> { }
 
 ### 📡 Real-Time Progress Tracking
 
-Stream processing status to the browser with SignalR:
+Upload progress is a **read-projection of the durable jobs ledger**, streamed as Server-Sent Events — no
+SignalR hub, no groups, no client library. The processing job reports progress once, durably, via `ctx.Progress`;
+the SSE endpoint tails the ledger:
 
 ```csharp
-// Backend: Emit progress events
-await _hubContext.Clients.Group($"job:{jobId}").SendAsync("PhotoProgress", new {
-    PhotoId = photo.Id,
-    Stage = "ai-description",  // upload → exif → thumbnails → ai-description → completed
-    Status = "processing"
-});
+// Backend: the job reports durable progress (persisted to the ledger, read by the SSE projection)
+await ctx.Progress(0.4, "ai-description");  // upload → exif → thumbnails → ai-description → completed
 
-// Frontend: Listen and update UI
-connection.on('PhotoProgress', (event) => {
-    updateProgressCard(event.photoId, event.stage);
-});
+// The endpoint streams the batch's progress straight off the ledger (Controllers/UploadProgressController.cs)
+[HttpGet("progress/{batchId}")]
+public IActionResult Progress(string batchId)
+    => SseActionResult.StreamEnvelopes(UploadProgressProjection.StreamAsync(batchId, HttpContext.RequestAborted));
 ```
 
-**Why it matters**: Background processing with real-time feedback creates professional UX.
+```javascript
+// Frontend: the browser-native EventSource (no library) listens and updates the UI
+const source = new EventSource(`/api/photos/progress/${batchId}`);
+source.addEventListener('PhotoProgress', (e) => updateProgressCard(JSON.parse(e.data)));
+source.addEventListener('JobCompleted', (e) => { /* ...*/ source.close(); });
+```
+
+**Why it matters**: you already wrote a durable, tenant-carried job — progress streaming is a projection of it,
+not a second broadcast system to build and keep in sync.
 
 ### 🎨 Modern Web Application
 
@@ -219,19 +225,19 @@ public class PhotosController : EntityController<PhotoAsset>
 
 ### Background Processing Pattern
 
+Durable, tenant-carrying background work via `Koan.Jobs` — no in-memory queue, no fire-and-forget `Task.Run`
+(which escaped both retries and the ambient tenant), no separate batch-tracker entity:
+
 ```csharp
-// 1. Create job for tracking
-var job = new ProcessingJob { TotalPhotos = files.Count };
-await job.Save();
+// 1. Submit one durable job per file, sharing a batch id (the ambient tenant rides across the async hop).
+var jobs = files.Select(f => new PhotoProcessingJob { BatchJobId = batchId, OriginalFileName = f.Name });
+await jobs.Submit(PhotoProcessingJob.Ingest);
 
-// 2. Return immediately with job ID
-return Ok(new { JobId = job.Id });
+// 2. Return the batch id immediately; the browser opens an EventSource on it.
+return Ok(new { jobId = batchId, totalQueued = files.Count });
 
-// 3. Process in background
-_ = Task.Run(() => ProcessPhotos(files, job.Id));
-
-// 4. Emit SignalR events for progress
-await _hub.Clients.Group($"job:{job.Id}").SendAsync("PhotoProgress", ...);
+// 3. The job's handler runs the pipeline and reports progress durably (read by the SSE projection).
+public static async Task Execute(PhotoProcessingJob job, JobContext ctx, CancellationToken ct) { /* ctx.Progress(...) */ }
 ```
 
 ---
@@ -251,8 +257,9 @@ samples/S6.SnapVault/
 │   ├── PhotoThumbnail.cs        # Thumbnail (hot-cdn)
 │   ├── Event.cs                 # Event organization
 │   └── AiAnalysis.cs            # Structured AI output
-├── Hubs/
-│   └── PhotoProcessingHub.cs    # SignalR progress streaming
+├── Progress/                    # Upload progress = an SSE read-projection of the jobs ledger (no SignalR hub)
+│   ├── PhotoProgressContract.cs
+│   └── UploadProgressProjection.cs
 ├── Initialization/
 │   └── KoanAutoRegistrar.cs     # Framework configuration
 ├── wwwroot/
@@ -406,7 +413,7 @@ config.UseLocalFileStorage(opts => {
 **Semantic Search**: `Services/PhotoProcessingService.cs` (lines 249-297)
 **Lightbox**: `wwwroot/js/components/lightbox.js`
 **Upload Flow**: `wwwroot/js/components/upload.js`
-**Real-Time Progress**: `Hubs/PhotoProcessingHub.cs` + `wwwroot/js/components/processMonitor.js`
+**Real-Time Progress**: `Progress/UploadProgressProjection.cs` + `Controllers/UploadProgressController.cs` (SSE) + `wwwroot/js/components/processMonitor.js` (EventSource)
 
 ### 📚 Additional Documentation
 
@@ -427,7 +434,7 @@ config.UseLocalFileStorage(opts => {
 | | Koan.Data | Multi-provider data access |
 | | Koan.Data.Vector | Semantic search |
 | | ImageSharp 3.x | EXIF extraction |
-| | SignalR | Real-time progress |
+| | Koan.Jobs + Koan.Web.Sse | Durable processing + SSE progress |
 | **Frontend** | Vanilla JavaScript (ES6 modules) | No build tools needed |
 | | CSS Variables | Theme system |
 | **Storage** | MongoDB | Photo metadata |
@@ -469,9 +476,8 @@ Potential additions to demonstrate more framework capabilities:
 - Check browser console for errors during search
 
 **"Upload stuck at processing"**
-- Check SignalR connection in browser console
-- Verify PhotoProcessingHub is registered in Program.cs
-- Check server logs for background task exceptions
+- Check the SSE stream in the browser Network tab (`/api/photos/progress/{batchId}`, an `EventSource`)
+- Check server logs for `PhotoProcessingJob` handler exceptions (the durable job records failures on the ledger)
 
 **"Images not displaying"**
 - Verify `./.Koan/storage/` directory exists
