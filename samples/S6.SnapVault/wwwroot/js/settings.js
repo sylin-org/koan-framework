@@ -11,8 +11,6 @@ class SettingsManager {
     init() {
         this.setupTabs();
         this.setupDangerZone();
-        this.setupMaintenanceActions();
-        this.setupExportActions();
         this.loadStorageStats();
     }
 
@@ -89,169 +87,36 @@ class SettingsManager {
     updateStorageUI() {
         if (!this.stats) return;
 
-        // Update storage chart
-        const total = this.stats.hotTierGB + this.stats.warmTierGB + this.stats.coldTierGB;
-        const hotPct = (this.stats.hotTierGB / total * 100).toFixed(1);
-        const warmPct = (this.stats.warmTierGB / total * 100).toFixed(1);
-        const coldPct = (this.stats.coldTierGB / total * 100).toFixed(1);
+        // Defensive: set text on an element only if it's present (some cards were trimmed in the greenfield).
+        const setText = (id, text) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
+        const setWidth = (selector, pct) => {
+            const el = document.querySelector(selector);
+            if (el) el.style.width = `${pct}%`;
+        };
 
-        document.querySelector('.chart-segment.hot').style.width = `${hotPct}%`;
-        document.querySelector('.chart-segment.warm').style.width = `${warmPct}%`;
-        document.querySelector('.chart-segment.cold').style.width = `${coldPct}%`;
+        // Update storage chart (guard divide-by-zero on an empty repository).
+        const total = this.stats.hotTierGB + this.stats.warmTierGB + this.stats.coldTierGB;
+        const pct = (v) => total > 0 ? (v / total * 100).toFixed(1) : '0';
+        setWidth('.chart-segment.hot', pct(this.stats.hotTierGB));
+        setWidth('.chart-segment.warm', pct(this.stats.warmTierGB));
+        setWidth('.chart-segment.cold', pct(this.stats.coldTierGB));
 
         // Update stat values
-        document.getElementById('hot-size').textContent = `${this.stats.hotTierGB.toFixed(1)} GB`;
-        document.getElementById('warm-size').textContent = `${this.stats.warmTierGB.toFixed(1)} GB`;
-        document.getElementById('cold-size').textContent = `${this.stats.coldTierGB.toFixed(1)} GB`;
-        document.getElementById('total-size').textContent = `${this.stats.totalGB.toFixed(1)} GB`;
-
-        // Update action metadata
-        document.getElementById('photo-count').textContent = `${this.stats.photoCount.toLocaleString()} photos`;
-        document.getElementById('cache-status').textContent =
-            `${this.stats.cacheEntries.toLocaleString()} cached embeddings (${this.stats.cacheSizeMB} MB)`;
+        setText('hot-size', `${this.stats.hotTierGB.toFixed(1)} GB`);
+        setText('warm-size', `${this.stats.warmTierGB.toFixed(1)} GB`);
+        setText('cold-size', `${this.stats.coldTierGB.toFixed(1)} GB`);
+        setText('total-size', `${this.stats.totalGB.toFixed(1)} GB`);
+        setText('photo-count', `${this.stats.photoCount.toLocaleString()} photos`);
+        setText('cache-status', `${this.stats.cacheEntries.toLocaleString()} cached renders (${this.stats.cacheSizeMB} MB)`);
 
         // Update wipe confirmation text
-        document.getElementById('wipe-photo-count').textContent = this.stats.photoCount.toLocaleString();
-        document.getElementById('wipe-photo-size').textContent = this.stats.totalGB.toFixed(1);
-        document.getElementById('modal-photo-count').textContent = this.stats.photoCount.toLocaleString();
-        document.getElementById('modal-photo-size').textContent = this.stats.totalGB.toFixed(1);
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // MAINTENANCE ACTIONS
-    // ═══════════════════════════════════════════════════════════════
-
-    setupMaintenanceActions() {
-        // Rebuild Index
-        document.getElementById('rebuild-index-btn').addEventListener('click', () => {
-            this.performMaintenance('rebuild-index', 'Search index rebuilt successfully');
-        });
-
-        // Clear Cache
-        document.getElementById('clear-cache-btn').addEventListener('click', () => {
-            this.performMaintenance('clear-cache', 'AI embedding cache cleared');
-        });
-
-        // Optimize Database
-        document.getElementById('optimize-db-btn').addEventListener('click', () => {
-            this.performMaintenance('optimize-db', 'Database optimized successfully');
-        });
-
-        // Load index status
-        this.loadIndexStatus();
-    }
-
-    async loadIndexStatus() {
-        try {
-            const response = await fetch(`${this.apiBase}/maintenance/index-status`);
-            if (response.ok) {
-                const data = await response.json();
-                const lastIndexed = new Date(data.lastIndexed);
-                const timeAgo = this.getTimeAgo(lastIndexed);
-                document.getElementById('index-status').textContent = `Last indexed: ${timeAgo}`;
-            }
-        } catch (error) {
-            document.getElementById('index-status').textContent = 'Status unknown';
-        }
-    }
-
-    async performMaintenance(action, successMessage) {
-        const btn = document.getElementById(`${action}-btn`);
-        const originalText = btn.textContent;
-
-        btn.classList.add('loading');
-        btn.disabled = true;
-
-        try {
-            const response = await fetch(`${this.apiBase}/maintenance/${action}`, {
-                method: 'POST'
-            });
-
-            if (response.ok) {
-                this.showToast(successMessage, 'success');
-                // Reload stats after maintenance
-                setTimeout(() => this.loadStorageStats(), 1000);
-            } else {
-                throw new Error('Maintenance action failed');
-            }
-        } catch (error) {
-            this.showToast(`Failed to ${action.replace('-', ' ')}`, 'error');
-        } finally {
-            btn.classList.remove('loading');
-            btn.disabled = false;
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // EXPORT ACTIONS
-    // ═══════════════════════════════════════════════════════════════
-
-    setupExportActions() {
-        document.getElementById('export-metadata-btn').addEventListener('click', () => {
-            this.exportMetadata();
-        });
-
-        document.getElementById('backup-config-btn').addEventListener('click', () => {
-            this.backupConfig();
-        });
-    }
-
-    async exportMetadata() {
-        const btn = document.getElementById('export-metadata-btn');
-        btn.classList.add('loading');
-        btn.disabled = true;
-
-        try {
-            const response = await fetch(`${this.apiBase}/maintenance/export-metadata`);
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `snapvault-metadata-${Date.now()}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-                this.showToast('Metadata exported successfully', 'success');
-            } else {
-                throw new Error('Export failed');
-            }
-        } catch (error) {
-            this.showToast('Failed to export metadata', 'error');
-        } finally {
-            btn.classList.remove('loading');
-            btn.disabled = false;
-        }
-    }
-
-    async backupConfig() {
-        const btn = document.getElementById('backup-config-btn');
-        btn.classList.add('loading');
-        btn.disabled = true;
-
-        try {
-            const response = await fetch(`${this.apiBase}/maintenance/backup-config`);
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `snapvault-config-${Date.now()}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-                this.showToast('Configuration backed up successfully', 'success');
-            } else {
-                throw new Error('Backup failed');
-            }
-        } catch (error) {
-            this.showToast('Failed to backup configuration', 'error');
-        } finally {
-            btn.classList.remove('loading');
-            btn.disabled = false;
-        }
+        setText('wipe-photo-count', this.stats.photoCount.toLocaleString());
+        setText('wipe-photo-size', this.stats.totalGB.toFixed(1));
+        setText('modal-photo-count', this.stats.photoCount.toLocaleString());
+        setText('modal-photo-size', this.stats.totalGB.toFixed(1));
     }
 
     // ═══════════════════════════════════════════════════════════════
