@@ -43,9 +43,12 @@ public sealed class SnapVaultModule : KoanModule
         // One line replaces the hand-written IMediaSource + the whole legacy derivative/serving stack.
         services.AddMediaSource<PhotoAsset>();
 
-        // NOTE: IPhotoProcessingService (consumed by PhotoProcessingJob.Execute) is intentionally NOT registered
-        // yet — its implementation is port-source in _legacy/ and gets rebuilt in the jobs/domain steps (4-5).
-        // No PhotoProcessingJob can be triggered before the upload surface exists, so boot stays clean.
+        // Ingest + AI pipeline (step 5a): the durable PhotoProcessingJob resolves IPhotoProcessingService to run
+        // storage → EXIF → daily-event → AI vision (gallery-recipe re-source) → embedding, reporting per-stage
+        // progress via ctx.Progress (read by the step-4 SSE projection). The prompt factory assembles the
+        // style-customized vision prompt (base template + DB-driven style parameters).
+        services.AddSingleton<Services.AI.IAnalysisPromptFactory, Services.AI.AnalysisPromptFactory>();
+        services.AddSingleton<IPhotoProcessingService, PhotoProcessingService>();
     }
 
     public override async Task Start(IServiceProvider services, CancellationToken ct)

@@ -48,10 +48,16 @@ public sealed class PhotoProcessingJob : Entity<PhotoProcessingJob>, IKoanJob<Ph
         switch (ctx.Action)
         {
             case Ingest:
-                // Open the staged raw blob (resolved under this job's rehydrated tenant) and run the pipeline.
+                // Open the staged raw blob (resolved under this job's rehydrated tenant) and run the pipeline,
+                // forwarding per-stage progress to the ledger via ctx.Progress (the step-4 SSE projection reads it).
                 await using (var raw = await UploadStaging.OpenRead(job.StagingKey, ct))
                 {
-                    await service.ProcessUpload(job.EventId, raw, job.OriginalFileName, job.ContentType, job.BatchJobId, ct);
+                    var photo = await service.ProcessUpload(
+                        job.EventId, raw, job.OriginalFileName, job.ContentType,
+                        (fraction, stage) => ctx.Progress(fraction, stage), ct);
+                    // Stamp the created photo id onto the work-item; save-if-changed (§17) persists it, so the
+                    // progress projection can surface PhotoId for this file.
+                    job.PhotoId = photo.Id;
                 }
 
                 // Success → drop the transient staging blob. A retryable failure above leaves it in place so the

@@ -72,12 +72,18 @@ public sealed class SnapVaultHostFixture : IAsyncLifetime
             ["Koan:Data:Tenancy:Posture"] = "Closed",
             // Access scoping (SEC-0008) also fails closed by default — this shared host proves BOTH: tenant isolation
             // here (studio reads run Subject.System(), the platform), and guest access scoping in the lifecycle spec.
-            // Local storage for the staging-blob leg (UploadStaging binds Profile="cold").
+            // Local storage for the ingest + staging-blob legs (UploadStaging + PhotoAsset bind Profile="cold").
+            // Each profile MUST declare a Container (StorageService.ValidateConfiguration) — omitting it was the
+            // "IStorageService not resolving" cause that parked the blob leg; the per-entity [StorageBinding]
+            // Container overrides this default.
             ["Koan:Storage:Providers:Local:BasePath"] = _storageRoot,
             ["Koan:Storage:DefaultProfile"] = "cold",
             ["Koan:Storage:Profiles:cold:Provider"] = "local",
+            ["Koan:Storage:Profiles:cold:Container"] = "cold",
             ["Koan:Storage:Profiles:warm:Provider"] = "local",
+            ["Koan:Storage:Profiles:warm:Container"] = "warm",
             ["Koan:Storage:Profiles:hot:Provider"] = "local",
+            ["Koan:Storage:Profiles:hot:Container"] = "hot",
         };
 
         Host = await KoanIntegrationHost.Configure()
@@ -233,8 +239,7 @@ public sealed class SnapVaultTenancyFlagshipSpec
 
     // ───────────────────────── Leg 5 — staged-upload blob isolation ─────────────────────────
 
-    [Fact(Skip = "WIP: IStorageService not resolving in the test boot (storage-config detail); parked during the feature-inventory pivot. Blob-key isolation is independently proven by the framework's StorageTenantIsolationSpec.",
-        DisplayName = "blob: a studio's staged upload is unreadable by another studio")]
+    [Fact(DisplayName = "blob: a studio's staged upload is unreadable by another studio")]
     public async Task Staging_blob_is_studio_isolated()
     {
         // This is the exact path PhotoProcessingJob.Ingest depends on: the controller stages the raw upload under

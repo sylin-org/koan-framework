@@ -8,14 +8,14 @@ using S6.SnapVault.Models;
 public interface IPhotoProcessingService
 {
     /// <summary>
-    /// Process a single uploaded photo from a raw content stream: storage, derivatives, EXIF, AI analysis.
-    /// If eventId is null, auto-creates a daily event based on EXIF capture date.
+    /// Process a single uploaded photo from a raw content stream: storage, EXIF, daily-event, AI analysis, embedding.
+    /// If eventId is null/empty, auto-creates a daily event based on the EXIF capture date.
     /// Runs inside the durable, tenant-carrying <c>PhotoProcessingJob</c> (no fire-and-forget) — AI analysis
-    /// completes in the same tenant scope before the job settles. Progress is surfaced by reporting through the
-    /// durable jobs ledger (<c>ctx.Progress</c>), which the SSE upload-progress projection reads — not SignalR.
-    /// (The per-stage progress reporter is threaded in when this service is rebuilt in step 5.)
+    /// completes in the same tenant scope before the job settles. Per-stage progress is reported through
+    /// <paramref name="reportProgress"/> (the job wires it to <c>ctx.Progress</c>, persisted to the ledger and
+    /// streamed by the step-4 SSE projection — not SignalR); pass <c>null</c> to run without progress.
     /// </summary>
-    Task<PhotoAsset> ProcessUpload(string? eventId, Stream content, string fileName, string contentType, string jobId, CancellationToken ct = default);
+    Task<PhotoAsset> ProcessUpload(string? eventId, Stream content, string fileName, string contentType, Func<double, string, Task>? reportProgress, CancellationToken ct = default);
 
     /// <summary>
     /// Generate AI metadata and vector embedding for a photo

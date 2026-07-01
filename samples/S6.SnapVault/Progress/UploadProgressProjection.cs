@@ -75,10 +75,10 @@ public static class UploadProgressProjection
                 FileName = item.OriginalFileName,
                 Status = MapStatus(rec),
                 Stage = MapStage(rec),
-                // The job's own failure reason, shown to the operator who owns this batch (own-tenant data, not a
-                // cross-boundary leak). Step-5 tripwire: when the rebuilt pipeline throws, map LastError to a
-                // user-safe message here rather than forwarding raw exception text.
-                Error = rec?.LastError,
+                // §9.7 tripwire discharged: never forward raw exception text (paths/hostnames) to the browser —
+                // a job only reaches Failed on an infrastructure error (the pipeline swallows AI failures as
+                // non-fatal), so a generic message is right; the detail stays in the server logs.
+                Error = SafeError(rec),
             });
         }
 
@@ -88,7 +88,7 @@ public static class UploadProgressProjection
 
         var success = records.Count(r => r!.Status == JobStatus.Completed);
         var failure = records.Count - success;
-        var errors = records.Where(r => !string.IsNullOrEmpty(r!.LastError)).Select(r => r!.LastError!).ToArray();
+        var errors = records.Select(SafeError).Where(e => e is not null).Select(e => e!).ToArray();
         var completion = new JobCompletionEvent
         {
             JobId = batchId,
@@ -159,4 +159,11 @@ public static class UploadProgressProjection
         if (!string.IsNullOrEmpty(rec?.ProgressMessage)) return rec!.ProgressMessage!;
         return MapStatus(rec);   // no ctx.Progress yet this tick → fall back to the coarse status
     }
+
+    // A job only fails on an infrastructure error (the pipeline treats AI failures as non-fatal). Surface a
+    // user-safe, generic message to the browser; the raw LastError stays in the server logs.
+    private static string? SafeError(JobRecord? rec)
+        => rec is { IsTerminal: true } && rec.Status is not JobStatus.Completed and not JobStatus.Cancelled
+            ? "Processing failed. Please retry; if it persists, check the server logs."
+            : null;
 }
