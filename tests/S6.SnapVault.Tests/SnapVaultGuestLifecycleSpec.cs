@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
@@ -14,7 +15,10 @@ using Koan.Jobs;
 using Koan.Media.Web.Routing;
 using Koan.Tenancy;
 using Koan.Testing.Integration;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
+using S6.SnapVault.Controllers;
 using S6.SnapVault.Models;
 using S6.SnapVault.Services;
 using Xunit;
@@ -237,5 +241,78 @@ public sealed class SnapVaultGuestLifecycleSpec
         accept.Outcome.Should().Be(InviteAcceptOutcome.EmailNotOwned);
         accept.Grant.Should().BeNull();
         (await GalleryGrant.Get(GalleryGrant.KeyFor(attacker, eventId))).Should().BeNull();
+    }
+
+    [Fact(DisplayName = "guest role: a 'viewer' invite grants view-only; the default 'proofer' grants select + comment (5f)")]
+    public async Task Guest_role_maps_to_grant_permissions()
+    {
+        var invites = Svc<GalleryInviteService>();
+        var stamp = Stamp();
+        var studio = "studio-" + stamp;
+
+        string eventId;
+        using (Tenant.Use(studio)) { var ev = new Event { Name = "Gallery" }; await ev.Save(); eventId = ev.Id; }
+
+        // A "viewer" invite → the grant can view but not select.
+        var viewer = "viewer-" + stamp; var viewerEmail = "viewer-" + stamp + "@example.com";
+        await SeedGuestAsync(viewer, IdentityEmail.Normalize(viewerEmail));
+        await invites.AcceptAsync((await invites.InviteAsync(studio, eventId, viewerEmail, role: "viewer")).Token, viewer);
+        var viewerGrant = await GalleryGrant.Get(GalleryGrant.KeyFor(viewer, eventId));
+        viewerGrant!.Allows("view").Should().BeTrue();
+        viewerGrant.Allows("select").Should().BeFalse();
+
+        // The default (proofer) invite → the grant can select + comment.
+        var proofer = "proofer-" + stamp; var prooferEmail = "proofer-" + stamp + "@example.com";
+        await SeedGuestAsync(proofer, IdentityEmail.Normalize(prooferEmail));
+        await invites.AcceptAsync((await invites.InviteAsync(studio, eventId, prooferEmail)).Token, proofer);
+        var prooferGrant = await GalleryGrant.Get(GalleryGrant.KeyFor(proofer, eventId));
+        prooferGrant!.Allows("select").Should().BeTrue();
+        prooferGrant.Allows("comment").Should().BeTrue();
+    }
+
+    private GalleryController Gallery(ClaimsPrincipal? user = null)
+    {
+        var http = new DefaultHttpContext();
+        if (user is not null) http.User = user;
+        return new GalleryController(Svc<GalleryInviteService>()) { ControllerContext = new ControllerContext { HttpContext = http } };
+    }
+    private static ClaimsPrincipal Person(string sub) => new(new ClaimsIdentity(new[] { new Claim("sub", sub) }, "test"));
+
+    [Fact(DisplayName = "gallery HTTP (5f): studio invites → the signed-in guest accepts → grant; unauthenticated and wrong-person are refused")]
+    public async Task Gallery_http_invite_then_accept()
+    {
+        var stamp = Stamp();
+        var studio = "studio-" + stamp;
+        var guestId = "guest-" + stamp;
+        var guestEmail = "client-" + stamp + "@example.com";
+        await SeedGuestAsync(guestId, IdentityEmail.Normalize(guestEmail));
+
+        string eventId;
+        using (Tenant.Use(studio)) { var ev = new Event { Name = "Gallery" }; await ev.Save(); eventId = ev.Id; }
+
+        // Studio issues the invite (tenant = ambient studio).
+        string token;
+        using (Tenant.Use(studio))
+        {
+            var res = await Gallery().Invite(new GalleryInviteRequest { EventId = eventId, Email = guestEmail });
+            var ok = res.Should().BeOfType<OkObjectResult>().Subject.Value!;
+            token = (string)ok.GetType().GetProperty("token")!.GetValue(ok)!;
+            token.Should().NotBeNullOrEmpty();
+        }
+
+        // Unauthenticated accept → 401.
+        (await Gallery().Accept(new GalleryAcceptRequest { Token = token }))
+            .Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(401);
+
+        // Wrong person (owns a different verified email) → 403, no grant.
+        var attacker = "attacker-" + stamp;
+        await SeedGuestAsync(attacker, IdentityEmail.Normalize("attacker-" + stamp + "@evil.com"));
+        (await Gallery(Person(attacker)).Accept(new GalleryAcceptRequest { Token = token }))
+            .Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
+        (await GalleryGrant.Get(GalleryGrant.KeyFor(attacker, eventId))).Should().BeNull();
+
+        // The invited guest accepts → grant minted.
+        (await Gallery(Person(guestId)).Accept(new GalleryAcceptRequest { Token = token })).Should().BeOfType<OkObjectResult>();
+        (await GalleryGrant.Get(GalleryGrant.KeyFor(guestId, eventId))).Should().NotBeNull();
     }
 }

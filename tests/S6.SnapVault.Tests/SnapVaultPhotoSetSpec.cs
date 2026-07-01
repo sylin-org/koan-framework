@@ -79,4 +79,33 @@ public sealed class SnapVaultPhotoSetSpec
             ordered.FindIndex(p => p.Id == p2.Id).Should().Be(2);
         }
     }
+
+    [Fact(DisplayName = "windowing: the 'event' context windows ONE event's photos (the #6 by-event unify — access-scoped, infinite-scroll)")]
+    public async Task Event_context_windows_one_event()
+    {
+        var studio = "studio-" + Stamp();
+        var svc = Svc<PhotoSetService>();
+        var baseDate = new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        Event evA, evB;
+        using (Tenant.Use(studio))
+        using (Subject.System())
+        {
+            evA = new Event { Name = "A" }; await evA.Save();
+            evB = new Event { Name = "B" }; await evB.Save();
+            for (var i = 0; i < 3; i++)
+                await new PhotoAsset { EventId = evA.Id, OriginalFileName = $"a{i}.jpg", CapturedAt = baseDate.AddDays(i) }.Save();
+            await new PhotoAsset { EventId = evB.Id, OriginalFileName = "b.jpg", CapturedAt = baseDate }.Save();
+        }
+
+        using (Tenant.Use(studio))
+        using (Subject.System())
+        {
+            var session = await svc.CreateSession(new PhotoSetDefinition { Context = "event", EventId = evA.Id, SortBy = "capturedAt", SortOrder = "desc" });
+            session.TotalCount.Should().Be(3);                 // only event A's photos, not B's
+            var window = await svc.ExecuteQuery(session, 0, 2);
+            window.Should().HaveCount(2);
+            window.Should().OnlyContain(p => p.EventId == evA.Id);
+        }
+    }
 }

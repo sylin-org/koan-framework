@@ -43,3 +43,17 @@ public sealed class ProofMarkRequest
     public bool? Selected { get; set; }
     public string? Comment { get; set; }
 }
+
+/// <summary>5f — a studio issues a gallery invite for an event (role: "proofer" default, or "viewer").</summary>
+public sealed class GalleryInviteRequest
+{
+    public string EventId { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string? Role { get; set; }
+}
+
+/// <summary>5f — a signed-in guest accepts a gallery invite by its token.</summary>
+public sealed class GalleryAcceptRequest
+{
+    public string Token { get; set; } = "";
+}

@@ -30,6 +30,11 @@ public class PhotoSetSession : Entity<PhotoSetSession>
     public string? CollectionId { get; set; }
 
     /// <summary>
+    /// Event ID (for context=event)
+    /// </summary>
+    public string? EventId { get; set; }
+
+    /// <summary>
     /// Sort field: capturedAt, createdAt, rating, fileName
     /// </summary>
     public string SortBy { get; set; } = "capturedAt";

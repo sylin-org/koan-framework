@@ -505,16 +505,20 @@ class SnapVaultApp {
     }
 
     container.innerHTML = this.state.events.map(event => `
-      <button class="library-item" data-event-id="${event.id}">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-          <line x1="16" y1="2" x2="16" y2="6"></line>
-          <line x1="8" y1="2" x2="8" y2="6"></line>
-          <line x1="3" y1="10" x2="21" y2="10"></line>
-        </svg>
-        <span class="label">${escapeHtml(event.name)}</span>
-        <span class="badge">${event.photoCount || 0}</span>
-      </button>
+      <div class="library-item-row" style="display:flex;align-items:center;gap:4px">
+        <button class="library-item" data-event-id="${event.id}" style="flex:1">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span class="label">${escapeHtml(event.name)}</span>
+          <span class="badge">${event.photoCount || 0}</span>
+        </button>
+        <button class="share-gallery" data-share-event="${event.id}" title="Share this gallery with a client"
+                style="background:none;border:none;cursor:pointer;color:inherit;opacity:.6;padding:4px">🔗</button>
+      </div>
     `).join('');
 
     // Attach click handlers to event items
@@ -534,6 +538,25 @@ class SnapVaultApp {
         await this.filterPhotosByEvent(eventId);
       });
     });
+
+    // Share affordance — issue a gallery invite for the event and hand back the guest link.
+    container.querySelectorAll('.share-gallery[data-share-event]').forEach(btn => {
+      btn.addEventListener('click', (e) => { e.stopPropagation(); this.shareEventGallery(btn.dataset.shareEvent); });
+    });
+  }
+
+  async shareEventGallery(eventId) {
+    const email = window.prompt("Client's email — they'll sign in with it to open their proofing gallery:");
+    if (!email) return;
+    try {
+      const res = await this.api.post('/api/gallery/invite', { eventId, email: email.trim() });
+      const link = `${window.location.origin}${res.acceptUrl}`;
+      this.components.toast?.show('Gallery invite created', { icon: '🔗', duration: 2500 });
+      // Hand the shareable link to the operator to copy.
+      window.prompt('Share this link with your client (they must sign in with the invited email):', link);
+    } catch (error) {
+      this.components.toast?.show(`Failed to create invite: ${error?.message ?? 'error'}`, { icon: '⚠️', duration: 3500 });
+    }
   }
 
   async filterPhotosByEvent(eventId) {
@@ -542,8 +565,14 @@ class SnapVaultApp {
     try {
       this.setLoading(true);
 
-      // Use the existing by-event endpoint from PhotosController
-      const response = await this.api.get(`/api/photos/by-event/${eventId}`);
+      // Unified onto the #5 windowed grid via the "event" context (access-scoped, so a guest's event browse is
+      // confined to their granted event for free) — no longer capped at the old 50-row by-event page. A generous
+      // window covers a realistic event; a full infinite-scroll routes through PhotoSetManager (follow-on).
+      const response = await this.api.post('/api/photosets/query', {
+        startIndex: 0,
+        count: 500,
+        definition: { context: 'event', eventId }
+      });
       this.state.photos = response.photos || [];
       this.components.grid.render();
 

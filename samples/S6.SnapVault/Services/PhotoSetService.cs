@@ -32,6 +32,7 @@ public sealed class PhotoSetService
             SearchQuery = definition.SearchQuery,
             SearchAlpha = definition.SearchAlpha,
             CollectionId = definition.CollectionId,
+            EventId = definition.EventId,
             SortBy = definition.SortBy,
             SortOrder = definition.SortOrder,
             TotalCount = totalCount,
@@ -44,13 +45,13 @@ public sealed class PhotoSetService
 
     /// <summary>Materialize a specific range using the session's stored query definition.</summary>
     public Task<List<PhotoAsset>> ExecuteQuery(PhotoSetSession session, int startIndex, int count, CancellationToken ct = default)
-        => ExecuteQueryWithPagination(session.Context, session.CollectionId, session.SearchQuery,
+        => ExecuteQueryWithPagination(session.Context, session.CollectionId, session.EventId, session.SearchQuery,
             session.SearchAlpha ?? 0.5, session.SortBy, session.SortOrder, startIndex, count, ct);
 
     /// <summary>Materialize the FULL ordered set for a definition (no windowing) — used to locate a photo's index
     /// within a browsing context (#4). Reuses the same context routing/sort, so index and grid stay consistent.</summary>
     public Task<List<PhotoAsset>> MaterializeContext(PhotoSetDefinition def, CancellationToken ct = default)
-        => ExecuteQueryWithPagination(def.Context, def.CollectionId, def.SearchQuery,
+        => ExecuteQueryWithPagination(def.Context, def.CollectionId, def.EventId, def.SearchQuery,
             def.SearchAlpha ?? 0.5, def.SortBy, def.SortOrder, 0, int.MaxValue, ct);
 
     private async Task<int> ComputeTotalCount(PhotoSetDefinition definition, CancellationToken ct)
@@ -81,13 +82,19 @@ public sealed class PhotoSetService
                 var searchResults = await _processingService.SemanticSearch(definition.SearchQuery, null, definition.SearchAlpha ?? 0.5, int.MaxValue, ct);
                 return searchResults.Count;
 
+            case "event":
+                if (string.IsNullOrEmpty(definition.EventId))
+                    throw new ArgumentException("EventId required for event context");
+                var eventResult = await PhotoAsset.QueryWithCount(p => p.EventId == definition.EventId, QueryDefinition.All.WithPagination(1, 1), ct);
+                return (int)eventResult.TotalCount;
+
             default:
                 throw new ArgumentException($"Unknown context: {definition.Context}");
         }
     }
 
     private async Task<List<PhotoAsset>> ExecuteQueryWithPagination(
-        string context, string? collectionId, string? searchQuery, double searchAlpha,
+        string context, string? collectionId, string? eventId, string? searchQuery, double searchAlpha,
         string sortBy, string sortOrder, int skip, int take, CancellationToken ct)
     {
         switch (context)
@@ -103,6 +110,12 @@ public sealed class PhotoSetService
             case "favorites":
                 var favItems = (await PhotoAsset.Query(p => p.IsFavorite, ct)).ToList();
                 return ApplySorting(favItems, sortBy, sortOrder).Skip(skip).Take(take).ToList();
+
+            case "event":
+                if (string.IsNullOrEmpty(eventId))
+                    throw new ArgumentException("EventId required for event context");
+                var eventItems = (await PhotoAsset.Query(p => p.EventId == eventId, ct)).ToList();
+                return ApplySorting(eventItems, sortBy, sortOrder).Skip(skip).Take(take).ToList();
 
             case "collection":
                 if (string.IsNullOrEmpty(collectionId))

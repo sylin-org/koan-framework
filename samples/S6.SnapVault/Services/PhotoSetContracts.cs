@@ -10,11 +10,14 @@ namespace S6.SnapVault.Services;
 /// </summary>
 public sealed record PhotoSetDefinition
 {
-    /// <summary>all-photos · favorites · collection · search.</summary>
+    /// <summary>all-photos · favorites · collection · search · event.</summary>
     public string Context { get; init; } = "all-photos";
     public string? SearchQuery { get; init; }
     public double? SearchAlpha { get; init; }
     public string? CollectionId { get; init; }
+    /// <summary>The event id for the <c>event</c> context (#6 unified onto the windowed grid — infinite scroll,
+    /// access-scoped, so a guest's event browse is confined to their granted event for free).</summary>
+    public string? EventId { get; init; }
     public string SortBy { get; init; } = "capturedAt";     // capturedAt · createdAt · rating · fileName
     public string SortOrder { get; init; } = "desc";        // asc · desc
 }

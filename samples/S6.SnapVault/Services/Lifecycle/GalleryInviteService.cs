@@ -29,9 +29,13 @@ public sealed class GalleryInviteService
     private readonly InviteAcceptanceService _accept;
     public GalleryInviteService(InviteAcceptanceService accept) => _accept = accept;
 
-    /// <summary>Studio invites <paramref name="email"/> to <paramref name="eventId"/>'s gallery. Returns the accept token.</summary>
+    /// <summary>
+    /// Studio invites <paramref name="email"/> to <paramref name="eventId"/>'s gallery with a guest
+    /// <paramref name="role"/> ("proofer" = view + select + comment, the default proofing share; "viewer" = view
+    /// only). The role is carried on the <see cref="GalleryInvite"/> and mapped to the grant's permissions on accept.
+    /// </summary>
     public async Task<GalleryInviteTicket> InviteAsync(
-        string studioTenantId, string eventId, string email, string? invitedBy = null,
+        string studioTenantId, string eventId, string email, string role = "proofer", string? invitedBy = null,
         TimeSpan? lifetime = null, CancellationToken ct = default)
     {
         var invite = new Invite
@@ -50,12 +54,19 @@ public sealed class GalleryInviteService
             InviteId = invite.Id,
             EventId = eventId,
             StudioTenantId = studioTenantId,
+            GuestRole = role,
             InvitedBy = invitedBy,
         };
         await gi.Save(ct);
 
         return new GalleryInviteTicket(invite.Token, invite.Id, eventId);
     }
+
+    /// <summary>Map a guest role to the grant's permission set. "viewer" = view only; anything else = proofer.</summary>
+    private static List<string> PermissionsForRole(string? role) =>
+        string.Equals(role, "viewer", StringComparison.OrdinalIgnoreCase)
+            ? new List<string> { "view" }
+            : new List<string> { "view", "select", "comment" };
 
     /// <summary>
     /// The signed-in guest <paramref name="signedInGuestId"/> accepts the invite <paramref name="token"/>. On success
@@ -74,14 +85,15 @@ public sealed class GalleryInviteService
         var gi = await GalleryInvite.Get(GalleryInvite.KeyFor(invite.Id));
         if (gi is null) return new GalleryAcceptResult(result.Outcome, null);
 
-        // Deterministic (guest,event) grant id ⇒ a re-accept converges instead of duplicating a seat.
+        // Deterministic (guest,event) grant id ⇒ a re-accept converges instead of duplicating a seat. The grant's
+        // permissions are mapped from the invite's GuestRole (viewer vs proofer) — the guest-write floor enforces them.
         var grant = new GalleryGrant
         {
             Id = GalleryGrant.KeyFor(signedInGuestId, gi.EventId),
             IdentityId = signedInGuestId,
             EventId = gi.EventId,
             StudioTenantId = gi.StudioTenantId,
-            Permissions = new List<string> { "view", "select", "comment" },
+            Permissions = PermissionsForRole(gi.GuestRole),
         };
         await grant.Save(ct);
         return new GalleryAcceptResult(result.Outcome, grant);
