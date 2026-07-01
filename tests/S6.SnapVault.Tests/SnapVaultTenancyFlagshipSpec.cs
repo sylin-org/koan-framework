@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Data.Access;
 using Koan.Data.Core;
 using Koan.Data.Core.Axes;
 using Koan.Data.Core.Model;
@@ -69,6 +70,8 @@ public sealed class SnapVaultHostFixture : IAsyncLifetime
             ["Koan:Data:AI:MediaAnalysis:Enabled"] = "false",
             // Prove isolation is ENFORCED, not incidental: an unscoped tenant op must fail closed.
             ["Koan:Data:Tenancy:Posture"] = "Closed",
+            // Access scoping (SEC-0008) also fails closed by default — this shared host proves BOTH: tenant isolation
+            // here (studio reads run Subject.System(), the platform), and guest access scoping in the lifecycle spec.
             // Local storage for the staging-blob leg (UploadStaging binds Profile="cold").
             ["Koan:Storage:Providers:Local:BasePath"] = _storageRoot,
             ["Koan:Storage:DefaultProfile"] = "cold",
@@ -100,7 +103,14 @@ public sealed class SnapVaultHostFixture : IAsyncLifetime
     }
 }
 
-public sealed class SnapVaultTenancyFlagshipSpec : IClassFixture<SnapVaultHostFixture>
+/// <summary>The one shared SnapVault host — BOTH flagship specs run on it. A single AddKoan boot is mandatory: the
+/// framework caches per-process static state (e.g. EmbeddingMetadata) against the provider, so a second boot reads a
+/// disposed provider. A collection fixture shares one instance across the classes in the "snapvault" collection.</summary>
+[CollectionDefinition("snapvault")]
+public sealed class SnapVaultCollection : ICollectionFixture<SnapVaultHostFixture> { }
+
+[Collection("snapvault")]
+public sealed class SnapVaultTenancyFlagshipSpec
 {
     private const string StudioA = "studio-acme";
     private const string StudioB = "studio-globex";
@@ -136,6 +146,7 @@ public sealed class SnapVaultTenancyFlagshipSpec : IClassFixture<SnapVaultHostFi
 
         // Reads see only own rows; cross-studio get-by-id is a fail-closed null (IDOR rejected).
         using (Tenant.Use(StudioA))
+        using (Subject.System())   // the studio/platform reads with full access; the access axis narrows for GUESTS
         {
             (await PhotoAsset.All()).Select(p => p.Id).Should().BeEquivalentTo(new[] { pA.Id });
             (await Event.All()).Select(e => e.Id).Should().BeEquivalentTo(new[] { evA.Id });
@@ -146,6 +157,7 @@ public sealed class SnapVaultTenancyFlagshipSpec : IClassFixture<SnapVaultHostFi
             (await Collection.Get(colB.Id)).Should().BeNull();
         }
         using (Tenant.Use(StudioB))
+        using (Subject.System())
         {
             (await PhotoAsset.All()).Select(p => p.Id).Should().BeEquivalentTo(new[] { pB.Id });
             (await PhotoAsset.Get(pA.Id, CancellationToken.None)).Should().BeNull();
@@ -190,12 +202,16 @@ public sealed class SnapVaultTenancyFlagshipSpec : IClassFixture<SnapVaultHostFi
 
         // Studio A searches with GLOBEX's exact vector. Without isolation a KNN returns globex-1 (the nearest);
         // the __koan_tenant filter excludes it, so only acme-1 comes back — proving the filter, not distance, isolates.
+        // (The SEC-0008 access axis also reaches the vector search chokepoint via ReadScopeFold, so a studio/operator
+        // search runs under Subject.System(); a GUEST's semantic search would be event-scoped for free.)
         using (Tenant.Use(StudioA))
+        using (Subject.System())
         {
             var r = await Vector<PhotoAsset>.Search(new VectorQueryOptions(Query: globexPoint, TopK: 10));
             r.Matches.Select(m => m.Id).Should().Equal("acme-1");
         }
         using (Tenant.Use(StudioB))
+        using (Subject.System())
         {
             var r = await Vector<PhotoAsset>.Search(new VectorQueryOptions(Query: acmePoint, TopK: 10));
             r.Matches.Select(m => m.Id).Should().Equal("globex-1");

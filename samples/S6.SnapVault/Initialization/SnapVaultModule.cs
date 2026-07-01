@@ -8,6 +8,7 @@ using Koan.Core.Modules;
 using Koan.Core.Provenance;
 using Koan.ZenGarden;
 using S6.SnapVault.Configuration;
+using S6.SnapVault.Services;
 
 namespace S6.SnapVault.Initialization;
 
@@ -24,6 +25,14 @@ public sealed class SnapVaultModule : KoanModule
     {
         // Bind SnapVault:Collections -> CollectionOptions (was services.Configure<>(...) in the old Program.cs).
         services.AddKoanOptions<CollectionOptions>("SnapVault:Collections");
+
+        // Studio↔client lifecycle (SEC-0007 P5 dogfood): invite→accept→grant, the guest ambient-scope resolver,
+        // proofing, and "delete client & prove it". GalleryInviteService/SnapVaultDeprovisioningService ride the
+        // shipped InviteAcceptanceService/DeprovisioningService (registered by Koan.Identity.Tenancy).
+        services.AddSingleton<GalleryInviteService>();
+        services.AddSingleton<GuestScopeService>();
+        services.AddSingleton<ProofingService>();
+        services.AddSingleton<SnapVaultDeprovisioningService>();
 
         // NOTE: IPhotoProcessingService (consumed by PhotoProcessingJob.Execute) is intentionally NOT registered
         // yet — its implementation is port-source in _legacy/ and gets rebuilt in the jobs/domain steps (4-5).

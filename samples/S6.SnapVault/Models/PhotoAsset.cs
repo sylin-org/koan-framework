@@ -3,6 +3,7 @@ using Koan.Storage.Infrastructure;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.AI.Attributes;
 using Koan.Data.Core.Relationships;
+using Koan.Data.Access;
 
 namespace S6.SnapVault.Models;
 
@@ -16,6 +17,12 @@ namespace S6.SnapVault.Models;
     MaxTokens = 8191,
     Version = 2,
     Exclude = ["EventId", "InferredStyleId"])]
+// SEC-0008 data-layer access scoping: a CONSTRAINED subject (an invited guest) sees only photos whose EventId is in
+// their "event:<id>" scope tokens — fail-closed on an absent subject. Studio operators run Subject.Unconstrained,
+// ingest/AI jobs Subject.System(). Enforced on EVERY read (controller, service, job, SSE), not just the endpoint.
+// INVARIANT: EventId must be a delimiter-free, globally-unique id (a GUID) — it is BOTH the scoped field and (as
+// "event:<id>") the scope token; a slug/email would reintroduce cross-studio collisions and token-splits.
+[AccessScoped("EventId", "event:")]
 public class PhotoAsset : MediaEntity<PhotoAsset>
 {
     // Event relationship
