@@ -76,6 +76,32 @@ closed**.
 - Erase is **two-step + control-plane-only** in v1 (never a one-click destructive fleet action).
 - Prod posture **fails closed** on a missing operator grant.
 
+## Activation (the layered model)
+
+"How does the console appear?" is answered by a composable `TenancyConsoleOptions`
+(`Koan:Tenancy:Console`) that mirrors the tenant-resolution carriers — but holds the routing/authority
+line the carrier design established (a carrier *resolves*, membership *authorizes*): **request-shape governs
+exposure, never authority.** Resolution is strictly layered and fail-closed:
+`Enabled` → `Exposure` (404 if unmatched) → posture + `Grant` (403 if unadmitted) → `200`.
+
+- **Enable** — `Enabled` (kill-switch, default true; Reference = Intent mounts the module, this can physically
+  remove the surface). Mounting is auto (referencing the package); enablement is a boot-announced posture.
+- **Exposure (routing → 404-or-continue)** — `Exposure.Hosts` (host allow-list, empty = any) and
+  `Exposure.RequireHeader` (optional). Enforced by a `BeforeRouting` middleware
+  (`TenancyConsoleExposureMiddleware`) that 404s a console request failing the conditions — the surface is
+  "not here", distinct from the 403 for an unadmitted operator. These are forgeable signals, used only to
+  decide *whether/where* the console responds. (Path *relocation* — a configurable prefix — is a follow-on:
+  it needs coordinated route-convention + UI-relative-path changes; v1 pins `/tenancy` + `/api/tenancy/admin`
+  and composes host/header.)
+- **Grant (authority → 403-or-200, fail-closed, composed OR)** — `Grant.Operators` (break-glass identity
+  allow-list, keyed on email/`sub`/name — a host config grant, never a tenant membership) **or** `Grant.Role`
+  (a role claim, e.g. bound via `Koan.Identity`'s `IdentityRole`). Either admits; empty list + no role claim =
+  nobody. The allow-list bootstraps the first operator; `IdentityRole` runs the managed/revocable steady state.
+- **Posture** stays the dev-open/prod-closed baseline. `RequireLoopbackForOpenPosture` optionally restricts the
+  dev-open auto-admit to loopback, so a dev host on a public bind can't expose an ungated console.
+- **Self-announcing** — the boot report prints the resolved activation
+  (`/tenancy · posture=… · exposure=host=…[·header=…] · operators-configured=N`).
+
 ## Honest v1 boundaries (documented, not faked)
 
 - Surfaces with **no backing data** — measured-cost, noisy-neighbor, placement, relocate — are **omitted,
@@ -111,6 +137,19 @@ ordering. A claimed HIGH — that `TenantOperation` needed `IAmbientExempt` or t
 under an act-as ambient — was **re-derived as overstated**: `TenantScopeMetadata` treats `[HostScoped]` as an
 exemption equal to `IAmbientExempt`, so `[HostScoped]` alone suffices; proven by a real worker-dispatched
 erase submitted under an act-as tenant ambient (`Erase_job_dispatched_under_an_act_as_tenant_ambient_completes_via_the_worker`).
+
+The **Activation layer** got its own review→verify workflow (3 lenses), folded: **(HIGH — the important
+one)** the "no master backdoor" invariant was guarded only on the invite *write* path — but the real
+enforcement point is the tenant-resolution role *projection*: `TenantResolutionMiddleware.ProjectRoles`
+(`Koan.Identity.Tenancy`) copied **every** `Membership.Role` onto the request principal, so a membership
+carrying `koan:tenancy-operator` (via any non-invite write path) would pass the host gate. Fixed
+structurally at the chokepoint — `ProjectRoles` now strips reserved host roles (`IsReservedHostRole`), so a
+tenant membership can never project a host role, regardless of how it was written (closure over discipline).
+**(MEDIUM)** the boot-report posture was derived from `env.IsDevelopment()`, not the resolved posture the gate
+uses — it would lie under the sanctioned `Koan:Data:Tenancy:Posture=Closed`-in-dev override; now resolved via
+`TenancyPostureResolver`. **(LOW)** a blank `Hosts:[""]` entry 404'd every host while the report said
+`host=any`; the exposure middleware now ignores blank entries. Both HIGH lens findings that touched a
+security boundary were adversarially verified against the real code before folding.
 
 ## Consequences
 

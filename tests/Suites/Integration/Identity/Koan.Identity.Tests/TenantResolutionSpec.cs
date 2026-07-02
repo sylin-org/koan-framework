@@ -161,6 +161,31 @@ public sealed class TenantResolutionSpec
     }
 
     [Fact]
+    public async Task A_reserved_host_role_on_a_membership_is_never_projected()
+    {
+        await new TenantRecord { Id = "tr-backdoor", Name = "Backdoor", Code = "backdoor" }.Save();
+        // A membership that somehow carries the HOST operator role (e.g. a bad seed/import/direct save) alongside a
+        // legit tenant role — the projection must strip the host role (ARCH-0104 "no master backdoor").
+        await new Membership { TenantId = "tr-backdoor", IdentityId = "backdoor-user", Roles = { TenancyRoles.Operator, "koan:member" } }.Save();
+
+        bool operatorInside = true, memberInside = false;
+        var ctx = new DefaultHttpContext { RequestServices = _fx.Services };
+        SignedIn(ctx, "backdoor-user");
+        ctx.Request.Headers["X-Koan-Tenant"] = "backdoor";
+        var mw = new TenantResolutionMiddleware(c =>
+        {
+            operatorInside = c.User.IsInRole(TenancyRoles.Operator);
+            memberInside = c.User.IsInRole("koan:member");
+            return Task.CompletedTask;
+        });
+        await mw.InvokeAsync(ctx, _fx.Services.GetServices<ITenantResolver>(),
+            _fx.Services.GetRequiredService<IOptions<TenancyResolutionOptions>>());
+
+        operatorInside.Should().BeFalse("a tenant membership must NEVER project a HOST role onto the request principal");
+        memberInside.Should().BeTrue("legit tenant roles still project");
+    }
+
+    [Fact]
     public async Task A_non_member_gets_no_projected_roles()
     {
         await new TenantRecord { Id = "tr-noproj", Name = "NoProj", Code = "noproj" }.Save();

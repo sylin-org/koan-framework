@@ -222,10 +222,12 @@ public sealed class TenancyConsoleSpec
 
     // --- The posture-aware operator gate (fail-closed) — a focused unit over the handler ---
 
-    private static async Task<bool> Evaluate(TenancyPosture posture, ClaimsPrincipal user)
+    private static async Task<bool> Evaluate(TenancyPosture posture, ClaimsPrincipal user, TenancyConsoleOptions? opts = null, HttpContext? http = null)
     {
         var env = new StubEnv(posture == TenancyPosture.Open ? Environments.Development : Environments.Production);
-        var handler = new OperatorAuthorizationHandler(new TenancyRuntime(Options.Create(new TenancyOptions()), env));
+        var runtime = new TenancyRuntime(Options.Create(new TenancyOptions()), env);
+        var accessor = new HttpContextAccessor { HttpContext = http };
+        var handler = new OperatorAuthorizationHandler(runtime, Options.Create(opts ?? new TenancyConsoleOptions()), accessor);
         var requirement = new OperatorRequirement();
         var context = new AuthorizationHandlerContext(new[] { requirement }, user, resource: null);
         await handler.HandleAsync(context);
@@ -245,6 +247,82 @@ public sealed class TenancyConsoleSpec
     {
         var identity = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Role, TenancyRoles.Operator) }, authenticationType: "test");
         (await Evaluate(TenancyPosture.Closed, new ClaimsPrincipal(identity))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Operator_gate_admits_a_break_glass_allow_list_identity_in_prod()
+    {
+        var opts = new TenancyConsoleOptions { Grant = { Operators = new[] { "leo@sylin.org" } } };
+        var authed = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, "leo@sylin.org") }, "test"));
+        (await Evaluate(TenancyPosture.Closed, authed, opts)).Should().BeTrue();
+
+        // A different authenticated identity, not on the list and without the role, is still denied (fail-closed).
+        var other = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, "mallory@evil.com") }, "test"));
+        (await Evaluate(TenancyPosture.Closed, other, opts)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Operator_gate_open_bypass_can_be_restricted_to_loopback()
+    {
+        var opts = new TenancyConsoleOptions { RequireLoopbackForOpenPosture = true };
+        var anon = new ClaimsPrincipal(new ClaimsIdentity());
+
+        var remote = new DefaultHttpContext();
+        remote.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("203.0.113.7"); // public
+        (await Evaluate(TenancyPosture.Open, anon, opts, remote)).Should().BeFalse();
+
+        var local = new DefaultHttpContext();
+        local.Connection.RemoteIpAddress = System.Net.IPAddress.Loopback;
+        (await Evaluate(TenancyPosture.Open, anon, opts, local)).Should().BeTrue();
+    }
+
+    // --- The exposure layer (routing → 404), a focused unit over the middleware ---
+
+    private static async Task<(int Status, bool NextCalled)> RunExposure(string path, string host, TenancyConsoleOptions opts, string? sendHeader = null)
+    {
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Path = path;
+        ctx.Request.Host = new HostString(host);
+        if (sendHeader is not null) ctx.Request.Headers[sendHeader] = "1";
+        var nextCalled = false;
+        RequestDelegate next = _ => { nextCalled = true; return Task.CompletedTask; };
+        var mw = new Koan.Tenancy.Web.Hosting.TenancyConsoleExposureMiddleware(next);
+        await mw.InvokeAsync(ctx, Options.Create(opts));
+        return (ctx.Response.StatusCode, nextCalled);
+    }
+
+    [Fact]
+    public async Task Exposure_404s_a_console_request_from_a_disallowed_host()
+    {
+        var opts = new TenancyConsoleOptions { Exposure = { Hosts = new[] { "ops.acme.com" } } };
+        (await RunExposure("/tenancy", "evil.com", opts)).Should().Be((404, false));
+        (await RunExposure("/tenancy", "ops.acme.com", opts)).NextCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Exposure_404s_a_console_request_missing_the_required_header()
+    {
+        var opts = new TenancyConsoleOptions { Exposure = { RequireHeader = "X-Koan-Console" } };
+        (await RunExposure("/api/tenancy/admin/tenants", "any", opts)).Should().Be((404, false));
+        (await RunExposure("/api/tenancy/admin/tenants", "any", opts, sendHeader: "X-Koan-Console")).NextCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Exposure_404s_everything_when_the_kill_switch_is_off_but_passes_non_console_paths()
+    {
+        var disabled = new TenancyConsoleOptions { Enabled = false };
+        (await RunExposure("/tenancy", "any", disabled)).Should().Be((404, false));
+        // A non-console path is never guarded, even with a restrictive exposure.
+        var pinned = new TenancyConsoleOptions { Exposure = { Hosts = new[] { "ops.acme.com" } } };
+        (await RunExposure("/healthz", "evil.com", pinned)).NextCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Exposure_treats_a_blank_host_entry_as_any_host()
+    {
+        // A stray blank array slot must not silently 404 every host (report says "any"; middleware must agree).
+        var opts = new TenancyConsoleOptions { Exposure = { Hosts = new[] { "" } } };
+        (await RunExposure("/tenancy", "anything.example", opts)).NextCalled.Should().BeTrue();
     }
 
     private sealed class StubEnv : IHostEnvironment

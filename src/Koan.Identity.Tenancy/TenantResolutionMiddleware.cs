@@ -95,7 +95,11 @@ internal sealed class TenantResolutionMiddleware
     {
         var roles = memberships
             .SelectMany(m => m.Roles)
-            .Where(r => !string.IsNullOrWhiteSpace(r) && !principal.IsInRole(r))
+            // A tenant membership must NEVER project a HOST role onto the request principal — otherwise a
+            // membership carrying koan:tenancy-operator (via any write path) would confer fleet-operator authority
+            // through this projection (ARCH-0104 "no master backdoor"). Enforced structurally at the projection
+            // chokepoint, not per-membership-write-site (closure over discipline).
+            .Where(r => !string.IsNullOrWhiteSpace(r) && !TenancyRoles.IsReservedHostRole(r) && !principal.IsInRole(r))
             .Distinct(StringComparer.Ordinal)
             .ToList();
         if (roles.Count == 0) return null;
