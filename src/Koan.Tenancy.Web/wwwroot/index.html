@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Koan Tenancy — Operator Console</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Unmistakable scope indicator: only visible while acting-as a tenant (ARCH-0104 guardrail). -->
+  <div id="scope-banner" class="scope-banner" hidden>
+    <span>⚠ Acting as <strong id="scope-tenant"></strong> — every action is attributed to you and audited.</span>
+    <button id="scope-stop" type="button">Stop acting-as</button>
+  </div>
+
+  <header class="topbar">
+    <div class="brand">Koan Tenancy · <span class="muted">Operator Console</span></div>
+    <div class="meta">
+      <span id="posture" class="badge">…</span>
+      <span id="operator" class="muted"></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel fleet">
+      <div class="panel-head">
+        <h2>Fleet</h2>
+        <button id="new-tenant" class="primary" type="button">+ New tenant</button>
+      </div>
+      <table class="grid" id="fleet-table">
+        <thead>
+          <tr><th>Tenant</th><th>Code</th><th>Status</th><th class="num">Seats</th><th class="num">Pending</th></tr>
+        </thead>
+        <tbody id="fleet-body"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+      </table>
+    </section>
+
+    <section class="panel detail" id="detail" hidden>
+      <div class="panel-head">
+        <h2 id="detail-name">—</h2>
+        <button class="ghost" id="detail-close" type="button">✕</button>
+      </div>
+      <div class="detail-meta">
+        <span class="muted" id="detail-id"></span>
+        <span class="badge" id="detail-status"></span>
+      </div>
+
+      <div class="actions" id="detail-actions"></div>
+
+      <h3>Members</h3>
+      <table class="grid" id="members-table">
+        <thead><tr><th>Identity</th><th>Roles</th><th></th></tr></thead>
+        <tbody id="members-body"></tbody>
+      </table>
+
+      <h3>Invites</h3>
+      <table class="grid" id="invites-table">
+        <thead><tr><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+        <tbody id="invites-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <section class="panel feeds">
+    <div class="tabs">
+      <button class="tab active" data-tab="operations" type="button">Operations</button>
+      <button class="tab" data-tab="audit" type="button">Audit log</button>
+    </div>
+    <div id="tab-operations" class="tab-body">
+      <table class="grid">
+        <thead><tr><th>When</th><th>Tenant</th><th>Action</th><th>Status</th><th>Result</th><th>By</th></tr></thead>
+        <tbody id="operations-body"><tr><td colspan="6" class="muted">—</td></tr></tbody>
+      </table>
+    </div>
+    <div id="tab-audit" class="tab-body" hidden>
+      <table class="grid">
+        <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Tenant</th><th>Summary</th></tr></thead>
+        <tbody id="audit-body"><tr><td colspan="5" class="muted">—</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
