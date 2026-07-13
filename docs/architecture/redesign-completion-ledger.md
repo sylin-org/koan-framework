@@ -32,7 +32,7 @@ as discovery warrants.
 - **Method + boundaries** — [[koan-architect-working-style]] (verify empirically; re-derive agent/review
   findings against current source before coding) · [[no-stopgaps-full-implementation]] ·
   [[break-and-rebuild-preferred]] · [[koan-ergonomics-first-no-csharp-ceremony]] ·
-  **[[persona-separation-no-gposingway]]** (never the user-platform names). Commit on `dev`, **don't push**.
+  **[[persona-separation-private-downstream]]** (never private downstream names or identifying details). Commit on `dev`, **don't push**.
   Newtonsoft canonical. **Ultracode is on → author Workflows for substantive phases.**
 
 ## Method — per facet / capability

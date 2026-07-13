@@ -105,6 +105,11 @@
       href: reference/canon/index.md
     - name: Orchestration
       href: reference/orchestration/index.md
+- name: Initiatives
+  href: initiatives/README.md
+  items:
+    - name: Koan V1 Reorganization
+      href: initiatives/koan-v1/README.md
 - name: Architecture
   href: architecture/principles.md
   items:
