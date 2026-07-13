@@ -154,6 +154,8 @@
       href: ARCH-0074-framework-gap-analysis-and-incremental-plan.md
     - name: ARCH-0105 Koan product constitution and proposal decision test
       href: ARCH-0105-product-constitution.md
+    - name: ARCH-0106 Entity language admission, facets, and responsibility boundaries
+      href: ARCH-0106-entity-semantics-contract.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

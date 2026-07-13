@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-13
   status: reviewed
-  scope: R03 Entity semantics and ecosystem-boundary handoff
+  scope: R04 foundation-hardening decomposition handoff
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -18,45 +18,46 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Active work
 
-- Work item: [R03 — Define the Entity Semantics Contract](work-items/R03-entity-semantics-contract.md)
+- Work item: [R04 — Harden the framework foundation](work-items/R04-foundation-hardening.md)
 - State: `in-progress`
-- Objective: define which semantics belong on `Entity<T>`, how modules extend that language without
-  IntelliSense clutter, and which ecosystem ideas Koan should adopt, adapt, integrate, complement, or
-  decline.
+- Objective: convert R02 evidence gaps and R03 semantic deltas into dependency-ordered, independently
+  reviewable foundation cards, then execute the smallest P0 repair with proportionate proof.
 - Foundation: R01 passed through [ARCH-0105](../../decisions/ARCH-0105-product-constitution.md) and the
   canonical [product constitution](../../architecture/product-constitution.md).
-- Current state: R02 passed. All 13 surfaces are classified in
-  [`CAPABILITIES.md`](CAPABILITIES.md), with reproducible command and claim evidence in
-  [`R02-EVIDENCE.md`](R02-EVIDENCE.md). No surface is currently labeled supported.
+- Current state: R02 and R03 passed. All 13 surfaces are classified in
+  [`CAPABILITIES.md`](CAPABILITIES.md); [ARCH-0106](../../decisions/ARCH-0106-entity-semantics-contract.md)
+  and the canonical [Entity Semantics Contract](../../architecture/entity-semantics-contract.md)
+  now bound implementation choices. No surface is currently labeled supported.
 
 ## Next safe actions
 
-1. Inventory `Entity<T>`, partials, extension methods, attributes, contexts, and namespaces exactly as
-   a consuming developer or coding agent sees them.
-2. Group the current surface by intrinsic entity semantics, capability facets, infrastructure control
-   planes, and application workflows; record collisions and misleading placements.
-3. Mine current ABP primary documentation/source first, then only the closest .NET/Rails approaches
-   that can change a concrete Koan decision.
-4. Draft an Entity admission test, namespace/overload rules, context and backend-selection rules, and
-   a disposition matrix: adopt, adapt, integrate, complement, or decline.
-5. Prove the draft with one anonymous business domain and one deliberate counterexample kept off Entity.
+1. Create a ranked R04 backlog whose cards state user-visible failure, personas, evidence, owner,
+   smallest meaningful fix, failure behavior, tests, compatibility, and rollback.
+2. Put package coherence, false-success behavior, disposed-host/static lifetime, and bounded bootstrap
+   execution ahead of vocabulary/facet migration.
+3. Separate cards that change public API/compatibility from cards that establish clean-room tests and
+   machine-readable explanation foundations.
+4. Run the `explore` skill before the first production-code card and stop at its implementation approval
+   checkpoint if required.
+5. Begin only a bounded P0 card whose proof can land independently without assuming later refactors.
 
 ## Expected working tree
 
-R02 closure adds capability/evidence records and corrects materially unsafe front-door claims. Treat
-every other pre-existing change as user-owned.
+R03 closure adds architecture/research/initiative documentation only. Treat every other pre-existing
+change as user-owned.
 
 ## Verification at handoff
 
-- every current Entity extension category maps to a proposed contract or remediation item;
-- ecosystem conclusions cite current primary sources and change a named Koan decision;
-- representative consumer/IntelliSense probes cover ambiguity and discoverability;
+- every R04 card is bounded, dependency-ordered, and traces to R02/R03 evidence;
+- the first production card uses the mandatory exploration workflow before edits;
+- runtime and consumer tests cover the stated failure and important negative paths;
 - documentation metadata, links, TOC, privacy scan, and `git diff --check` pass;
 - no private downstream detail enters evidence or examples.
 
 ## Do not infer
 
-- Do not copy ABP, Rails, EF Core, Aspire, or agent frameworks for feature parity.
-- Do not put infrastructure control planes on Entity merely to maximize IntelliSense discoverability.
-- Do not infer semantic correctness from an existing extension method or partial class.
-- Do not implement R04 runtime repairs while R03's semantic contract is still open.
+- Do not combine package, host-lifetime, bootstrap, explanation, and Entity-facet changes into one
+  foundation rewrite.
+- Do not migrate public Entity vocabulary before false-success and host-lifetime hazards are bounded.
+- Do not use a passing source build to claim package installation is fixed.
+- Do not promote maturity until external clean-room and failure evidence earns it.

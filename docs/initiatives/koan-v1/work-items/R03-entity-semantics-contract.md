@@ -15,7 +15,7 @@ validation:
 # R03 — Define the Entity Semantics Contract
 
 - Tranche: `T3 — semantic spine and ecosystem boundaries`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R02
 - Unlocks: R04
 - Owner: maintainer
@@ -100,3 +100,23 @@ counterexample showing a capability deliberately kept elsewhere.
 
 - Stop if capability evidence contradicts the assumed Entity model; update the constitution explicitly.
 - Stop ecosystem research when it no longer changes a concrete Koan decision.
+
+## Acceptance result
+
+- Outcome: PASS
+- Date and commit: 2026-07-13; inventory snapshot
+  `e325ff5899528a776893fe5aae11b4b9f6f58df4`; acceptance recorded in this closure change.
+- Evidence: canonical [`Entity Semantics Contract`](../../../architecture/entity-semantics-contract.md),
+  accepted [ARCH-0106](../../../decisions/ARCH-0106-entity-semantics-contract.md), current
+  [`Entity` language inventory](../R03-ENTITY-INVENTORY.md), and primary-source
+  [ecosystem dispositions](../R03-ECOSYSTEM.md).
+- Tests / validation: a disposable .NET 10/C# 14 file-based compile probe proved constrained static
+  and instance extension members on an Entity subtype (`Todo.Semantic` and an instance verb), then was
+  removed. R02's 283/283 Data.Core result remains the runtime baseline; R03 changes no runtime code.
+- Unsupported scenarios: the current v0.17 API does not yet implement the contract. Module facets,
+  host-owned registries, event timing, broad-receiver cleanup, cost negotiation, and migration probes
+  are R04 work, not inferred support.
+- Follow-up work: R04 must rank and execute false-success/lifetime repairs before facet and vocabulary
+  migration; R05 proves the resulting language in a clean anonymous application journey.
+- Reviewer: maintainer authorized full initiative execution; ARCH-0106 records the conservative
+  contract and ecosystem dispositions for repository review.

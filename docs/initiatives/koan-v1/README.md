@@ -36,6 +36,11 @@ Use [`ROADMAP.md`](ROADMAP.md) for dependency order and tranche exit criteria. U
 [`CAPABILITIES.md`](CAPABILITIES.md) for public capability maturity. Neither duplicates live
 work-item status.
 
+Completed tranche evidence remains restartable: [`R02-EVIDENCE.md`](R02-EVIDENCE.md) records the
+capability baseline; [`R03-ENTITY-INVENTORY.md`](R03-ENTITY-INVENTORY.md) and
+[`R03-ECOSYSTEM.md`](R03-ECOSYSTEM.md) support the canonical
+[Entity Semantics Contract](../../architecture/entity-semantics-contract.md).
+
 ## Sources of truth
 
 | Question | Authoritative artifact |
@@ -47,6 +52,7 @@ work-item status.
 | What exactly does a work item require? | its `work-items/Rxx-*.md` card |
 | What makes work acceptable? | `ACCEPTANCE.md` |
 | How mature is a public capability? | `CAPABILITIES.md` |
+| What belongs in the Entity language? | `docs/architecture/entity-semantics-contract.md` |
 | What does Koan actually ship? | source, tests, current reference docs |
 
 When artifacts disagree, shipped evidence wins. Record the contradiction in the Progress

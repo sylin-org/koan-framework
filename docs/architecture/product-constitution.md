@@ -151,5 +151,6 @@ Package names, provider lists, serializer choices, exact startup formatting, the
 source-generation mechanics, current samples, and individual module APIs are important but tactical.
 They may change without changing Koan's identity if the principles above remain true.
 
-See [framework principles](principles.md) for current implementation patterns and
+See the [Entity Semantics Contract](entity-semantics-contract.md) for the admission and responsibility
+rules, [framework principles](principles.md) for current implementation patterns, and
 [ARCH-0105](../decisions/ARCH-0105-product-constitution.md) for the ratification decision.

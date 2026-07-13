@@ -15,7 +15,7 @@ validation:
 # R04 — Harden the framework foundation
 
 - Tranche: `T4 — foundation hardening`
-- Status: `pending`
+- Status: `in-progress`
 - Depends on: R03
 - Unlocks: R05
 - Owner: maintainer

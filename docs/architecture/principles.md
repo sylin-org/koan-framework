@@ -14,16 +14,20 @@ validation:
 
 # Koan Framework Architecture Principles
 
-The [product constitution](product-constitution.md) defines Koan's durable product rules. This page
-describes current implementation principles and representative APIs. Source and tests remain the
-authority for shipped behavior; the capability evidence ledger determines support maturity.
+The [product constitution](product-constitution.md) defines Koan's durable product rules, and the
+[Entity Semantics Contract](entity-semantics-contract.md) governs how modules grow its first-class
+application language. This page describes current implementation principles and representative APIs.
+Source and tests remain the authority for shipped behavior; the capability evidence ledger determines
+support maturity.
 
 ## Core philosophy
 
 ### Entity-first development
 
-Entities own their persistence and their surfaces. No repositories, no DbContext, no service
-layer for CRUD.
+Entities own their common-path persistence and genuinely entity-centered surfaces. No repository,
+`DbContext`, or service layer is required for CRUD. Repositories remain an advanced escape hatch, and
+multi-entity/external-system workflows remain plain business-named workflows rather than unrelated
+Entity extensions.
 
 ```csharp
 public sealed class Todo : Entity<Todo>
@@ -40,8 +44,9 @@ await todo.Remove();
 
 The same entity can be the subject across multiple pillars: REST (`EntityController<T>`), caching
 (`[Cacheable]`), jobs (`IKoanJob<T>`), embeddings (`[Embedding]`), agent tools (`[McpEntity]`).
-One grammar, many capabilities — this is the framework's center of gravity, and its front-door
-facades are deliberately protected from churn.
+One grammar, many capabilities — this is the framework's center of gravity. New module vocabulary
+must pass the Entity admission test; type-wide capability grows through small module-contributed
+facets rather than permanent Data.Core placeholders.
 
 ### Reference = Intent
 
@@ -188,6 +193,7 @@ team (and its coding agents) ships sophisticated systems without scaffolding tim
 ---
 
 **References**: [Product constitution](product-constitution.md) ·
+[Entity Semantics Contract](entity-semantics-contract.md) ·
 [ADR index](../decisions/index.md) ·
 [Framework assessment & maturity model](../assessment/00-overview.md) ·
 [Getting started](../getting-started/overview.md) ·

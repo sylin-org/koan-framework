@@ -50,11 +50,12 @@ Storage, variant routing, transform pipeline, and the recipe-based rendering sur
 |----|-------|--------|
 | ARCH-0062 | S8 legacy snapshot removal and sample streamline | Removed obsolete duplicate S8 snapshot; clarified single active sample path. |
 
-## Product Constitution
+## Product Constitution and Entity Language
 
 | ID | Title | Status | Scope |
 |----|-------|--------|-------|
 | ARCH-0105 | [Koan product constitution and proposal decision test](ARCH-0105-product-constitution.md) | Accepted | Durable product principles, meaningful-step definition, evidence boundary, and proposal decision test |
+| ARCH-0106 | [Entity language admission, facets, and responsibility boundaries](ARCH-0106-entity-semantics-contract.md) | Accepted | Entity admission test, C# 14 module facets, context/lifecycle boundaries, and migration rules |
 
 ## Authoring Principles
 

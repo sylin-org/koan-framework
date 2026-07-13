@@ -115,6 +115,8 @@
   items:
     - name: Product Constitution
       href: architecture/product-constitution.md
+    - name: Entity Semantics Contract
+      href: architecture/entity-semantics-contract.md
     - name: Framework Principles
       href: architecture/principles.md
     - name: Pagination Refactor Plan

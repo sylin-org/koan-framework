@@ -180,7 +180,7 @@ need them; activation is deterministically ordered and reported.
 | **First 15 minutes** | [Getting started](docs/getting-started/overview.md) — the golden path, concept by concept |
 | **Run real apps** | [samples/](samples/README.md) — the ladder: S0 console → S1 CRUD → S10 multi-provider → S14 jobs/benchmarks, then the dogfood flagships |
 | **Do a task** | [Guides](docs/guides/README.md) — APIs, data modeling, auth, AI, media, jobs |
-| **Understand why** | [Product constitution](docs/architecture/product-constitution.md) · [Architecture principles](docs/architecture/principles.md) · [ADRs](docs/decisions/index.md) |
+| **Understand why** | [Product constitution](docs/architecture/product-constitution.md) · [Entity Semantics Contract](docs/architecture/entity-semantics-contract.md) · [Architecture principles](docs/architecture/principles.md) · [ADRs](docs/decisions/index.md) |
 | **Check what's solid** | [Framework assessment & maturity model](docs/assessment/00-overview.md) |
 | **When stuck** | [Troubleshooting](docs/support/troubleshooting.md) |
 | **Coding agents** | [llms.txt](llms.txt) — the framework in one file: three beats, the 8 concepts, anti-patterns, the canonical way |
