@@ -9,9 +9,9 @@ nav: true
 
 # Getting started with Koan
 
-This is the golden path: zero to a working, explained application, one concept at a time.
-Every code block on this page compiles against the current source — if one doesn't, that is a
-bug; please report it.
+This is the intended golden path: zero to a working, explained application, one concept at a time.
+Source and executable checks are authoritative; the V1 capability baseline is re-verifying this path
+from clean checkout.
 
 > **Pre-1.0 note**: until 1.0, the recommended path is **building from source** (Path A below).
 > Published NuGet packages use the `Sylin.Koan.*` prefix and may lag the repo.
@@ -213,7 +213,8 @@ public sealed class Todo : Entity<Todo> { /* exposed to agents over MCP (HTTP/SS
 - **Guides**: [building APIs](../guides/building-apis.md) ·
   [data modeling](../guides/data-modeling.md) · [AI integration](../guides/ai-integration.md) ·
   [auth setup](../guides/authentication-setup.md) · [jobs](../guides/jobs-howto.md).
-- **Why it's built this way**: [architecture principles](../architecture/principles.md) ·
+- **Why it's built this way**: [product constitution](../architecture/product-constitution.md) ·
+  [architecture principles](../architecture/principles.md) ·
   [ADR index](../decisions/index.md).
 - **What's settled vs experimental**: [the framework's own assessment](../assessment/00-overview.md).
 - **The vocabulary**: [glossary](../reference/glossary.md) — every term defined and pinned to

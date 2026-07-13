@@ -4,13 +4,19 @@ domain: framework
 title: "Koan Framework Architecture Principles"
 audience: [architects, developers, ai-agents]
 status: current
+last_updated: 2026-07-13
+framework_version: v0.17.0
+validation:
+  date_last_tested: 2026-07-13
+  status: reviewed
+  scope: alignment with product constitution and current bootstrap implementation
 ---
 
 # Koan Framework Architecture Principles
 
-The canon: what Koan believes, why, and where each belief is enforced in code. Every code block
-on this page reflects the current source. Principles marked **(consolidation era)** were adopted
-during the post-feasibility hardening and take precedence where older material conflicts.
+The [product constitution](product-constitution.md) defines Koan's durable product rules. This page
+describes current implementation principles and representative APIs. Source and tests remain the
+authority for shipped behavior; the capability evidence ledger determines support maturity.
 
 ## Core philosophy
 
@@ -32,7 +38,7 @@ await new Todo { Title = "Ship" }.Save();
 await todo.Remove();
 ```
 
-The same entity is the unit of *every* pillar: REST (`EntityController<T>`), caching
+The same entity can be the subject across multiple pillars: REST (`EntityController<T>`), caching
 (`[Cacheable]`), jobs (`IKoanJob<T>`), embeddings (`[Embedding]`), agent tools (`[McpEntity]`).
 One grammar, many capabilities — this is the framework's center of gravity, and its front-door
 facades are deliberately protected from churn.
@@ -49,9 +55,10 @@ var app = builder.Build();
 app.Run();
 ```
 
-Discovery is **not** runtime reflection magic: a Roslyn source generator emits a per-assembly
-registry at build time (`KoanRegistry`), loaded via module initializers with deterministic
-topological ordering (`[Before]`/`[After]`). It is AOT-friendly and inspectable.
+The primary discovery path uses a Roslyn-generated per-assembly registry (`KoanRegistry`) and
+deterministic topological ordering (`[Before]`/`[After]`). Embedded intent manifests, runtime manifest
+loading, assembly-closure loading, and loose-module fallback preserve participation across deployment
+shapes. These mechanisms are tactical; predictable activation and explanation are the contract.
 
 ### Capability-graded provider transparency **(consolidation era — ARCH-0084)**
 
@@ -74,15 +81,15 @@ cannot give.
 An operation the provider cannot honor is a **hard, descriptive error**, never silent narrowing.
 A filter that cannot be pushed down to a vector store throws; an unsupported capability throws
 `CapabilityNotSupportedException`; resolution failures name the exact configuration keys to fix.
-(Known gap being closed: boot-time module failures historically logged nothing — the boot path
-is being aligned with this principle; see the assessment, Track F.)
+Explicit degraded boot may continue after a failure, but the failed module and missing guarantees remain
+visible. The capability baseline will identify paths that do not yet meet this rule.
 
 ### Self-reporting infrastructure
 
-The application explains itself. At startup, the boot report names every discovered module, the
-adapter elections, and the boot phases; health contributors aggregate readiness; capability sets
-and well-known endpoints describe the running service; `[McpEntity]` extends the same
-self-description to agents.
+The application should explain itself. Current startup reporting includes registry, module, phase,
+health, and composition facts; several collection paths are intentionally best-effort or become known
+after startup. Capability sets and well-known endpoints add runtime inspection, and `[McpEntity]`
+projects applicable domain surfaces to agents. R02 determines the verified coverage of each claim.
 
 ```csharp
 KoanEnv.DumpSnapshot(logger);   // environment snapshot on demand
@@ -180,7 +187,8 @@ team (and its coding agents) ships sophisticated systems without scaffolding tim
 
 ---
 
-**References**: [ADR index](../decisions/index.md) ·
+**References**: [Product constitution](product-constitution.md) ·
+[ADR index](../decisions/index.md) ·
 [Framework assessment & maturity model](../assessment/00-overview.md) ·
 [Getting started](../getting-started/overview.md) ·
 [Framework utilities catalog](../guides/framework-utilities.md)

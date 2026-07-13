@@ -15,7 +15,7 @@ validation:
 # R01 — Ratify the product constitution
 
 - Tranche: `T1 — product constitution`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R00
 - Unlocks: R02
 - Owner: maintainer
@@ -97,3 +97,25 @@ external-framework comparisons cannot be classified as core, extension, experime
 
 - Stop if R00 has not reached a safe disposition.
 - Stop if a principle requires unsupported capability claims to sound coherent.
+
+## Proposal decision probes
+
+| Proposal | Result | Constitutional reason |
+|---|---|---|
+| Add a machine-readable composition fact model shared by startup, health, tests, and agents | Continue | It makes framework-owned complexity inspectable through one fact model. |
+| Add a scaffolding generator so applications begin with framework layers and placeholders | Reject | Generated preparation is not a meaningful business step; agent guidance and conventions should produce business code directly. |
+| Add a global provider-backup operation as an `Entity<T>` extension for discoverability | Redirect | Backup is provider/application operations, not an intrinsic entity semantic; expose it through an explicit operational surface. |
+
+## Acceptance result
+
+- Outcome: PASS
+- Date and commit: 2026-07-13; recorded by the R01 closure commit
+- Evidence: canonical `docs/architecture/product-constitution.md`; accepted ARCH-0105; current
+  `AddKoan`, registry, runtime fallback, composition, startup-report, Entity, and prior assessment
+  evidence reviewed.
+- Tests / validation: documentation lint reported zero errors across architecture, decisions, and
+  getting-started; TOC parsed independently; links and `git diff --check` passed.
+- Unsupported scenarios: this decision does not assert that current modules comply or upgrade any
+  capability maturity.
+- Follow-up work: R02 capability evidence baseline; R03 Entity Semantics Contract.
+- Reviewer: operator-authorized initiative direction

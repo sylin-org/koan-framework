@@ -10,15 +10,15 @@
       href: STACK-0001-sylin-stack-canon.md
 - name: ADR Series
   items:
-  - name: ADR-0050 Data access semantics - streaming and paging APIs
+    - name: ADR-0050 Data access semantics - streaming and paging APIs
       href: ADR-0050-data-access-pagination-and-streaming.md
-  - name: ADR-0051 Vector hybrid search integration
+    - name: ADR-0051 Vector hybrid search integration
       href: ADR-0051-vector-hybrid-search.md
-  - name: ADR-0052 Adaptive sliding window vector pagination
+    - name: ADR-0052 Adaptive sliding window vector pagination
       href: ADR-0052-adaptive-sliding-window-vector-pagination.md
-  - name: ADR-0053 Vector search native continuation with adapter push-down
+    - name: ADR-0053 Vector search native continuation with adapter push-down
       href: ADR-0053-vector-search-native-continuation.md
-  - name: ADR-0054 Entity-backed search profile management (superseded)
+    - name: ADR-0054 Entity-backed search profile management (superseded)
       href: ADR-0054-entity-backed-search-profile-management.md
     - name: ADR-0055 Tag-centric semantic search rebuild
       href: ADR-0055-tag-centric-semantic-search.md
@@ -152,6 +152,8 @@
       href: ARCH-0073-code-modernization-sweep.md
     - name: ARCH-0074 Framework gap analysis and incremental plan
       href: ARCH-0074-framework-gap-analysis-and-incremental-plan.md
+    - name: ARCH-0105 Koan product constitution and proposal decision test
+      href: ARCH-0105-product-constitution.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

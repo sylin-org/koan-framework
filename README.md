@@ -11,12 +11,14 @@ Koan is a .NET 10 meta-framework for **agentic, data-driven web applications** �
 your code is written with coding agents. One grammar — `Entity<T>` — covers CRUD, REST, vector
 search, background jobs, caching, embeddings, and agent (MCP) tools.
 
+The [product constitution](docs/architecture/product-constitution.md) defines what that promise means:
+V0 to V1 in meaningful, small steps, business-readable application code, and infrastructure complexity
+that remains inspectable.
+
 > **Status: pre-1.0, consolidation phase** (version via [NBGV](version.json), currently 0.17.x).
-> The core — entity/data pillar, web, cache, jobs, vector — is settled and integration-tested;
-> several outer pillars are experimental and being consolidated or cut. We audit ourselves:
-> see the [framework assessment](docs/assessment/00-overview.md) and the per-pillar
-> [maturity model](docs/assessment/03-maturity-model.md) for exactly what is settled and what
-> isn't. **Until 1.0, build from source** — published packages (`Sylin.Koan.*` on NuGet) lag the
+> Capability maturity is being re-baselined from current code and executable evidence by the
+> [Koan V1 initiative](docs/initiatives/koan-v1/README.md); do not infer support from package or sample
+> existence. **Until 1.0, build from source** — published packages (`Sylin.Koan.*` on NuGet) lag the
 > repo.
 
 ---
@@ -134,10 +136,10 @@ if (Data<Todo, string>.Capabilities.Has(DataCaps.Query.Linq))
 ### 3 · The app explains itself
 
 Beyond the boot report: capability sets are queryable at runtime, well-known endpoints describe
-the running service, health contributors aggregate readiness, and `[McpEntity]` exposes your
-domain to agents through the same endpoint service the REST controllers use. The framework's
-discovery isn't reflection magic at runtime — it's a **Roslyn source-generated registry**
-compiled into your assemblies: deterministic, ordered, AOT-friendly.
+the running service, health contributors aggregate readiness, and `[McpEntity]` exposes applicable
+domain surfaces to agents through the same endpoint service the REST controllers use. Discovery is
+**source-generated first**, with embedded-manifest and runtime fallbacks for deployment shapes that
+need them; activation is deterministically ordered and reported.
 
 > **See all three beats run for real** — [the wedge demo](docs/case-studies/agent-wedge-demo/README.md): a
 > live, captured transcript building a multi-provider AI app from one entity to an agent-operable MCP
@@ -176,7 +178,7 @@ compiled into your assemblies: deterministic, ordered, AOT-friendly.
 | **First 15 minutes** | [Getting started](docs/getting-started/overview.md) — the golden path, concept by concept |
 | **Run real apps** | [samples/](samples/README.md) — the ladder: S0 console → S1 CRUD → S10 multi-provider → S14 jobs/benchmarks, then the dogfood flagships |
 | **Do a task** | [Guides](docs/guides/README.md) — APIs, data modeling, auth, AI, media, jobs |
-| **Understand why** | [Architecture principles](docs/architecture/principles.md) · [ADRs](docs/decisions/index.md) |
+| **Understand why** | [Product constitution](docs/architecture/product-constitution.md) · [Architecture principles](docs/architecture/principles.md) · [ADRs](docs/decisions/index.md) |
 | **Check what's solid** | [Framework assessment & maturity model](docs/assessment/00-overview.md) |
 | **When stuck** | [Troubleshooting](docs/support/troubleshooting.md) |
 | **Coding agents** | [llms.txt](llms.txt) — the framework in one file: three beats, the 8 concepts, anti-patterns, the canonical way |

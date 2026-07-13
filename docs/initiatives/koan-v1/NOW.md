@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-13
   status: reviewed
-  scope: R01 product-constitution handoff
+  scope: R02 capability-baseline handoff
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -18,39 +18,39 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Active work
 
-- Work item: [R01 — Ratify the product constitution](work-items/R01-product-constitution.md)
+- Work item: [R02 — Build the capability truth baseline](work-items/R02-capability-baseline.md)
 - State: `in-progress`
-- Objective: give maintainers and coding agents a concise, evidence-aware constitution for deciding
-  what belongs in Koan and what does not.
-- Foundation: R00 passed with all live published branch tips clean and an explicit acceptance of
-  retained historical residue.
-- Draft input: [`CHARTER.md`](CHARTER.md) expresses the intended product reality but is not yet
-  canonical architecture.
+- Objective: distinguish what Koan specifies, demonstrates, verifies, supports, deprecates, and does
+  not support using current repository evidence.
+- Foundation: R01 passed through [ARCH-0105](../../decisions/ARCH-0105-product-constitution.md) and the
+  canonical [product constitution](../../architecture/product-constitution.md).
+- Current state: every row in [`CAPABILITIES.md`](CAPABILITIES.md) remains intentionally unassessed.
 
 ## Next safe actions
 
-1. Read the R01 card, charter, current architecture principles, public README, getting-started overview,
-   and the code-backed composition entry points.
-2. Classify each candidate principle as constitutional, directional, tactical, obsolete, or overstated.
-3. Define observable decision tests for meaningful steps, business-code density, Entity-centered
-   semantics, inspectability, and ecosystem ownership.
-4. Draft the smallest canonical constitution and identify superseded or conflicting prose.
-5. Apply the R01 acceptance additions before changing public positioning.
+1. Freeze the assessed commit and inventory application-facing capability entry points.
+2. Assess bootstrap/composition, Entity/data, and backend negotiation first because later surfaces
+   depend on them.
+3. For each surface, link code, tests, maintained samples, startup/error behavior, support limits, and
+   compatibility expectation.
+4. Assign the lowest maturity label fully supported by evidence.
+5. Correct only materially unsafe front-door claims during assessment; rank other gaps for R04.
 
 ## Expected working tree
 
-R00 closure updates initiative artifacts only. Treat every other pre-existing change as user-owned.
+R01 closure may add the constitution and ADR, align public architecture prose, and update initiative
+artifacts. Treat every other pre-existing change as user-owned.
 
 ## Verification at handoff
 
-- R01 claims cite current code or remain explicitly directional;
-- canonical architecture and public overview do not conflict;
+- every assessed label is reproducible from linked repository artifacts;
+- unsupported and untested scenarios are explicit;
 - documentation metadata, links, TOC, and `git diff --check` pass;
 - no private downstream detail enters evidence or examples.
 
 ## Do not infer
 
-- Do not reopen the accepted history disposition without evidence of actual privacy harm.
-- Do not promote the draft charter into a support claim.
+- Do not promote a capability to match README language or roadmap preference.
+- Do not treat a sample, project, or private deployment as a compatibility guarantee.
 - Do not infer that private downstream success is repository evidence.
-- Do not begin runtime changes until the capability baseline and Entity contract establish their need.
+- Do not fix runtime gaps inside R02; record and rank them.

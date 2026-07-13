@@ -111,8 +111,10 @@
     - name: Koan V1 Reorganization
       href: initiatives/koan-v1/README.md
 - name: Architecture
-  href: architecture/principles.md
+  href: architecture/product-constitution.md
   items:
+    - name: Product Constitution
+      href: architecture/product-constitution.md
     - name: Framework Principles
       href: architecture/principles.md
     - name: Pagination Refactor Plan

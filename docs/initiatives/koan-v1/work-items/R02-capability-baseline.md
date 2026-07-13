@@ -15,7 +15,7 @@ validation:
 # R02 — Build the capability truth baseline
 
 - Tranche: `T2 — capability truth baseline`
-- Status: `pending`
+- Status: `in-progress`
 - Depends on: R01
 - Unlocks: R03
 - Owner: maintainer

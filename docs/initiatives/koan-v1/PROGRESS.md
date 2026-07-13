@@ -20,10 +20,9 @@ or completes a work item. The roadmap describes order; it does not report progre
 ## Initiative state
 
 - Overall: `active`
-- Current tranche: `T1 — product constitution`
-- Active work item: `R01`
-- Next decision: ratify which product principles are constitutional, directional, tactical, or
-  overstated
+- Current tranche: `T2 — capability truth baseline`
+- Active work item: `R02`
+- Next decision: assign the lowest evidence-backed maturity to each initial capability surface
 - V1 readiness: `not assessed`
 
 ## Work items
@@ -31,8 +30,8 @@ or completes a work item. The roadmap describes order; it does not report progre
 | ID | Work item | Tranche | Status | Depends on | Claim | Evidence / note |
 |---|---|---|---|---|---|---|
 | R00 | [Establish the privacy boundary](work-items/R00-privacy-boundary.md) | T0 | passed | — | Codex · 2026-07-13 | Published branch tips are clean; operator accepted retained historical residue and declined a disruptive rewrite. |
-| R01 | [Ratify the product constitution](work-items/R01-product-constitution.md) | T1 | in-progress | R00 | Codex · 2026-07-13 | Draft charter exists; reconcile it with code-backed architecture and public positioning. |
-| R02 | [Build the capability truth baseline](work-items/R02-capability-baseline.md) | T2 | pending | R01 | — | Assessment queue initialized in `CAPABILITIES.md`. |
+| R01 | [Ratify the product constitution](work-items/R01-product-constitution.md) | T1 | passed | R00 | Codex · 2026-07-13 | ARCH-0105 and the canonical product constitution separate durable rules, tactical mechanisms, and maturity claims. |
+| R02 | [Build the capability truth baseline](work-items/R02-capability-baseline.md) | T2 | in-progress | R01 | Codex · 2026-07-13 | Assess current code, tests, samples, packaging, failures, and unsupported scenarios by user-visible surface. |
 | R03 | [Define the Entity Semantics Contract](work-items/R03-entity-semantics-contract.md) | T3 | pending | R02 | — | Requires capability evidence and ecosystem comparison. |
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | pending | R03 | — | Backlog must be evidence-ranked before implementation. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | pending | R04 | — | Anonymous business domain only. |
@@ -45,8 +44,8 @@ item should normally be `in-progress`.
 | Work item | Ready? | Gate |
 |---|---|---|
 | R00 | passed | Forward-only sanitization and residual-risk acceptance recorded on 2026-07-13. |
-| R01 | yes | R00 passed; charter, principles, code, and public overview are available. |
-| R02 | no | The product constitution must be canonical enough to classify evidence. |
+| R01 | passed | ARCH-0105 accepted; canonical constitution and public alignment are complete. |
+| R02 | yes | The constitution and maturity vocabulary now provide the classification frame. |
 | R03 | no | Capability baseline and focused ecosystem research must exist. |
 | R04 | no | Entity and module boundaries must be decided. |
 | R05 | no | The foundation path must be stable enough to measure honestly. |
