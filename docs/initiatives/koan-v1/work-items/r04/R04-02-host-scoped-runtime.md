@@ -17,9 +17,9 @@ framework_version: v0.17.0
 
 ## User-visible failure
 
-Repeated integration hosts and some static Entity paths can retain a disposed service provider. The
-current Data/AI lifecycle test fails with `ObjectDisposedException: IServiceProvider`; static lifecycle
-registries and relationship metadata have the same risk shape.
+Before R04-02, repeated integration hosts and some static Entity paths could retain a disposed service
+provider. The original Data/AI lifecycle process failed with `ObjectDisposedException: IServiceProvider`;
+static lifecycle registries and relationship metadata retain the same risk shape until audited.
 
 ## Personas
 
@@ -46,9 +46,26 @@ cannot trust lifecycle isolation in workers or reload scenarios.
   storage isolation.
 - The repaired Data.AI suite passes 80/80 as one process; the complete Core suite passes 195/195.
 
-This increment does not complete R04-02. `VectorModelGuard`'s confirmation cache, runtime registration
-sets, relationship/lifecycle metadata, `AppHost.Identity`, and the non-hosted `StartKoan()` binding path
-still require owner-specific classification and proof.
+At that checkpoint, `VectorModelGuard`'s confirmation cache, runtime registration sets,
+relationship/lifecycle metadata, `AppHost.Identity`, and the non-hosted `StartKoan()` binding path
+still required owner-specific classification and proof.
+
+## Second increment — durable vector-model confirmation
+
+- Removed `VectorModelGuard`'s process-wide `(entity, partition, model)` confirmation cache.
+- Every guarded write now reads the current host's keyed `VectorModelRegistry<TEntity>` record before
+  deciding or recording.
+- A red/green two-host probe proved the defect: before removal, host B started with an empty backend,
+  inherited host A's confirmation, and left its own registry empty.
+- The repeated-host fixture now proves host B records the same entity/model in its own backend.
+- Data.AI builds with zero errors and its complete self-executing suite passes 81/81.
+
+The durable registry is authoritative for completed writes but does not provide atomic compare-and-set
+across simultaneous first writers. R04-02 removes host/process leakage; a provider-negotiated concurrent
+write guarantee must be earned separately.
+
+R04-02 remains active for runtime registration sets, relationship/lifecycle metadata,
+`AppHost.Identity`, and the non-hosted `StartKoan()` path.
 
 ## Smallest meaningful fix
 

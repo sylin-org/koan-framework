@@ -246,16 +246,22 @@ overload and above all six repositories.
   one partition and relying on a filter is a Koan anti-pattern. *(The entity-web `QueryFilterComposer.AndAll`
   remains the right tool for hook-contributed predicates within a partition, but is not a tenancy boundary.)*
 - **D3 — W4 guards at the write boundary, backed by a model registry.** A durable per-collection
-  model registry (`VectorModelRegistry<TEntity>`, keyed per `(entity, partition)`, O(1), never stale)
+  model registry (`VectorModelRegistry<TEntity>`, keyed per `(entity, partition)`, O(1), read for every
+  attempted write)
   records the producing model on each `SaveWithVector`. `GuardWrite` runs immediately before each
   write (`EmbeddingWorker`, `KoanAutoRegistrar`) and throws `VectorModelMismatchException` when a write
   would introduce a second model into a single-model index — fired at the genuine boundary (the write
-  that would corrupt the index), and only against the durable registry it just read, never on stale
-  data. An index that is legitimately multi-model is tolerated with a WARN; `Evaluate`/`Inspect`
+  that would corrupt the index), and only against the durable registry it just read. No process cache
+  may bypass that read. An index that is legitimately multi-model is tolerated with a WARN; `Evaluate`/`Inspect`
   surface "models in index" as warn-only health, and `EmbeddingMigrator.Reset` clears the registry for
   a by-design model transition. Guarding at write time is strictly stronger than a read-time check —
-  a guarded single-model index can never mismatch a same-model query — and avoids the layering problem
+  completed serialized writes cannot introduce a known second model — and avoids the layering problem
   that `Koan.Data.Vector` cannot resolve the query model.
+
+  This registry check is not an atomic compare-and-set across simultaneous first writers. Providers
+  need a conditional-write or transaction capability before Koan can claim exclusion for concurrent
+  different-model writes; the guard currently protects completed-write sequences and reports the
+  durable state it observed.
 
 ### 9.2 Filter semantics & capability contract
 

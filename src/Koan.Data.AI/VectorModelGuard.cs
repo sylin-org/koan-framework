@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Koan.Data.Core;
 using Microsoft.Extensions.Logging;
 
@@ -7,8 +6,8 @@ namespace Koan.Data.AI;
 /// <summary>
 /// W4 (AI-0036 P2): prevents a vector index from silently becoming a <b>mixed-space</b> — built from
 /// more than one embedding model, whose vectors are not comparable. Backed by the durable,
-/// per-(entity, partition) <see cref="VectorModelRegistry{TEntity}"/> maintained at write time, so the
-/// check is O(1) and never stale.
+/// per-(entity, partition) <see cref="VectorModelRegistry{TEntity}"/> maintained at write time. Every
+/// guarded write reads that host-routed record in O(1); no process cache can bypass backend truth.
 /// </summary>
 /// <remarks>
 /// Posture (AI-0036 §7 decision 3): <b>throw when knowable, warn for by-design multi-model</b>. The
@@ -22,11 +21,6 @@ namespace Koan.Data.AI;
 /// </remarks>
 public static class VectorModelGuard
 {
-    // Per-process confirmation cache: once (entity, partition, model) is recorded in the registry we
-    // skip the registry read on subsequent writes. Best-effort; the registry is the durable truth.
-    private static readonly ConcurrentDictionary<string, byte> _confirmed = new();
-
-    private static string Key(string entity, string partition, string model) => $"{entity}|{partition}|{model}";
     private static string PartLabel(string p) => string.IsNullOrEmpty(p) ? "" : $" (partition '{p}')";
 
     /// <summary>Pure decision used for diagnostics/health: given the index's models and an optional query model.</summary>
@@ -55,7 +49,8 @@ public static class VectorModelGuard
     /// Write-time guard: records <paramref name="model"/> as a producer of the current (entity,
     /// partition) vector index, and THROWS <see cref="VectorModelMismatchException"/> if it would
     /// introduce a second model into a single-model index. Call immediately before writing a vector.
-    /// Unknown (null/empty) model is a no-op (cannot guard). O(1) after the first write per model.
+    /// Unknown (null/empty) model is a no-op (cannot guard). Performs one O(1) registry read per
+    /// guarded write so the decision follows the current host and backend.
     /// </summary>
     public static async Task GuardWrite<TEntity>(string? model, ILogger? logger = null, CancellationToken ct = default)
         where TEntity : class
@@ -63,7 +58,6 @@ public static class VectorModelGuard
         if (string.IsNullOrEmpty(model)) return;
         var entity = typeof(TEntity).Name;
         var partition = EntityContext.Current?.Partition ?? string.Empty;
-        if (_confirmed.ContainsKey(Key(entity, partition, model))) return;
 
         var id = VectorModelRegistry<TEntity>.MakeId(partition);
         var reg = await VectorModelRegistry<TEntity>.Get(id, ct);
@@ -88,8 +82,6 @@ public static class VectorModelGuard
                 await reg.Save(ct);
                 break;
         }
-
-        _confirmed.TryAdd(Key(entity, partition, model), 0);
     }
 
     /// <summary>
@@ -100,18 +92,12 @@ public static class VectorModelGuard
     public static async Task Reset<TEntity>(string? model, CancellationToken ct = default)
         where TEntity : class
     {
-        var entity = typeof(TEntity).Name;
         var partition = EntityContext.Current?.Partition ?? string.Empty;
         var id = VectorModelRegistry<TEntity>.MakeId(partition);
         var reg = await VectorModelRegistry<TEntity>.Get(id, ct)
                   ?? new VectorModelRegistry<TEntity> { Id = id, Partition = partition };
         reg.Models = string.IsNullOrEmpty(model) ? new List<string>() : new List<string> { model! };
         await reg.Save(ct);
-
-        foreach (var k in _confirmed.Keys)
-            if (k.StartsWith($"{entity}|{partition}|", StringComparison.Ordinal))
-                _confirmed.TryRemove(k, out _);
-        if (!string.IsNullOrEmpty(model)) _confirmed.TryAdd(Key(entity, partition, model!), 0);
     }
 
     /// <summary>The distinct producing models for the current (entity, partition) index — O(1) registry read.</summary>

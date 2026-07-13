@@ -22,6 +22,8 @@ source: src/Koan.Data.AI/
   host-owned and must not be captured in static initializers.
 - Sequential hosts may reuse the same closed-generic Entity and metadata paths without retaining the
   previous provider or its storage selection.
+- Vector model confirmations are never cached process-wide. Each guarded write reads the current
+  host's keyed durable registry record before deciding whether the model is safe.
 - Parallel hosts or jobs use `AppHost.PushScope(provider)` around the flow that performs Entity work.
 
 ## Failure behavior
@@ -29,6 +31,8 @@ source: src/Koan.Data.AI/
 - A stopped host is not restored as an ambient fallback.
 - Logging is best-effort and cannot poison an Entity metadata type initializer after host disposal.
 - Vector model mismatches fail at the guarded write boundary; inspection remains diagnostic.
+- The registry decision covers completed write sequences. Atomic exclusion between simultaneous first
+  writers requires a provider transaction or conditional-write contract and is not currently claimed.
 
 ## References
 

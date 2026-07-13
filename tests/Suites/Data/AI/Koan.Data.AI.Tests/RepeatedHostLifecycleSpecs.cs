@@ -9,8 +9,8 @@ using Xunit;
 namespace Koan.Data.AI.Tests;
 
 /// <summary>
-/// Proves that a second real Koan host can use the same closed-generic Entity path after the first
-/// host and its service provider have been disposed.
+/// Proves that a second real Koan host can use the same closed-generic Entity and AI registry paths
+/// after the first host and its service provider have been disposed.
 /// </summary>
 [Collection(nameof(DataAiHostLifecycleCollection))]
 public sealed class RepeatedHostLifecycleSpecs
@@ -44,6 +44,41 @@ public sealed class RepeatedHostLifecycleSpecs
 
             await new RepeatedHostEntity { Id = EntityId, Value = "host-b" }.Save();
             (await RepeatedHostEntity.Get(EntityId))!.Value.Should().Be("host-b");
+        }
+        finally
+        {
+            await second.DisposeAsync();
+        }
+
+        AppHost.Current.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Sequential_hosts_record_vector_model_confirmation_in_their_own_backend()
+    {
+        const string Model = "shared-embedding-model";
+
+        var first = await StartHost("memory://vector-model-host-a");
+        try
+        {
+            await VectorModelGuard.GuardWrite<RepeatedHostEntity>(Model);
+            (await VectorModelGuard.ModelsInIndex<RepeatedHostEntity>()).Should().Equal(Model);
+        }
+        finally
+        {
+            await first.DisposeAsync();
+        }
+
+        AppHost.Current.Should().BeNull();
+
+        var second = await StartHost("memory://vector-model-host-b");
+        try
+        {
+            (await VectorModelGuard.ModelsInIndex<RepeatedHostEntity>()).Should().BeEmpty();
+
+            await VectorModelGuard.GuardWrite<RepeatedHostEntity>(Model);
+
+            (await VectorModelGuard.ModelsInIndex<RepeatedHostEntity>()).Should().Equal(Model);
         }
         finally
         {
