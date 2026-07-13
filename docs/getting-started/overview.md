@@ -13,8 +13,9 @@ This is the intended golden path: zero to a working, explained application, one 
 Source and executable checks are authoritative; the V1 capability baseline is re-verifying this path
 from clean checkout.
 
-> **Pre-1.0 note**: until 1.0, the recommended path is **building from source** (Path A below).
-> Published NuGet packages use the `Sylin.Koan.*` prefix and may lag the repo.
+> **Pre-1.0 note:** build from source. The public 0.17.0 `Sylin.Koan.*` packages currently have an
+> internal version mismatch and cannot restore as a coherent application. See the
+> [clean package probe](../initiatives/koan-v1/R02-EVIDENCE.md#clean-package-install-probe).
 
 ## The concept budget
 
@@ -31,7 +32,7 @@ else is required:
 8. Web defaults — controllers, `/api/health`, secure headers auto-wired; JSON is **camelCase,
    nulls omitted** (Newtonsoft.Json — chosen for predictable polymorphic serialization)
 
-## Path A — run it from the repo (60 seconds)
+## Path A — run it from the repo
 
 ```bash
 git clone https://github.com/sylin-org/koan-framework
@@ -39,12 +40,15 @@ cd koan-framework
 dotnet run --project samples/S1.Web
 ```
 
-Browse the printed URL; hit `/api/health`; read the boot report in the console — it lists every
-discovered module, the elected adapters, and the boot phases. Then read
+Browse the printed URL; hit `/api/health`; read the boot report in the console — it lists discovered
+modules, major adapter elections, and boot phases. Then read
 [samples/README.md](../../samples/README.md) for the learning ladder
 (S0 → S1 → S10 → S14).
 
-## Path B — from scratch
+## Path B — from scratch (currently unavailable)
+
+The following is Koan's intended package-first journey. It is retained to make the target concrete,
+but it is not runnable against the current public 0.17.0 package set.
 
 ```bash
 dotnet new web -n MyApp

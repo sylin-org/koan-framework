@@ -15,7 +15,7 @@ validation:
 # R03 — Define the Entity Semantics Contract
 
 - Tranche: `T3 — semantic spine and ecosystem boundaries`
-- Status: `pending`
+- Status: `in-progress`
 - Depends on: R02
 - Unlocks: R04
 - Owner: maintainer

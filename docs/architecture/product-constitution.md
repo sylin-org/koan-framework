@@ -153,4 +153,3 @@ They may change without changing Koan's identity if the principles above remain 
 
 See [framework principles](principles.md) for current implementation patterns and
 [ARCH-0105](../decisions/ARCH-0105-product-constitution.md) for the ratification decision.
-

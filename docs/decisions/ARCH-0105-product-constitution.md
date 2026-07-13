@@ -102,4 +102,3 @@ support independently.
 
 R02 must assign maturity from current evidence and correct remaining overstatement or understatement.
 R03 must turn the Entity-first principle into a precise semantic admission and IntelliSense contract.
-

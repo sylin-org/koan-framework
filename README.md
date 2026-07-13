@@ -1,7 +1,7 @@
 # Koan Framework
 
 **Model your domain as entities. Reference your intents. Koan composes the rest — storage, web,
-AI, jobs, caching — and tells you exactly what it did.**
+AI, jobs, caching — and reports the major choices it made.**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/download)
@@ -18,12 +18,13 @@ that remains inspectable.
 > **Status: pre-1.0, consolidation phase** (version via [NBGV](version.json), currently 0.17.x).
 > Capability maturity is being re-baselined from current code and executable evidence by the
 > [Koan V1 initiative](docs/initiatives/koan-v1/README.md); do not infer support from package or sample
-> existence. **Until 1.0, build from source** — published packages (`Sylin.Koan.*` on NuGet) lag the
-> repo.
+> existence. **Build from source today.** The public 0.17.0 packages are not a coherent install set:
+> an internal dependency requires an unpublished Core patch. See the
+> [current capability evidence](docs/initiatives/koan-v1/R02-EVIDENCE.md#clean-package-install-probe).
 
 ---
 
-## 60 seconds to a running app
+## Shortest path to a running app
 
 ```bash
 git clone https://github.com/sylin-org/koan-framework
@@ -146,15 +147,16 @@ need them; activation is deterministically ordered and reported.
 > server in one session (REST → Postgres → cache → jobs → semantic search → an agent mutating over
 > `koan://entities`), every command and output run against the framework.
 
-## What's distinctive (and actually shipped)
+## What's implemented today
 
 - **One grammar everywhere** — the same `Entity<T>` is your table row, your REST resource, your
   cache entry, your job, your embedding source, and your agent tool.
 - **Capability-graded multi-provider** — SQLite, Postgres, SQL Server, MongoDB, Couchbase,
   Redis, JSON-file storage; Weaviate, Qdrant, Milvus, Elasticsearch, OpenSearch vectors — behind
   one API that *negotiates* features (pushdown, bulk ops, CAS, TTL) rather than faking parity. A
-  cross-adapter convergence oracle tests that every adapter agrees with the reference semantics.
-- **Background jobs as entities** ([JOBS-0005](docs/decisions/JOBS-0005-jobs-pillar-rebuild.md))
+  shared convergence-test model lets provider suites compare their behavior with reference semantics;
+  current verification remains provider- and suite-specific.
+- **Background jobs as entities** ([JOBS-0005](docs/decisions/JOBS-0005-job-orchestrator-rebuild.md))
   — a capability ladder from in-memory to durable-ledger to distributed competing consumers,
   with cron/`@boot` scheduling, idempotency, chains, and contention-free claims.
 - **Transparent entity caching** — `[Cacheable]` L1/L2 with cross-node coherence and a

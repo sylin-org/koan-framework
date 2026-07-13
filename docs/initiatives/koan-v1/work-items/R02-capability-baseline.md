@@ -15,7 +15,7 @@ validation:
 # R02 — Build the capability truth baseline
 
 - Tranche: `T2 — capability truth baseline`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R01
 - Unlocks: R03
 - Owner: maintainer
@@ -99,3 +99,23 @@ into one current ledger.
 
 - Stop and split the work if a surface is too broad to assess coherently.
 - Do not upgrade a maturity label to avoid an uncomfortable documentation correction.
+
+## Acceptance result
+
+- Outcome: PASS
+- Date and commit: 2026-07-13; assessed snapshot
+  `4471e9c7ffeaa2cd198a62589a9763c4555d9b7f`; acceptance recorded in this closure change.
+- Evidence: all 13 capability records in [`../CAPABILITIES.md`](../CAPABILITIES.md), command results and
+  public-claim audit in [`../R02-EVIDENCE.md`](../R02-EVIDENCE.md), and ranked dispositions in the same
+  evidence record.
+- Tests / validation: 900 focused tests passed across data core, web, jobs, cache, AI, vector,
+  MCP, identity, testing, and observability; 3 skipped; 1 AI integration test failed; the bootstrap
+  suite did not complete within 304 seconds. `S1.Web` builds with 0 errors and 10 warnings. A clean
+  exact-0.17.0 NuGet application fails restore because the public package set is version-incoherent.
+- Unsupported scenarios: container-backed provider fleet, distributed brokers/transports, external
+  identity providers, full-solution certification, package upgrades, and production operations were
+  not assessed. Each capability record narrows its own verified scope.
+- Follow-up work: R03 owns the Entity admission/IntelliSense and ecosystem contract. R04 begins with
+  packaging, host lifecycle, bootstrap testability, and unified explanation.
+- Reviewer: maintainer authorized full initiative execution; the conservative evidence labels are
+  recorded for repository review rather than inferred from that authorization.

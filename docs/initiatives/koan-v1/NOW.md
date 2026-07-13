@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-13
   status: reviewed
-  scope: R02 capability-baseline handoff
+  scope: R03 Entity semantics and ecosystem-boundary handoff
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -18,39 +18,45 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Active work
 
-- Work item: [R02 — Build the capability truth baseline](work-items/R02-capability-baseline.md)
+- Work item: [R03 — Define the Entity Semantics Contract](work-items/R03-entity-semantics-contract.md)
 - State: `in-progress`
-- Objective: distinguish what Koan specifies, demonstrates, verifies, supports, deprecates, and does
-  not support using current repository evidence.
+- Objective: define which semantics belong on `Entity<T>`, how modules extend that language without
+  IntelliSense clutter, and which ecosystem ideas Koan should adopt, adapt, integrate, complement, or
+  decline.
 - Foundation: R01 passed through [ARCH-0105](../../decisions/ARCH-0105-product-constitution.md) and the
   canonical [product constitution](../../architecture/product-constitution.md).
-- Current state: every row in [`CAPABILITIES.md`](CAPABILITIES.md) remains intentionally unassessed.
+- Current state: R02 passed. All 13 surfaces are classified in
+  [`CAPABILITIES.md`](CAPABILITIES.md), with reproducible command and claim evidence in
+  [`R02-EVIDENCE.md`](R02-EVIDENCE.md). No surface is currently labeled supported.
 
 ## Next safe actions
 
-1. Freeze the assessed commit and inventory application-facing capability entry points.
-2. Assess bootstrap/composition, Entity/data, and backend negotiation first because later surfaces
-   depend on them.
-3. For each surface, link code, tests, maintained samples, startup/error behavior, support limits, and
-   compatibility expectation.
-4. Assign the lowest maturity label fully supported by evidence.
-5. Correct only materially unsafe front-door claims during assessment; rank other gaps for R04.
+1. Inventory `Entity<T>`, partials, extension methods, attributes, contexts, and namespaces exactly as
+   a consuming developer or coding agent sees them.
+2. Group the current surface by intrinsic entity semantics, capability facets, infrastructure control
+   planes, and application workflows; record collisions and misleading placements.
+3. Mine current ABP primary documentation/source first, then only the closest .NET/Rails approaches
+   that can change a concrete Koan decision.
+4. Draft an Entity admission test, namespace/overload rules, context and backend-selection rules, and
+   a disposition matrix: adopt, adapt, integrate, complement, or decline.
+5. Prove the draft with one anonymous business domain and one deliberate counterexample kept off Entity.
 
 ## Expected working tree
 
-R01 closure may add the constitution and ADR, align public architecture prose, and update initiative
-artifacts. Treat every other pre-existing change as user-owned.
+R02 closure adds capability/evidence records and corrects materially unsafe front-door claims. Treat
+every other pre-existing change as user-owned.
 
 ## Verification at handoff
 
-- every assessed label is reproducible from linked repository artifacts;
-- unsupported and untested scenarios are explicit;
-- documentation metadata, links, TOC, and `git diff --check` pass;
+- every current Entity extension category maps to a proposed contract or remediation item;
+- ecosystem conclusions cite current primary sources and change a named Koan decision;
+- representative consumer/IntelliSense probes cover ambiguity and discoverability;
+- documentation metadata, links, TOC, privacy scan, and `git diff --check` pass;
 - no private downstream detail enters evidence or examples.
 
 ## Do not infer
 
-- Do not promote a capability to match README language or roadmap preference.
-- Do not treat a sample, project, or private deployment as a compatibility guarantee.
-- Do not infer that private downstream success is repository evidence.
-- Do not fix runtime gaps inside R02; record and rank them.
+- Do not copy ABP, Rails, EF Core, Aspire, or agent frameworks for feature parity.
+- Do not put infrastructure control planes on Entity merely to maximize IntelliSense discoverability.
+- Do not infer semantic correctness from an existing extension method or partial class.
+- Do not implement R04 runtime repairs while R03's semantic contract is still open.

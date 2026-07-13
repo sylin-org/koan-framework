@@ -9,10 +9,11 @@ nav: true
 
 # Quickstart
 
-Two paths. Until 1.0, **Path A (from source) is the recommended one** — published `Sylin.Koan.*`
-packages may lag the repo.
+The source checkout is the only currently demonstrated path. The public 0.17.0 `Sylin.Koan.*`
+packages have an internal version mismatch and cannot restore as a coherent application; see the
+[clean package probe](../initiatives/koan-v1/R02-EVIDENCE.md#clean-package-install-probe).
 
-## Path A — clone and run (60 seconds)
+## Clone and run
 
 ```bash
 git clone https://github.com/sylin-org/koan-framework
@@ -30,7 +31,10 @@ dotnet run --project samples/S1.Web
 
 To explore the whole framework: open `Koan.sln`.
 
-## Path B — new project
+## Package-first project — currently unavailable
+
+The intended package-first journey is shown below as a product target, not a runnable quickstart.
+Do not use it with the current 0.17.0 public package set.
 
 ```bash
 dotnet new web -n MyApp
