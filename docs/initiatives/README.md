@@ -28,7 +28,7 @@ architecture canon:
 
 | Initiative | Mission | State |
 |---|---|---|
-| [Koan V1 reorganization](koan-v1/README.md) | Move Koan toward an Entity-centered V1 through meaningful, gated increments | Active — R00 history rewrite |
+| [Koan V1 reorganization](koan-v1/README.md) | Move Koan toward an Entity-centered V1 through meaningful, gated increments | Active — R01 product constitution |
 
 ## Initiative contract
 

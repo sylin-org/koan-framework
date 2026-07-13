@@ -15,7 +15,7 @@ validation:
 # R01 — Ratify the product constitution
 
 - Tranche: `T1 — product constitution`
-- Status: `pending`
+- Status: `in-progress`
 - Depends on: R00
 - Unlocks: R02
 - Owner: maintainer

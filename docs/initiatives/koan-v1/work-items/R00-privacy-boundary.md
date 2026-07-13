@@ -15,7 +15,7 @@ validation:
 # R00 — Establish the privacy boundary
 
 - Tranche: `T0 — privacy and memory boundary`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: none
 - Unlocks: R01
 - Owner: maintainer
@@ -112,3 +112,17 @@ boundary it is meant to protect.
 
 Update [`../PROGRESS.md`](../PROGRESS.md), replace [`../NOW.md`](../NOW.md), and apply
 [`../ACCEPTANCE.md`](../ACCEPTANCE.md).
+
+## Acceptance result
+
+- Outcome: PASS
+- Date and commit: 2026-07-13; recorded by the R00 closure commit
+- Evidence: all three published branch tips contain no private audit-term matches; current tracked
+  content and paths are clean; the public initiative contains only the generic downstream boundary.
+- Tests / validation: scoped documentation lint, TOC parsing, private current-tree scan, branch-tip
+  scans, and `git diff --check`.
+- Unsupported scenarios: historical commits, GitHub-managed pull refs, caches, forks, and existing
+  clones were not rewritten or claimed clean.
+- Follow-up work: none unless concrete discoverability or personal-risk evidence justifies a separately
+  approved GitHub-coordinated purge.
+- Reviewer: operator-approved forward-only disposition

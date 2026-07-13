@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-13
   status: reviewed
-  scope: initial R00 handoff
+  scope: R01 product-constitution handoff
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -18,43 +18,39 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Active work
 
-- Work item: [R00 — Establish the privacy boundary](work-items/R00-privacy-boundary.md)
+- Work item: [R01 — Ratify the product constitution](work-items/R01-product-constitution.md)
 - State: `in-progress`
-- Objective: make the public repository independent of every private downstream identity while
-  preserving anonymous, reproducible learning.
-- Current fact: tracked content and paths are clean, and 53,203 historical objects contain no
-  identifying paths.
-- Rewrite fact: identifying content remains reachable in Git history because the sanitized line has a
-  reachable predecessor. Two bounded full-content scans did not complete, so the total extent remains
-  inconclusive.
-- Authorization: on 2026-07-13, the operator explicitly authorized rewriting affected published
-  history and force-pushing affected refs.
+- Objective: give maintainers and coding agents a concise, evidence-aware constitution for deciding
+  what belongs in Koan and what does not.
+- Foundation: R00 passed with all live published branch tips clean and an explicit acceptance of
+  retained historical residue.
+- Draft input: [`CHARTER.md`](CHARTER.md) expresses the intended product reality but is not yet
+  canonical architecture.
 
 ## Next safe actions
 
-1. Commit the reviewed initiative state and create a recoverable bundle outside the repository.
-2. Clone an isolated mirror of the published repository and record branch/tag object IDs.
-3. Rewrite the private term set without emitting terms or matching content.
-4. Verify current files, reachable paths, reachable object content, and changed refs.
-5. Force-push only changed branch/tag refs, then independently clone and verify the public result.
-6. Pass R00 and replace this file to start R01.
+1. Read the R01 card, charter, current architecture principles, public README, getting-started overview,
+   and the code-backed composition entry points.
+2. Classify each candidate principle as constitutional, directional, tactical, obsolete, or overstated.
+3. Define observable decision tests for meaningful steps, business-code density, Entity-centered
+   semantics, inspectability, and ecosystem ownership.
+4. Draft the smallest canonical constitution and identify superseded or conflicting prose.
+5. Apply the R01 acceptance additions before changing public positioning.
 
 ## Expected working tree
 
-The initiative bootstrap may add `docs/initiatives/`, update `docs/toc.yml`, and sanitize a generic
-privacy note in the architecture redesign ledger. Treat every other pre-existing change as user-owned.
+R00 closure updates initiative artifacts only. Treat every other pre-existing change as user-owned.
 
 ## Verification at handoff
 
-- documentation metadata and links pass the repository documentation linter;
-- the documentation table of contents resolves;
-- current tracked files contain no operator-supplied identifying terms;
-- `git diff --check` passes;
-- no private term, application name, path, domain detail, or identifying example appears in the diff.
+- R01 claims cite current code or remain explicitly directional;
+- canonical architecture and public overview do not conflict;
+- documentation metadata, links, TOC, and `git diff --check` pass;
+- no private downstream detail enters evidence or examples.
 
 ## Do not infer
 
-- Do not infer that exposure is limited to the known predecessor.
-- Do not infer that private downstream success is a supported public capability.
-- Do not infer permission to rewrite history, publish identity, or broaden the initiative into runtime
-  changes.
+- Do not reopen the accepted history disposition without evidence of actual privacy harm.
+- Do not promote the draft charter into a support claim.
+- Do not infer that private downstream success is repository evidence.
+- Do not begin runtime changes until the capability baseline and Entity contract establish their need.
