@@ -89,6 +89,10 @@ Per-operation options (`BackupOptions`, `GlobalBackupOptions`, `RestoreOptions`,
 
 ## Edge cases & guidance
 
+- Backup deletion: managed deletion is not implemented. `EntityBackupExtensions.DeleteBackup(...)`
+  returns a faulted task with `NotSupportedException`, explicitly states that nothing was deleted, and
+  does not resolve services or touch storage. Retain the archive until a verified backup-management
+  operation and deletion receipt contract exist.
 - Large archives: operations use streaming enumerables and per-entity batching to avoid loading entire datasets into memory; ensure storage profiles can handle large uploads.
 - Partial availability: if a provider lacks backup capability, discovery still records the entity, but backup attempts will surface adapter exceptions—filter via `GlobalBackupOptions.IncludeProviders` when needed.
 - Schema drift: manifests store schema snapshots; use them during validation or restore planning to detect incompatible changes.
@@ -97,5 +101,6 @@ Per-operation options (`BackupOptions`, `GlobalBackupOptions`, `RestoreOptions`,
 
 ## Validation notes
 
+- Safety proof: `Koan.Data.Backup.Tests` pins fail-loud deletion behavior and its non-success message.
 - Source review: `StreamingBackupService`, `OptimizedRestoreService`, `BackupStorageService`, `BackupMaintenanceService`, `Initialization/KoanAutoRegistrar`, and related models as of 2025-09-29.
 - DocFX strict build executed via `pwsh -File scripts/build-docs.ps1 -ConfigPath docs/api/docfx.json -LogLevel Warning -Strict`.

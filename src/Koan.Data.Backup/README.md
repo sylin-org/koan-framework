@@ -53,6 +53,8 @@ public sealed class BackupAutoRegistrar : IKoanAutoRegistrar
 
 ## Edge cases
 
+- Managed deletion is not available. `EntityBackupExtensions.DeleteBackup(...)` returns a faulted
+  task with `NotSupportedException`; it performs no storage operation and never reports success.
 - Paused backups: resume by reinvoking `BackupSession.ResumeAsync` with the stored continuation token.
 - Partially restored entities: use `RestoreDiagnostics` to replay failed rows and avoid duplicates.
 - Tenant isolation: ensure plan bucket/scope values isolate multi-tenant data to prevent leakage.

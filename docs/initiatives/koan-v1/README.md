@@ -39,7 +39,9 @@ work-item status.
 Completed tranche evidence remains restartable: [`R02-EVIDENCE.md`](R02-EVIDENCE.md) records the
 capability baseline; [`R03-ENTITY-INVENTORY.md`](R03-ENTITY-INVENTORY.md) and
 [`R03-ECOSYSTEM.md`](R03-ECOSYSTEM.md) support the canonical
-[Entity Semantics Contract](../../architecture/entity-semantics-contract.md).
+[Entity Semantics Contract](../../architecture/entity-semantics-contract.md). R04 execution follows
+the dependency-ordered [`R04-BACKLOG.md`](R04-BACKLOG.md); each child card under
+[`work-items/r04/`](work-items/r04/) must land an independently meaningful result.
 
 ## Sources of truth
 
@@ -50,6 +52,7 @@ capability baseline; [`R03-ENTITY-INVENTORY.md`](R03-ENTITY-INVENTORY.md) and
 | What is in progress or runnable? | `PROGRESS.md` |
 | What should the next session do? | `NOW.md` |
 | What exactly does a work item require? | its `work-items/Rxx-*.md` card |
+| What foundation repair executes next? | `R04-BACKLOG.md` and its linked child card |
 | What makes work acceptable? | `ACCEPTANCE.md` |
 | How mature is a public capability? | `CAPABILITIES.md` |
 | What belongs in the Entity language? | `docs/architecture/entity-semantics-contract.md` |

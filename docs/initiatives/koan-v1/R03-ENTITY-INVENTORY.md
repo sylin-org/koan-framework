@@ -97,8 +97,8 @@ extension appears in IntelliSense without an import.
 - [backup extensions](../../../src/Koan.Data.Backup/Extensions/EntityBackupExtensions.cs) attach
   type-wide backup/restore/catalog operations to an arbitrary entity instance; the receiver is unused
   for identity and state.
-- the same backup surface contains `DeleteBackup`, which returns `true` from a placeholder rather than
-  performing deletion. It must not remain a discoverable success-shaped method.
+- at inventory time the same backup surface contained `DeleteBackup`, which returned `true` from a
+  placeholder rather than performing deletion. R04-01 now makes it fail loudly without touching storage.
 - `RebuildViews(this entity, IServiceProvider, ...)` uses an entity instance to trigger a type-wide
   administrative operation and exposes DI plumbing in application code.
 
@@ -131,7 +131,7 @@ events, integration events, and cache/index projections are not yet one explicit
 | Namespace import is an unstated prerequisite | no package build target contributes module global usings | Referencing intent and discovering the extension are currently separate steps. |
 | Runtime-only rejection | `Upsert/Delete(this object)` and `Send(this class)` | Agents and developers receive plausible verbs on invalid receivers; errors arrive too late. |
 | Misleading instance semantics | backup and view-rebuild operations ignore the receiver's identity | Reading code suggests one record is affected when the operation is type-wide. |
-| False success | `DeleteBackup` is a placeholder returning `true` | This is unsafe public behavior, not documentation debt. |
+| False success | `DeleteBackup` was a placeholder returning `true`; R04-01 replaces it with an explicit faulted task | The unsafe success is closed; managed deletion remains unsupported. |
 | Hidden provider cost | relationship child helpers load all records and filter in memory | Business-readable code conceals an unbounded operation without negotiation or warning. |
 | Host-global state | lifecycle registries and relationship metadata are static/cached | Repeatable hosts, tests, and agent sandboxes can observe cross-host residue. |
 | Duplicate grammar | `Save`/`Upsert`, instance/static forms, generic/string forms | Useful convenience has grown into overload and documentation cost. |

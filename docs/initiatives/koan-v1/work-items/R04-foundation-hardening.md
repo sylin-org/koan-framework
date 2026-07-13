@@ -79,6 +79,8 @@ work responsibly.
 
 Every child card states the user-visible failure, affected personas, current evidence, owning layer,
 smallest meaningful fix, failure behavior, tests, compatibility impact, and rollback/removal path.
+The dependency order and live child-card state are maintained in
+[`R04-BACKLOG.md`](../R04-BACKLOG.md).
 
 ## Verification
 

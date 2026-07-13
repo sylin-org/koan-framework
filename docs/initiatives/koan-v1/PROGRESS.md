@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T4 — foundation hardening`
 - Active work item: `R04`
-- Next decision: approve dependency-ordered hardening cards and begin the smallest P0 foundation repair
+- Next decision: begin R04-02 host-scoped runtime exploration and reproduce the disposed-host failure
 - V1 readiness: `not assessed`
 
 ## Work items
@@ -33,7 +33,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R01 | [Ratify the product constitution](work-items/R01-product-constitution.md) | T1 | passed | R00 | Codex · 2026-07-13 | ARCH-0105 and the canonical product constitution separate durable rules, tactical mechanisms, and maturity claims. |
 | R02 | [Build the capability truth baseline](work-items/R02-capability-baseline.md) | T2 | passed | R01 | Codex · 2026-07-13 | All 13 surfaces are classified with reproducible evidence; no capability is mislabeled as supported while packaging is incoherent. |
 | R03 | [Define the Entity Semantics Contract](work-items/R03-entity-semantics-contract.md) | T3 | passed | R02 | Codex · 2026-07-13 | ARCH-0106 ratifies five semantic locations, strict Entity admission, C# 14 module facets, and host/context/event boundaries. |
-| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-13 | Convert the evidence-ranked gaps and semantic deltas into bounded cards before changing runtime foundations. |
+| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-13 | Dependency-ordered backlog established; R04-01 passed with executable proof, and R04-02 is ready. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | pending | R04 | — | Anonymous business domain only. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
@@ -47,7 +47,7 @@ item should normally be `in-progress`.
 | R01 | passed | ARCH-0105 accepted; canonical constitution and public alignment are complete. |
 | R02 | passed | Capability ledger, focused execution record, public-claim audit, and ranked dispositions accepted. |
 | R03 | passed | Entity inventory, ecosystem dispositions, canonical contract, and ARCH-0106 accepted. |
-| R04 | yes | R02 evidence ranking and R03 semantic boundaries are available for card decomposition. |
+| R04 | active | R04-01 passed; R04-02 host-scoped runtime is the next dependency-unlocked card. |
 | R05 | no | The foundation path must be stable enough to measure honestly. |
 
 ## Divergence and risk log
@@ -68,6 +68,9 @@ item should normally be `in-progress`.
 | 2026-07-13 | R03 | Current Entity language includes `this object` persistence, `where T : class` messaging, module-absent cache members, type-wide operations on arbitrary instances, static host state, and hidden relationship full scans. | ARCH-0106 rejects these shapes; stage compatibility-aware repairs after immediate false-success/lifetime hazards. |
 | 2026-07-13 | R03 | Data.Backup exposes `DeleteBackup` as a successful placeholder returning `true`. | Treat as P0 false-success behavior: disable or implement with focused proof before broader API reshaping. |
 | 2026-07-13 | R03 | ABP's strategic value is boundary discipline—aggregate invariants, UoW, deferred events, module dependencies, and optional repositories—not generated layering. | Adapt the boundaries while declining mandatory scaffolding and dynamic property bags for app-owned entities. |
+| 2026-07-13 | R04-01 | `DeleteBackup` had no management service or unambiguous name-to-archive deletion contract; raw storage deletion would invent unsafe semantics. | Return one actionable faulted task, prove that success is impossible, and defer deletion receipts/control-plane design. |
+| 2026-07-13 | R04-03 | `dotnet test` returned zero without building or reporting tests for the new xUnit v3 suite; direct build plus self-execution proved one passing test. | Require discovered/executed counts for test-lane evidence; diagnose command/tooling coherence in the bounded-lanes card. |
+| 2026-07-13 | R04-08 | Data.Backup public prose names absent APIs, and the test-authoring guide mandates a removed harness/path. | Keep R04-01 wording truthful; repair and executable-gate the broader documentation in R04-08. |
 
 ## Operator gates
 

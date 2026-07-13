@@ -114,18 +114,22 @@ public static class EntityBackupExtensions
     }
 
     /// <summary>
-    /// Deletes a backup for this entity type
+    /// Returns a faulted task because managed backup deletion is not currently supported.
+    /// No backup is deleted by this operation.
     /// </summary>
-    public static async Task<bool> DeleteBackup<TEntity, TKey>(
+    /// <exception cref="NotSupportedException">
+    /// Always returned through the faulted task because the backup module does not yet expose a
+    /// verified deletion operation.
+    /// </exception>
+    public static Task<bool> DeleteBackup<TEntity, TKey>(
         this Entity<TEntity, TKey> entity,
         string backupName,
         CancellationToken ct = default)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        // This would need to be implemented in a backup management service
-        await Task.CompletedTask;
-        return true; // Placeholder
+        return Task.FromException<bool>(new NotSupportedException(
+            "Backup deletion is not supported. No backup was deleted. Keep the backup in place until a verified backup-management operation is available."));
     }
 
     /// <summary>

@@ -1,0 +1,6 @@
+id: data-backup
+name: Data Backup
+category: data
+status: in-progress
+description: |
+  Focused safety and contract coverage for Koan.Data.Backup public operations.
