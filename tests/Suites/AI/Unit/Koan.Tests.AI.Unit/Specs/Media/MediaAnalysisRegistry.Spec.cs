@@ -4,8 +4,8 @@ using Koan.Data.AI.Attributes;
 namespace Koan.Tests.AI.Unit.Specs.Media;
 
 /// <summary>
-/// Tests for MediaAnalysisRegistry — type registration and async filtering.
-/// Each test resets the global registry to avoid cross-test pollution.
+/// Tests for MediaAnalysisRegistry — process-lifetime type discovery and async filtering.
+/// Each test resets the process registry to avoid cross-test pollution.
 /// </summary>
 [Trait("ADR", "AI-0027")]
 [Trait("Category", "Unit")]

@@ -64,8 +64,25 @@ The durable registry is authoritative for completed writes but does not provide 
 across simultaneous first writers. R04-02 removes host/process leakage; a provider-negotiated concurrent
 write guarantee must be earned separately.
 
-R04-02 remains active for runtime registration sets, relationship/lifecycle metadata,
-`AppHost.Identity`, and the non-hosted `StartKoan()` path.
+## Third increment — classify AI discovery registries
+
+- `EmbeddingRegistry` and `MediaAnalysisRegistry` retain only immutable entity `Type` discovery facts;
+  they do not retain services, configuration, host identity, adapters, or backend state.
+- Their process-wide, additive, idempotent ownership is intentional. Moving these facts into host DI
+  would add lifecycle complexity without isolating any host-owned state.
+- Public registration remains available because generated consumer modules and framework assembly
+  discovery need an infrastructure entry point. It is not a supported per-host runtime extension API.
+- Focused embedding registry evidence proves idempotent type discovery, attribute-derived async
+  filtering, and null-tolerant generated input. The complete AI unit suite passes 155/155.
+- Strong process-lifetime `Type` references mean collectible plugin unloading remains unsupported.
+- `MediaAnalysisRegistry.Register(Type, bool)` currently ignores its `async` argument because async
+  selection comes from attribute metadata. That compatibility-shaped inconsistency is recorded for a
+  later API cleanup; this ownership increment does not change its behavior.
+
+The actual adjacent ownership hazard is activation, not discovery: `KoanAutoRegistrar` appends
+handlers to static closed-generic Entity lifecycle arrays for every host. R04-02 remains active for
+those lifecycle registrations, relationship metadata, `AppHost.Identity`, and the non-hosted
+`StartKoan()` path.
 
 ## Smallest meaningful fix
 

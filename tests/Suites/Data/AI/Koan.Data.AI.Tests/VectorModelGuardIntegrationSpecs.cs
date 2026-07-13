@@ -16,10 +16,10 @@ namespace Koan.Data.AI.Tests;
 /// establish → same-model no-op → second-model throw → Reset (migration) → new model accepted.
 /// </summary>
 /// <remarks>
-/// Uses a dedicated <see cref="W4GuardEntity"/> type so the guard's process-static confirmation
-/// cache and the registry key (both keyed on <c>typeof(TEntity).Name</c>) are isolated from every
-/// other spec. Host-based Data.AI specs share a non-parallel collection because their static Entity
-/// calls intentionally exercise the process-default <c>AppHost.Current</c> binding.
+/// Uses a dedicated <see cref="W4GuardEntity"/> type so its registry key (derived from
+/// <c>typeof(TEntity).Name</c>) is isolated from every other spec. Host-based Data.AI specs share a
+/// non-parallel collection because their static Entity calls intentionally exercise the
+/// process-default <c>AppHost.Current</c> binding.
 /// </remarks>
 [Collection(nameof(DataAiHostLifecycleCollection))]
 public sealed class VectorModelGuardIntegrationSpecs : IAsyncLifetime

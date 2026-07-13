@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-13
   status: reviewed
-  scope: R04-02 host-owned runtime registries
+  scope: R04-02 Entity lifecycle activation ownership
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -29,31 +29,35 @@ Replace this file at every handoff. It is a restart point, not a diary.
   [`CAPABILITIES.md`](CAPABILITIES.md); [ARCH-0106](../../decisions/ARCH-0106-entity-semantics-contract.md)
   and the canonical [Entity Semantics Contract](../../architecture/entity-semantics-contract.md)
   now bound implementation choices. The dependency-ordered [`R04-BACKLOG.md`](R04-BACKLOG.md) is
-  established, R04-01 passed, and R04-02's host lease plus durable vector-model confirmation
-  increments are green. No capability maturity label changed.
+  established, R04-01 passed, and R04-02's host lease, durable vector-model confirmation, and AI
+  discovery-registry classification increments are green. No capability maturity label changed.
 
 ## Next safe actions
 
-1. Treat the leased host binding, late Data.AI logger resolution, and uncached durable vector-model
-   registry as the stable R04-02 base.
+1. Treat the leased host binding, late Data.AI logger resolution, uncached durable vector-model
+   registry, and process-wide immutable AI type discovery as the stable R04-02 base.
 2. Run the `explore` skill before the next production increment.
-3. Classify static registration sets beginning with `EmbeddingRegistry`: separate generated immutable
-   type inventory from runtime registrations and identify their actual lifecycle owner.
-4. Continue owner-by-owner through relationship/lifecycle metadata, `AppHost.Identity`, and the
-   non-hosted `StartKoan()` path; keep immutable reflection facts static.
-5. Do not mark R04-02 passed until sequential and parallel ownership probes cover every named owner and
+3. Map `KoanAutoRegistrar` lifecycle activation into `EntityEventRegistry`'s static closed-generic
+   handler arrays. Establish whether activation should be host-owned, removable, or idempotent across
+   sequential hosts before changing behavior.
+4. Add a red repeated-host probe for the proven handler-duplication shape, then repair that one owner
+   without moving immutable type/reflection facts into DI.
+5. Continue owner-by-owner through relationship metadata, `AppHost.Identity`, and the non-hosted
+   `StartKoan()` path.
+6. Do not mark R04-02 passed until sequential and parallel ownership probes cover every named owner and
    missing/disposed host behavior is corrective.
 
 ## Expected working tree
 
-R04-01 and R04-02's first host-lease increment should be committed. The vector-model confirmation
-repair should remain one owner-specific commit with its red/green repeated-host proof and evidence.
-Treat every unrelated pre-existing change as user-owned.
+R04-01 and R04-02's host-lease and vector-model confirmation increments should be committed. The AI
+discovery-registry classification should remain one reviewable contract-and-evidence commit. Treat
+every unrelated pre-existing change as user-owned.
 
 ## Verification at handoff
 
 - Core host-binding and Data.AI projects build with zero errors;
 - the Core self-executing suite passes 195/195 and the Data.AI suite passes 81/81;
+- the AI unit project builds with zero errors and its self-executing suite passes 155/155;
 - repeated-host probes prove different DI markers, Entity storage, and vector-model registry state;
 - runtime and consumer tests for R04-02 must cover repeat hosts and disposed-state negative paths;
 - documentation metadata, links, TOC, privacy scan, and `git diff --check` pass;

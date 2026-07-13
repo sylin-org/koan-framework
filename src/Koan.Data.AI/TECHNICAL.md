@@ -18,6 +18,9 @@ source: src/Koan.Data.AI/
 ## Runtime ownership
 
 - Immutable reflection and attribute metadata may remain in process-wide caches.
+- `EmbeddingRegistry` and `MediaAnalysisRegistry` contain only process-wide entity `Type` discovery
+  facts. Generated module initialization and loaded-assembly discovery populate them additively; their
+  public registration entry points are framework infrastructure, not per-host runtime extension APIs.
 - Loggers, adapters, configuration, lifecycle registrations, and backend-dependent confirmations are
   host-owned and must not be captured in static initializers.
 - Sequential hosts may reuse the same closed-generic Entity and metadata paths without retaining the
@@ -25,6 +28,11 @@ source: src/Koan.Data.AI/
 - Vector model confirmations are never cached process-wide. Each guarded write reads the current
   host's keyed durable registry record before deciding whether the model is safe.
 - Parallel hosts or jobs use `AppHost.PushScope(provider)` around the flow that performs Entity work.
+
+The discovery registries retain strong `Type` references for the process lifetime. Collectible plugin
+unloading is therefore not a supported scenario. Host activation derived from those facts—including
+Entity lifecycle handlers—must still have host-safe ownership; a process-wide type inventory does not
+make process-wide runtime registrations safe.
 
 ## Failure behavior
 

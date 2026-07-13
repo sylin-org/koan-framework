@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-13
   status: reviewed
-  scope: R04-02 host-owned runtime registries
+  scope: R04-02 Entity lifecycle activation ownership
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T4 — foundation hardening`
 - Active work item: `R04`
-- Next decision: classify generated versus runtime registration state beginning with EmbeddingRegistry
+- Next decision: establish host-safe ownership for Entity lifecycle handler activation
 - V1 readiness: `not assessed`
 
 ## Work items
@@ -33,7 +33,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R01 | [Ratify the product constitution](work-items/R01-product-constitution.md) | T1 | passed | R00 | Codex · 2026-07-13 | ARCH-0105 and the canonical product constitution separate durable rules, tactical mechanisms, and maturity claims. |
 | R02 | [Build the capability truth baseline](work-items/R02-capability-baseline.md) | T2 | passed | R01 | Codex · 2026-07-13 | All 13 surfaces are classified with reproducible evidence; no capability is mislabeled as supported while packaging is incoherent. |
 | R03 | [Define the Entity Semantics Contract](work-items/R03-entity-semantics-contract.md) | T3 | passed | R02 | Codex · 2026-07-13 | ARCH-0106 ratifies five semantic locations, strict Entity admission, C# 14 module facets, and host/context/event boundaries. |
-| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-13 | R04-01 passed. R04-02 has a green host lease plus host-routed Entity and vector-model registry proof; registration/lifecycle owners remain. |
+| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-13 | R04-01 passed. R04-02 has a green host lease, host-routed Entity/vector-model proof, and classified AI discovery facts; lifecycle activation owners remain. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | pending | R04 | — | Anonymous business domain only. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
@@ -47,7 +47,7 @@ item should normally be `in-progress`.
 | R01 | passed | ARCH-0105 accepted; canonical constitution and public alignment are complete. |
 | R02 | passed | Capability ledger, focused execution record, public-claim audit, and ranked dispositions accepted. |
 | R03 | passed | Entity inventory, ecosystem dispositions, canonical contract, and ARCH-0106 accepted. |
-| R04 | active | R04-01 passed; R04-02 is in progress with host binding and vector confirmation isolated. |
+| R04 | active | R04-01 passed; R04-02 is in progress with host binding, vector confirmation, and AI discovery ownership isolated. |
 | R05 | no | The foundation path must be stable enough to measure honestly. |
 
 ## Divergence and risk log
@@ -75,6 +75,7 @@ item should normally be `in-progress`.
 | 2026-07-13 | R04-02 | Owner-checked host leases, late Data.AI logger resolution, and a two-host Entity/storage probe are green; Core passes 195/195 and Data.AI passes 80/80. Backend-dependent caches and alternate binding paths remain unaudited. | Keep R04-02 `in-progress` and migrate one runtime owner at a time rather than claiming host scope from the first repair. |
 | 2026-07-13 | R04-02 | `VectorModelGuard._confirmed` let host B skip its durable registry because host A had confirmed the same entity/partition/model process-wide; the red two-host probe left B's empty backend unrecorded. | Remove the cache rather than invent another scope: every guard reads the current host's O(1) durable record. Data.AI passes 81/81. |
 | 2026-07-13 | AI-0036 | The durable registry prevents leakage across completed host-routed writes, but its read-modify-write sequence is not atomic between simultaneous first writers. | Correct “never stale” wording; require provider CAS/transaction evidence before claiming concurrent different-model exclusion. |
+| 2026-07-13 | R04-02 | AI discovery registries store only additive `Type` facts and immutable attribute metadata; their public methods exist for generated/framework discovery, not supported per-host extension. Static Entity lifecycle arrays populated from those facts are the actual adjacent leak shape. | Keep discovery process-wide, document collectible plugin unloading as unsupported, prove the registry contract (AI unit 155/155), and explore lifecycle activation as the next owner. |
 
 ## Operator gates
 
