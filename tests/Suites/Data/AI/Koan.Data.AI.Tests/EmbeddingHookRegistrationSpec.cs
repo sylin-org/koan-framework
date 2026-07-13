@@ -16,6 +16,7 @@ namespace Koan.Data.AI.Tests;
 /// it, <c>AddKoan()</c> threw a <c>KoanBootException</c> ("does not have a static Events property") for
 /// every <c>Entity&lt;T&gt;</c>-shaped <c>[Embedding]</c> type (surfaced by the S5.Recs Media dogfood, P2.1).
 /// </summary>
+[Collection(nameof(DataAiHostLifecycleCollection))]
 public sealed class EmbeddingHookRegistrationSpec : IAsyncLifetime
 {
     private IntegrationHost? _host;

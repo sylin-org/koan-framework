@@ -10,11 +10,12 @@ namespace Koan.Core.Hosting.App;
 // Generic-host binder: ensures AppHost.Current is set and KoanEnv is initialized early
 internal sealed class AppHostBinderHostedService(System.IServiceProvider sp) : IHostedService
 {
+    private IDisposable? _hostLease;
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        // Set ambient host once
-        if (AppHost.Current is null)
-            AppHost.Current = sp;
+        Interlocked.Exchange(ref _hostLease, null)?.Dispose();
+        _hostLease = AppHost.Attach(sp);
         try { KoanEnv.TryInitialize(sp); } catch { }
 
         try
@@ -31,5 +32,8 @@ internal sealed class AppHostBinderHostedService(System.IServiceProvider sp) : I
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
-        => Task.CompletedTask;
+    {
+        Interlocked.Exchange(ref _hostLease, null)?.Dispose();
+        return Task.CompletedTask;
+    }
 }

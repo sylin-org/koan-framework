@@ -10,7 +10,6 @@ using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
 using Koan.Core;
 using Koan.Core.AI;
-using Koan.Core.Hosting.App;
 using Koan.Data.AI.Attributes;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
@@ -29,6 +28,7 @@ namespace Koan.Data.AI.Tests;
 /// <c>AfterUpsert</c> → the hook → … → <b>StackOverflow</b> (which terminates the process; this test would crash
 /// the run, not merely fail). The fix routes the hook through the vector-only <c>VectorData.Save</c>.
 /// </summary>
+[Collection(nameof(DataAiHostLifecycleCollection))]
 public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
 {
     private IntegrationHost? _host;
@@ -65,17 +65,11 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
             Capabilities = caps,
             Origin = "in-process",
         });
-
-        // Force-bind the ambient host to ours: AppHostBinderHostedService only binds when AppHost.Current is
-        // null (first-host-wins), so a prior spec's disposed host would otherwise stick. Null it on dispose
-        // (if still ours) so the next spec's StartAsync rebinds cleanly — the canonical EntityConformance pattern.
-        AppHost.Current = _host.Services;
     }
 
     public async ValueTask DisposeAsync()
     {
         if (_host is not null) await _host.DisposeAsync();
-        if (ReferenceEquals(AppHost.Current, _host?.Services)) AppHost.Current = null;
     }
 
     [Fact]

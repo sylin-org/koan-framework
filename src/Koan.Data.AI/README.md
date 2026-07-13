@@ -16,6 +16,10 @@ dotnet add package Sylin.Koan.Data.AI
 
 **Convention over configuration.** On-demand operations (embed a string, search semantically) work with zero attributes. Attributes are only needed to opt into **automatic** processing on entity save.
 
+Embedding metadata inferred only from entity types and attributes is cached across the process. AI
+services, logging, adapters, configuration, and lifecycle state are resolved from the current host when
+an operation runs; they are not retained by the metadata cache.
+
 ---
 
 ## Embeddings

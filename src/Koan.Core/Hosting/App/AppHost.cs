@@ -5,8 +5,9 @@ namespace Koan.Core.Hosting.App;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Production code calls <c>AppHost.Current = sp</c> once during startup; the value is held in
-/// a static field and is visible to every consumer that doesn't enter an explicit scope.
+/// Framework hosts attach their provider for the duration of the host lifecycle. The attached
+/// provider is visible to every consumer that doesn't enter an explicit scope and is released
+/// when its owning host stops.
 /// </para>
 /// <para>
 /// Tests, background jobs, and any caller that needs flow-scoped isolation use
@@ -28,8 +29,20 @@ public static class AppHost
 
     public static IServiceProvider? Current
     {
-        get => _scoped.Value ?? _global;
-        set => _global = value;
+        get => _scoped.Value ?? Volatile.Read(ref _global);
+        set => Interlocked.Exchange(ref _global, value);
+    }
+
+    /// <summary>
+    /// Attaches <paramref name="sp"/> as the process-default provider and returns its ownership
+    /// lease. Disposing the lease clears the provider only when that lease still owns the current
+    /// default; it never restores an earlier provider that may already have been disposed.
+    /// </summary>
+    internal static IDisposable Attach(IServiceProvider sp)
+    {
+        ArgumentNullException.ThrowIfNull(sp);
+        Interlocked.Exchange(ref _global, sp);
+        return new HostLease(sp);
     }
 
     /// <summary>
@@ -49,6 +62,20 @@ public static class AppHost
         private readonly IServiceProvider? _previous;
         public Pop(IServiceProvider? previous) => _previous = previous;
         public void Dispose() => _scoped.Value = _previous;
+    }
+
+    private sealed class HostLease(IServiceProvider owner) : IDisposable
+    {
+        private IServiceProvider? _owner = owner;
+
+        public void Dispose()
+        {
+            var currentOwner = Interlocked.Exchange(ref _owner, null);
+            if (currentOwner is not null)
+            {
+                Interlocked.CompareExchange(ref _global, null, currentOwner);
+            }
+        }
     }
 
     public static ApplicationIdentitySnapshot Identity => _identity;

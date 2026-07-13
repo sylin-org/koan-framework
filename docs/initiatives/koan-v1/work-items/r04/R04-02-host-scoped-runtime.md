@@ -11,7 +11,7 @@ framework_version: v0.17.0
 # R04-02 — Make runtime state host-scoped
 
 - Priority: P0
-- Status: `ready`
+- Status: `in-progress`
 - Depends on: R04-01
 - Owner: Core hosting with Data.Core/AI consumers
 
@@ -28,10 +28,27 @@ cannot trust lifecycle isolation in workers or reload scenarios.
 
 ## Current evidence
 
-- `VectorModelGuardIntegrationSpecs.Registry_round_trips_the_full_model_lifecycle` fails through
-  `Data<T>.Repo` after host disposal.
+- Before the first repair, the self-executing Data.AI suite reported 79 tests: 48 passed and 31 failed.
+  The root failure was `EmbeddingMetadata` resolving a logger from a disposed `AppHost.Current` in its
+  static initializer; the poisoned type initializer caused the remaining cascade.
 - `AppHost.Current`, static closed-generic registries, and cached relationship metadata are reachable
   from Entity paths.
+
+## First increment — host binding and Data.AI capture repair
+
+- The generic-host binder now owns a disposable `AppHost` lease from start through stop.
+- A newer host replaces the process default; an older host cannot clear it; releasing the newest host
+  never resurrects a predecessor.
+- `AppHost.PushScope` remains the explicit provider selector for parallel execution flows.
+- `EmbeddingMetadata` and `EntityAi` retain only immutable metadata statically and resolve logging at
+  operation time.
+- A real two-host in-memory probe reuses the same closed-generic Entity path and proves provider and
+  storage isolation.
+- The repaired Data.AI suite passes 80/80 as one process; the complete Core suite passes 195/195.
+
+This increment does not complete R04-02. `VectorModelGuard`'s confirmation cache, runtime registration
+sets, relationship/lifecycle metadata, `AppHost.Identity`, and the non-hosted `StartKoan()` binding path
+still require owner-specific classification and proof.
 
 ## Smallest meaningful fix
 

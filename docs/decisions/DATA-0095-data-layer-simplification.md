@@ -147,6 +147,21 @@ ASP.NET seeds `_current` at the start of each request (already done via middlewa
 
 The visible change is zero for happy-path callers; the elimination of the cross-test pollution bug class is the win. `AggregateConfigs.Reset()` and `EntitySchemaGuard.ResetAll()` patches both delete because the state is no longer shared.
 
+#### Implementation clarification (2026-07-13)
+
+Generic-host applications also need a default provider for Entity calls made outside a request, job,
+or test scope. The implemented resolution order is therefore a flow-local `AsyncLocal` override followed
+by one host-owned default lease:
+
+- every started Koan host replaces the default with its provider;
+- stopping a host clears the default only when that host still owns it;
+- releasing the newest lease never restores an earlier provider, because that provider may already be
+  disposed;
+- parallel hosts and execution contexts select their provider with `AppHost.PushScope(provider)`.
+
+This refines the mechanism without changing the decision: a disposed provider cannot remain reachable
+as a fallback, and host-specific services or configuration may not be captured in process-static state.
+
 ### Phase 2
 
 #### 2.1 Relational DDL chain consolidation

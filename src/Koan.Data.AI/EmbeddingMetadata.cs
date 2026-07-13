@@ -18,7 +18,6 @@ namespace Koan.Data.AI;
 public class EmbeddingMetadata
 {
     private static readonly ConcurrentDictionary<Type, EmbeddingMetadata> _cache = new();
-    private static readonly ILogger? _logger = (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(ILoggerFactory)) as ILoggerFactory)?.CreateLogger("Koan.Data.AI.EmbeddingMetadata");
 
     // Approximate tokens per character for English text (tiktoken-style estimation)
     private const double CHARS_PER_TOKEN = 4.0;
@@ -324,15 +323,29 @@ public class EmbeddingMetadata
 
         truncated = truncated.TrimEnd() + "...";
 
-        if (WarnOnTruncation && _logger != null)
+        var logger = WarnOnTruncation ? ResolveLogger() : null;
+        if (logger != null)
         {
-            _logger.LogWarning(
+            logger.LogWarning(
                 "Embedding text truncated for {EntityType}: {EstimatedTokens} tokens > {MaxTokens} limit. " +
                 "Consider increasing MaxTokens or simplifying content structure.",
                 entityType.Name, estimatedTokens, MaxTokens);
         }
 
         return truncated;
+    }
+
+    private static ILogger? ResolveLogger()
+    {
+        try
+        {
+            return (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(ILoggerFactory)) as ILoggerFactory)
+                ?.CreateLogger("Koan.Data.AI.EmbeddingMetadata");
+        }
+        catch (ObjectDisposedException)
+        {
+            return null;
+        }
     }
 
     public static int EstimateTokens(string text)

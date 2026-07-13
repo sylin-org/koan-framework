@@ -14,6 +14,9 @@ dotnet add package Sylin.Koan.Core
 ## Notes
 - Options: bind with Microsoft.Extensions.Options
 - Environment: use `KoanEnv.Current` for machine/env metadata
+- Host ownership: `AddKoan()` hosts attach the ambient `AppHost` provider while running and release
+  it when they stop. Use `AppHost.PushScope(provider)` when parallel flows must select different hosts.
+- A stopped host is never restored as a fallback when a newer host releases its lease.
 
 ## Links
 - Repo: https://github.com/sylin-org/Koan-framework

@@ -18,9 +18,10 @@ namespace Koan.Data.AI.Tests;
 /// <remarks>
 /// Uses a dedicated <see cref="W4GuardEntity"/> type so the guard's process-static confirmation
 /// cache and the registry key (both keyed on <c>typeof(TEntity).Name</c>) are isolated from every
-/// other spec. This is the only host-based class in the suite, so it never races other tests on
-/// the process-global <c>AppHost.Current</c>.
+/// other spec. Host-based Data.AI specs share a non-parallel collection because their static Entity
+/// calls intentionally exercise the process-default <c>AppHost.Current</c> binding.
 /// </remarks>
+[Collection(nameof(DataAiHostLifecycleCollection))]
 public sealed class VectorModelGuardIntegrationSpecs : IAsyncLifetime
 {
     private IntegrationHost? _host;
