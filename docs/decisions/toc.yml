@@ -156,6 +156,8 @@
       href: ARCH-0105-product-constitution.md
     - name: ARCH-0106 Entity language admission, facets, and responsibility boundaries
       href: ARCH-0106-entity-semantics-contract.md
+    - name: ARCH-0107 Host-scoped KoanLog ownership
+      href: ARCH-0107-host-scoped-koanlog.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

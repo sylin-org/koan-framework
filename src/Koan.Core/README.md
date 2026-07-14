@@ -21,6 +21,9 @@ dotnet add package Sylin.Koan.Core
   lease with the provider. Applications should normally let a Koan host or `StartKoan()` own it.
 - Application identity: `AppHost.Identity` follows that same current provider or flow scope. With no
   active host, it falls back to the frozen process identity in `KoanEnv`.
+- Static `KoanLog.For<T>()` scopes retain only their category. Each emission follows the current
+  `AppHost` provider and its `ILoggerFactory`; hostless or unconfigured flows no-op without falling
+  back to a different host.
 
 ## Links
 - Repo: https://github.com/sylin-org/Koan-framework

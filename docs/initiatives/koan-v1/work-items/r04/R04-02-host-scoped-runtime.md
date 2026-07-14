@@ -427,6 +427,34 @@ loggers, the set-only background service locator remains, and the unified missin
 failure contract is absent. The obsolete broad test-authoring guide remains an R04-08 concern, and
 no capability maturity label changes.
 
+## Eighteenth increment — one host owner for façade logging
+
+`KoanLog` no longer owns a second ambient runtime. The process-global `ILoggerFactory`, the
+per-scope cached `ILogger`, and `KoanLogFactoryBridge` have been removed. A reusable
+`KoanLogScope` now retains only its immutable category name and resolves `ILoggerFactory` through
+the current `AppHost` provider for each emission. The standard factory remains responsible for
+category logger reuse.
+
+This makes logging follow the same owner-checked generic-host lease and `AppHost.PushScope` flow
+selection as Entity statics and application identity. An older host cannot redirect a newer host's
+logs during teardown, simultaneous flows can select different factories, and a hostless or
+unconfigured flow no-ops without falling back to another host. `AppHostBinderHostedService` is now
+the first Koan hosted-service registration so later hosted-service startup logs remain visible after
+the bridge removal. Public `KoanLog.For<T>()`, category, stage, action, outcome, and formatting call
+shapes are unchanged.
+
+The focused ownership surface was red 0/2 before the repair because an `AppHost` provider alone was
+invisible to the separate logging owner. It is green 2/2 afterward, and a third structural guard fixes
+the binder's registration order. The complete Core suite passes 200/200, Core Unit passes 79/79, and
+the established 293-test Data.Core process exits successfully. ARCH-0107 records the simplified
+ownership contract and supersedes ARCH-0057's bridge mechanism while retaining its façade decision.
+
+All thirteen production static scopes are now category-only and retain no host runtime. R04-02
+remains `in-progress` for the set-only background service locator and the unified
+missing/disposed-host failure contract. Early calls made before any host is active remain
+intentionally silent; this increment does not claim complete pre-host startup reporting or change a
+capability maturity label.
+
 ## Smallest meaningful fix
 
 Define one host/runtime lease and make service/configuration-backed registries resolve through it.

@@ -18,11 +18,11 @@ namespace Koan.Tests.Data.Core.Specs.Configuration;
 /// Two halves:
 /// 1. Behavioral (seam-free): a malformed value at each origin (source-definition / config-source /
 ///    config-adapter) returns the supplied default; a well-formed value still coerces (positive control).
-/// 2. Observability — the ConfigWarning deferred from F2-sqlite's test pass. It routes through the
-///    process-global static <see cref="KoanLog.KoanLogScope"/> whose per-scope logger is cached by the
-///    first host boot, so a factory-attach capture is flaky. Instead we observe the single
-///    <c>KoanLog.Write</c> chokepoint via the internal <c>KoanLog.TestSink</c> seam, filtered to a unique
-///    provider so no concurrent emission can pollute the assertion.
+/// 2. Observability — the ConfigWarning deferred from F2-sqlite's test pass. It routes through a
+///    static <see cref="KoanLog.KoanLogScope"/> that follows the current host. This focused unit spec
+///    intentionally has no host, so it observes the single <c>KoanLog.Write</c> chokepoint through the
+///    internal <c>KoanLog.TestSink</c> seam, filtered to a unique provider so no concurrent emission can
+///    pollute the assertion.
 /// </summary>
 public sealed class AdapterConnectionResolverFailurePathSpec
 {

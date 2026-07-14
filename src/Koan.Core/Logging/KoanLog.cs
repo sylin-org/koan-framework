@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Threading;
+using Koan.Core.Hosting.App;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Core.Logging;
@@ -10,31 +10,17 @@ namespace Koan.Core.Logging;
 /// </summary>
 public static class KoanLog
 {
-    private static ILoggerFactory? _loggerFactory;
-
-    internal static void AttachFactory(ILoggerFactory factory)
-    {
-        if (factory is null) throw new ArgumentNullException(nameof(factory));
-        Interlocked.Exchange(ref _loggerFactory, factory);
-    }
-
-    internal static void DetachFactory(ILoggerFactory factory)
-    {
-        if (factory is null) return;
-        Interlocked.CompareExchange(ref _loggerFactory, null, factory);
-    }
-
     internal static ILogger? CreateLogger(string categoryName)
     {
-        var factory = Volatile.Read(ref _loggerFactory);
-        if (factory is null || string.IsNullOrWhiteSpace(categoryName))
+        if (string.IsNullOrWhiteSpace(categoryName))
         {
             return null;
         }
 
         try
         {
-            return factory.CreateLogger(categoryName);
+            var factory = AppHost.Current?.GetService(typeof(ILoggerFactory)) as ILoggerFactory;
+            return factory?.CreateLogger(categoryName);
         }
         catch
         {
@@ -159,8 +145,7 @@ public static class KoanLog
     /// <summary>
     /// Test-only seam (InternalsVisibleTo). When set, every <see cref="Write"/> call is mirrored here BEFORE
     /// the logger dispatch and REGARDLESS of whether a logger is resolved — so a test can deterministically
-    /// observe a KoanLog emission without depending on the process-global factory attach + the per-scope
-    /// logger cache (which a prior host boot may already have populated, defeating a factory-attach capture).
+    /// observe a KoanLog emission without depending on ambient host selection or a configured logging provider.
     /// Always <c>null</c> in production (one static null-check on this diagnostic path).
     /// </summary>
     internal static Action<KoanLogStage, LogLevel, string, string?, (string Key, object? Value)[]>? TestSink;
@@ -181,30 +166,12 @@ public static class KoanLog
     public sealed class KoanLogScope
     {
         private readonly string _categoryName;
-        private ILogger? _logger;
-
         internal KoanLogScope(string categoryName)
         {
             _categoryName = categoryName;
         }
 
-        private ILogger? ResolveLogger()
-        {
-            var logger = Volatile.Read(ref _logger);
-            if (logger is not null)
-            {
-                return logger;
-            }
-
-            var created = CreateLogger(_categoryName);
-            if (created is null)
-            {
-                return null;
-            }
-
-            Interlocked.CompareExchange(ref _logger, created, null);
-            return Volatile.Read(ref _logger);
-        }
+        private ILogger? ResolveLogger() => CreateLogger(_categoryName);
 
         public void StageDebug(KoanLogStage stage, string action, string? outcome = null, params (string Key, object? Value)[] context)
             => KoanLog.StageDebug(ResolveLogger(), stage, action, outcome, context);

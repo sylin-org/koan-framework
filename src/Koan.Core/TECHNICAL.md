@@ -25,6 +25,9 @@ source: src/Koan.Core/
   process default only if it still owns that binding; it never revives a predecessor.
 - `AppHost.Identity`: resolves the immutable identity snapshot registered by that same provider;
   hostless callers receive the frozen `KoanEnv` application identity.
+- `KoanLog.For<T>()`: creates a category-only reusable scope. Each emission resolves
+  `ILoggerFactory` from the current `AppHost` provider, so host leases and flow scopes also govern
+  logging without a second ambient owner.
 
 ## Usage guidance
 
@@ -38,6 +41,8 @@ source: src/Koan.Core/
   provider. Do not retain configuration-derived identity in another process static.
 - Do not cache services obtained from `AppHost.Current` in process-static fields. Immutable reflection
   metadata may be process-static; services and configuration remain host-owned.
+- Static `KoanLogScope` fields are safe because they retain only category text. A hostless flow or a
+  selected provider without `ILoggerFactory` emits nothing and never falls back to another host.
 
 ## Observability & Security
 

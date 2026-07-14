@@ -2,10 +2,14 @@
 id: ARCH-0057
 slug: koanlog-facade-and-stage-logging
 domain: Architecture
-status: approved
+status: superseded
+superseded_by: ARCH-0107
 date: 2025-10-05
 title: KoanLog façade and stage logging centralization
 ---
+
+> Superseded by [ARCH-0107](ARCH-0107-host-scoped-koanlog.md). The `KoanLog` façade and stage grammar
+> remain; the separate logger-factory bridge and per-scope logger cache do not.
 
 ## Contract
 

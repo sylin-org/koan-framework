@@ -66,8 +66,9 @@ public static class ServiceCollectionExtensions
             typeof(ApplicationIdentitySnapshot),
             sp => sp.GetRequiredService<ApplicationIdentityOptions>().ToSnapshot()));
 
-        // Bind KoanLog to the ambient logger factory once the host starts up
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, KoanLogFactoryBridge>());
+        // Establish the canonical ambient host before other hosted services start. KoanLog and other
+        // terse framework surfaces resolve host-owned services through this same owner.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AppHostBinderHostedService>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, StartupTimelineHostedService>());
 
         // Best-effort early initialization when provider is built later
@@ -88,8 +89,6 @@ public static class ServiceCollectionExtensions
         if (!services.Any(d => d.ServiceType == typeof(Koan.Core.Hosting.Runtime.IAppRuntime)))
             services.AddSingleton<Koan.Core.Hosting.Runtime.IAppRuntime, Koan.Core.Hosting.Runtime.AppRuntime>();
 
-        // Ensure ambient host is set in generic hosts (web apps do this via startup filter)
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.Extensions.Hosting.IHostedService, Koan.Core.Hosting.App.AppHostBinderHostedService>());
         return services;
     }
 }
