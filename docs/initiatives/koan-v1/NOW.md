@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-14
   status: reviewed
-  scope: R04-03 bootstrap topology green; failed-start cleanup next
+  scope: R04-03 passed; R04-04 next
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -20,10 +20,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 - Work item: [R04 — Harden the framework foundation](work-items/R04-foundation-hardening.md)
 - State: `in-progress`
-- Active child: [R04-03 — Establish bounded bootstrap test lanes](work-items/r04/R04-03-bounded-bootstrap-lanes.md)
-  is in progress; its ARCH-0109 topology increment is green.
-- Objective: close the remaining failed-start ownership gap in `KoanIntegrationHost`, then rerun the
-  bounded lanes and decide R04-03.
+- Active child: none. [R04-03 — Establish bounded bootstrap test lanes](work-items/r04/R04-03-bounded-bootstrap-lanes.md)
+  is passed; [R04-04 — Prove atomic packages in an external clean room](work-items/r04/R04-04-atomic-packages-clean-room.md)
+  is next.
+- Objective: assess the package graph and design the smallest external clean-room proof before any
+  package or production change.
 - Foundation: R01 passed through [ARCH-0105](../../decisions/ARCH-0105-product-constitution.md) and the
   canonical [product constitution](../../architecture/product-constitution.md).
 - Current state: R02 and R03 passed. All 13 surfaces are classified in
@@ -58,25 +59,26 @@ Replace this file at every handoff. It is a restart point, not a diary.
   required common Data/AI paths one typed missing/disposed/missing-service contract while optional AI
   probes remain quiet. Core 204/204, Core Unit 79/79, AI Unit 157/157, and Data.Core pass; closure
   inventory is clean, so R04-02 is passed. ARCH-0109 now separates bootstrap evidence into a
-  deterministic 15-test Core lane, a 16-test offline pillar lane, and a seven-test explicit
+  deterministic 16-test Core/test-host lane, a 16-test offline pillar lane, and a seven-test explicit
   infrastructure lane. `scripts/test-bootstrap.ps1` bounds build and run phases, kills only its owned
-  process tree, and requires a nonzero xUnit summary. Observed test execution is 4.469s, 7.008s, and
-  120.068s respectively; all three lanes pass. The test-host failed-start cleanup remains before
-  R04-03 can pass. A parallel design-only
+  process tree, and requires a nonzero xUnit summary. Observed accepting test execution is 0.417s,
+  4.793s, and 115.178s respectively; all three lanes pass. Failed integration-host startup now
+  disposes the host before rethrowing, including async-owned resources, and the focused proof passes;
+  R04-03 is passed.
+  A parallel design-only
   [`R04 Entity Facet Candidate Slate`](R04-ENTITY-FACET-CANDIDATES.md) elects the eventual R04-07
   language without changing the active production card or implementing public syntax.
 
 ## Next safe actions
 
-1. Treat ARCH-0109's three project boundaries and bounded runner as the stable bootstrap topology.
-2. Add one focused `Koan.Testing.Hosting` proof that a host built but not started successfully is
-   disposed before `KoanIntegrationHost.Builder.StartAsync` rethrows.
-3. Make the smallest ownership repair needed by that proof; do not change application runtime behavior.
-4. Re-run Fast and Pillars, the focused hosting proof, strict docs, and the default explicit-test check.
-5. Pass R04-03 only if the failed-start path is green and no command can report success without a
-   nonzero executed count.
-6. Keep the obsolete test-authoring guide for R04-08 and package restore truth for R04-04.
-7. Preserve the current maturity labels until the later clean-room and negotiation gates pass.
+1. Treat ARCH-0109 and R04-03's failed-start ownership contract as stable foundation behavior.
+2. Run the repository `explore` workflow before the first R04-04 production or packaging edit.
+3. Reproduce one local package set from one commit/version and inspect its dependency and advisory
+   graph without publishing it.
+4. Design a clean-room application outside the repository that restores only from a local feed and
+   proves startup, health, and SQLite Entity CRUD.
+5. Keep publication, compatibility, and support claims operator-gated.
+6. Preserve the current maturity labels until the external clean-room proof earns a change.
 
 ## Expected working tree
 
@@ -87,8 +89,8 @@ should be committed.
 The closure-audit ledger, provider-owned aggregate-configuration repair, scoped Identity/Web startup,
 and binder-owned data-spec and Entity-conformance repairs should also be committed. Host-scoped
 logging and the dead-locator deletion should be committed; ARCH-0108 and its Data/AI consumer
-migration should be committed. The ARCH-0109 lane split, runner, and documentation may be the only
-active diff; no application runtime code belongs in that increment.
+migration should be committed. The ARCH-0109 lane split and failed-start host ownership repair should
+also be committed. No R04-04 production or packaging change is expected before its exploration gate.
 Treat every unrelated pre-existing change as user-owned.
 
 ## Verification at handoff
@@ -142,10 +144,11 @@ Treat every unrelated pre-existing change as user-owned.
   required Data/AI host-context failures and R04-02 is passed;
 - the complete Data.Core process passes 294/294 with zero disposed-service, meter-factory, or
   cancellation-exception signatures;
-- the bounded Fast bootstrap lane passes 15/15 in 4.469s with only Core/test-host references;
-- the bounded offline Pillars lane passes 16/16 in 7.008s without Redis configuration or external
+- the bounded Fast bootstrap lane passes 16/16 in 0.417s with only Core/test-host
+  references; its failed-start proof is red before repair and green after async-owned cleanup;
+- the bounded offline Pillars lane passes 16/16 in 4.793s without Redis configuration or external
   infrastructure;
-- the explicitly selected Infrastructure lane passes 7/7 in 120.068s; its facts remain explicit and
+- the explicitly selected Infrastructure lane passes 7/7 in 115.178s; its facts remain explicit and
   are not a default solution-test dependency;
 - the runner rejects missing/zero execution summaries, reports lane/phase/project/command/deadline,
   and kills only its owned process tree on timeout;
@@ -155,7 +158,7 @@ Treat every unrelated pre-existing change as user-owned.
 
 ## Do not infer
 
-- Do not broaden R04-02 into package, bootstrap, explanation, or Entity-facet work.
+- Do not reopen R04-02 or R04-03 without evidence that their accepted contracts are false.
 - Do not migrate public Entity vocabulary before false-success and host-lifetime hazards are bounded.
 - Do not treat the R04 facet slate's target grammar as current supported syntax.
 - Do not claim that a contributor which ignores cancellation is guaranteed to finish within host

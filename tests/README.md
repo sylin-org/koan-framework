@@ -113,7 +113,7 @@ Bootstrap proof is partitioned by composition cost (ARCH-0109). Use the bounded 
 test filter; Reference = Intent means a filter cannot remove modules referenced by the test assembly.
 
 ```pwsh
-# Default: 15 deterministic Core bootstrap contracts, no external infrastructure
+# Default: 16 deterministic Core bootstrap contracts, no external infrastructure
 ./scripts/test-bootstrap.ps1
 
 # 16 real AddKoan() pillar proofs using only in-process backends

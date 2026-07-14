@@ -127,8 +127,16 @@ public static class KoanIntegrationHost
         public async Task<IntegrationHost> StartAsync(CancellationToken ct = default)
         {
             var host = Build();
-            await host.StartAsync(ct).ConfigureAwait(false);
-            return host;
+            try
+            {
+                await host.StartAsync(ct).ConfigureAwait(false);
+                return host;
+            }
+            catch
+            {
+                await host.DisposeAsync().ConfigureAwait(false);
+                throw;
+            }
         }
     }
 }
@@ -163,6 +171,13 @@ public sealed class IntegrationHost : IAsyncDisposable
         _disposed = true;
         try { await _host.StopAsync(CancellationToken.None).ConfigureAwait(false); }
         catch { /* teardown is best-effort */ }
-        _host.Dispose();
+        if (_host is IAsyncDisposable asyncHost)
+        {
+            await asyncHost.DisposeAsync().ConfigureAwait(false);
+        }
+        else
+        {
+            _host.Dispose();
+        }
     }
 }

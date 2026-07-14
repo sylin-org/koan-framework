@@ -11,7 +11,7 @@ framework_version: v0.17.0
 # R04-03 — Establish bounded bootstrap test lanes
 
 - Priority: P0
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R04-02
 - Owner: Core bootstrap/testing
 
@@ -48,17 +48,18 @@ and fix the first non-completing path rather than raising the global timeout.
 
 ARCH-0109 establishes three project boundaries and `scripts/test-bootstrap.ps1`:
 
-- Fast owns 15 Core bootstrap contracts and has no pillar or infrastructure references.
+- Fast owns 16 Core bootstrap and test-host ownership contracts and has no pillar or infrastructure
+  references.
 - Pillars owns 16 real `AddKoan()` proofs using in-process backends and no Redis workaround.
 - Infrastructure owns seven explicit Redis, ONNX, and sqlite-vec facts and opts out of VSTest project
   execution; explicit facts alone can still initialize their class fixture.
 - The runner bounds build and execution independently, kills only its child process tree, preserves
   diagnostics, and rejects an exit-zero run without a nonzero xUnit summary.
 
-Observed self-executing test time on the accepting host: Fast 15/15 in 4.469s, Pillars 16/16 in
-7.008s, and explicit Infrastructure 7/7 in 120.068s. Infrastructure remains intentionally coarse and
-internally composes all three infrastructure surfaces; split it only if that coupling causes a concrete
-deadline or reliability failure.
+Observed self-executing test time on the accepting host: Fast 16/16 in 0.417s, Pillars 16/16 in
+4.793s, and explicit Infrastructure 7/7 in 115.178s. Infrastructure remains intentionally coarse and
+internally composes all three infrastructure surfaces; split it only if that coupling causes a
+concrete deadline or reliability failure.
 
 ## Failure behavior
 
@@ -74,10 +75,10 @@ terminates the owned child process tree without killing unrelated `dotnet` proce
 - container/broker lanes are explicit and skip/fail with a reason;
 - no test depends on execution order or residue from another host.
 
-The topology increment satisfies the first three bullets. Process serialization protects the current
-host/registry ownership boundary. A focused failed-start cleanup proof is still required before this
-card passes: if `KoanIntegrationHost.Builder.StartAsync` throws after building a host, the constructed
-host must be disposed before the exception escapes.
+All four conditions are satisfied. Process serialization protects the current host/registry ownership
+boundary. A focused proof is red before repair because an async-owned service survives failed startup,
+then green after `KoanIntegrationHost.Builder.StartAsync` disposes its wrapper before rethrowing the
+original startup error. The wrapper now awaits the underlying host's asynchronous disposal path.
 
 ## Compatibility and rollback
 

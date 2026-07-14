@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-14
   status: reviewed
-  scope: R04-03 bootstrap topology green; failed-start cleanup next
+  scope: R04-03 passed; R04-04 next
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T4 — foundation hardening`
 - Active work item: `R04`
-- Next decision: close integration-host failed-start ownership inside R04-03
+- Next decision: prove one atomic package set in an external clean room through R04-04
 - V1 readiness: `not assessed`
 
 ## Work items
@@ -33,7 +33,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R01 | [Ratify the product constitution](work-items/R01-product-constitution.md) | T1 | passed | R00 | Codex · 2026-07-13 | ARCH-0105 and the canonical product constitution separate durable rules, tactical mechanisms, and maturity claims. |
 | R02 | [Build the capability truth baseline](work-items/R02-capability-baseline.md) | T2 | passed | R01 | Codex · 2026-07-13 | All 13 surfaces are classified with reproducible evidence; no capability is mislabeled as supported while packaging is incoherent. |
 | R03 | [Define the Entity Semantics Contract](work-items/R03-entity-semantics-contract.md) | T3 | passed | R02 | Codex · 2026-07-13 | ARCH-0106 ratifies five semantic locations, strict Entity admission, C# 14 module facets, and host/context/event boundaries. |
-| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-14 | R04-01 and R04-02 passed. R04-03 has bounded ARCH-0109 lanes; failed-start test-host cleanup remains. |
+| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-14 | R04-01 through R04-03 passed; R04-04 atomic package closure is next. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | pending | R04 | — | Anonymous business domain only. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
@@ -47,7 +47,7 @@ item should normally be `in-progress`.
 | R01 | passed | ARCH-0105 accepted; canonical constitution and public alignment are complete. |
 | R02 | passed | Capability ledger, focused execution record, public-claim audit, and ranked dispositions accepted. |
 | R03 | passed | Entity inventory, ecosystem dispositions, canonical contract, and ARCH-0106 accepted. |
-| R04 | active | R04-01 and R04-02 passed. R04-03's three bounded lanes are green; one failed-start ownership increment remains. |
+| R04 | active | R04-01 through R04-03 passed. R04-04 is dependency-ready. |
 | R05 | no | The foundation path must be stable enough to measure honestly. |
 
 ## Divergence and risk log
@@ -70,8 +70,9 @@ item should normally be `in-progress`.
 | 2026-07-13 | R03 | ABP's strategic value is boundary discipline—aggregate invariants, UoW, deferred events, module dependencies, and optional repositories—not generated layering. | Adapt the boundaries while declining mandatory scaffolding and dynamic property bags for app-owned entities. |
 | 2026-07-13 | R04-01 | `DeleteBackup` had no management service or unambiguous name-to-archive deletion contract; raw storage deletion would invent unsafe semantics. | Return one actionable faulted task, prove that success is impossible, and defer deletion receipts/control-plane design. |
 | 2026-07-13 | R04-03 | `dotnet test` returned zero without building or reporting tests for the new xUnit v3 suite; direct build plus self-execution proved one passing test. | Require discovered/executed counts for test-lane evidence; diagnose command/tooling coherence in the bounded-lanes card. |
-| 2026-07-14 | R04-03 | Filtering the 38-test bootstrap assembly could not shrink its Reference = Intent closure; one Data proof took 26.245s with unrelated Redis/AI work and the full diagnostic run exceeded 90s. | ARCH-0109 splits 15 fast, 16 offline-pillar, and 7 explicit-infrastructure proofs. The bounded runner reports 15/15 in 4.469s, 16/16 in 7.008s, and 7/7 in 120.068s; failed-start host cleanup remains before pass. |
+| 2026-07-14 | R04-03 | Filtering the 38-test bootstrap assembly could not shrink its Reference = Intent closure; one Data proof took 26.245s with unrelated Redis/AI work and the full diagnostic run exceeded 90s. | ARCH-0109 splits 16 fast, 16 offline-pillar, and 7 explicit-infrastructure proofs. The accepting bounded run reports 16/16 in 0.417s, 16/16 in 4.793s, and 7/7 in 115.178s. |
 | 2026-07-14 | R04-03 | xUnit/VSTest initialized the Redis class fixture even though all infrastructure facts were explicit, briefly starting Docker before reporting seven tests Not Run. | Keep explicit facts as intent markers and set the self-executing infrastructure project `IsTestProject=false`; solution testing builds it but only `scripts/test-bootstrap.ps1 -Lane Infrastructure` executes it. |
+| 2026-07-14 | R04-03 | `KoanIntegrationHost.Builder.StartAsync` leaked the host it had built when hosted-service startup threw; the focused proof observed its async-owned service still alive. | Make the returned wrapper the single ownership boundary, dispose it before rethrowing failed startup, and prefer the underlying host's async disposal path. The unchanged proof is green in the 16/16 Fast lane, so R04-03 passes. |
 | 2026-07-13 | R04-08 | Data.Backup public prose names absent APIs, and the test-authoring guide mandates a removed harness/path. | Keep R04-01 wording truthful; repair and executable-gate the broader documentation in R04-08. |
 | 2026-07-13 | R04-02 | The isolated VectorModel guard spec passed, but the 79-test Data.AI process produced 31 failures after `EmbeddingMetadata` captured a logger from a disposed first-host provider. | Treat the static initializer as the root failure; lease generic-host binding and resolve host services only when an operation runs. |
 | 2026-07-13 | R04-02 | Owner-checked host leases, late Data.AI logger resolution, and a two-host Entity/storage probe are green; Core passes 195/195 and Data.AI passes 80/80. Backend-dependent caches and alternate binding paths remain unaudited. | Keep R04-02 `in-progress` and migrate one runtime owner at a time rather than claiming host scope from the first repair. |

@@ -25,7 +25,8 @@ count is not sufficient evidence that a bootstrap contract ran.
 Bootstrap evidence is owned by three separate test assemblies:
 
 - `Koan.Tests.Integration.Bootstrap` is the deterministic fast lane. It references only Core and the
-  neutral test host and owns 15 discovery, manifest, fail-loud/lenient, and startup-rendering proofs.
+  neutral test host and owns 16 discovery, manifest, fail-loud/lenient, startup-rendering, and test-host
+  ownership proofs.
 - `Koan.Tests.Integration.Bootstrap.Pillars` owns 16 real `AddKoan()` proofs for the in-process pillar
   composition. Its references are limited to modules that require no external service.
 - `Koan.Tests.Integration.Bootstrap.Infrastructure` owns seven Redis, ONNX, and sqlite-vec proofs. All
@@ -51,8 +52,8 @@ bootstrap tests inspect process-wide registry snapshots.
 - Infrastructure proof is deliberately opt-in and expensive. Its current assembly still composes all
   three infrastructure surfaces, so non-Redis tests can observe Redis startup work. Split it further
   only when a concrete reliability or deadline failure justifies more projects.
-- The runner makes silent hangs bounded but does not repair resource ownership inside a host. Failed
-  `KoanIntegrationHost.StartAsync` cleanup remains a separate R04-03 increment.
+- Failed `KoanIntegrationHost.StartAsync` now disposes the host it built before rethrowing. The
+  returned wrapper also uses true asynchronous host disposal when the underlying host supports it.
 - This decision changes test topology and evidence, not application runtime behavior or capability
   maturity.
 
@@ -60,12 +61,14 @@ bootstrap tests inspect process-wide registry snapshots.
 
 On the accepting development host, the self-executing lanes reported:
 
-- fast: 15/15 in 4.469 seconds;
-- pillars: 16/16 in 7.008 seconds;
-- infrastructure: 7/7 in 120.068 seconds, explicitly selected with Docker available.
+- fast: 16/16 in 0.417 seconds;
+- pillars: 16/16 in 4.793 seconds;
+- infrastructure: 7/7 in 115.178 seconds, explicitly selected with Docker available.
 
 The bounded wrapper also validates the build phase and refuses a zero-test success. These are observed
 results, not cross-machine performance guarantees; the conservative defaults are overrideable.
+The failed-start proof was red because its async-owned service remained undisposed, then green after
+the builder adopted the wrapper as its single cleanup boundary.
 
 ## References
 
