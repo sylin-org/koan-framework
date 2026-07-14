@@ -62,6 +62,9 @@ public static class ServiceCollectionExtensions
         var identityBuilder = services.AddKoanOptions<ApplicationIdentityOptions>(ApplicationIdentityDefaults.ConfigurationSection);
         identityBuilder.Services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IPostConfigureOptions<ApplicationIdentityOptions>), typeof(ApplicationIdentityPostConfigure)));
         identityBuilder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<ApplicationIdentityOptions>>().Value);
+        identityBuilder.Services.TryAdd(ServiceDescriptor.Singleton(
+            typeof(ApplicationIdentitySnapshot),
+            sp => sp.GetRequiredService<ApplicationIdentityOptions>().ToSnapshot()));
 
         // Bind KoanLog to the ambient logger factory once the host starts up
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, KoanLogFactoryBridge>());

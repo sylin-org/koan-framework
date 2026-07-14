@@ -227,7 +227,33 @@ vestigial; removing a public type is outside this lifetime repair. Relationship 
 contains load-all-and-filter paths; their cost and capability behavior remain explicitly owned by
 R04-06 rather than being hidden inside host ownership work.
 
-R04-02 remains active for `AppHost.Identity` and the non-hosted `StartKoan()` path.
+## Tenth increment — bind application identity to the active host
+
+- The identity inventory found one write (`AppHostBinderHostedService.SetIdentity`) and three direct
+  production reads: OpenAPI document metadata, S3 bucket-prefix fallback, and ZenGarden content-change
+  filtering. The stored snapshot retained no provider, service, logger, adapter, or disposable, but it
+  did retain configuration after its owning lease and ignored `AppHost.PushScope` selection.
+- Two focused red probes made the split-brain concrete. Both sequential binders and parallel flow
+  scopes selected distinct providers while `AppHost.Identity` continued returning the process-global
+  `koan-core-tests` identity; the focused surface passed 3/5 before the repair.
+- `ApplicationIdentitySnapshot` is now a host-owned singleton derived from the existing configured
+  `ApplicationIdentityOptions`. `AppHost.Identity` resolves it from the current leased or flow-scoped
+  provider on every access; with no registered host identity it falls back to the frozen process
+  snapshot in `KoanEnv`.
+- Removed the binder's independent global identity assignment. S3 and ZenGarden keep their public call
+  shapes and now inherit active-host selection automatically.
+- OpenAPI already receives its host's application services, so its transformer now resolves that
+  provider's identity directly. A real two-TestServer probe starts Alpha and Beta together and proves
+  that both documents retain their own title and application code.
+- The unchanged focused binder surface passes 5/5. Core passes 197/197, Core Unit passes 79/79, and
+  OpenAPI passes 10/10.
+
+`KoanEnv.CurrentSnapshot.Application` remains an init-once process identity by design and is the
+hostless fallback. MCP and composition surfaces that read `KoanEnv` directly were inventoried but not
+silently reclassified as host-aware by this increment; any change to that frozen-infrastructure
+contract requires its own bounded decision and evidence.
+
+R04-02 remains active for the non-hosted `StartKoan()` path.
 
 ## Smallest meaningful fix
 

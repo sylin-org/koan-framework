@@ -75,9 +75,63 @@ public sealed class AppHostBinderHostedServiceTests : IDisposable
         AppHost.Current.Should().BeNull();
     }
 
-    private sealed class FakeServiceProvider(string name) : IServiceProvider
+    [Fact]
+    public async Task Identity_follows_sequential_host_ownership()
     {
-        public object? GetService(Type serviceType) => null;
+        var providerA = new FakeServiceProvider("A", Identity("app-a"));
+        var providerB = new FakeServiceProvider("B", Identity("app-b"));
+        var binderA = new AppHostBinderHostedService(providerA);
+        var binderB = new AppHostBinderHostedService(providerB);
+
+        await binderA.StartAsync(TestContext.Current.CancellationToken);
+        AppHost.Identity.Code.Should().Be("app-a");
+        await binderA.StopAsync(TestContext.Current.CancellationToken);
+
+        await binderB.StartAsync(TestContext.Current.CancellationToken);
+        AppHost.Identity.Code.Should().Be("app-b");
+        await binderB.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task Parallel_flow_scopes_see_their_own_host_identity()
+    {
+        var attached = new FakeServiceProvider("attached", Identity("attached"));
+        var providerA = new FakeServiceProvider("A", Identity("app-a"));
+        var providerB = new FakeServiceProvider("B", Identity("app-b"));
+        var binder = new AppHostBinderHostedService(attached);
+        await binder.StartAsync(TestContext.Current.CancellationToken);
+
+        async Task<string> ResolveInScope(FakeServiceProvider provider)
+        {
+            using (AppHost.PushScope(provider))
+            {
+                await Task.Delay(20, TestContext.Current.CancellationToken);
+                return AppHost.Identity.Code;
+            }
+        }
+
+        var resolved = await Task.WhenAll(ResolveInScope(providerA), ResolveInScope(providerB));
+        resolved.Should().Equal("app-a", "app-b");
+
+        AppHost.Identity.Code.Should().Be("attached");
+        await binder.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    private static ApplicationIdentitySnapshot Identity(string code) => new(
+        $"Application {code}",
+        code,
+        "",
+        null,
+        null,
+        []);
+
+    private sealed class FakeServiceProvider(
+        string name,
+        ApplicationIdentitySnapshot? identity = null) : IServiceProvider
+    {
+        public object? GetService(Type serviceType) =>
+            serviceType == typeof(ApplicationIdentitySnapshot) ? identity : null;
+
         public override string ToString() => name;
     }
 }

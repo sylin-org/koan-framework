@@ -25,7 +25,6 @@ public static class AppHost
 {
     private static IServiceProvider? _global;
     private static readonly System.Threading.AsyncLocal<IServiceProvider?> _scoped = new();
-    private static ApplicationIdentitySnapshot _identity = ApplicationIdentitySnapshot.Empty;
 
     public static IServiceProvider? Current
     {
@@ -78,10 +77,24 @@ public static class AppHost
         }
     }
 
-    public static ApplicationIdentitySnapshot Identity => _identity;
-
-    internal static void SetIdentity(ApplicationIdentitySnapshot snapshot)
+    /// <summary>
+    /// Gets the application identity owned by the current host or flow scope.
+    /// </summary>
+    /// <remarks>
+    /// When no host is active, the process-level <see cref="global::Koan.Core.KoanEnv"/> snapshot is
+    /// returned as a hostless fallback. Host configuration is never retained in a separate static.
+    /// </remarks>
+    public static ApplicationIdentitySnapshot Identity
     {
-        _identity = snapshot;
+        get
+        {
+            var services = Current;
+            if (services?.GetService(typeof(ApplicationIdentitySnapshot)) is ApplicationIdentitySnapshot identity)
+            {
+                return identity;
+            }
+
+            return global::Koan.Core.KoanEnv.CurrentSnapshot.Application;
+        }
     }
 }

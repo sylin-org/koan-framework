@@ -21,12 +21,16 @@ source: src/Koan.Core/
 - `AppHost`: resolves the current flow-scoped provider, then the running host's leased default.
 - `AppHost.PushScope(IServiceProvider)`: selects a provider for one async flow and restores the prior
   flow value when disposed.
+- `AppHost.Identity`: resolves the immutable identity snapshot registered by that same provider;
+  hostless callers receive the frozen `KoanEnv` application identity.
 
 ## Usage guidance
 
 - Prefer these utilities over bespoke helpers; keep concerns separated.
 - Let `AddKoan()` and the generic host manage the default provider. Use `PushScope` for concurrent
   integration hosts, jobs, or other explicit execution contexts.
+- Resolve host-specific application identity through `AppHost.Identity` or an explicitly supplied
+  provider. Do not retain configuration-derived identity in another process static.
 - Do not cache services obtained from `AppHost.Current` in process-static fields. Immutable reflection
   metadata may be process-static; services and configuration remain host-owned.
 
