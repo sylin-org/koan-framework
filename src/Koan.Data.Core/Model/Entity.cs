@@ -919,29 +919,21 @@ namespace Koan.Data.Core.Model
             return children.AsReadOnly();
         }
 
-        // Static accessor for relationship metadata service (set by DI registration)
-        private static IRelationshipMetadata? _cachedMetadata;
-        private static readonly object _metadataLock = new();
+        // Hostless metadata inspection needs no runtime owner; its reflection facts are immutable.
+        // Hosted calls must resolve the active host's singleton on every invocation so a closed
+        // Entity type never retains a service from an earlier, disposed host.
+        private static readonly IRelationshipMetadata FallbackRelationshipMetadata = new RelationshipMetadataService();
 
         public IRelationshipMetadata GetRelationshipService()
         {
-            if (_cachedMetadata != null) return _cachedMetadata;
-            lock (_metadataLock)
+            var accessor = EntityMetadataProvider.RelationshipMetadataAccessor;
+            var services = Koan.Core.Hosting.App.AppHost.Current;
+            if (accessor != null && services != null)
             {
-                if (_cachedMetadata != null) return _cachedMetadata;
-                if (EntityMetadataProvider.RelationshipMetadataAccessor != null)
-                {
-                    var sp = Koan.Core.Hosting.App.AppHost.Current;
-                    if (sp != null)
-                    {
-                        _cachedMetadata = EntityMetadataProvider.RelationshipMetadataAccessor(sp);
-                        return _cachedMetadata;
-                    }
-                }
-                // Fallback for test scenarios
-                _cachedMetadata = new RelationshipMetadataService();
-                return _cachedMetadata;
+                return accessor(services);
             }
+
+            return FallbackRelationshipMetadata;
         }
 
     }

@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-13
   status: reviewed
-  scope: R04-02 captured lifecycle dependency ownership
+  scope: R04-02 relationship metadata ownership
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -30,35 +30,35 @@ Replace this file at every handoff. It is a restart point, not a diary.
   and the canonical [Entity Semantics Contract](../../architecture/entity-semantics-contract.md)
   now bound implementation choices. The dependency-ordered [`R04-BACKLOG.md`](R04-BACKLOG.md) is
   established, R04-01 passed, and R04-02's host lease, durable vector-model confirmation, AI
-  discovery and lifecycle-capture classification, idempotent lifecycle composition, and host-owned
-  startup-health increments are green. `HealthProbeScheduler` now has one orchestrator-owned execution
-  path while
-  retaining its background, pokeable, and health aliases, and the orchestrator awaits owned child
-  cleanup within the host shutdown deadline. No capability maturity label changed. A
+  discovery and lifecycle-capture classification, active-host relationship metadata, idempotent
+  lifecycle composition, and host-owned startup-health increments are green. `HealthProbeScheduler`
+  has one orchestrator-owned execution path while retaining its background, pokeable, and health
+  aliases, and the orchestrator awaits owned child cleanup within the host shutdown deadline. No
+  capability maturity label changed. A
   parallel design-only [`R04 Entity Facet Candidate Slate`](R04-ENTITY-FACET-CANDIDATES.md) elects
   the eventual R04-07 language without changing the active production card or implementing public syntax.
 
 ## Next safe actions
 
 1. Treat the leased host binding, late Data.AI logger resolution, uncached durable vector-model
-   registry, immutable AI type discovery, clean lifecycle-capture classification, equal-delegate
-   lifecycle idempotence, tracked startup health probing, single-owner health scheduling, and bounded
-   orchestrator child shutdown as the stable R04-02 base.
+   registry, immutable AI type discovery, clean lifecycle-capture classification, active-host
+   relationship metadata, equal-delegate lifecycle idempotence, tracked startup health probing,
+   single-owner health scheduling, and bounded orchestrator child shutdown as the stable R04-02 base.
 2. Run the `explore` skill before the next production increment.
-3. Inventory relationship metadata caches and registration paths; separate immutable reflection/type
-   facts from providers, adapters, configuration, and other host-owned runtime state.
-4. Reduce the first concrete relationship owner with a repeated-host probe before changing its storage
-   or registration shape. If the inventory is clean, record that classification with evidence.
-5. Then audit `AppHost.Identity` and the non-hosted `StartKoan()` path.
+3. Inventory every read/write of `AppHost.Identity`, including binder leases, direct assignment,
+   diagnostics, and tests; determine whether it retains host-owned identity beyond provider ownership.
+4. Reduce the first concrete identity-owner failure with sequential and parallel host probes before
+   changing its shape. If the inventory is clean, record that classification with evidence.
+5. Then audit the non-hosted `StartKoan()` path.
 6. Do not mark R04-02 passed until sequential and parallel ownership probes cover every named owner and
    missing/disposed host behavior is corrective.
 
 ## Expected working tree
 
 R04-01 and R04-02's host lease, vector-model confirmation, AI discovery and lifecycle-capture
-classification, lifecycle idempotence, startup-health ownership, scheduler single-owner, and
-orchestrator shutdown repairs should be committed. Treat every unrelated pre-existing change as
-user-owned.
+classification, active-host relationship metadata, lifecycle idempotence, startup-health ownership,
+scheduler single-owner, and orchestrator shutdown repairs should be committed. Treat every unrelated
+pre-existing change as user-owned.
 
 ## Verification at handoff
 
@@ -77,6 +77,10 @@ user-owned.
   host runtime state, while OpenGraph's application-supplied resolver/selector boundary is explicit;
 - focused lifecycle consumers pass: Data.AI repeated-host 3/3, Data.Core 11/11, Identity 113/113, and
   OpenGraph 38/38;
+- the relationship metadata two-host probe is red 0/1 before the repair and green 1/1 after it; host B
+  resolves its own singleton after host A disposes its registration;
+- the complete Data.Core process passes 286/286 with zero disposed-service, meter-factory, or
+  cancellation-exception signatures;
 - runtime and consumer tests for R04-02 must cover repeat hosts and disposed-state negative paths;
 - documentation metadata, links, TOC, privacy scan, and `git diff --check` pass;
 - no private downstream detail enters evidence or examples.

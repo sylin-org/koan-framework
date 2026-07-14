@@ -202,8 +202,32 @@ Focused verification passes: Data.AI repeated-host lifecycle 3/3, Data.Core Enti
 Identity 113/113, and OpenGraph 38/38. Documentation lint reports zero errors with the unchanged 1,518
 repository warnings.
 
-R04-02 remains active for relationship metadata, `AppHost.Identity`, and the non-hosted
-`StartKoan()` path.
+## Ninth increment — resolve relationship metadata from the active host
+
+- A focused two-host red probe used one closed Entity type and a disposable metadata singleton per
+  real `AddKoan()` host. Host A disposed its singleton, but host B's Entity returned that same stale
+  object instead of host B's registration; the probe failed 0/1.
+- `Entity<TEntity,TKey>` no longer caches `IRelationshipMetadata` in a closed-generic static. Each
+  hosted call resolves the current ambient provider through the existing targetless accessor, so the
+  host owns both the service and its lifetime.
+- `RelationshipMetadataService` remains a per-host singleton. Its four internal dictionaries retain
+  only entity `Type`, property name, and related `Type` reflection facts; they retain no provider,
+  adapter, options, logger, configuration, or host identity.
+- `AssemblyCache` remains process-wide and additive because child discovery needs assembly reflection
+  facts. It retains no host runtime service; collectible assembly unloading remains unsupported.
+- Hostless `GetRelationshipService()` metadata inspection keeps one process-static fallback service.
+  That fallback has no DI/runtime dependencies and caches only the same immutable reflection facts.
+- The unchanged ownership probe passes 1/1 after the repair. The complete Data.Core process passes
+  286/286 with zero `ObjectDisposedException`, `DefaultMeterFactory`, or `TaskCanceledException`
+  signatures. Public relationship syntax, `IRelationshipMetadata`, and the targetless accessor remain
+  compatible.
+
+The unused global-namespace `EntityMetadataProvider` duplicate at the end of `Entity.cs` remains
+vestigial; removing a public type is outside this lifetime repair. Relationship child loading still
+contains load-all-and-filter paths; their cost and capability behavior remain explicitly owned by
+R04-06 rather than being hidden inside host ownership work.
+
+R04-02 remains active for `AppHost.Identity` and the non-hosted `StartKoan()` path.
 
 ## Smallest meaningful fix
 
