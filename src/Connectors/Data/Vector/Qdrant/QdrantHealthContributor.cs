@@ -30,6 +30,10 @@ public sealed class QdrantHealthContributor(
             logger?.LogDebug("Qdrant health: {Body}", body);
             return new HealthReport(Name, HealthState.Healthy, "qdrant reachable", null, null);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger?.LogWarning(ex, "Qdrant health check failed");

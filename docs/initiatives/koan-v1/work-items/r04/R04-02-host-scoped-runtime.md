@@ -104,7 +104,28 @@ test hosts also produced background Qdrant health-probe `ObjectDisposedException
 `DefaultMeterFactory` while the focused tests still exited green. That is a separate host-disposal and
 observability owner and must not be hidden by this repair.
 
-R04-02 remains active for captured lifecycle dependencies, background health/startup work,
+## Fifth increment — host-owned startup health probing
+
+- A focused red Core probe proved that `StartupProbeService.StopAsync` returned while its active
+  contributor remained blocked and the next contributor could run after shutdown.
+- A second red probe proved that the cancellation token already accepted by `RequestProbe` was not
+  delivered to targeted health contributors.
+- `StartupProbeService` is now a tracked one-shot `BackgroundService`; host shutdown cancels and awaits
+  the active contributor before service-provider disposal.
+- Probe request arguments carry the caller's cancellation token. Targeted and broadcast bridge paths
+  use it, and cancellation does not create an Unhealthy sample.
+- Qdrant health checks rethrow intentional host cancellation instead of logging a warning and returning
+  an Unhealthy report.
+- The focused Core lifecycle probes pass 2/2, Core Unit passes 74/74, main Core passes 195/195, Data.AI
+  passes 82/82, and Data.Core passes 285/285. A full Data.Core output gate found zero
+  `ObjectDisposedException`, `DefaultMeterFactory`, disposed-object, or cancellation-stack matches.
+
+The same full-host logs show `HealthProbeScheduler` starting and stopping twice: it is registered as a
+direct hosted service and also activated by the Koan background-service orchestrator. That duplicate
+execution is the next bounded background owner; this increment does not conceal it inside the startup
+probe repair.
+
+R04-02 remains active for duplicate health-scheduler activation, captured lifecycle dependencies,
 relationship metadata, `AppHost.Identity`, and the non-hosted `StartKoan()` path.
 
 ## Smallest meaningful fix
