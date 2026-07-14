@@ -125,7 +125,26 @@ direct hosted service and also activated by the Koan background-service orchestr
 execution is the next bounded background owner; this increment does not conceal it inside the startup
 probe repair.
 
-R04-02 remains active for duplicate health-scheduler activation, captured lifecycle dependencies,
+## Sixth increment — one scheduler lifecycle owner
+
+- Two focused red probes used real `AddKoan()` composition: one found the scheduler registered directly
+  as an `IHostedService`, and the other observed two scheduler starts and two stops in one host lifecycle.
+- Removed only the direct hosted-service registration. The generated background-service descriptor and
+  `KoanBackgroundServiceOrchestrator` are now the scheduler's sole execution path.
+- The concrete scheduler and its `IKoanBackgroundService`, `IKoanPokableService`, and
+  `IHealthContributor` aliases still resolve to the same singleton, retaining manual probe actions,
+  health reporting, and service inspectability.
+- The unchanged focused probes pass 2/2. Core Unit passes 76/76, Core passes 195/195, Data.AI passes
+  82/82, and Data.Core passes 285/285.
+- Full-process output shows balanced single-owner scheduler lifecycles across repeated hosts: Data.AI
+  reports 8 starts/8 stops and Data.Core 87/87. Both output scans contain zero
+  `ObjectDisposedException`, `DefaultMeterFactory`, disposed-object, or `TaskCanceledException` matches.
+
+The orchestrator cancels each child through a linked token, but its own stop path does not explicitly
+await every tracked child task before returning. That adjacent shutdown contract is the next bounded
+background owner; this increment proves one scheduler loop without overstating child completion.
+
+R04-02 remains active for orchestrator child-task shutdown, captured lifecycle dependencies,
 relationship metadata, `AppHost.Identity`, and the non-hosted `StartKoan()` path.
 
 ## Smallest meaningful fix

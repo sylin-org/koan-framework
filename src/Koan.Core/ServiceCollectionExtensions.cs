@@ -77,7 +77,8 @@ public static class ServiceCollectionExtensions
         // bridge fan those contributors into the push-first aggregator on probe.
         services.AddSingleton<IHealthRegistry, HealthRegistry>();
         services.AddHostedService<HealthContributorsBridge>();
-        services.AddHostedService<HealthProbeScheduler>();
+        // HealthProbeScheduler is a discovered Koan background service; the background-service
+        // orchestrator is its sole execution owner and preserves its pokeable + health aliases.
         // Kick a startup probe so readiness is populated early
         services.AddHostedService<StartupProbeService>();
         // Hosting runtime: apps depend on greenfield IAppRuntime
