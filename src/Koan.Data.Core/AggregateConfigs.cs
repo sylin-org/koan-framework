@@ -1,32 +1,63 @@
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 
 namespace Koan.Data.Core;
 
 public static class AggregateConfigs
 {
-    private static readonly ConcurrentDictionary<(Type, Type), object> Cache = new();
+    private static ConditionalWeakTable<
+        IServiceProvider,
+        ConcurrentDictionary<(Type EntityType, Type KeyType), object>> _configsByProvider = new();
+    private static readonly ConcurrentDictionary<(Type EntityType, Type KeyType), byte> RegisteredTypes = new();
 
     public static AggregateConfig<TEntity, TKey> Get<TEntity, TKey>(IServiceProvider sp)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var key = (typeof(TEntity), typeof(TKey));
-        if (Cache.TryGetValue(key, out var existing)) return (AggregateConfig<TEntity, TKey>)existing;
+        ArgumentNullException.ThrowIfNull(sp);
 
-        var provider = ResolveProvider(typeof(TEntity)) ?? DefaultProvider(sp);
-        var idSpec = AggregateMetadata.GetIdSpec(typeof(TEntity));
-        var cfg = new AggregateConfig<TEntity, TKey>(provider, idSpec, sp);
-        Cache[key] = cfg;
-        return cfg;
+        var key = (typeof(TEntity), typeof(TKey));
+        RegisteredTypes.TryAdd(key, 0);
+        var cache = Volatile.Read(ref _configsByProvider).GetValue(
+            sp,
+            static _ => new ConcurrentDictionary<(Type EntityType, Type KeyType), object>());
+
+        return (AggregateConfig<TEntity, TKey>)cache.GetOrAdd(key, _ =>
+        {
+            var provider = ResolveProvider(typeof(TEntity)) ?? DefaultProvider(sp);
+            var idSpec = AggregateMetadata.GetIdSpec(typeof(TEntity));
+            return new AggregateConfig<TEntity, TKey>(provider, idSpec, sp);
+        });
     }
 
-    // Testing/host reset: clear cached configs to avoid cross-root contamination.
-    // Public because the AdapterSurface matrix needs to call it between test-class boundaries —
-    // each WebApplicationFactory<Program> creates its own ServiceProvider but the static cache
-    // pins references to the first one.
-    public static void Reset() => Cache.Clear();
+    /// <summary>
+    /// Gets the provider-free entity and key types observed by aggregate configuration.
+    /// </summary>
+    /// <remarks>
+    /// This process-wide discovery surface retains type facts only. Provider selection, repositories,
+    /// and services remain isolated to the provider supplied to <see cref="Get{TEntity,TKey}"/>.
+    /// </remarks>
+    public static IReadOnlyCollection<(Type EntityType, Type KeyType)> GetRegisteredTypes()
+        => RegisteredTypes.Keys.ToArray();
+
+    /// <summary>
+    /// Clears aggregate configuration and discovery state used by test matrices.
+    /// </summary>
+    /// <remarks>
+    /// Runtime correctness does not require this reset: configuration caches are partitioned by
+    /// service-provider identity and release with their provider.
+    /// </remarks>
+    public static void Reset()
+    {
+        Interlocked.Exchange(
+            ref _configsByProvider,
+            new ConditionalWeakTable<
+                IServiceProvider,
+                ConcurrentDictionary<(Type EntityType, Type KeyType), object>>());
+        RegisteredTypes.Clear();
+    }
 
     private static string? ResolveProvider(Type aggregateType)
     {

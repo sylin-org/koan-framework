@@ -303,6 +303,40 @@ repository `explore` workflow and a failing repeated-host probe that demonstrate
 own provider and repository without calling `AggregateConfigs.Reset()`. The other residuals remain
 visible here so completing one cannot be mistaken for closing the card.
 
+## Thirteenth increment — host-owned aggregate configuration
+
+`AggregateConfigs` no longer stores runtime configuration in one process dictionary. Configuration
+and its lazy repository are memoized inside a weak-keyed cache partitioned by the supplied
+`IServiceProvider`; the value can close over that provider without extending its lifetime, and two
+providers using the same closed Entity type cannot observe one another's adapter factory, guards,
+read contributors, configuration, or repository. Per-provider insertion is atomic, preserving
+same-host memoization under contention.
+
+The only process-wide state retained by this surface is the additive `(EntityType, KeyType)` discovery
+fact set. The new `AggregateConfigs.GetRegisteredTypes()` inspection method returns a snapshot of
+those provider-free facts. `AggregateConfigs.Reset()` remains as compatibility cleanup for test
+matrices, but no repeated-host correctness proof calls it.
+
+Data.Backup no longer reflects the private Data.Core cache. Its registered-entity fallback accepts
+the discovery service's injected provider, obtains the supported type facts, and resolves each
+provider against that host. The no-argument compatibility facade uses the current ambient host when
+one exists and reports `unknown` rather than recovering runtime metadata from an earlier host when
+none exists.
+
+Evidence on 2026-07-14:
+
+- the new focused Data.Core ownership surface was red 1/3 against the process cache because later
+  host tests reused an earlier cached configuration; unchanged after the repair it passes 3/3;
+- sequential hosts resolve distinct configurations/repositories without reset, simultaneous hosts
+  remain isolated, and one host creates its repository once;
+- the supported Backup discovery seam passes its focused proof and the complete Backup suite passes
+  2/2;
+- the complete Data.Core process passes 293/293.
+
+R04-02 remains `in-progress`. Alternate ambient writers, static logging scopes, the dead background
+service locator, and the unified missing/disposed-host failure contract remain separate closure
+residuals; this increment does not change their status or any capability maturity label.
+
 ## Smallest meaningful fix
 
 Define one host/runtime lease and make service/configuration-backed registries resolve through it.

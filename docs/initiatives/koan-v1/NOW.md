@@ -4,12 +4,12 @@ domain: framework
 title: "Koan V1 Reorganization Current Handoff"
 audience: [maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-13
+last_updated: 2026-07-14
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-14
   status: reviewed
-  scope: R04-02 closure audit and aggregate-cache residual
+  scope: R04-02 host-owned aggregate configuration and remaining closure residuals
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -39,9 +39,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
   hostless process snapshot. The synchronous non-hosted `StartKoan()` path now owns the same atomic
   host lease as the generic-host binder: disposal releases its binding, overlapping owners cannot
   clear one another, and failed startup disposes the new provider. No capability maturity label
-  changed. A closure audit found that R04-02 is not ready to pass: `AggregateConfigs` still pins its
-  first provider/repository, alternate `AppHost.Current` writers remain, static logging scopes cache
-  first-host loggers, and an unused background-service locator retains its provider. A parallel design-only
+  changed. Aggregate configuration and its repository are now memoized per weak provider identity;
+  Backup consumes provider-free type facts through a supported seam and resolves provider metadata
+  against its injected host. A closure audit still prevents R04-02 from passing: alternate
+  `AppHost.Current` writers remain, static logging scopes cache first-host loggers, an unused
+  background-service locator retains its provider, and the unified missing-host failure is absent. A parallel design-only
   [`R04 Entity Facet Candidate Slate`](R04-ENTITY-FACET-CANDIDATES.md) elects the eventual R04-07
   language without changing the active production card or implementing public syntax.
 
@@ -51,17 +53,16 @@ Replace this file at every handoff. It is a restart point, not a diary.
    registry, immutable AI type discovery, clean lifecycle-capture classification, active-host
    relationship metadata, equal-delegate lifecycle idempotence, tracked startup health probing,
    single-owner health scheduling, bounded orchestrator child shutdown, and host-owned application
-   identity as the stable R04-02 base.
+   identity and provider-owned aggregate configuration as the stable R04-02 base.
 2. Run the `explore` skill before the next production increment.
-3. Reduce only the first closure residual: `AggregateConfigs` pins the first provider inside a
-   process-static `AggregateConfig<TEntity,TKey>` and relies on public `Reset()` calls for isolation.
-4. Start with a red two-host probe using one Entity type and no reset. Host B must resolve its own
-   provider/repository after host A is disposed; add parallel evidence only after the sequential owner
-   is correct.
+3. Reduce only the next closure residual: the seven tracked production/test-support ambient writers
+   that assign or clear `AppHost.Current` outside canonical owner leases or flow scopes.
+4. Classify framework-host wiring separately from test flow selection before changing code. Begin
+   with the smallest red sequential/parallel owner probe and migrate one writer family at a time.
 5. Keep direct `KoanEnv.CurrentSnapshot.Application` consumers classified as process-snapshot users;
    do not imply they became host-aware through the `AppHost.Identity` repair.
-6. Do not fold the alternate ambient writers, static logging scopes, dead service locator, or unified
-   missing-host error into the aggregate-cache repair. They remain explicit later R04-02 residuals.
+6. Do not fold static logging scopes, the dead service locator, or the unified missing-host error into
+   the ambient-writer repair. They remain explicit later R04-02 residuals.
 7. Do not mark R04-02 passed until sequential and parallel ownership probes cover every named owner and
    missing/disposed host behavior is corrective.
 
@@ -71,15 +72,14 @@ R04-01 and R04-02's host lease, vector-model confirmation, AI discovery and life
 classification, active-host relationship metadata, lifecycle idempotence, startup-health ownership,
 scheduler single-owner, orchestrator shutdown, application-identity, and non-hosted startup repairs
 should be committed.
-The closure-audit residual ledger should also be committed; no new production repair is expected in
-that audit commit.
+The closure-audit ledger and provider-owned aggregate-configuration repair should also be committed.
 Treat every unrelated pre-existing change as user-owned.
 
 ## Verification at handoff
 
 - Core host-binding, OpenAPI, and Data.AI projects build with zero errors;
 - Core Unit passes 79/79, the Core self-executing suite passes 197/197, Data.AI passes 82/82, and
-  Data.Core passes 290/290;
+  Data.Core passes 293/293;
 - the AI unit project builds with zero errors and its self-executing suite passes 155/155;
 - the focused Data.Core lifecycle class passes 11/11;
 - repeated-host probes prove different DI markers, Entity storage, and vector-model registry state;
@@ -101,10 +101,12 @@ Treat every unrelated pre-existing change as user-owned.
 - the non-hosted `StartKoan()` ownership surface is red 0/4 before the repair and green 4/4 after it;
   provider disposal, overlapping owners, concurrent scoped flows, and failed startup all release the
   correct binding and owned services;
-- the closure audit counts 14 `AggregateConfigs.Reset()` call sites, seven tracked `src/` ambient
-  assignments, thirteen static logging scopes, and one set-only static background provider; therefore
-  R04-02 remains `in-progress`;
-- the complete Data.Core process passes 290/290 with zero disposed-service, meter-factory, or
+- aggregate configuration ownership is red 1/3 before repair and green 3/3 after it without reset;
+  the complete Data.Core process passes 293/293 and Backup passes 2/2;
+- the closure audit still counts 14 compatibility `AggregateConfigs.Reset()` call sites, seven
+  tracked `src/` ambient assignments, thirteen static logging scopes, and one set-only static
+  background provider; therefore R04-02 remains `in-progress`;
+- the complete Data.Core process passes 293/293 with zero disposed-service, meter-factory, or
   cancellation-exception signatures;
 - runtime and consumer tests for R04-02 must cover repeat hosts and disposed-state negative paths;
 - documentation metadata, links, TOC, privacy scan, and `git diff --check` pass;

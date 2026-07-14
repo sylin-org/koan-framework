@@ -148,7 +148,7 @@ public class EntityDiscoveryService(IServiceProvider serviceProvider, ILogger<En
             return _currentDiscovery.Entities;
 
         // Fall back to AggregateConfigs if no discovery has been run
-        return AggregateConfigsExtensions.GetAllRegisteredEntities();
+        return AggregateConfigsExtensions.GetAllRegisteredEntities(serviceProvider);
     }
 
     public async Task RefreshDiscovery(CancellationToken ct = default)
@@ -163,7 +163,7 @@ public class EntityDiscoveryService(IServiceProvider serviceProvider, ILogger<En
     {
         return _currentDiscovery ?? new EntityDiscoveryResult
         {
-            Entities = AggregateConfigsExtensions.GetAllRegisteredEntities().ToList(),
+            Entities = AggregateConfigsExtensions.GetAllRegisteredEntities(serviceProvider).ToList(),
             DiscoveredAt = DateTimeOffset.UtcNow,
             DiscoveryDuration = TimeSpan.Zero
         };

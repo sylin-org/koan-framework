@@ -35,6 +35,18 @@ source: src/Koan.Data.Core/
 - Distinct closure instances remain distinct handlers; idempotence is not a substitute for correct
   host-independent handler design.
 
+## Aggregate configuration ownership
+
+- `AggregateConfigs.Get<TEntity,TKey>(services)` memoizes configuration and its lazy repository per
+  `IServiceProvider`. Sequential or simultaneous hosts using the same closed Entity type do not share
+  adapter factories, guards, read contributors, configurations, or repositories.
+- Per-provider caches use weak provider keys, so the cache does not extend a host's lifetime. Values
+  may safely close over their owning provider because the entire entry releases with that provider.
+- `AggregateConfigs.GetRegisteredTypes()` exposes process-wide entity/key discovery facts only. It
+  never exposes or retains a provider, repository, configuration snapshot, or service instance.
+- `AggregateConfigs.Reset()` remains available for test-matrix discovery cleanup, but repeated-host
+  correctness does not depend on calling it.
+
 ## Configuration
 
 - Prefer typed Options for tunables; avoid magic values

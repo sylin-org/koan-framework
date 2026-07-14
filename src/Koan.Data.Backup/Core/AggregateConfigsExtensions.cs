@@ -1,8 +1,7 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Backup.Models;
-using System.Collections.Concurrent;
-using System.Reflection;
+using Koan.Core.Hosting.App;
 using System.Threading.Tasks;
 
 namespace Koan.Data.Backup.Core;
@@ -12,19 +11,40 @@ namespace Koan.Data.Backup.Core;
 /// </summary>
 public static class AggregateConfigsExtensions
 {
+    private const string UnknownProvider = "unknown";
+
     /// <summary>
-    /// Gets all registered entity types from the AggregateConfigs cache
+    /// Gets all registered entity types using the current ambient host when one is available.
     /// </summary>
     public static IEnumerable<EntityTypeInfo> GetAllRegisteredEntities()
     {
-        return GetCacheField()
-            .Keys
+        var services = AppHost.Current;
+        return services is not null
+            ? GetAllRegisteredEntities(services)
+            : AggregateConfigs.GetRegisteredTypes()
+                .Select(key => new EntityTypeInfo
+                {
+                    EntityType = key.EntityType,
+                    KeyType = key.KeyType,
+                    Provider = UnknownProvider,
+                    Assembly = key.EntityType.Assembly.FullName
+                });
+    }
+
+    /// <summary>
+    /// Gets all registered entity types and resolves their providers against the supplied host.
+    /// </summary>
+    public static IEnumerable<EntityTypeInfo> GetAllRegisteredEntities(IServiceProvider services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        return AggregateConfigs.GetRegisteredTypes()
             .Select(key => new EntityTypeInfo
             {
-                EntityType = key.Item1,
-                KeyType = key.Item2,
-                Provider = GetProviderForType(key.Item1, key.Item2),
-                Assembly = key.Item1.Assembly.FullName
+                EntityType = key.EntityType,
+                KeyType = key.KeyType,
+                Provider = GetProviderForType(key.EntityType, key.KeyType, services),
+                Assembly = key.EntityType.Assembly.FullName
             });
     }
 
@@ -171,27 +191,10 @@ public static class AggregateConfigsExtensions
         }
     }
 
-    private static string GetProviderForType(Type entityType, Type keyType)
+    private static string GetProviderForType(Type entityType, Type keyType, IServiceProvider services)
     {
-        // Access the cached config to get provider information
-        var cache = GetCacheField();
-        var key = (entityType, keyType);
-
-        if (cache.TryGetValue(key, out var config))
-        {
-            var providerProperty = config.GetType().GetProperty("Provider");
-            return providerProperty?.GetValue(config) as string ?? "unknown";
-        }
-
-        return "unknown";
-    }
-
-    private static ConcurrentDictionary<(Type, Type), object> GetCacheField()
-    {
-        var cacheField = typeof(AggregateConfigs)
-            .GetField("Cache", BindingFlags.NonPublic | BindingFlags.Static);
-
-        return cacheField?.GetValue(null) as ConcurrentDictionary<(Type, Type), object>
-            ?? throw new InvalidOperationException("Could not access AggregateConfigs cache");
+        var config = GetConfigByReflection(entityType, keyType, services);
+        var providerProperty = config.GetType().GetProperty(nameof(EntityTypeInfo.Provider));
+        return providerProperty?.GetValue(config) as string ?? UnknownProvider;
     }
 }

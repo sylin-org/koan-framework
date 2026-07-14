@@ -31,7 +31,7 @@ validation:
 ## Backup workflow
 
 1. **Plan registration** – Applications register `BackupPlan` definitions (see README sample) or rely on discovery; `AddKoanBackupRestore()` wires services and options into DI.
-2. **Entity discovery** – `EntityDiscoveryService` scans Koan aggregates, caching `EntityTypeInfo` records (entity type, key type, provider). Optional warmup occurs during maintenance startup when `WarmupEntitiesOnStartup` is enabled.
+2. **Entity discovery** – `EntityDiscoveryService` scans Koan aggregates, caching `EntityTypeInfo` records (entity type, key type, provider). Its pre-scan fallback consumes Data Core's provider-free registered-type facts and resolves provider metadata against the service's injected host; it does not inspect Data Core private caches or inherit a prior host's repository. Optional warmup occurs during maintenance startup when `WarmupEntitiesOnStartup` is enabled.
 3. **Streaming export** – `StreamingBackupService` orchestrates backups:
    - Creates a manifest and progress record (stored in `_activeBackups`).
    - Builds a ZIP archive in memory via `BackupStorageService.CreateBackupArchiveAsync`.
@@ -102,5 +102,7 @@ Per-operation options (`BackupOptions`, `GlobalBackupOptions`, `RestoreOptions`,
 ## Validation notes
 
 - Safety proof: `Koan.Data.Backup.Tests` pins fail-loud deletion behavior and its non-success message.
+- Host-ownership proof: registered-type fallback discovery resolves provider metadata against an
+  explicitly supplied host through the supported Data Core inspection surface.
 - Source review: `StreamingBackupService`, `OptimizedRestoreService`, `BackupStorageService`, `BackupMaintenanceService`, `Initialization/KoanAutoRegistrar`, and related models as of 2025-09-29.
 - DocFX strict build executed via `pwsh -File scripts/build-docs.ps1 -ConfigPath docs/api/docfx.json -LogLevel Warning -Strict`.

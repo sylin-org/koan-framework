@@ -4,12 +4,12 @@ domain: framework
 title: "Koan V1 Reorganization Progress"
 audience: [architects, maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-13
+last_updated: 2026-07-14
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-14
   status: reviewed
-  scope: R04-02 closure audit and aggregate-cache residual
+  scope: R04-02 host-owned aggregate configuration and remaining closure residuals
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T4 — foundation hardening`
 - Active work item: `R04`
-- Next decision: remove `AggregateConfigs` first-provider retention with a no-reset two-host proof
+- Next decision: reduce alternate ambient `AppHost.Current` writers through canonical leases/scopes
 - V1 readiness: `not assessed`
 
 ## Work items
@@ -33,7 +33,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R01 | [Ratify the product constitution](work-items/R01-product-constitution.md) | T1 | passed | R00 | Codex · 2026-07-13 | ARCH-0105 and the canonical product constitution separate durable rules, tactical mechanisms, and maturity claims. |
 | R02 | [Build the capability truth baseline](work-items/R02-capability-baseline.md) | T2 | passed | R01 | Codex · 2026-07-13 | All 13 surfaces are classified with reproducible evidence; no capability is mislabeled as supported while packaging is incoherent. |
 | R03 | [Define the Entity Semantics Contract](work-items/R03-entity-semantics-contract.md) | T3 | passed | R02 | Codex · 2026-07-13 | ARCH-0106 ratifies five semantic locations, strict Entity admission, C# 14 module facets, and host/context/event boundaries. |
-| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-13 | R04-01 passed. R04-02's canonical hosted/non-hosted leases and named repairs are green, but closure found first-provider aggregate configuration, alternate ambient writers, cached static loggers, and a dead static service locator. |
+| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-14 | R04-01 passed. R04-02's aggregate configurations are now provider-owned; alternate ambient writers, cached static loggers, a dead static service locator, and the unified missing-host contract remain. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | pending | R04 | — | Anonymous business domain only. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
@@ -47,7 +47,7 @@ item should normally be `in-progress`.
 | R01 | passed | ARCH-0105 accepted; canonical constitution and public alignment are complete. |
 | R02 | passed | Capability ledger, focused execution record, public-claim audit, and ranked dispositions accepted. |
 | R03 | passed | Entity inventory, ecosystem dispositions, canonical contract, and ARCH-0106 accepted. |
-| R04 | active | R04-01 passed; R04-02 remains in progress. Its next bounded owner is the first-provider `AggregateConfigs` cache; the closure ledger preserves later ambient/logging residuals. |
+| R04 | active | R04-01 passed; R04-02 remains in progress. Aggregate configuration is provider-owned and Backup no longer reflects its cache; alternate ambient writers are the next bounded owner. |
 | R05 | no | The foundation path must be stable enough to measure honestly. |
 
 ## Divergence and risk log
@@ -84,6 +84,7 @@ item should normally be `in-progress`.
 | 2026-07-13 | R04-02 | All seven production Entity lifecycle registration statements are runtime-capture clean: AI uses targetless static methods; Identity closures retain immutable declaration metadata and resolve the active host during execution; OpenGraph lifecycle delegates are noncapturing but its separate static registry can retain application-supplied resolver/selector closures. | Keep the framework handlers process-stable, document indirect registry and convenience-wrapper capture boundaries, and do not invent host-scoped storage without a concrete supported use case. Existing Data.AI repeated-host, Data.Core lifecycle, Identity, and OpenGraph suites remain the executable evidence; relationship metadata is next. |
 | 2026-07-13 | R04-02 | A closed `Entity<TEntity,TKey>` retained host A's `IRelationshipMetadata` singleton after host A disposed it; the two-host probe failed 0/1 when host B received the stale object. | Remove the closed-generic DI-service cache and resolve through the active ambient host on each call. Keep only a hostless fallback containing service-independent reflection facts. The unchanged probe passes 1/1 and Data.Core passes 286/286 with zero lifecycle-disposal signatures; `AppHost.Identity` is next. |
 | 2026-07-13 | R04-02 | Closure audit found `AggregateConfigs` still caching a lazy first-host provider/repository, seven tracked `src/` ambient assignments outside canonical leases/scopes, thirteen static logging scopes that cache a first-host logger, and a set-only static background provider. The promised unified missing-host failure is also not implemented. | Do not pass R04-02. Repair `AggregateConfigs` first with a no-reset two-host probe, then reduce each remaining owner separately; retain current maturity labels. |
+| 2026-07-14 | R04-02 | The process-wide aggregate cache retained the first host's lazy provider/repository and Data.Backup reflected that private cache for fallback discovery; the new ownership surface was red 1/3 before repair. | Partition configuration atomically by weak provider identity, retain only provider-free type facts process-wide, and make Backup resolve those facts against its injected host. Focused ownership passes 3/3, Data.Core 293/293, and Backup 2/2; keep R04-02 open for the remaining closure owners. |
 | 2026-07-13 | R04-07 | A pillar-first review could have placed every Koan capability on Entity, recreating the IntelliSense clutter the contract rejects; the first slate then underweighted the delight of discovering events from the Entity itself. | Elect intrinsic `Events` plus module-grown `Cache`, `AI`, and narrowly constrained `Media`; retain direct Data and constrained Canon/Storage verbs; keep control-plane, projection, messaging, and job surfaces off generic Entity. Static `Todo.Events` owns lifecycle composition, instance `todo.Events` raises domain facts, and neither implies broker delivery. Cache remains the one-facet pilot after R04-02/R04-05. |
 
 ## Operator gates
