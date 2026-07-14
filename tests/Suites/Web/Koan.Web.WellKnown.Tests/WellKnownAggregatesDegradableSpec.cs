@@ -4,7 +4,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AwesomeAssertions;
-using Koan.Core.Hosting.App;
 using Xunit;
 
 namespace Koan.Web.WellKnown.Tests;
@@ -22,7 +21,6 @@ public sealed class WellKnownAggregatesDegradableSpec : IClassFixture<WellKnownW
 
     public WellKnownAggregatesDegradableSpec(WellKnownWebApplicationFactory factory)
     {
-        AppHost.Current = factory.Services;
         _client = factory.CreateClient();
     }
 

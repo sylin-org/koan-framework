@@ -29,24 +29,23 @@ that remains inspectable.
 ```bash
 git clone https://github.com/sylin-org/koan-framework
 cd koan-framework
-dotnet run --project samples/S1.Web
-# → browse http://localhost:5044  ·  curl http://localhost:5044/api/health
+dotnet run --project samples/FirstUse
+# in another shell:
+curl -X POST http://localhost:5000/api/approvals -H "Content-Type: application/json" -d '{"subject":"Approve supplier invoice"}'
+curl http://localhost:5000/api/approvals
+curl http://localhost:5000/.well-known/Koan/facts
 ```
 
-You'll see the framework introduce itself before the first request — what got discovered, which
-adapters won, what capabilities they negotiated:
+The printed URL can differ when a launch profile or `--urls` is used. The application code is in
+[`samples/FirstUse`](samples/FirstUse/README.md): one business entity, one controller, and the
+four-line bootstrap. Koan elects SQLite, creates the development schema, exposes the governed REST
+surface, and projects the same runtime facts to operators and MCP clients. Its boot report is the
+framework's character in one screen: **the app explains itself.**
 
-```text
-┌─ [KOAN] Application ─────────────────────────────
-│  Name: S1.Web · Environment: Development
-│  Registry: initializers, auto-registrars, background services
-│  Inventory: Koan.Core, Koan.Data.Core, Koan.Web, Koan.Data.Connector.Sqlite, …
-└──────────────────────────────────────────────────
-[K:PHASE] warmup→registry→data→services→ready
-```
-*(abridged — run it to see the real thing)*
-
-That boot report is the framework's character in one screen: **the app explains itself.**
+When that first result makes sense, continue with
+[`samples/GoldenJourney`](samples/GoldenJourney/README.md). It grows one cumulative application
+through business rules, durable work, bounded agent collaboration, and explained adapter recovery
+without replacing the four-line bootstrap or introducing application infrastructure plumbing.
 
 ## The whole framework in three beats
 
@@ -63,29 +62,31 @@ app.Run();
 
 <!-- validate -->
 ```csharp
-public sealed class Todo : Entity<Todo>
+public sealed class Approval : Entity<Approval>
 {
-    public string Title { get; set; } = "";
-    public bool IsCompleted { get; set; }
+    public string Subject { get; set; } = "";
+    public ApprovalState State { get; set; } = ApprovalState.Pending;
 }
 
-[Route("api/[controller]")]
-public sealed class TodoController : EntityController<Todo> { }
+public enum ApprovalState { Pending, Approved, Rejected }
+
+[Route("api/approvals")]
+public sealed class ApprovalsController : EntityController<Approval>;
 ```
 
 That's a full REST API: GET/POST/DELETE with pagination and querying, GUID v7 ids generated on
-first read, `/api/health`, structured logging, and zero-config SQLite (`./data/app.db`). Schema
+first read, `/health`, structured logging, and zero-config SQLite (`./data/app.db`). Schema
 is created automatically in development. JSON defaults: camelCase, nulls omitted
 (Newtonsoft.Json — chosen for predictable polymorphic serialization).
 
 Working with entities is direct — no repositories, no DbContext:
 
 ```csharp
-var todo = await Todo.Get(id);                       // null if missing
-var open = await Todo.Query(t => !t.IsCompleted);    // pushed down to the store
-await new Todo { Title = "Try Koan" }.Save();
-await todo.Remove();
-await foreach (var t in Todo.AllStream(batchSize: 1000)) { /* streams, no materialization */ }
+var approval = await Approval.Get(id);                    // null if missing
+var pending = await Approval.Query(a => a.State == ApprovalState.Pending);
+await new Approval { Subject = "Approve invoice" }.Save();
+await approval.Remove();
+await foreach (var item in Approval.AllStream(batchSize: 1000)) { /* streaming */ }
 ```
 
 ### 2 · Reference an intent → gain a capability
@@ -128,11 +129,17 @@ the framework negotiates them, and an unsupported operation **fails loudly** ins
 degrading.
 
 ```csharp
-if (Data<Todo, string>.Capabilities.Has(DataCaps.Query.Linq))
+var profile = Data<Todo, string>.Capabilities
+    .Detail<FilterExecutionProfile>(DataCaps.Query.FilterExecution);
+
+if (profile?.Kind is FilterExecutionKind.Native)
 {
-    // this query runs inside the database, not in memory
+    // normalized filters execute in the backend
 }
 ```
+
+`DataCaps.Query.Filter` describes which operators are correct; `FilterExecutionProfile` describes
+their physical cost posture. Relationship traversal uses both and rejects implicit backend scans.
 
 ### 3 · The app explains itself
 
@@ -177,7 +184,8 @@ need them; activation is deterministically ordered and reported.
 
 | Path | Where |
 |---|---|
-| **First 15 minutes** | [Getting started](docs/getting-started/overview.md) — the golden path, concept by concept |
+| **First meaningful result** | [FirstUse](samples/FirstUse/README.md) — the executable source and package contract |
+| **First 15 minutes** | [Getting started](docs/getting-started/overview.md) — grow from that result, concept by concept |
 | **Run real apps** | [samples/](samples/README.md) — the ladder: S0 console → S1 CRUD → S10 multi-provider → S14 jobs/benchmarks, then the dogfood flagships |
 | **Do a task** | [Guides](docs/guides/README.md) — APIs, data modeling, auth, AI, media, jobs |
 | **Understand why** | [Product constitution](docs/architecture/product-constitution.md) · [Entity Semantics Contract](docs/architecture/entity-semantics-contract.md) · [Architecture principles](docs/architecture/principles.md) · [ADRs](docs/decisions/index.md) |

@@ -4,6 +4,8 @@ using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Runtime;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
+using Koan.Core.Diagnostics;
+using Koan.Data.Core.Infrastructure;
 
 namespace Koan.Tests.Data.Core.Specs.Composition;
 
@@ -45,6 +47,18 @@ public class CompositionLockfileSpec
             election.Adapter.Should().Be("sqlite");
             election.Via.Should().Be("reference-priority");
 
+            var registry = host.Services.GetRequiredService<DataSourceRegistry>();
+            var runtimeDecision = AdapterResolver.ResolveDefault(host.Services, registry);
+            runtimeDecision.Adapter.Should().Be(election.Adapter);
+            runtimeDecision.Via.Should().Be(election.Via);
+
+            var fact = host.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts
+                .Single(item => item.Code == Constants.Diagnostics.Codes.AdapterSelected
+                    && item.Subject == "data:default");
+            fact.State.Should().Be(KoanFactState.Selected);
+            fact.ReasonCode.Should().Be(runtimeDecision.Via);
+            fact.Summary.Should().Contain(runtimeDecision.Adapter);
+
             // Exercise the actual write path against a content root with an obj/ folder, then read it
             // back as the operator/agent would — the resolved twin must be valid, parseable JSON.
             Directory.CreateDirectory(Path.Combine(root, "obj"));
@@ -59,6 +73,39 @@ public class CompositionLockfileSpec
         {
             AppHost.Current = null;
             try { Directory.Delete(root, recursive: true); } catch { /* best-effort */ }
+        }
+    }
+
+    [Fact]
+    public async Task Unavailable_configured_default_is_rejected_with_a_safe_correction()
+    {
+        await using var host = await KoanIntegrationHost.Configure()
+            .WithSetting("Koan:Environment", "Test")
+            .WithSetting("Koan:Data:Sources:Default:Adapter", "not-referenced")
+            .ConfigureServices(services => services.AddKoan())
+            .StartAsync();
+
+        AppHost.Current = host.Services;
+        try
+        {
+            host.Services.GetRequiredService<IAppRuntime>().Discover();
+
+            var fact = host.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts
+                .Single(item => item.Code == Constants.Diagnostics.Codes.AdapterRejected
+                    && item.Subject == "data:default");
+
+            fact.State.Should().Be(KoanFactState.Rejected);
+            fact.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.AdapterUnavailable);
+            fact.Correction.Should().Contain("Koan:Data:Sources:Default:Adapter")
+                .And.Contain("reference the connector package")
+                .And.NotContain("ConnectionString");
+
+            var action = () => KoanCompositionSnapshot.BuildFromServices(host.Services);
+            action.Should().NotThrow("fact collection must describe the rejection without breaking inspection");
+        }
+        finally
+        {
+            AppHost.Current = null;
         }
     }
 }

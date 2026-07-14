@@ -5,6 +5,8 @@ using System.Text;
 using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Observability.Health;
+using Koan.Core.Diagnostics;
+using Koan.Core.Infrastructure;
 
 namespace Koan.Core.Logging;
 
@@ -21,7 +23,8 @@ internal static class KoanConsoleBlocks
         RegistrySummarySnapshot? registry,
         HealthSnapshot? health,
         int registeredProbes = 0,
-        string? compositionLine = null)
+        string? compositionLine = null,
+        KoanFactEnvelope? runtimeFacts = null)
     {
         var identity = snapshot.Application;
         var uniqueModules = DeduplicateModules(modules);
@@ -72,15 +75,57 @@ internal static class KoanConsoleBlocks
 
             // MODULES-FAILED block (Track F · fail-fast.json): in lenient boot a broken module no longer
             // vanishes — it is rendered here so the operator can see it in the boot report.
+            var factFailures = runtimeFacts?.Facts
+                .Where(fact => fact.Code == Constants.Diagnostics.Codes.ModuleRejected)
+                .ToArray() ?? [];
             var failures = registry.Value.ModuleFailures;
-            if (failures is { Count: > 0 })
+            if (factFailures.Length > 0 || failures is { Count: > 0 })
             {
                 builder.AddLine("");
                 builder.AddLine(FormatSectionDivider("MODULES-FAILED"));
-                foreach (var failure in failures)
+                if (factFailures.Length > 0)
                 {
-                    builder.AddLine(FormatKeyValue(failure.Module, $"[{failure.Phase}] {failure.Error}"));
+                    foreach (var failure in factFailures)
+                    {
+                        builder.AddLine(FormatKeyValue(failure.Subject, failure.Summary));
+                        if (!string.IsNullOrWhiteSpace(failure.Correction))
+                            builder.AddLine(FormatKeyValue("Correction", failure.Correction!));
+                    }
                 }
+                else
+                {
+                    foreach (var failure in failures)
+                    {
+                        builder.AddLine(FormatKeyValue(failure.Module, $"[{failure.Phase}] {failure.Error}"));
+                    }
+                }
+            }
+        }
+
+        var elections = runtimeFacts?.Facts
+            .Where(fact => fact.Kind == KoanFactKind.Election && fact.State == KoanFactState.Selected)
+            .ToArray() ?? [];
+        if (elections.Length > 0)
+        {
+            builder.AddLine("");
+            builder.AddLine(FormatSectionDivider("Decisions"));
+            foreach (var election in elections)
+                builder.AddLine(FormatKeyValue(election.Subject, election.Summary));
+        }
+
+        var diagnosticIssues = runtimeFacts?.Facts
+            .Where(fact => fact.Code != Constants.Diagnostics.Codes.ModuleRejected
+                && (fact.State is KoanFactState.Degraded or KoanFactState.Rejected or KoanFactState.CollectionFailed))
+            .ToArray() ?? [];
+        if (diagnosticIssues.Length > 0)
+        {
+            builder.AddLine("");
+            builder.AddLine(FormatSectionDivider("Diagnostics"));
+            foreach (var issue in diagnosticIssues)
+            {
+                builder.AddLine(FormatKeyValue(issue.Subject, issue.Summary));
+                if (!string.IsNullOrWhiteSpace(issue.Correction))
+                    builder.AddLine(FormatKeyValue("Correction", issue.Correction!));
             }
         }
 

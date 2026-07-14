@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Sylin.Koan.App</PackageId>
+    <KoanPackageKind>Bundle</KoanPackageKind>
+    <PackageType>Dependency</PackageType>
+    <Description>Tested Koan application bundle: the Koan foundation plus controller-based ASP.NET Core integration.</Description>
+    <PackageTags>$(CommonPackageTags);bundle;web;aspnetcore</PackageTags>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Sylin.Koan/Sylin.Koan.csproj" />
+    <ProjectReference Include="../../src/Koan.Web/Koan.Web.csproj" />
+  </ItemGroup>
+</Project>

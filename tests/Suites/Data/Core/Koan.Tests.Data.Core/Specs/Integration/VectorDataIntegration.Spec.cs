@@ -291,7 +291,7 @@ public sealed class VectorDataIntegrationSpec
             fakeRepo.ContainsVector(article.Id).Should().BeTrue();
 
             // Delete both
-            await article.Delete();
+            await article.Remove();
             await Vector<ArticleEntity>.Delete(article.Id);
 
             // Verify deleted

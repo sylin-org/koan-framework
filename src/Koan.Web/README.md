@@ -9,6 +9,8 @@ ASP.NET Core integration for Koan: controller-first routing, health endpoints, w
 
 - MVC controller-first routing (attribute-routed)
 - Health endpoints and OpenAPI wiring (opt-in)
+- Static-file middleware when the host supplies a real WebRoot file provider; API-only hosts stay quiet
+- Redacted runtime facts at `GET /.well-known/Koan/facts` in Development or explicit observability exposure
 - Transformers for payload shaping (see WEB-0035)
 
 ## Install (minimal setup)
@@ -34,6 +36,9 @@ public sealed class ItemsController : EntityController<Item, Guid>
 - Use transformers for response shaping; see decision WEB-0035.
 
 See TECHNICAL.md for contracts, options, and integration details.
+
+Runtime facts use the same schema as startup, health, and `koan://facts`. Outside Development, enable
+`Koan:Web:ExposeObservabilitySnapshot` deliberately and protect the operational surface.
 
 ## Customization
 

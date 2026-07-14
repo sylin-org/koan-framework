@@ -4,10 +4,10 @@ domain: framework
 title: "Koan V1 Capability Evidence Ledger"
 audience: [architects, maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-13
+last_updated: 2026-07-14
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-14
   status: reviewed
   scope: evidence vocabulary and initial assessment queue
 ---
@@ -60,9 +60,9 @@ it here.
 
 | Surface | Assessment state | Maturity | Evidence record | Principal question |
 |---|---|---|---|---|
-| Bootstrap, discovery, and startup reporting | assessed | `demonstrated` | [record](#bootstrap-discovery-and-startup-reporting) | Useful and fail-loud, but reporting is best-effort and the focused suite did not complete. |
+| Bootstrap, discovery, and startup reporting | assessed | `demonstrated` | [record](#bootstrap-discovery-and-startup-reporting) | Bounded lanes pass; a shared fact model now proves one vertical slice, not exhaustive runtime narration. |
 | `Entity<T>` data semantics and context | assessed | `verified` | [record](#entityt-data-semantics-and-context) | Strong core semantics; external-provider parity remains test-scoped. |
-| Backend discovery and negotiation | assessed | `demonstrated` | [record](#backend-discovery-and-negotiation) | The contract is explicit; fleet-wide selection and fallback are not certified. |
+| Backend discovery and negotiation | assessed | `demonstrated` | [record](#backend-discovery-and-negotiation) | Child-edge cost is explicit and bounded for three proven providers; fleet-wide parity is not certified. |
 | Web/API conventions | assessed | `verified` | [record](#webapi-conventions) | In-memory API behavior is well tested; package installation is blocked. |
 | Events and messaging | assessed | `demonstrated` | [record](#events-and-messaging) | A real sample and providers exist; no current broker conformance result was obtained. |
 | Jobs and scheduling | assessed | `verified` | [record](#jobs-and-scheduling) | Core/in-process behavior is strong; distributed tiers remain separate. |
@@ -70,9 +70,9 @@ it here.
 | AI, vector, and semantic capabilities | assessed | `experimental` | [record](#ai-vector-and-semantic-capabilities) | Strong unit/in-memory evidence, with a current host-lifecycle integration failure. |
 | MCP and agent-facing surfaces | assessed | `verified` | [record](#mcp-and-agent-facing-surfaces) | Core contract passes conformance; transports and operational authorization need broader proof. |
 | Authentication and authorization | assessed | `verified` | [record](#authentication-and-authorization) | Core identity passes; real external identity providers were not exercised. |
-| Testing and local infrastructure | assessed | `demonstrated` | [record](#testing-and-local-infrastructure) | Useful inherited conformance exists, with skipped batteries and fragmented execution. |
-| Packaging, installation, and upgrades | assessed | `specified` | [record](#packaging-installation-and-upgrades) | Intended package path is documented but public 0.17.0 packages cannot restore coherently. |
-| Operations, health, and diagnostics | assessed | `demonstrated` | [record](#operations-health-and-diagnostics) | Useful primitives exist, but coverage and completeness do not justify support language. |
+| Testing and local infrastructure | assessed | `demonstrated` | [record](#testing-and-local-infrastructure) | Bounded bootstrap and FirstUse lanes are coherent; inherited batteries still contain explicit skips. |
+| Packaging, installation, and upgrades | assessed | `specified` | [record](#packaging-installation-and-upgrades) | Local release artifacts pass the real FirstUse clean room; public 0.17.0 remains incoherent. |
+| Operations, health, and diagnostics | assessed | `demonstrated` | [record](#operations-health-and-diagnostics) | Schema-1 runtime facts are verified for module/default-data decisions; fleet completeness remains open. |
 
 R02 may split or merge rows only when the resulting boundaries better match user-visible contracts.
 
@@ -83,8 +83,9 @@ the entire capability fleet is production-certified.
 
 ## Capability records
 
-Every record below was assessed by Codex on 2026-07-13 at
-`4471e9c7ffeaa2cd198a62589a9763c4555d9b7f`.
+Every record below was initially assessed by Codex on 2026-07-13 at
+`4471e9c7ffeaa2cd198a62589a9763c4555d9b7f`. R04 evidence amendments are dated in their text and the
+initiative progress ledger; they do not silently promote the original maturity labels.
 
 ### Bootstrap, discovery, and startup reporting
 
@@ -96,19 +97,21 @@ Every record below was assessed by Codex on 2026-07-13 at
   [`KoanRegistry`](../../../src/Koan.Core/Hosting/Registry/KoanRegistry.cs), and
   [`AppRuntime`](../../../src/Koan.Core/Hosting/Runtime/AppRuntime.cs). Source-generated registrations
   are preferred; embedded manifests, assembly closure, and runtime fallbacks are intentional.
-- **Executable evidence:** [`S1.Web`](../../../samples/S1.Web/Program.cs) builds. The focused
-  [bootstrap suite](../../../tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap/Koan.Tests.Integration.Bootstrap.csproj)
-  did not complete within 304 seconds and produced no test result.
+- **Executable evidence:** [`FirstUse`](../../../samples/FirstUse/Program.cs) builds and its source
+  contract passes through the 15/15 packaging suite. The bounded bootstrap lanes pass Fast 17/17,
+  offline Pillars 16/16, and explicit Infrastructure 7/7. Core passes 211/211.
 - **Inspection and failure:** module activation is fail-fast by default; `KOAN_BOOT_LENIENT=1` opts
-  into degraded boot and a `MODULES-FAILED` report. Composition/health rendering is best-effort, and
-  entity inventory is populated lazily rather than exhaustively at process start.
+  into degraded boot. Activation/rejection and default data election now enter the shared
+  [runtime fact envelope](../../engineering/runtime-facts.md), which projects corrections into
+  startup, exception, health, lockfile, Web, and MCP views. Entity inventory remains lazy rather than
+  exhaustive at process start.
 - **Unsupported / compatibility:** exact or exhaustive startup narration, deterministic ordering of
   every incidental background-service enumeration, and bootstrap certification across trimming/AOT
   and all deployment shapes are not established. Pre-1.0 compatibility is not promised.
 - **Maturity / safe claim:** `demonstrated`. Koan discovers referenced modules and can explain major
   composition choices at startup; the report is useful but not a complete proof of runtime state.
-- **Open risks:** diagnose the non-completing suite; make one structured composition model feed human,
-  machine, health, and lockfile views.
+- **Open risks:** extend the proven fact path to other negotiations without claiming exhaustive runtime
+  state or admitting arbitrary provider payloads.
 
 ### `Entity<T>` data semantics and context
 
@@ -140,18 +143,19 @@ Every record below was assessed by Codex on 2026-07-13 at
   [`DataAdapterAttribute`](../../../src/Koan.Data.Abstractions/DataAdapterAttribute.cs),
   [`DataCaps`](../../../src/Koan.Data.Abstractions/Capabilities/DataCaps.cs), and core
   [`CapabilitySet`](../../../src/Koan.Core/Capabilities/CapabilitySet.cs).
-- **Executable evidence:** data-core tests pass, including core resolution paths; capability-set tests
-  cover loud unsupported behavior. [`S10.DevPortal`](../../../samples/S10.DevPortal/README.md)
-  demonstrates provider switching.
-- **Inspection and failure:** [`DataCompositionContributor`](../../../src/Koan.Data.Core/Composition/DataCompositionContributor.cs)
-  contributes adapter elections to composition output. `CapabilityNotSupportedException` identifies
-  an unsupported negotiated intent.
+- **Executable evidence:** Data.Core passes 299/299. Relationship cells execute InMemory, JSON, and
+  SQLite selection/rejection/bounds; Web relationship passes 7/7; MCP relationship passes 2/2 and MCP
+  conformance 73/73. [`S10.DevPortal`](../../../samples/S10.DevPortal/README.md) demonstrates provider switching.
+- **Inspection and failure:** [`AdapterResolutionDecision`](../../../src/Koan.Data.Core/Routing/AdapterResolutionDecision.cs)
+  is the single calculation for configured/default data selection used by runtime behavior, lockfile,
+  and schema-1 facts. [ARCH-0112](../../decisions/ARCH-0112-bounded-relationship-negotiation.md) adds
+  physical filter profiles, corrective relationship rejections, and the latest safe execution fact.
 - **Unsupported / compatibility:** R02 did not run every relational, document, cache, vector, or
   messaging connector, nor prove fallback/election behavior for every ambiguous multi-provider graph.
 - **Maturity / safe claim:** `demonstrated`. Koan has a real capability-negotiation model and reports
   major elections; only specifically tested provider combinations may claim parity.
-- **Open risks:** publish a single deterministic election/explanation contract and a matrix generated
-  from executable provider evidence.
+- **Open risks:** execute the remaining provider cells; verify index sufficiency and performance;
+  design parent batching and recursive graph/depth budgets without turning facts into request history.
 
 ### Web/API conventions
 
@@ -161,7 +165,8 @@ Every record below was assessed by Codex on 2026-07-13 at
   [`ServiceCollectionExtensions`](../../../src/Koan.Web/Extensions/ServiceCollectionExtensions.cs).
 - **Executable evidence:** the
   [in-memory adapter surface](../../../tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.InMemory.Tests/Koan.Web.AdapterSurface.InMemory.Tests.csproj)
-  passes 70/70; [`S1.Web`](../../../samples/S1.Web/Program.cs) builds.
+  passes 70/70; [`FirstUse`](../../../samples/FirstUse/README.md) creates and reads a real approval
+  over SQLite in both source and package-only lanes.
 - **Inspection and failure:** web operations reuse the same endpoint/entity service semantics as MCP;
   health and well-known surfaces are separately implemented. Provider capability failures remain
   explicit.
@@ -200,28 +205,35 @@ Every record below was assessed by Codex on 2026-07-13 at
 - **Entry point and owner:** [`IKoanJob`](../../../src/Koan.Jobs/IKoanJob.cs) and
   [`JobsServiceCollectionExtensions`](../../../src/Koan.Jobs/JobsServiceCollectionExtensions.cs) in
   `Sylin.Koan.Jobs`.
-- **Executable evidence:** [74/74 core jobs tests](../../../tests/Suites/Jobs/Koan.Jobs.Tests/Koan.Jobs.Tests.csproj)
-  pass. [`S14.AdapterBench`](../../../samples/S14.AdapterBench/Jobs/BenchmarkJob.cs) demonstrates a
-  business-facing job.
+- **Executable evidence:** [76/76 core jobs tests](../../../tests/Suites/Jobs/Koan.Jobs.Tests/Koan.Jobs.Tests.csproj)
+  and 78/78 SQLite ledger tests pass. [`S14.AdapterBench`](../../../samples/S14.AdapterBench/Jobs/BenchmarkJob.cs) demonstrates a
+  business-facing job. The shared terminal-progress contract additionally passes against the
+  in-memory and SQLite ledgers, and [`GoldenJourney`](../../../samples/GoldenJourney/README.md)
+  observes the completed business priority and 100% progress from a running source application.
 - **Inspection and failure:** health snapshots/contributors, metrics, state transitions, and explicit
   ledgers/transports exist. Failures are recorded in job state rather than hidden in application glue.
 - **Unsupported / compatibility:** R02 did not certify distributed competing consumers, messaging
   transport, every durable ledger, clock-skew behavior, or upgrade compatibility.
 - **Maturity / safe claim:** `verified`. In-process/core job semantics are automated; distributed and
   provider-specific tiers must be claimed separately.
-- **Open risks:** publish the capability ladder and expose selected ledger, transport, lane, and health
-  as one machine-readable explanation.
+- **Open risks:** distributed transport/ledger tiers still need their own composition and behavior
+  evidence; lane and scheduling elections are not yet part of the common fact envelope.
 
 ### Cache and distributed state
 
 - **Outcome and shortest path:** add cache intent through `Sylin.Koan.Cache` and entity-centered
   attributes/extensions; Koan resolves stores, policy, tiers, and coherence.
 - **Entry point and owner:** [`CacheableAttribute`](../../../src/Koan.Cache.Abstractions/Policies/CacheableAttribute.cs),
+  the module-owned [`EntityCacheFacet`](../../../src/Koan.Cache/Entity/EntityCacheFacet.cs),
   [`EntityCacheExtensions`](../../../src/Koan.Cache/Extensions/EntityCacheExtensions.cs), and
   [`CacheAdapterResolver`](../../../src/Koan.Cache/Adapters/CacheAdapterResolver.cs).
 - **Executable evidence:** the
   [cross-engine suite](../../../tests/Suites/Cache/CrossEngine/Koan.Tests.Cache.CrossEngine/Koan.Tests.Cache.CrossEngine.csproj)
-  passes 14/14; additional topology, coherence, Redis, and SQLite projects exist but were not all run.
+  passes 14/14; the
+  [Entity-language consumer suite](../../../tests/Suites/EntityLanguage/Koan.Tests.EntityLanguage/Koan.Tests.EntityLanguage.csproj)
+  passes 9/9 for module absence/presence/removal, receiver validity, collision safety, explanation,
+  compatibility operations, corrective failure, and repeated-host resolution. Additional topology,
+  coherence, Redis, and SQLite projects exist but were not all run.
 - **Inspection and failure:** topology and capabilities are explicit; instrumentation, trace filtering,
   and health checks exist. An obsolete compatibility shim still produces build warnings.
 - **Unsupported / compatibility:** R02 does not certify cross-node failure recovery, Redis production
@@ -259,17 +271,20 @@ Every record below was assessed by Codex on 2026-07-13 at
 - **Entry point and owner:** `Sylin.Koan.Mcp`; registration and transports live under
   [`Koan.Mcp`](../../../src/Koan.Mcp/Koan.Mcp.csproj), with optional operations and explorer packages.
 - **Executable evidence:** [MCP conformance](../../../tests/Suites/Mcp/Koan.Mcp.Conformance.Tests/Koan.Mcp.Conformance.Tests.csproj)
-  passes 72/72. Custom-tool, streamable transport, relationship visibility, operations, and explorer
-  suites exist but were not included in this focused result.
+  passes 73/73, including canonical `koan://facts` serialization. Custom-tool, streamable transport,
+  relationship visibility, operations, and explorer
+  suites exist but were not included in this focused result. `FirstUseContractTests` additionally
+  prove Streamable HTTP initialization, resource discovery, identical Web/MCP facts, remote-origin
+  operation filtering, dry-run non-mutation, and a real agent upsert observed through REST.
 - **Inspection and failure:** entity catalog/self resources, schemas, tool hints, dry-run, provenance,
-  correlation, access policy, and response translation give agents a structured surface rather than
-  source scraping alone.
+  correlation, access policy, response translation, and the host fact envelope give agents a
+  structured surface rather than source or log scraping.
 - **Unsupported / compatibility:** not every transport, explorer path, production edge-auth policy,
   sandbox, code-mode behavior, or hostile-client scenario is certified by R02.
 - **Maturity / safe claim:** `verified`. The core MCP projection and invocation contract passes its
   conformance suite; deployment-specific safety claims require their own evidence.
-- **Open risks:** align agent-visible errors and composition facts with the human startup report, and
-  make safe operational boundaries unmistakable by default.
+- **Open risks:** expand fact coverage beyond the current module/default-data slice and make safe
+  operational boundaries unmistakable by default.
 
 ### Authentication and authorization
 
@@ -298,17 +313,18 @@ Every record below was assessed by Codex on 2026-07-13 at
   [`KoanIntegrationHost`](../../../src/Koan.Testing.Hosting/KoanIntegrationHost.cs).
 - **Entry point and owner:** `Sylin.Koan.Testing` and `Sylin.Koan.Testing.Hosting`.
 - **Executable evidence:** [testing meta-tests](../../../tests/Suites/Testing/Koan.Testing.Tests/Koan.Testing.Tests.csproj)
-  report 10 passed and 3 skipped; cache and embedding batteries were skipped. The repository contains
-  many focused suites, but the bootstrap suite did not complete under a routine invocation.
-- **Inspection and failure:** capability-gated conformance can explain why some batteries do not apply,
-  but current skip/timeout behavior is not yet a single reliable developer feedback loop.
+  report 11 passed and 3 intentional skips; cache and embedding batteries were skipped. Bootstrap is
+  split into bounded 17/17 Fast, 16/16 Pillars, and 7/7 Infrastructure lanes. The 15/15 packaging suite
+  includes serialized isolated source-checkout FirstUse and GoldenJourney process proofs.
+- **Inspection and failure:** capability-gated conformance can explain why some batteries do not apply;
+  bounded runners report the lane, phase, command, deadline, and captured diagnostics on failure.
 - **Unsupported / compatibility:** inherited testing does not presently guarantee every entity/module
   combination, external infrastructure lifecycle, deterministic full-suite execution, or stable public
   test-kit APIs.
 - **Maturity / safe claim:** `demonstrated`. Koan provides useful reusable conformance tests; applications
   do not yet inherit a fully verified, package-installable test contract.
-- **Open risks:** make skipped capability reasons explicit, establish bounded test lanes, and ship a
-  coherent package-first application test.
+- **Open risks:** make every skipped capability reason explicit and consolidate the remaining
+  provider-specific runners without accidentally starting infrastructure from routine solution tests.
 
 ### Packaging, installation, and upgrades
 
@@ -318,40 +334,55 @@ Every record below was assessed by Codex on 2026-07-13 at
   [`Directory.Build.props`](../../../Directory.Build.props), compatibility ranges in
   [`build/compat-ranges.targets`](../../../build/compat-ranges.targets), and NBGV
   [`version.json`](../../../version.json).
-- **Executable evidence:** source `S1.Web` builds. A disposable exact-0.17.0 NuGet application fails
-  restore because `Sylin.Koan.Data.Abstractions` requires Core `>= 0.17.3`, while public Core is
-  0.17.0. The probe also reports a high-severity advisory in a transitive SQLite native dependency.
+- **Executable evidence:** the release compiler inventories 113 independently versioned owners. A
+  fresh Git-derived rehearsal selected and verified 84 packages: 45 changed versions and 39
+  unpublished-current registry repairs. Its package-only clean room copied the exact public
+  [`FirstUse`](../../../samples/FirstUse/FirstUse.csproj) and
+  [`GoldenJourney`](../../../samples/GoldenJourney/GoldenJourney.csproj) apps outside the checkout,
+  hydrated one local feed, and passed FirstUse 8/8 in 4.129s plus GoldenJourney 11/11 in 8.769s. Both
+  external restores/builds emitted zero warnings and zero errors. Separately, a
+  disposable exact-0.17.0 public-NuGet application fails restore because
+  `Sylin.Koan.Data.Abstractions` requires Core `>= 0.17.3`, while public Core is 0.17.0; that probe also
+  reports a high-severity advisory in a transitive SQLite native dependency.
+- **Current R05 change:** the fresh package proof embeds one source commit across independently
+  selected App, SQLite, Jobs, and MCP versions and writes separate evidence for both applications.
+  This proves local artifact coherence; it is not a public package-path claim because the release set
+  was not published.
 - **Inspection and failure:** the restore fails loudly, which is safer than an ABI mismatch, but the
   public docs previously described packages only as lagging and offered a broken copy/paste path.
-- **Unsupported / compatibility:** package-first install, package-set coherence, upgrades, rollback,
-  migration, release cadence, and support windows are not established at this snapshot.
+- **Unsupported / compatibility:** the staged package set is coherent, but public package-first install,
+  upgrades, rollback, migration, release cadence, and support windows are not established until the
+  automated `dev` release is actually published and observed.
 - **Maturity / safe claim:** `specified`. The package model and compatibility-range intent are written;
   the current public package set is not a supported installation path. Source checkout is the only
   demonstrated path.
-- **Open risks:** R04 priority zero is an atomic, advisory-clean package set plus an external clean-room
-  restore/run test and an explicit pre-1.0 upgrade policy.
+- **Open risks:** observe the first trusted `dev` publication, retain advisory review, and add explicit
+  pre-1.0 upgrade/rollback policy before promoting the package path.
 
 ### Operations, health, and diagnostics
 
-- **Outcome and shortest path:** inspect boot output, health aggregation, capability sets, and
-  composition contributors to understand what the application selected and whether it is ready.
-- **Entry point and owner:** core health under
-  [`Koan.Core/Observability`](../../../src/Koan.Core/Observability), plus
+- **Outcome and shortest path:** inject `IKoanRuntimeFacts`, inspect boot output/health, request the
+  gated `/.well-known/Koan/facts` endpoint, or read `koan://facts` to understand the decisions in the
+  migrated runtime slice.
+- **Entry point and owner:** [`IKoanRuntimeFacts`](../../../src/Koan.Core/Diagnostics/IKoanRuntimeFacts.cs)
+  and core health under [`Koan.Core/Observability`](../../../src/Koan.Core/Observability), plus
   [`Sylin.Koan.Observability`](../../../src/Koan.Observability/Koan.Observability.csproj) and module
   contributors.
-- **Executable evidence:** the
-  [observability suite](../../../tests/Suites/Observability/Koan.Observability.Tests/Koan.Observability.Tests.csproj)
-  passes 1/1. Startup/health implementations are exercised indirectly elsewhere, but the bootstrap
-  suite did not complete.
-- **Inspection and failure:** health aggregation and provider contributors are real; startup rendering
-  intentionally catches reporting failures so diagnostics do not necessarily prevent application boot.
-- **Unsupported / compatibility:** exhaustive composition, stable machine-readable schemas, production
-  telemetry pipelines, redaction proof, alerting/SLO contracts, and every provider health contributor
-  are not certified.
-- **Maturity / safe claim:** `demonstrated`. Koan offers useful startup, capability, and health
-  inspection primitives; operators should not treat the current report as a complete source of truth.
-- **Open risks:** define one structured explanation model, test redaction and degraded states, and make
-  human, agent, reviewer, and telemetry projections consistent.
+- **Executable evidence:** focused facts pass 7/7; Core 211/211, Data.Core 299/299, Web WellKnown 3/3,
+  Web relationship 7/7, MCP relationship 2/2, and MCP conformance 73/73. These prove ordering, schema round-trip, redaction, host isolation,
+  unknown/degraded health, and identical Web/MCP serialization for the vertical slice. FirstUse proves
+  the operator and agent projections against the same running SQLite-backed business application.
+- **Inspection and failure:** collection starts incomplete/unknown; safe collection failures and
+  rejected/degraded facts cannot silently become healthy. Human output is a projection and machine
+  views use canonical schema-1 JSON.
+- **Unsupported / compatibility:** exhaustive composition, all provider negotiations, production
+  telemetry pipelines, alerting/SLO contracts, and every provider health contributor are not
+  certified. Schema changes require a new version; exact human formatting is not a contract.
+- **Maturity / safe claim:** `demonstrated`. Koan offers one verified fact model and consistent
+  projections for module activation and default data election; operators must not treat current
+  coverage as exhaustive runtime truth.
+- **Open risks:** migrate other provider negotiations through the model, and add
+  provider-owned detail surfaces without weakening redaction or schema stability.
 
 ## Entry template
 

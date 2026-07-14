@@ -21,6 +21,11 @@ public static class DataCaps
         public static readonly Capability OptimizedCount = new("query.optimizedCount");
         /// <summary>Filter pushdown — carries a <see cref="Filtering.FilterSupport"/> detail describing the operator set.</summary>
         public static readonly Capability Filter = new("query.filter");
+        /// <summary>
+        /// Physical filter execution posture. Carries a <see cref="FilterExecutionProfile"/> so
+        /// consumers can distinguish native backend filtering from in-memory and keyspace scans.
+        /// </summary>
+        public static readonly Capability FilterExecution = new("query.filter.execution");
     }
 
     /// <summary>Write negotiation tokens.</summary>

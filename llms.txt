@@ -9,6 +9,17 @@
 > outer pillars are experimental. Until 1.0, build from source — published packages
 > (`Sylin.Koan.*` on NuGet) lag the repo.
 
+## Start here
+
+`samples/FirstUse` is the executable first-use contract. Run it with
+`dotnet run --project samples/FirstUse`. The same directory is compiled from source in tests and
+from staged packages in the release clean room. It proves one business entity through SQLite,
+REST, startup reporting, operator facts, governed MCP discovery, dry-run, and agent mutation.
+
+`samples/GoldenJourney` is the cumulative growth contract. Read its entity first, then its
+business-named controller and bounded MCP toolset. Its executable source proof covers persistence,
+jobs and progress, shared runtime facts, agent business boundaries, and adapter rejection/recovery.
+
 ## The whole framework in three beats
 
 ### 1 · Model an entity → get an application
@@ -41,7 +52,7 @@ public sealed class TodoController : EntityController<Todo> { }
 ```
 
 That's a full REST API: GET/POST/DELETE with pagination and querying, GUID v7 ids generated
-on first read, `/api/health`, structured logging, and zero-config SQLite (`./data/app.db`).
+on first read, `/health`, structured logging, and zero-config SQLite (`./data/app.db`).
 Schema is created automatically in development.
 
 Working with data (the verbs — note: `Query`, not `Where`; `Remove`, not `Delete`):
@@ -82,7 +93,7 @@ Hello-CRUD needs exactly eight Koan concepts; nothing else is required:
 5. Provider election — the referenced data connector wins; zero-config defaults (SQLite → `./data/app.db`)
 6. The boot report — what the app prints at startup is the primary debugging surface
 7. Auto schema ("magic") — created in Development; gated by `Koan:AllowMagicInProduction` elsewhere
-8. Web defaults — controllers, `/api/health`, secure headers auto-wired; JSON is camelCase, nulls omitted (Newtonsoft.Json)
+8. Web defaults — controllers, `/health`, secure headers auto-wired; JSON is camelCase, nulls omitted (Newtonsoft.Json)
 
 ## Anti-patterns (immediate red flags)
 

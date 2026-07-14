@@ -53,7 +53,7 @@ The examples in this section are **target grammar**, not current supported synta
 |---|---|---|
 | Identity and persistence | `Todo.Get(id)`, `todo.Save()`, `todo.Remove()` | These are the shortest universally meaningful Entity operations. `Todo.Data` would add ceremony without adding information. |
 | Set reads and bounded queries | `Todo.Query(...)`, `Todo.Page(...)`, `Todo.Count` | The Entity type is already the set receiver. Cost and boundedness belong in overloads, facts, and explanation rather than a redundant pillar noun. |
-| Relationships | direct receiver-local verbs initially; consider `todo.Relations` only if cost-safe breadth requires grouping | Relationships are Entity semantics inside Data, not a separately referenced pillar. R04-06 must first eliminate or explain hidden full scans. |
+| Relationships | direct receiver-local verbs initially; consider `todo.Relations` only if cost-safe breadth requires grouping | Relationships are Entity semantics inside Data, not a separately referenced pillar. R04-06 now makes child-edge cost explicit and bounded; R04-07 can judge language shape without inheriting a hidden scan. |
 | Operation context | `EntityContext.Transaction(...)` and named module scopes such as `Tenant.Use(...)` | Context is the third Entity-language location, but it scopes a logical flow rather than one record. `todo.Context` would imply false ownership. |
 
 ### 2. `Events`: elected intrinsic flagship facet

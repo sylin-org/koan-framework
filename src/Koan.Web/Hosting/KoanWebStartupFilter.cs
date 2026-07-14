@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Web.Infrastructure;
@@ -45,7 +46,8 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                 {
                     app.UseExceptionHandler();
                 }
-                if (opts.EnableStaticFiles)
+                var webEnvironment = app.ApplicationServices.GetRequiredService<IWebHostEnvironment>();
+                if (opts.EnableStaticFiles && webEnvironment.WebRootFileProvider is not NullFileProvider)
                 {
                     app.UseDefaultFiles();
                     app.UseStaticFiles();

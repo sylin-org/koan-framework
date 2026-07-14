@@ -211,7 +211,7 @@ internal sealed class ModelService(IAiAdapterRegistry registry) : IModelService
 
         foreach (var entry in toPrune)
         {
-            await entry.Delete(ct);
+            await entry.Remove(ct);
         }
     }
 

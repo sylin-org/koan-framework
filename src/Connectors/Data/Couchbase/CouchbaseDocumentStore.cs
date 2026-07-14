@@ -117,6 +117,7 @@ internal sealed class CouchbaseDocumentStore<TEntity, TKey> :
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
         .Add(DataCaps.Write.AtomicBatch)
         .Add(DataCaps.Write.ConditionalReplace)   // native CAS (DATA-0102)
+        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Native))
         .Add(DataCaps.Query.Filter, CouchbaseN1qlFilterTranslator.Capabilities);
 
     // ==================== Container resolution + schema (Container mode) ====================

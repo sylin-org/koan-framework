@@ -9,6 +9,7 @@ using Koan.Core.Extensions;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Observability;
 using Koan.Core.Observability.Health;
+using Koan.Core.Diagnostics;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Web.Infrastructure;
@@ -26,7 +27,8 @@ public sealed class WellKnownController(
     IOptions<ObservabilityOptions>? obsOptions,
     IConfiguration cfg,
     IServiceProvider sp,
-    Koan.Data.Core.IDataService? data
+    Koan.Data.Core.IDataService? data,
+    IKoanRuntimeFacts runtimeFacts
 ) : ControllerBase
 {
     private bool CanExposeObservability() => env.IsDevelopment() || (webOptions?.Value?.ExposeObservabilitySnapshot == true);
@@ -71,6 +73,17 @@ public sealed class WellKnownController(
 
         Response.Headers.CacheControl = KoanWebConstants.Policies.NoStore;
         return Ok(payload);
+    }
+
+    [HttpGet(KoanWebConstants.Routes.WellKnownFacts)]
+    public IActionResult Facts()
+    {
+        if (!CanExposeObservability()) return NotFound();
+
+        Response.Headers.CacheControl = KoanWebConstants.Policies.NoStore;
+        return Content(
+            KoanFactJson.Serialize(runtimeFacts.Current),
+            KoanWebConstants.ContentTypes.ApplicationJson);
     }
 
     [HttpGet("aggregates")]
@@ -127,7 +140,11 @@ public sealed class WellKnownController(
         var payload = new
         {
             aggregates = items,
-            links = new[] { new { rel = "observability", href = $"/{KoanWebConstants.Routes.WellKnownBase}/{KoanWebConstants.Routes.WellKnownObservability}" } }
+            links = new[]
+            {
+                new { rel = "observability", href = $"/{KoanWebConstants.Routes.WellKnownBase}/{KoanWebConstants.Routes.WellKnownObservability}" },
+                new { rel = "facts", href = $"/{KoanWebConstants.Routes.WellKnownBase}/{KoanWebConstants.Routes.WellKnownFacts}" }
+            }
         };
         return Ok(payload);
     }

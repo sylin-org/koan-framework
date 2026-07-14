@@ -3,15 +3,15 @@ type: GUIDE
 domain: observability
 title: "R04-05 - Unify Composition and Error Facts"
 audience: [maintainers, operators, framework-authors, ai-agents]
-status: draft
-last_updated: 2026-07-13
+status: current
+last_updated: 2026-07-14
 framework_version: v0.17.0
 ---
 
 # R04-05 — Unify composition and error facts
 
 - Priority: P1
-- Status: `pending`
+- Status: `passed`
 - Depends on: R04-02, R04-03
 - Owner: Core hosting/observability
 
@@ -27,8 +27,10 @@ the exact runtime decision or distinguish unknown from healthy.
 
 ## Current evidence
 
-R02 found useful startup/composition code but lazy Entity inventory, caught reporting failures, and only
-one focused observability test. ARCH-0105/0106 require one fact model.
+[ARCH-0111](../../../../decisions/ARCH-0111-unified-runtime-facts.md) establishes one host-owned,
+schema-versioned, redacted fact envelope. Module activation/rejection and default data-adapter election
+now produce that model once; startup output, exceptions, health, lock comparison, the gated Web facts
+endpoint, and `koan://facts` project it without provider payload bags or log scraping.
 
 ## Smallest meaningful fix
 
@@ -50,6 +52,16 @@ turn missing facts into success. Secrets/connection material are structurally ex
 - degraded and reporter-failure fixtures remain diagnosable;
 - compatibility/versioning behavior for the envelope is documented.
 
+Accepting evidence on 2026-07-14:
+
+- Core passes 208/208; the focused runtime-facts surface passes 4/4, including deterministic ordering,
+  JSON round-trip, redaction, unknown/degraded health, and distinct host sessions;
+- Core Unit passes 79/79; bootstrap Fast passes 17/17, Pillars 16/16, and Infrastructure 7/7;
+- Data.Core passes 294/294, including the single-source default adapter decision and lockfile proof;
+- Web WellKnown passes 3/3 and MCP conformance passes 73/73; their focused facts projections each pass
+  1/1 and emit the canonical serialization;
+- the relevant projects build in Release with zero errors.
+
 ## Compatibility and rollback
 
 Keep current human output as a projection during migration; do not promise exact formatting. Version
@@ -59,3 +71,10 @@ machine-readable changes. Roll back one contributor/renderer without inventing a
 
 Split if a universal schema starts absorbing provider-specific payloads instead of stable shared facts
 plus owned detail.
+
+## Accepted boundary
+
+This card proves the shared model and one meaningful vertical slice. It does not claim exhaustive fact
+coverage across every connector, capability negotiation, background service, health contributor, or
+deployment topology. R04-06 extends honest negotiation without widening the shared schema into a
+provider-specific payload container.

@@ -3,15 +3,15 @@ type: GUIDE
 domain: data
 title: "R04-07 - Prove Module-Grown Entity Language"
 audience: [maintainers, framework-authors, developers, ai-agents]
-status: draft
-last_updated: 2026-07-13
+status: current
+last_updated: 2026-07-14
 framework_version: v0.17.0
 ---
 
 # R04-07 — Prove module-grown Entity language
 
 - Priority: P1
-- Status: `pending`
+- Status: `passed`
 - Depends on: R04-02, R04-05
 - Owner: Data.Core plus one pilot module
 
@@ -26,14 +26,19 @@ attached to arbitrary instances.
 Developers and coding agents receive noisy or dishonest IntelliSense; reviewers cannot see module
 language drift; maintainers fear cleanup because consumer compilation is not gated.
 
-## Current evidence
+## Delivered evidence
 
-ARCH-0106 and R03 inventory classify each hazard. A disposable C# 14 probe proved static and instance
-extension members on a constrained Entity subtype. The
+ARCH-0106 and R03 inventory classify each hazard. The repository-owned .NET 10/C# 14 consumer suite
+now proves the static module facet against real built assemblies. The
 [`R04 Entity Facet Candidate Slate`](../../R04-ENTITY-FACET-CANDIDATES.md) elects `Cache` as the
 consumer-infrastructure pilot, intrinsic `Events` and module-grown `AI` as user-delight flagships, and
 narrowly constrained `Media` as the next interface proof; it explicitly keeps control-plane pillars
 and generic messaging/jobs off Entity.
+
+`Todo.Cache` is now declared in `Koan.Cache` under the canonical Entity namespace. Data.Core no
+longer predicts the member. Existing `Flush/Count/Any` behavior moved intact; read-only `Explain()`
+projects materialized policy facts and resolves the current host per call. `Delete(object)` remains
+binary/static-call compatible but is no longer an extension receiver and is explicitly obsolete.
 
 ## Smallest meaningful fix
 
@@ -48,11 +53,16 @@ receivers never reach reflection. Collision tests fail the module build.
 
 ## Verification
 
-- C# 14 compile cells from the Entity contract;
-- XML docs and agent schema align on effects/prerequisites;
-- no package global-using injection;
-- repeated-host behavior passes R04-02 fixtures;
-- compatibility forwarding/deprecation tests for the migrated member.
+- [x] C# 14 absence, presence, invalid-receiver, contracted-module collision, and removal cells;
+- [x] XML docs describe read-only explanation, host prerequisite, and Entity-type scope;
+- [x] no package global-using injection;
+- [x] repeated-host resolution uses the active host on every call;
+- [x] existing Cache operations forward through the module-owned facet;
+- [x] runtime-only `Delete(object)` remains an explicit deprecated static compatibility path.
+
+Acceptance: Entity language 9/9; Data.Core 299/299; Cache topology 50/50; Cache cross-engine 14/14;
+Release solution build 0 errors / 25 existing warnings; documentation lint 0 errors / 1541 existing
+warnings; `git diff --check` clean.
 
 ## Compatibility and rollback
 

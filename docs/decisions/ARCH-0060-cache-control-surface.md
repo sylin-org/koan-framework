@@ -10,6 +10,10 @@ title: Cache Control Surface Helpers and Entity Policy Integration
 
 > **Status: Reaffirmed by ARCH-0075 (Koan.Cache Pillar).** This control surface survived the cache pillar rebuild and remains accepted.
 
+> **2026-07-14 amendment (ARCH-0106 / R04-07):** the Entity-scoped behavior remains accepted,
+> but its syntax is now owned by `Koan.Cache`. `Todo.Cache` appears only when that module is
+> referenced; Data.Core no longer predicts an unavailable cache capability.
+
 > **Contract**
 >
 > - **Inputs:** Koan.Cache client abstractions, cache policy registry metadata, Entity<TEntity> lifecycles, and developer requests for targeted cache invalidation diagnostics.
@@ -45,7 +49,8 @@ We extend the cache surface with the following components:
   - `Cache.Exists("key")`
   - `Cache.Tags("tag")` returning a `CacheTagSet` with `.Flush()`, `.Count()`, `.Any()` (all sans `Async`).
   - `ICacheEntryBuilder<T>.Exists(ct)` for per-entry probes.
-- `Entity<TEntity, TKey>.Cache` partial helper using `ICachePolicyRegistry` + `ICacheClient` pulled from `AppHost` to flush or count policy-derived tags.
+- A module-owned `Entity<TEntity, TKey>.Cache` facet using `ICachePolicyRegistry` + `ICacheClient`
+  resolved from the active `AppHost` to explain, flush, or count policy-derived tags.
 
 All new public helpers drop the `Async` suffix while remaining asynchronous under the hood.
 
@@ -61,7 +66,7 @@ All new public helpers drop the `Async` suffix while remaining asynchronous unde
 1. `ICacheStore.ExistsAsync` implementations re-use existing deserialization to respect stale windows and clean up invalid envelopes.
 2. Tag-based helpers deduplicate keys via `HashSet<CacheKey>` to avoid double eviction when multiple tags reference the same cache entry.
 3. Expired entries discovered during enumeration trigger immediate removal to keep tag indexes healthy.
-4. `EntityCacheAccessor` filters out tags containing `{}` placeholders to avoid malformed flushes; callers can supply additional explicit tags per invocation.
+4. `EntityCacheFacet<TEntity, TKey>` filters out tags containing `{}` placeholders to avoid malformed flushes; callers can supply additional explicit tags per invocation.
 5. Cache façade overloads accept `IEnumerable<string>` to make composition straightforward for admin tooling.
 6. Tests cover memory adapter existence checks, `CacheClient` tag operations, and entity helper behaviour with mock policy/client services.
 

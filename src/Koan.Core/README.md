@@ -29,6 +29,9 @@ dotnet add package Sylin.Koan.Core
 - Static `KoanLog.For<T>()` scopes retain only their category. Each emission follows the current
   `AppHost` provider and its `ILoggerFactory`; hostless or unconfigured flows no-op without falling
   back to a different host.
+- `IKoanRuntimeFacts.Current` exposes the current host's versioned, redacted composition and failure
+  facts. An incomplete snapshot is unknown, never implicit success. Startup, health, Web diagnostics,
+  and MCP project this same envelope.
 
 ## Links
 - Repo: https://github.com/sylin-org/Koan-framework

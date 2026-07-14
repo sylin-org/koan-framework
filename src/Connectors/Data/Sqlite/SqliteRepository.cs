@@ -56,6 +56,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         .Add(DataCaps.Isolation.RowScoped)
         .Add(DataCaps.Isolation.ContainerScoped)
         .Add(DataCaps.Isolation.DatabaseScoped)
+        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Native))
         .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     private readonly IServiceProvider _sp;

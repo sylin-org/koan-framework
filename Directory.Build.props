@@ -1,10 +1,6 @@
 <Project>
-  <!--
-    ARCH-0082: two-tier versioning (kernel lockstep, periphery independent).
-    Version resolution lives in Directory.Build.targets — the import must run
-    AFTER the csproj has set $(KoanPackageKind), and .props imports happen too
-    early. See docs/guides/versioning-workbook.md for operational guidance.
-  -->
+  <!-- ARCH-0085/0110: every packable project owns an independent NBGV version;
+       advancing dev compiles and proves the affected release set. -->
 
   <PropertyGroup>
     <!-- Generate XML docs for all projects to support API documentation. -->

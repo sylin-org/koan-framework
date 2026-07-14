@@ -7,6 +7,8 @@ using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
+using Koan.Core.Diagnostics;
+using Koan.Core.Infrastructure;
 using Xunit;
 
 namespace Koan.Tests.Integration.Bootstrap.Specs;
@@ -60,6 +62,10 @@ public sealed class FailLoudBootSpec
         ex.Message.Should().Contain(typeof(ThrowingBootInitializer).FullName);
         ex.Phase.Should().Be("initializer");
         ex.InnerException.Should().BeOfType<ThrowingBootInitializer.BootBoomException>();
+        ex.Fact.Code.Should().Be(Constants.Diagnostics.Codes.ModuleRejected);
+        ex.Fact.Subject.Should().Be(typeof(ThrowingBootInitializer).FullName);
+        ex.Fact.Summary.Should().NotContain("intentionally exploded",
+            "the machine fact must not copy arbitrary exception text");
 
         // (g) The other diagnostic fields carry the provenance an operator needs: which assembly declared
         // the broken module, its version, and — crucially — how to recover (the lenient-boot escape hatch).
@@ -119,6 +125,12 @@ public sealed class FailLoudBootSpec
             summary!.Value.ModuleFailures.Should()
                 .ContainSingle(f => f.Module == typeof(ThrowingBootInitializer).FullName
                                     && f.Phase == "initializer");
+
+            var facts = host.Services.GetRequiredService<IKoanRuntimeFacts>().Current;
+            facts.Complete.Should().BeTrue();
+            facts.Facts.Should().ContainSingle(fact =>
+                fact.Code == Constants.Diagnostics.Codes.ModuleRejected
+                && fact.Subject == typeof(ThrowingBootInitializer).FullName);
         }
         finally
         {

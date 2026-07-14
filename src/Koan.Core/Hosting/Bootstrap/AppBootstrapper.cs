@@ -5,6 +5,8 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
+using Koan.Core.Diagnostics;
+using Koan.Core.Infrastructure;
 
 namespace Koan.Core.Hosting.Bootstrap;
 
@@ -27,12 +29,15 @@ public static class AppBootstrapper
     [ThreadStatic]
     private static List<ModuleFailure>? _bootFailures;
 
+    [ThreadStatic]
+    private static List<KoanFact>? _bootFacts;
+
     internal static RegistrySummarySnapshot? RegistrySummary => _registrySummary;
 
     private static bool IsLenientBoot()
         => string.Equals(Environment.GetEnvironmentVariable(LenientBootEnvVar), "1", StringComparison.OrdinalIgnoreCase);
 
-    private static void RecordFailure(Type module, string assembly, string phase, Exception ex)
+    private static KoanFact RecordFailure(Type module, string assembly, string phase, Exception ex)
     {
         // Console.Error is the only diagnostic channel available at InitializeModules time
         // (no ILogger yet) — precedent: EmitAssemblySummary writes to Console. Mirrors
@@ -41,12 +46,26 @@ public static class AppBootstrapper
         Console.Error.WriteLine(ex.ToString());
         (_bootFailures ??= new List<ModuleFailure>())
             .Add(new ModuleFailure(module.FullName ?? module.Name, assembly, phase, ex.Message));
+
+        var fact = KoanFact.Create(
+            Constants.Diagnostics.Codes.ModuleRejected,
+            KoanFactKind.Rejection,
+            KoanFactState.Rejected,
+            module.FullName ?? module.Name,
+            "Koan rejected a module during activation.",
+            Constants.Diagnostics.Reasons.InitializerFailed,
+            "Fix the module activation failure or remove the module reference. Use lenient boot only for diagnosis.",
+            assembly,
+            $"bootstrap:{module.FullName ?? module.Name}:{phase}");
+        (_bootFacts ??= new List<KoanFact>()).Add(fact);
+        return fact;
     }
 
     public static void InitializeModules(IServiceCollection services)
     {
         KoanStartupTimeline.Mark(KoanStartupStage.BootstrapStart);
         _bootFailures = new List<ModuleFailure>();
+        _bootFacts = new List<KoanFact>();
         var lenientBoot = IsLenientBoot();
 
         // Build a closure of loaded + referenced assemblies and populate AssemblyCache
@@ -169,12 +188,23 @@ public static class AppBootstrapper
                 if (Activator.CreateInstance(initializerType) is IKoanInitializer init)
                 {
                     init.Initialize(services);
+                    var assembly = initializerType.Assembly.GetName().Name ?? "unknown";
+                    _bootFacts.Add(KoanFact.Create(
+                        Constants.Diagnostics.Codes.ModuleActivated,
+                        KoanFactKind.Discovery,
+                        KoanFactState.Observed,
+                        initializerType.FullName ?? initializerType.Name,
+                        "Koan activated a referenced module.",
+                        Constants.Diagnostics.Reasons.InitializerCompleted,
+                        null,
+                        assembly,
+                        $"bootstrap:{initializerType.FullName ?? initializerType.Name}"));
                 }
             }
             catch (Exception ex)
             {
                 var asmName = initializerType.Assembly.GetName();
-                RecordFailure(initializerType, asmName.Name ?? "<unknown>", "initializer", ex);
+                var fact = RecordFailure(initializerType, asmName.Name ?? "<unknown>", "initializer", ex);
                 if (!lenientBoot)
                 {
                     throw new KoanBootException(
@@ -182,7 +212,8 @@ public static class AppBootstrapper
                         asmName.Name ?? "<unknown>",
                         asmName.Version?.ToString() ?? "unknown",
                         "initializer",
-                        ex);
+                        ex,
+                        fact);
                 }
             }
         }
@@ -191,6 +222,7 @@ public static class AppBootstrapper
         // report (AppRuntime → KoanConsoleBlocks) can render a MODULES-FAILED block in lenient mode.
         var registrySummary = BuildRegistrySummary(initializerTypes, autoRegistrarTypes, backgroundServices, serviceDiscoveryAdapters);
         _registrySummary = registrySummary;
+        services.AddSingleton(new KoanBootstrapSnapshot(registrySummary, (_bootFacts ?? []).ToArray()));
 
         KoanStartupTimeline.Mark(KoanStartupStage.DataReady);
     }
@@ -393,7 +425,7 @@ public static class AppBootstrapper
             var actual = (ex as TargetInvocationException)?.InnerException ?? ex;
             var phase = $"manifest-invoker(scanning '{asm.GetName().Name}')";
             var asmName = loaderType.Assembly.GetName();
-            RecordFailure(loaderType, asmName.Name ?? "<unknown>", phase, actual);
+            var fact = RecordFailure(loaderType, asmName.Name ?? "<unknown>", phase, actual);
             if (!IsLenientBoot())
             {
                 throw new KoanBootException(
@@ -401,7 +433,8 @@ public static class AppBootstrapper
                     asmName.Name ?? "<unknown>",
                     asmName.Version?.ToString() ?? "unknown",
                     phase,
-                    actual);
+                    actual,
+                    fact);
             }
         }
     }

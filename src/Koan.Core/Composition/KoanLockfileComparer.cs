@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Koan.Core.Diagnostics;
+using Koan.Core.Infrastructure;
 
 namespace Koan.Core.Composition;
 
@@ -26,6 +28,42 @@ internal readonly record struct KoanLockComparison(KoanLockStatus Status, IReadO
             KoanLockStatus.Drift => $"{moduleCount} {noun} · lockfile DRIFT({string.Join(", ", DriftKeys)})",
             _ => $"{moduleCount} {noun} · lockfile not found",
         };
+    }
+
+    public KoanFact ToFact(int moduleCount)
+    {
+        var (code, kind, state, reason, correction) = Status switch
+        {
+            KoanLockStatus.Ok => (
+                Constants.Diagnostics.Codes.LockfileMatched,
+                KoanFactKind.Dependency,
+                KoanFactState.Healthy,
+                Constants.Diagnostics.Reasons.LockfileMatched,
+                (string?)null),
+            KoanLockStatus.Drift => (
+                Constants.Diagnostics.Codes.LockfileDrifted,
+                KoanFactKind.Degradation,
+                KoanFactState.Degraded,
+                Constants.Diagnostics.Reasons.LockfileDrifted,
+                "Regenerate and review koan.lock.json so build intent matches the resolved runtime composition."),
+            _ => (
+                Constants.Diagnostics.Codes.LockfileMissing,
+                KoanFactKind.Dependency,
+                KoanFactState.Unknown,
+                Constants.Diagnostics.Reasons.LockfileMissing,
+                "Build the application with Koan package targets enabled to create koan.lock.json.")
+        };
+
+        return KoanFact.Create(
+            code,
+            kind,
+            state,
+            "koan.lock.json",
+            Format(moduleCount),
+            reason,
+            correction,
+            nameof(KoanLockfileComparer),
+            "composition:lockfile");
     }
 }
 

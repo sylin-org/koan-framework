@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
+using Koan.Core.Hosting.App;
 
 namespace Koan.Data.Core.Relationships
 {
@@ -74,6 +75,7 @@ namespace Koan.Data.Core.Relationships
             where TKey : notnull
         {
             var result = new Dictionary<(string, Type), Dictionary<object, List<object>>>();
+            var executor = AppHost.GetRequiredService<IRelationshipQueryExecutor>("batch relationship child loading");
             var childRels = metadata.GetChildRelationships(typeof(TEntity));
             foreach (var (referenceProperty, childType) in childRels)
             {
@@ -83,52 +85,33 @@ namespace Koan.Data.Core.Relationships
                     continue;
                 }
 
-                var childDict = new Dictionary<object, List<object>>();
-                var dataType = typeof(Data<,>).MakeGenericType(childType, typeof(TKey));
-                var allMethod = dataType.GetMethod("All", new[] { typeof(CancellationToken) });
-                if (allMethod is null)
-                {
-                    continue;
-                }
-
-                var allTask = allMethod.Invoke(null, new object[] { ct }) as Task;
-                if (allTask is null)
-                {
-                    continue;
-                }
-
-                await allTask;
-                var resultProp = allTask.GetType().GetProperty("Result");
-                var allChildren = resultProp?.GetValue(allTask) as System.Collections.IEnumerable;
-                if (allChildren is null)
-                {
-                    continue;
-                }
-
-                var referencePropertyInfo = childType.GetProperty(referenceProperty);
-                if (referencePropertyInfo is null)
-                {
-                    continue;
-                }
-
-                foreach (var id in entityIds)
-                {
-                    var matches = new List<object>();
-                    foreach (var child in allChildren)
-                    {
-                        var value = referencePropertyInfo.GetValue(child);
-                        if (Equals(value, id))
-                        {
-                            matches.Add(child);
-                        }
-                    }
-
-                    childDict[id] = matches;
-                }
+                var method = typeof(BatchRelationshipLoader).GetMethod(
+                    nameof(LoadChildEdge),
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!
+                    .MakeGenericMethod(typeof(TEntity), childType, typeof(TKey));
+                var childDict = await (Task<Dictionary<object, List<object>>>)method.Invoke(
+                    null,
+                    new object[] { executor, entityIds, referenceProperty, ct })!;
 
                 result[(referenceProperty, childType)] = childDict;
             }
             return result;
+        }
+
+        private static async Task<Dictionary<object, List<object>>> LoadChildEdge<TParent, TChild, TKey>(
+            IRelationshipQueryExecutor executor,
+            IReadOnlyCollection<TKey> parentIds,
+            string referenceProperty,
+            CancellationToken ct)
+            where TParent : class, IEntity<TKey>
+            where TChild : class, IEntity<TKey>
+            where TKey : notnull
+        {
+            var edge = await executor.LoadChildren<TParent, TChild, TKey>(
+                parentIds, referenceProperty, ct: ct);
+            return edge.ByParent.ToDictionary(
+                pair => (object)pair.Key,
+                pair => pair.Value.Cast<object>().ToList());
         }
     }
 }

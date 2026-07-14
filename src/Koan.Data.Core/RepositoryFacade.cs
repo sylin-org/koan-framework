@@ -28,6 +28,7 @@ namespace Koan.Data.Core;
 internal sealed class RepositoryFacade<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IQueryRepository<TEntity, TKey>,
+    IBoundedQueryRepository<TEntity, TKey>,
     IRawQueryRepository<TEntity, TKey>,
     IDescribesCapabilities,
     IConditionalWriteRepository<TEntity, TKey>,
@@ -354,6 +355,28 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         await Guard(ct);
         var managed = ReadScopeFilter();
         return await RequireQuery().Count(managed is null ? query : ApplyManaged(query, managed), ct);
+    }
+
+    public async Task<BoundedQueryResult<TEntity>> QueryBoundedCandidates(
+        QueryDefinition query,
+        int maxCandidates,
+        CancellationToken ct = default)
+    {
+        await Guard(ct);
+        var managed = ReadScopeFilter();
+        var bounded = _inner as IBoundedQueryRepository<TEntity, TKey>
+            ?? throw new NotSupportedException(
+                $"The adapter backing {typeof(TEntity).Name} does not support provider-enforced bounded candidate reads.");
+        var result = await bounded.QueryBoundedCandidates(
+            managed is null ? query : ApplyManaged(query, managed),
+            maxCandidates,
+            ct);
+        if (_fieldTransform.HasTransforms)
+        {
+            foreach (var entity in result.Items)
+                _fieldTransform.ApplyOnRead(entity);
+        }
+        return result;
     }
 
     private IQueryRepository<TEntity, TKey> RequireQuery()

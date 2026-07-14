@@ -6,6 +6,8 @@ using System.Reflection;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Configuration;
 using Koan.Core.Hosting.Registry;
+using Koan.Core.Diagnostics;
+using Koan.Core.Infrastructure;
 
 namespace Koan.Core.Composition;
 
@@ -21,6 +23,9 @@ internal static class KoanCompositionSnapshot
     public const string ResolvedTwinRelativePath = "obj/koan.lock.resolved.json";
 
     public static KoanLockfile Build(IServiceProvider services, string appName, IConfiguration? config)
+        => BuildResult(services, appName, config).Lockfile;
+
+    internal static KoanCompositionResult BuildResult(IServiceProvider services, string appName, IConfiguration? config)
     {
         // "Modules" = the Koan.* assemblies the app is composed of — the SAME notion the build-time
         // emitter records from MSBuild references. The bootstrap loads the full reference closure for
@@ -33,8 +38,9 @@ internal static class KoanCompositionSnapshot
         if (config is not null) AddConfigKeys(builder, config);
         RunContributors(builder, services);
 
-        builder.ApplyTo(out var elections, out var capabilities, out var configKeys, out var entities);
-        return new KoanLockfile(KoanLockfile.CurrentSchema, app, lockModules, elections, capabilities, configKeys, entities);
+        builder.ApplyTo(out var elections, out var capabilities, out var configKeys, out var entities, out var facts);
+        var lockfile = new KoanLockfile(KoanLockfile.CurrentSchema, app, lockModules, elections, capabilities, configKeys, entities);
+        return new KoanCompositionResult(lockfile, facts);
     }
 
     /// <summary>Build the resolved twin from a live host (app name from <see cref="KoanEnv"/>).</summary>
@@ -101,9 +107,18 @@ internal static class KoanCompositionSnapshot
                 if (Activator.CreateInstance(type) is IKoanCompositionContributor contributor)
                     contributor.Contribute(builder, services);
             }
-            catch
+            catch (Exception ex)
             {
-                // A contributor is best-effort enrichment; it must never break the boot report.
+                builder.AddFact(KoanFact.Create(
+                    Constants.Diagnostics.Codes.CollectionFailed,
+                    KoanFactKind.Degradation,
+                    KoanFactState.CollectionFailed,
+                    type.FullName ?? type.Name,
+                    "A composition contributor could not report its runtime facts.",
+                    Constants.Diagnostics.Reasons.ReporterFailed,
+                    "Inspect the named contributor and retry startup after correcting its reporting failure.",
+                    type.Assembly.GetName().Name ?? "composition",
+                    $"composition:{type.FullName ?? type.Name}:{ex.GetType().Name}"));
             }
         }
     }
@@ -132,3 +147,7 @@ internal static class KoanCompositionSnapshot
         return $"net{v.Major}.{v.Minor}";
     }
 }
+
+internal sealed record KoanCompositionResult(
+    KoanLockfile Lockfile,
+    IReadOnlyList<KoanFact> Facts);

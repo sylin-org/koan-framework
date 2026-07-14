@@ -24,11 +24,16 @@ source: src/Koan.Web/
 
 - `EntityController<TEntity, TKey>`
 - Transformers for payload shaping (see WEB-0035)
+- `GET /.well-known/Koan/facts` projects `IKoanRuntimeFacts.Current` through `KoanFactJson`.
 
 ## Configuration
 
 - Use typed Options for feature toggles (health, OpenAPI, transformers)
+- Runtime facts are exposed automatically in Development. Set
+  `Koan:Web:ExposeObservabilitySnapshot=true` for an intentional non-Development exposure.
 - Avoid inline endpoints; keep routing in controllers
+- `EnableStaticFiles` retains Koan's conventional static-file wiring, but middleware is skipped when
+  ASP.NET exposes `NullFileProvider`; API-only applications therefore need no empty `wwwroot` folder.
 
 ## Usage guidance
 
@@ -45,6 +50,8 @@ source: src/Koan.Web/
 
 - Integrate with logging/tracing; expose health endpoints when enabled
 - Use transformers to control payload shapes and security concerns
+- Runtime facts are redacted but still disclose module/decision names; retain an operational access
+  boundary and do not cache the response.
 
 ## Design and composition
 
@@ -77,3 +84,18 @@ source: src/Koan.Web/
 - Web API: `/docs/api/web-http-api.md`
 - Decision - transformers: `/docs/decisions/WEB-0035-entitycontroller-transformers.md`
 - Engineering guardrails: `/docs/engineering/index.md`
+- Runtime facts: `/docs/engineering/runtime-facts.md`
+
+## Relationship expansion safety
+
+- `?with=all` preserves each related type's request-option/visibility predicates and delegates child
+  execution to Data.Core's `IRelationshipQueryExecutor`. Collections issue one child query per edge,
+  not one query per root.
+- `EntityEndpointOptions.RelationshipMaxResults` defaults to 200 rows per edge across the request.
+  `RelationshipFallbackMaxCandidates` defaults to null, so scan-backed adapters fail closed unless an
+  application explicitly chooses a finite candidate budget.
+- Unsupported or implicit scans return 422. Candidate/result limit overflow returns 413. The response
+  carries stable reason, relationship, provider, correction, and limit fields; no entity keys or
+  provider configuration are included.
+- MCP uses `IEntityEndpointService` and therefore receives the same authorization, limits, errors, and
+  runtime facts. These are direct-edge guarantees, not recursive graph-depth or parent-batching claims.

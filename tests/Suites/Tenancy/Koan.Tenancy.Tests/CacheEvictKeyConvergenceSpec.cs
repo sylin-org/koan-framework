@@ -96,7 +96,7 @@ public sealed class CacheEvictKeyConvergenceSpec
         (await client.Exists(globexKey, opts, default)).Should().BeTrue("globex's entry is untouched by acme's Uncache");
     }
 
-    [Fact(DisplayName = "cache evict convergence: EntityCache<T>.Flush under the same tenant removes the scoped entry")]
+    [Fact(DisplayName = "cache evict convergence: typed cache handle Flush under the same tenant removes the scoped entry")]
     public async Task Flush_under_the_same_tenant_evicts_the_scoped_entry()
     {
         await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"));

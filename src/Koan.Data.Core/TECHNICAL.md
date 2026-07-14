@@ -96,7 +96,26 @@ source: src/Koan.Data.Core/
 
 - Large result sets → require paging/streaming
 - Concurrency and batches → follow transactional batch semantics (see DATA-0007)
-- Adapter capabilities vary; use capability flags when present
+- Adapter capabilities vary. `DataCaps.Query.Filter` describes operator semantics;
+  `DataCaps.Query.FilterExecution` carries `FilterExecutionProfile` (`Native`, `InMemory`, `Scan`, or
+  `Unknown`). Do not infer backend pushdown from `DataCaps.Query.Linq` or `FilterSupport.Full`.
+
+## Relationship negotiation
+
+- `IRelationshipQueryExecutor` is the single child-edge execution owner used by Entity, batch, Web,
+  and MCP paths. A batch of roots becomes one `Filter.In` query per edge.
+- `RelationshipQueryPolicy.Strict` accepts native or already-resident InMemory execution and rejects
+  scans or residual fallback. It is the default for existing Entity method shapes.
+- `RelationshipQueryPolicy.Bounded(maxCandidates, maxResults)` explicitly accepts finite scan or
+  residual work. Providers implementing `IBoundedQueryRepository` refuse before returning partial
+  data when the candidate limit is exceeded.
+- `RepositoryFacade` applies storage guards and managed/read-scope filters to bounded reads exactly as
+  it does ordinary queries; field transforms are reversed before results leave the facade.
+- `RelationshipQueryRejectedException` carries safe relationship/provider/reason/correction fields.
+  The latest selected or rejected mode is recorded as `koan.data.relationship.execution` in the
+  shared runtime-fact snapshot.
+- This contract covers direct child edges. Parent batching, recursive graph planning, depth budgets,
+  index verification, and fleet-wide performance certification are not included.
 
 ## Observability and security
 

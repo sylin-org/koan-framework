@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" Version="9.4.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Consumer cells must use the same C# 14 compiler as the active .NET 10 SDK. -->
+    <Reference Include="Microsoft.CodeAnalysis"
+               HintPath="$(MSBuildSDKsPath)/../Roslyn/bincore/Microsoft.CodeAnalysis.dll"
+               Private="true" />
+    <Reference Include="Microsoft.CodeAnalysis.CSharp"
+               HintPath="$(MSBuildSDKsPath)/../Roslyn/bincore/Microsoft.CodeAnalysis.CSharp.dll"
+               Private="true" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../src/Koan.Cache/Koan.Cache.csproj" />
+    <ProjectReference Include="../../../../src/Koan.Cache.Abstractions/Koan.Cache.Abstractions.csproj" />
+    <ProjectReference Include="../../../../src/Koan.Core/Koan.Core.csproj" />
+    <ProjectReference Include="../../../../src/Koan.Data.Core/Koan.Data.Core.csproj" />
+    <ProjectReference Include="../../../../src/Koan.Data.SoftDelete/Koan.Data.SoftDelete.csproj" />
+    <ProjectReference Include="../../../../src/Koan.Jobs/Koan.Jobs.csproj" />
+  </ItemGroup>
+</Project>

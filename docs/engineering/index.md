@@ -4,8 +4,8 @@ domain: engineering
 title: "Koan Engineering Guardrails"
 audience: [developers, maintainers, ai-agents]
 status: current
-last_updated: 2025-09-29
-framework_version: v0.2.18+
+last_updated: 2026-07-14
+framework_version: v0.17.0
 validation:
   date_last_tested: 2025-09-29
   status: verified
@@ -17,7 +17,7 @@ validation:
 ## Contract
 
 - **Scope**: Day-to-day guardrails for contributors working inside the Koan repository.
-- **Inputs**: Existing modules, ADRs, scripts (`apply-version.ps1`, `scripts/validate-packages.ps1`), and framework conventions.
+- **Inputs**: Existing modules, ADRs, the evaluated package release compiler, validation scripts, and framework conventions.
 - **Outputs**: Code and docs that comply with controller-first web APIs, entity-first data patterns, packaging standards, and documentation posture.
 - **Failure modes**: Inline endpoints, repository abstractions over entities, scattered magic literals, missing README/TECHNICAL companions, or drifting NuGet metadata.
 - **Success criteria**: Features land with controllers, entity statics, centralized constants/options, validated packaging metadata, and updated companion docs.
@@ -30,7 +30,8 @@ validation:
 - [Configuration provenance descriptors](provenance-configuration-descriptors.md)
 - [Architecture principles](../architecture/principles.md)
 - [Documentation posture (ARCH-0041)](../decisions/ARCH-0041-docs-posture-instructions-over-tutorials.md)
-- [Script-owned versioning (BUILD-0072)](../decisions/BUILD-0072-script-owned-versioning.md)
+- [Git-driven package releases (ARCH-0110)](../decisions/ARCH-0110-dev-release-compiler.md)
+- [Runtime facts](runtime-facts.md)
 
 ## Prime Guardrails
 
@@ -51,10 +52,10 @@ validation:
 
 ## Packaging Checklist
 
-- Update `version.json`; run `apply-version.ps1` instead of editing `<Version>` nodes.
+- Give every packable project a local `version.json`; NBGV owns patch and assembly/package stamping.
 - Ensure `<Description>`, `<PackageTags>`, and `<GenerateDocumentationFile>true</GenerateDocumentationFile>` are set.
 - Write or update per-project `README.md` with controller/entity examples.
-- Execute `scripts/validate-packages.ps1` locally and wire it into CI jobs touching packaging.
+- Run `dotnet run --project tools/Koan.Packaging -- inventory` and the relevant local package plan.
 - Dotnet tools set `<PackAsTool>true</PackAsTool>` and document install commands; analyzers ship assets under `analyzers/dotnet/cs`.
 
 See the [NuGet packaging policy](packaging.md) for detailed expectations and follow-ups.
@@ -70,7 +71,7 @@ See the [NuGet packaging policy](packaging.md) for detailed expectations and fol
 1. **Trace existing surfaces**: Search the repo/samples before introducing new helpers.
 2. **Document decisions**: Add ADRs for structural changes; update `docs/engineering/**` and module-level companion docs.
 3. **Validate**: Run unit or integration tests applicable to touched components plus the docs build (`scripts/build-docs.ps1 -Strict`).
-4. **Package lint**: Execute `scripts/validate-packages.ps1` to confirm metadata compliance before PRs.
+4. **Package lint**: Run the release compiler inventory; the artifact gate checks evaluated metadata.
 
 ## Edge Cases & Escalation
 

@@ -1,12 +1,18 @@
 ﻿---
 id: BUILD-0072
-status: accepted
+status: superseded
 date: 2025-09-29
 related:
   - tools/versioning-script
+  - ARCH-0085
+  - ARCH-0110
 ---
 
 ## Contract
+
+> **Superseded by ARCH-0085 and ARCH-0110.** This file records the former policy. NBGV now owns
+> deterministic per-package versions, and advancing `dev` invokes the release compiler. No script
+> stamps versions into project files.
 
 - **Decision scope**: Koan repository version stamping for NuGet packages and assemblies.
 - **Inputs**: `version.json`, release versioning script (`scripts/apply-version.ps1`), MSBuild project files.

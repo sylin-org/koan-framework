@@ -5,6 +5,7 @@ using Koan.Web.AdapterSurface.InMemory.Tests.RelationshipExpansion;
 using Koan.Web.AdapterSurface.TestKit;
 using Koan.Web.Extensions;
 using Koan.Web.Hooks;
+using Koan.Web.Endpoints;
 
 namespace Koan.Web.AdapterSurface.InMemory.Tests;
 
@@ -28,6 +29,7 @@ public sealed class InMemoryAdapterFactory : AdapterTestFactoryBase
         services.AddKoanControllersFrom<WorksController>();
         services.AddSingleton<IRequestOptionsHook<Maker>, MakerVisibilityHook>();
         services.AddSingleton<IRequestOptionsHook<Work>, WorkVisibilityHook>();
+        services.Configure<EntityEndpointOptions>(options => options.RelationshipMaxResults = 2);
     }
 
     protected override IEnumerable<KeyValuePair<string, string?>> AdapterConfiguration() => new Dictionary<string, string?>

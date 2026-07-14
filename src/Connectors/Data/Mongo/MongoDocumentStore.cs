@@ -91,6 +91,7 @@ internal sealed class MongoDocumentStore<TEntity, TKey> :
         .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
         .Add(DataCaps.Retention.TtlIndex)
+        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Native))
         .Add(DataCaps.Query.Filter, MongoFilterTranslator<TEntity>.Capabilities);
 
     protected override RemoveStrategy ResolveStrategy(RemoveStrategy strategy)

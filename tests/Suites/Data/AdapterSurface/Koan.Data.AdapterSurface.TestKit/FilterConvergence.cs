@@ -74,7 +74,7 @@ public static class FilterConvergence
     /// </summary>
     public static async Task AssertConvergesAsync()
     {
-        foreach (var existing in await Data<ConvergenceWidget, string>.Query("{}")) await existing.Delete();
+        foreach (var existing in await Data<ConvergenceWidget, string>.Query("{}")) await existing.Remove();
         await ConvergenceWidget.UpsertMany(Corpus);
 
         var failures = new List<string>();

@@ -49,14 +49,7 @@ public static class EntityCacheExtensions
         => new(ResolveClient());
 
     private static ICacheWriter ResolveClient()
-    {
-        var provider = Koan.Core.Hosting.App.AppHost.Current
-            ?? throw new InvalidOperationException(
-                "AppHost is not initialized. Ensure the application host is started before using entity cache extensions.");
-        return (ICacheWriter)(provider.GetService(typeof(ICacheWriter))
-            ?? throw new InvalidOperationException(
-                "ICacheWriter is not registered. Ensure AddKoanCache() has been called."));
-    }
+        => Koan.Core.Hosting.App.AppHost.GetRequiredService<ICacheWriter>("entity cache eviction");
 }
 
 /// <summary>

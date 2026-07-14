@@ -1,9 +1,12 @@
 # Koan.Cache — Reference
 
-**Status:** initial release · v0.7.0
+**Status:** current · v0.17.0
 **Architecture:** ARCH-0075 · ARCH-0076 (decorator order)
 
 The cache pillar provides transparent L1/L2 caching for `Entity<T>` with cross-node coherence. Reference = Intent: adding `Koan.Cache.Adapter.Redis` activates Redis-as-L2 and coherence broadcasting with zero user code.
+
+The Entity language is reference-activated too: `Todo.Cache` is contributed by `Koan.Cache`, not
+predicted by Data.Core. Remove the module reference and that facet disappears at compile time.
 
 This is the first stop for using the cache. The architecture overview lives in [koan-cache-module.md](../../architecture/koan-cache-module.md); the canonical decision record is [ARCH-0075](../../decisions/ARCH-0075-koan-cache-pillar.md).
 
@@ -28,6 +31,8 @@ var todo = await Todo.Get(id);                 // first call hits DB, populates 
 var again = await Todo.Get(id);                // L1 hit, sub-ms
 todo.Title = "updated";
 await todo.Save();                             // cache write-through; peers get evict broadcast
+
+var policy = Todo.Cache.Explain();             // read-only materialized policy facts
 ```
 
 Boot report (with Redis):
@@ -79,7 +84,7 @@ public sealed class HotKey : Entity<HotKey> { }
 | `Tier` | `Layered` | L1 + L2. Effective tier is `LocalOnly` if no Remote store registered. |
 | `Strategy` | `GetOrSet` | Read-through with write-back. |
 | `Key template` | `{TypeName}:{Partition}:{Id}` | Partition-aware. `{Partition}` resolves to `"_"` outside a partition scope. |
-| `Tags` | `["{TypeName}"]` | Materialized to the actual type name at boot. Enables `EntityCache<T>.Flush()`. |
+| `Tags` | `["{TypeName}"]` | Materialized to the actual type name at boot. Enables `Todo.Cache.Flush()`. |
 | `ForceCoherenceBroadcast` | `true` | Writes broadcast `EvictKey` to peers. |
 | `L1AbsoluteTtl` | `min(L2Ttl, max(30s, L2Ttl/2))` | Defense-in-depth: L1 staleness capped even if coherence is silent. |
 
@@ -200,8 +205,12 @@ var key = CacheKey.For<Todo>(id, partition: "archive");
 
 // Evict locally + broadcast to peers via coherence
 await todo.Uncache();                                 // instance form (entity → key by convention)
-await EntityCacheExtensions.Cache<Todo, string>().Flush(id);   // typed handle
+await Todo.Cache.Flush();                             // every entry tagged for Todo
+await EntityCacheExtensions.Cache<Todo, string>().Flush(id);   // advanced keyed handle
 ```
+
+`Todo.Cache.Explain()` is non-destructive and returns provider-neutral materialized policy facts. It
+does not read or mutate cache entries and does not claim to be cache-cluster administration.
 
 ---
 

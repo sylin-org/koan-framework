@@ -15,6 +15,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Relationships;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Web.Authorization;
@@ -295,7 +296,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         if (!string.IsNullOrWhiteSpace(request.With) && request.With.Contains("all", StringComparison.OrdinalIgnoreCase))
         {
-            payload = await EnrichRelationships(list, context, request.Set);
+            try
+            {
+                payload = await EnrichRelationships(list, context, request.Set);
+            }
+            catch (RelationshipQueryRejectedException ex)
+            {
+                return new EntityCollectionResult<TEntity>(context, list, total, null, RelationshipRejectedResult(ex));
+            }
         }
         else if (!string.IsNullOrWhiteSpace(request.Shape))
         {
@@ -453,9 +461,17 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         if (!string.IsNullOrWhiteSpace(request.With) && request.With.Contains("all", StringComparison.OrdinalIgnoreCase) && model is Entity<TEntity, TKey>)
         {
             // WEB-0068 / AN-leak: relationship expansion must govern every related entity by ITS OWN
-            // type's visibility predicates — the raw GetRelatives() loaders are app-authority and would
-            // tunnel hidden rows out through a visible parent. Already inside the partition scope above.
-            var enriched = await GovernedRelationshipExpander.ExpandAsync<TEntity, TKey>(model, request.Id!, context);
+            // type's visibility predicates — domain GetRelatives() is app-authority and would tunnel
+            // hidden rows out through a visible parent. Already inside the partition scope above.
+            RelationshipGraph<TEntity> enriched;
+            try
+            {
+                enriched = await GovernedRelationshipExpander.ExpandAsync<TEntity, TKey>(model, request.Id!, context);
+            }
+            catch (RelationshipQueryRejectedException ex)
+            {
+                return new EntityModelResult<TEntity>(context, model, null, RelationshipRejectedResult(ex));
+            }
             ApplyViewHeader(context, request.Accept);
             CopyHookHeaders(context, hookContext);
             return new EntityModelResult<TEntity>(context, model, enriched);
@@ -1076,21 +1092,28 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     private static async Task<IReadOnlyList<object>> EnrichRelationships(IReadOnlyList<TEntity> list, EntityRequestContext context, string? set)
     {
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(set) ? null : set);
-        var enrichedResults = new List<object>(list.Count);
-        foreach (var item in list)
-        {
-            if (item is Entity<TEntity, TKey>)
-            {
-                var enriched = await GovernedRelationshipExpander.ExpandAsync<TEntity, TKey>(item, item.Id, context);
-                enrichedResults.Add(enriched);
-            }
-            else
-            {
-                enrichedResults.Add(item!);
-            }
-        }
-        return enrichedResults;
+        if (list.Count == 0) return Array.Empty<object>();
+        if (list.Any(item => item is not Entity<TEntity, TKey>)) return list.Cast<object>().ToArray();
+        var roots = list.Select(item => (item, item.Id)).ToArray();
+        var enriched = await GovernedRelationshipExpander.ExpandManyAsync<TEntity, TKey>(roots, context);
+        return enriched.Cast<object>().ToArray();
     }
+
+    private static ObjectResult RelationshipRejectedResult(RelationshipQueryRejectedException exception)
+        => new(new
+        {
+            error = "Relationship expansion rejected",
+            reason = exception.ReasonCode,
+            relationship = $"{exception.ParentType}->{exception.ChildType}.{exception.ReferenceProperty}",
+            provider = exception.Provider,
+            correction = exception.Correction,
+            limit = exception.Limit
+        })
+        {
+            StatusCode = exception.IsLimitExceeded
+                ? StatusCodes.Status413PayloadTooLarge
+                : StatusCodes.Status422UnprocessableEntity
+        };
 
     private static object ApplyShape(string? shape, IReadOnlyList<TEntity> list)
     {

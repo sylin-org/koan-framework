@@ -41,6 +41,9 @@ public static class FactoryResolver
         return name.ToLowerInvariant();
     }
 
+    internal static int Priority<TFactory>(TFactory factory) where TFactory : class, IAdapterFactory
+        => factory.GetType().GetCustomAttribute<ProviderPriorityAttribute>()?.Priority ?? 0;
+
     // Highest [ProviderPriority] first; type-name (ordinal-ignore-case) as the stable tie-break — the exact ordering
     // both call sites used before convergence.
     private static IReadOnlyList<TFactory> Rank<TFactory>(IEnumerable<TFactory> factories)

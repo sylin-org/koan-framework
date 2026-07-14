@@ -1,153 +1,28 @@
-# Versioning
+# Package versioning
 
-How Koan package versions are computed and how to control them. Versions are driven by Nerdbank.GitVersioning (nbgv) per ARCH-0085.
+Koan packages version independently with Nerdbank.GitVersioning (NBGV). A package's `version.json`
+contains deliberate major/minor intent; Git history supplies the patch. Advancing `dev` is the release
+event, and the release compiler compares the public NBGV version at the event's two commits.
 
-> Companion ADR: [ARCH-0085](../decisions/ARCH-0085-versioning-compatibility-and-automation.md) -- why the system is shaped this way.
-> Companion ADR: [ARCH-0082](../decisions/ARCH-0082-versioning-strategy.md) -- the strategy this supersedes.
-> Companion workbook: [nuget-publishing.md](nuget-publishing.md) -- once versions are decided, how they reach nuget.org.
+> Governing decisions: [ARCH-0085](../decisions/ARCH-0085-versioning-compatibility-and-automation.md)
+> and [ARCH-0110](../decisions/ARCH-0110-dev-release-compiler.md).
 
----
+## Mental model
 
-## When to use this
-
-- You're preparing a commit and want to know what version it'll produce
-- A package bumped (or didn't bump) and you want to understand why
-- You're adding a new package and need to wire it into the versioning system
-- You want to bump a package's major or minor version deliberately
-
-**Prerequisites:**
-
-- PowerShell 7+ (`pwsh`), Git, .NET 10 SDK
-- `dotnet tool restore` at the repo root (installs `nbgv`)
-- Working tree at the repo root
-
----
-
-## Mental model (30 seconds)
-
-Every packable project under `src/` has its own `version.json` file with:
-
-```json
-{
-  "version": "0.17",
-  "versionHeightOffset": -1,
-  "pathFilters": ["."]
-}
+```text
+package-local version.json + commits matching pathFilters
+                         ↓
+               deterministic NBGV version
+                         ↓
+before version differs from after version? ── yes ──> release that package identity
+                         │
+                         no
+                         ↓
+                 leave it untouched
 ```
 
-- **`version`** -- the major.minor floor. You own this; edit it to bump major or minor.
-- **patch** -- computed automatically by nbgv as the git commit height of that package's folder since `version` last changed. A folder with no new commits since its last published version keeps the same patch; nuget.org's `--skip-duplicate` skips it on push.
-- **`versionHeightOffset: -1`** -- ensures the commit that introduces or changes `version.json` lands on `major.minor.0` (not `.1`).
-- **`pathFilters: ["."]`** -- only commits touching THIS package's folder increment its patch. A commit touching only `src/Koan.Cache.Adapter.Redis/` does not bump `src/Koan.Core/`.
-
-Clean versions (no `-gXXXXXXX` prerelease suffix) require being on `main` or passing `-p:PublicRelease=true`.
-
-Releases are tagged `release/YYYY-MM-DD` by the workflow. Tags are for audit trail only -- they do not drive version computation.
-
-That's the whole model. Everything else in this workbook is how to operate on it.
-
----
-
-## Happy path
-
-You don't operate the versioning system on every commit. The CI workflow does it on every merge to `main` -- see [nuget-publishing.md](nuget-publishing.md) for that flow.
-
-To **preview** what version a package will get on the next release:
-
-```pwsh
-# From the repo root, for a specific package:
-dotnet nbgv get-version -p src/Koan.Cache.Adapter.Redis
-
-# Or from inside the package folder:
-cd src/Koan.Cache.Adapter.Redis
-dotnet nbgv get-version
-
-# To see the NuGet package version specifically:
-dotnet nbgv get-version -p src/Koan.Cache.Adapter.Redis --format json | ConvertFrom-Json | Select-Object NuGetPackageVersion
-```
-
-If the output shows a prerelease suffix (e.g., `0.17.5-g1a2b3c4`), that is correct for a non-main branch. The suffix is stripped when building from `main` or with `-p:PublicRelease=true`.
-
----
-
-## Scenarios
-
-| If you want to... | Go to |
-|---|---|
-| Fix a bug in one package | [Patch bump (automatic)](#patch-bump-automatic) |
-| Bump a package to a new minor or major | [Minor or major bump](#minor-or-major-bump) |
-| Add a brand-new package | [Adding a package](#adding-a-package) |
-| Temporarily exclude a package from NuGet | [Mark a package non-packable](#mark-a-package-non-packable) |
-| Run a release manually (CI is down) | See [nuget-publishing.md -- Manual publish](nuget-publishing.md#manual-publish) |
-| Preview the version without committing | [Preview version](#preview-version) |
-
-### Patch bump (automatic)
-
-Commit any code change to the package's folder. The patch number increments by one for each commit that touches the folder since the last `version.json` change.
-
-```pwsh
-# Commit your change normally.
-git commit -m "fix(cache): Redis adapter stalls on slow Subscribe"
-
-# Preview the resulting version.
-dotnet nbgv get-version -p src/Koan.Cache.Adapter.Redis
-# Expect: Version = 0.17.X where X is one more than last published.
-
-# Push and open a PR to main. CI handles the rest.
-```
-
-### Minor or major bump
-
-Edit the package's `version.json` `version` field and commit that file as part of your change:
-
-```pwsh
-# Example: bump Koan.Cache.Adapter.Redis from 0.17 to 0.18.
-# Edit src/Koan.Cache.Adapter.Redis/version.json:
-#   "version": "0.18"
-
-git add src/Koan.Cache.Adapter.Redis/version.json
-git commit -m "feat(cache): Redis adapter 0.18 -- streaming subscribe support"
-
-# Preview: patch resets to 0 for this commit (versionHeightOffset = -1).
-dotnet nbgv get-version -p src/Koan.Cache.Adapter.Redis
-# Expect: NuGetPackageVersion = 0.18.0 (on main / with PublicRelease=true)
-```
-
-For a **major bump** that signals a breaking change, increment the major digit instead:
-
-```json
-{
-  "version": "1.0",
-  "versionHeightOffset": -1,
-  "pathFilters": ["."]
-}
-```
-
-This is an ADR-level decision; flag it for review before merging.
-
-### Adding a package
-
-1. Scaffold the csproj under `src/`. Set required metadata:
-
-```xml
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>    <!-- required for metadata audit -->
-    <TargetFramework>net10.0</TargetFramework>
-    <Description>One sentence describing what this package does.</Description>
-    <PackageTags>$(CommonPackageTags);your;specific;tags</PackageTags>
-  </PropertyGroup>
-</Project>
-```
-
-2. Create the package's `version.json` by running the baseline script:
-
-```pwsh
-pwsh scripts/versioning/Initialize-NbgvBaseline.ps1 -WhatIf   # preview
-pwsh scripts/versioning/Initialize-NbgvBaseline.ps1            # write
-```
-
-Or create it manually:
+Every packable project must have a `version.json` in its own directory. There is no kernel lockstep,
+root stamping pass, or package checklist. A typical file is:
 
 ```json
 {
@@ -158,123 +33,83 @@ Or create it manually:
 }
 ```
 
-3. Verify the metadata is complete:
+- `version` is the semantic major/minor floor. Change it only when you mean to change the
+  compatibility tier.
+- patch is the matching Git height and is never typed by hand;
+- `pathFilters` defines the package-affecting history. Most leaf packages own their directory;
+  bundles additionally include the paths that define their composition;
+- `versionHeightOffset` establishes a baseline. `-1` makes a newly introduced ownership commit
+  `.0`. Some migrated, already-existing packages deliberately use `0` so the first dedicated
+  ownership commit cannot collide with an already published `.0`; preserve those baselines.
 
-```pwsh
-pwsh scripts/versioning/Audit-NuGetMetadata.ps1
-# Should report 0 missing Description / PackageTags / KoanPackageKind.
+The workflow passes `PublicRelease=true`, so a `dev` event produces a stable package identity. Local
+non-release builds may carry NBGV's commit suffix.
+
+## Common tasks
+
+### Preview one package
+
+```powershell
+dotnet nbgv get-version -p src/Koan.Core --public-release=true
 ```
 
-4. On the next merge to `main`, the package is packed and published automatically.
+### Preview the exact event
 
-### Mark a package non-packable
-
-Temporarily exclude a package from NuGet publishing:
-
-```xml
-<!-- Inside the csproj's first <PropertyGroup>: -->
-<IsPackable>false</IsPackable>
+```powershell
+dotnet run --project tools/Koan.Packaging -- plan `
+  --before HEAD~1 --after HEAD --offline `
+  --output artifacts/release/release-set.json
 ```
 
-Effect:
-- The workflow packs the csproj but produces no `.nupkg` (MSBuild no-ops the pack).
-- No NuGet push attempt for this package.
-- The csproj still builds, so dependents still work in-repo.
+The offline form shows only identities changed by Git. The protected workflow uses the online form,
+which also includes a current identity missing from nuget.org so interrupted or historical gaps heal
+without an operator-maintained list.
 
-To re-enable: delete the `IsPackable` line.
+### Make a normal patch release
 
-### Preview version
+Change business/framework code in the package's owned path and push or merge it to `dev`. Do not edit
+the version file for an ordinary patch.
 
-```pwsh
-# Single package:
-dotnet nbgv get-version -p src/Koan.Core
+### Change the compatibility tier
 
-# All packages (slow -- probes each folder):
-Get-ChildItem -Path src -Filter version.json -Recurse | ForEach-Object {
-  $pkg = Split-Path (Split-Path $_.FullName -Parent) -Leaf
-  $ver = dotnet nbgv get-version -p (Split-Path $_.FullName -Parent) --format json | ConvertFrom-Json
-  [pscustomobject]@{ Package = $pkg; Version = $ver.NuGetPackageVersion }
-} | Format-Table -AutoSize
+Edit that package's `version.json` `version` field as part of the breaking/feature change. Before 1.0,
+the minor is the breaking tier; at 1.0 and later, the major is. Internal dependencies pack as bounded
+ranges (`[0.17.x,0.18.0)` before 1.0), so incompatible combinations fail during restore.
+
+ARCH-0085's reverse-dependent republish rule for a breaking tier change remains explicit follow-up
+work. Do not describe that closure as automated until its version-graph gate exists.
+
+### Add a package
+
+Create its project-local `version.json`, README, metadata, and ProjectReferences, then run:
+
+```powershell
+dotnet run --project tools/Koan.Packaging -- inventory
 ```
 
----
+Inventory fails when a packable project lacks a local version owner or two projects claim one package
+ID.
 
-## Failure -> recovery
+## Failure → recovery
 
-### Symptom: package version has a prerelease suffix on main
-
-**Why it happens:** the pack step ran without `-p:PublicRelease=true`.
-
-**Recovery:** re-run the workflow or add `-p:PublicRelease=true` to any manual pack command.
-
-### Symptom: wrong patch number (expected 5, got 12)
-
-**Why it happens:** nbgv counts every commit in the folder's history since `version.json` last changed, including merge commits and commits from other branches that touched the folder.
-
-**Recovery:**
-
-```pwsh
-# See which commits nbgv is counting.
-dotnet nbgv get-version -p src/Koan.YourPackage --format json | ConvertFrom-Json | Select-Object -ExpandProperty GitCommitIdShort
-# Then inspect the log:
-git log --oneline -- src/Koan.YourPackage/
-```
-
-If the count is genuinely wrong (e.g., a mass-refactor touched the folder incidentally), the only way to reset patch to 0 is to bump the `version` field in the package's `version.json`.
-
-### Symptom: new package version is not on nuget.org after a green workflow run
-
-**Why it happens:** the package's version on nuget.org already matched the computed version (a previous publish or a duplicate run), so `--skip-duplicate` silently skipped it.
-
-**Recovery:**
-
-```pwsh
-# Check what version the workflow produced.
-dotnet nbgv get-version -p src/Koan.YourPackage --format json | ConvertFrom-Json | Select-Object NuGetPackageVersion
-
-# Check what's on nuget.org (lowercased package id).
-curl -s https://api.nuget.org/v3-flatcontainer/sylin.koan.yourpackage/index.json
-```
-
-If those match, the package IS published -- it just didn't increment because no commits touched the folder. To force a new publish, add any commit to the package folder and merge again.
-
-### Symptom: new package doesn't show up in the pack output at all
-
-**Why it happens:** the csproj has `IsPackable=false` (directly or via an ancestor `Directory.Build.props`), or no `version.json` exists in the package folder.
-
-**Recovery:**
-
-```pwsh
-# Check the audit.
-pwsh scripts/versioning/Audit-NuGetMetadata.ps1
-
-# Probe-pack locally.
-dotnet pack src/Koan.NewThing/Koan.NewThing.csproj -c Release "-p:PublicRelease=true" -o artifacts/probe
-```
-
-If `IsPackable=false` is inherited from a parent folder (e.g., `src/Services/`), override it in the csproj:
-
-```xml
-<IsPackable>true</IsPackable>
-```
-
----
+- **Unexpected prerelease suffix** — preview with `--public-release=true`; never compensate with a
+  `<Version>` property.
+- **Unexpected patch** — inspect commits matching `pathFilters` and the package's intentional
+  baseline. Patch height counts Git history, including merge commits.
+- **Package absent from a release plan** — confirm its evaluated `IsPackable`, local `version.json`,
+  and whether the two endpoint versions actually differ.
+- **Current version is missing publicly** — use an online plan; reconciliation includes it even if
+  the event itself did not change its version.
+- **Duplicate identity** — do not force-push or overwrite. Package identities are immutable; advance
+  the package through Git.
 
 ## Anti-patterns
 
-- **Don't add `<Version>` directly to a csproj.** The version is resolved by nbgv via `Directory.Build.targets`. A direct `<Version>` overrides nbgv and creates drift.
-- **Don't hand-edit `version.json` to set a specific patch.** The patch is computed from git height. Set the `version` field (major.minor) only; let nbgv own the patch.
-- **Don't bump major.minor without an ADR for packages that other packages compile against.** A major.minor change is a contract claim. For shared abstractions, flag it for review.
-- **Don't delete a package's `version.json`.** The package would fall back to the root version.json, picking up a version based on repo-wide git height rather than its own folder history.
-- **Don't use `versionHeightOffset` other than `-1`.** The current setting ensures the commit introducing `version.json` lands on `major.minor.0`. Other values produce unexpected patch numbers.
+- Do not set `<Version>`, `<PackageVersion>`, `<AssemblyVersion>`, or `<FileVersion>` per project.
+- Do not hand-edit a patch number or run `apply-version`.
+- Do not delete a package-local `version.json`; that destroys independent ownership.
+- Do not copy one version into a bundle's dependency ranges.
+- Do not tag to influence NBGV or trigger publication; release tags are post-publication evidence.
 
----
-
-## References
-
-- [ARCH-0085 -- Versioning compatibility and automation](../decisions/ARCH-0085-versioning-compatibility-and-automation.md)
-- [ARCH-0082 -- Per-package versioning strategy](../decisions/ARCH-0082-versioning-strategy.md)
-- [ARCH-0083 -- Operational workbooks](../decisions/ARCH-0083-operational-workbooks.md)
-- [scripts/versioning/Initialize-NbgvBaseline.ps1](../../scripts/versioning/Initialize-NbgvBaseline.ps1) -- per-package version.json scaffolding
-- [scripts/versioning/Audit-NuGetMetadata.ps1](../../scripts/versioning/Audit-NuGetMetadata.ps1) -- metadata diagnostic
-- [nuget-publishing.md](nuget-publishing.md) -- what happens after versions are decided
+See [packaging.md](packaging.md) for the package contract and
+[nuget-publishing.md](nuget-publishing.md) for the automated release path.

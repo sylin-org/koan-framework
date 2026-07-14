@@ -3,11 +3,11 @@ type: SPEC
 domain: framework
 title: "R05 - Prove the Golden V0-to-V1 Journey"
 audience: [architects, maintainers, ai-agents]
-status: draft
-last_updated: 2026-07-13
+status: current
+last_updated: 2026-07-14
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-14
   status: reviewed
   scope: golden-journey proof work-item specification
 ---
@@ -15,7 +15,7 @@ validation:
 # R05 — Prove the golden V0-to-V1 journey
 
 - Tranche: `T5 — golden V0-to-V1 proof`
-- Status: `pending`
+- Status: `in-progress`
 - Depends on: R04
 - Unlocks: capability-ring expansion and V1 readiness assessment
 - Owner: maintainer
@@ -47,6 +47,11 @@ must rest on assessed and hardened foundations rather than an aspirational sampl
 - Each commit or documented step produces a meaningful result.
 - Generated scaffolding is not counted as progress.
 - The proof serves application developers, coding agents, operators, and reviewers.
+- FirstUse remains the stable shortest result; R05 uses one cumulative `samples/GoldenJourney` app.
+- The anonymous domain is a review request moving through assessment to a non-final recommendation.
+- Checkpoints are executable business assertions, not sibling projects, scaffolds, or build variants.
+- Business-named HTTP actions and bounded custom tools prevent raw mutation from bypassing rules.
+- The dependency-ordered implementation cards live in [`R05-BACKLOG.md`](../R05-BACKLOG.md).
 
 ### DEFAULT
 
@@ -57,9 +62,14 @@ must rest on assessed and hardened foundations rather than an aspirational sampl
 
 ### OPEN
 
-- Which anonymous domain best exercises the foundation without becoming a showcase feature catalog?
-- What quantitative and qualitative signals demonstrate business-code density?
-- Which agent workflow proves repository navigation, composition, and failure recovery responsibly?
+- What observations emerge when a new human and a fresh coding-agent context independently rehearse
+  the public path?
+
+### RESOLVED
+
+- A fresh staged-package release reproduces both application contracts without retained artifacts:
+  84 packages were compiled from one Git snapshot; FirstUse passed 8/8 and GoldenJourney 11/11 from
+  the hydrated package-only feed.
 
 ## Scope
 

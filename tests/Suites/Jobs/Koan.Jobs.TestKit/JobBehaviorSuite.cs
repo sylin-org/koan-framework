@@ -42,6 +42,22 @@ public abstract class JobBehaviorSuite
     }
 
     [Fact]
+    public async Task terminal_settlement_preserves_reported_progress()
+    {
+        await using var host = await CreateHostAsync();
+        var work = new ProgressJob();
+
+        await work.Job.Submit();
+        await host.Drain();
+
+        var record = await host.JobFor<ProgressJob>(work.Id);
+        record.Should().NotBeNull();
+        record!.Status.Should().Be(JobStatus.Completed);
+        record.ProgressFraction.Should().Be(0.75);
+        record.ProgressMessage.Should().Be("three quarters");
+    }
+
+    [Fact]
     public async Task batch_submit_runs_every_work_item()
     {
         GreetJob.Reset();

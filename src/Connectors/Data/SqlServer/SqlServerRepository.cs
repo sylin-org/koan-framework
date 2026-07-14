@@ -52,6 +52,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         .Add(DataCaps.Isolation.RowScoped)
         .Add(DataCaps.Isolation.ContainerScoped)
         .Add(DataCaps.Isolation.DatabaseScoped)
+        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Native))
         .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     // Managed-field conflict-aware upsert (DATA-0105 §3b — the write-verify half). When a managed write-scope is

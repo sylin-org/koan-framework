@@ -14,25 +14,24 @@ using Koan.Data.Core.Relationships;
 using Koan.Web.Filtering;
 using Koan.Web.Hooks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Web.Endpoints;
 
 /// <summary>
 /// AN-leak (docs/assessment/09 §10) — governed relationship expansion for the agent/HTTP read path.
 ///
-/// The raw <c>Entity&lt;T,K&gt;.GetRelatives()</c> loaders are app-authority: they fetch related rows
-/// via <c>Data&lt;TChild,TKey&gt;.All()</c> and filter by foreign key in-memory, with no request
-/// predicates. That is correct when service code traverses relationships, but a row-level visibility
-/// bypass on the agent/HTTP read path — a caller reads a visible parent, expands with <c>?with=all</c>,
-/// and receives related rows a direct query of that type would hide (WEB-0068).
+/// Domain <c>Entity&lt;T,K&gt;.GetRelatives()</c> traversal is app-authority: it deliberately has no HTTP
+/// request predicates. Reusing it on the agent/HTTP path would let a caller read a visible parent and
+/// receive related rows a direct query of that type would hide (WEB-0068).
 ///
 /// This expander resolves each edge as a <em>governed</em> query through the related type's own
 /// visibility pipeline: it runs the related type's <see cref="IRequestOptionsHook{TEntity}"/>s for the
 /// same request (principal + headers), AND-composes the contributed predicates with the foreign-key
-/// filter, and pushes the whole thing down to the adapter. An edge inherits its resolved query's
+/// filter, and hands the normalized query to the shared capability-aware executor. An edge inherits its resolved query's
 /// projection (DECIDED #1); a related row hidden by predicate produces no count, no field name, no
-/// existence signal (walled-means-silent, §9.4). The fix lives entirely in <c>Koan.Web</c> — the
-/// domain traversal API in <c>Koan.Data.Core</c> stays app-authority and unchanged (DECIDED #3).
+/// existence signal (walled-means-silent, §9.4). The domain API remains app-authority while both paths
+/// share Data.Core's bounded backend negotiation.
 ///
 /// MCP rides the same <see cref="IEntityEndpointService{TEntity,TKey}"/>, so fixing the endpoint fixes
 /// every transport — the governance is not duplicated per transport (the AN3 lesson).
@@ -40,7 +39,7 @@ namespace Koan.Web.Endpoints;
 internal static class GovernedRelationshipExpander
 {
     private static readonly MethodInfo ResolveChildrenMethod =
-        typeof(GovernedRelationshipExpander).GetMethod(nameof(ResolveChildren), BindingFlags.NonPublic | BindingFlags.Static)!;
+        typeof(GovernedRelationshipExpander).GetMethod(nameof(ResolveChildrenMany), BindingFlags.NonPublic | BindingFlags.Static)!;
 
     private static readonly MethodInfo ResolveParentMethod =
         typeof(GovernedRelationshipExpander).GetMethod(nameof(ResolveParent), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -52,68 +51,88 @@ internal static class GovernedRelationshipExpander
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var graph = new RelationshipGraph<TEntity> { Entity = entity };
+        var graphs = await ExpandManyAsync<TEntity, TKey>([(entity, entityId)], context);
+        return graphs[0];
+    }
+
+    public static async Task<IReadOnlyList<RelationshipGraph<TEntity>>> ExpandManyAsync<TEntity, TKey>(
+        IReadOnlyList<(TEntity Entity, TKey Id)> roots,
+        EntityRequestContext context)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        if (roots.Count == 0) return Array.Empty<RelationshipGraph<TEntity>>();
+
         var services = context.Services;
         var metadata = services.GetRequiredService<IRelationshipMetadata>();
         var ct = context.CancellationToken;
+        var graphs = roots.Select(root => new RelationshipGraph<TEntity> { Entity = root.Entity }).ToArray();
 
         // Parents: a relationship foreign key on the root resolves to the parent type, gated by the
         // parent type's own visibility predicates. A null FK keeps the existing present-with-null shape
         // (the relationship simply isn't set); a walled or missing parent is omitted — the FK scalar
         // already lives on the root row, so omission discloses nothing new (T-parent, walled-means-silent).
-        foreach (var (propertyName, parentType) in metadata.GetParentRelationships(typeof(TEntity)))
+        for (var index = 0; index < roots.Count; index++)
         {
-            var foreignKey = ReadForeignKey(entity!, propertyName);
-            if (foreignKey is null)
+            var root = roots[index];
+            var graph = graphs[index];
+            foreach (var (propertyName, parentType) in metadata.GetParentRelationships(typeof(TEntity)))
             {
-                graph.Parents[propertyName] = null;
-                continue;
-            }
+                var foreignKey = ReadForeignKey(root.Entity!, propertyName);
+                if (foreignKey is null)
+                {
+                    graph.Parents[propertyName] = null;
+                    continue;
+                }
 
-            var task = (Task<object?>)ResolveParentMethod
-                .MakeGenericMethod(parentType, typeof(TKey))
-                .Invoke(null, new object?[] { services, context, foreignKey, ct })!;
-            var parent = await task;
-            if (parent is not null)
-            {
-                graph.Parents[propertyName] = parent;
+                var task = (Task<object?>)ResolveParentMethod
+                    .MakeGenericMethod(parentType, typeof(TKey))
+                    .Invoke(null, new object?[] { services, context, foreignKey, ct })!;
+                var parent = await task;
+                if (parent is not null)
+                {
+                    graph.Parents[propertyName] = parent;
+                }
             }
         }
 
         // Children: each (referenceProperty, childType) edge resolves to a governed query of the child
-        // type filtered by FK == root id, AND-composed with the child's visibility predicates and pushed
-        // down to the adapter (this also fixes the All()+in-memory N-load). An edge that resolves to zero
+        // type filtered by FK in the root-id set, AND-composed with the child's visibility predicates and
+        // negotiated once per edge for the whole root batch. An edge that resolves to zero
         // visible rows is omitted entirely — no empty-but-present edge that would leak the relationship.
         foreach (var (referenceProperty, childType) in metadata.GetChildRelationships(typeof(TEntity)))
         {
-            var task = (Task<IReadOnlyList<object>>)ResolveChildrenMethod
-                .MakeGenericMethod(childType, typeof(TKey))
-                .Invoke(null, new object?[] { services, context, referenceProperty, entityId, ct })!;
-            var rows = await task;
-            if (rows.Count == 0)
+            var task = (Task<IReadOnlyDictionary<TKey, IReadOnlyList<object>>>)ResolveChildrenMethod
+                .MakeGenericMethod(typeof(TEntity), childType, typeof(TKey))
+                .Invoke(null, new object?[] { services, context, referenceProperty, roots.Select(root => root.Id).ToArray(), ct })!;
+            var rowsByParent = await task;
+            for (var index = 0; index < roots.Count; index++)
             {
-                continue;
-            }
+                if (!rowsByParent.TryGetValue(roots[index].Id, out var rows) || rows.Count == 0)
+                    continue;
 
-            var childTypeName = childType.Name;
-            if (!graph.Children.TryGetValue(childTypeName, out var byProperty))
-            {
-                byProperty = new Dictionary<string, IReadOnlyList<object>>();
-                graph.Children[childTypeName] = byProperty;
-            }
+                var graph = graphs[index];
+                var childTypeName = childType.Name;
+                if (!graph.Children.TryGetValue(childTypeName, out var byProperty))
+                {
+                    byProperty = new Dictionary<string, IReadOnlyList<object>>();
+                    graph.Children[childTypeName] = byProperty;
+                }
 
-            byProperty[referenceProperty] = rows;
+                byProperty[referenceProperty] = rows;
+            }
         }
 
-        return graph;
+        return graphs;
     }
 
-    private static async Task<IReadOnlyList<object>> ResolveChildren<TChild, TKey>(
+    private static async Task<IReadOnlyDictionary<TKey, IReadOnlyList<object>>> ResolveChildrenMany<TParent, TChild, TKey>(
         IServiceProvider services,
         EntityRequestContext rootContext,
         string referenceProperty,
-        TKey parentId,
+        IReadOnlyCollection<TKey> parentIds,
         CancellationToken ct)
+        where TParent : class, IEntity<TKey>
         where TChild : class, IEntity<TKey>
         where TKey : notnull
     {
@@ -121,14 +140,27 @@ internal static class GovernedRelationshipExpander
         if (predicates is null)
         {
             // The child type's options pipeline short-circuited (denied) — the whole edge is walled.
-            return Array.Empty<object>();
+            return new Dictionary<TKey, IReadOnlyList<object>>();
         }
 
-        var foreignKeyFilter = BuildForeignKeyFilter<TChild>(referenceProperty, parentId);
-        var composed = QueryFilterComposer.AndAll<TChild>(foreignKeyFilter, predicates);
-
-        var rows = await Data<TChild, TKey>.All(QueryDefinition.All.Where(composed), ct);
-        return rows.Cast<object>().ToList();
+        var visibility = QueryFilterComposer.AndAll<TChild>(null, predicates);
+        var options = services.GetRequiredService<IOptions<EntityEndpointOptions>>().Value;
+        var policy = new RelationshipQueryPolicy
+        {
+            MaxResults = options.RelationshipMaxResults,
+            MaxFallbackCandidates = options.RelationshipFallbackMaxCandidates
+        };
+        var executor = services.GetRequiredService<IRelationshipQueryExecutor>();
+        var edge = await executor.LoadChildren<TParent, TChild, TKey>(
+            parentIds,
+            referenceProperty,
+            visibility,
+            policy,
+            rootContext.HttpContext?.TraceIdentifier,
+            ct);
+        return edge.ByParent.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyList<object>)pair.Value.Cast<object>().ToArray());
     }
 
     private static async Task<object?> ResolveParent<TParent, TKey>(
@@ -189,21 +221,6 @@ internal static class GovernedRelationshipExpander
 
         var allowed = await pipeline.BuildOptions(hookContext, options);
         return allowed ? options.Predicates : null;
-    }
-
-    private static Filter BuildForeignKeyFilter<TChild>(string referenceProperty, object parentId)
-    {
-        var property = typeof(TChild).GetProperty(referenceProperty, BindingFlags.Public | BindingFlags.Instance)
-            ?? throw new InvalidOperationException(
-                $"Relationship reference property '{referenceProperty}' was not found on {typeof(TChild).FullName}.");
-
-        var parameter = Expression.Parameter(typeof(TChild), "c");
-        var member = Expression.Property(parameter, property);
-        var constant = Expression.Constant(parentId, property.PropertyType);
-        var body = Expression.Equal(member, constant);
-        var lambda = Expression.Lambda<Func<TChild, bool>>(body, parameter);
-
-        return LinqFilterCompiler.Compile(lambda);
     }
 
     private static object? ReadForeignKey(object entity, string propertyName)

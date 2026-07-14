@@ -31,6 +31,13 @@ public sealed class GreetJob : Entity<GreetJob>, IKoanJob<GreetJob>
     public static void Reset() => Executions = 0;
 }
 
+/// <summary>Reports one durable progress value so settlement cannot erase the observer-visible update.</summary>
+public sealed class ProgressJob : Entity<ProgressJob>, IKoanJob<ProgressJob>
+{
+    public static Task Execute(ProgressJob job, JobContext ctx, CancellationToken ct)
+        => ctx.Progress(0.75, "three quarters");
+}
+
 /// <summary>Multi-action linear pipeline (declared chain). Carries saga state across stages.</summary>
 [JobChain(Stage.Fetch, Stage.Parse, Stage.Mint, Stage.Publish)]
 public sealed class Pipeline : Entity<Pipeline>, IKoanJob<Pipeline>

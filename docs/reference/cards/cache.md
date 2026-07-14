@@ -34,6 +34,8 @@ var todo = await Todo.Get(id);                // first call hits the store + pop
 var again = await Todo.Get(id);               // L1 hit, sub-ms
 todo.Title = "updated";
 await todo.Save();                            // write-through; peers get an evict broadcast
+
+var policy = Todo.Cache.Explain();            // read-only materialized policy facts
 ```
 
 Stale-while-revalidate is **opt-in**: `[Cacheable(300, AllowStaleForSeconds = 60)]`. Past `AbsoluteTtl` a default read returns `null`, not stale data.
@@ -59,7 +61,10 @@ await todo.Uncache();                         // evict one entity (e.g. after a 
 await Todo.Cache.Flush();                     // evict every entry tagged for this type
 ```
 
-Writes always invalidate regardless of `EntityContext` ([CacheBehavior](../../decisions/ARCH-0075-koan-cache-pillar.md)). `Todo.Cache.Count()` reports tagged-entry counts.
+`Todo.Cache` exists only when `Koan.Cache` is referenced; Data.Core no longer advertises unavailable
+cache behavior. Writes always invalidate regardless of `EntityContext`
+([CacheBehavior](../../decisions/ARCH-0075-koan-cache-pillar.md)). `Todo.Cache.Count()` reports
+tagged-entry counts, while `Todo.Cache.Explain()` inspects policy without cache I/O.
 
 ## The sample that shows it
 

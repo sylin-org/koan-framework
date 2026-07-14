@@ -3,6 +3,32 @@ namespace Koan.Core.Infrastructure;
 // Centralized constants across the Koan platform
 public static class Constants
 {
+    public static class Diagnostics
+    {
+        public const int FactSchemaVersion = 1;
+
+        public static class Codes
+        {
+            public const string ModuleActivated = "koan.bootstrap.module.activated";
+            public const string ModuleRejected = "koan.bootstrap.module.rejected";
+            public const string CollectionFailed = "koan.diagnostics.collection.failed";
+            public const string ElectionSelected = "koan.composition.election.selected";
+            public const string LockfileMatched = "koan.composition.lockfile.matched";
+            public const string LockfileDrifted = "koan.composition.lockfile.drifted";
+            public const string LockfileMissing = "koan.composition.lockfile.missing";
+        }
+
+        public static class Reasons
+        {
+            public const string InitializerCompleted = "initializer-completed";
+            public const string InitializerFailed = "initializer-failed";
+            public const string ReporterFailed = "reporter-failed";
+            public const string LockfileMatched = "lockfile-matched";
+            public const string LockfileDrifted = "lockfile-drifted";
+            public const string LockfileMissing = "lockfile-missing";
+        }
+    }
+
     public static class Configuration
     {
         public static class Koan

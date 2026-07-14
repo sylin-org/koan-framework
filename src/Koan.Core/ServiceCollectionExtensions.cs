@@ -71,7 +71,17 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AppHostBinderHostedService>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, StartupTimelineHostedService>());
 
-        // Best-effort early initialization when provider is built later
+        // One host-owned explanation snapshot feeds startup, health, operators, and agents.
+        services.TryAddSingleton<Koan.Core.Diagnostics.KoanRuntimeFactStore>();
+        services.TryAddSingleton<Koan.Core.Diagnostics.IKoanRuntimeFacts>(sp =>
+            sp.GetRequiredService<Koan.Core.Diagnostics.KoanRuntimeFactStore>());
+        services.TryAddSingleton<Koan.Core.Diagnostics.IKoanRuntimeFactRecorder>(sp =>
+            sp.GetRequiredService<Koan.Core.Diagnostics.KoanRuntimeFactStore>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, Koan.Core.Diagnostics.KoanFactsHealthContributor>());
+
+        if (!services.Any(d => d.ServiceType == typeof(Koan.Core.Hosting.Runtime.IAppRuntime)))
+            services.AddSingleton<Koan.Core.Hosting.Runtime.IAppRuntime, Koan.Core.Hosting.Runtime.AppRuntime>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, Koan.Core.Hosting.Runtime.AppRuntimeHostedService>());
 
         // Health Aggregator (push-first) is the single source of truth for readiness.
         services.AddKoanOptions<Koan.Core.Observability.Health.HealthAggregatorOptions>(Infrastructure.ConfigurationConstants.Health.AggregatorSection);
@@ -85,10 +95,6 @@ public static class ServiceCollectionExtensions
         // orchestrator is its sole execution owner and preserves its pokeable + health aliases.
         // Kick a startup probe so readiness is populated early
         services.AddHostedService<StartupProbeService>();
-        // Hosting runtime: apps depend on greenfield IAppRuntime
-        if (!services.Any(d => d.ServiceType == typeof(Koan.Core.Hosting.Runtime.IAppRuntime)))
-            services.AddSingleton<Koan.Core.Hosting.Runtime.IAppRuntime, Koan.Core.Hosting.Runtime.AppRuntime>();
-
         return services;
     }
 }

@@ -3,7 +3,7 @@
 **The samples are the curriculum**: each rung teaches a bounded set of concepts; the flagships
 are dogfood applications that drive framework evolution (aspirational reading, not tutorials).
 
-> Status below is truthful as of 2026-06: ✅ = in `Koan.sln`, builds, CI-protected ·
+> Status below is truthful as of 2026-07: ✅ = in `Koan.sln`, builds, CI-protected ·
 > 🛠 dogfood = large real app, maintained but not a tutorial · ⚠ = on disk but currently broken
 > or not in the solution (being consolidated; see `docs/assessment/`). The old
 > [CATALOG.md](CATALOG.md) is superseded by this page pending regeneration.
@@ -12,10 +12,12 @@ are dogfood applications that drive framework evolution (aspirational reading, n
 
 | Rung | Sample | Teaches | Time | Status |
 |---|---|---|---|---|
-| 1 | **S0.ConsoleJsonRepo** | Minimal bootstrap; entity statics in a console app | 5 min | ✅ |
-| 2 | **S1.Web** | REST CRUD via `EntityController<T>`, relationships (`[Parent]`), pagination, `[Cacheable]` | 30 min | ✅ |
-| 3 | **S10.DevPortal** | Live multi-provider switching (Mongo ⇄ Postgres ⇄ SQLite), capability detection, bulk ops | 20 min | ✅ |
-| 4 | **S14.AdapterBench** | Cross-adapter benchmarking; **entity-first background jobs** (`IKoanJob<T>`, progress, durable ledger) | 20 min | ✅ |
+| 0 | **FirstUse** | One meaningful business result; bootstrap, SQLite election, REST, facts, governed MCP | 5 min | ✅ executable source/package contract |
+| 1 | **GoldenJourney** | Grow that result through rules, durable jobs, bounded agent collaboration, and explained recovery | 15 min | ✅ executable source contract |
+| 2 | **S0.ConsoleJsonRepo** | Minimal bootstrap; entity statics in a console app | 5 min | ✅ |
+| 3 | **S1.Web** | REST CRUD via `EntityController<T>`, relationships (`[Parent]`), pagination, `[Cacheable]` | 30 min | ✅ |
+| 4 | **S10.DevPortal** | Live multi-provider switching (Mongo ⇄ Postgres ⇄ SQLite), capability detection, bulk ops | 20 min | ✅ |
+| 5 | **S14.AdapterBench** | Cross-adapter benchmarking; **entity-first background jobs** (`IKoanJob<T>`, progress, durable ledger) | 20 min | ✅ |
 
 After the ladder, pick by interest:
 
@@ -39,7 +41,10 @@ archived samples are pending deletion. Don't trust directory listings — trust 
 
 ```bash
 # Anything in Koan.sln:
-dotnet run --project samples/S1.Web
+dotnet run --project samples/FirstUse
+
+# Then see the same model survive meaningful growth:
+dotnet run --project samples/GoldenJourney
 
 # Samples with container dependencies ship a start.bat (preferred over docker compose by hand):
 cd samples/S5.Recs && ./start.bat

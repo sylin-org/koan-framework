@@ -32,6 +32,7 @@ namespace Koan.Data.Core.KeyValue;
 public abstract class KeyValueStore<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IQueryRepository<TEntity, TKey>,
+    IBoundedQueryRepository<TEntity, TKey>,
     IDescribesCapabilities,
     IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
@@ -46,6 +47,14 @@ public abstract class KeyValueStore<TEntity, TKey> :
 
     /// <summary>Every record in the current store (the full-keyspace scan the family's filter contract is built on).</summary>
     protected abstract Task<IReadOnlyList<KvRecord<TEntity>>> ScanAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Read at most <paramref name="maxCandidates"/> records from the physical store. Implementations
+    /// must stop enumeration at the bound; delegating to <see cref="ScanAsync"/> is not conformant.
+    /// </summary>
+    protected abstract Task<IReadOnlyList<KvRecord<TEntity>>> ScanBoundedAsync(
+        int maxCandidates,
+        CancellationToken ct);
 
     /// <summary>Write (insert or replace by id) a record into the current store.</summary>
     protected abstract Task WriteAsync(TKey id, KvRecord<TEntity> record, CancellationToken ct);
@@ -109,6 +118,30 @@ public abstract class KeyValueStore<TEntity, TKey> :
     {
         ct.ThrowIfCancellationRequested();
         var records = await ScanAsync(ct).ConfigureAwait(false);
+
+        return ExecuteQuery(records, query);
+    }
+
+    public async Task<BoundedQueryResult<TEntity>> QueryBoundedCandidates(
+        QueryDefinition query,
+        int maxCandidates,
+        CancellationToken ct = default)
+    {
+        if (maxCandidates <= 0) throw new ArgumentOutOfRangeException(nameof(maxCandidates));
+        ct.ThrowIfCancellationRequested();
+
+        var records = await ScanBoundedAsync(checked(maxCandidates + 1), ct).ConfigureAwait(false);
+        if (records.Count > maxCandidates)
+            return new BoundedQueryResult<TEntity>([], records.Count, CandidateLimitExceeded: true);
+
+        var result = ExecuteQuery(records, query);
+        return new BoundedQueryResult<TEntity>(result.Items, records.Count, CandidateLimitExceeded: false);
+    }
+
+    private static RepositoryQueryResult<TEntity> ExecuteQuery(
+        IReadOnlyList<KvRecord<TEntity>> records,
+        QueryDefinition query)
+    {
 
         IEnumerable<TEntity> items = query.Filter is null
             ? records.Select(r => r.Entity)

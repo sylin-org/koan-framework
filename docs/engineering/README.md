@@ -28,8 +28,9 @@ The voice is imperative. Commands are concrete. Explanations sit alongside what 
 
 | Workbook | What it covers |
 |---|---|
-| [versioning.md](versioning.md) | Bumping package versions, the kernel/periphery split, computing what changes on each merge |
-| [nuget-publishing.md](nuget-publishing.md) | How packages reach nuget.org, what the release-on-main workflow does, recovery when it fails |
+| [versioning.md](versioning.md) | How per-package NBGV versions follow Git and how to express major/minor intent |
+| [packaging.md](packaging.md) | The evaluated package contract, bundle shape, and local release proof |
+| [nuget-publishing.md](nuget-publishing.md) | What every advancement of `dev` publishes and how failed events converge |
 | [adding-a-connector.md](adding-a-connector.md) | Scaffolding a new connector (data store, vector store, AI provider, broker, storage) from csproj to integration tests |
 
 ---

@@ -44,6 +44,7 @@ public sealed class WellKnownWebApplicationFactory : IAsyncLifetime
                     ["Koan:Data:Sources:Default:Adapter"] = "inmemory",
                     ["Koan:Data:Sources:Default:ConnectionString"] = "memory://wellknown-tests",
                     ["Koan:BackgroundServices:Enabled"] = "false",
+                    ["Koan:Web:ExposeObservabilitySnapshot"] = "true",
                     ["Logging:LogLevel:Default"] = "Warning",
                 }))
                 .ConfigureServices(services =>

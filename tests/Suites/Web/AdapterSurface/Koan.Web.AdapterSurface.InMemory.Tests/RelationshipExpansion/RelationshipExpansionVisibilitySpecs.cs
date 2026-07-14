@@ -2,9 +2,11 @@ using System.Net;
 using System.Linq;
 using AwesomeAssertions;
 using Koan.Core.Hosting.App;
+using Koan.Core.Diagnostics;
 using Koan.Data.Core;
 using Newtonsoft.Json.Linq;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Web.AdapterSurface.InMemory.Tests.RelationshipExpansion;
 
@@ -132,6 +134,28 @@ public sealed class RelationshipExpansionVisibilitySpecs : IClassFixture<InMemor
         children.Should().HaveCount(4, "authored (2) + reviewed (2), with no predicate applied");
         children.Select(w => w.Title).Should().Contain("reviewed-draft-1",
             "the domain API returns Drafts that the Web read path would wall");
+    }
+
+    [Fact]
+    public async Task Relationship_result_limit_returns_413_and_records_a_safe_fact()
+    {
+        await Work.Upsert(new Work
+        {
+            Id = "w-limit",
+            Title = "third-authored-work",
+            AuthorId = "m1",
+            Status = WorkStatus.Published
+        });
+
+        var response = await _factory.Client.GetAsync("/api/an-makers/m1?with=all");
+
+        response.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("relationship-result-limit").And.Contain("correction");
+        _factory.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts.Should().Contain(fact =>
+            fact.Code == Koan.Data.Core.Infrastructure.Constants.Diagnostics.Codes.RelationshipExecution
+            && fact.State == KoanFactState.Rejected
+            && fact.ReasonCode == Koan.Data.Core.Infrastructure.Constants.Diagnostics.Reasons.ResultLimit);
     }
 
     // ---- helpers --------------------------------------------------------------------------------

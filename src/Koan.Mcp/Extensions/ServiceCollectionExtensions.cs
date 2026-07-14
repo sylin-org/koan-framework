@@ -52,6 +52,7 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Mcp.Resources.IMcpResourceProvider, Koan.Mcp.Resources.EntityCatalogResourceProvider>());
         // AN8: koan://self self-introduction (prose + structured), per grant.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Mcp.Resources.IMcpResourceProvider, Koan.Mcp.Resources.SelfResourceProvider>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Mcp.Resources.IMcpResourceProvider, Koan.Mcp.Resources.RuntimeFactsResourceProvider>());
 
         // AI-0037 — the shared, transport-agnostic JSON-RPC dispatch core (every HTTP surface routes through it).
         services.TryAddSingleton<McpRpcDispatcher>();

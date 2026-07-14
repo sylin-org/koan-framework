@@ -158,8 +158,8 @@ and business readability. A future third-party module-extension seam may be cons
 
 ## Evidence reviewed
 
-- `src/Koan.Data.Core/Model/Entity.cs`, `Entity.Cache.cs`, `AggregateExtensions.cs`, `EntityContext.cs`,
-  and Entity lifecycle types.
+- `src/Koan.Data.Core/Model/Entity.cs`, `src/Koan.Cache/Entity/EntityCacheFacet.cs`,
+  `AggregateExtensions.cs`, `EntityContext.cs`, and Entity lifecycle types.
 - Entity extensions in cache, AI, media, messaging, backup, canon, relationships, and data movement.
 - R02 capability/test/package evidence and the R03 consumer-visible inventory.
 - Current primary documentation from ABP, Rails, Microsoft .NET/EF Core, and C# 14, linked in the R03

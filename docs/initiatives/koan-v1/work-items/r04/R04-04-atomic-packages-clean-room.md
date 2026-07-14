@@ -3,7 +3,7 @@ type: GUIDE
 domain: packaging
 title: "R04-04 - Prove Atomic Packages in an External Clean Room"
 audience: [maintainers, release-engineers, ai-agents]
-status: draft
+status: current
 last_updated: 2026-07-13
 framework_version: v0.17.0
 ---
@@ -11,7 +11,7 @@ framework_version: v0.17.0
 # R04-04 — Prove atomic packages in an external clean room
 
 - Priority: P0
-- Status: `pending`
+- Status: `passed`
 - Depends on: R04-02, R04-03
 - Owner: build/release engineering
 
@@ -28,8 +28,11 @@ cannot prove that published artifacts match source or each other.
 
 ## Current evidence
 
-R02 contains the exact clean application probe, dependency chain, NU1605 result, and NU1903 advisory.
-NBGV and bounded compatibility ranges exist, but publication was not atomic/coherent.
+R02 contains the original clean application failure, dependency chain, NU1605 result, and NU1903
+advisory. The accepting 2026-07-14 proof inventories 113 independently owned package projects,
+compiles an 83-identity reconciliation manifest, packs and hashes all 82 missing identities in
+dependency order, and validates 78 required symbol packages with portable-PDB SourceLink documents.
+The remaining identity was already public and is reconciled rather than rebuilt.
 
 ## Smallest meaningful fix
 
@@ -57,7 +60,20 @@ Do not rewrite/delete existing public packages. Publish a new coherent patch onl
 operator/release gate. Compatibility ranges remain fail-loud; fix version production/publication, not
 the safety bound. Roll back the release workflow before publication if any closure cell fails.
 
-## Stop condition
+## Accepting evidence
 
-Publishing or changing a support/compatibility promise requires an explicit recorded maintainer release
-decision even after local proof passes.
+- `Koan.Packaging.Tests`: 12/12;
+- every staged package has matching ID/version/source commit, README, description, tags, license,
+  repository metadata, canonical Koan compatibility ranges, symbol policy, and SHA-256 evidence;
+- high/critical NuGet advisories are release errors; the SQLite closure is clean with the explicit
+  safe native-library override;
+- a fresh external global-package folder restores only the hydrated local Koan feed, builds, starts,
+  returns healthy, and performs controller-based SQLite Entity create/read/delete;
+- interrupted local packing resumes only artifacts whose embedded source commit matches the
+  manifest; publication independently reconciles immutable registry identities and symbol state;
+- ARCH-0110 records the accepted `dev` release contract and its honest registry/non-transactional
+  boundary.
+
+The maintainer explicitly accepted automated publication from every advancement of `dev` on
+2026-07-14. No package was published during this local proof. The public front door must continue to
+state that the old 0.17.0 set is incoherent until a real `dev` workflow run provides registry evidence.

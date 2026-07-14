@@ -6,14 +6,15 @@ since: 0.6.3
 packages: [Sylin.Koan.Data.Backup]
 source: src/Koan.Data.Backup/
 validation:
-  date: 2025-09-29
-  status: verified
+  date: 2026-07-14
+  status: source-reviewed
 ---
 
 ## Contract
 
-- Provide streaming-first backup and restore services that operate on Koan entities via `Data<TEntity, TKey>` statics and adapter metadata.
-- Auto-register backup plans, discovery services, and optional maintenance jobs when the package is referenced so applications obtain turnkey backup APIs.
+- Stream entity enumeration during backup and restore through Koan entity/repository surfaces. The
+  current ZIP archive is still assembled in memory before upload.
+- Auto-register backup, restore, discovery, and optional maintenance services when the package is referenced.
 - Persist manifests, verification data, and entity payloads through Koan storage providers while exposing progress, viability checks, and catalog discovery.
 - Support selective restore paths with optimization hooks (`IRestoreOptimizedRepository`) so adapters can disable constraints, batch, or bulk-load data safely.
 
@@ -30,22 +31,27 @@ validation:
 
 ## Backup workflow
 
-1. **Plan registration** – Applications register `BackupPlan` definitions (see README sample) or rely on discovery; `AddKoanBackupRestore()` wires services and options into DI.
+1. **Reference and policy declaration** – The package auto-registrar calls `AddKoanBackupRestore()`.
+   `[EntityBackup]` and assembly-level `[EntityBackupScope]` control discovery participation.
 2. **Entity discovery** – `EntityDiscoveryService` scans Koan aggregates, caching `EntityTypeInfo` records (entity type, key type, provider). Its pre-scan fallback consumes Data Core's provider-free registered-type facts and resolves provider metadata against the service's injected host; it does not inspect Data Core private caches or inherit a prior host's repository. Optional warmup occurs during maintenance startup when `WarmupEntitiesOnStartup` is enabled.
 3. **Streaming export** – `StreamingBackupService` orchestrates backups:
    - Creates a manifest and progress record (stored in `_activeBackups`).
-   - Builds a ZIP archive in memory via `BackupStorageService.CreateBackupArchiveAsync`.
+   - Builds a ZIP archive in memory via `BackupStorageService.CreateBackupArchive`.
    - Streams each entity using `Data<TEntity, TKey>.AllStream(batchSize)` (single-entity) or reflection-based enumeration for global backups.
    - Serializes records as JSON Lines and collects schema metadata, sizes, checksums, and timing metrics per entity.
    - After all entities are processed, writes manifest & verification files (`manifest.json`, `verification/*`) and uploads the archive using `IStorageService` under the configured storage profile.
-4. **Progress & cancellation** – `GetBackupProgressAsync` returns aggregate metrics, while `CancelBackupAsync` marks the in-memory record as `Cancelled`. Backups run sequentially inside a single archive to avoid ZIP concurrency issues.
+4. **Progress & cancellation** – `GetBackupProgress` returns process-local aggregate metrics, while
+   `CancelBackup` marks the process-local record as `Cancelled`. Use the caller cancellation token to
+   stop active I/O. Backups run sequentially inside a single archive to avoid ZIP concurrency issues.
 
 ## Restore workflow
 
 1. **Manifest loading** – `OptimizedRestoreService` locates backup archives through `BackupStorageService` and loads the stored `BackupManifest`.
 2. **Adapter preparation** – If the entity repository implements `IRestoreOptimizedRepository`, `PrepareForRestoreAsync` receives `RestorePreparationOptions` (estimated counts, flags for disabling constraints/indexes, bulk mode). The returned context is restored after the operation.
 3. **Data import** – Entities are read from stored JSON Lines via `BackupStorageService.ReadEntityDataAsync<T>` or reflection fallback (`ReadEntityDataAsObjects`). Records are upserted using `Data<TEntity, TKey>.UpsertManyAsync` in batches, respecting dry-run and continue-on-error settings.
-4. **Progress & viability** – Global restores manage concurrent operations with a configurable `SemaphoreSlim`. `TestRestoreViabilityAsync` inspects manifests, checks entity types, and estimates restore time, capturing adapter optimization availability in a report.
+4. **Progress & viability** – Global restores manage concurrent operations with a configurable
+   `SemaphoreSlim`. `TestRestoreViability` inspects manifests, checks entity types, and estimates
+   restore time, capturing adapter optimization availability in a report.
 5. **Error handling** – Failures per entity capture messages in `EntityBackupInfo.ErrorMessage` and log warnings without halting entire global runs unless `ContinueOnError=false`.
 
 ## Storage artifacts
@@ -93,7 +99,11 @@ Per-operation options (`BackupOptions`, `GlobalBackupOptions`, `RestoreOptions`,
   returns a faulted task with `NotSupportedException`, explicitly states that nothing was deleted, and
   does not resolve services or touch storage. Retain the archive until a verified backup-management
   operation and deletion receipt contract exist.
-- Large archives: operations use streaming enumerables and per-entity batching to avoid loading entire datasets into memory; ensure storage profiles can handle large uploads.
+- Large archives: entity iteration is streamed and batched, but `BackupStorageService` currently holds
+  the complete compressed archive in a `MemoryStream` until upload. Large-backup memory safety is not
+  established.
+- Encryption: `EntityBackupAttribute.Encrypt` is recorded as policy/manifest metadata; the archive
+  writer currently performs no payload encryption.
 - Partial availability: if a provider lacks backup capability, discovery still records the entity, but backup attempts will surface adapter exceptions—filter via `GlobalBackupOptions.IncludeProviders` when needed.
 - Schema drift: manifests store schema snapshots; use them during validation or restore planning to detect incompatible changes.
 - Restore to missing types: viability testing attempts to resolve entity types by name; consider providing custom mapping or reconciling renamed entities ahead of time.
@@ -104,5 +114,8 @@ Per-operation options (`BackupOptions`, `GlobalBackupOptions`, `RestoreOptions`,
 - Safety proof: `Koan.Data.Backup.Tests` pins fail-loud deletion behavior and its non-success message.
 - Host-ownership proof: registered-type fallback discovery resolves provider metadata against an
   explicitly supplied host through the supported Data Core inspection surface.
-- Source review: `StreamingBackupService`, `OptimizedRestoreService`, `BackupStorageService`, `BackupMaintenanceService`, `Initialization/KoanAutoRegistrar`, and related models as of 2025-09-29.
+- Source review: `StreamingBackupService`, `OptimizedRestoreService`, `BackupStorageService`,
+  `BackupMaintenanceService`, `Initialization/KoanAutoRegistrar`, and related models as of 2026-07-14.
+- Maturity boundary: no end-to-end storage-plus-data-adapter backup/restore conformance suite currently
+  supports production recovery claims.
 - DocFX strict build executed via `pwsh -File scripts/build-docs.ps1 -ConfigPath docs/api/docfx.json -LogLevel Warning -Strict`.

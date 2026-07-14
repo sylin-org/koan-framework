@@ -3,11 +3,11 @@ type: GUIDE
 domain: framework
 title: "R04 - Harden the Framework Foundation"
 audience: [architects, maintainers, ai-agents]
-status: draft
-last_updated: 2026-07-13
+status: current
+last_updated: 2026-07-14
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-14
   status: reviewed
   scope: foundation-hardening program work-item specification
 ---
@@ -15,7 +15,7 @@ validation:
 # R04 — Harden the framework foundation
 
 - Tranche: `T4 — foundation hardening`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R03
 - Unlocks: R05
 - Owner: maintainer
@@ -100,3 +100,16 @@ The dependency order and live child-card state are maintained in
 
 - Split any child card whose blast radius or migration cost cannot be independently reviewed.
 - Stop if a proposed convenience reduces deterministic behavior or inspectability.
+
+## Acceptance result
+
+- Outcome: PASS
+- Date and commit: 2026-07-14; working tree at `7249ce72ad836324fc02b289e21f39ddcd3b6290`
+- Evidence: R04-01 through R04-08 passed with their linked repository-owned proofs.
+- Tests / validation: bounded bootstrap, package compiler/clean room, runtime facts, relationship
+  negotiation, Entity-language consumer cells, and FirstUse source/package lanes are green; the final
+  solution/docs/diff result is recorded in `PROGRESS.md`.
+- Unsupported scenarios: public package availability, provider-fleet certification, exhaustive runtime
+  facts, future Entity facets, and the complete golden business journey remain explicitly bounded.
+- Follow-up work: R05 is now dependency-ready.
+- Reviewer: Codex; maintainer authorized autonomous implementation.

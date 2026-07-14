@@ -1,6 +1,6 @@
 # ARCH-0082 — Two-tier versioning: kernel lockstep, periphery independent
 
-**Status**: Accepted
+**Status**: Superseded by ARCH-0085
 **Date**: 2026-05-16
 **Deciders**: Enterprise Architect
 **Scope**: NuGet package versioning across the Koan monorepo

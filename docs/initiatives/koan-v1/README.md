@@ -44,6 +44,8 @@ the dependency-ordered [`R04-BACKLOG.md`](R04-BACKLOG.md); each child card under
 [`work-items/r04/`](work-items/r04/) must land an independently meaningful result. The
 [`R04-ENTITY-FACET-CANDIDATES.md`](R04-ENTITY-FACET-CANDIDATES.md) slate elects the pillar-owned Entity
 language that R04-07 should prove without authorizing a mass API migration.
+R05 execution follows the three-card [`R05-BACKLOG.md`](R05-BACKLOG.md); it preserves FirstUse and
+proves meaningful growth in the cumulative [`GoldenJourney`](../../../samples/GoldenJourney/README.md).
 
 ## Sources of truth
 
@@ -55,6 +57,7 @@ language that R04-07 should prove without authorizing a mass API migration.
 | What should the next session do? | `NOW.md` |
 | What exactly does a work item require? | its `work-items/Rxx-*.md` card |
 | What foundation repair executes next? | `R04-BACKLOG.md` and its linked child card |
+| What golden-journey work executes next? | `R05-BACKLOG.md` and its linked child card |
 | Which module capabilities should grow Entity language? | `R04-ENTITY-FACET-CANDIDATES.md`, subject to the Entity Semantics Contract |
 | What makes work acceptable? | `ACCEPTANCE.md` |
 | How mature is a public capability? | `CAPABILITIES.md` |

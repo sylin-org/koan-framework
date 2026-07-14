@@ -3,15 +3,15 @@ type: GUIDE
 domain: data
 title: "R04-06 - Make Negotiation and Relationship Cost Honest"
 audience: [maintainers, framework-authors, operators, ai-agents]
-status: draft
-last_updated: 2026-07-13
+status: current
+last_updated: 2026-07-14
 framework_version: v0.17.0
 ---
 
 # R04-06 — Make negotiation and relationship cost honest
 
 - Priority: P1
-- Status: `pending`
+- Status: `passed`
 - Depends on: R04-05
 - Owner: Data.Core and provider test kits
 
@@ -27,8 +27,9 @@ after the decision rather than why it happened; reviewers cannot prove provider 
 
 ## Current evidence
 
-R02 verifies Data.Core but not the provider fleet. R03 identifies the unbounded relationship fallback
-and requires native/streamed/hybrid/in-memory/rejected execution facts.
+[ARCH-0112](../../../../decisions/ARCH-0112-bounded-relationship-negotiation.md) separates filter
+correctness from physical cost and establishes one child-edge executor. Entity, batch, Web, and MCP
+now choose native, already-resident InMemory, explicit bounded scan/fallback, or a corrective rejection.
 
 ## Smallest meaningful fix
 
@@ -49,6 +50,19 @@ fallback, configured bound, and safe alternative. No silent full scan.
 - REST/MCP expansion observes the same limits/facts as in-process access;
 - provider matrix derives from executable results, not project inventory.
 
+Accepting evidence on 2026-07-14:
+
+- Data Core passes 299/299. The focused relationship cells prove InMemory selection, SQLite native
+  execution, JSON strict rejection and bounded success, no partial result beyond a candidate bound,
+  Entity-first overloads, grouping, cancellation, and safe facts;
+- Core runtime facts pass focused 7/7, including stable operation-fact replacement, safe recollection,
+  and the rule that a
+  rejected capability decision remains inspectable without degrading readiness;
+- governed Web relationship behavior passes 7/7: related-type visibility remains enforced and an
+  exceeded result bound returns 413 plus the same runtime fact;
+- MCP relationship visibility passes 2/2 and MCP conformance passes 73/73 through the shared endpoint;
+- relevant Release builds complete with zero errors.
+
 ## Compatibility and rollback
 
 Current silent fallback may become explicit failure, requiring a documented opt-in migration. Preserve
@@ -59,3 +73,10 @@ roll back to unbounded implicit behavior.
 
 Split general provider-election schema work from the first relationship vertical if it exceeds one
 reviewable capability path.
+
+## Accepted boundary
+
+This card certifies child-edge negotiation for InMemory, JSON, and SQLite and declares execution
+profiles across the current record providers. It does not certify fleet performance, index
+sufficiency, batched parent lookup, recursive/depth-limited graphs, or a request audit trail. Runtime
+facts remain a latest-state snapshot.

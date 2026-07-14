@@ -1,38 +1,20 @@
-# Packaging
+# Koan bundles
 
-This folder contains nuspecs for the meta packages (published under Sylin.Koan.*):
+This directory owns Koan's dependency-only convenience bundles:
 
-- Koan.nuspec -> Sylin.Koan: meta-package for core + data abstractions + JSON adapter
-- Koan.App.nuspec -> Sylin.Koan.App: meta-package for Sylin.Koan + Sylin.Koan.Web
+- `Sylin.Koan` — the tested foundation: Core, Data abstractions/core, and the JSON connector.
+- `Sylin.Koan.App` — the foundation plus controller-based ASP.NET Core integration.
 
-Automated publish
+Each bundle is a normal SDK package project with its own NBGV version. ProjectReferences preserve the
+independently evaluated version and bounded compatibility range of every member. Bundle path filters
+include their composition, so changing a member advances the bundle without forcing that bundle's
+version onto unrelated packages.
 
-- Stable releases: push a tag vX.Y.Z to trigger `.github/workflows/nuget-release.yml` (publishes to nuget.org).
-- Nightly canaries: currently disabled. Enable `.github/workflows/canary-nightly.yml` when needed.
-
-Required secrets
-
-- NUGET_API_KEY: an API key from nuget.org with push scope.
-
-Manual pack (local):
+The [release compiler](../tools/Koan.Packaging/README.md) discovers, plans, packs, proves, and publishes
+these projects with the rest of the package graph. Do not add tokenized nuspecs or pack bundles through
+a separate path.
 
 ```powershell
-# from repo root
-# 1) Pack all library projects
-dotnet pack . -c Release -o .\artifacts
-
-# 2) Compute version and pack meta-packages with aligned dependency ranges
-powershell .\.github\scripts\pack-meta.ps1 -Version (nbgv get-version -v SimpleVersion) -OutDir .\artifacts
+dotnet pack packaging/Sylin.Koan/Sylin.Koan.csproj -c Release -p:PublicRelease=true
+dotnet pack packaging/Sylin.Koan.App/Sylin.Koan.App.csproj -c Release -p:PublicRelease=true
 ```
-
-Push (example):
-
-```powershell
-nuget push .\artifacts\Sylin.Koan*.nupkg -Source https://api.nuget.org/v3/index.json -ApiKey $env:NUGET_API_KEY
-```
-
-Notes
-- Versioning is powered by Nerdbank.GitVersioning (`version.json`). Tags in the form `vX.Y.Z` are treated as public releases.
-- Meta-packages are tokenized and packed by CI to align their dependency ranges with the computed release version.
-- Dependency range used by meta-packages: [MAJOR.MINOR.0, MAJOR.(MINOR+1).0)
-- Consider adding dotnet new templates that reference these meta packages for an even faster start.

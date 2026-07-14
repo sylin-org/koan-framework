@@ -4,6 +4,7 @@ using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
@@ -66,6 +67,13 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
         return Task.FromResult((IReadOnlyList<KvRecord<TEntity>>)store.Values.ToList());
     }
 
+    protected override Task<IReadOnlyList<KvRecord<TEntity>>> ScanBoundedAsync(int maxCandidates, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var (_, store) = Resolve();
+        return Task.FromResult((IReadOnlyList<KvRecord<TEntity>>)store.Values.Take(maxCandidates).ToList());
+    }
+
     protected override async Task WriteAsync(TKey id, KvRecord<TEntity> record, CancellationToken ct)
     {
         var (name, store) = Resolve();
@@ -111,7 +119,8 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
 
     // JSON is a file floor — no native bulk / atomic APIs to announce. The family caps (LINQ, Full filter, RowScoped)
     // come from the base's Describe.
-    protected override void DescribeBackend(ICapabilities caps) { }
+    protected override void DescribeBackend(ICapabilities caps) => caps
+        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Scan, true));
 
     // ==================== Instructions ====================
 

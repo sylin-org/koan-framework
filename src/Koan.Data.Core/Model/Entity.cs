@@ -683,6 +683,10 @@ namespace Koan.Data.Core.Model
         /// Throws InvalidOperationException if the entity has no children or multiple child types.
         /// </summary>
         public async Task<IReadOnlyList<object>> GetChildren(CancellationToken ct = default)
+            => await GetChildren(RelationshipQueryPolicy.Strict, ct);
+
+        /// <summary>Gets the only child relationship using an explicit execution safety policy.</summary>
+        public async Task<IReadOnlyList<object>> GetChildren(RelationshipQueryPolicy policy, CancellationToken ct = default)
         {
             var relationshipService = GetRelationshipService();
             relationshipService.ValidateRelationshipCardinality(typeof(TEntity), "getchildren");
@@ -690,13 +694,18 @@ namespace Koan.Data.Core.Model
             var childTypes = relationshipService.GetAllChildTypes(typeof(TEntity));
             var childType = childTypes[0];
 
-            return await LoadChildEntities(childType, ct);
+            return await LoadChildEntities(childType, policy, ct);
         }
 
         /// <summary>
         /// Gets all children of the specified type for this entity.
         /// </summary>
         public async Task<IReadOnlyList<TChild>> GetChildren<TChild>(CancellationToken ct = default)
+            where TChild : class, IEntity<TKey>
+            => await GetChildren<TChild>(RelationshipQueryPolicy.Strict, ct);
+
+        /// <summary>Gets children of the specified type using an explicit execution safety policy.</summary>
+        public async Task<IReadOnlyList<TChild>> GetChildren<TChild>(RelationshipQueryPolicy policy, CancellationToken ct = default)
             where TChild : class, IEntity<TKey>
         {
             var relationshipService = GetRelationshipService();
@@ -710,7 +719,7 @@ namespace Koan.Data.Core.Model
             var allChildren = new List<TChild>();
             foreach (var (referenceProperty, _) in childRelationships)
             {
-                var children = await LoadChildrenByProperty<TChild>(referenceProperty, ct);
+                var children = await LoadChildrenByProperty<TChild>(referenceProperty, policy, ct);
                 allChildren.AddRange(children);
             }
 
@@ -722,8 +731,13 @@ namespace Koan.Data.Core.Model
         /// </summary>
         public async Task<IReadOnlyList<TChild>> GetChildren<TChild>(string referenceProperty, CancellationToken ct = default)
             where TChild : class, IEntity<TKey>
+            => await GetChildren<TChild>(referenceProperty, RelationshipQueryPolicy.Strict, ct);
+
+        /// <summary>Gets a named child edge using an explicit execution safety policy.</summary>
+        public async Task<IReadOnlyList<TChild>> GetChildren<TChild>(string referenceProperty, RelationshipQueryPolicy policy, CancellationToken ct = default)
+            where TChild : class, IEntity<TKey>
         {
-            return await LoadChildrenByProperty<TChild>(referenceProperty, ct);
+            return await LoadChildrenByProperty<TChild>(referenceProperty, policy, ct);
         }
 
         /// <summary>
@@ -731,6 +745,10 @@ namespace Koan.Data.Core.Model
         /// Returns a RelationshipGraph with selective enrichment - only this entity is enriched.
         /// </summary>
         public async Task<RelationshipGraph<TEntity>> GetRelatives(CancellationToken ct = default)
+            => await GetRelatives(RelationshipQueryPolicy.Strict, ct);
+
+        /// <summary>Gets the relationship graph using an explicit execution safety policy for child edges.</summary>
+        public async Task<RelationshipGraph<TEntity>> GetRelatives(RelationshipQueryPolicy policy, CancellationToken ct = default)
         {
             var relationshipGraph = new RelationshipGraph<TEntity>
             {
@@ -746,7 +764,7 @@ namespace Koan.Data.Core.Model
 
             foreach (var (referenceProperty, childType) in childRelationships)
             {
-                var children = await LoadChildEntitiesByProperty(childType, referenceProperty, ct);
+                var children = await LoadChildEntitiesByProperty(childType, referenceProperty, policy, ct);
 
                 var childTypeName = childType.Name;
                 if (!relationshipGraph.Children.ContainsKey(childTypeName))
@@ -818,105 +836,54 @@ namespace Koan.Data.Core.Model
             return resultProperty?.GetValue(task);
         }
 
-        private async Task<IReadOnlyList<object>> LoadChildEntities(Type childType, CancellationToken ct)
+        private async Task<IReadOnlyList<object>> LoadChildEntities(Type childType, RelationshipQueryPolicy policy, CancellationToken ct)
         {
-            // Use reflection to call Data<TChild, TKey>.Query to find children referencing this entity
-            var dataType = typeof(Data<,>).MakeGenericType(childType, typeof(TKey));
-            var allMethod = dataType.GetMethod("All", new[] { typeof(CancellationToken) });
-
-            if (allMethod == null) return new List<object>().AsReadOnly();
-
-            var task = (Task)allMethod.Invoke(null, new object[] { ct })!;
-            await task;
-
-            var resultProperty = task.GetType().GetProperty("Result");
-            var allResults = (System.Collections.IEnumerable?)resultProperty?.GetValue(task);
-
-            if (allResults == null) return new List<object>().AsReadOnly();
-
-            // Filter children that reference this entity
             var children = new List<object>();
             var relationshipService = GetRelationshipService();
             var childRelationships = relationshipService.GetChildRelationships(typeof(TEntity))
                 .Where(x => x.ChildType == childType);
-
-            foreach (var item in allResults)
+            foreach (var (referenceProperty, _) in childRelationships)
             {
-                foreach (var (referenceProperty, _) in childRelationships)
-                {
-                    var property = childType.GetProperty(referenceProperty);
-                    if (property != null)
-                    {
-                        var referenceValue = property.GetValue(item);
-                        if (Equals(referenceValue, Id))
-                        {
-                            children.Add(item);
-                            break; // Found a match, no need to check other reference properties for this item
-                        }
-                    }
-                }
+                children.AddRange(await LoadChildEntitiesByProperty(childType, referenceProperty, policy, ct));
             }
-
-            return children.AsReadOnly();
+            return children.Distinct().ToList().AsReadOnly();
         }
 
-        private async Task<IReadOnlyList<TChild>> LoadChildrenByProperty<TChild>(string referenceProperty, CancellationToken ct)
+        private async Task<IReadOnlyList<TChild>> LoadChildrenByProperty<TChild>(
+            string referenceProperty,
+            RelationshipQueryPolicy policy,
+            CancellationToken ct)
             where TChild : class, IEntity<TKey>
         {
-            // For now, load all children and filter in memory
-            // This could be optimized with query support in the future
-            var allChildren = await Data<TChild, TKey>.All(ct);
-
-            var matchingChildren = new List<TChild>();
-            var property = typeof(TChild).GetProperty(referenceProperty);
-
-            if (property != null)
-            {
-                foreach (var child in allChildren)
-                {
-                    var referenceValue = property.GetValue(child);
-                    if (Equals(referenceValue, Id))
-                    {
-                        matchingChildren.Add(child);
-                    }
-                }
-            }
-
-            return matchingChildren.AsReadOnly();
+            var executor = Koan.Core.Hosting.App.AppHost.GetRequiredService<IRelationshipQueryExecutor>("relationship child loading");
+            var result = await executor.LoadChildren<TEntity, TChild, TKey>(
+                new[] { Id }, referenceProperty, policy: policy, ct: ct);
+            return result.ByParent.TryGetValue(Id, out var children)
+                ? children
+                : Array.Empty<TChild>();
         }
 
-        private async Task<IReadOnlyList<object>> LoadChildEntitiesByProperty(Type childType, string referenceProperty, CancellationToken ct)
+        private async Task<IReadOnlyList<object>> LoadChildEntitiesByProperty(
+            Type childType,
+            string referenceProperty,
+            RelationshipQueryPolicy policy,
+            CancellationToken ct)
         {
-            // Use reflection to call Data<TChild, TKey>.All() and filter by reference property
-            var dataType = typeof(Data<,>).MakeGenericType(childType, typeof(TKey));
-            var allMethod = dataType.GetMethod("All", new[] { typeof(CancellationToken) });
+            var method = GetType().GetMethod(
+                nameof(LoadChildEntitiesByPropertyTyped),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .MakeGenericMethod(childType);
+            return await (Task<IReadOnlyList<object>>)method.Invoke(this, new object[] { referenceProperty, policy, ct })!;
+        }
 
-            if (allMethod == null) return new List<object>().AsReadOnly();
-
-            var task = (Task)allMethod.Invoke(null, new object[] { ct })!;
-            await task;
-
-            var resultProperty = task.GetType().GetProperty("Result");
-            var allResults = (System.Collections.IEnumerable?)resultProperty?.GetValue(task);
-
-            if (allResults == null) return new List<object>().AsReadOnly();
-
-            var children = new List<object>();
-            var property = childType.GetProperty(referenceProperty);
-
-            if (property != null)
-            {
-                foreach (var item in allResults)
-                {
-                    var referenceValue = property.GetValue(item);
-                    if (Equals(referenceValue, Id))
-                    {
-                        children.Add(item);
-                    }
-                }
-            }
-
-            return children.AsReadOnly();
+        private async Task<IReadOnlyList<object>> LoadChildEntitiesByPropertyTyped<TChild>(
+            string referenceProperty,
+            RelationshipQueryPolicy policy,
+            CancellationToken ct)
+            where TChild : class, IEntity<TKey>
+        {
+            var rows = await LoadChildrenByProperty<TChild>(referenceProperty, policy, ct);
+            return rows.Cast<object>().ToArray();
         }
 
         // Hostless metadata inspection needs no runtime owner; its reflection facts are immutable.

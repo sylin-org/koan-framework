@@ -4,6 +4,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Routing;
+using Koan.Data.Core.Infrastructure;
 
 namespace Koan.Data.Core;
 
@@ -32,6 +33,12 @@ internal static class AdapterResolver
         IServiceProvider sp,
         DataSourceRegistry sourceRegistry)
         where TEntity : class
+        => ResolveDecisionForEntity<TEntity>(sp, sourceRegistry).ToTuple();
+
+    internal static AdapterResolutionDecision ResolveDecisionForEntity<TEntity>(
+        IServiceProvider sp,
+        DataSourceRegistry sourceRegistry)
+        where TEntity : class
     {
         var ctx = EntityContext.Current;
 
@@ -55,7 +62,10 @@ internal static class AdapterResolver
                     $"Source '{routed.Source}' does not specify an adapter. " +
                     $"Add 'Adapter' key to Koan:Data:Sources:{routed.Source} configuration.");
 
-            return (sourceDefinition.Adapter, routed.Source!);
+            return new AdapterResolutionDecision(
+                sourceDefinition.Adapter,
+                routed.Source!,
+                Constants.Diagnostics.Reasons.ContextSource);
         }
 
         // Priority 1.5 (ARCH-0102 §3 — Database-mode auto-routing): a Database-mode axis derives the data source from
@@ -79,13 +89,19 @@ internal static class AdapterResolver
                     $"Database-mode axis routed entity '{typeof(TEntity).Name}' to data source '{routedKey}', which does " +
                     $"not specify an adapter. Add 'Adapter' to Koan:Data:Sources:{routedKey}.");
 
-            return (routedDefinition.Adapter, routedKey);
+            return new AdapterResolutionDecision(
+                routedDefinition.Adapter,
+                routedKey,
+                Constants.Diagnostics.Reasons.DatabaseAxis);
         }
 
         // Priority 2: Adapter specified in context → use with implicit "Default" source
         if (!string.IsNullOrWhiteSpace(ctx?.Adapter))
         {
-            return (ctx.Adapter, "Default");
+            return new AdapterResolutionDecision(
+                ctx.Adapter,
+                "Default",
+                Constants.Diagnostics.Reasons.ContextAdapter);
         }
 
         // Priority 3: Entity [SourceAdapter] or [DataAdapter] attribute
@@ -93,18 +109,46 @@ internal static class AdapterResolver
         if (entityAdapter != null)
         {
             // Attribute specified → MUST honor or fail
-            return (entityAdapter, "Default");
+            return new AdapterResolutionDecision(
+                entityAdapter,
+                "Default",
+                Constants.Diagnostics.Reasons.EntityAttribute);
         }
 
         // Priority 4: "Default" source configuration
+        return ResolveDefault(sp, sourceRegistry);
+    }
+
+    internal static AdapterResolutionDecision ResolveDefault(
+        IServiceProvider sp,
+        DataSourceRegistry sourceRegistry)
+    {
+        var factories = sp.GetServices<IDataAdapterFactory>().ToList();
         var defaultSource = sourceRegistry.GetSource("Default");
         if (defaultSource != null && !string.IsNullOrWhiteSpace(defaultSource.Adapter))
         {
-            return (defaultSource.Adapter, "Default");
+            if (!factories.Any(factory => factory.CanHandle(defaultSource.Adapter)))
+            {
+                var available = factories
+                    .Select(FactoryResolver.ProviderName)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                var choices = available.Length == 0 ? "no referenced adapters" : string.Join(", ", available);
+                throw new AdapterResolutionException(
+                    defaultSource.Adapter,
+                    Constants.Diagnostics.Reasons.AdapterUnavailable,
+                    $"Set Koan:Data:Sources:Default:Adapter to a referenced adapter ({choices}), " +
+                    "or reference the connector package that owns the requested adapter.");
+            }
+
+            return new AdapterResolutionDecision(
+                defaultSource.Adapter,
+                "Default",
+                Constants.Diagnostics.Reasons.DefaultSource);
         }
 
         // Priority 5: Highest priority adapter factory (the shared [ProviderPriority]+CanHandle ranking, ARCH-0103 §4.1).
-        var factories = sp.GetServices<IDataAdapterFactory>().ToList();
         if (factories.Count == 0)
             throw new InvalidOperationException(
                 "No IDataAdapterFactory instances registered. " +
@@ -112,7 +156,11 @@ internal static class AdapterResolver
 
         // No desired provider here → highest priority overall; non-null because the list is non-empty (checked above).
         var chosen = FactoryResolver.Resolve(factories, desired: null)!;
-        return (FactoryResolver.ProviderName(chosen), "Default");
+        return new AdapterResolutionDecision(
+            FactoryResolver.ProviderName(chosen),
+            "Default",
+            Constants.Diagnostics.Reasons.ReferencePriority,
+            FactoryResolver.Priority(chosen));
     }
 
     /// <summary>

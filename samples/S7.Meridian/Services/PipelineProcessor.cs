@@ -534,7 +534,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
         await job.Save("completed-jobs", ct).ConfigureAwait(false);
 
         // Remove from active jobs collection to prevent TryClaimAnyAsync from finding it
-        await job.Delete(ct).ConfigureAwait(false);
+        await job.Remove(ct).ConfigureAwait(false);
         _logger.LogInformation("Job {JobId} archived and removed from active queue", job.Id);
     }
 

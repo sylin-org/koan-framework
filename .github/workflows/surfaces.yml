@@ -1,8 +1,7 @@
 # Surface-ledger tripwire (Epic E02).
 #
-# KOAN's general build/test CI is disabled by design (ci.yml / validate-main-pr.yml
-# are noop placeholders; release-on-main.yml is build-only). This standalone, purpose-
-# built workflow guards ONE thing: that docs/SURFACES.md exists and its table parses.
+# This standalone, purpose-built workflow guards ONE thing: that docs/SURFACES.md exists and its
+# table parses. Build/test and package proof are owned by pr-gate.yml and release-on-dev.yml.
 # It runs no build and no tests — it is the cheap tripwire the rotation contract
 # requires, nothing more.
 name: surfaces

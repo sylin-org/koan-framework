@@ -6,6 +6,8 @@ using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Logging;
 using Xunit;
+using Koan.Core.Diagnostics;
+using Koan.Core.Infrastructure;
 
 namespace Koan.Tests.Integration.Bootstrap.Specs;
 
@@ -65,6 +67,38 @@ public sealed class ModulesFailedRenderSpec
             health: null);
 
         block.Should().NotContain("MODULES-FAILED");
+    }
+
+    [Fact]
+    public void Runtime_fact_projection_renders_the_same_redacted_failure_and_correction()
+    {
+        var fact = KoanFact.Create(
+            Constants.Diagnostics.Codes.ModuleRejected,
+            KoanFactKind.Rejection,
+            KoanFactState.Rejected,
+            FailingModule,
+            "Koan rejected a module during activation.",
+            Constants.Diagnostics.Reasons.InitializerFailed,
+            "Fix the module activation failure or remove the module reference.",
+            "Demo.Failing",
+            "bootstrap:demo");
+        var envelope = new KoanFactEnvelope(1, 1, "test", DateTimeOffset.UtcNow, true, [fact]);
+
+        var block = KoanConsoleBlocks.BuildStartupOverviewBlock(
+            SampleEnvironment(),
+            hostDescription: "test-host",
+            modules: Array.Empty<(string, string)>(),
+            runtimeVersion: "0.0.0-test",
+            registry: RegistryWithFailures(),
+            health: null,
+            runtimeFacts: envelope);
+
+        block.Should().Contain("MODULES-FAILED");
+        block.Should().Contain(FailingModule);
+        block.Should().Contain(fact.Summary);
+        block.Should().Contain("Fix the module activation failure",
+            "human rendering may wrap corrective prose to the console width");
+        block.Should().NotContain(FailingError, "raw exception text is not part of the shared fact");
     }
 
     private static RegistrySummarySnapshot RegistryWithFailures(params ModuleFailure[] failures)

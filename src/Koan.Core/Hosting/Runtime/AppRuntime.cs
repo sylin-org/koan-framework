@@ -15,32 +15,47 @@ using Koan.Core;
 using Koan.Core.Provenance;
 using Koan.Core.Observability;
 using Koan.Core.Observability.Health;
+using Koan.Core.Diagnostics;
+using Koan.Core.Infrastructure;
 
 namespace Koan.Core.Hosting.Runtime;
 
 internal sealed class AppRuntime : IAppRuntime
 {
     private readonly IServiceProvider _sp;
+    private readonly KoanRuntimeFactStore _runtimeFacts;
     private readonly ILogger<AppRuntime>? _logger;
+    private int _discovered;
+    private int _started;
 
-    public AppRuntime(IServiceProvider sp, ILogger<AppRuntime>? logger = null)
+    public AppRuntime(IServiceProvider sp, KoanRuntimeFactStore runtimeFacts, ILogger<AppRuntime>? logger = null)
     {
         _sp = sp;
+        _runtimeFacts = runtimeFacts;
         _logger = logger;
     }
 
     public void Discover()
     {
+        if (Interlocked.Exchange(ref _discovered, 1) != 0) return;
+
+        var collectedFacts = new List<KoanFact>();
         // Initialize KoanEnv and print a bootstrap report if enabled
         try { KoanEnv.TryInitialize(_sp); } catch { }
         KoanStartupTimeline.Mark(KoanStartupStage.BootstrapStart);
         try
         {
+            var bootstrap = _sp.GetService<KoanBootstrapSnapshot>();
+            if (bootstrap is not null)
+            {
+                collectedFacts.AddRange(bootstrap.Facts);
+            }
+
             IProvenanceRegistry registry = ProvenanceRegistry.Instance;
             var cfg = _sp.GetService<IConfiguration>();
 
             // Collect module information from all KoanAutoRegistrars
-            CollectProvenance(registry, cfg);
+            CollectProvenance(registry, cfg, collectedFacts);
 
             var provenance = registry.CurrentSnapshot;
             var modulePairs = provenance.Pillars
@@ -59,9 +74,13 @@ internal sealed class AppRuntime : IAppRuntime
                 var healthAggregator = _sp.GetService<IHealthAggregator>();
                 healthSnapshot = healthAggregator?.GetSnapshot();
             }
-            catch
+            catch (Exception ex)
             {
-                // intentionally best-effort
+                collectedFacts.Add(CollectionFailure(
+                    "health",
+                    typeof(IHealthAggregator),
+                    ex,
+                    "Koan could not collect the startup health snapshot."));
             }
 
             // StartupProbeService seeds the health snapshot on a background task that runs AFTER the host
@@ -70,19 +89,29 @@ internal sealed class AppRuntime : IAppRuntime
             // than fabricate an overall verdict the probes have not yet produced (H9 health-line race fix).
             var registeredProbes = 0;
             try { registeredProbes = _sp.GetService<IHealthRegistry>()?.All.Count ?? 0; }
-            catch { /* best-effort */ }
+            catch (Exception ex)
+            {
+                collectedFacts.Add(CollectionFailure(
+                    "health-registry",
+                    typeof(IHealthRegistry),
+                    ex,
+                    "Koan could not inspect registered health probes."));
+            }
 
             var hostDescription = DescribeHost();
-            var compositionLine = TryBuildCompositionLine(snapshot);
+            var composition = TryBuildComposition(snapshot);
+            collectedFacts.AddRange(composition.Facts);
+            var factEnvelope = _runtimeFacts.Replace(collectedFacts, complete: true);
             var startupBlock = KoanConsoleBlocks.BuildStartupOverviewBlock(
                 snapshot,
                 hostDescription,
                 modulePairs,
                 runtimeVersion,
-                AppBootstrapper.RegistrySummary,
+                bootstrap?.Registry ?? AppBootstrapper.RegistrySummary,
                 healthSnapshot,
                 registeredProbes,
-                compositionLine);
+                composition.Line,
+                factEnvelope);
 
             KoanStartupTimeline.Mark(KoanStartupStage.ConfigReady);
             var timeline = KoanStartupTimeline.GetSummary();
@@ -118,10 +147,21 @@ internal sealed class AppRuntime : IAppRuntime
                 }
             }
         }
-        catch { /* best-effort */ }
+        catch (Exception ex)
+        {
+            collectedFacts.Add(CollectionFailure(
+                "startup-report",
+                typeof(AppRuntime),
+                ex,
+                "Koan could not complete runtime fact collection."));
+            _runtimeFacts.Replace(collectedFacts, complete: true);
+        }
     }
 
-    private void CollectProvenance(IProvenanceRegistry registry, IConfiguration? cfg)
+    private void CollectProvenance(
+        IProvenanceRegistry registry,
+        IConfiguration? cfg,
+        ICollection<KoanFact> facts)
     {
         if (cfg == null) return;
 
@@ -139,9 +179,13 @@ internal sealed class AppRuntime : IAppRuntime
                 module.Describe(registrar.ModuleVersion);
                 registrar.Describe(module, cfg, hostEnv);
             }
-            catch
+            catch (Exception ex)
             {
-                // best-effort only; provenance should never block host start
+                facts.Add(CollectionFailure(
+                    $"provenance:{registrarType.FullName ?? registrarType.Name}",
+                    registrarType,
+                    ex,
+                    "A module could not report its configuration provenance."));
             }
         }
     }
@@ -149,7 +193,7 @@ internal sealed class AppRuntime : IAppRuntime
     // P1.1: build the one-line composition verdict and write the resolved-twin lockfile. Best-effort
     // — a composition failure must never disrupt the boot report. Runs here (Discover) because _sp is
     // fully built; the resolved twin is a non-production artifact.
-    private string? TryBuildCompositionLine(KoanEnvironmentSnapshot snapshot)
+    private CompositionReport TryBuildComposition(KoanEnvironmentSnapshot snapshot)
     {
         try
         {
@@ -157,20 +201,45 @@ internal sealed class AppRuntime : IAppRuntime
             var contentRoot = _sp.GetService<IHostEnvironment>()?.ContentRootPath;
             var appName = string.IsNullOrWhiteSpace(snapshot.Application.Name) ? "app" : snapshot.Application.Name;
 
-            var resolved = Composition.KoanCompositionSnapshot.Build(_sp, appName, cfg);
+            var result = Composition.KoanCompositionSnapshot.BuildResult(_sp, appName, cfg);
+            var resolved = result.Lockfile;
             if (!KoanEnv.IsProduction)
                 Composition.KoanCompositionSnapshot.TryWriteResolvedTwin(resolved, contentRoot);
 
             var lockedPath = string.IsNullOrEmpty(contentRoot) ? null : Path.Combine(contentRoot!, "koan.lock.json");
             var locked = lockedPath is null ? null : Composition.KoanLockfileSerializer.TryReadFile(lockedPath);
             var comparison = Composition.KoanLockfileComparer.Compare(locked, resolved);
-            return comparison.Format(resolved.Modules.Count);
+            return new CompositionReport(
+                comparison.Format(resolved.Modules.Count),
+                result.Facts.Append(comparison.ToFact(resolved.Modules.Count)).ToArray());
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            return new CompositionReport(
+                null,
+                [CollectionFailure(
+                    "composition",
+                    typeof(Composition.KoanCompositionSnapshot),
+                    ex,
+                    "Koan could not collect the resolved composition snapshot.")]);
         }
     }
+
+    private static KoanFact CollectionFailure(
+        string subject,
+        Type source,
+        Exception exception,
+        string summary)
+        => KoanFact.Create(
+            Constants.Diagnostics.Codes.CollectionFailed,
+            KoanFactKind.Degradation,
+            KoanFactState.CollectionFailed,
+            subject,
+            summary,
+            Constants.Diagnostics.Reasons.ReporterFailed,
+            "Inspect the named fact source and retry after correcting its reporting failure.",
+            source.Assembly.GetName().Name ?? source.Name,
+            $"diagnostics:{subject}:{exception.GetType().Name}");
 
     private string ResolveRuntimeVersion(IReadOnlyList<(string Name, string Version)> modules)
     {
@@ -199,6 +268,8 @@ internal sealed class AppRuntime : IAppRuntime
 
     public void Start()
     {
+        if (Interlocked.Exchange(ref _started, 1) != 0) return;
+
         // No-op by default; features (e.g., data) can hook into hosted services for start-up work.
         // Keep best-effort guards and avoid throwing during host start.
         try { /* intentional no-op */ } catch { }

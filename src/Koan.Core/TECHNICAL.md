@@ -30,6 +30,8 @@ source: src/Koan.Core/
 - `KoanLog.For<T>()`: creates a category-only reusable scope. Each emission resolves
   `ILoggerFactory` from the current `AppHost` provider, so host leases and flow scopes also govern
   logging without a second ambient owner.
+- `IKoanRuntimeFacts`: read-only access to the current host's schema-versioned runtime fact envelope.
+- `KoanFactJson`: the canonical deterministic JSON projection used by Web and MCP.
 
 ## Usage guidance
 
@@ -48,12 +50,17 @@ source: src/Koan.Core/
   `Try*`, nullable, or availability behavior instead of throwing this exception.
 - Static `KoanLogScope` fields are safe because they retain only category text. A hostless flow or a
   selected provider without `ILoggerFactory` emits nothing and never falls back to another host.
+- Read fact `Code`/`ReasonCode`/`State` for automation. Do not parse startup prose or treat
+  `Complete=false` as healthy.
 
 ## Observability & Security
 
-- Integrates with logging/tracing where applicable; no direct security surface.
+- Runtime facts exclude arbitrary payloads, raw exception messages, stack traces, and configuration
+  values. They still expose topology identifiers and should use an operational access boundary.
 
 ## References
 
 - ARCH-0040 config and constants: `/docs/decisions/ARCH-0040-config-and-constants-naming.md`
 - Engineering guardrails: `/docs/engineering/index.md`
+- Runtime facts: `/docs/engineering/runtime-facts.md`
+- ARCH-0111: `/docs/decisions/ARCH-0111-unified-runtime-facts.md`

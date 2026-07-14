@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Koan.Core.Diagnostics;
+using Koan.Core.Infrastructure;
 
 namespace Koan.Core.Composition;
 
@@ -16,12 +18,50 @@ public sealed class KoanCompositionBuilder
     private readonly Dictionary<string, IReadOnlyList<string>> _capabilities = new(StringComparer.Ordinal);
     private readonly List<KoanLockEntity> _entities = new();
     private readonly HashSet<string> _configKeys = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, KoanFact> _facts = new(StringComparer.Ordinal);
 
     /// <summary>Record a resolved election, e.g. <c>data:default</c> → adapter <c>postgres</c>.</summary>
-    public void AddElection(string key, string adapter, string via, int? priority = null)
+    public void AddElection(
+        string key,
+        string adapter,
+        string via,
+        int? priority = null,
+        string? source = null,
+        string? factCode = null)
     {
         if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(adapter)) return;
         _elections[key] = new KoanLockElection(adapter, via ?? "unknown", priority);
+        AddFact(KoanFact.Create(
+            factCode ?? Constants.Diagnostics.Codes.ElectionSelected,
+            KoanFactKind.Election,
+            KoanFactState.Selected,
+            key,
+            $"Koan selected adapter '{adapter}' for '{key}'.",
+            string.IsNullOrWhiteSpace(via) ? "unknown" : via,
+            null,
+            source ?? "composition",
+            key));
+    }
+
+    /// <summary>Record a rejected composition decision without accepting provider-specific payloads.</summary>
+    public void AddRejection(
+        string key,
+        string reasonCode,
+        string correction,
+        string? source = null,
+        string? factCode = null)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return;
+        AddFact(KoanFact.Create(
+            factCode ?? Constants.Diagnostics.Codes.CollectionFailed,
+            KoanFactKind.Rejection,
+            KoanFactState.Rejected,
+            key,
+            $"Koan could not resolve composition for '{key}'.",
+            reasonCode,
+            correction,
+            source ?? "composition",
+            key));
     }
 
     /// <summary>Record a provider's negotiated capability tokens, e.g. <c>data:postgres</c> → query.linq, …</summary>
@@ -57,7 +97,8 @@ public sealed class KoanCompositionBuilder
         out IReadOnlyDictionary<string, KoanLockElection>? elections,
         out IReadOnlyDictionary<string, IReadOnlyList<string>>? capabilities,
         out IReadOnlyList<string>? configKeys,
-        out IReadOnlyList<KoanLockEntity>? entities)
+        out IReadOnlyList<KoanLockEntity>? entities,
+        out IReadOnlyList<KoanFact> facts)
     {
         elections = _elections.Count == 0
             ? null
@@ -73,5 +114,16 @@ public sealed class KoanCompositionBuilder
         entities = _entities.Count == 0
             ? null
             : _entities.OrderBy(e => e.Type, StringComparer.Ordinal).ToArray();
+        facts = _facts.Values
+            .OrderBy(fact => fact.Kind)
+            .ThenBy(fact => fact.Code, StringComparer.Ordinal)
+            .ThenBy(fact => fact.Subject, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    internal void AddFact(KoanFact fact)
+    {
+        ArgumentNullException.ThrowIfNull(fact);
+        _facts[fact.Id] = fact;
     }
 }

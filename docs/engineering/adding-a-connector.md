@@ -270,22 +270,24 @@ dotnet pack src/Connectors/Data/Vector/Acme/Koan.Data.Vector.Connector.Acme.cspr
 unzip -p /tmp/test/Sylin.Koan.Data.Vector.Connector.Acme.*.nupkg '*.nuspec' | grep -E '<id>|<description>'
 #   id should be `Sylin.Koan.Data.Vector.Connector.Acme`, description present.
 
-pwsh scripts/versioning/Audit-NuGetMetadata.ps1
-#   Your new csproj should be in the 103+ packable count with all metadata present.
+dotnet run --project tools/Koan.Packaging -- inventory
+#   Your new package should have one evaluated owner with complete metadata.
 
 dotnet test tests/Suites/Data/Connector.Acme/Koan.Data.Connector.Acme.Tests/Koan.Data.Connector.Acme.Tests.csproj
 #   At least one passing spec.
 ```
 
-### Step 10 — PR + merge
+### Step 10 — Push or merge to `dev`
 
-The next merge to `main` picks up your connector. The release workflow:
+The next advancement of `dev` picks up your connector. The release workflow:
 
-- Detects commits in `src/Connectors/Data/Vector/Acme/` → bumps `Sylin.Koan.Data.Vector.Connector.Acme` (minor for `feat:`, patch for `fix:`)
-- Packs only the bumped packages (your new one + any others touched)
-- Publishes to nuget.org
+- asks NBGV for its version at the two Git endpoints;
+- packs the changed identity and any missing current identities in dependency order;
+- proves the package closure in an external app, then publishes through trusted identity.
 
-See [versioning.md](versioning.md) and [nuget-publishing.md](nuget-publishing.md) for what happens after merge.
+Commit-message vocabulary does not calculate versions. Git height owns patch; an intentional
+major/minor change is an explicit `version.json` edit. See [versioning.md](versioning.md) and
+[nuget-publishing.md](nuget-publishing.md).
 
 ---
 
@@ -375,7 +377,7 @@ docker run --rm -p 8080:8080 acme/acme:1.0
 
 If discovery in the connector picks the wrong endpoint (container DNS vs localhost), test fixtures should explicitly set `Endpoint` rather than relying on `"auto"`.
 
-### Symptom: `Audit-NuGetMetadata.ps1` flags missing `<Description>` or `<PackageTags>`
+### Symptom: package verification flags missing description or tags
 
 **Why it happens:** csproj was scaffolded without them.
 
@@ -386,7 +388,7 @@ If discovery in the connector picks the wrong endpoint (container DNS vs localho
 <PackageTags>$(CommonPackageTags);data;vector;<provider>;<key-capabilities></PackageTags>
 ```
 
-The audit re-runs cleanly after.
+Re-run the release compiler inventory, then package verification for the affected release set.
 
 ---
 
@@ -407,7 +409,7 @@ The audit re-runs cleanly after.
 - [Mongo connector](../../src/Connectors/Data/Mongo/) — example for data store pillar
 - [Redis connector](../../src/Connectors/Data/Redis/) — example with shared-transport ownership
 - [tests/Suites/Data/Connector.Weaviate/](../../tests/Suites/Data/Connector.Weaviate/) — test layout template
-- [scripts/versioning/Audit-NuGetMetadata.ps1](../../scripts/versioning/Audit-NuGetMetadata.ps1) — metadata audit
+- [Koan.Packaging](../../tools/Koan.Packaging/README.md) — evaluated inventory and release proof
 - [versioning.md](versioning.md) — when your connector bumps
 - [nuget-publishing.md](nuget-publishing.md) — how it reaches nuget.org
 - [ARCH-0049](../decisions/) — `[KoanService]` orchestration metadata

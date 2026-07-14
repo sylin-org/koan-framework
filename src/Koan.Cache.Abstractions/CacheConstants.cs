@@ -2,6 +2,12 @@
 
 public static class CacheConstants
 {
+    public static class Capabilities
+    {
+        /// <summary>Stable identity for Entity-scoped cache policy and entry behavior.</summary>
+        public const string Entity = "koan.cache.entity";
+    }
+
     public static class Configuration
     {
         public const string Section = "Cache";

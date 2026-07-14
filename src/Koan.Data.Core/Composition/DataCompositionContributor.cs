@@ -1,9 +1,10 @@
 using System;
 using System.Linq;
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core.Composition;
 using Koan.Data.Abstractions;
+using Koan.Data.Core.Infrastructure;
+using Koan.Data.Core.Routing;
 
 namespace Koan.Data.Core.Composition;
 
@@ -28,29 +29,36 @@ internal sealed class DataCompositionContributor : IKoanCompositionContributor
     {
         var registry = services.GetService<DataSourceRegistry>();
 
-        var defaultSource = registry?.GetSource("Default");
-        if (defaultSource is { } ds && !string.IsNullOrWhiteSpace(ds.Adapter))
+        if (registry is not null)
         {
-            builder.AddElection("data:default", ds.Adapter, "default-source");
-        }
-        else
-        {
-            var factories = services.GetServices<IDataAdapterFactory>().ToList();
-            if (factories.Count > 0)
+            try
             {
-                var ranked = factories
-                    .Select(f => new
-                    {
-                        Name = f.GetType().Name,
-                        Priority = f.GetType().GetCustomAttribute<ProviderPriorityAttribute>()?.Priority ?? 0,
-                    })
-                    .OrderByDescending(x => x.Priority)
-                    .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
-                    .First();
-                var adapter = ranked.Name
-                    .Replace("AdapterFactory", "", StringComparison.OrdinalIgnoreCase)
-                    .ToLowerInvariant();
-                builder.AddElection("data:default", adapter, "reference-priority", ranked.Priority);
+                var decision = AdapterResolver.ResolveDefault(services, registry);
+                builder.AddElection(
+                    "data:default",
+                    decision.Adapter,
+                    decision.Via,
+                    decision.Priority,
+                    typeof(DataCompositionContributor).FullName,
+                    Constants.Diagnostics.Codes.AdapterSelected);
+            }
+            catch (AdapterResolutionException exception)
+            {
+                builder.AddRejection(
+                    "data:default",
+                    exception.ReasonCode,
+                    exception.Correction,
+                    typeof(DataCompositionContributor).FullName,
+                    Constants.Diagnostics.Codes.AdapterRejected);
+            }
+            catch (InvalidOperationException)
+            {
+                builder.AddRejection(
+                    "data:default",
+                    Constants.Diagnostics.Reasons.NoFactory,
+                    "Reference a Koan data adapter or configure Koan:Data:Sources:Default:Adapter.",
+                    typeof(DataCompositionContributor).FullName,
+                    Constants.Diagnostics.Codes.AdapterRejected);
             }
         }
 

@@ -41,6 +41,12 @@ internal sealed class InMemoryRepository<TEntity, TKey> : KeyValueStore<TEntity,
     protected override Task<IReadOnlyList<KvRecord<TEntity>>> ScanAsync(CancellationToken ct)
         => Task.FromResult((IReadOnlyList<KvRecord<TEntity>>)Store().Values.ToList());
 
+    protected override Task<IReadOnlyList<KvRecord<TEntity>>> ScanBoundedAsync(int maxCandidates, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult((IReadOnlyList<KvRecord<TEntity>>)Store().Values.Take(maxCandidates).ToList());
+    }
+
     protected override Task WriteAsync(TKey id, KvRecord<TEntity> record, CancellationToken ct)
     {
         Store()[id] = record;
@@ -60,5 +66,6 @@ internal sealed class InMemoryRepository<TEntity, TKey> : KeyValueStore<TEntity,
 
     // The in-memory floor honours full LINQ-to-objects + atomic bulk writes.
     protected override void DescribeBackend(ICapabilities caps) => caps
+        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.InMemory, true))
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.AtomicBatch);
 }

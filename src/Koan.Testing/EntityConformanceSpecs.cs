@@ -213,7 +213,7 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
 
         var saved = await NewValid().Save();
         Assert.True(await Entity<TEntity, string>.Get(saved.Id) is not null, "warm the cache.");
-        await saved.Delete();
+        await saved.Remove();
         Assert.True(await Entity<TEntity, string>.Get(saved.Id) is null,
             "[Cacheable] must invalidate the cache on delete, not serve a stale hit.");
     }

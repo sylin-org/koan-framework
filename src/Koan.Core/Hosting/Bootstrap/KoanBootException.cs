@@ -1,4 +1,6 @@
 using System;
+using Koan.Core.Diagnostics;
+using Koan.Core.Infrastructure;
 
 namespace Koan.Core.Hosting.Bootstrap;
 
@@ -22,6 +24,32 @@ public sealed class KoanBootException : Exception
 {
     /// <summary>Creates the exception naming the failing <paramref name="module"/> and boot <paramref name="phase"/>.</summary>
     public KoanBootException(Type module, string assembly, string version, string phase, Exception inner)
+        : this(
+            module,
+            assembly,
+            version,
+            phase,
+            inner,
+            KoanFact.Create(
+                Constants.Diagnostics.Codes.ModuleRejected,
+                KoanFactKind.Rejection,
+                KoanFactState.Rejected,
+                module.FullName ?? module.Name,
+                "Koan rejected a module during activation.",
+                Constants.Diagnostics.Reasons.InitializerFailed,
+                "Fix the module activation failure or remove the module reference. Use lenient boot only for diagnosis.",
+                assembly,
+                $"bootstrap:{module.FullName ?? module.Name}:{phase}"))
+    {
+    }
+
+    internal KoanBootException(
+        Type module,
+        string assembly,
+        string version,
+        string phase,
+        Exception inner,
+        KoanFact fact)
         : base($"Koan boot failed: module '{module.FullName ?? module.Name}' (assembly '{assembly}' {version}) threw during {phase}. " +
                $"Set environment variable KOAN_BOOT_LENIENT=1 to boot in degraded mode and surface this in the MODULES-FAILED boot report block instead. " +
                $"Inner: {inner.Message}", inner)
@@ -30,6 +58,7 @@ public sealed class KoanBootException : Exception
         Assembly = assembly;
         Version = version;
         Phase = phase;
+        Fact = fact;
     }
 
     /// <summary>The module type whose construction / initialization failed.</summary>
@@ -43,4 +72,7 @@ public sealed class KoanBootException : Exception
 
     /// <summary>The boot phase in which the failure occurred (e.g. <c>initializer</c>, <c>manifest-invoker</c>).</summary>
     public string Phase { get; }
+
+    /// <summary>The same redacted rejection fact projected by startup, health, and machine diagnostics.</summary>
+    public KoanFact Fact { get; }
 }

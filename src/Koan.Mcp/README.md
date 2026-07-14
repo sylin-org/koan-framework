@@ -7,6 +7,12 @@
 - **Failure modes**: Missing entity annotations, unsupported transport modes, or MCP schema mismatches when serializing descriptors.
 - **Success criteria**: MCP clients can enumerate Koan entities/tools, execute actions through the protocol, and receive diagnostics in the expected schema.
 
+## Runtime inspection
+
+MCP clients can read `koan://facts` for the same versioned, redacted runtime-fact envelope used by
+startup, health, and the Web well-known surface. Check `complete` before treating the snapshot as a
+verdict, and use stable fact codes rather than parsing summaries.
+
 ## Quick start
 
 To expose a Koan entity over the Model Context Protocol (MCP), simply annotate your entity class with the `[McpEntity]` attribute. The framework's Zero-DX scanner will automatically discover the entity, map its relational/data endpoints to MCP tools, and host them.
@@ -98,6 +104,7 @@ When exposing MCP to public networks, adopt the following security guidelines:
 
 ## Reference
 - `McpEntityAttribute` – decorator to mark entities for MCP exposure.
+- `RuntimeFactsResourceProvider` – projects the current host's canonical runtime facts.
 - `DescriptorMapper` – maps data descriptors to MCP-compliant schemas and tools.
 - `McpRpcHandler` – handles incoming JSON-RPC calls for tool discovery and execution.
 

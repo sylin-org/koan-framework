@@ -29,21 +29,23 @@ else is required:
 5. Provider election — the referenced data connector wins; zero-config defaults (SQLite → `./data/app.db`)
 6. The boot report — what the app prints at startup is the primary debugging surface
 7. Auto schema ("magic") — created in Development; gated by `Koan:AllowMagicInProduction` elsewhere
-8. Web defaults — controllers, `/api/health`, secure headers auto-wired; JSON is **camelCase,
+8. Web defaults — controllers, `/health`, secure headers auto-wired; JSON is **camelCase,
    nulls omitted** (Newtonsoft.Json — chosen for predictable polymorphic serialization)
 
-## Path A — run it from the repo
+## Path A — start from the executable contract
 
 ```bash
 git clone https://github.com/sylin-org/koan-framework
 cd koan-framework
-dotnet run --project samples/S1.Web
+dotnet run --project samples/FirstUse
 ```
 
-Browse the printed URL; hit `/api/health`; read the boot report in the console — it lists discovered
-modules, major adapter elections, and boot phases. Then read
-[samples/README.md](../../samples/README.md) for the learning ladder
-(S0 → S1 → S10 → S14).
+Create an approval, read it back, and inspect `/.well-known/Koan/facts` using the commands in the
+[quickstart](./quickstart.md). Then read the small application in
+[`samples/FirstUse`](../../samples/FirstUse/README.md). This exact code is the source-checkout and
+package clean-room contract, including its REST, SQLite, startup-report, runtime-facts, and MCP
+behavior. Once that mental model is clear, use [samples/README.md](../../samples/README.md) for the
+larger learning ladder.
 
 ## Path B — from scratch (currently unavailable)
 
@@ -53,8 +55,7 @@ but it is not runnable against the current public 0.17.0 package set.
 ```bash
 dotnet new web -n MyApp
 cd MyApp
-dotnet add package Sylin.Koan.Core
-dotnet add package Sylin.Koan.Web
+dotnet add package Sylin.Koan.App
 dotnet add package Sylin.Koan.Data.Connector.Sqlite
 ```
 
@@ -91,7 +92,7 @@ Run and verify:
 dotnet run
 curl -X POST http://localhost:5000/api/todo -H "Content-Type: application/json" -d '{"title":"Experience Koan"}'
 curl http://localhost:5000/api/todo
-curl http://localhost:5000/api/health
+curl http://localhost:5000/health
 ```
 
 Working with data (the verbs — note: `Query`, not `Where`; `Remove`, not `Delete`):

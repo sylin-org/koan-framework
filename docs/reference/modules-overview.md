@@ -112,7 +112,7 @@ Use this reference when you plan a Koan solution and need to understand which mo
 ### Koan.Cache
 
 - **Purpose**: fluent caching client, policy registry, and adapter system (memory, Redis) aligned with `Entity<TEntity>` patterns.
-- **How to use**: reference `Koan.Cache`; its auto-registrar invokes `AddKoanCache()` for you. Add provider packages (for example `Koan.Cache.Adapter.Redis`) and configure `Cache:Provider` plus adapter settings. Use `Cache.WithJson(...)`, `Cache.Tags(...)`, and `Entity<TEntity,TKey>.Cache` for policy-driven invalidation.
+- **How to use**: reference `Koan.Cache`; its auto-registrar invokes `AddKoanCache()` and contributes the module-owned `Todo.Cache` Entity facet. Add provider packages (for example `Koan.Cache.Adapter.Redis`) and configure adapter settings. Use `Cache.WithJson(...)`, `Cache.Tags(...)`, and `Todo.Cache.Explain/Flush/Count` for Entity-scoped policy inspection and invalidation.
 - **When to use**: memoizing expensive queries, broadcasting cache invalidations across web nodes, or coordinating stale-while-revalidate flows in background jobs.
 
 ### Koan.Data.Vector & Koan.Data.Vector.Abstractions

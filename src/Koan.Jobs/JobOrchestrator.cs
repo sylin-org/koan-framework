@@ -173,7 +173,16 @@ public sealed class JobOrchestrator
         if (rec.CancelRequestedAt is not null) { try { linked.Cancel(); } catch (ObjectDisposedException) { } }
 
         using var scope = _scopes.CreateScope();
-        var ctx = new JobContext(rec.Action, rec.Id, scope.ServiceProvider, _logger, ToState(rec), _clock, linked.Token, ProgressSink);
+        Task PersistProgress(string jobId, double fraction, string? message, CancellationToken ct)
+        {
+            // Progress is written immediately for live observers. Keep the claimed snapshot in sync too, otherwise
+            // the subsequent settle Update would overwrite that newer ledger row with its pre-handler values.
+            rec.ProgressFraction = fraction;
+            rec.ProgressMessage = message;
+            return ProgressSink(jobId, fraction, message, ct);
+        }
+
+        var ctx = new JobContext(rec.Action, rec.Id, scope.ServiceProvider, _logger, ToState(rec), _clock, linked.Token, PersistProgress);
         try
         {
             await binding.Execute(workItem, ctx, linked.Token);

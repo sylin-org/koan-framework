@@ -1,16 +1,12 @@
 # Koan kernel package manifest
 #
-# Authoritative list of packages that version in lockstep (Tier 1, per ARCH-0082).
+# Informational list of packages that form the framework contract surface.
 # Paths are relative to the repo root, one per line. Lines starting with '#' are comments.
 #
-# Adding to / removing from this list is an ADR-level decision — it changes the
-# framework contract surface. Don't edit casually; if a new abstractions package
-# stabilizes and should join the kernel, write an ADR and reference it here.
+# ARCH-0085 retired lockstep versioning. Every package versions independently; this
+# file remains only as architectural classification and drives no release behavior.
 #
-# Kept in sync with: docs/decisions/ARCH-0082-versioning-strategy.md
-#
-# Read by: scripts/versioning/Update-Versions.ps1, scripts/versioning/Show-VersionStatus.ps1
-# Written by: humans only.
+# Kept in sync with ARCH-0085's informational contract-surface boundary.
 
 src/Koan.Core/Koan.Core.csproj
 src/Koan.Core.Adapters/Koan.Core.Adapters.csproj

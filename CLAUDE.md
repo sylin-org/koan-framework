@@ -116,7 +116,7 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 
 ### Common Patterns
 - **Guard Clauses** (`Koan.Core.Utilities.Guard`) - `Must.NotBeNull()`, `Be.Positive()`, `NotBe.Default()`
-- **Entity Static Methods** - `Todo.Get(id)`, `Todo.Query(x => ...)`, `todo.Save()`, `todo.Delete()`
+- **Entity Static Methods** - `Todo.Get(id)`, `Todo.Query(x => ...)`, `todo.Save()`, `todo.Remove()`
 
 ### Decision Framework: Static vs DI
 

@@ -162,6 +162,12 @@
       href: ARCH-0108-corrective-host-context-failures.md
     - name: ARCH-0109 Bootstrap evidence partitioned by composition cost
       href: ARCH-0109-bounded-bootstrap-test-lanes.md
+    - name: ARCH-0110 Git-driven independent package releases from dev
+      href: ARCH-0110-dev-release-compiler.md
+    - name: ARCH-0111 One host-owned runtime fact envelope
+      href: ARCH-0111-unified-runtime-facts.md
+    - name: ARCH-0112 Capability-aware bounded relationship negotiation
+      href: ARCH-0112-bounded-relationship-negotiation.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries
@@ -382,7 +388,7 @@
       href: MEDIA-0004-recipe-pipeline.md
 - name: Build (BUILD)
   items:
-    - name: BUILD-0072 Script-owned versioning
+    - name: BUILD-0072 Script-owned versioning (superseded)
       href: BUILD-0072-script-owned-versioning.md
 - name: Operations (OPS)
   items:

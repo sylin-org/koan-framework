@@ -53,6 +53,7 @@ internal class PostgresRepository<
         .Add(DataCaps.Isolation.RowScoped)
         .Add(DataCaps.Isolation.ContainerScoped)
         .Add(DataCaps.Isolation.DatabaseScoped)
+        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Native))
         .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     // Storage optimization support

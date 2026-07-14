@@ -44,11 +44,11 @@ foundations so a pleasant API is not laid over ambiguous behavior.
 | [R04-01](work-items/r04/R04-01-honest-backup-deletion.md) | P0 | passed | Deleting a backup can no longer report success without deleting anything. | R03 | faulted-task contract and focused executable spec |
 | [R04-02](work-items/r04/R04-02-host-scoped-runtime.md) | P0 | passed | Repeated hosts/tests cannot inherit disposed providers or registrations. | R04-01 | owner probes plus ARCH-0108 corrective host-context contract |
 | [R04-03](work-items/r04/R04-03-bounded-bootstrap-lanes.md) | P0 | passed | Bootstrap tests finish or fail with a bounded, diagnostic result. | R04-02 | ARCH-0109 lanes plus failed-start ownership proof |
-| [R04-04](work-items/r04/R04-04-atomic-packages-clean-room.md) | P0 | pending | One package set restores, builds, runs, and performs CRUD outside the repo. | R04-02, R04-03 | public 0.17.0 dependency mismatch and advisory |
-| [R04-05](work-items/r04/R04-05-explanation-error-facts.md) | P1 | pending | Humans, agents, health, and logs project one redacted composition/error fact model. | R04-02, R04-03 | best-effort fragmented startup/health reporting |
-| [R04-06](work-items/r04/R04-06-negotiation-boundedness.md) | P1 | pending | Provider selection, fallback, and relationship cost fail or explain themselves honestly. | R04-05 | hidden load-all/filter relationship path; fleet gaps |
-| [R04-07](work-items/r04/R04-07-entity-language-consumers.md) | P1 | pending | Referencing a module adds only valid Entity facets; invalid/broad receivers disappear safely. | R04-02, R04-05 | ARCH-0106, C# 14 probe, and elected facet slate |
-| [R04-08](work-items/r04/R04-08-first-use-agent-docs.md) | P1 | pending | Clean first use and agent use are executable, truthful, and release-gating. | R04-04–07 | broken package quickstart, stale docs, fragmented agent proof |
+| [R04-04](work-items/r04/R04-04-atomic-packages-clean-room.md) | P0 | passed | One package set restores, builds, runs, and performs CRUD outside the repo. | R04-02, R04-03 | 113 owners; 82-package reconciliation; metadata/range/SourceLink/hash proof; fresh-cache package-only health + SQLite CRUD |
+| [R04-05](work-items/r04/R04-05-explanation-error-facts.md) | P1 | passed | Humans, agents, health, and logs project one redacted composition/error fact model. | R04-02, R04-03 | ARCH-0111; module/default-data vertical slice; Core 208/208, Data.Core 294/294, Web 3/3, MCP 73/73 |
+| [R04-06](work-items/r04/R04-06-negotiation-boundedness.md) | P1 | passed | Provider selection, fallback, and relationship cost fail or explain themselves honestly. | R04-05 | ARCH-0112; Data.Core 299/299; Web relationship 7/7; MCP relationship 2/2 + conformance 73/73 |
+| [R04-07](work-items/r04/R04-07-entity-language-consumers.md) | P1 | passed | Referencing a module adds only valid Entity facets; invalid/broad receivers disappear safely. | R04-02, R04-05 | module-owned Cache facet; C# 14 consumer cells 9/9; explicit deprecated runtime Delete compatibility path |
+| [R04-08](work-items/r04/R04-08-first-use-agent-docs.md) | P1 | passed | Clean first use and agent use are executable, truthful, and release-gating. | R04-04–07 | one public FirstUse app; source suite 13/13; package clean-room probe 8/8; stale test/backup docs replaced |
 
 ## Program rules
 

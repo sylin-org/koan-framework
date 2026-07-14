@@ -27,6 +27,17 @@ dotnet add package Sylin.Koan.Data.Core
 - For large sets, use paging or streaming; don’t materialize unbounded results.
 - If a first-class static isn’t available, you can fall back to the generic facade (second-class): `Data<TEntity, TKey>.Query(...)`.
 
+Child relationships are strict by default. Native and in-memory providers execute directly; a
+scan-backed provider fails with a corrective `RelationshipQueryRejectedException` unless the call
+chooses a finite budget:
+
+```csharp
+var children = await todo.GetChildren<TodoItem>(
+    RelationshipQueryPolicy.Bounded(maxCandidates: 1_000, maxResults: 200), ct);
+```
+
+This policy bounds candidates before rows escape and never returns a partial relationship.
+
 Required Entity/Data operations without a usable Koan host throw `KoanHostContextException`. Its
 `Failure`, `Operation`, and `RequiredService` properties distinguish an absent host, a disposed host,
 and a host where the Data module was not composed.

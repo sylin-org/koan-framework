@@ -76,6 +76,22 @@ internal sealed class RedisRepository<TEntity, TKey> : KeyValueStore<TEntity, TK
         return list;
     }
 
+    protected override async Task<IReadOnlyList<KvRecord<TEntity>>> ScanBoundedAsync(int maxCandidates, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var db = Db();
+        var pattern = $"{Keyspace()}:*";
+        var keys = ScanKeys(db, pattern, maxCandidates);
+        if (keys.Length == 0) return [];
+
+        var values = await db.StringGetAsync(keys).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
+        var list = new List<KvRecord<TEntity>>(values.Length);
+        foreach (var value in values)
+            if (!value.IsNullOrEmpty) list.Add(Deserialize(value!));
+        return list;
+    }
+
     protected override async Task WriteAsync(TKey id, KvRecord<TEntity> record, CancellationToken ct)
         => await WriteWithTtlAsync(Db(), KeyOf(id), Serialize(record), record.Entity).ConfigureAwait(false);
 
@@ -122,6 +138,7 @@ internal sealed class RedisRepository<TEntity, TKey> : KeyValueStore<TEntity, TK
 
     // The native enrichments the family base does not own.
     protected override void DescribeBackend(ICapabilities caps) => caps
+        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Scan, true))
         .Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Retention.TtlIndex);   // native key TTL via [Index(Ttl = true)] → SET PX (DATA-0101)
 
@@ -182,13 +199,16 @@ internal sealed class RedisRepository<TEntity, TKey> : KeyValueStore<TEntity, TK
 
     // ==================== Keyspace scan ====================
 
-    private RedisKey[] ScanKeys(IDatabase db, string pattern)
+    private RedisKey[] ScanKeys(IDatabase db, string pattern, int? maxCandidates = null)
     {
         var server = _muxer.GetEndPoints().Select(ep => _muxer.GetServer(ep)).FirstOrDefault(s => s.IsConnected);
         if (server is not null)
-            return server.Keys(db.Database, pattern: pattern, pageSize: 1000).ToArray();
+            return Limit(server.Keys(db.Database, pattern: pattern, pageSize: 1000), maxCandidates);
 
         // Fallback when no server handle is available (e.g. some managed clouds): best-effort across known servers.
-        return _muxer.GetServers().SelectMany(s => s.Keys(db.Database, pattern: pattern)).ToArray();
+        return Limit(_muxer.GetServers().SelectMany(s => s.Keys(db.Database, pattern: pattern)), maxCandidates);
     }
+
+    private static RedisKey[] Limit(IEnumerable<RedisKey> keys, int? maxCandidates)
+        => (maxCandidates is > 0 ? keys.Take(maxCandidates.Value) : keys).ToArray();
 }
