@@ -4,14 +4,14 @@ domain: core
 title: "R04-02 - Make Runtime State Host-Scoped"
 audience: [maintainers, framework-authors, ai-agents]
 status: draft
-last_updated: 2026-07-13
+last_updated: 2026-07-14
 framework_version: v0.17.0
 ---
 
 # R04-02 — Make runtime state host-scoped
 
 - Priority: P0
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R04-01
 - Owner: Core hosting with Data.Core/AI consumers
 
@@ -470,6 +470,32 @@ The focused orchestrator lifecycle surface passes 3/3, Core Unit passes 79/79, a
 200/200. R04-02 remains `in-progress` only for the unified missing/disposed-host failure contract.
 The stale broad background-service guide is still an R04-08 documentation concern, not evidence that
 the unused internal locator had a supported consumer.
+
+## Twentieth increment — one corrective host-context contract
+
+Core now owns `KoanHostContextException` and `AppHost.GetRequiredService<T>(operation)`. Required
+terse framework paths distinguish a missing host, disposed host, and missing composed service while
+naming the operation and service type. A disposed provider remains available as the inner cause, and
+unrelated service-construction exceptions are not relabeled. ARCH-0108 records the contract and
+constrains the helper to framework surfaces and advanced hosting seams rather than application
+service location.
+
+Common Data access, aggregate persistence, transaction creation, AI pipeline use, and AI adapter
+selection now use that contract. AI availability and `TryResolve()` remain optional and return
+absence for both missing and disposed hosts. Explicit-provider overloads and the separately
+classified cache, vector, and metadata probes are unchanged.
+
+The contract surface passes Core 204/204, Core Unit 79/79, AI Unit 157/157, and the established
+Data.Core process with its added host-context consumer proof. Closure inventory finds zero direct
+`AppHost.Current` assignments under `src/`, zero process-static provider locators, no cached AI
+pipeline resolver, and no duplicated raw missing-host message in the migrated common Data/AI paths.
+The known integration-host failed-start concern belongs to R04-03's bounded bootstrap work and the
+obsolete test-authoring guide belongs to R04-08; neither is silently claimed by this contract.
+
+R04-02 passes. The passed claim is deliberately narrow: repeated and flow-selected hosts own their
+runtime state, and common required Data/AI operations fail correctively when that context is unusable.
+It does not promote AI/vector maturity, certify every connector, or provide R04-05's complete
+composition/error fact model.
 
 ## Smallest meaningful fix
 

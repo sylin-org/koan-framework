@@ -24,6 +24,8 @@ namespace Koan.Data.Core;
 /// </summary>
 public static class EntityContext
 {
+    private const string TransactionOperation = "entity transaction";
+
     private static readonly AsyncLocal<ContextState?> _current = new();
 
     /// <summary>
@@ -296,20 +298,7 @@ public static class EntityContext
 
     private static ITransactionCoordinator CreateTransactionCoordinator(string name)
     {
-        var sp = AppHost.Current;
-        if (sp == null)
-        {
-            throw new InvalidOperationException(
-                "AppHost.Current is not set. Ensure your application has called builder.Services.AddKoan().");
-        }
-
-        var factory = sp.GetService<ITransactionCoordinatorFactory>();
-        if (factory == null)
-        {
-            throw new InvalidOperationException(
-                "Transaction support not enabled. Call builder.Services.AddKoanTransactions() to enable transactions.");
-        }
-
+        var factory = AppHost.GetRequiredService<ITransactionCoordinatorFactory>(TransactionOperation);
         return factory.Create(name);
     }
 

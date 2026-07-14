@@ -17,6 +17,8 @@ source: src/Koan.Data.Core/
   - Naming and constants policy (see ADR ARCH-0040)
 - Error modes
   - Validation and adapter errors surface as exceptions; adapters may wrap provider errors
+  - Common host-backed Entity/Data operations use `KoanHostContextException` when no host is active,
+    the selected provider is disposed, or a required Data service is absent
 - Success criteria
   - Consistent paging/streaming semantics across adapters; predictable options binding
 
@@ -72,6 +74,8 @@ source: src/Koan.Data.Core/
 - In application models, expose first-class statics:
   - `Item.All(ct)`, `Item.Query(...)`, `Item.FirstPage(...)`, `Item.Page(...)`, `Item.QueryStream(...)`
 - Reserve `Data<TEntity, TKey>` for cases where no first-class static exists
+- Establish the runtime with a Koan generic host or `StartKoan()` before calling static Entity/Data
+  operations; use the typed host-context failure to diagnose lifecycle versus composition errors
 - For large sets, prefer paging/streaming; avoid unbounded `All()`
 
 ## Pager and EntityCursor

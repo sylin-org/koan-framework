@@ -1,5 +1,5 @@
-using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
+using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
 
@@ -12,9 +12,10 @@ namespace Koan.Data.Core;
 /// </summary>
 public static class AggregateExtensions
 {
+    private const string DataOperation = "aggregate data access";
+
     private static IDataService DataService()
-        => Koan.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
-            ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddKoan() and greenfield boot (AppHost.Current + IAppRuntime).");
+        => AppHost.GetRequiredService<IDataService>(DataOperation);
 
     // Instance-level convenience: model.Upsert() (generic key)
     /// <summary>

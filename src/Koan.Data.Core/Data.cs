@@ -4,9 +4,9 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
 using Koan.Core.Capabilities;
+using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
@@ -21,9 +21,14 @@ public static class Data<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
+    private const string DataOperation = "entity data access";
+    private const string IdentityOperation = "aggregate identity assignment";
+
+    private static IDataService Service
+        => AppHost.GetRequiredService<IDataService>(DataOperation);
+
     private static IDataRepository<TEntity, TKey> Repo
-    => Koan.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()?.GetRepository<TEntity, TKey>()
-           ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddKoan() and greenfield boot (AppHost.Current + IAppRuntime).");
+        => Service.GetRepository<TEntity, TKey>();
 
     /// <summary>
     /// The provider's capabilities as the unified <see cref="CapabilitySet"/> (ARCH-0084), resolved
@@ -327,8 +332,7 @@ public static class Data<TEntity, TKey>
         var context = EntityContext.Current;
         if (context?.TransactionCoordinator != null)
         {
-            var manager = Koan.Core.Hosting.App.AppHost.Current?.GetService<IAggregateIdentityManager>()
-                ?? throw new InvalidOperationException("Aggregate identity manager not registered. Ensure services.AddKoanDataCore() is configured correctly.");
+            var manager = AppHost.GetRequiredService<IAggregateIdentityManager>(IdentityOperation);
             await manager.EnsureIdAsync<TEntity, TKey>(model, ct);
             context.TransactionCoordinator.TrackSave<TEntity, TKey>(model, context);
             return model;
@@ -470,9 +474,7 @@ public static class Data<TEntity, TKey>
     // ------------------------------------------------------------------
     public static Task<TResult> Execute<TResult>(Instruction instruction, CancellationToken ct = default)
     {
-        var ds = Koan.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
-                     ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddKoan() and greenfield boot (AppHost.Current + IAppRuntime).");
-        return DataServiceExecuteExtensions.Execute<TEntity, TResult>(ds, instruction, ct);
+        return DataServiceExecuteExtensions.Execute<TEntity, TResult>(Service, instruction, ct);
     }
 
     public static Task<TResult> Execute<TResult>(Instruction instruction, IDataService data, CancellationToken ct = default)
@@ -480,9 +482,7 @@ public static class Data<TEntity, TKey>
 
     public static Task<int> Execute(string sql, CancellationToken ct = default)
     {
-        var ds = Koan.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
-                     ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddKoan() and greenfield boot (AppHost.Current + IAppRuntime).");
-        return DataServiceExecuteExtensions.Execute<TEntity, int>(ds, InstructionSql.NonQuery(sql), ct);
+        return DataServiceExecuteExtensions.Execute<TEntity, int>(Service, InstructionSql.NonQuery(sql), ct);
     }
 
     public static Task<int> Execute(string sql, IDataService data, object? parameters = null, CancellationToken ct = default)
@@ -490,10 +490,8 @@ public static class Data<TEntity, TKey>
 
     public static Task<TResult> Execute<TResult>(string sql, CancellationToken ct = default)
     {
-        var ds = Koan.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
-             ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddKoan() and greenfield boot (AppHost.Current + IAppRuntime).");
         var instr = typeof(TResult) == typeof(int) ? InstructionSql.NonQuery(sql) : InstructionSql.Scalar(sql);
-        return DataServiceExecuteExtensions.Execute<TEntity, TResult>(ds, instr, ct);
+        return DataServiceExecuteExtensions.Execute<TEntity, TResult>(Service, instr, ct);
     }
 
     public static Task<TResult> Execute<TResult>(string sql, IDataService data, object? parameters = null, CancellationToken ct = default)

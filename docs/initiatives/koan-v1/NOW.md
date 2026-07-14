@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-14
   status: reviewed
-  scope: R04-02 final missing-host failure contract
+  scope: R04-02 passed; R04-03 next
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -20,9 +20,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 - Work item: [R04 — Harden the framework foundation](work-items/R04-foundation-hardening.md)
 - State: `in-progress`
-- Active child: [R04-02 — Establish host-scoped runtime ownership](work-items/r04/R04-02-host-scoped-runtime.md)
-- Objective: make repeated hosts and tests unable to inherit disposed providers, registrations, or
-  other host-owned runtime state.
+- Active child: none; [R04-02 — Establish host-scoped runtime ownership](work-items/r04/R04-02-host-scoped-runtime.md)
+  passed and [R04-03 — Establish bounded bootstrap test lanes](work-items/r04/R04-03-bounded-bootstrap-lanes.md)
+  is next.
+- Objective: begin R04-03 from the repeatable-host foundation and make bootstrap evidence finish or
+  fail with a bounded, diagnostic result.
 - Foundation: R01 passed through [ARCH-0105](../../decisions/ARCH-0105-product-constitution.md) and the
   canonical [product constitution](../../architecture/product-constitution.md).
 - Current state: R02 and R03 passed. All 13 surfaces are classified in
@@ -53,32 +55,26 @@ Replace this file at every handoff. It is a restart point, not a diary.
   `ILoggerFactory` through `AppHost`; its thirteen static scopes retain only category text, and the
   separate factory bridge and logger caches are gone. ARCH-0107 records that simplified owner. A
   background-service locator and its sole write are now deleted; its getter had no source, test, or
-  sample consumer, while the public DI-owned service registry remains unchanged. A closure audit
-  still prevents R04-02 from passing because the unified missing/disposed-host failure is absent. A
-  parallel design-only
+  sample consumer, while the public DI-owned service registry remains unchanged. ARCH-0108 now gives
+  required common Data/AI paths one typed missing/disposed/missing-service contract while optional AI
+  probes remain quiet. Core 204/204, Core Unit 79/79, AI Unit 157/157, and Data.Core pass; closure
+  inventory is clean, so R04-02 is passed. A parallel design-only
   [`R04 Entity Facet Candidate Slate`](R04-ENTITY-FACET-CANDIDATES.md) elects the eventual R04-07
   language without changing the active production card or implementing public syntax.
 
 ## Next safe actions
 
-1. Treat the leased host binding, late Data.AI logger resolution, uncached durable vector-model
-   registry, immutable AI type discovery, clean lifecycle-capture classification, active-host
-   relationship metadata, equal-delegate lifecycle idempotence, tracked startup health probing,
-   single-owner health scheduling, bounded orchestrator child shutdown, and host-owned application
-   identity, provider-owned aggregate configuration, flow-owned Identity/Web startup,
-   binder-owned testing hosts, host-scoped façade logging, and zero static provider locators as the
-   stable R04-02 base.
-2. Run the `explore` skill before the next production increment.
-3. Define the narrow unified missing/disposed-host error contract next; inventory the common Data and
-   AI entry points and their current null/exception behavior through the repository `explore` workflow.
-4. Prefer one Core-owned corrective fact/exception over duplicated strings or broad catch-and-wrap
-   behavior; preserve explicitly optional `Try*` paths.
-5. Keep direct `KoanEnv.CurrentSnapshot.Application` consumers classified as process-snapshot users;
-   do not imply they became host-aware through the `AppHost.Identity` repair.
-6. Do not fold integration-host failed-start cleanup or the broader obsolete test-authoring guide into
-   the missing-host contract. They remain separately classified later concerns.
-7. Do not mark R04-02 passed until sequential and parallel ownership probes cover every named owner and
-   missing/disposed host behavior is corrective.
+1. Treat R04-02 and ARCH-0108 as the stable host/lifecycle base; do not reopen it for unrelated
+   bootstrap, packaging, explanation, or Entity-language work.
+2. Run the repository `explore` skill before R04-03's first production change.
+3. Reproduce the non-completing bootstrap lane with an explicit executable runner and an observed test
+   count; separate build time, discovery, composition, infrastructure wait, and teardown.
+4. Elect the smallest deterministic lane that can finish or emit a phase-specific timeout without
+   requiring external infrastructure.
+5. Classify the known integration-host failed-start concern inside R04-03 instead of retroactively
+   broadening ARCH-0108.
+6. Keep the obsolete test-authoring guide for R04-08 and package restore truth for R04-04.
+7. Preserve the current maturity labels until the later clean-room and negotiation gates pass.
 
 ## Expected working tree
 
@@ -88,15 +84,16 @@ scheduler single-owner, orchestrator shutdown, application-identity, and non-hos
 should be committed.
 The closure-audit ledger, provider-owned aggregate-configuration repair, scoped Identity/Web startup,
 and binder-owned data-spec and Entity-conformance repairs should also be committed. Host-scoped
-logging should be committed; the dead-locator deletion may be the only active production diff.
+logging and the dead-locator deletion should be committed; ARCH-0108 and its Data/AI consumer
+migration may be the only active production diff.
 Treat every unrelated pre-existing change as user-owned.
 
 ## Verification at handoff
 
 - Core host-binding, OpenAPI, and Data.AI projects build with zero errors;
-- Core Unit passes 79/79, the Core self-executing suite passes 197/197, Data.AI passes 82/82, and
-  Data.Core passes 293/293;
-- the AI unit project builds with zero errors and its self-executing suite passes 155/155;
+- Core Unit passes 79/79, the Core self-executing suite passes 204/204, Data.AI passes 82/82, and
+  Data.Core passes 294/294;
+- the AI unit project builds with zero errors and its self-executing suite passes 157/157;
 - the focused Data.Core lifecycle class passes 11/11;
 - repeated-host probes prove different DI markers, Entity storage, and vector-model registry state;
 - focused startup-health ownership probes pass 2/2, the Qdrant cancellation probe passes 1/1, and the
@@ -138,9 +135,9 @@ Treat every unrelated pre-existing change as user-owned.
   the complete Data.Core process passes 293/293 and Backup passes 2/2;
 - the closure audit still counts 14 compatibility `AggregateConfigs.Reset()` call sites, zero direct
   `src/` ambient assignments, thirteen category-only static logging scopes with zero cached loggers,
-  and zero static background providers; only the unified missing/disposed-host contract keeps R04-02
-  `in-progress`;
-- the complete Data.Core process passes 293/293 with zero disposed-service, meter-factory, or
+  zero static background providers, and no cached AI pipeline resolver; ARCH-0108 covers common
+  required Data/AI host-context failures and R04-02 is passed;
+- the complete Data.Core process passes 294/294 with zero disposed-service, meter-factory, or
   cancellation-exception signatures;
 - runtime and consumer tests for R04-02 must cover repeat hosts and disposed-state negative paths;
 - documentation metadata, links, TOC, privacy scan, and `git diff --check` pass;

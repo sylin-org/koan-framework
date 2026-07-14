@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-14
   status: reviewed
-  scope: R04-02 final missing-host failure contract
+  scope: R04-02 passed; R04-03 next
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T4 — foundation hardening`
 - Active work item: `R04`
-- Next decision: define one corrective missing/disposed-host failure contract
+- Next decision: establish bounded, diagnostic bootstrap test lanes
 - V1 readiness: `not assessed`
 
 ## Work items
@@ -33,7 +33,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R01 | [Ratify the product constitution](work-items/R01-product-constitution.md) | T1 | passed | R00 | Codex · 2026-07-13 | ARCH-0105 and the canonical product constitution separate durable rules, tactical mechanisms, and maturity claims. |
 | R02 | [Build the capability truth baseline](work-items/R02-capability-baseline.md) | T2 | passed | R01 | Codex · 2026-07-13 | All 13 surfaces are classified with reproducible evidence; no capability is mislabeled as supported while packaging is incoherent. |
 | R03 | [Define the Entity Semantics Contract](work-items/R03-entity-semantics-contract.md) | T3 | passed | R02 | Codex · 2026-07-13 | ARCH-0106 ratifies five semantic locations, strict Entity admission, C# 14 module facets, and host/context/event boundaries. |
-| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-14 | R04-01 passed. R04-02 has zero direct ambient writers, host-scoped façade logging, and no static provider locator; the unified missing-host contract remains. |
+| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-14 | R04-01 and R04-02 passed. Host ownership is closure-audited and common Data/AI failures use ARCH-0108; R04-03 is next. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | pending | R04 | — | Anonymous business domain only. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
@@ -47,7 +47,7 @@ item should normally be `in-progress`.
 | R01 | passed | ARCH-0105 accepted; canonical constitution and public alignment are complete. |
 | R02 | passed | Capability ledger, focused execution record, public-claim audit, and ranked dispositions accepted. |
 | R03 | passed | Entity inventory, ecosystem dispositions, canonical contract, and ARCH-0106 accepted. |
-| R04 | active | R04-01 passed; R04-02 remains in progress. Aggregate configuration, startup, testing hosts, façade logging, and background services are owner-safe; only the common missing-host contract remains. |
+| R04 | active | R04-01 and R04-02 passed. R04-03 may begin from a repeatable host foundation and must bound the non-completing bootstrap lane. |
 | R05 | no | The foundation path must be stable enough to measure honestly. |
 
 ## Divergence and risk log
@@ -91,6 +91,7 @@ item should normally be `in-progress`.
 | 2026-07-14 | R04-02 | `EntityConformanceSpecs` directly replaced the binder-owned process default during initialization and conditionally cleared ambient state during teardown. | Delegate ownership entirely to the binder without changing the inheritance grammar. The source-generated ownership probe is red 0/1 before and green 1/1 after; the meta-suite reports 11 passed and 3 intentional skips, both consumer surfaces report 4 passed and 2 skips, package companions document the boundary, and direct `src/` assignments reach zero. |
 | 2026-07-14 | R04-02 | `KoanLog` duplicated `AppHost` with a process-global factory bridge and permanently cached the first resolved logger in thirteen static scopes, preventing host/flow-scoped routing and retaining earlier runtime graphs. | Remove the bridge, global factory, and scope cache; resolve through the current `AppHost` per emission and register the binder first. The ownership surface is red 0/2 before and green 2/2 after, its order guard passes, Core passes 200/200, Core Unit 79/79, and the 293-test Data.Core process exits green. ARCH-0107 supersedes only ARCH-0057's ownership mechanism. |
 | 2026-07-14 | R04-02 | The background-service orchestrator wrote its provider into an internal static locator whose getter had zero source, test, or sample consumers, retaining the provider after stop for no behavior. | Delete the locator and its sole write without replacing them; preserve the public DI-owned registry. Source inventory reaches zero, focused lifecycle passes 3/3, Core Unit 79/79, and Core 200/200. |
+| 2026-07-14 | R04-02 | Common required Data/AI paths repeated raw host errors, could leak disposed-provider failures, and AI retained an unnecessary process resolver despite singleton pipeline registration. | Add the Core-owned ARCH-0108 contract, migrate only required common paths, preserve optional probes, and remove the resolver. Core 204/204, Core Unit 79/79, AI Unit 157/157, and Data.Core pass; closure inventory is clean, so R04-02 passes. |
 | 2026-07-13 | R04-07 | A pillar-first review could have placed every Koan capability on Entity, recreating the IntelliSense clutter the contract rejects; the first slate then underweighted the delight of discovering events from the Entity itself. | Elect intrinsic `Events` plus module-grown `Cache`, `AI`, and narrowly constrained `Media`; retain direct Data and constrained Canon/Storage verbs; keep control-plane, projection, messaging, and job surfaces off generic Entity. Static `Todo.Events` owns lifecycle composition, instance `todo.Events` raises domain facts, and neither implies broker delivery. Cache remains the one-facet pilot after R04-02/R04-05. |
 
 ## Operator gates

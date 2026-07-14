@@ -33,6 +33,51 @@ public static class AppHost
     }
 
     /// <summary>
+    /// Gets a required service from the current Koan host or flow scope.
+    /// </summary>
+    /// <remarks>
+    /// This primitive supports Koan's terse framework surfaces and advanced hosting integrations.
+    /// Application business code should continue to prefer constructor injection; this method is
+    /// not a general-purpose service locator.
+    /// </remarks>
+    /// <exception cref="KoanHostContextException">
+    /// Thrown when no host is active, the active provider is disposed, or the service is absent.
+    /// </exception>
+    public static T GetRequiredService<T>(string operation) where T : class
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(operation);
+
+        var services = Current;
+        if (services is null)
+        {
+            throw new KoanHostContextException(
+                operation,
+                typeof(T),
+                KoanHostContextException.FailureKind.MissingHost);
+        }
+
+        object? service;
+        try
+        {
+            service = services.GetService(typeof(T));
+        }
+        catch (ObjectDisposedException exception)
+        {
+            throw new KoanHostContextException(
+                operation,
+                typeof(T),
+                KoanHostContextException.FailureKind.DisposedHost,
+                exception);
+        }
+
+        return service as T
+            ?? throw new KoanHostContextException(
+                operation,
+                typeof(T),
+                KoanHostContextException.FailureKind.MissingService);
+    }
+
+    /// <summary>
     /// Attaches <paramref name="sp"/> as the process-default provider and returns its ownership
     /// lease. Disposing the lease clears the provider only when that lease still owns the current
     /// default; it never restores an earlier provider that may already have been disposed.

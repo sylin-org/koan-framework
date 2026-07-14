@@ -27,6 +27,10 @@ dotnet add package Sylin.Koan.Data.Core
 - For large sets, use paging or streaming; don’t materialize unbounded results.
 - If a first-class static isn’t available, you can fall back to the generic facade (second-class): `Data<TEntity, TKey>.Query(...)`.
 
+Required Entity/Data operations without a usable Koan host throw `KoanHostContextException`. Its
+`Failure`, `Operation`, and `RequiredService` properties distinguish an absent host, a disposed host,
+and a host where the Data module was not composed.
+
 For a synchronous, non-hosted process, `new ServiceCollection().StartKoan()` returns the active
 provider. The caller owns it; use `using var app = (IDisposable)services.StartKoan()` so disposal also
 releases the ambient Koan host binding. ASP.NET Core, workers, and applications that need

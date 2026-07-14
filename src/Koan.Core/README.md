@@ -19,6 +19,11 @@ dotnet add package Sylin.Koan.Core
 - A stopped host is never restored as a fallback when a newer host releases its lease.
 - Hosting integrations may use the low-level `AppHost.Attach(provider)` lease, but must dispose that
   lease with the provider. Applications should normally let a Koan host or `StartKoan()` own it.
+- Required terse framework operations fail with `KoanHostContextException` when the host is absent,
+  disposed, or missing a required service. The exception exposes the operation, service type, and
+  failure kind alongside corrective startup guidance.
+- `AppHost.GetRequiredService<T>(operation)` exists for Koan framework surfaces and advanced hosting
+  integrations. Application business code should prefer constructor injection.
 - Application identity: `AppHost.Identity` follows that same current provider or flow scope. With no
   active host, it falls back to the frozen process identity in `KoanEnv`.
 - Static `KoanLog.For<T>()` scopes retain only their category. Each emission follows the current

@@ -238,19 +238,18 @@ Every record below was assessed by Codex on 2026-07-13 at
 - **Entry point and owner:** `Sylin.Koan.Data.AI`, `Sylin.Koan.Data.Vector`, and connector packages;
   vector capability vocabulary starts at [`VectorCaps`](../../../src/Koan.Data.Vector.Abstractions/Capabilities/VectorCaps.cs).
 - **Executable evidence:** [AI unit tests](../../../tests/Suites/AI/Unit/Koan.Tests.AI.Unit/Koan.Tests.AI.Unit.csproj)
-  pass 152/152 and the
+  pass 157/157 and the
   [in-memory vector surface](../../../tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.InMemory.Tests/Koan.Data.VectorAdapterSurface.InMemory.Tests.csproj)
   passes 33/33. [Data/AI integration](../../../tests/Suites/Data/AI/Koan.Data.AI.Tests/Koan.Data.AI.Tests.csproj)
-  fails 1 of 79 on a disposed host service provider.
-- **Inspection and failure:** models and vector capabilities are registrable/queryable, but lifecycle
-  failure currently leaks a low-level `ObjectDisposedException` rather than a corrective Koan error.
-- **Unsupported / compatibility:** host teardown/restart safety, external model servers, every vector
-  database, background embedding durability, model migration, cost/rate behavior, and semantic parity
-  are not certified.
+  passes 82/82 after the R04-02 repeated-host repairs.
+- **Inspection and failure:** models and vector capabilities are registrable/queryable. Common required
+  AI client paths expose a typed host-context failure; optional availability probes remain nullable.
+- **Unsupported / compatibility:** external model servers, every vector database, background
+  embedding durability, model migration, cost/rate behavior, and semantic parity are not certified.
 - **Maturity / safe claim:** `experimental`. Koan has useful verified AI building blocks and in-memory
   vector behavior, but the combined lifecycle is not foundation-ready.
-- **Open risks:** fix and regress the lifecycle failure; define model/provider negotiation and observable
-  embedding state before positioning AI as a stable property of every entity.
+- **Open risks:** define model/provider negotiation and observable embedding state before positioning AI
+  as a stable property of every entity.
 
 ### MCP and agent-facing surfaces
 

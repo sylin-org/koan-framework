@@ -11,7 +11,7 @@ source: src/Koan.Core/
 
 - Inputs/Outputs: foundational types, result helpers, guards, and common abstractions.
 - Options: follow ADR ARCH-0040 for constants/options.
-- Error modes: standard .NET exceptions; avoid magic values.
+- Error modes: required terse host-backed surfaces use `KoanHostContextException`; avoid magic values.
 - Runtime ownership: the generic-host binder owns the process-default `AppHost` provider from host
   start through stop. Explicit flow scopes override that default without mutating its lease.
 
@@ -23,6 +23,8 @@ source: src/Koan.Core/
   flow value when disposed.
 - `AppHost.Attach(IServiceProvider)`: low-level hosting integration lease. Disposing it clears the
   process default only if it still owns that binding; it never revives a predecessor.
+- `AppHost.GetRequiredService<T>(operation)`: resolves a required service from the selected host and
+  distinguishes missing host, disposed host, and missing service through `KoanHostContextException`.
 - `AppHost.Identity`: resolves the immutable identity snapshot registered by that same provider;
   hostless callers receive the frozen `KoanEnv` application identity.
 - `KoanLog.For<T>()`: creates a category-only reusable scope. Each emission resolves
@@ -41,6 +43,9 @@ source: src/Koan.Core/
   provider. Do not retain configuration-derived identity in another process static.
 - Do not cache services obtained from `AppHost.Current` in process-static fields. Immutable reflection
   metadata may be process-static; services and configuration remain host-owned.
+- Reserve `GetRequiredService<T>(operation)` for terse framework APIs and advanced hosting seams.
+  Application business code should use constructor injection. Optional probes should retain explicit
+  `Try*`, nullable, or availability behavior instead of throwing this exception.
 - Static `KoanLogScope` fields are safe because they retain only category text. A hostless flow or a
   selected provider without `ILoggerFactory` emits nothing and never falls back to another host.
 
