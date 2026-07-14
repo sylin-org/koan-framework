@@ -3,13 +3,13 @@ type: REF
 domain: data
 title: "Entity Lifecycle Events"
 audience: [developers, architects, ai-agents]
-last_updated: 2025-02-19
-framework_version: v0.6.3
+last_updated: 2026-07-13
+framework_version: v0.17.0
 status: current
 validation:
-    date_last_tested: 2025-02-19
-    status: verified
-    scope: docs/reference/data/entity-lifecycle-events.md
+    date_last_tested: 2026-07-13
+    status: reviewed
+    scope: lifecycle registration ownership and current Data.Core behavior
 ---
 
 # Entity Lifecycle Events
@@ -37,6 +37,16 @@ The pipeline is a process-stable Entity behavior declaration. Do not capture a h
 scoped service, configuration snapshot, or disposable logger in a handler closure. Resolve runtime
 dependencies through Koan's active ambient host when the handler executes. Different closure instances
 are intentionally different handlers and are not deduplicated.
+
+This rule also applies when a lifecycle handler reads another process-static declaration registry.
+Resolvers, selectors, and callbacks retained by that registry must contain only immutable declaration
+facts. They must not indirectly retain a provider, scope, runtime service, options snapshot, adapter,
+or disposable. Prefer Entity operations such as `Article.Get(...)`, which select the active runtime
+when invoked, over capturing a repository or service created during startup.
+
+The `Action` and synchronous `Func` convenience overloads wrap the supplied delegate. The wrapper
+therefore retains the supplied delegate and its target; using a convenience overload does not make a
+host-capturing handler safe.
 
 ```csharp
 public static class ArticleLifecycle

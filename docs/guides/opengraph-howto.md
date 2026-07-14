@@ -43,6 +43,13 @@ and discarded, so `/work/{id}/{slug}`, `/work/{id}`, and a request like
 `/work/{id}/anything` all resolve off the same id. The entity type must be a `Koan`
 entity (`T : Entity<T>`).
 
+Card registrations are process-stable declarations. The registry retains the resolver and selectors
+for request-time cold fill and lifecycle warming, so they must not close over a service provider,
+scope, runtime service, options snapshot, adapter, or disposable. Use `id => T.Get(id)` so Entity
+resolution selects the active Koan runtime when the resolver executes, and keep selectors pure over
+the entity value. `SocialCards.Reset()` exists for test isolation; it is not a per-host production
+registration model.
+
 Because the selectors are pure functions over the loaded entity, per-entity-state
 customization is a one-line conditional, which an attribute scheme could not express:
 

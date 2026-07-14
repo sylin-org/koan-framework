@@ -167,8 +167,43 @@ A child that ignores cancellation may still run after the host's shutdown deadli
 does not claim otherwise. Faults that occur only after that deadline are outside synchronous shutdown
 reporting because the provider may already be disposing.
 
-R04-02 remains active for captured lifecycle dependencies, relationship metadata,
-`AppHost.Identity`, and the non-hosted `StartKoan()` path.
+## Eighth increment — classify captured lifecycle dependencies
+
+A source inventory found seven production Entity lifecycle registration statements under `src/`:
+two reflection-installed AI hooks, three Identity hook declarations, and two OpenGraph hook
+declarations. None retains a framework-owned service, provider, adapter, configuration snapshot,
+host identity, logger, or disposable.
+
+| Owner | Registration shape | Retained state | Runtime dependency path | Disposition |
+|---|---|---|---|---|
+| Data.AI embedding | targetless closed static `EmbeddingHookAsync<TEntity>` delegate | none | metadata is immutable; data/AI operations resolve against the active Entity/AI runtime when invoked | keep process-stable; the existing two-host probe proves one handler after both hosts |
+| Data.AI media analysis | targetless closed static `MediaAnalysisHookAsync<TEntity>` delegate | none | metadata is immutable; data/AI operations resolve when invoked | keep process-stable; same delegate-construction path as embedding |
+| Identity before-upsert | noncapturing generic async delegate, instantiated for eight Identity entity types | none beyond the closed entity type | prior state comes from the operation context | keep process-stable |
+| Identity after-upsert/remove | two closure instances per Identity entity type | immutable entity/action strings plus the static subject selector delegate | `AppHost.Current` is read inside `EmitAsync` at execution time and follows the ambient host binding | keep process-stable; do not replace immutable declaration metadata with host DI |
+| OpenGraph after-upsert/remove | two noncapturing generic delegates per carded entity type | none in the lifecycle delegates | each invocation looks up the current `CardRegistration` | keep process-stable; registration reset/replacement remains test-owned |
+| Data.Core convenience overloads | wrapper closure around an application-supplied `Action` or synchronous `Func` | exactly the supplied delegate and its target | application-defined | supported declaration mechanism, but not automatically host-safe |
+
+OpenGraph is the only indirect capture-capable boundary found. Its process-static `CardRegistration`
+retains the application resolver, builder, and projection delegates so request-time cold fill and
+lifecycle warming use one declaration. The canonical resolver (`id => T.Get(id)`) and pure entity
+selectors retain no runtime owner. An application resolver or selector that closes over a service
+provider, scope, service instance, options snapshot, or disposable would make that application
+declaration process-owned and is unsupported. The lifecycle delegates themselves do not retain the
+registration; they look it up at execution time, so `SocialCards.Reset()` releases the application
+delegates for test isolation.
+
+The public builder cannot reliably inspect an arbitrary delegate graph and determine whether it is
+host-owned. A host-scoped registry redesign without a concrete supported per-host declaration use case
+would add ownership machinery while weakening the intended startup declaration model. The bounded
+repair is therefore an explicit ownership contract in the lifecycle and OpenGraph guidance, not a
+production migration.
+
+Focused verification passes: Data.AI repeated-host lifecycle 3/3, Data.Core Entity lifecycle 11/11,
+Identity 113/113, and OpenGraph 38/38. Documentation lint reports zero errors with the unchanged 1,518
+repository warnings.
+
+R04-02 remains active for relationship metadata, `AppHost.Identity`, and the non-hosted
+`StartKoan()` path.
 
 ## Smallest meaningful fix
 
