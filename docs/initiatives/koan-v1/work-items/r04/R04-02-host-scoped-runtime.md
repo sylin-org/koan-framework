@@ -337,6 +337,25 @@ R04-02 remains `in-progress`. Alternate ambient writers, static logging scopes, 
 service locator, and the unified missing/disposed-host failure contract remain separate closure
 residuals; this increment does not change their status or any capability maturity label.
 
+## Fourteenth increment — Identity startup flow ownership
+
+`SecIdentityModule.Start` no longer assigns `AppHost.Current` when no global host is present. The
+module now pushes the provider supplied to that startup invocation for the full asynchronous method
+and restores the prior ambient value on every exit. Entity statics used by development seeding resolve
+the correct provider even when two module starts overlap, while neither start replaces the
+process-default host owned by `AppHostBinderHostedService`.
+
+The focused proof runs two Identity module starts concurrently with different providers while a third
+fixture host remains attached. Before the repair, both reconcilers observed the unrelated fixture host
+for all three seed operations. The unchanged probe now passes 1/1: each reconciler observes only its
+own supplied provider and the attached fixture is restored after both starts. The complete Identity
+suite passes 114/114.
+
+This reduces the alternate-writer inventory from seven to six assignment statements. Web startup has
+one remaining production assignment; the shipped data-spec and Entity-conformance helpers contain the
+other five. They retain distinct lifetime and flow semantics and remain separate increments. R04-02
+stays `in-progress`, and no maturity label changes.
+
 ## Smallest meaningful fix
 
 Define one host/runtime lease and make service/configuration-backed registries resolve through it.

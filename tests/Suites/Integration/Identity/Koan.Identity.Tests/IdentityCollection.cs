@@ -3,10 +3,9 @@ using Xunit;
 namespace Koan.Identity.Tests;
 
 /// <summary>
-/// Shares ONE offline host across the identity specs (run serially). Essential: the entity statics resolve through
-/// the process-static <c>AppHost.Current</c> (bound if-null at the first start) and the audit lifecycle hooks
-/// register on a process-static registry — a second host would neither rebind nor re-register, so every fact must
-/// ride a single shared host.
+/// Shares one offline store across the Identity specs so durable reconciliation and audit facts remain visible
+/// between test classes. Module startup scopes Entity statics to the provider supplied for that invocation; the
+/// shared fixture is a data-lifetime choice, not ambient-host ownership machinery.
 /// </summary>
 [CollectionDefinition("identity")]
 public sealed class IdentityCollection : ICollectionFixture<IdentityHostFixture>;

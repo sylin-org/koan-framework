@@ -69,8 +69,9 @@ public sealed class SecIdentityModule : KoanModule
 
     public override async Task Start(IServiceProvider services, CancellationToken ct)
     {
-        // Entity statics resolve the repository through the ambient provider; bind it if a hosted service hasn't yet.
-        AppHost.Current ??= services;
+        // Module startup can run alongside another host in tests or embedded compositions. Entity statics must
+        // resolve through the provider this invocation was handed without replacing the process-default owner.
+        using var hostScope = AppHost.PushScope(services);
 
         // Layer 1 — audit-by-construction: hook the lifecycle seam once per process so identity mutations self-audit.
         Audit.IdentityAuditHooks.EnsureRegistered();

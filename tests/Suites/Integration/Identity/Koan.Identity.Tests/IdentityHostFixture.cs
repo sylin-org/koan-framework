@@ -9,8 +9,8 @@ namespace Koan.Identity.Tests;
 /// A single shared, OFFLINE host (in-memory data adapter) for the SEC-0007 P0 / Layer-0 acceptance, in the
 /// neutral <c>"Test"</c> environment (non-production so the data adapter is permissive, non-Development so the
 /// full Koan service graph — incl. ASP.NET's web-only MVC services from the auth pillar — is not strict-validated
-/// against a generic host). A single shared host keeps every fact on the same store (<c>AppHost.Current</c> binds
-/// if-null at the first start). <c>Koan.Tenancy</c> is referenced live (Closed posture) so the facts exercise that
+/// against a generic host). A single shared host keeps every fact on the same store. <c>Koan.Tenancy</c> is
+/// referenced live (Closed posture) so the facts exercise that
 /// identity entities are ambient-exempt (the global plane) and the <c>Membership</c> soft-FK resolves.
 /// </summary>
 public sealed class IdentityHostFixture : IAsyncLifetime
