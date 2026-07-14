@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-13
   status: reviewed
-  scope: R04-02 orchestrator child-task shutdown ownership
+  scope: R04-02 captured lifecycle dependency ownership
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -32,7 +32,8 @@ Replace this file at every handoff. It is a restart point, not a diary.
   established, R04-01 passed, and R04-02's host lease, durable vector-model confirmation, AI
   discovery classification, idempotent lifecycle composition, and host-owned startup-health
   increments are green. `HealthProbeScheduler` now has one orchestrator-owned execution path while
-  retaining its background, pokeable, and health aliases. No capability maturity label changed. A
+  retaining its background, pokeable, and health aliases, and the orchestrator awaits owned child
+  cleanup within the host shutdown deadline. No capability maturity label changed. A
   parallel design-only [`R04 Entity Facet Candidate Slate`](R04-ENTITY-FACET-CANDIDATES.md) elects
   the eventual R04-07 language without changing the active production card or implementing public syntax.
 
@@ -40,27 +41,28 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 1. Treat the leased host binding, late Data.AI logger resolution, uncached durable vector-model
    registry, immutable AI type discovery, equal-delegate lifecycle idempotence, tracked startup
-   health probing, and single-owner health scheduling as the stable R04-02 base.
+   health probing, single-owner health scheduling, and bounded orchestrator child shutdown as the
+   stable R04-02 base.
 2. Run the `explore` skill before the next production increment.
-3. Reduce whether `KoanBackgroundServiceOrchestrator.StopAsync` can return while an owned child task is
-   still active, using a cancellation-aware blocking background service and provider-disposal boundary.
-4. If red, make the orchestrator cancel and await its tracked children without hiding service faults or
-   exceeding the host shutdown token.
-5. Then audit lifecycle registrations that capture runtime dependencies, followed by relationship
-   metadata, `AppHost.Identity`, and the non-hosted `StartKoan()` path.
+3. Inventory every Entity lifecycle registration that captures a service, configuration snapshot,
+   adapter, provider, or other host-owned runtime dependency; distinguish static method declarations
+   from closure instances.
+4. Reduce the first concrete captured-runtime owner with a repeated-host probe before changing its
+   storage or registration shape. If the inventory is clean, record that classification with evidence.
+5. Then audit relationship metadata, `AppHost.Identity`, and the non-hosted `StartKoan()` path.
 6. Do not mark R04-02 passed until sequential and parallel ownership probes cover every named owner and
    missing/disposed host behavior is corrective.
 
 ## Expected working tree
 
 R04-01 and R04-02's host lease, vector-model confirmation, AI discovery classification, lifecycle
-idempotence, startup-health ownership, and scheduler single-owner repairs should be committed. Treat
-every unrelated pre-existing change as user-owned.
+idempotence, startup-health ownership, scheduler single-owner, and orchestrator shutdown repairs
+should be committed. Treat every unrelated pre-existing change as user-owned.
 
 ## Verification at handoff
 
 - Core host-binding and Data.AI projects build with zero errors;
-- Core Unit passes 76/76, the Core self-executing suite passes 195/195, Data.AI passes 82/82, and
+- Core Unit passes 79/79, the Core self-executing suite passes 195/195, Data.AI passes 82/82, and
   Data.Core passes 285/285;
 - the AI unit project builds with zero errors and its self-executing suite passes 155/155;
 - the focused Data.Core lifecycle class passes 11/11;
@@ -68,7 +70,8 @@ every unrelated pre-existing change as user-owned.
 - focused startup-health ownership probes pass 2/2, the Qdrant cancellation probe passes 1/1, and the
   full Data.Core output contains zero disposed-service or cancellation-stack signatures;
 - focused scheduler ownership probes pass 2/2; repeated-host output records balanced scheduler
-  lifecycles (Data.AI 8/8 and Data.Core 87/87 starts/stops) with zero disposal/cancellation signatures;
+  lifecycles (Data.AI 8/8 and Data.Core 86/86 starts/stops) with zero disposal/cancellation signatures;
+- focused orchestrator shutdown probes pass 3/3 and the combined scheduler/orchestrator surface 5/5;
 - runtime and consumer tests for R04-02 must cover repeat hosts and disposed-state negative paths;
 - documentation metadata, links, TOC, privacy scan, and `git diff --check` pass;
 - no private downstream detail enters evidence or examples.

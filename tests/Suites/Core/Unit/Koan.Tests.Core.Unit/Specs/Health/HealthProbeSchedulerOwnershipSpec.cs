@@ -79,13 +79,16 @@ public sealed class HealthProbeSchedulerOwnershipSpec
             await WaitUntilAsync(() => Volatile.Read(ref starts) > 0);
 
             lifetime.SignalStopping();
+            using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(2));
             for (var index = hostedServices.Count - 1; index >= 0; index--)
             {
-                await hostedServices[index].StopAsync(CancellationToken.None);
+                await hostedServices[index].StopAsync(shutdown.Token);
             }
             lifetime.SignalStopped();
             await WaitUntilAsync(() => Volatile.Read(ref stops) >= Volatile.Read(ref starts));
 
+            shutdown.IsCancellationRequested.Should().BeFalse(
+                "the cancellation-aware scheduler must finish within graceful shutdown");
             Volatile.Read(ref starts).Should().Be(1);
             Volatile.Read(ref stops).Should().Be(1);
         }

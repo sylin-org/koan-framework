@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-13
   status: reviewed
-  scope: R04-02 single-owner health scheduling
+  scope: R04-02 bounded background child shutdown
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T4 — foundation hardening`
 - Active work item: `R04`
-- Next decision: establish awaited shutdown ownership for orchestrator-owned background tasks
+- Next decision: classify and isolate Entity lifecycle registrations that capture host-owned dependencies
 - V1 readiness: `not assessed`
 
 ## Work items
@@ -33,7 +33,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R01 | [Ratify the product constitution](work-items/R01-product-constitution.md) | T1 | passed | R00 | Codex · 2026-07-13 | ARCH-0105 and the canonical product constitution separate durable rules, tactical mechanisms, and maturity claims. |
 | R02 | [Build the capability truth baseline](work-items/R02-capability-baseline.md) | T2 | passed | R01 | Codex · 2026-07-13 | All 13 surfaces are classified with reproducible evidence; no capability is mislabeled as supported while packaging is incoherent. |
 | R03 | [Define the Entity Semantics Contract](work-items/R03-entity-semantics-contract.md) | T3 | passed | R02 | Codex · 2026-07-13 | ARCH-0106 ratifies five semantic locations, strict Entity admission, C# 14 module facets, and host/context/event boundaries. |
-| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-13 | R04-01 passed. R04-02 has green host routing, durable vector confirmation, classified AI discovery, idempotent static lifecycle composition, tracked startup probing, and one health-scheduler owner; background shutdown and captured-runtime owners remain. |
+| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-13 | R04-01 passed. R04-02 has green host routing, durable vector confirmation, classified AI discovery, idempotent static lifecycle composition, tracked startup probing, one health-scheduler owner, and bounded child shutdown; captured-runtime owners remain. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | pending | R04 | — | Anonymous business domain only. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
@@ -47,7 +47,7 @@ item should normally be `in-progress`.
 | R01 | passed | ARCH-0105 accepted; canonical constitution and public alignment are complete. |
 | R02 | passed | Capability ledger, focused execution record, public-claim audit, and ranked dispositions accepted. |
 | R03 | passed | Entity inventory, ecosystem dispositions, canonical contract, and ARCH-0106 accepted. |
-| R04 | active | R04-01 passed; R04-02 is in progress with host binding, vector confirmation, AI discovery, equal-delegate lifecycle composition, startup probing, and scheduler activation isolated. |
+| R04 | active | R04-01 passed; R04-02 is in progress with host binding, vector confirmation, AI discovery, equal-delegate lifecycle composition, startup probing, scheduler activation, and orchestrator child shutdown isolated. |
 | R05 | no | The foundation path must be stable enough to measure honestly. |
 
 ## Divergence and risk log
@@ -80,6 +80,7 @@ item should normally be `in-progress`.
 | 2026-07-13 | R04-02 | Focused Data.Core verification exited green but background Qdrant health work logged `ObjectDisposedException` against a disposed `DefaultMeterFactory` after test-host shutdown. | Do not hide the log or broaden the lifecycle patch. Reduce and repair health/startup task shutdown ownership as the next bounded increment. |
 | 2026-07-13 | R04-02 | `StartupProbeService` detached a `Task.Run`, used the host-start token, ignored `StopAsync`, and failed to pass request cancellation through the health bridge; Qdrant then converted shutdown cancellation into an Unhealthy warning. | Make the one-shot probe a tracked `BackgroundService`, propagate request cancellation, and rethrow Qdrant host cancellation. Core Unit passes 74/74, Core 195/195, Data.AI 82/82, and Data.Core 285/285 with zero disposal/cancellation-stack log matches. Full-host logs now isolate duplicate `HealthProbeScheduler` activation as the next background owner. |
 | 2026-07-13 | R04-02 | `HealthProbeScheduler` was both a direct `IHostedService` and a generated `IKoanBackgroundService`; focused real-composition probes observed two starts and two stops for one host. | Remove only the direct registration and retain the generated singleton aliases. Focused ownership passes 2/2; Core Unit 76/76, Core 195/195, Data.AI 82/82, and Data.Core 285/285 pass. Repeated-host output is balanced at 8/8 and 87/87 scheduler starts/stops with zero disposal/cancellation signatures. The orchestrator's child-task await boundary is next. |
+| 2026-07-13 | R04-02 | The orchestrator canceled linked child tokens but `StopAsync` awaited only its own loop, allowing provider disposal while cancellation-aware child cleanup was still active; completed shutdown faults were also unreported. | Await tracked child tasks within the host shutdown token, ignore expected cancellation, and log completed faults once. Focused probes pass 3/3, combined lifecycle 5/5, Core Unit 79/79, Core 195/195, Data.AI 82/82, and Data.Core 285/285; repeated-host scheduler output is balanced at 8/8 and 86/86 with zero disposal/cancellation signatures. |
 | 2026-07-13 | R04-07 | A pillar-first review could have placed every Koan capability on Entity, recreating the IntelliSense clutter the contract rejects; the first slate then underweighted the delight of discovering events from the Entity itself. | Elect intrinsic `Events` plus module-grown `Cache`, `AI`, and narrowly constrained `Media`; retain direct Data and constrained Canon/Storage verbs; keep control-plane, projection, messaging, and job surfaces off generic Entity. Static `Todo.Events` owns lifecycle composition, instance `todo.Events` raises domain facts, and neither implies broker delivery. Cache remains the one-facet pilot after R04-02/R04-05. |
 
 ## Operator gates

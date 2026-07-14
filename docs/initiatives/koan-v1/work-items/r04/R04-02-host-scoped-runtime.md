@@ -144,8 +144,31 @@ The orchestrator cancels each child through a linked token, but its own stop pat
 await every tracked child task before returning. That adjacent shutdown contract is the next bounded
 background owner; this increment proves one scheduler loop without overstating child completion.
 
-R04-02 remains active for orchestrator child-task shutdown, captured lifecycle dependencies,
-relationship metadata, `AppHost.Identity`, and the non-hosted `StartKoan()` path.
+## Seventh increment — bounded child-task shutdown
+
+- A focused red probe proved that `KoanBackgroundServiceOrchestrator.StopAsync` returned while a
+  cancellation-aware child was still blocked in cleanup. A second red probe proved that a child fault
+  completed during shutdown was never reported; the host-deadline probe was already green.
+- The orchestrator now awaits its tracked child tasks after canceling its own loop. The host-provided
+  shutdown token remains the bound, so a non-cooperative child cannot extend graceful shutdown.
+- Expected child cancellation remains non-error behavior. Faulted children completed within the
+  graceful window are observed and logged once with the service name and exception rather than
+  turning host shutdown into a second failure.
+- Synthetic child services use closed instances of generic test types, so direct-DI lifecycle probes
+  cannot be misclassified as application services by real `AddKoan()` registry discovery.
+- The focused orchestrator probes pass 3/3 and the combined scheduler/orchestrator lifecycle surface
+  passes 5/5. Core Unit passes 79/79, Core passes 195/195, Data.AI passes 82/82, and Data.Core passes
+  285/285.
+- Full-process output remains balanced across repeated hosts: Data.AI reports 8 scheduler starts/8
+  stops and Data.Core 86/86. Both output scans contain zero `ObjectDisposedException`,
+  `DefaultMeterFactory`, disposed-object, or `TaskCanceledException` matches.
+
+A child that ignores cancellation may still run after the host's shutdown deadline; the framework
+does not claim otherwise. Faults that occur only after that deadline are outside synchronous shutdown
+reporting because the provider may already be disposing.
+
+R04-02 remains active for captured lifecycle dependencies, relationship metadata,
+`AppHost.Identity`, and the non-hosted `StartKoan()` path.
 
 ## Smallest meaningful fix
 
