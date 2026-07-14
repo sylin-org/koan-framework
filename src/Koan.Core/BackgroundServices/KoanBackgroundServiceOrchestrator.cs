@@ -70,9 +70,6 @@ public class KoanBackgroundServiceOrchestrator : BackgroundService, IHealthContr
 
         try
         {
-            // Initialize service locator
-            ServiceLocator.SetProvider(_serviceProvider);
-
             // Discover all background services
             var backgroundServices = _serviceProvider.GetServices<IKoanBackgroundService>().ToList();
             _logger.LogKoanServices($"discovered {backgroundServices.Count} background services");

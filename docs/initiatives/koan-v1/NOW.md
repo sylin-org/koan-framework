@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-14
   status: reviewed
-  scope: R04-02 host-scoped logging and final closure residuals
+  scope: R04-02 final missing-host failure contract
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -52,8 +52,10 @@ Replace this file at every handoff. It is a restart point, not a diary.
   assignment statements under `src/`. `KoanLog` now resolves the active host or flow's
   `ILoggerFactory` through `AppHost`; its thirteen static scopes retain only category text, and the
   separate factory bridge and logger caches are gone. ARCH-0107 records that simplified owner. A
-  closure audit still prevents R04-02 from passing: an unused background-service locator retains its
-  provider, and the unified missing-host failure is absent. A parallel design-only
+  background-service locator and its sole write are now deleted; its getter had no source, test, or
+  sample consumer, while the public DI-owned service registry remains unchanged. A closure audit
+  still prevents R04-02 from passing because the unified missing/disposed-host failure is absent. A
+  parallel design-only
   [`R04 Entity Facet Candidate Slate`](R04-ENTITY-FACET-CANDIDATES.md) elects the eventual R04-07
   language without changing the active production card or implementing public syntax.
 
@@ -64,16 +66,17 @@ Replace this file at every handoff. It is a restart point, not a diary.
    relationship metadata, equal-delegate lifecycle idempotence, tracked startup health probing,
    single-owner health scheduling, bounded orchestrator child shutdown, and host-owned application
    identity, provider-owned aggregate configuration, flow-owned Identity/Web startup,
-   binder-owned testing hosts, and host-scoped façade logging as the stable R04-02 base.
+   binder-owned testing hosts, host-scoped façade logging, and zero static provider locators as the
+   stable R04-02 base.
 2. Run the `explore` skill before the next production increment.
-3. Reduce only the set-only background-service locator next; first prove its getter has no production
-   consumer through the repository `explore` workflow.
-4. Prefer deletion of the unused provider field, setter, and write over inventing another lease.
+3. Define the narrow unified missing/disposed-host error contract next; inventory the common Data and
+   AI entry points and their current null/exception behavior through the repository `explore` workflow.
+4. Prefer one Core-owned corrective fact/exception over duplicated strings or broad catch-and-wrap
+   behavior; preserve explicitly optional `Try*` paths.
 5. Keep direct `KoanEnv.CurrentSnapshot.Application` consumers classified as process-snapshot users;
    do not imply they became host-aware through the `AppHost.Identity` repair.
-6. Do not fold the unified missing-host error, integration-host failed-start cleanup, or the broader
-   obsolete test-authoring guide into the locator removal. They remain explicit later R04-02/R04-08
-   residuals.
+6. Do not fold integration-host failed-start cleanup or the broader obsolete test-authoring guide into
+   the missing-host contract. They remain separately classified later concerns.
 7. Do not mark R04-02 passed until sequential and parallel ownership probes cover every named owner and
    missing/disposed host behavior is corrective.
 
@@ -84,8 +87,8 @@ classification, active-host relationship metadata, lifecycle idempotence, startu
 scheduler single-owner, orchestrator shutdown, application-identity, and non-hosted startup repairs
 should be committed.
 The closure-audit ledger, provider-owned aggregate-configuration repair, scoped Identity/Web startup,
-and binder-owned data-spec and Entity-conformance repairs should also be committed. The host-scoped
-logging repair may be the only active production diff.
+and binder-owned data-spec and Entity-conformance repairs should also be committed. Host-scoped
+logging should be committed; the dead-locator deletion may be the only active production diff.
 Treat every unrelated pre-existing change as user-owned.
 
 ## Verification at handoff
@@ -120,6 +123,8 @@ Treat every unrelated pre-existing change as user-owned.
 - façade logging ownership is red 0/2 before repair and green 2/2 after it; a third focused guard
   fixes the binder ahead of later hosted services, Core passes 200/200, Core Unit passes 79/79, and
   the established 293-test Data.Core process exits successfully;
+- background-service locator inventory finds zero getters after deletion; the focused orchestrator
+  lifecycle passes 3/3, Core Unit passes 79/79, and Core passes 200/200;
 - the relationship metadata two-host probe is red 0/1 before the repair and green 1/1 after it; host B
   resolves its own singleton after host A disposes its registration;
 - the application-identity binder surface is red 3/5 before the repair and green 5/5 after it;
@@ -133,7 +138,8 @@ Treat every unrelated pre-existing change as user-owned.
   the complete Data.Core process passes 293/293 and Backup passes 2/2;
 - the closure audit still counts 14 compatibility `AggregateConfigs.Reset()` call sites, zero direct
   `src/` ambient assignments, thirteen category-only static logging scopes with zero cached loggers,
-  and one set-only static background provider; therefore R04-02 remains `in-progress`;
+  and zero static background providers; only the unified missing/disposed-host contract keeps R04-02
+  `in-progress`;
 - the complete Data.Core process passes 293/293 with zero disposed-service, meter-factory, or
   cancellation-exception signatures;
 - runtime and consumer tests for R04-02 must cover repeat hosts and disposed-state negative paths;

@@ -455,6 +455,22 @@ missing/disposed-host failure contract. Early calls made before any host is acti
 intentionally silent; this increment does not claim complete pre-host startup reporting or change a
 capability maturity label.
 
+## Nineteenth increment — delete the dead background-service locator
+
+The internal `ServiceLocator` and the orchestrator's sole `SetProvider` call have been deleted. A
+current-tree inventory found no getter call in source, tests, or samples; the orchestrator already
+resolves every background service through its injected provider, and the public DI-owned
+`IServiceRegistry` / `ServiceRegistry` contract is unchanged.
+
+No replacement lease, ambient accessor, compatibility shim, option, or test-only abstraction was
+introduced. This removes the last process-static provider field identified by the closure audit and
+lets the provider lifetime remain entirely with DI and the orchestrator instance that uses it.
+
+The focused orchestrator lifecycle surface passes 3/3, Core Unit passes 79/79, and Core passes
+200/200. R04-02 remains `in-progress` only for the unified missing/disposed-host failure contract.
+The stale broad background-service guide is still an R04-08 documentation concern, not evidence that
+the unused internal locator had a supported consumer.
+
 ## Smallest meaningful fix
 
 Define one host/runtime lease and make service/configuration-backed registries resolve through it.
