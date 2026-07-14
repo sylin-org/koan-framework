@@ -42,7 +42,7 @@ foundations so a pleasant API is not laid over ambiguous behavior.
 | ID | Priority | Status | Meaningful result | Depends on | Evidence |
 |---|---|---|---|---|---|
 | [R04-01](work-items/r04/R04-01-honest-backup-deletion.md) | P0 | passed | Deleting a backup can no longer report success without deleting anything. | R03 | faulted-task contract and focused executable spec |
-| [R04-02](work-items/r04/R04-02-host-scoped-runtime.md) | P0 | in-progress | Repeated hosts/tests cannot inherit disposed providers or registrations. | R04-01 | canonical leases, provider-owned aggregate configuration, and scoped Identity/Web startup are green; bounded testing/logging residuals remain |
+| [R04-02](work-items/r04/R04-02-host-scoped-runtime.md) | P0 | in-progress | Repeated hosts/tests cannot inherit disposed providers or registrations. | R04-01 | canonical leases, provider-owned aggregate configuration, scoped Identity/Web startup, and binder-owned data specs are green; conformance/logging residuals remain |
 | [R04-03](work-items/r04/R04-03-bounded-bootstrap-lanes.md) | P0 | pending | Bootstrap tests finish or fail with a bounded, diagnostic result. | R04-02 | focused suite silent beyond 304 seconds |
 | [R04-04](work-items/r04/R04-04-atomic-packages-clean-room.md) | P0 | pending | One package set restores, builds, runs, and performs CRUD outside the repo. | R04-02, R04-03 | public 0.17.0 dependency mismatch and advisory |
 | [R04-05](work-items/r04/R04-05-explanation-error-facts.md) | P1 | pending | Humans, agents, health, and logs project one redacted composition/error fact model. | R04-02, R04-03 | best-effort fragmented startup/health reporting |

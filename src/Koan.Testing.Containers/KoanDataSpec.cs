@@ -17,8 +17,9 @@ namespace Koan.Testing.Containers;
 /// </summary>
 /// <remarks>
 /// Specs run sequentially within an engine assembly because <see cref="AppHost.Current"/> is a
-/// process-global ambient (the repo's established pattern for ambient-host suites); engines
-/// parallelize across processes (each test project is its own xUnit v3 executable).
+/// process-default ambient owned by each booted host. <see cref="BoundHost"/> delegates that
+/// ownership to Koan's generic-host binder; engines parallelize across processes (each test project
+/// is its own xUnit v3 executable).
 /// </remarks>
 public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixture
 {
@@ -41,9 +42,10 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
     }
 
     /// <summary>
-    /// Boot a real Koan host over the fixture's settings via the ARCH-0079 reflective host and bind
-    /// it as the ambient <see cref="AppHost.Current"/> so the static <c>Entity&lt;T&gt;</c> API resolves.
-    /// Disposing (via <c>await using</c>) stops the host and clears the ambient binding.
+    /// Boot a real Koan host over the fixture's settings via the ARCH-0079 reflective host. Koan's
+    /// generic-host binder owns the ambient <see cref="AppHost.Current"/> binding so the static
+    /// <c>Entity&lt;T&gt;</c> API resolves. Disposing (via <c>await using</c>) stops the host and releases
+    /// that owner-checked binding.
     /// </summary>
     protected Task<BoundHost> BootAsync() => BootAsync(null);
 
@@ -59,7 +61,6 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
             .ConfigureServices(s => { s.AddKoan(); configure?.Invoke(s); })
             .StartAsync()
             .ConfigureAwait(false);
-        AppHost.Current = host.Services;
         return new BoundHost(host);
     }
 
@@ -80,7 +81,6 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
             .ConfigureServices(s => { s.AddKoan(); configure?.Invoke(s); })
             .StartAsync()
             .ConfigureAwait(false);
-        AppHost.Current = host.Services;
         return new BoundHost(host);
     }
 
@@ -94,7 +94,7 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
     /// <summary>Lease a partition as the ambient scope so the static <c>Entity&lt;T&gt;</c> API targets it.</summary>
     protected static IDisposable Lease(string partition) => EntityContext.Partition(partition);
 
-    /// <summary>A reflective Koan host bound as <see cref="AppHost.Current"/>; clears the binding on dispose.</summary>
+    /// <summary>A reflective Koan host whose generic-host binder owns <see cref="AppHost.Current"/>.</summary>
     protected sealed class BoundHost : IAsyncDisposable
     {
         private readonly IntegrationHost _host;
@@ -104,10 +104,6 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
 
         public async ValueTask DisposeAsync()
         {
-            if (ReferenceEquals(AppHost.Current, _host.Services))
-            {
-                AppHost.Current = null;
-            }
             await _host.DisposeAsync().ConfigureAwait(false);
         }
     }

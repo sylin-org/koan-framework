@@ -4,12 +4,12 @@ domain: engineering
 title: "Testing Your App — Conformance Kits"
 audience: [developers, architects]
 status: current
-last_updated: 2026-06-20
+last_updated: 2026-07-14
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-06-20
+  date_last_tested: 2026-07-14
   status: verified
-  scope: EntityConformanceSpecs batteries + meta-tests + S1.Web/S5.Recs dogfood
+  scope: EntityConformanceSpecs batteries + KoanDataSpec host ownership guidance
 ---
 
 # Testing Your App — Conformance Kits
@@ -46,8 +46,9 @@ There is a second, optional hook — `protected override TEntity Mutate(TEntity 
 
 ## Two rules
 
-1. **Run sequentially.** The static `Entity<T>` API resolves against the process-global ambient host,
-   so add this once to your conformance test project:
+1. **Run sequentially.** Each booted host owns the process-default ambient provider used by the
+   static `Entity<T>` API. The testing helpers use the host's owner-checked lifecycle binding, but do
+   not make concurrent test classes flow-isolated. Add this once to your conformance test project:
 
    ```csharp
    [assembly: CollectionBehavior(DisableTestParallelization = true)]
@@ -70,6 +71,10 @@ There is a second, optional hook — `protected override TEntity Mutate(TEntity 
 | `Sylin.Koan.Testing` | the conformance kit — `EntityConformanceSpecs<T>` + the batteries (this is the one you reference) |
 | `Sylin.Koan.Testing.Hosting` | the xUnit-free reflective host `KoanIntegrationHost` (ARCH-0079); reference it directly to boot a Koan host in any test |
 | `Sylin.Koan.Testing.Containers` | xUnit v3 Testcontainers fixtures (`KoanContainerFixture` / `KoanDataSpec`) for engine-backed specs |
+
+`KoanDataSpec.BootAsync()` starts a real generic host and delegates ambient ownership to Koan's host
+binder. Dispose its returned `BoundHost` with `await using`; stopping an older host cannot clear a
+newer owner. Data partitions isolate records, not concurrent process-default host selection.
 
 The pushdown battery reuses the framework's own `InMemoryFilterEvaluator` (the same oracle the
 cross-adapter convergence suite uses) — it is referenced, never re-implemented, so the conformance

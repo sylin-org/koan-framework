@@ -7,13 +7,13 @@ under **xUnit v3** with **Testcontainers 4.x** module fixtures (ARCH-0091), boot
 ## Contract
 
 - **Suites** live under `Suites/<Domain>/<Scope>/` and map 1:1 with Koan runtime modules.
-- **Shared assets** live in `Shared/` and are consumed by suites via project references:
-  - `Koan.Testing.Hosting/` — the xUnit-agnostic ARCH-0079 reflective host (`KoanIntegrationHost`,
+- **Shared testing packages** live under `src/` and are consumed by suites via project references:
+  - `src/Koan.Testing.Hosting/` — the xUnit-agnostic ARCH-0079 reflective host (`KoanIntegrationHost`,
     namespace `Koan.Testing.Integration`). Carries no xUnit dependency, so it is referenced by both
     the xUnit-v2 fenced Jobs projects and the xUnit-v3 suites without an assembly collision.
-  - `Koan.Testing.Containers/` — the xUnit-v3 Testcontainers fixtures (`KoanContainerFixture` + the
+  - `src/Koan.Testing.Containers/` — the xUnit-v3 Testcontainers fixtures (`KoanContainerFixture` + the
     per-engine fixtures) and the `KoanDataSpec<TFixture>` spec base.
-  - `Koan.Testing/` — **retired.** The bespoke `TestPipeline`/`TestContext` DSL was removed in
+  - `src/Koan.Testing/` — **retired.** The bespoke `TestPipeline`/`TestContext` DSL was removed in
     ARCH-0091; the project survives only as a thin shim that re-exposes `Koan.Testing.Hosting` so the
     fenced xUnit-v2 `Koan.Jobs.TestKit` keeps compiling. Do not add anything to it.
 - **Seed packs** in `SeedPacks/` deliver deterministic data and are content-copied into every test
@@ -41,8 +41,9 @@ with:
 
 Differences from the old xUnit v2 DSL that every spec must respect:
 
-- **Serialize the assembly.** Koan binds the process-global `AppHost.Current`, so concurrent boots
-  would race on it. Add `[assembly: CollectionBehavior(DisableTestParallelization = true)]` (in
+- **Serialize the assembly.** Each booted Koan host owns the process-default `AppHost` binding, so
+  concurrent spec classes would race on host selection. Add
+  `[assembly: CollectionBehavior(DisableTestParallelization = true)]` (in
   `AssemblyInfo.cs` or `GlobalUsings.cs`).
 - **`IAsyncLifetime` returns `ValueTask`** (not `Task`) — both `InitializeAsync` and `DisposeAsync`.
 - **Native skips** — use `Assert.Skip(reason)` / `Assert.SkipWhen(cond, reason)` /
@@ -92,13 +93,13 @@ For data-adapter suites, derive from `KoanDataSpec<TFixture>` instead of hand-wi
 - `BootAsync()` — returns a `BoundHost` (an `await using` host booted with the fixture's settings via
   `KoanIntegrationHost` + `AddKoan()`).
 - `NewPartition(label)` + `Lease(partition)` — mint and enter a per-execution `EntityContext.Partition`
-  so parallel-by-class suites never collide on shared backing stores.
+  so sequential specs and separate test processes do not collide on shared backing stores.
 
 ## Adding a suite
 
 1. Create `Suites/<Domain>/<Scope>/<ProjectName>/` (mirror the `src/` path of the module under test).
-2. Reference `Shared/Koan.Testing.Hosting` (for `KoanIntegrationHost`) and, when you need a real
-   backing store, `Shared/Koan.Testing.Containers` (for the fixtures + `KoanDataSpec`). Do **not**
+2. Reference `src/Koan.Testing.Hosting` (for `KoanIntegrationHost`) and, when you need a real
+   backing store, `src/Koan.Testing.Containers` (for the fixtures + `KoanDataSpec`). Do **not**
    reference the retired `Koan.Testing` shim.
 3. Adopt the xUnit-v3 csproj shape above and add the `DisableTestParallelization` assembly attribute.
 4. Keep specs under `Specs/<Feature>/`.
@@ -171,7 +172,7 @@ Without the integration tests, these would have shipped. With them, they're caug
 
 1. Create `tests/Suites/<Domain>/<Adapter>/Koan.<Domain>.<Adapter>.Tests/` (mirrors the adapter
    project's path under `src/`).
-2. Reference `tests/Shared/Koan.Testing.Hosting` and `tests/Shared/Koan.Testing.Containers`, plus the
+2. Reference `src/Koan.Testing.Hosting` and `src/Koan.Testing.Containers`, plus the
    adapter's project + its pillar core.
 3. Use `KoanIntegrationHost.Configure().ConfigureServices(s => s.AddKoan()).StartAsync(ct)` to build
    the host (or derive from `KoanDataSpec<TFixture>` and call `BootAsync()`). Don't invoke

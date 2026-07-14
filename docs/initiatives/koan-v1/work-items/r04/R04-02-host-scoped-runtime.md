@@ -376,6 +376,31 @@ testing helpers: three in `KoanDataSpec` and two in `EntityConformanceSpecs`. Th
 fixture semantics and remain separate increments. R04-02 stays `in-progress`, and no capability
 maturity label changes.
 
+## Sixteenth increment — binder-owned data-spec hosts
+
+`KoanDataSpec` no longer writes or clears `AppHost.Current`. Both `BootAsync` overloads already start
+a real generic host through `KoanIntegrationHost` and `AddKoan()`, so
+`AppHostBinderHostedService` is the sole host-lifetime owner. `BoundHost.DisposeAsync` now delegates
+directly to integration-host disposal; the binder's compare-and-release lease prevents an older host
+from clearing a newer owner.
+
+The focused InMemory proof covers both overloads by registering a hosted service after `AddKoan()`
+that attaches a newer marker during startup. Before the repair, each overload overwrote that marker
+after host start and the surface was red 1/3. The unchanged surface is green 3/3 after the repair:
+both newer markers survive `BootAsync`, and disposing an older overlapping `BoundHost` leaves the
+newer host's registered marker selected.
+
+The complete Docker-free InMemory connector suite grows from 52 to 55 tests and passes 55/55. The
+complete Data.Core process remains green at 293/293. New package-level `README.md` and `TECHNICAL.md`
+companions make fixture selection, skips, partitioning, host ownership, and the sequential execution
+limit explicit; focused testing guidance no longer names removed `tests/Shared` paths or implies that
+data partitions make concurrent host selection safe.
+
+This reduces the alternate-writer inventory from five to two assignment statements, both in
+`EntityConformanceSpecs`. The helper remains intentionally assembly-serialized: host ownership is
+safe, but overlapping static Entity operation flows are not claimed as supported. R04-02 stays
+`in-progress`, and no capability maturity label changes.
+
 ## Smallest meaningful fix
 
 Define one host/runtime lease and make service/configuration-backed registries resolve through it.
