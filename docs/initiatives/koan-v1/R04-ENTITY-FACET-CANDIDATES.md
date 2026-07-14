@@ -47,20 +47,42 @@ control-plane mutation fails this test.
 
 The examples in this section are **target grammar**, not current supported syntax.
 
-### 1. Intrinsic Entity grammar: direct, not faceted
+### 1. Intrinsic Entity grammar: direct where a facet adds no meaning
 
 | Semantic | Elected shape | Why it is delightful |
 |---|---|---|
 | Identity and persistence | `Todo.Get(id)`, `todo.Save()`, `todo.Remove()` | These are the shortest universally meaningful Entity operations. `Todo.Data` would add ceremony without adding information. |
 | Set reads and bounded queries | `Todo.Query(...)`, `Todo.Page(...)`, `Todo.Count` | The Entity type is already the set receiver. Cost and boundedness belong in overloads, facts, and explanation rather than a redundant pillar noun. |
-| Lifecycle hooks | `Todo.Events.BeforeUpsert(...)` | Lifecycle is intrinsic to the Entity persistence boundary and already has a coherent type receiver. It must not be confused with domain events or broker delivery. |
 | Relationships | direct receiver-local verbs initially; consider `todo.Relations` only if cost-safe breadth requires grouping | Relationships are Entity semantics inside Data, not a separately referenced pillar. R04-06 must first eliminate or explain hidden full scans. |
 | Operation context | `EntityContext.Transaction(...)` and named module scopes such as `Tenant.Use(...)` | Context is the third Entity-language location, but it scopes a logical flow rather than one record. `todo.Context` would imply false ownership. |
 
-`Events` keeps its present lifecycle meaning during R04. A future domain-event vocabulary needs its own
-transactional proof; integration messages remain separate from both.
+### 2. `Events`: elected intrinsic flagship facet
 
-### 2. `AI`: elected flagship facet
+Candidate shape:
+
+```csharp
+Todo.Events.BeforeUpsert(...);
+todo.Events.Raise(new TodoCompleted(...));
+```
+
+`Events` earns a facet even though it is intrinsic rather than module-contributed. It is a natural
+place for a developer or coding agent to discover both how an Entity type participates in persistence
+and which business facts an Entity instance may raise. Static versus instance access carries useful
+meaning without adding another concept:
+
+- `Todo.Events` owns ordered lifecycle composition for the Todo type;
+- `todo.Events` owns domain facts raised by this Todo instance;
+- lifecycle hooks, domain events, framework reactions, and integration messages remain distinct
+  mechanisms with different timing and delivery promises;
+- `Raise` records a typed fact in the current unit of work; it never means immediate broker delivery;
+- handler ownership, order, transaction phase, outbox participation, and failures use the common
+  composition/explanation facts;
+- a disposed or missing host fails correctively rather than retaining a static provider or handler.
+
+The current `Todo.Events` lifecycle grammar is the compatibility anchor. Instance event raising waits
+for host ownership and transaction-boundary proof; the election does not claim it exists today.
+
+### 3. `AI`: elected module-grown flagship facet
 
 Candidate shape:
 
@@ -89,7 +111,7 @@ Admission rules:
 This is the flagship demonstration of module-grown IntelliSense, but not the first migration: its
 backend and lifecycle semantics make it a poor test-infrastructure pilot.
 
-### 3. `Cache`: elected pilot facet
+### 4. `Cache`: elected pilot facet
 
 Candidate shape:
 
@@ -114,7 +136,7 @@ Admission rules:
   control plane;
 - an unset Entity identity makes instance eviction an explained no-op, not false success.
 
-### 4. `Media`: elected constrained facet
+### 5. `Media`: elected constrained facet
 
 Candidate shape:
 
@@ -166,18 +188,19 @@ This is intentional asymmetry. Pillars govern ownership; they do not impose need
 | Order | Candidate | R04 role | Proof that earns the next step |
 |---|---|---|---|
 | 1 | `Cache` | compile-infrastructure pilot | Base absence, module presence, invalid receiver, all-module collision, removal, XML docs, and non-destructive runtime explanation. |
-| 2 | `AI` | flagship user-delight proof | Static and instance facets, honest backend negotiation/cost, convention explanation, repeated-host isolation, and constrained OCR. |
-| 3 | `Media` | narrow-interface proof | Facet appears only on media-capable entities and explains storage/delivery effects. |
-| 4 | Canon direct verb plus receiver cleanup | asymmetry proof | Direct constrained verb remains clearer; administrative instance extension is removed or forwarded safely. |
-| 5 | Broad receiver cleanup | language hygiene | `this object` persistence and `where T : class` messaging no longer advertise invalid operations. |
+| 2 | `Events` | intrinsic user-delight flagship | Existing static lifecycle grammar remains compatible; instance facts are typed, host-owned, transaction-aware, inspectable, and never imply broker delivery. |
+| 3 | `AI` | module-grown user-delight flagship | Static and instance facets, honest backend negotiation/cost, convention explanation, repeated-host isolation, and constrained OCR. |
+| 4 | `Media` | narrow-interface proof | Facet appears only on media-capable entities and explains storage/delivery effects. |
+| 5 | Canon direct verb plus receiver cleanup | asymmetry proof | Direct constrained verb remains clearer; administrative instance extension is removed or forwarded safely. |
+| 6 | Broad receiver cleanup | language hygiene | `this object` persistence and `where T : class` messaging no longer advertise invalid operations. |
 
 R04-07 still stops after one facet pilot and one broad-receiver repair. This ordering elects the
 destination without authorizing a mass migration.
 
 ## One capability identity everywhere
 
-The facet noun is not merely syntax. For every elected module facet, R04-05 and R04-07 should define
-one stable capability identity projected into:
+The facet noun is not merely syntax. For every elected intrinsic or module facet, R04-05 and R04-07
+should define one stable capability identity projected into:
 
 - IntelliSense and XML documentation;
 - startup composition and backend election reporting;
@@ -200,6 +223,8 @@ The election fixes the semantic owners and preferred nouns, but consumer proof m
 3. whether Media has enough proven breadth to justify a facet in its first migration, or should retain
    direct constrained verbs until then;
 4. how static and instance facet accessors avoid allocations and host-owned service capture;
-5. which compatibility forwarders can be safely deprecated without preserving dishonest receivers.
+5. which typed domain-event contract and `Raise` result best expose transaction acceptance without
+   suggesting delivery completion;
+6. which compatibility forwarders can be safely deprecated without preserving dishonest receivers.
 
 These are compile/API design checks, not reasons to reopen which capabilities belong on Entity.

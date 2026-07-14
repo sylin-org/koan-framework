@@ -31,8 +31,9 @@ language drift; maintainers fear cleanup because consumer compilation is not gat
 ARCH-0106 and R03 inventory classify each hazard. A disposable C# 14 probe proved static and instance
 extension members on a constrained Entity subtype. The
 [`R04 Entity Facet Candidate Slate`](../../R04-ENTITY-FACET-CANDIDATES.md) elects `Cache` as the
-consumer-infrastructure pilot, `AI` as the flagship, and narrowly constrained `Media` as the next
-interface proof; it explicitly keeps control-plane pillars and generic messaging/jobs off Entity.
+consumer-infrastructure pilot, intrinsic `Events` and module-grown `AI` as user-delight flagships, and
+narrowly constrained `Media` as the next interface proof; it explicitly keeps control-plane pillars
+and generic messaging/jobs off Entity.
 
 ## Smallest meaningful fix
 
@@ -60,5 +61,5 @@ safe; name replacement and removal condition. Revert the pilot facet without rem
 
 ## Stop condition
 
-Do not migrate cache, AI, backup, messaging, canon, media, and jobs in one card. One facet and one broad
-receiver are the maximum pilot scope.
+Do not migrate cache, events, AI, backup, messaging, canon, media, and jobs in one card. One facet and
+one broad receiver are the maximum pilot scope.

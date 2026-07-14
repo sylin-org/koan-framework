@@ -216,6 +216,19 @@ entity unless an explicit guarded contract permits it.
 Domain events carry business data, not providers or services. Integration messages require a message
 contract; a broad `.Send()` on every class is outside this contract.
 
+Event grammar follows the Entity receiver:
+
+```csharp
+Todo.Events.BeforeUpsert(...);              // type lifecycle composition
+todo.Events.Raise(new TodoCompleted(...));  // domain fact raised by this entity
+```
+
+`Events` is an intrinsic Entity facet. The static form describes the ordered lifecycle of the Entity
+type; the instance form records a typed business fact from one Entity. Sharing the noun makes both
+capabilities discoverable without merging their promises: `Raise` joins the declared unit-of-work and
+never means immediate broker publication. Any integration delivery is a separately named, explained,
+and negotiated reaction.
+
 ## Relationships and execution cost
 
 Relationship methods are entity-centered, but their convenience does not authorize silent unbounded
