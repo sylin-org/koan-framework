@@ -277,6 +277,32 @@ R04-02 remains active for the non-hosted `StartKoan()` path.
 implementations, coordinate graceful shutdown, or expose a runtime stop phase. Those are hosting-mode
 limits, not hidden guarantees of this ownership repair.
 
+## Twelfth increment — closure audit and residual ledger
+
+The closure audit does **not** pass R04-02 yet. Canonical generic-host and non-hosted leases are green,
+but a current-tree source inventory found host-owned state and ambient writes outside those owners.
+Passing now would contradict the card's repeated-host objective and its no-provider-residue gate.
+
+| Residual owner | Current evidence | Why closure is unsafe | Bounded disposition |
+|---|---|---|---|
+| Data.Core aggregate configuration | [`AggregateConfigs.Cache`](../../../../../src/Koan.Data.Core/AggregateConfigs.cs) stores one [`AggregateConfig<TEntity,TKey>`](../../../../../src/Koan.Data.Core/AggregateConfig.cs) per type pair; that object owns a lazy delegate closing over the first `IServiceProvider` and the repository it creates. Fourteen source/test call sites still invoke `AggregateConfigs.Reset()` as isolation machinery. | Host B can inherit host A's provider, adapter factory, guards, contributors, or repository after host A is disposed. The public reset is evidence of the leak, not lifecycle ownership. | **Next increment:** red/green two-host proof using one Entity type and no reset; replace provider retention with immutable metadata plus active-host resolution. |
+| Alternate ambient writers | Seven tracked `src/` assignments remain across [Web startup](../../../../../src/Koan.Web/Hosting/KoanWebStartupFilter.cs), [Identity startup fallback](../../../../../src/Koan.Identity/Initialization/SecIdentityModule.cs), and shipped [container](../../../../../src/Koan.Testing.Containers/KoanDataSpec.cs) / [conformance](../../../../../src/Koan.Testing/EntityConformanceSpecs.cs) helpers. They write or clear `AppHost.Current` directly instead of owning `Attach` leases or flow scopes. | An unleased continuation can overwrite the last attached host, and a failed/parallel path has no owner-checked release. Sequential test conventions reduce frequency but do not establish the parallel contract. | Inventory and reduce only after the aggregate cache lands; separate framework-host wiring from testing-flow selection. |
+| Static logging scopes | Thirteen production `static readonly KoanLogScope` fields use a scope implementation that [caches the first `ILogger`](../../../../../src/Koan.Core/Logging/KoanLog.cs) it resolves. `KoanLogFactoryBridge` owner-checks the global factory, but those cached scopes do not follow later hosts. | A process-static scope can retain host A's logger/provider graph and continue using it under host B. Existing tests observe a static test sink, not repeated-host logger ownership. | Add a focused two-factory probe, then make scopes resolve against the active factory without pinning a host logger. |
+| Background-service locator | [`ServiceLocator.SetProvider`](../../../../../src/Koan.Core/BackgroundServices/ServiceRegistry.Contracts.cs) stores the orchestrator's provider in a process static, never clears it, and its getter currently has no production caller. | The most recently started orchestrator remains retained after stop even though the locator supplies no current behavior. | Prove the getter is dead and remove the locator/write in a narrow Core cleanup rather than adding another lease. |
+| Missing-host failure contract | Current [Data](../../../../../src/Koan.Data.Core/Data.cs) and [AI](../../../../../src/Koan.AI/Client.cs) paths throw several raw `InvalidOperationException` messages, while some optional paths return `null` or catch `ObjectDisposedException`. | The card's promised single corrective host-context error is not yet true or covered by one negative-path contract. | After ownership is clean, define one Core host-context failure and project it through the affected common paths; R04-05 may reuse its facts but cannot retroactively supply R04-02 evidence. |
+
+The same audit classified three adjacent shapes as safe for this card:
+[`AdapterNaming`](../../../../../src/Koan.Data.Core/Configuration/AdapterNaming.cs) keys factories by
+provider through a `ConditionalWeakTable`; the [AI client](../../../../../src/Koan.AI/Client.cs) caches
+a targetless resolver and supplies the current provider on every call; discovery/metadata registries
+retain only immutable type or reflection facts. `KoanEnv` remains the explicitly documented process
+snapshot.
+
+The next change is intentionally only the aggregate-configuration owner. It must begin with the
+repository `explore` workflow and a failing repeated-host probe that demonstrates host B resolving its
+own provider and repository without calling `AggregateConfigs.Reset()`. The other residuals remain
+visible here so completing one cannot be mistaken for closing the card.
+
 ## Smallest meaningful fix
 
 Define one host/runtime lease and make service/configuration-backed registries resolve through it.

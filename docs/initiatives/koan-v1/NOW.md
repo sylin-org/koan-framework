@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-13
   status: reviewed
-  scope: R04-02 non-hosted startup ownership
+  scope: R04-02 closure audit and aggregate-cache residual
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -39,7 +39,9 @@ Replace this file at every handoff. It is a restart point, not a diary.
   hostless process snapshot. The synchronous non-hosted `StartKoan()` path now owns the same atomic
   host lease as the generic-host binder: disposal releases its binding, overlapping owners cannot
   clear one another, and failed startup disposes the new provider. No capability maturity label
-  changed. A parallel design-only
+  changed. A closure audit found that R04-02 is not ready to pass: `AggregateConfigs` still pins its
+  first provider/repository, alternate `AppHost.Current` writers remain, static logging scopes cache
+  first-host loggers, and an unused background-service locator retains its provider. A parallel design-only
   [`R04 Entity Facet Candidate Slate`](R04-ENTITY-FACET-CANDIDATES.md) elects the eventual R04-07
   language without changing the active production card or implementing public syntax.
 
@@ -51,13 +53,16 @@ Replace this file at every handoff. It is a restart point, not a diary.
    single-owner health scheduling, bounded orchestrator child shutdown, and host-owned application
    identity as the stable R04-02 base.
 2. Run the `explore` skill before the next production increment.
-3. Run a closure audit against every owner and negative-path criterion named by R04-02. Mark it passed
-   only if the evidence is complete; otherwise open one bounded residual increment.
-4. Keep `StartKoan()` positioned as a synchronous non-hosted convenience. Do not imply it starts
-   hosted services or coordinates graceful shutdown.
+3. Reduce only the first closure residual: `AggregateConfigs` pins the first provider inside a
+   process-static `AggregateConfig<TEntity,TKey>` and relies on public `Reset()` calls for isolation.
+4. Start with a red two-host probe using one Entity type and no reset. Host B must resolve its own
+   provider/repository after host A is disposed; add parallel evidence only after the sequential owner
+   is correct.
 5. Keep direct `KoanEnv.CurrentSnapshot.Application` consumers classified as process-snapshot users;
    do not imply they became host-aware through the `AppHost.Identity` repair.
-6. Do not mark R04-02 passed until sequential and parallel ownership probes cover every named owner and
+6. Do not fold the alternate ambient writers, static logging scopes, dead service locator, or unified
+   missing-host error into the aggregate-cache repair. They remain explicit later R04-02 residuals.
+7. Do not mark R04-02 passed until sequential and parallel ownership probes cover every named owner and
    missing/disposed host behavior is corrective.
 
 ## Expected working tree
@@ -66,6 +71,8 @@ R04-01 and R04-02's host lease, vector-model confirmation, AI discovery and life
 classification, active-host relationship metadata, lifecycle idempotence, startup-health ownership,
 scheduler single-owner, orchestrator shutdown, application-identity, and non-hosted startup repairs
 should be committed.
+The closure-audit residual ledger should also be committed; no new production repair is expected in
+that audit commit.
 Treat every unrelated pre-existing change as user-owned.
 
 ## Verification at handoff
@@ -94,6 +101,9 @@ Treat every unrelated pre-existing change as user-owned.
 - the non-hosted `StartKoan()` ownership surface is red 0/4 before the repair and green 4/4 after it;
   provider disposal, overlapping owners, concurrent scoped flows, and failed startup all release the
   correct binding and owned services;
+- the closure audit counts 14 `AggregateConfigs.Reset()` call sites, seven tracked `src/` ambient
+  assignments, thirteen static logging scopes, and one set-only static background provider; therefore
+  R04-02 remains `in-progress`;
 - the complete Data.Core process passes 290/290 with zero disposed-service, meter-factory, or
   cancellation-exception signatures;
 - runtime and consumer tests for R04-02 must cover repeat hosts and disposed-state negative paths;
