@@ -37,7 +37,13 @@ public static class AppHost
     /// lease. Disposing the lease clears the provider only when that lease still owns the current
     /// default; it never restores an earlier provider that may already have been disposed.
     /// </summary>
-    internal static IDisposable Attach(IServiceProvider sp)
+    /// <remarks>
+    /// This is a low-level lifecycle primitive for Koan hosting integrations. The caller must keep
+    /// the returned lease alive for exactly as long as the provider is active and dispose it when
+    /// that provider stops. Applications should normally use a Koan host or <c>StartKoan()</c>
+    /// instead of attaching providers directly.
+    /// </remarks>
+    public static IDisposable Attach(IServiceProvider sp)
     {
         ArgumentNullException.ThrowIfNull(sp);
         Interlocked.Exchange(ref _global, sp);

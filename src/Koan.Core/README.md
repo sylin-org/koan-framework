@@ -17,6 +17,8 @@ dotnet add package Sylin.Koan.Core
 - Host ownership: `AddKoan()` hosts attach the ambient `AppHost` provider while running and release
   it when they stop. Use `AppHost.PushScope(provider)` when parallel flows must select different hosts.
 - A stopped host is never restored as a fallback when a newer host releases its lease.
+- Hosting integrations may use the low-level `AppHost.Attach(provider)` lease, but must dispose that
+  lease with the provider. Applications should normally let a Koan host or `StartKoan()` own it.
 - Application identity: `AppHost.Identity` follows that same current provider or flow scope. With no
   active host, it falls back to the frozen process identity in `KoanEnv`.
 

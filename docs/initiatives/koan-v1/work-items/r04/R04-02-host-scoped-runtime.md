@@ -255,6 +255,28 @@ contract requires its own bounded decision and evidence.
 
 R04-02 remains active for the non-hosted `StartKoan()` path.
 
+## Eleventh increment — make non-hosted startup own its lease
+
+- A source inventory found one supported non-hosted entry point: Data.Core's synchronous
+  `IServiceCollection.StartKoan()`. It built a provider and assigned `AppHost.Current` directly, so
+  neither provider disposal nor startup failure released that process-default binding.
+- Four focused probes made the defect concrete: provider disposal, overlapping sequential owners,
+  parallel flow scopes followed by concurrent disposal, and runtime-discovery failure all left a
+  stale provider selected. The unchanged surface passed 0/4 before the repair.
+- `StartKoan()` now uses the same atomic `AppHost.Attach` ownership lease as the generic-host binder.
+  Its returned provider owner releases the lease before tearing down container services;
+  compare-and-release prevents an older provider from clearing a newer owner.
+- Startup is transactional at the ownership boundary. If runtime resolution, discovery, or startup
+  throws, the pending lease and newly built provider are disposed before the startup failure
+  propagates.
+- The focused ownership surface passes 4/4. The public `IServiceProvider` return shape remains
+  compatible, and documentation now makes caller disposal explicit. The complete Data.Core process
+  passes 290/290; Core passes 197/197, Core Unit passes 79/79, and Data.AI passes 82/82.
+
+`StartKoan()` remains intentionally narrower than the generic host: it does not start `IHostedService`
+implementations, coordinate graceful shutdown, or expose a runtime stop phase. Those are hosting-mode
+limits, not hidden guarantees of this ownership repair.
+
 ## Smallest meaningful fix
 
 Define one host/runtime lease and make service/configuration-backed registries resolve through it.

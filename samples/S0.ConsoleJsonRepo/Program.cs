@@ -14,7 +14,7 @@ if (args is { Length: > 0 } && !string.IsNullOrWhiteSpace(args[0]))
 {
     services.PostConfigure<JsonDataOptions>(o => o.DirectoryPath = args[0]);
 }
-services.StartKoan();
+using var app = (IDisposable)services.StartKoan();
 
 var todo = await new Todo { Title = "buy milk" }.Save();
 var item = await Todo.Get(todo.Id);

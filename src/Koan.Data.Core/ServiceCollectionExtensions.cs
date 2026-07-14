@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -93,7 +94,18 @@ public static class ServiceCollectionExtensions
         Transactions.TransactionServiceCollectionExtensions.AddKoanTransactions(services);
     }
 
-    // One-liner startup: builds provider, runs discovery, starts runtime (greenfield)
+    /// <summary>
+    /// Builds a provider and starts Koan runtime discovery for a synchronous, non-hosted process.
+    /// </summary>
+    /// <remarks>
+    /// The caller owns the returned provider and must dispose it. This path does not run a generic
+    /// host or its hosted-service lifecycle; web applications and workers should use <c>AddKoan()</c>
+    /// with the generic host instead.
+    /// </remarks>
+    /// <returns>
+    /// The active provider. The returned object implements both <see cref="IDisposable"/> and
+    /// <see cref="IAsyncDisposable"/>.
+    /// </returns>
     public static IServiceProvider StartKoan(this IServiceCollection services)
     {
         // Avoid duplicate registration if already configured
@@ -112,15 +124,26 @@ public static class ServiceCollectionExtensions
             var cfg = cb.Build();
             services.AddSingleton<IConfiguration>(cfg);
         }
+
         var sp = services.BuildServiceProvider();
-        Koan.Core.Hosting.App.AppHost.Current = sp;
-        // If secrets configuration is present, upgrade from bootstrap to DI-backed resolver and emit reload
-        TryInvokeSecretsBootstrap("UpgradeSecretsConfiguration", sp);
-        try { KoanEnv.TryInitialize(sp); } catch { }
-        var rt = sp.GetService<Koan.Core.Hosting.Runtime.IAppRuntime>();
-        rt?.Discover();
-        rt?.Start();
-        return sp;
+        var owner = new NonHostedServiceProvider(sp);
+        owner.Own(Koan.Core.Hosting.App.AppHost.Attach(owner));
+
+        try
+        {
+            // If secrets configuration is present, upgrade from bootstrap to DI-backed resolver and emit reload
+            TryInvokeSecretsBootstrap("UpgradeSecretsConfiguration", owner);
+            try { KoanEnv.TryInitialize(owner); } catch { }
+            var rt = owner.GetService<Koan.Core.Hosting.Runtime.IAppRuntime>();
+            rt?.Discover();
+            rt?.Start();
+            return owner;
+        }
+        catch
+        {
+            owner.Dispose();
+            throw;
+        }
     }
 
     [DynamicDependency(DynamicallyAccessedMemberTypes.PublicMethods, "Koan.Secrets.Core.Configuration.SecretResolvingConfigurationExtensions", "Koan.Secrets.Core")]
@@ -133,5 +156,41 @@ public static class ServiceCollectionExtensions
             method?.Invoke(null, args ?? []);
         }
         catch { /* optional */ }
+    }
+
+    private sealed class NonHostedServiceProvider(ServiceProvider provider) : IServiceProvider, IDisposable, IAsyncDisposable
+    {
+        private ServiceProvider? _provider = provider;
+        private IDisposable? _lease;
+
+        public void Own(IDisposable lease)
+        {
+            ArgumentNullException.ThrowIfNull(lease);
+            Interlocked.Exchange(ref _lease, lease)?.Dispose();
+        }
+
+        public object? GetService(Type serviceType)
+        {
+            ArgumentNullException.ThrowIfNull(serviceType);
+            var current = Volatile.Read(ref _provider)
+                ?? throw new ObjectDisposedException(nameof(NonHostedServiceProvider));
+            return current.GetService(serviceType);
+        }
+
+        public void Dispose()
+        {
+            Interlocked.Exchange(ref _lease, null)?.Dispose();
+            Interlocked.Exchange(ref _provider, null)?.Dispose();
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            Interlocked.Exchange(ref _lease, null)?.Dispose();
+            var current = Interlocked.Exchange(ref _provider, null);
+            if (current is not null)
+            {
+                await current.DisposeAsync().ConfigureAwait(false);
+            }
+        }
     }
 }

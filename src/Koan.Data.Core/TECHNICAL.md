@@ -41,6 +41,20 @@ source: src/Koan.Data.Core/
 - Centralize constants per project (see ARCH-0040)
 - Paging and streaming follow DATA-0061
 
+## Non-hosted startup ownership
+
+- `IServiceCollection.StartKoan()` is the short synchronous path for processes that do not need a
+  generic-host lifecycle. It composes Koan when needed, builds a provider, runs runtime discovery and
+  startup, and returns that provider.
+- The returned provider is caller-owned and implements `IDisposable` and `IAsyncDisposable`.
+  Disposing it releases its process-default `AppHost` lease before owned services are torn down.
+- If discovery or startup throws, `StartKoan()` releases the host lease and disposes the provider
+  before rethrowing. A failed start does not leave a selectable ambient host.
+- Overlapping providers are safe at the binding boundary: disposing an older provider cannot clear a
+  newer owner. Use `AppHost.PushScope(provider)` when concurrent flows must select different providers.
+- `StartKoan()` does not run the generic host or its `IHostedService` lifecycle. Use `AddKoan()` with a
+  generic host for web apps, workers, graceful stop, and hosted background services.
+
 ## Usage guidance
 
 - In application models, expose first-class statics:

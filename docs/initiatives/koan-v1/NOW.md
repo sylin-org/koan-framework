@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-13
   status: reviewed
-  scope: R04-02 application identity ownership
+  scope: R04-02 non-hosted startup ownership
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -36,9 +36,12 @@ Replace this file at every handoff. It is a restart point, not a diary.
   aliases, and the orchestrator awaits owned child cleanup within the host shutdown deadline.
   Application identity now follows the active host/provider scope instead of a separate process
   static; OpenAPI resolves its explicitly supplied host provider. `KoanEnv` remains the frozen
-  hostless process snapshot. No capability maturity label changed. A
-  parallel design-only [`R04 Entity Facet Candidate Slate`](R04-ENTITY-FACET-CANDIDATES.md) elects
-  the eventual R04-07 language without changing the active production card or implementing public syntax.
+  hostless process snapshot. The synchronous non-hosted `StartKoan()` path now owns the same atomic
+  host lease as the generic-host binder: disposal releases its binding, overlapping owners cannot
+  clear one another, and failed startup disposes the new provider. No capability maturity label
+  changed. A parallel design-only
+  [`R04 Entity Facet Candidate Slate`](R04-ENTITY-FACET-CANDIDATES.md) elects the eventual R04-07
+  language without changing the active production card or implementing public syntax.
 
 ## Next safe actions
 
@@ -48,10 +51,10 @@ Replace this file at every handoff. It is a restart point, not a diary.
    single-owner health scheduling, bounded orchestrator child shutdown, and host-owned application
    identity as the stable R04-02 base.
 2. Run the `explore` skill before the next production increment.
-3. Audit the non-hosted `StartKoan()` path, including every direct `AppHost.Current` assignment and
-   disposal boundary it creates.
-4. Reduce the first concrete non-hosted ownership failure with sequential and parallel probes before
-   changing the binding shape. If the inventory is clean, record that classification with evidence.
+3. Run a closure audit against every owner and negative-path criterion named by R04-02. Mark it passed
+   only if the evidence is complete; otherwise open one bounded residual increment.
+4. Keep `StartKoan()` positioned as a synchronous non-hosted convenience. Do not imply it starts
+   hosted services or coordinates graceful shutdown.
 5. Keep direct `KoanEnv.CurrentSnapshot.Application` consumers classified as process-snapshot users;
    do not imply they became host-aware through the `AppHost.Identity` repair.
 6. Do not mark R04-02 passed until sequential and parallel ownership probes cover every named owner and
@@ -61,14 +64,15 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 R04-01 and R04-02's host lease, vector-model confirmation, AI discovery and lifecycle-capture
 classification, active-host relationship metadata, lifecycle idempotence, startup-health ownership,
-scheduler single-owner, orchestrator shutdown, and application-identity repairs should be committed.
+scheduler single-owner, orchestrator shutdown, application-identity, and non-hosted startup repairs
+should be committed.
 Treat every unrelated pre-existing change as user-owned.
 
 ## Verification at handoff
 
 - Core host-binding, OpenAPI, and Data.AI projects build with zero errors;
 - Core Unit passes 79/79, the Core self-executing suite passes 197/197, Data.AI passes 82/82, and
-  Data.Core passes 286/286;
+  Data.Core passes 290/290;
 - the AI unit project builds with zero errors and its self-executing suite passes 155/155;
 - the focused Data.Core lifecycle class passes 11/11;
 - repeated-host probes prove different DI markers, Entity storage, and vector-model registry state;
@@ -87,7 +91,10 @@ Treat every unrelated pre-existing change as user-owned.
   sequential binders and parallel flow scopes resolve their own immutable snapshots;
 - a real two-host OpenAPI probe passes 1/1 and the full OpenAPI suite passes 10/10; Alpha and Beta
   retain distinct document titles and application codes while both hosts are running;
-- the complete Data.Core process passes 286/286 with zero disposed-service, meter-factory, or
+- the non-hosted `StartKoan()` ownership surface is red 0/4 before the repair and green 4/4 after it;
+  provider disposal, overlapping owners, concurrent scoped flows, and failed startup all release the
+  correct binding and owned services;
+- the complete Data.Core process passes 290/290 with zero disposed-service, meter-factory, or
   cancellation-exception signatures;
 - runtime and consumer tests for R04-02 must cover repeat hosts and disposed-state negative paths;
 - documentation metadata, links, TOC, privacy scan, and `git diff --check` pass;
