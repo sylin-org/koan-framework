@@ -401,6 +401,32 @@ This reduces the alternate-writer inventory from five to two assignment statemen
 safe, but overlapping static Entity operation flows are not claimed as supported. R04-02 stays
 `in-progress`, and no capability maturity label changes.
 
+## Seventeenth increment — binder-owned Entity conformance hosts
+
+`EntityConformanceSpecs<TEntity>` no longer writes or clears `AppHost.Current`. Each conformance
+battery still starts a real generic host through `AddKoan()`, so `AppHostBinderHostedService` is the
+sole host-lifetime owner. Fixture disposal now delegates directly to host disposal; the binder's
+owner-checked lease prevents an older battery from clearing a newer process-default owner. The public
+one-class-per-Entity inheritance grammar and all six batteries remain unchanged.
+
+The focused ownership proof uses a test-only source-generated auto-registrar to attach a delegating
+marker after the binder starts. Before the repair, the helper overwrote that marker and the focused
+surface was red 0/1. The unchanged proof is green 1/1 after the repair: a newer marker survives
+initialization, disposing an older overlapping conformance host leaves the newer owner selected, and
+disposing both releases the ambient state. The marker delegates service resolution to its host, so
+the proof exercises real Entity reachability rather than replacing it with a test double.
+
+The complete Koan.Testing meta-suite grows to 14 cases and reports 11 passed with 3 intentional
+backing-store skips. The S1 and S5 consumer conformance surfaces each report 6 cases: 4 passed and 2
+intentional skips. Package-level `README.md` and `TECHNICAL.md` companions now document selection,
+composition, lifecycle ownership, skip/failure behavior, and the sequential execution boundary.
+
+This reduces the alternate direct-writer inventory from two assignment statements to zero under
+`src/`. R04-02 remains `in-progress`: thirteen static logging scopes can still pin first-host
+loggers, the set-only background service locator remains, and the unified missing/disposed-host
+failure contract is absent. The obsolete broad test-authoring guide remains an R04-08 concern, and
+no capability maturity label changes.
+
 ## Smallest meaningful fix
 
 Define one host/runtime lease and make service/configuration-backed registries resolve through it.

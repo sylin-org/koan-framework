@@ -3,8 +3,8 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using Xunit;
 
-// Conformance specs resolve the static Entity<T> API against the process-global ambient host, so the
-// suite must run sequentially. (Consumers add this same line to their own conformance test projects.)
+// Each conformance host owns the process-default provider used by static Entity<T>, so the suite must
+// run sequentially. (Consumers add this same line to their own conformance test projects.)
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 
 namespace Koan.Testing.Tests;

@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-14
   status: reviewed
-  scope: R04-02 binder-owned data-spec hosts and remaining closure residuals
+  scope: R04-02 zero direct ambient writers and remaining closure residuals
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -46,9 +46,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
   flow-scopes its application provider across Koan and downstream startup filters without replacing
   a newer attached owner. `KoanDataSpec` now delegates host attachment and release to the generic-host
   binder; both boot overloads preserve a later startup owner, older-host disposal cannot clear the
-  newer host, and package companions state the sequential execution limit. A closure audit still
-  prevents R04-02 from passing: two `EntityConformanceSpecs` `AppHost.Current` assignment statements
-  remain, static logging scopes cache first-host loggers, an
+  newer host, and package companions state the sequential execution limit. `EntityConformanceSpecs`
+  also delegates ownership to that binder without changing its one-class-per-Entity grammar; older
+  fixture teardown cannot clear a newer owner. There are now zero direct `AppHost.Current`
+  assignment statements under `src/`. A closure audit still prevents R04-02 from passing: static
+  logging scopes cache first-host loggers, an
   unused background-service locator retains its provider, and the unified missing-host failure is
   absent. A parallel design-only
   [`R04 Entity Facet Candidate Slate`](R04-ENTITY-FACET-CANDIDATES.md) elects the eventual R04-07
@@ -61,16 +63,16 @@ Replace this file at every handoff. It is a restart point, not a diary.
    relationship metadata, equal-delegate lifecycle idempotence, tracked startup health probing,
    single-owner health scheduling, bounded orchestrator child shutdown, and host-owned application
    identity, provider-owned aggregate configuration, flow-owned Identity/Web startup, and
-   binder-owned data-spec hosts as the stable R04-02 base.
+   binder-owned data-spec and Entity-conformance hosts as the stable R04-02 base.
 2. Run the `explore` skill before the next production increment.
-3. Reduce only the final direct-writer family: the two assignments in `EntityConformanceSpecs`;
-   first classify its per-battery host and xUnit lifecycle through the repository `explore` workflow.
-4. Preserve the public one-class-per-Entity inheritance grammar while proving setup and teardown
-   cannot overwrite or clear a newer owner.
+3. Reduce only the static logging-scope family next; first classify the thirteen cached scopes and
+   the `KoanLogFactoryBridge` ownership contract through the repository `explore` workflow.
+4. Prove two factories/hosts cannot pin the first logger or provider while preserving stable scope
+   identity and current logging call shapes.
 5. Keep direct `KoanEnv.CurrentSnapshot.Application` consumers classified as process-snapshot users;
    do not imply they became host-aware through the `AppHost.Identity` repair.
-6. Do not fold static logging scopes, the dead service locator, the unified missing-host error, or
-   the broader obsolete test-authoring guide into the Entity-conformance repair. They remain explicit
+6. Do not fold the dead service locator, the unified missing-host error, integration-host failed-start
+   cleanup, or the broader obsolete test-authoring guide into the logger repair. They remain explicit
    later R04-02/R04-08 residuals.
 7. Do not mark R04-02 passed until sequential and parallel ownership probes cover every named owner and
    missing/disposed host behavior is corrective.
@@ -82,7 +84,7 @@ classification, active-host relationship metadata, lifecycle idempotence, startu
 scheduler single-owner, orchestrator shutdown, application-identity, and non-hosted startup repairs
 should be committed.
 The closure-audit ledger, provider-owned aggregate-configuration repair, scoped Identity/Web startup,
-and binder-owned data-spec repair should also be committed.
+and binder-owned data-spec and Entity-conformance repairs should also be committed.
 Treat every unrelated pre-existing change as user-owned.
 
 ## Verification at handoff
@@ -111,6 +113,9 @@ Treat every unrelated pre-existing change as user-owned.
 - `KoanDataSpec` host ownership is red 1/3 before repair and green 3/3 after it; both boot overloads
   preserve a newer startup owner, older-host disposal leaves the newer host selected, InMemory passes
   55/55, and Data.Core passes 293/293;
+- `EntityConformanceSpecs` host ownership is red 0/1 before repair and green 1/1 after it; an older
+  conformance host cannot clear a newer owner, the meta-suite reports 11 passed with 3 intentional
+  skips, and both focused consumer suites report 4 passed with 2 intentional skips;
 - the relationship metadata two-host probe is red 0/1 before the repair and green 1/1 after it; host B
   resolves its own singleton after host A disposes its registration;
 - the application-identity binder surface is red 3/5 before the repair and green 5/5 after it;
@@ -122,8 +127,8 @@ Treat every unrelated pre-existing change as user-owned.
   correct binding and owned services;
 - aggregate configuration ownership is red 1/3 before repair and green 3/3 after it without reset;
   the complete Data.Core process passes 293/293 and Backup passes 2/2;
-- the closure audit still counts 14 compatibility `AggregateConfigs.Reset()` call sites, two tracked
-  `src/` ambient assignments in `EntityConformanceSpecs`, thirteen static logging scopes, and one
+- the closure audit still counts 14 compatibility `AggregateConfigs.Reset()` call sites, zero direct
+  `src/` ambient assignments, thirteen static logging scopes, and one
   set-only static background provider; therefore R04-02 remains `in-progress`;
 - the complete Data.Core process passes 293/293 with zero disposed-service, meter-factory, or
   cancellation-exception signatures;

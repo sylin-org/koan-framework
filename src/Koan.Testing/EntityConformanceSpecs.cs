@@ -34,9 +34,10 @@ namespace Koan.Testing;
 /// unreachable (no Docker), so the suite is green out of the box and meaningful when infra is present.
 /// </summary>
 /// <remarks>
-/// The static <c>Entity&lt;T&gt;</c> API resolves against the process-global ambient host
-/// (<see cref="AppHost.Current"/>), so conformance test projects must run sequentially — add
-/// <c>[assembly: CollectionBehavior(DisableTestParallelization = true)]</c> to the test project.
+/// The static <c>Entity&lt;T&gt;</c> API resolves against the process-default ambient host owned by each
+/// booted generic host (<see cref="AppHost.Current"/>), so conformance test projects must run
+/// sequentially — add <c>[assembly: CollectionBehavior(DisableTestParallelization = true)]</c> to the
+/// test project.
 /// </remarks>
 public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
     where TEntity : Entity<TEntity>
@@ -78,7 +79,6 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
                 .ConfigureServices(s => s.AddKoan())
                 .StartAsync()
                 .ConfigureAwait(false);
-            AppHost.Current = _host.Services;
 
             // Reachability probe: a read against the entity's resolved adapter. If the store is absent
             // (e.g. a container that isn't running) this throws and every battery skips — distinguishing
@@ -96,7 +96,6 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
     {
         if (_host is not null)
         {
-            if (ReferenceEquals(AppHost.Current, _host.Services)) AppHost.Current = null;
             await _host.DisposeAsync().ConfigureAwait(false);
         }
         TryDeleteRoot();

@@ -13,9 +13,9 @@ under **xUnit v3** with **Testcontainers 4.x** module fixtures (ARCH-0091), boot
     the xUnit-v2 fenced Jobs projects and the xUnit-v3 suites without an assembly collision.
   - `src/Koan.Testing.Containers/` — the xUnit-v3 Testcontainers fixtures (`KoanContainerFixture` + the
     per-engine fixtures) and the `KoanDataSpec<TFixture>` spec base.
-  - `src/Koan.Testing/` — **retired.** The bespoke `TestPipeline`/`TestContext` DSL was removed in
-    ARCH-0091; the project survives only as a thin shim that re-exposes `Koan.Testing.Hosting` so the
-    fenced xUnit-v2 `Koan.Jobs.TestKit` keeps compiling. Do not add anything to it.
+  - `src/Koan.Testing/` — the application-facing `EntityConformanceSpecs<TEntity>` kit. The bespoke
+    `TestPipeline`/`TestContext` DSL formerly associated with this name was removed in ARCH-0091; do
+    not add general harness primitives back to the conformance package.
 - **Seed packs** in `SeedPacks/` deliver deterministic data and are content-copied into every test
   project via `tests/Directory.Build.props`.
 

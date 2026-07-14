@@ -4,7 +4,7 @@ using Koan.Testing;
 using S5.Recs.Models;
 using Xunit;
 
-// Conformance specs share the process-global ambient host — run them sequentially.
+// Conformance hosts select the process-default ambient provider — run them sequentially.
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 
 namespace S5.Recs.Tests;

@@ -76,6 +76,10 @@ There is a second, optional hook — `protected override TEntity Mutate(TEntity 
 binder. Dispose its returned `BoundHost` with `await using`; stopping an older host cannot clear a
 newer owner. Data partitions isolate records, not concurrent process-default host selection.
 
+`EntityConformanceSpecs<TEntity>` follows the same ownership rule: each inherited battery starts and
+disposes a binder-owned generic host without assigning `AppHost.Current` itself. The public consumer
+surface remains one subclass and one `NewValid()` method.
+
 The pushdown battery reuses the framework's own `InMemoryFilterEvaluator` (the same oracle the
 cross-adapter convergence suite uses) — it is referenced, never re-implemented, so the conformance
 contract and the framework's contract can never drift.
