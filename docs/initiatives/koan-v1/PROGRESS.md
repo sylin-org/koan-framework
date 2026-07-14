@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-14
   status: reviewed
-  scope: R04-02 scoped Identity startup and remaining closure residuals
+  scope: R04-02 scoped Web startup and remaining closure residuals
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T4 — foundation hardening`
 - Active work item: `R04`
-- Next decision: remove Web startup's unleased ambient assignment without changing pipeline behavior
+- Next decision: classify and repair `KoanDataSpec` host ownership without broadening into conformance helpers
 - V1 readiness: `not assessed`
 
 ## Work items
@@ -33,7 +33,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R01 | [Ratify the product constitution](work-items/R01-product-constitution.md) | T1 | passed | R00 | Codex · 2026-07-13 | ARCH-0105 and the canonical product constitution separate durable rules, tactical mechanisms, and maturity claims. |
 | R02 | [Build the capability truth baseline](work-items/R02-capability-baseline.md) | T2 | passed | R01 | Codex · 2026-07-13 | All 13 surfaces are classified with reproducible evidence; no capability is mislabeled as supported while packaging is incoherent. |
 | R03 | [Define the Entity Semantics Contract](work-items/R03-entity-semantics-contract.md) | T3 | passed | R02 | Codex · 2026-07-13 | ARCH-0106 ratifies five semantic locations, strict Entity admission, C# 14 module facets, and host/context/event boundaries. |
-| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-14 | R04-01 passed. R04-02's aggregate configurations and Identity startup are host-safe; Web/testing ambient writers, cached static loggers, a dead static service locator, and the unified missing-host contract remain. |
+| R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | in-progress | R03 | Codex · 2026-07-14 | R04-01 passed. R04-02's aggregate configurations, Identity startup, and Web pipeline construction are host-safe; five testing-helper writers, cached static loggers, a dead static service locator, and the unified missing-host contract remain. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | pending | R04 | — | Anonymous business domain only. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
@@ -47,7 +47,7 @@ item should normally be `in-progress`.
 | R01 | passed | ARCH-0105 accepted; canonical constitution and public alignment are complete. |
 | R02 | passed | Capability ledger, focused execution record, public-claim audit, and ranked dispositions accepted. |
 | R03 | passed | Entity inventory, ecosystem dispositions, canonical contract, and ARCH-0106 accepted. |
-| R04 | active | R04-01 passed; R04-02 remains in progress. Aggregate configuration is provider-owned and Identity startup is flow-scoped; Web startup is the next bounded writer family. |
+| R04 | active | R04-01 passed; R04-02 remains in progress. Aggregate configuration is provider-owned, Identity and Web startup are flow-scoped, and `KoanDataSpec` is the next bounded writer family. |
 | R05 | no | The foundation path must be stable enough to measure honestly. |
 
 ## Divergence and risk log
@@ -86,6 +86,7 @@ item should normally be `in-progress`.
 | 2026-07-13 | R04-02 | Closure audit found `AggregateConfigs` still caching a lazy first-host provider/repository, seven tracked `src/` ambient assignments outside canonical leases/scopes, thirteen static logging scopes that cache a first-host logger, and a set-only static background provider. The promised unified missing-host failure is also not implemented. | Do not pass R04-02. Repair `AggregateConfigs` first with a no-reset two-host probe, then reduce each remaining owner separately; retain current maturity labels. |
 | 2026-07-14 | R04-02 | The process-wide aggregate cache retained the first host's lazy provider/repository and Data.Backup reflected that private cache for fallback discovery; the new ownership surface was red 1/3 before repair. | Partition configuration atomically by weak provider identity, retain only provider-free type facts process-wide, and make Backup resolve those facts against its injected host. Focused ownership passes 3/3, Data.Core 293/293, and Backup 2/2; keep R04-02 open for the remaining closure owners. |
 | 2026-07-14 | R04-02 | Concurrent `SecIdentityModule.Start` calls both resolved Entity seed work through an unrelated attached fixture because the module only assigned `AppHost.Current` when it was null. | Push a flow scope for the full asynchronous module start and restore the prior host. The focused probe is red 0/1 before and green 1/1 after; Identity passes 114/114 and six alternate assignment statements remain. |
+| 2026-07-14 | R04-02 | Web pipeline construction directly replaced a newer attached process owner even though the generic-host binder already owned the host-lifetime lease. | Flow-scope the application provider across Koan and downstream startup filters, then restore the newer owner. The real TestServer probe is red 0/1 before and green 1/1 after; WellKnown passes 2/2, Web Extensions 110/110, OpenAPI 10/10, and five testing-helper assignments remain. |
 | 2026-07-13 | R04-07 | A pillar-first review could have placed every Koan capability on Entity, recreating the IntelliSense clutter the contract rejects; the first slate then underweighted the delight of discovering events from the Entity itself. | Elect intrinsic `Events` plus module-grown `Cache`, `AI`, and narrowly constrained `Media`; retain direct Data and constrained Canon/Storage verbs; keep control-plane, projection, messaging, and job surfaces off generic Entity. Static `Todo.Events` owns lifecycle composition, instance `todo.Events` raises domain facts, and neither implies broker delivery. Cache remains the one-facet pilot after R04-02/R04-05. |
 
 ## Operator gates

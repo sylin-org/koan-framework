@@ -356,6 +356,26 @@ one remaining production assignment; the shipped data-spec and Entity-conformanc
 other five. They retain distinct lifetime and flow semantics and remain separate increments. R04-02
 stays `in-progress`, and no maturity label changes.
 
+## Fifteenth increment — Web pipeline startup flow ownership
+
+`KoanWebStartupFilter` no longer assigns `AppHost.Current` while constructing the ASP.NET Core
+pipeline. The generic-host binder remains the process-default owner for the host lifetime; the Web
+filter now pushes the application provider only for its pipeline-construction flow, including
+downstream startup filters, and restores the prior ambient owner on exit. Middleware, contributor,
+endpoint, and startup-filter ordering are unchanged.
+
+A real TestServer proof registers an outer startup filter that attaches a newer marker owner
+immediately before Koan constructs the inner pipeline. Before the repair, Koan replaced that marker
+with the Web application provider and the focused surface was red 0/1. The unchanged probe is green
+1/1 after the repair: Koan startup work observes its application provider, the outer filter observes
+its newer marker after Koan returns, and releasing the marker restores the empty ambient state.
+
+The complete WellKnown suite passes 2/2, Web Extensions passes 110/110, and OpenAPI passes 10/10.
+This reduces the alternate-writer inventory from six to five assignment statements, all in shipped
+testing helpers: three in `KoanDataSpec` and two in `EntityConformanceSpecs`. They retain distinct
+fixture semantics and remain separate increments. R04-02 stays `in-progress`, and no capability
+maturity label changes.
+
 ## Smallest meaningful fix
 
 Define one host/runtime lease and make service/configuration-backed registries resolve through it.

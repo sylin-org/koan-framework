@@ -51,6 +51,15 @@ source: src/Koan.Web/
 - Composes with Koan.Data modules via application model statics
 - Keeps web concerns in controllers; avoids startup inline endpoints
 
+### Startup ownership
+
+- The generic-host binder owns the process-default `AppHost` binding for the host lifetime.
+- `KoanWebStartupFilter` flow-scopes the Web application provider while Koan and downstream startup
+  filters construct the pipeline. Startup contributors can therefore use ambient Entity operations
+  without replacing a newer attached process owner.
+- Exiting pipeline construction restores the prior ambient host. This ownership boundary does not
+  change middleware, contributor, endpoint, or startup-filter ordering.
+
 ## Deployment and topology
 
 - Library packaged for ASP.NET Core apps; no standalone runtime

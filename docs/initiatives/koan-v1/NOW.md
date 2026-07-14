@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-14
   status: reviewed
-  scope: R04-02 scoped Identity startup and remaining closure residuals
+  scope: R04-02 scoped Web startup and remaining closure residuals
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -42,10 +42,12 @@ Replace this file at every handoff. It is a restart point, not a diary.
   changed. Aggregate configuration and its repository are now memoized per weak provider identity;
   Backup consumes provider-free type facts through a supported seam and resolves provider metadata
   against its injected host. Identity module startup now scopes Entity operations to the provider it
-  was handed and restores the prior ambient host under simultaneous starts. A closure audit still
-  prevents R04-02 from passing: six alternate `AppHost.Current` assignment statements remain, static
-  logging scopes cache first-host loggers, an unused
-  background-service locator retains its provider, and the unified missing-host failure is absent. A parallel design-only
+  was handed and restores the prior ambient host under simultaneous starts. Web pipeline startup now
+  flow-scopes its application provider across Koan and downstream startup filters without replacing
+  a newer attached owner. A closure audit still prevents R04-02 from passing: five testing-helper
+  `AppHost.Current` assignment statements remain, static logging scopes cache first-host loggers, an
+  unused background-service locator retains its provider, and the unified missing-host failure is
+  absent. A parallel design-only
   [`R04 Entity Facet Candidate Slate`](R04-ENTITY-FACET-CANDIDATES.md) elects the eventual R04-07
   language without changing the active production card or implementing public syntax.
 
@@ -55,18 +57,18 @@ Replace this file at every handoff. It is a restart point, not a diary.
    registry, immutable AI type discovery, clean lifecycle-capture classification, active-host
    relationship metadata, equal-delegate lifecycle idempotence, tracked startup health probing,
    single-owner health scheduling, bounded orchestrator child shutdown, and host-owned application
-   identity, provider-owned aggregate configuration, and flow-owned Identity startup as the stable
+   identity, provider-owned aggregate configuration, and flow-owned Identity/Web startup as the stable
    R04-02 base.
 2. Run the `explore` skill before the next production increment.
-3. Reduce only the next writer family: `KoanWebStartupFilter` directly assigns
-   `AppHost.Current` even though the generic-host binder owns the process-default lease.
-4. Prove Web startup observes its supplied application provider without overwriting a newer attached
-   owner; use a bounded flow scope only for startup work that actually needs ambient Entity access.
+3. Reduce only the next writer family: the three direct assignments in `KoanDataSpec`; first classify
+   the helper's host, fixture, and disposal ownership through the repository `explore` workflow.
+4. Prove repeated and overlapping data specs cannot overwrite or clear another host before choosing
+   between an attached lease and a bounded flow scope.
 5. Keep direct `KoanEnv.CurrentSnapshot.Application` consumers classified as process-snapshot users;
    do not imply they became host-aware through the `AppHost.Identity` repair.
-6. Do not fold the five shipped testing-helper assignments, static logging scopes, the dead service
-   locator, or the unified missing-host error into the Web startup repair. They remain explicit later
-   R04-02 residuals.
+6. Do not fold the two Entity-conformance assignments, static logging scopes, the dead service
+   locator, or the unified missing-host error into the `KoanDataSpec` repair. They remain explicit
+   later R04-02 residuals.
 7. Do not mark R04-02 passed until sequential and parallel ownership probes cover every named owner and
    missing/disposed host behavior is corrective.
 
@@ -76,8 +78,8 @@ R04-01 and R04-02's host lease, vector-model confirmation, AI discovery and life
 classification, active-host relationship metadata, lifecycle idempotence, startup-health ownership,
 scheduler single-owner, orchestrator shutdown, application-identity, and non-hosted startup repairs
 should be committed.
-The closure-audit ledger, provider-owned aggregate-configuration repair, and scoped Identity startup
-should also be committed.
+The closure-audit ledger, provider-owned aggregate-configuration repair, and scoped Identity/Web
+startup repairs should also be committed.
 Treat every unrelated pre-existing change as user-owned.
 
 ## Verification at handoff
@@ -100,6 +102,9 @@ Treat every unrelated pre-existing change as user-owned.
 - simultaneous Identity module startup is red 0/1 before repair and green 1/1 after it; each of two
   reconcilers observes only its supplied provider, the prior host is restored, and Identity passes
   114/114;
+- Web pipeline startup is red 0/1 before repair and green 1/1 after it; a newer attached owner is
+  restored after Koan and downstream startup filters run, while WellKnown passes 2/2, Web Extensions
+  110/110, and OpenAPI 10/10;
 - the relationship metadata two-host probe is red 0/1 before the repair and green 1/1 after it; host B
   resolves its own singleton after host A disposes its registration;
 - the application-identity binder surface is red 3/5 before the repair and green 5/5 after it;
@@ -111,9 +116,9 @@ Treat every unrelated pre-existing change as user-owned.
   correct binding and owned services;
 - aggregate configuration ownership is red 1/3 before repair and green 3/3 after it without reset;
   the complete Data.Core process passes 293/293 and Backup passes 2/2;
-- the closure audit still counts 14 compatibility `AggregateConfigs.Reset()` call sites, six tracked
-  `src/` ambient assignments, thirteen static logging scopes, and one set-only static
-  background provider; therefore R04-02 remains `in-progress`;
+- the closure audit still counts 14 compatibility `AggregateConfigs.Reset()` call sites, five tracked
+  `src/` ambient assignments in shipped testing helpers, thirteen static logging scopes, and one
+  set-only static background provider; therefore R04-02 remains `in-progress`;
 - the complete Data.Core process passes 293/293 with zero disposed-service, meter-factory, or
   cancellation-exception signatures;
 - runtime and consumer tests for R04-02 must cover repeat hosts and disposed-state negative paths;
