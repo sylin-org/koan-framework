@@ -34,6 +34,11 @@ unloading is therefore not a supported scenario. Host activation derived from th
 Entity lifecycle handlers—must still have host-safe ownership; a process-wide type inventory does not
 make process-wide runtime registrations safe.
 
+Embedding and media-analysis lifecycle hooks are static, host-independent behavior definitions. If
+repeated host composition discovers the same closed-generic hook again, Entity lifecycle registration
+is idempotent by delegate equality. Hook execution resolves adapters, storage, logging, and options from
+the active host; the hook definition does not capture them.
+
 ## Failure behavior
 
 - A stopped host is not restored as an ambient fallback.

@@ -24,13 +24,19 @@ validation:
 ## Edge Cases to Account For
 - New entities do not have a prior snapshot — guard code should check `ctx.Prior.HasValue` before dereferencing.
 - Batched deletes may stream across multiple providers; call `ctx.Operation.RequireAtomic()` when you must abort the whole batch on the first failure.
-- Multiple handlers can register for the same stage; order is FIFO registration — avoid assumptions about other modules.
+- Distinct handlers can register for the same stage and run in FIFO order. Registering an equal delegate
+  repeatedly is idempotent so repeatable host composition does not multiply one behavior.
 - `ProtectAll` blocks revision or identifier updates unless explicitly whitelisted via `AllowMutation`.
 - Cancellation should include user-facing reasons; empty strings degrade diagnostics.
 
 ## Registering Hooks
 
 Lifecycle hooks are configured through the static `Events` builder on each entity type. Register them during application boot (for example, inside a module initializer or registrar) so they run once per process.
+
+The pipeline is a process-stable Entity behavior declaration. Do not capture a host service provider,
+scoped service, configuration snapshot, or disposable logger in a handler closure. Resolve runtime
+dependencies through Koan's active ambient host when the handler executes. Different closure instances
+are intentionally different handlers and are not deduplicated.
 
 ```csharp
 public static class ArticleLifecycle
@@ -170,11 +176,12 @@ Because `AfterLoad` runs after provider retrieval, enrichment does not affect pe
 
 ## Testing and Resetting
 
-When running unit tests, call `TEntity.Events.Reset()` in `TestInitialize`/`[SetUp]` to remove previously registered handlers and ensure isolation.
+When running unit tests, use `EntityEventTestHooks.Reset<TEntity, TKey>()` during setup and teardown to
+remove previously registered handlers and ensure isolation.
 
 ```csharp
 [TestInitialize]
-public void ResetHooks() => TestEntity.Events.Reset();
+public void ResetHooks() => EntityEventTestHooks.Reset<TestEntity, string>();
 ```
 
 Avoid registering hooks lazily during tests — production code should configure pipelines at startup, and tests should exercise the same code paths.

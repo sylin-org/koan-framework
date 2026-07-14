@@ -4,7 +4,8 @@ using System.Threading.Tasks;
 namespace Koan.Data.Core.Events;
 
 /// <summary>
-/// Fluent configuration surface for entity lifecycle events.
+/// Fluent configuration surface for process-stable entity lifecycle behavior.
+/// Registering an equal delegate more than once is idempotent; distinct handlers execute in FIFO order.
 /// </summary>
 public sealed class EntityEventsBuilder<TEntity, TKey>
     where TEntity : class

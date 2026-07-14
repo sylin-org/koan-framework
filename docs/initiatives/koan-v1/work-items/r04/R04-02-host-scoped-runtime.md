@@ -84,6 +84,29 @@ handlers to static closed-generic Entity lifecycle arrays for every host. R04-02
 those lifecycle registrations, relationship metadata, `AppHost.Identity`, and the non-hosted
 `StartKoan()` path.
 
+## Fourth increment — idempotent lifecycle composition
+
+- A focused red Core probe registered the same after-upsert delegate twice and observed two executions.
+- A red two-host `AddKoan()` probe observed the same closed-generic AI hook grow from one registration
+  after host A to two after host B.
+- `EntityEventRegistry` now treats an equal delegate as the same process-stable behavior declaration.
+  Distinct handlers remain ordered FIFO, and reset clears the complete pipeline without a parallel
+  idempotence cache.
+- The unchanged probes are green. The complete Data.AI suite passes 82/82, and the focused Data.Core
+  lifecycle class passes 11/11.
+- Lifecycle documentation now states the ownership boundary: handler definitions may be process-stable,
+  but they must not capture a provider, scoped service, configuration snapshot, or other disposable
+  host state. Different closure instances remain intentionally distinct.
+
+This increment prevents repeatable framework composition from multiplying static AI behavior; it does
+not claim that arbitrary application closures are host-safe. During Data.Core verification, disposed
+test hosts also produced background Qdrant health-probe `ObjectDisposedException` logs against
+`DefaultMeterFactory` while the focused tests still exited green. That is a separate host-disposal and
+observability owner and must not be hidden by this repair.
+
+R04-02 remains active for captured lifecycle dependencies, background health/startup work,
+relationship metadata, `AppHost.Identity`, and the non-hosted `StartKoan()` path.
+
 ## Smallest meaningful fix
 
 Define one host/runtime lease and make service/configuration-backed registries resolve through it.

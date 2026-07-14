@@ -73,6 +73,14 @@ internal static class EntityEventRegistry<TEntity, TKey>
 
         lock (Gate)
         {
+            // Module discovery may compose the same process-stable behavior for more than one host.
+            // Delegate equality identifies the same target/method while preserving distinct handlers
+            // (including distinct closures) and their FIFO registration order.
+            if (Array.IndexOf(target, handler) >= 0)
+            {
+                return;
+            }
+
             var length = target.Length;
             var copy = new THandler[length + 1];
             if (length > 0)

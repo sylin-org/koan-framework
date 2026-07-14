@@ -337,6 +337,32 @@ public sealed class EntityLifecycleSpec
         afterUpsertCount.Should().Be(2, "plain Upsert always persists and fires events");
     }
 
+    [Fact]
+    public async Task Registering_the_same_handler_twice_executes_it_once()
+    {
+        var afterUpsertCount = 0;
+
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        ResetHooks(runtime);
+
+        Func<EntityEventContext<LifecycleEntity>, ValueTask> handler = _ =>
+        {
+            afterUpsertCount++;
+            return ValueTask.CompletedTask;
+        };
+
+        LifecycleEntity.Events
+            .AfterUpsert(handler)
+            .AfterUpsert(handler);
+
+        using var lease = runtime.UsePartition(NewPartition());
+        await LifecycleEntity.Upsert(new LifecycleEntity { Title = "Idempotent" });
+
+        afterUpsertCount.Should().Be(1,
+            "repeatable composition must not multiply the same lifecycle behavior");
+    }
+
     private sealed class LifecycleEntity : Entity<LifecycleEntity, string>
     {
         [Identifier]

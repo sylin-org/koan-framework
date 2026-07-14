@@ -1,7 +1,9 @@
 using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Data.AI;
 using Koan.Data.Core;
+using Koan.Data.Core.Events;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -83,6 +85,44 @@ public sealed class RepeatedHostLifecycleSpecs
         finally
         {
             await second.DisposeAsync();
+        }
+
+        AppHost.Current.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Sequential_hosts_register_one_embedding_lifecycle_handler()
+    {
+        EntityEventTestHooks.Reset<RepeatedHostEmbeddingEntity, string>();
+        EmbeddingRegistry.RegisterTypes([typeof(RepeatedHostEmbeddingEntity)]);
+
+        try
+        {
+            var first = await StartHost("memory://lifecycle-handler-host-a");
+            try
+            {
+                EntityEventTestHooks.GetAfterUpsertHandlerCount<RepeatedHostEmbeddingEntity, string>()
+                    .Should().Be(1);
+            }
+            finally
+            {
+                await first.DisposeAsync();
+            }
+
+            var second = await StartHost("memory://lifecycle-handler-host-b");
+            try
+            {
+                EntityEventTestHooks.GetAfterUpsertHandlerCount<RepeatedHostEmbeddingEntity, string>()
+                    .Should().Be(1, "the same process-stable AI hook must not be appended per host");
+            }
+            finally
+            {
+                await second.DisposeAsync();
+            }
+        }
+        finally
+        {
+            EntityEventTestHooks.Reset<RepeatedHostEmbeddingEntity, string>();
         }
 
         AppHost.Current.Should().BeNull();

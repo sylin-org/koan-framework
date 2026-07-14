@@ -25,6 +25,16 @@ source: src/Koan.Data.Core/
 - Primary abstractions: `IEntity<TKey>`, helpers and extensions for data operations
 - Extension points: adapter/provider implementations consume these primitives
 
+## Entity lifecycle ownership
+
+- `TEntity.Events` declares process-stable, host-independent behavior for an Entity type.
+- Registering an equal delegate repeatedly is idempotent. Distinct handlers retain FIFO order.
+- Handlers must not capture a host service provider, scoped service, configuration snapshot, or other
+  disposable runtime state. Runtime dependencies resolve through the active operation's ambient host.
+- Repeated `AddKoan()` composition may rediscover the same static module hook without multiplying it.
+- Distinct closure instances remain distinct handlers; idempotence is not a substitute for correct
+  host-independent handler design.
+
 ## Configuration
 
 - Prefer typed Options for tunables; avoid magic values
