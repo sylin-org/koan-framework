@@ -24,56 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- ARCH-0091: KoanIntegrationHost (xUnit-free host) + the v3 RedisFixture (CachePillarBootstrapSpec).
-         The bespoke Koan.Testing reference is dropped; its transitive graph is restored per-need. -->
+    <!-- Deterministic bootstrap contracts: no pillar or infrastructure modules belong in this lane. -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Containers\Koan.Testing.Containers.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
-
-    <!-- Cache pillar (CachePillarBootstrapSpec) -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Cache\Koan.Cache.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Cache.Abstractions\Koan.Cache.Abstractions.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Cache.Adapter.Sqlite\Koan.Cache.Adapter.Sqlite.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Cache.Adapter.Redis\Koan.Cache.Adapter.Redis.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Cache.Coherence.InMemory\Koan.Cache.Coherence.InMemory.csproj" />
-
-    <!-- Data pillar (DataCorePillarBootstrapSpec) — uses InMemory connector -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\InMemory\Koan.Data.Connector.InMemory.csproj" />
-
-    <!-- Vector pillar (VectorInMemoryPillarBootstrapSpec) — in-process brute-force floor -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Vector\InMemory\Koan.Data.Vector.Connector.InMemory.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Vector\SqliteVec\Koan.Data.Vector.Connector.SqliteVec.csproj" />
-
-    <!-- Storage pillar (StoragePillarBootstrapSpec) — uses Local connector -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Storage\Koan.Storage.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
-
-    <!-- Messaging pillar (MessagingCorePillarBootstrapSpec) — in-process provider -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Connectors\Messaging\InMemory\Koan.Messaging.Connector.InMemory.csproj" />
-
-    <!-- Auth pillar (AuthPillarBootstrapSpec) -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
-
-    <!-- AI pillar (AiPillarBootstrapSpec) -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.AI\Koan.AI.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Connectors\AI\Onnx\Koan.AI.Connector.Onnx.csproj" />
-
-    <!-- Web pillar (WebPillarBootstrapSpec) -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Web\Koan.Web.csproj" />
-
-    <!-- Mcp pillar (McpPillarBootstrapSpec) -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Mcp\Koan.Mcp.csproj" />
-
-    <!-- Media pillar (MediaPillarBootstrapSpec) -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
-
-    <!-- Jobs pillar (JobsPillarBootstrapSpec) -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Jobs\Koan.Jobs.csproj" />
-
-    <!-- Canon pillar (CanonPillarBootstrapSpec) — Canon Web registrar is the only entry point -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Canon.Web\Koan.Canon.Web.csproj" />
   </ItemGroup>
 </Project>

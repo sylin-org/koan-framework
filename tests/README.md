@@ -21,8 +21,9 @@ under **xUnit v3** with **Testcontainers 4.x** module fixtures (ARCH-0091), boot
 
 ## xUnit v3 conventions
 
-Every suite is xUnit v3 in VSTest-compatible mode (so `dotnet test` keeps working). A project opts in
-with:
+Suites are xUnit v3 in VSTest-compatible mode (so `dotnet test` keeps working) unless an explicitly
+documented self-executing infrastructure lane opts out to prevent fixture side effects. A normal
+project opts in with:
 
 ```xml
 <PropertyGroup>
@@ -105,6 +106,34 @@ For data-adapter suites, derive from `KoanDataSpec<TFixture>` instead of hand-wi
 4. Keep specs under `Specs/<Feature>/`.
 
 ## Running suites
+
+### Bootstrap lanes
+
+Bootstrap proof is partitioned by composition cost (ARCH-0109). Use the bounded runner instead of a
+test filter; Reference = Intent means a filter cannot remove modules referenced by the test assembly.
+
+```pwsh
+# Default: 15 deterministic Core bootstrap contracts, no external infrastructure
+./scripts/test-bootstrap.ps1
+
+# 16 real AddKoan() pillar proofs using only in-process backends
+./scripts/test-bootstrap.ps1 -Lane Pillars
+
+# 7 explicit Redis, ONNX, and sqlite-vec proofs
+./scripts/test-bootstrap.ps1 -Lane Infrastructure
+
+# Run the three lanes in cost order
+./scripts/test-bootstrap.ps1 -Lane All
+```
+
+The runner applies separate build/run deadlines and requires a nonzero xUnit execution summary.
+Override a deadline only when diagnosing a known machine constraint, for example
+`-BuildTimeoutSeconds 180 -RunTimeoutSeconds 240`. A timeout kills only that lane's child process tree
+and reports its lane, phase, project, command, deadline, and captured diagnostics. Infrastructure facts
+are xUnit-explicit as an intent marker. The project also sets `IsTestProject=false` so the default
+solution invocation cannot accidentally start Docker or native model work: xUnit/VSTest can initialize
+a class fixture even when every fact is explicit. Direct `dotnet test` is intentionally not an
+execution path for that project; use the bounded runner shown above.
 
 ```pwsh
 dotnet test Koan.sln

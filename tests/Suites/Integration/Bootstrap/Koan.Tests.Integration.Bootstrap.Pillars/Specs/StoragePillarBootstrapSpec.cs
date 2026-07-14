@@ -8,13 +8,12 @@ using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Koan.Tests.Integration.Bootstrap.Specs;
+namespace Koan.Tests.Integration.Bootstrap.Pillars.Specs;
 
 /// <summary>
 /// Boot-smoke for the Storage pillar core (per ARCH-0079). Proves <c>IStorageService</c>
 /// resolves through real <c>AddKoan()</c> reflective discovery with the Local filesystem
-/// connector. See <see cref="DataCorePillarBootstrapSpec"/> for the residual cross-pillar
-/// Redis config note (the data connector's eager-connect is a separate concern from ARCH-0080).
+/// connector.
 /// </summary>
 public sealed class StoragePillarBootstrapSpec : IDisposable
 {
@@ -47,8 +46,6 @@ public sealed class StoragePillarBootstrapSpec : IDisposable
             .WithSetting("Koan:Storage:DefaultProfile", "local")
             .WithSetting("Koan:Storage:Profiles:local:Provider", "local")
             .WithSetting("Koan:Storage:Profiles:local:Container", _tempRoot)
-            // Offline-only — see DataCorePillarBootstrapSpec remarks.
-            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 

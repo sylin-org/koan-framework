@@ -10,7 +10,7 @@ using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Koan.Tests.Integration.Bootstrap.Specs;
+namespace Koan.Tests.Integration.Bootstrap.Infrastructure.Specs;
 
 /// <summary>
 /// Boot-smoke for the durable in-process vector floor (per ARCH-0079). Proves the sqlite-vec connector is
@@ -23,7 +23,7 @@ public sealed class SqliteVecPillarBootstrapSpec
     [VectorAdapter("sqlitevec")]
     public sealed class SqliteVecDoc : Entity<SqliteVecDoc> { }
 
-    [Fact]
+    [Fact(Explicit = true)]
     public async Task AddKoan_loads_vec0_and_ranks_durably()
     {
         var dbPath = Path.Combine(Path.GetTempPath(), $"koan-vectest-{Guid.NewGuid():N}.db");

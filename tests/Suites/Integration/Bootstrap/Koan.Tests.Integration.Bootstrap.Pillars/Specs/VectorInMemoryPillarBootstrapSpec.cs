@@ -9,7 +9,7 @@ using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Koan.Tests.Integration.Bootstrap.Specs;
+namespace Koan.Tests.Integration.Bootstrap.Pillars.Specs;
 
 /// <summary>
 /// Boot-smoke for the in-process vector floor (per ARCH-0079). Proves the InMemory vector connector is

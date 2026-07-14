@@ -28,9 +28,9 @@ public sealed class EmbeddedModuleManifestSpec
 
         var skips = AppBootstrapper.LoadIntentModulesFromManifest(Spy, typeof(EmbeddedModuleManifestSpec).Assembly);
 
-        skips.Should().Be(0, "every Koan name in the test manifest resolves to a referenced, loadable assembly");
-        loaded.Should().Contain("Koan.Core").And.Contain("Koan.Data.Core",
-            "the manifest's Koan.* lines must be loaded and handed to the accumulator");
+        skips.Should().Be(1, "the deliberately unavailable Koan module is reported without failing the manifest pass");
+        loaded.Should().ContainSingle().Which.Should().Be("Koan.Core",
+            "only referenced, loadable Koan modules are handed to the accumulator");
         loaded.Should().NotContain("System.Text.Json",
             "non-Koan lines are filtered out (the manifest scope mirrors the legacy Koan.*.dll scan)");
     }

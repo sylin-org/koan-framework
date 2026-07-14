@@ -6,7 +6,7 @@ using Koan.Web.Auth.Providers;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Koan.Tests.Integration.Bootstrap.Specs;
+namespace Koan.Tests.Integration.Bootstrap.Pillars.Specs;
 
 /// <summary>
 /// Boot-smoke for the Auth pillar (per ARCH-0079). Proves <c>IProviderRegistry</c> resolves
@@ -33,8 +33,6 @@ public sealed class AuthPillarBootstrapSpec
     public async Task AddKoan_resolves_IProviderRegistry_through_real_bootstrap()
     {
         await using var host = await KoanIntegrationHost.Configure()
-            // Offline-only — see DataCorePillarBootstrapSpec remarks.
-            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 

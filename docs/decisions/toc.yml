@@ -160,6 +160,8 @@
       href: ARCH-0107-host-scoped-koanlog.md
     - name: ARCH-0108 Corrective host-context failures
       href: ARCH-0108-corrective-host-context-failures.md
+    - name: ARCH-0109 Bootstrap evidence partitioned by composition cost
+      href: ARCH-0109-bounded-bootstrap-test-lanes.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

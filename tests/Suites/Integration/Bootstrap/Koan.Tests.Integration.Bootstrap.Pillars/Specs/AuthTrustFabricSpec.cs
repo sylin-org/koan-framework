@@ -6,7 +6,7 @@ using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Koan.Tests.Integration.Bootstrap.Specs;
+namespace Koan.Tests.Integration.Bootstrap.Pillars.Specs;
 
 /// <summary>
 /// SEC-0001 Phase 2 (2g), per ARCH-0079: the trust fabric composes through real <c>AddKoan()</c> reflective
@@ -20,8 +20,6 @@ public sealed class AuthTrustFabricSpec
     public async Task AddKoan_registers_the_trust_issuer_through_real_bootstrap()
     {
         await using var host = await KoanIntegrationHost.Configure()
-            // Offline-only — mirrors AuthPillarBootstrapSpec.
-            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 

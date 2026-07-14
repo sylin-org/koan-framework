@@ -6,7 +6,7 @@ using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Koan.Tests.Integration.Bootstrap.Specs;
+namespace Koan.Tests.Integration.Bootstrap.Pillars.Specs;
 
 /// <summary>
 /// Boot-smoke for the Mcp pillar (per ARCH-0079). Proves <c>McpServer</c> resolves
@@ -37,8 +37,6 @@ public sealed class McpPillarBootstrapSpec
         await using var host = await KoanIntegrationHost.Configure()
             // Explicit-off defends future StdioTransport behavioural changes.
             .WithSetting("Koan:Mcp:EnableStdioTransport", "false")
-            // Offline-only — see DataCorePillarBootstrapSpec remarks.
-            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 

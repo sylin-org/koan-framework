@@ -10,7 +10,7 @@ using Koan.Web.Auth.Flow.Builtin;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Koan.Tests.Integration.Bootstrap.Specs;
+namespace Koan.Tests.Integration.Bootstrap.Pillars.Specs;
 
 /// <summary>
 /// Canon for the auth de-split (ARCH-0086 Facet 2 stage b): <c>IKoanAuthFlowHandler</c> implementations
@@ -25,8 +25,6 @@ public sealed class AuthDiscoverableContributorSpec
     public async Task Bootstrap_routes_auth_flow_handler_discovery_through_the_registry()
     {
         await using var host = await KoanIntegrationHost.Configure()
-            // Offline-only — see AuthPillarBootstrapSpec / DataCorePillarBootstrapSpec remarks.
-            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 
@@ -47,7 +45,6 @@ public sealed class AuthDiscoverableContributorSpec
     public async Task Discovered_flow_handlers_register_builtins_including_the_migrated_contributor()
     {
         await using var host = await KoanIntegrationHost.Configure()
-            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 

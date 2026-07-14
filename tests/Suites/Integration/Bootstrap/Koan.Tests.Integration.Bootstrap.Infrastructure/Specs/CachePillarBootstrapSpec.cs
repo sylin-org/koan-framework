@@ -12,7 +12,7 @@ using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Koan.Tests.Integration.Bootstrap.Specs;
+namespace Koan.Tests.Integration.Bootstrap.Infrastructure.Specs;
 
 /// <summary>
 /// Full-DI bootstrap smoke for the cache pillar. Unlike unit tests and even the per-adapter
@@ -41,7 +41,7 @@ public sealed class CachePillarBootstrapSpec(RedisFixture redis, ITestOutputHelp
 {
     private readonly ITestOutputHelper _output = output;
 
-    [Fact]
+    [Fact(Explicit = true)]
     public async Task AddKoan_resolves_ICacheClient_through_real_bootstrap()
     {
         Assert.SkipWhen(!redis.IsAvailable, redis.Reason ?? "Redis unavailable");
@@ -61,7 +61,7 @@ public sealed class CachePillarBootstrapSpec(RedisFixture redis, ITestOutputHelp
         client.Should().NotBeNull();
     }
 
-    [Fact]
+    [Fact(Explicit = true)]
     public async Task AddKoan_registers_memory_sqlite_and_redis_as_ICacheStore()
     {
         Assert.SkipWhen(!redis.IsAvailable, redis.Reason ?? "Redis unavailable");
@@ -80,7 +80,7 @@ public sealed class CachePillarBootstrapSpec(RedisFixture redis, ITestOutputHelp
         storeNames.Should().Contain("redis");
     }
 
-    [Fact]
+    [Fact(Explicit = true)]
     public async Task AddKoan_activates_coherence_via_redis_channel_end_to_end()
     {
         Assert.SkipWhen(!redis.IsAvailable, redis.Reason ?? "Redis unavailable");

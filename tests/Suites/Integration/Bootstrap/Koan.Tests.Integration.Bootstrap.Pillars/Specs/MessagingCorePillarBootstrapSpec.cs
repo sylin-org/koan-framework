@@ -6,7 +6,7 @@ using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Koan.Tests.Integration.Bootstrap.Specs;
+namespace Koan.Tests.Integration.Bootstrap.Pillars.Specs;
 
 /// <summary>
 /// Boot-smoke for the Messaging pillar core (per ARCH-0079). Proves the messaging proxy
@@ -22,10 +22,6 @@ namespace Koan.Tests.Integration.Bootstrap.Specs;
 /// broker-backed <c>IMessageBus</c> boot smoke belongs in the
 /// <c>Koan.Messaging.Connector.RabbitMq</c> adapter suite.
 /// </para>
-/// <para>
-/// See <see cref="DataCorePillarBootstrapSpec"/> for the residual cross-pillar Redis config
-/// note — the data connector's eager-connect is a separate concern from ARCH-0080.
-/// </para>
 /// </remarks>
 public sealed class MessagingCorePillarBootstrapSpec
 {
@@ -40,8 +36,6 @@ public sealed class MessagingCorePillarBootstrapSpec
     public async Task AddKoan_resolves_IMessageProxy_through_real_bootstrap()
     {
         await using var host = await KoanIntegrationHost.Configure()
-            // Offline-only — see DataCorePillarBootstrapSpec remarks.
-            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 

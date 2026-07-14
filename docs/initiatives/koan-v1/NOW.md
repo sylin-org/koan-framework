@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-14
   status: reviewed
-  scope: R04-02 passed; R04-03 next
+  scope: R04-03 bootstrap topology green; failed-start cleanup next
 ---
 
 # Koan V1 Reorganization Current Handoff
@@ -20,11 +20,10 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 - Work item: [R04 — Harden the framework foundation](work-items/R04-foundation-hardening.md)
 - State: `in-progress`
-- Active child: none; [R04-02 — Establish host-scoped runtime ownership](work-items/r04/R04-02-host-scoped-runtime.md)
-  passed and [R04-03 — Establish bounded bootstrap test lanes](work-items/r04/R04-03-bounded-bootstrap-lanes.md)
-  is next.
-- Objective: begin R04-03 from the repeatable-host foundation and make bootstrap evidence finish or
-  fail with a bounded, diagnostic result.
+- Active child: [R04-03 — Establish bounded bootstrap test lanes](work-items/r04/R04-03-bounded-bootstrap-lanes.md)
+  is in progress; its ARCH-0109 topology increment is green.
+- Objective: close the remaining failed-start ownership gap in `KoanIntegrationHost`, then rerun the
+  bounded lanes and decide R04-03.
 - Foundation: R01 passed through [ARCH-0105](../../decisions/ARCH-0105-product-constitution.md) and the
   canonical [product constitution](../../architecture/product-constitution.md).
 - Current state: R02 and R03 passed. All 13 surfaces are classified in
@@ -58,21 +57,24 @@ Replace this file at every handoff. It is a restart point, not a diary.
   sample consumer, while the public DI-owned service registry remains unchanged. ARCH-0108 now gives
   required common Data/AI paths one typed missing/disposed/missing-service contract while optional AI
   probes remain quiet. Core 204/204, Core Unit 79/79, AI Unit 157/157, and Data.Core pass; closure
-  inventory is clean, so R04-02 is passed. A parallel design-only
+  inventory is clean, so R04-02 is passed. ARCH-0109 now separates bootstrap evidence into a
+  deterministic 15-test Core lane, a 16-test offline pillar lane, and a seven-test explicit
+  infrastructure lane. `scripts/test-bootstrap.ps1` bounds build and run phases, kills only its owned
+  process tree, and requires a nonzero xUnit summary. Observed test execution is 4.469s, 7.008s, and
+  120.068s respectively; all three lanes pass. The test-host failed-start cleanup remains before
+  R04-03 can pass. A parallel design-only
   [`R04 Entity Facet Candidate Slate`](R04-ENTITY-FACET-CANDIDATES.md) elects the eventual R04-07
   language without changing the active production card or implementing public syntax.
 
 ## Next safe actions
 
-1. Treat R04-02 and ARCH-0108 as the stable host/lifecycle base; do not reopen it for unrelated
-   bootstrap, packaging, explanation, or Entity-language work.
-2. Run the repository `explore` skill before R04-03's first production change.
-3. Reproduce the non-completing bootstrap lane with an explicit executable runner and an observed test
-   count; separate build time, discovery, composition, infrastructure wait, and teardown.
-4. Elect the smallest deterministic lane that can finish or emit a phase-specific timeout without
-   requiring external infrastructure.
-5. Classify the known integration-host failed-start concern inside R04-03 instead of retroactively
-   broadening ARCH-0108.
+1. Treat ARCH-0109's three project boundaries and bounded runner as the stable bootstrap topology.
+2. Add one focused `Koan.Testing.Hosting` proof that a host built but not started successfully is
+   disposed before `KoanIntegrationHost.Builder.StartAsync` rethrows.
+3. Make the smallest ownership repair needed by that proof; do not change application runtime behavior.
+4. Re-run Fast and Pillars, the focused hosting proof, strict docs, and the default explicit-test check.
+5. Pass R04-03 only if the failed-start path is green and no command can report success without a
+   nonzero executed count.
 6. Keep the obsolete test-authoring guide for R04-08 and package restore truth for R04-04.
 7. Preserve the current maturity labels until the later clean-room and negotiation gates pass.
 
@@ -85,7 +87,8 @@ should be committed.
 The closure-audit ledger, provider-owned aggregate-configuration repair, scoped Identity/Web startup,
 and binder-owned data-spec and Entity-conformance repairs should also be committed. Host-scoped
 logging and the dead-locator deletion should be committed; ARCH-0108 and its Data/AI consumer
-migration may be the only active production diff.
+migration should be committed. The ARCH-0109 lane split, runner, and documentation may be the only
+active diff; no application runtime code belongs in that increment.
 Treat every unrelated pre-existing change as user-owned.
 
 ## Verification at handoff
@@ -139,6 +142,13 @@ Treat every unrelated pre-existing change as user-owned.
   required Data/AI host-context failures and R04-02 is passed;
 - the complete Data.Core process passes 294/294 with zero disposed-service, meter-factory, or
   cancellation-exception signatures;
+- the bounded Fast bootstrap lane passes 15/15 in 4.469s with only Core/test-host references;
+- the bounded offline Pillars lane passes 16/16 in 7.008s without Redis configuration or external
+  infrastructure;
+- the explicitly selected Infrastructure lane passes 7/7 in 120.068s; its facts remain explicit and
+  are not a default solution-test dependency;
+- the runner rejects missing/zero execution summaries, reports lane/phase/project/command/deadline,
+  and kills only its owned process tree on timeout;
 - runtime and consumer tests for R04-02 must cover repeat hosts and disposed-state negative paths;
 - documentation metadata, links, TOC, privacy scan, and `git diff --check` pass;
 - no private downstream detail enters evidence or examples.
@@ -152,4 +162,6 @@ Treat every unrelated pre-existing change as user-owned.
   shutdown; the repaired contract propagates and awaits cancellation-aware work.
 - Do not use a passing source build to claim package installation is fixed.
 - Do not accept a zero test-command exit code without a discovered/executed test count.
+- Do not treat an xUnit filter as composition isolation; module references define bootstrap intent.
+- Do not make the infrastructure lane a default gate or claim its observed duration across machines.
 - Do not promote maturity until external clean-room and failure evidence earns it.

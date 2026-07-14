@@ -16,7 +16,7 @@ using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Koan.Tests.Integration.Bootstrap.Specs;
+namespace Koan.Tests.Integration.Bootstrap.Infrastructure.Specs;
 
 /// <summary>
 /// Boot-smoke for the in-process embeddings floor (per ARCH-0079). Proves the ONNX connector, discovered
@@ -36,7 +36,7 @@ public sealed class OnnxEmbeddingsPillarBootstrapSpec
         return File.Exists(model) ? model : null;
     }
 
-    [Fact]
+    [Fact(Explicit = true)]
     public async Task AddKoan_registers_onnx_embedder_and_embeds_semantically()
     {
         var modelPath = FindModelPath();
@@ -68,7 +68,7 @@ public sealed class OnnxEmbeddingsPillarBootstrapSpec
             "a real embedding model must place 'cats'~'felines' closer than 'cats'~'quarterly report'");
     }
 
-    [Fact]
+    [Fact(Explicit = true)]
     public async Task Client_Embed_routes_to_the_in_process_onnx_source()
     {
         var modelPath = FindModelPath();
@@ -107,7 +107,7 @@ public sealed class OnnxEmbeddingsPillarBootstrapSpec
         }
     }
 
-    [Fact]
+    [Fact(Explicit = true)]
     public async Task Misconfigured_model_path_degrades_cleanly_without_registering()
     {
         // A configured-but-missing model must not silently register a broken embedder. The contributor

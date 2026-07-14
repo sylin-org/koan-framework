@@ -6,7 +6,7 @@ using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Koan.Tests.Integration.Bootstrap.Specs;
+namespace Koan.Tests.Integration.Bootstrap.Pillars.Specs;
 
 /// <summary>
 /// Boot-smoke for the Media pillar (per ARCH-0079, updated for MEDIA-0004
@@ -27,8 +27,6 @@ public sealed class MediaPillarBootstrapSpec
     public async Task AddKoan_resolves_IMediaRecipeRegistry_through_real_bootstrap()
     {
         await using var host = await KoanIntegrationHost.Configure()
-            // Offline-only — see DataCorePillarBootstrapSpec remarks.
-            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 
