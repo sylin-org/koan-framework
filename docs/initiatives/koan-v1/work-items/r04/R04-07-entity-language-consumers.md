@@ -29,13 +29,16 @@ language drift; maintainers fear cleanup because consumer compilation is not gat
 ## Current evidence
 
 ARCH-0106 and R03 inventory classify each hazard. A disposable C# 14 probe proved static and instance
-extension members on a constrained Entity subtype.
+extension members on a constrained Entity subtype. The
+[`R04 Entity Facet Candidate Slate`](../../R04-ENTITY-FACET-CANDIDATES.md) elects `Cache` as the
+consumer-infrastructure pilot, `AI` as the flagship, and narrowly constrained `Media` as the next
+interface proof; it explicitly keeps control-plane pillars and generic messaging/jobs off Entity.
 
 ## Smallest meaningful fix
 
 Create repository-owned consumer compilation tests for base-absence, module-presence, invalid receiver,
-all-module collision, and module removal. Pilot one non-destructive facet (prefer cache inspection over
-mutation) without migrating all modules. Separately deprecate or constrain one broad receiver.
+all-module collision, and module removal. Pilot non-destructive `Cache` explanation/inspection without
+migrating all modules. Separately deprecate or constrain one broad receiver.
 
 ## Failure behavior
 

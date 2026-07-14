@@ -31,7 +31,9 @@ Replace this file at every handoff. It is a restart point, not a diary.
   now bound implementation choices. The dependency-ordered [`R04-BACKLOG.md`](R04-BACKLOG.md) is
   established, R04-01 passed, and R04-02's host lease, durable vector-model confirmation, AI
   discovery classification, and idempotent lifecycle-composition increments are green. No capability
-  maturity label changed.
+  maturity label changed. A parallel design-only
+  [`R04 Entity Facet Candidate Slate`](R04-ENTITY-FACET-CANDIDATES.md) elects the eventual R04-07
+  language without changing the active production card or implementing public syntax.
 
 ## Next safe actions
 
@@ -70,6 +72,7 @@ unrelated pre-existing change as user-owned.
 
 - Do not broaden R04-02 into package, bootstrap, explanation, or Entity-facet work.
 - Do not migrate public Entity vocabulary before false-success and host-lifetime hazards are bounded.
+- Do not treat the R04 facet slate's target grammar as current supported syntax.
 - Do not use a passing source build to claim package installation is fixed.
 - Do not accept a zero test-command exit code without a discovered/executed test count.
 - Do not promote maturity until external clean-room and failure evidence earns it.
