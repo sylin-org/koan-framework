@@ -4,6 +4,7 @@ internal sealed record GoldenJourneyEvidence(
     string Lane,
     DateTimeOffset StartedAtUtc,
     double TotalSeconds,
+    bool CompositionLockfileObserved,
     bool BusinessRuleObserved,
     bool PersistenceObserved,
     bool ReactiveWorkObserved,

@@ -14,10 +14,11 @@ validation:
 
 # Composition Lockfile (`koan.lock.json`)
 
-**What is this app, exactly?** — answered without booting it. Referencing `Sylin.Koan.Core` makes
-your build emit a checked-in `koan.lock.json` describing the app's composition. PR review then shows
-composition drift in a plain `git diff`; at boot the host writes a richer **resolved twin** and the
-boot report prints a one-line verdict.
+**What is this app, exactly?** — answered without booting it. Any supported package graph containing
+`Sylin.Koan.Core` makes the application build emit a checked-in `koan.lock.json` describing its static
+composition. The target flows through Koan's application bundles, so no direct Core reference is
+required. PR review then shows composition drift in a plain `git diff`; at boot the host writes a
+richer **resolved twin** and the boot report prints a one-line verdict.
 
 ## The UX
 
@@ -43,7 +44,7 @@ Composition  8 modules · lockfile DRIFT(+Koan.Cache)
 
 | File | Written by | When | Checked in? | Sections |
 |---|---|---|---|---|
-| `koan.lock.json` | the `Sylin.Koan.Core` build target | every build | **yes** | `schema`, `app`, `modules` |
+| `koan.lock.json` | the transitive `Sylin.Koan.Core` build target | every supported application build | **yes** | `schema`, `app`, `modules` |
 | `obj/koan.lock.resolved.json` | the host at boot | each run (non-production) | no (gitignored) | the above **plus** `elections`, `configKeys`, `entities`, (best-effort) `capabilities` |
 
 The build-time file carries only what is honestly knowable **without running the app**: identity and
@@ -86,9 +87,9 @@ connection string's *path* appears; its secret never does).
 
 ## Reference = Intent
 
-Referencing `Sylin.Koan.Core` is the whole opt-in: NuGet auto-imports `build/Sylin.Koan.Core.targets`,
-which writes `koan.lock.json` after `Build` for **app** projects (`OutputType=Exe`). Force it on or off
-with `$(KoanComposition)`:
+Referencing a package that depends on `Sylin.Koan.Core` is the whole opt-in: NuGet imports
+`buildTransitive/Sylin.Koan.Core.targets`, which writes `koan.lock.json` after `Build` for **app**
+projects (`OutputType=Exe`). Force it on or off with `$(KoanComposition)`:
 
 ```xml
 <PropertyGroup>
@@ -96,9 +97,11 @@ with `$(KoanComposition)`:
 </PropertyGroup>
 ```
 
-> **In-repo note.** A `ProjectReference` does not import a referenced package's `build/` targets — only
-> a real `PackageReference` does. The dogfood sample `samples/S0.ConsoleJsonRepo` imports the target
-> explicitly; your app, referencing the package, gets it automatically.
+> **Source-checkout note.** A `ProjectReference` does not import a referenced package's build assets.
+> Koan's FirstUse and GoldenJourney source contracts import the same target centrally through the
+> repository build, while their package-only copies receive it through `buildTransitive`. Other
+> source-only framework dogfood projects must explicitly import the target or set
+> `KoanComposition=false`; package consumers need no project-file ceremony.
 
 ## Drift gates
 
@@ -142,7 +145,8 @@ public sealed class MyPillarComposition : IKoanCompositionContributor
   `Entity<T>` access), so the list is typically what the app touched during startup.
 - The resolved twin and the boot-line comparison need a content root, so they apply to host-based apps
   (`WebApplication` / generic `Host`) in development (`ContentRootPath` = the project directory). The
-  build-time `koan.lock.json` is produced for **every** app regardless.
+  build-time `koan.lock.json` is produced for supported package applications and Koan's executable
+  source contracts regardless of whether the app is later started.
 
 ## See also
 

@@ -25,6 +25,7 @@ public sealed class FirstUseContractTests
             TestContext.Current.CancellationToken);
 
         Assert.Equal("sqlite", evidence.SelectedAdapter);
+        Assert.True(evidence.CompositionLockfileObserved);
         Assert.True(evidence.StartupReported);
         Assert.True(evidence.FactsConverged);
         Assert.True(evidence.DryRunPreservedState);

@@ -7,6 +7,8 @@ internal static class PackagingConstants
     public const string NuGetSource = "https://api.nuget.org/v3/index.json";
     public const string NuGetFlatContainer = "https://api.nuget.org/v3-flatcontainer";
     public const string PackagePrefix = "Sylin.Koan";
+    public const string CorePackageId = "Sylin.Koan.Core";
+    public const string CoreCompositionTargetPackagePath = "buildTransitive/Sylin.Koan.Core.targets";
     public const string DefaultBeforeRevision = "HEAD~1";
     public const string DefaultAfterRevision = "HEAD";
     public const int EvaluationParallelism = 8;
@@ -22,6 +24,21 @@ internal static class PackagingConstants
         public const string McpSessionHeader = "Mcp-Session-Id";
         public const string McpProtocolVersion = "2025-06-18";
         public const string RuntimeFactsUri = "koan://facts";
+        public const string CompositionLockfileName = "koan.lock.json";
+        public const string CompositionSchemaProperty = "schema";
+        public const string CompositionAppProperty = "app";
+        public const string CompositionNameProperty = "name";
+        public const string CompositionVersionProperty = "koan";
+        public const string CompositionTargetFrameworkProperty = "tfm";
+        public const string CompositionModulesProperty = "modules";
+        public const string CompositionModuleIdProperty = "id";
+        public const string UnknownCompositionVersion = "0.0";
+        public const string CoreModuleId = "Koan.Core";
+        public const string SqliteModuleId = "Koan.Data.Connector.Sqlite";
+        public const string McpModuleId = "Koan.Mcp";
+        public const string JobsModuleId = "Koan.Jobs";
+        public const string TargetFramework = "net10.0";
+        public const int CompositionLockfileSchema = 1;
         public const string SelfUri = "koan://self";
         public const string CustomToolsProperty = "customTools";
         public const string EmptySelfMessage = "nothing here you can use yet";
@@ -34,6 +51,7 @@ internal static class PackagingConstants
     public static class FirstUse
     {
         public const string ProjectFile = "FirstUse.csproj";
+        public const string ApplicationName = "Koan.FirstUse";
         public const string EvidenceFileName = "first-use-package-evidence.json";
         public const string HealthPath = ApplicationProbe.HealthPath;
         public const string FactsPath = ApplicationProbe.FactsPath;
@@ -54,6 +72,7 @@ internal static class PackagingConstants
     public static class GoldenJourney
     {
         public const string ProjectFile = "GoldenJourney.csproj";
+        public const string ApplicationName = "Koan.GoldenJourney";
         public const string EvidenceFileName = "golden-journey-package-evidence.json";
         public const string ReviewsPath = "api/reviews";
         public const string PendingTool = "review_pending";

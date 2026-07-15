@@ -32,6 +32,8 @@ source: src/Koan.Core/
   logging without a second ambient owner.
 - `IKoanRuntimeFacts`: read-only access to the current host's schema-versioned runtime fact envelope.
 - `KoanFactJson`: the canonical deterministic JSON projection used by Web and MCP.
+- `buildTransitive/Sylin.Koan.Core.targets`: emits static composition, the embedded intent manifest,
+  and trimming roots for applicable executable builds even when Core arrives through a bundle.
 
 ## Usage guidance
 
@@ -52,6 +54,8 @@ source: src/Koan.Core/
   selected provider without `ILoggerFactory` emits nothing and never falls back to another host.
 - Read fact `Code`/`ReasonCode`/`State` for automation. Do not parse startup prose or treat
   `Complete=false` as healthy.
+- Keep the checked-in `koan.lock.json` under review. It contains static app/module identity only;
+  negotiated elections and runtime facts belong to `obj/koan.lock.resolved.json`.
 
 ## Observability & Security
 

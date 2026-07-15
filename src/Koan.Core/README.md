@@ -32,6 +32,9 @@ dotnet add package Sylin.Koan.Core
 - `IKoanRuntimeFacts.Current` exposes the current host's versioned, redacted composition and failure
   facts. An incomplete snapshot is unknown, never implicit success. Startup, health, Web diagnostics,
   and MCP project this same envelope.
+- The package carries `buildTransitive/Sylin.Koan.Core.targets`. Any executable package consumer whose
+  dependency graph contains Core refreshes a checked-in `koan.lock.json`; `KoanComposition=false`
+  explicitly opts out.
 
 ## Links
 - Repo: https://github.com/sylin-org/Koan-framework

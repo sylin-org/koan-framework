@@ -15,6 +15,13 @@ internal sealed class GoldenJourneyApplicationProbe
         string lane,
         CancellationToken cancellationToken)
     {
+        var compositionLockfileObserved = CompositionLockfileProbe.Require(
+            applicationDirectory,
+            PackagingConstants.GoldenJourney.ApplicationName,
+            PackagingConstants.ApplicationProbe.CoreModuleId,
+            PackagingConstants.ApplicationProbe.SqliteModuleId,
+            PackagingConstants.ApplicationProbe.JobsModuleId,
+            PackagingConstants.ApplicationProbe.McpModuleId);
         var startedAt = DateTimeOffset.UtcNow;
         var total = Stopwatch.StartNew();
         var steps = new List<ApplicationStepEvidence>();
@@ -262,6 +269,7 @@ internal sealed class GoldenJourneyApplicationProbe
             lane,
             startedAt,
             Math.Round(total.Elapsed.TotalSeconds, 3),
+            compositionLockfileObserved,
             businessRuleObserved,
             persistenceObserved,
             reactiveWorkObserved,

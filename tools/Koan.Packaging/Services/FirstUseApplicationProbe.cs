@@ -16,6 +16,12 @@ internal sealed class FirstUseApplicationProbe
         string lane,
         CancellationToken cancellationToken)
     {
+        var compositionLockfileObserved = CompositionLockfileProbe.Require(
+            applicationDirectory,
+            PackagingConstants.FirstUse.ApplicationName,
+            PackagingConstants.ApplicationProbe.CoreModuleId,
+            PackagingConstants.ApplicationProbe.SqliteModuleId,
+            PackagingConstants.ApplicationProbe.McpModuleId);
         var startedAt = DateTimeOffset.UtcNow;
         var total = Stopwatch.StartNew();
         var steps = new List<ApplicationStepEvidence>();
@@ -171,6 +177,7 @@ internal sealed class FirstUseApplicationProbe
             RuntimeInformation.OSDescription,
             startedAt,
             Math.Round(total.Elapsed.TotalSeconds, 3),
+            compositionLockfileObserved,
             selectedAdapter,
             startupReported,
             factsConverged,

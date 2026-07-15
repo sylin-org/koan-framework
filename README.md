@@ -172,9 +172,10 @@ need them; activation is deterministically ordered and reported.
   semantic search is a query, not a subsystem you build.
 - **Decision-first engineering** — 280+ ADRs, integration-tests-as-canon, and a self-assessment
   you can read. The architecture is auditable, not asserted.
-- **Composition you can diff** — every build writes a checked-in
-  [`koan.lock.json`](docs/guides/composition-lockfile.md) describing the app's modules and elections,
-  so PR review *sees* composition drift in a plain `git diff` and the boot report self-checks it.
+- **Composition you can diff** — supported application builds write a checked-in
+  [`koan.lock.json`](docs/guides/composition-lockfile.md) describing the statically referenced Koan
+  modules, so PR review *sees* composition drift in a plain `git diff`. At runtime, the resolved twin
+  adds elections and the boot report checks the two views for drift.
 - **Your app inherits a test suite** — reference
   [`Sylin.Koan.Testing`](docs/guides/testing-your-app.md) and write one method per entity;
   `EntityConformanceSpecs<T>` runs round-trip, pushdown-vs-reference-oracle, paging, partition, cache

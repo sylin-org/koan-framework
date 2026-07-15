@@ -6,6 +6,7 @@ internal sealed record FirstUseEvidence(
     string OperatingSystem,
     DateTimeOffset StartedAtUtc,
     double TotalSeconds,
+    bool CompositionLockfileObserved,
     string SelectedAdapter,
     bool StartupReported,
     bool FactsConverged,

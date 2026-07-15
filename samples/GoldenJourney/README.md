@@ -53,8 +53,9 @@ one preserves the previous result and adds one business-aligned capability.
 the business priority rule, completed job progress, selected Jobs ledger and transport, identical
 operator/agent facts, MCP tool discovery, rejection before assessment, honest custom-tool dry-run,
 caller-specific `koan://self` acknowledgement of both custom workflows, an agent recommendation
-observed through REST, and unavailable-adapter explanation followed by a clean restart. Package-only
-clean-room proof is tracked separately and must pass before that lane is claimed as supported.
+observed through REST, unavailable-adapter explanation followed by a clean restart, and the checked-in
+composition lockfile. Package-only clean-room proof repeats the lockfile assertion after the Core
+target flows transitively through `Sylin.Koan.App`.
 
 This is not a production security template. HTTP MCP is enabled for local Development, the agent
 recommendation is deliberately non-final, and authentication/authorization must be designed for the

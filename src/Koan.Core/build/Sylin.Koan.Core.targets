@@ -2,18 +2,19 @@
   <!--
     P1.1 · Composition lockfile (build-time emitter).
 
-    NuGet auto-imports build/<PackageId>.targets for PackageReference consumers, so referencing
-    Sylin.Koan.Core gives an app a checked-in koan.lock.json refreshed on every build — `git diff`
-    then shows composition drift in PR review WITHOUT booting the app. The boot-time host writes the
-    richer resolved twin (obj/koan.lock.resolved.json) and compares.
+    NuGet auto-imports buildTransitive/<PackageId>.targets for direct and transitive PackageReference
+    consumers, so referencing a Koan application bundle gives an app a checked-in koan.lock.json
+    refreshed on every build — `git diff` then shows composition drift in PR review WITHOUT booting
+    the app. The boot-time host writes the richer resolved twin (obj/koan.lock.resolved.json) and compares.
 
     Build-time we can honestly emit only app + modules (capabilities/elections/entities are
     runtime-negotiated — ARCH-0084). Module versions are major.minor (ARCH-0085 pre-1.0 breaking
     tier) so the checked-in file is byte-stable across commits and diffs stay meaningful.
 
     Scope: app projects (OutputType=Exe) by default; force on/off with $(KoanComposition)=true|false.
-    In-repo (ProjectReference) NuGet does not auto-import this — the dogfood sample imports it
-    explicitly; real consumers get it via PackageReference.
+    ProjectReference does not import package build assets. The repository's supported source
+    application contracts import this file centrally from Directory.Build.targets; package consumers
+    receive it transitively without project-file ceremony.
   -->
   <PropertyGroup>
     <_KoanCompositionEnabled Condition="'$(KoanComposition)' == 'true'">true</_KoanCompositionEnabled>

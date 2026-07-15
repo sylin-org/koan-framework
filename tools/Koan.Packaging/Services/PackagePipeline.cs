@@ -57,6 +57,7 @@ internal sealed class PackagePipeline(
             }
             var inspected = InspectPackage(artifact);
             ValidateMetadata(package, inspected, manifest.SourceCommit);
+            ValidateRequiredBuildAssets(package.PackageId, artifact);
             package.PackageDependencies = inspected.Dependencies;
             package.PackageFile = Path.GetFileName(artifact);
             package.PackageSha256 = await HashAsync(artifact, cancellationToken);
@@ -181,6 +182,23 @@ internal sealed class PackagePipeline(
             ? new Version(0, minimum.Minor + 1, 0)
             : new Version(minimum.Major + 1, 0, 0);
         return maximum == expectedMaximum;
+    }
+
+    internal static void ValidateRequiredBuildAssets(string packageId, string packagePath)
+    {
+        if (!string.Equals(packageId, PackagingConstants.CorePackageId, StringComparison.OrdinalIgnoreCase)) return;
+
+        using var archive = ZipFile.OpenRead(packagePath);
+        if (archive.Entries.Any(entry => string.Equals(
+                entry.FullName,
+                PackagingConstants.CoreCompositionTargetPackagePath,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"{packageId} is missing required transitive build asset '{PackagingConstants.CoreCompositionTargetPackagePath}'.");
     }
 
     private async Task VerifyClosureAsync(ReleaseManifest manifest, CancellationToken cancellationToken)

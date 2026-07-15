@@ -30,6 +30,7 @@ HTTP MCP is enabled for local Development. Production keeps Koan's authenticatio
 
 When it is working well:
 
+- the build refreshes the checked-in `koan.lock.json` without an extra project setting;
 - startup identifies the composed modules and elected adapter;
 - `/.well-known/Koan/facts` explains the same runtime decisions to an operator;
 - `koan://facts` gives an MCP client the identical redacted envelope;
@@ -38,6 +39,6 @@ When it is working well:
 - a write made through MCP is immediately observable through the REST API.
 
 The release compiler copies this same directory outside the repository and rebuilds it exclusively
-from locally staged `Sylin.Koan.*` packages. `FirstUseContractTests` proves the source lane; the
-release clean room writes `first-use-package-evidence.json` for the package lane. Public package
-availability is a separate release fact.
+from locally staged `Sylin.Koan.*` packages. `FirstUseContractTests` proves the source lane, including
+the lockfile; the release clean room writes `first-use-package-evidence.json` with the same package-
+transitive assertion. Public package availability is a separate release fact.

@@ -35,6 +35,7 @@ public sealed class GoldenJourneyContractTests
             TestContext.Current.CancellationToken);
 
         Assert.True(evidence.BusinessRuleObserved);
+        Assert.True(evidence.CompositionLockfileObserved);
         Assert.True(evidence.PersistenceObserved);
         Assert.True(evidence.ReactiveWorkObserved);
         Assert.True(evidence.JobsCompositionObserved);

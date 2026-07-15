@@ -13,4 +13,13 @@
        compatibility ranges at pack time. See build/compat-ranges.targets. -->
   <Import Project="$(MSBuildThisFileDirectory)build/compat-ranges.targets"
           Condition="Exists('$(MSBuildThisFileDirectory)build/compat-ranges.targets')" />
+
+  <!--
+    The public NuGet path receives Koan's composition target through Core's buildTransitive asset.
+    ProjectReference does not import package build assets, so the two executable source/package
+    contracts opt into the same target here through their existing UseKoanSource switch. Keeping
+    this repository-only bridge outside the applications preserves their package-shaped project files.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)src/Koan.Core/build/Sylin.Koan.Core.targets"
+          Condition="'$(UseKoanSource)' == 'true' and '$(OutputType)' == 'Exe' and Exists('$(MSBuildThisFileDirectory)src/Koan.Core/build/Sylin.Koan.Core.targets')" />
 </Project>
