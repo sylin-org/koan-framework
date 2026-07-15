@@ -13,14 +13,10 @@ internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegist
         var beforeCommit = await repository.ResolveCommitAsync(beforeRevision, cancellationToken);
         var sourceCommit = await repository.ResolveCommitAsync(afterRevision, cancellationToken);
         var projects = await repository.DiscoverPackagesAsync(cancellationToken);
+        var graph = new PackageGraph(projects);
         Console.WriteLine(
             $"compare  {beforeCommit[..12]} -> {sourceCommit[..12]} across {projects.Count} package owner(s)" +
             (offline ? " (offline)" : " + registry reconciliation"));
-        var projectByPath = projects.ToDictionary(
-            FullProjectPath,
-            project => project,
-            StringComparer.OrdinalIgnoreCase);
-
         var packages = new List<ReleasePackage>();
         await Parallel.ForEachAsync(
             projects,
@@ -35,7 +31,7 @@ internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegist
                 var published = !offline && await registry.ExistsAsync(project.PackageId, current, ct);
                 if (!changed && published) return;
 
-                var dependencies = ResolveProjectDependencies(project, projectByPath);
+                var dependencies = graph.DependenciesOf(project.PackageId).ToList();
 
                 lock (packages)
                 {
@@ -59,48 +55,13 @@ internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegist
             BeforeCommit = beforeCommit,
             SourceCommit = sourceCommit,
             CreatedAtUtc = DateTimeOffset.UtcNow,
-            Packages = TopologicalOrder(packages)
+            Packages = OrderPackages(packages, graph)
         };
     }
 
-    internal static List<string> ResolveProjectDependencies(
-        PackageProject project,
-        IReadOnlyDictionary<string, PackageProject> projectByPath) =>
-        project.ProjectReferences
-            .Select(path => projectByPath.GetValueOrDefault(Path.GetFullPath(path))?.PackageId)
-            .Where(id => id is not null)
-            .Cast<string>()
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-    internal static string FullProjectPath(PackageProject project) =>
-        Path.GetFullPath(Path.Combine(project.ProjectDirectory, Path.GetFileName(project.ProjectPath)));
-
-    internal static List<ReleasePackage> TopologicalOrder(IEnumerable<ReleasePackage> source)
+    private static List<ReleasePackage> OrderPackages(IEnumerable<ReleasePackage> source, PackageGraph graph)
     {
         var packages = source.ToDictionary(package => package.PackageId, StringComparer.OrdinalIgnoreCase);
-        var result = new List<ReleasePackage>(packages.Count);
-        var state = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-        void Visit(ReleasePackage package)
-        {
-            if (state.TryGetValue(package.PackageId, out var current))
-            {
-                if (current == 1) throw new InvalidOperationException($"Package dependency cycle contains {package.PackageId}.");
-                if (current == 2) return;
-            }
-
-            state[package.PackageId] = 1;
-            foreach (var dependency in package.ProjectDependencies)
-            {
-                if (packages.TryGetValue(dependency, out var selectedDependency)) Visit(selectedDependency);
-            }
-            state[package.PackageId] = 2;
-            result.Add(package);
-        }
-
-        foreach (var package in packages.Values.OrderBy(package => package.PackageId, StringComparer.OrdinalIgnoreCase)) Visit(package);
-        return result;
+        return graph.TopologicalOrder(packages.Keys).Select(packageId => packages[packageId]).ToList();
     }
 }
