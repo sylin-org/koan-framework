@@ -47,6 +47,44 @@ poll its status until it reports `Completed`.
 These are reading and verification checkpoints, not generated projects or scaffolding stages. Each
 one preserves the previous result and adds one business-aligned capability.
 
+## Reproduce V5: reject, explain, recover
+
+Run the complete executable proof from the repository root:
+
+```powershell
+dotnet test tests/Koan.Packaging.Tests/Koan.Packaging.Tests.csproj --filter "FullyQualifiedName~SourceCheckoutProducesTheCumulativeGoldenJourney"
+```
+
+That command forces `Koan:Data:Sources:Default:Adapter=not-referenced` for one isolated start, checks
+`/.well-known/Koan/facts` for `koan.data.adapter.rejected` / `adapter-unavailable` plus its correction,
+then starts cleanly and confirms that the default election returns to SQLite.
+
+To inspect the same behavior manually, start the rejected application:
+
+```powershell
+$env:Koan__Data__Sources__Default__Adapter = "not-referenced"
+dotnet run --project samples/GoldenJourney
+```
+
+From another shell, use the URL printed by the app and inspect the facts:
+
+```powershell
+Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts | ConvertTo-Json -Depth 8
+```
+
+Stop the app, remove the invalid intent, and restart:
+
+```powershell
+Remove-Item Env:Koan__Data__Sources__Default__Adapter -ErrorAction SilentlyContinue
+dotnet run --project samples/GoldenJourney
+```
+
+This setting controls the application **default**, not every Entity. Koan resolves an ambient source
+or adapter first, then an Entity's `[SourceAdapter]`/`[DataAdapter]`, then the configured Default, and
+finally reference priority. `ReviewRequest` deliberately declares `[DataAdapter("sqlite")]`, so its
+entity-specific route remains explicit while the invalid default is rejected rather than silently
+replaced. V5 proves both facts: routing is scoped, and a bad default remains inspectable.
+
 ## What the executable contract proves
 
 `GoldenJourneyContractTests` builds and runs this exact directory. It verifies SQLite persistence,

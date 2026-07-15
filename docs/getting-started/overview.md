@@ -204,7 +204,9 @@ public sealed class Todo : Entity<Todo> { /* exposed to agents over MCP (HTTP/SS
 
 1. **Read the boot report first.** It names every module discovered, the adapter elections, and
    the boot phases — most "why isn't X registered" questions are answered there.
-2. Resolution failures throw messages that name the exact configuration keys to set.
+2. Resolution failures throw messages that name the exact configuration keys to set. The
+   [GoldenJourney V5 reproduction](../../samples/GoldenJourney/README.md#reproduce-v5-reject-explain-recover)
+   shows a rejected default adapter, its machine-readable correction, and a clean recovery.
 3. **Check the composition lockfile.** The checked-in
    [`koan.lock.json`](../guides/composition-lockfile.md) records statically referenced modules; the
    runtime-resolved twin adds adapter elections. The boot report's `lockfile DRIFT(...)` verdict
