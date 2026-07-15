@@ -86,7 +86,7 @@ a smaller truth queue. Four bounded shared repairs now close it:
 3. current docs name `/health/live` and `/health/ready`, rejected adapter intent returns readiness
    503, and Jobs paces persistent ledger failures without repeated Error noise (`46c523d8`); and
 4. convention-based MCP schemas are quiet, mutating custom tools advertise `dry_run`, and the HTTP
-   guide is rebuilt around the canonical Streamable path.
+   guide is rebuilt around the canonical Streamable path (`0e40b455`).
 
 Verification for the final slice passes Koan.Mcp warning-as-error, MCP conformance 74/74,
 Streamable HTTP 18/18, both executable journey classes 3/3, and strict docs. Compatibility-sensitive

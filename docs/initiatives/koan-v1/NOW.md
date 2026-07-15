@@ -194,7 +194,7 @@ findings; preserve small design choices in `POST-CYCLE-TODO.md`.
 
 The coherent R04/R05 candidate is `d1dbbe35`; the first independent-rehearsal repair sequence ends at
 `ffc1ed27`, and its closure record is `47ce8915`. Commits `f66bc8f5`, `88e3be69`, and `46c523d8`
-repair the fresh-repeat filter, composition truth, and readiness/operator behavior; this change
+repair the fresh-repeat filter, composition truth, and readiness/operator behavior; `0e40b455`
 closes MCP discoverability. Only evaluator reports remain untracked under `tmp/`.
 Do not stage those reports, or publish, push, tag, or release the candidate without a separate
 operator request.
