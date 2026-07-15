@@ -101,4 +101,27 @@ public class KoanLockfileSpec
         KoanCompositionSnapshot.MajorMinor("unknown").Should().Be("unknown");
         KoanCompositionSnapshot.MajorMinor(null).Should().Be("unknown");
     }
+
+    [Fact]
+    public void Runtime_module_roster_excludes_the_application_assembly()
+    {
+        var applicationAssembly = typeof(KoanLockfileSpec).Assembly;
+
+        var modules = KoanCompositionSnapshot.GetLoadedKoanModules(applicationAssembly);
+
+        modules.Select(module => module.Id).Should()
+            .Contain("Koan.Core")
+            .And.NotContain(applicationAssembly.GetName().Name!);
+    }
+
+    [Fact]
+    public void Runtime_lockfile_uses_assembly_identity_not_friendly_product_name()
+    {
+        var applicationAssembly = typeof(KoanLockfileSpec).Assembly;
+
+        var name = KoanCompositionSnapshot.ResolveApplicationName(applicationAssembly, "Friendly Product Name");
+
+        name.Should().Be(applicationAssembly.GetName().Name)
+            .And.NotBe("Friendly Product Name");
+    }
 }

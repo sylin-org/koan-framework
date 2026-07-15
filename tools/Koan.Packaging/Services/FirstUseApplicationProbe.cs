@@ -34,6 +34,7 @@ internal sealed class FirstUseApplicationProbe
         var mcp = new McpProbeClient(http);
 
         string selectedAdapter = "unknown";
+        var compositionLockfileMatched = false;
         var restFilterObserved = false;
         var factsConverged = false;
         var dryRunPreservedState = false;
@@ -52,6 +53,7 @@ internal sealed class FirstUseApplicationProbe
                 var root = document.RootElement;
                 if (!root.GetProperty("complete").GetBoolean())
                     throw new InvalidOperationException("FirstUse runtime facts are incomplete.");
+                compositionLockfileMatched = CompositionLockfileProbe.RequireRuntimeMatch(root);
 
                 var election = root.GetProperty("facts").EnumerateArray().FirstOrDefault(fact =>
                     fact.GetProperty("code").GetString() == PackagingConstants.FirstUse.AdapterSelectedCode
@@ -191,6 +193,7 @@ internal sealed class FirstUseApplicationProbe
             startedAt,
             Math.Round(total.Elapsed.TotalSeconds, 3),
             compositionLockfileObserved,
+            compositionLockfileMatched,
             selectedAdapter,
             restFilterObserved,
             startupReported,

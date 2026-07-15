@@ -4,12 +4,12 @@ domain: core
 title: "Composition Lockfile How-To"
 audience: [developers, architects]
 status: current
-last_updated: 2026-06-20
+last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-06-20
+  date_last_tested: 2026-07-15
   status: verified
-  scope: build-time emitter + resolved twin + comparer (unit + ARCH-0079 integration)
+  scope: build-time emitter + resolved twin + comparer + supported live application matches
 ---
 
 # Composition Lockfile (`koan.lock.json`)
@@ -51,6 +51,12 @@ The build-time file carries only what is honestly knowable **without running the
 the Koan packages it is composed of. Adapter **elections** and negotiated **capabilities** are
 runtime concerns (they depend on configuration and on what each provider negotiates — ARCH-0084), so
 they live only in the resolved twin.
+
+`app.name` is the executable assembly identity used by the build graph (for example,
+`Koan.FirstUse`), not the friendly product name shown in startup reporting. Keeping those identities
+separate lets an application improve its operator-facing name without creating composition drift.
+The executable assembly is likewise never repeated under `modules`; that list contains referenced
+Koan assemblies only.
 
 ### Build-time `koan.lock.json`
 

@@ -25,6 +25,7 @@ internal sealed class GoldenJourneyApplicationProbe
         var startedAt = DateTimeOffset.UtcNow;
         var total = Stopwatch.StartNew();
         var steps = new List<ApplicationStepEvidence>();
+        var compositionLockfileMatched = false;
         var businessRuleObserved = false;
         var persistenceObserved = false;
         var reactiveWorkObserved = false;
@@ -55,6 +56,7 @@ internal sealed class GoldenJourneyApplicationProbe
                 var root = document.RootElement;
                 if (!root.GetProperty("complete").GetBoolean())
                     throw new InvalidOperationException("GoldenJourney runtime facts are incomplete.");
+                compositionLockfileMatched = CompositionLockfileProbe.RequireRuntimeMatch(root);
 
                 var facts = root.GetProperty("facts").EnumerateArray().ToArray();
                 AssertSelected(facts, PackagingConstants.GoldenJourney.JobsLedgerSubject, PackagingConstants.GoldenJourney.DurableLedger);
@@ -270,6 +272,7 @@ internal sealed class GoldenJourneyApplicationProbe
             startedAt,
             Math.Round(total.Elapsed.TotalSeconds, 3),
             compositionLockfileObserved,
+            compositionLockfileMatched,
             businessRuleObserved,
             persistenceObserved,
             reactiveWorkObserved,

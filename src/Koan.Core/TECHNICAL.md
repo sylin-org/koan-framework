@@ -56,6 +56,8 @@ source: src/Koan.Core/
   `Complete=false` as healthy.
 - Keep the checked-in `koan.lock.json` under review. It contains static app/module identity only;
   negotiated elections and runtime facts belong to `obj/koan.lock.resolved.json`.
+- Lockfile `app.name` is the executable assembly identity and is excluded from `modules`; friendly
+  application identity remains an operator/runtime-facts concern.
 
 ## Observability & Security
 

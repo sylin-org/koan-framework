@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R05 fresh-agent repeat and filtered-query repair complete
+  scope: R05 fresh-agent repeat repairs 1 and 2 complete
 ---
 
 # Koan V1 reorganization current handoff
@@ -29,6 +29,9 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - The first promoted finding is repaired: case-insensitive field binding now hands relational
   adapters the canonical resolved path, and the exact documented camelCase FirstUse filter is part
   of the executable source/package evidence.
+- The second promoted finding is repaired: runtime composition uses the executable assembly as the
+  `app` identity and excludes it from `modules`; both supported journeys now require and report a
+  matched lockfile fact.
 - No public package was published and no branch was pushed by this work.
 
 ## What now exists
@@ -109,6 +112,9 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
   lowercase and mixed-case field probes; the FirstUse contract now asserts the exact documented
   camelCase filter and passes 1/1 after a warning-as-error Release build; the filtering suite remains
   green at 92/92.
+- Fresh-repeat composition-truth repair: Core lockfile contracts pass 15/15; FirstUse and
+  GoldenJourney each pass their exact live source contract with `CompositionLockfileMatched=true`;
+  both Release builds remain warning-free.
 
 ## Important discoveries
 
@@ -140,15 +146,19 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
   case-insensitive, but SQLite extracted the caller spelling from case-sensitive stored JSON and
   silently returned an empty result. The shared canonical-path handoff fixes the relational family
   rather than special-casing FirstUse or rewriting the public command.
+- Removing the application assembly from `modules` exposed a second hidden mismatch: the resolved
+  twin used friendly product identity while MSBuild correctly recorded executable assembly identity.
+  Composition now uses the assembly for comparison and leaves the friendly name in startup/runtime
+  facts, so changing operator-facing product copy cannot manufacture lockfile drift.
 
 ## Next safe action
 
-Repair the fresh repeat's composition truth mismatch next: runtime module discovery currently counts
-the application assembly as a module while the build lockfile correctly records it only as `app`, so
-both supported samples report false `+Koan.*` drift. Prove a no-drift live sample contract, then move
-to the bounded readiness/operator and MCP discoverability findings. Obtain the remaining human
-rehearsal only after this second repair queue is quiet. Do not begin the post-cycle todo register
-unless new evidence promotes an entry into a correctness, security, or release blocker.
+Take the bounded readiness/operator slice next: correct public guidance to the canonical
+`/health/live` and `/health/ready` controller routes, prove rejected-default readiness through the
+actual readiness endpoint, and prevent the Jobs worker from flooding logs while its durable ledger is
+unavailable. Then address MCP discoverability and guide shape. Obtain the remaining human rehearsal
+only after this second repair queue is quiet. Do not begin the post-cycle todo register unless new
+evidence promotes an entry into a correctness, security, or release blocker.
 
 ## Do not infer
 
@@ -162,6 +172,7 @@ unless new evidence promotes an entry into a correctness, security, or release b
 ## Repository state
 
 The coherent R04/R05 candidate is `d1dbbe35`; the first independent-rehearsal repair sequence ends at
-`ffc1ed27`, and its closure record is `47ce8915`. This commit contains the fresh-repeat filtered-query
-repair. Only evaluator reports remain untracked under `tmp/`. Do not stage those reports, or publish,
-push, tag, or release the candidate without a separate operator request.
+`ffc1ed27`, and its closure record is `47ce8915`. Commit `f66bc8f5` repairs the fresh-repeat filtered
+query; this commit repairs composition truth. Only evaluator reports remain untracked under `tmp/`.
+Do not stage those reports, or publish, push, tag, or release the candidate without a separate
+operator request.

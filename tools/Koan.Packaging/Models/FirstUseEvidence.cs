@@ -7,6 +7,7 @@ internal sealed record FirstUseEvidence(
     DateTimeOffset StartedAtUtc,
     double TotalSeconds,
     bool CompositionLockfileObserved,
+    bool CompositionLockfileMatched,
     string SelectedAdapter,
     bool RestFilterObserved,
     bool StartupReported,

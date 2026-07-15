@@ -36,6 +36,7 @@ public sealed class GoldenJourneyContractTests
 
         Assert.True(evidence.BusinessRuleObserved);
         Assert.True(evidence.CompositionLockfileObserved);
+        Assert.True(evidence.CompositionLockfileMatched);
         Assert.True(evidence.PersistenceObserved);
         Assert.True(evidence.ReactiveWorkObserved);
         Assert.True(evidence.JobsCompositionObserved);

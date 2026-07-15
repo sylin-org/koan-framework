@@ -5,6 +5,7 @@ internal sealed record GoldenJourneyEvidence(
     DateTimeOffset StartedAtUtc,
     double TotalSeconds,
     bool CompositionLockfileObserved,
+    bool CompositionLockfileMatched,
     bool BusinessRuleObserved,
     bool PersistenceObserved,
     bool ReactiveWorkObserved,

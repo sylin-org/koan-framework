@@ -52,4 +52,33 @@ internal static class CompositionLockfileProbe
 
         return true;
     }
+
+    public static bool RequireRuntimeMatch(JsonElement runtimeFacts)
+    {
+        var facts = runtimeFacts
+            .GetProperty(PackagingConstants.ApplicationProbe.FactsProperty)
+            .EnumerateArray()
+            .ToArray();
+        var drift = facts.FirstOrDefault(fact =>
+            fact.GetProperty(PackagingConstants.ApplicationProbe.FactCodeProperty).GetString()
+                == PackagingConstants.ApplicationProbe.LockfileDriftedCode);
+        if (drift.ValueKind != JsonValueKind.Undefined)
+        {
+            var summary = drift.TryGetProperty(
+                PackagingConstants.ApplicationProbe.FactSummaryProperty,
+                out var summaryProperty)
+                ? summaryProperty.GetString()
+                : null;
+            throw new InvalidOperationException(
+                $"The running application reports composition lockfile drift: {summary ?? "no summary"}.");
+        }
+
+        var matched = facts.Any(fact =>
+            fact.GetProperty(PackagingConstants.ApplicationProbe.FactCodeProperty).GetString()
+                == PackagingConstants.ApplicationProbe.LockfileMatchedCode);
+        if (!matched)
+            throw new InvalidOperationException("The running application did not report a matched composition lockfile.");
+
+        return true;
+    }
 }

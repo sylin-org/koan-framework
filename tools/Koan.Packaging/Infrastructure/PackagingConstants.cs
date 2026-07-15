@@ -32,6 +32,11 @@ internal static class PackagingConstants
         public const string CompositionTargetFrameworkProperty = "tfm";
         public const string CompositionModulesProperty = "modules";
         public const string CompositionModuleIdProperty = "id";
+        public const string FactsProperty = "facts";
+        public const string FactCodeProperty = "code";
+        public const string FactSummaryProperty = "summary";
+        public const string LockfileMatchedCode = "koan.composition.lockfile.matched";
+        public const string LockfileDriftedCode = "koan.composition.lockfile.drifted";
         public const string UnknownCompositionVersion = "0.0";
         public const string CoreModuleId = "Koan.Core";
         public const string SqliteModuleId = "Koan.Data.Connector.Sqlite";

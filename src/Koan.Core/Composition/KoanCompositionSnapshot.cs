@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Koan.Core.Hosting.Registry;
 using Koan.Core.Diagnostics;
 using Koan.Core.Infrastructure;
@@ -27,12 +28,13 @@ internal static class KoanCompositionSnapshot
 
     internal static KoanCompositionResult BuildResult(IServiceProvider services, string appName, IConfiguration? config)
     {
-        // "Modules" = the Koan.* assemblies the app is composed of — the SAME notion the build-time
-        // emitter records from MSBuild references. The bootstrap loads the full reference closure for
-        // scanning, so at boot the loaded set matches the referenced set and the two files compare cleanly.
-        var lockModules = GetLoadedKoanModules();
+        // "App" is the executable assembly identity and "Modules" are its Koan.* references — the SAME
+        // separation the build-time emitter records from MSBuild. Friendly product identity belongs in
+        // runtime facts, not in this build/runtime comparison contract.
+        var applicationAssembly = ResolveApplicationAssembly(services);
+        var lockModules = GetLoadedKoanModules(applicationAssembly);
         var koan = lockModules.FirstOrDefault(m => string.Equals(m.Id, "Koan.Core", StringComparison.Ordinal))?.Version ?? "unknown";
-        var app = new KoanLockApp(string.IsNullOrWhiteSpace(appName) ? "app" : appName, koan, ResolveTfm());
+        var app = new KoanLockApp(ResolveApplicationName(applicationAssembly, appName), koan, ResolveTfm());
 
         var builder = new KoanCompositionBuilder();
         if (config is not null) AddConfigKeys(builder, config);
@@ -51,11 +53,14 @@ internal static class KoanCompositionSnapshot
         return Build(services, appName, config);
     }
 
-    private static IReadOnlyList<KoanLockModule> GetLoadedKoanModules()
-        => AppDomain.CurrentDomain.GetAssemblies()
+    internal static IReadOnlyList<KoanLockModule> GetLoadedKoanModules(Assembly? applicationAssembly)
+    {
+        var applicationAssemblyName = applicationAssembly?.GetName().Name;
+        return AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic)
             .Select(a => a.GetName())
             .Where(n => !string.IsNullOrEmpty(n.Name)
+                && !string.Equals(n.Name, applicationAssemblyName, StringComparison.Ordinal)
                 && (n.Name!.StartsWith("Koan.", StringComparison.Ordinal) || n.Name == "Koan")
                 && !n.Name.EndsWith(".Generators", StringComparison.Ordinal)
                 && !n.Name.StartsWith("Koan.Testing", StringComparison.Ordinal))
@@ -64,6 +69,30 @@ internal static class KoanCompositionSnapshot
             .Select(g => g.First())
             .OrderBy(m => m.Id, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    internal static string ResolveApplicationName(Assembly? applicationAssembly, string? fallback)
+    {
+        var assemblyName = applicationAssembly?.GetName().Name;
+        if (!string.IsNullOrWhiteSpace(assemblyName)) return assemblyName;
+        return string.IsNullOrWhiteSpace(fallback) ? "app" : fallback;
+    }
+
+    private static Assembly? ResolveApplicationAssembly(IServiceProvider services)
+    {
+        var applicationName = (services.GetService(typeof(IHostEnvironment)) as IHostEnvironment)?.ApplicationName;
+        if (!string.IsNullOrWhiteSpace(applicationName))
+        {
+            var applicationAssembly = AppDomain.CurrentDomain.GetAssemblies()
+                .FirstOrDefault(assembly => string.Equals(
+                    assembly.GetName().Name,
+                    applicationName,
+                    StringComparison.Ordinal));
+            if (applicationAssembly is not null) return applicationAssembly;
+        }
+
+        return Assembly.GetEntryAssembly();
+    }
 
     /// <summary>Write the resolved twin to <c>{contentRoot}/obj/koan.lock.resolved.json</c>. Best-effort.</summary>
     public static void TryWriteResolvedTwin(KoanLockfile lockfile, string? contentRootPath)
