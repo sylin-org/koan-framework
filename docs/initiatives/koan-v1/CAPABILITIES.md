@@ -271,11 +271,12 @@ initiative progress ledger; they do not silently promote the original maturity l
 - **Entry point and owner:** `Sylin.Koan.Mcp`; registration and transports live under
   [`Koan.Mcp`](../../../src/Koan.Mcp/Koan.Mcp.csproj), with optional operations and explorer packages.
 - **Executable evidence:** [MCP conformance](../../../tests/Suites/Mcp/Koan.Mcp.Conformance.Tests/Koan.Mcp.Conformance.Tests.csproj)
-  passes 73/73, including canonical `koan://facts` serialization. Custom-tool, streamable transport,
-  relationship visibility, operations, and explorer
-  suites exist but were not included in this focused result. `FirstUseContractTests` additionally
-  prove Streamable HTTP initialization, resource discovery, identical Web/MCP facts, remote-origin
-  operation filtering, dry-run non-mutation, and a real agent upsert observed through REST.
+  passes 73/73, including custom-tool projection and caller-specific `koan://self` behavior alongside
+  canonical `koan://facts` serialization. `FirstUseContractTests` additionally prove Streamable HTTP
+  initialization, resource discovery, identical Web/MCP facts, remote-origin operation filtering,
+  dry-run non-mutation, and a real agent upsert observed through REST. The cumulative GoldenJourney
+  source contract proves that a custom-tool-only application describes both live workflows through
+  `koan://self` before an agent mutation is observed through REST.
 - **Inspection and failure:** entity catalog/self resources, schemas, tool hints, dry-run, provenance,
   correlation, access policy, response translation, and the host fact envelope give agents a
   structured surface rather than source or log scraping.

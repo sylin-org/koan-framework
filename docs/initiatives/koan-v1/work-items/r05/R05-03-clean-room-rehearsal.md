@@ -92,5 +92,12 @@ The responsible repair queue is:
 Repair 1 is complete in local commit `977f33b9`. It introduces selection-aware data health, aligns
 JSON readiness with repository auto-provisioning, repairs host-owned observed-Entity diagnostics, and
 makes both executable application probes gate on `/health/ready`. Verification passes Data.Core
-301/301, JSON 19/19, both source journeys, strict docs, and the 113-owner package inventory. A fresh
-agent repeat and human record remain required after the bounded queue.
+301/301, JSON 19/19, both source journeys, strict docs, and the 113-owner package inventory.
+
+Repair 2 is complete in local commit `c9977361`. One caller-aware custom-tool projection now governs
+protocol listing, remote dispatch, Explorer, and `koan://self`; trusted local STDIO retains its
+established surface, while concrete remote callers honor authentication, scopes, and disabled
+operational toolsets. `koan://self` now exposes structured custom workflows and matching prose, while
+`koan://entities` stays Entity-specific. Verification passes MCP conformance 73/73, the real
+Streamable HTTP GoldenJourney source contract 1/1, and strict docs. A fresh agent repeat and human
+record remain required after the bounded queue.

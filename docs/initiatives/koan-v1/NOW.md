@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-14
   status: reviewed
-  scope: R05 independent agent rehearsal entered repair-and-repeat
+  scope: R05 independent rehearsal repairs 1 and 2 complete
 ---
 
 # Koan V1 reorganization current handoff
@@ -78,6 +78,10 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
   repository auto-provisioning, and host-owned Entity diagnostics no longer reflect over a removed
   cache field. Data.Core passes 301/301, JSON 19/19, both executable journeys use `/health/ready` and
   pass, strict docs build passes, and the package inventory still recognizes 113 owners.
+- MCP self-description repair commit `c9977361`: one custom-tool projection now drives protocol
+  listing, remote dispatch, Explorer, and `koan://self`. The self resource exposes only the caller's
+  usable Entity and custom-workflow surface, while `koan://entities` remains Entity-specific. MCP
+  conformance passes 73/73, the live GoldenJourney source contract passes 1/1, and strict docs pass.
 
 ## Important discoveries
 
@@ -101,19 +105,18 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
   `977f33b9`, its missing default directory made a SQLite-selected application return readiness 503.
   Health now gates only default-elected, configured, or observed providers; availability alone is
   inspectable but inert.
-- The independent run also found that custom MCP tools are live while `koan://self` says there is
-  nothing usable, source builds do not emit the lockfile promised by the README, the V5
-  rejection/recovery command is not public, and several warning/transport details need tightening.
+- The independent run also found that source builds do not emit the lockfile promised by the README,
+  the V5 rejection/recovery command is not public, and several warning/transport details need
+  tightening. Its MCP self-description finding is repaired in `c9977361`.
 
 ## Next safe action
 
 Continue the bounded repair-and-repeat queue in this order:
 
-1. make `koan://self` describe live custom MCP tools while keeping `koan://entities` entity-specific;
-2. make the lockfile claim true on supported source/package front doors, or narrow the claim to the
+1. make the lockfile claim true on supported source/package front doors, or narrow the claim to the
    exact supported build shape;
-3. document the exact V5 rejection/recovery command and its default-vs-entity routing semantics;
-4. remove genuine warning noise and clarify Streamable HTTP `POST /mcp` plus one REST query example.
+2. document the exact V5 rejection/recovery command and its default-vs-entity routing semantics;
+3. remove genuine warning noise and clarify Streamable HTTP `POST /mcp` plus one REST query example.
 
 After each material repair, rerun the affected source contracts. Then obtain a genuinely fresh agent
 repeat and the remaining human rehearsal before closing R05-03.
@@ -129,6 +132,6 @@ repeat and the remaining human rehearsal before closing R05-03.
 
 ## Repository state
 
-The coherent R04/R05 candidate is `d1dbbe35`; the first independent-rehearsal repair is the local
-commit `977f33b9`. Only evaluator reports remain untracked under `tmp/`. Do not stage those reports,
-or publish, push, tag, or release the candidate without a separate operator request.
+The coherent R04/R05 candidate is `d1dbbe35`; independent-rehearsal repairs are local commits
+`977f33b9` and `c9977361`. Only evaluator reports remain untracked under `tmp/`. Do not stage those
+reports, or publish, push, tag, or release the candidate without a separate operator request.
