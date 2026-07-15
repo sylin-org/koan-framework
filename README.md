@@ -33,6 +33,7 @@ dotnet run --project samples/FirstUse
 # in another shell:
 curl -X POST http://localhost:5000/api/approvals -H "Content-Type: application/json" -d '{"subject":"Approve supplier invoice"}'
 curl http://localhost:5000/api/approvals
+curl --get --data-urlencode 'filter={"subject":"Approve supplier invoice"}' http://localhost:5000/api/approvals
 curl http://localhost:5000/.well-known/Koan/facts
 ```
 
@@ -119,7 +120,7 @@ public sealed class Todo : Entity<Todo> { /* embeddings maintained in the backgr
 var related = await SemanticSearch<Todo>("groceries and meal planning");
 // using static Koan.Data.AI.EntityEmbeddingExtensions;
 
-// dotnet add package Sylin.Koan.Mcp → entities become agent tools over HTTP/SSE:
+// dotnet add package Sylin.Koan.Mcp → entities become agent tools over Streamable HTTP:
 [McpEntity]
 public sealed class Todo : Entity<Todo> { /* agents can now query and mutate Todos */ }
 ```

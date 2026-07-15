@@ -8,7 +8,7 @@ namespace Koan.Core.Adapters;
 /// The shared adapter operation-tracing template (ARCH-0103 cross-cutting promotion): open one <see cref="Activity"/>
 /// for a backend op, let the caller tag it, run the op, and record the error status on a throw. Any adapter family base
 /// composes this so every backend op is traced consistently (span name · tags · error status) instead of each adapter
-/// repeating the boilerplate once per method. A no-op when nothing is listening (<see cref="ActivitySource.StartActivity"/>
+/// repeating the boilerplate once per method. A no-op when nothing is listening (<c>ActivitySource.StartActivity</c>
 /// returns null), so it is free on the hot path.
 /// </summary>
 public static class AdapterActivity

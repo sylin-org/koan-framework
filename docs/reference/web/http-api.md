@@ -4,10 +4,10 @@ domain: web
 title: "Web HTTP API"
 audience: [developers, architects]
 status: current
-last_updated: 2025-10-09
-framework_version: v0.6.3
+last_updated: 2026-07-15
+framework_version: v0.17.0
 validation:
-  date_last_tested: 2025-10-09
+  date_last_tested: 2026-07-15
   status: verified
   scope: docs/reference/web/http-api.md
 ---
@@ -40,6 +40,20 @@ public class ProductsController : EntityController<Product> { }
 - Automatic CRUD: GET/POST/PUT/PATCH/DELETE
 - Pagination: Controlled via attributes and safety bounds
 - Filters/sort: JSON filter language and defaults
+
+## Query a collection
+
+`filter` is URL-encoded JSON; `q` is a separate free-text search slot. For example:
+
+```bash
+curl --get \
+  --data-urlencode 'filter={"status":"Pending"}' \
+  http://localhost:5000/api/products
+```
+
+The FirstUse SQLite path executes this contract. Support and execution posture remain
+adapter-specific, so do not infer universal filter parity, pushdown, or cost from one connector;
+unsupported and historically uneven provider paths remain visible in the capability evidence.
 
 ## Transformers (WEB-0035)
 

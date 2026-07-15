@@ -25,7 +25,7 @@ public sealed class GoldenJourneyContractTests
         var application = Path.Combine(RepositoryRoot(), "samples", "GoldenJourney");
         await new ProcessRunner().RequireAsync(
             "dotnet",
-            ["build", PackagingConstants.GoldenJourney.ProjectFile, "-c", "Release", "--nologo"],
+            ["build", PackagingConstants.GoldenJourney.ProjectFile, "-c", "Release", "--nologo", "-warnaserror"],
             application,
             TestContext.Current.CancellationToken);
 

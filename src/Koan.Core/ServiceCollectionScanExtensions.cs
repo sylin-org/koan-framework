@@ -6,7 +6,7 @@ namespace Koan.Core;
 
 /// <summary>
 /// Scan-based DI registration for "many implementations of one service contract" shapes
-/// (adapters, plug-ins, scheduled tasks, etc.). Lets <see cref="IKoanAutoRegistrar.Initialize"/>
+/// (adapters, plug-ins, scheduled tasks, etc.). Lets an <see cref="IKoanAutoRegistrar"/>
 /// register an entire family of implementations without listing each concrete type by hand —
 /// adding a new implementation becomes a zero-config drop.
 /// </summary>

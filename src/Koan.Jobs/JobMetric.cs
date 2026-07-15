@@ -29,7 +29,7 @@ public sealed class JobMetric : Entity<JobMetric>, IAmbientExempt
     public string NodeShard { get; set; } = "";
 
     /// <summary>Cumulative count for (Bucket, WorkType, Outcome) contributed by this node.</summary>
-    public long Count { get; set; }
+    public new long Count { get; set; }
 
     /// <summary>Last flush time — drives bucket-age retention.</summary>
     public DateTimeOffset LastFlushedAt { get; set; }

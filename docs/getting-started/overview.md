@@ -197,7 +197,7 @@ dotnet add package Sylin.Koan.Mcp
 
 ```csharp
 [McpEntity]
-public sealed class Todo : Entity<Todo> { /* exposed to agents over MCP (HTTP/SSE) */ }
+public sealed class Todo : Entity<Todo> { /* exposed to agents over MCP (Streamable HTTP) */ }
 ```
 
 ## When something goes wrong

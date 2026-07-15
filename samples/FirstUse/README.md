@@ -22,8 +22,14 @@ Then create and read an approval:
 ```powershell
 Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/approvals -ContentType application/json -Body '{"subject":"Approve supplier invoice"}'
 Invoke-RestMethod http://localhost:5000/api/approvals
+$filter = [uri]::EscapeDataString('{"subject":"Approve supplier invoice"}')
+Invoke-RestMethod "http://localhost:5000/api/approvals?filter=$filter"
 Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
 ```
+
+The filtered read is the REST query contract: `filter` contains URL-encoded JSON and is distinct
+from the optional free-text `q` parameter. This example is executable against FirstUse's elected
+SQLite adapter; other adapters advertise and negotiate their own filter execution support.
 
 The exact URL is printed by ASP.NET Core and may differ when a launch profile or `--urls` is used.
 HTTP MCP is enabled for local Development. Production keeps Koan's authentication-required posture.

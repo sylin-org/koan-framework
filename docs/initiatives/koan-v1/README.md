@@ -46,6 +46,8 @@ the dependency-ordered [`R04-BACKLOG.md`](R04-BACKLOG.md); each child card under
 language that R04-07 should prove without authorizing a mass API migration.
 R05 execution follows the three-card [`R05-BACKLOG.md`](R05-BACKLOG.md); it preserves FirstUse and
 proves meaningful growth in the cumulative [`GoldenJourney`](../../../samples/GoldenJourney/README.md).
+Small design and polish debts deliberately kept out of the active acceptance path live in the
+[`POST-CYCLE-TODO.md`](POST-CYCLE-TODO.md) register with their required decisions and evidence.
 
 ## Sources of truth
 
@@ -58,6 +60,7 @@ proves meaningful growth in the cumulative [`GoldenJourney`](../../../samples/Go
 | What exactly does a work item require? | its `work-items/Rxx-*.md` card |
 | What foundation repair executes next? | `R04-BACKLOG.md` and its linked child card |
 | What golden-journey work executes next? | `R05-BACKLOG.md` and its linked child card |
+| Which small issues wait until the main cycle closes? | `POST-CYCLE-TODO.md` |
 | Which module capabilities should grow Entity language? | `R04-ENTITY-FACET-CANDIDATES.md`, subject to the Entity Semantics Contract |
 | What makes work acceptable? | `ACCEPTANCE.md` |
 | How mature is a public capability? | `CAPABILITIES.md` |

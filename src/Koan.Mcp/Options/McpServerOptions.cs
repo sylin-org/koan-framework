@@ -42,7 +42,8 @@ public sealed class McpServerOptions
     public bool EnableLegacySseTransport { get; set; } = false;
 
     /// <summary>
-    /// Base route used for HTTP + SSE endpoints (e.g. /mcp => /mcp/sse, /mcp/rpc).
+    /// Base route for Streamable HTTP (for example, <c>/mcp</c>). The deprecated legacy transport,
+    /// when explicitly enabled, derives its <c>/sse</c> and <c>/rpc</c> routes from this value.
     /// </summary>
     public string HttpSseRoute { get; set; } = "/mcp";
 

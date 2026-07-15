@@ -28,6 +28,7 @@ curl -X POST http://localhost:5000/api/approvals \
   -H "Content-Type: application/json" \
   -d '{"subject":"Approve supplier invoice"}'
 curl http://localhost:5000/api/approvals
+curl --get --data-urlencode 'filter={"subject":"Approve supplier invoice"}' http://localhost:5000/api/approvals
 curl http://localhost:5000/.well-known/Koan/facts
 ```
 

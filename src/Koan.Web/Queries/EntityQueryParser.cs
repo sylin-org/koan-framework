@@ -12,7 +12,7 @@ namespace Koan.Web.Queries;
 
 /// <summary>
 /// Static helper for parsing HTTP query parameters into <see cref="QueryOptions"/>.
-/// Sort fields are resolved against <typeparamref name="TEntity"/> at parse time
+/// Sort fields are resolved against the requested entity type at parse time
 /// (strict by default — unresolvable fields throw <see cref="InvalidSortFieldException"/>).
 /// </summary>
 public static class EntityQueryParser

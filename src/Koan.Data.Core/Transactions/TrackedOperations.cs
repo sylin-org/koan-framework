@@ -156,7 +156,7 @@ internal sealed class VectorSaveOperation<TEntity, TKey> : ITrackedOperation
         // vector.ToArray()). Reflection binds arguments by exact type, so the ReadOnlyMemory<float> field
         // must be materialized to an array here too — otherwise Invoke throws "ReadOnlyMemory<float>
         // cannot be converted to Single[]" and the whole transaction is reported non-atomic.
-        var task = upsertMethod.Invoke(repo, new object[] { _id, _embedding.ToArray(), _metadata, ct }) as Task;
+        var task = upsertMethod.Invoke(repo, new object?[] { _id, _embedding.ToArray(), _metadata, ct }) as Task;
         if (task != null)
             await task;
     }

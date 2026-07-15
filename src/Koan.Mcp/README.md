@@ -1,115 +1,105 @@
 # Koan.Mcp
 
 ## Contract
-- **Purpose**: Implement a Model Context Protocol (MCP) host for Koan modules, exposing entities, tools, and diagnostics to AI-powered agents.
-- **Primary inputs**: `McpEntityAttribute`-decorated types, entity registries built from `McpEntityRegistration`, Koan adapters describing available capabilities.
-- **Outputs**: MCP descriptors composed via `DescriptorMapper`, hosted endpoints through the Koan hosting layer, and tool definitions consumable by MCP clients.
-- **Failure modes**: Missing entity annotations, unsupported transport modes, or MCP schema mismatches when serializing descriptors.
-- **Success criteria**: MCP clients can enumerate Koan entities/tools, execute actions through the protocol, and receive diagnostics in the expected schema.
 
-## Runtime inspection
+- **Purpose**: Project governed Koan entities, business tools, and runtime explanation to AI agents.
+- **Primary inputs**: referenced `Sylin.Koan.Mcp`, `[McpEntity]` entities, optional `[McpTool]`
+  workflows, and the application's existing access declarations.
+- **Outputs**: caller-specific MCP tools and resources over STDIO or Streamable HTTP.
+- **Failure modes**: no annotated surface, invalid JSON-RPC, unavailable tools, denied access, or an
+  unsupported transport request.
+- **Success criteria**: an agent discovers only usable capabilities, receives structured failures,
+  and can inspect the same runtime facts as an operator.
 
-MCP clients can read `koan://facts` for the same versioned, redacted runtime-fact envelope used by
-startup, health, and the Web well-known surface. Check `complete` before treating the snapshot as a
-verdict, and use stable fact codes rather than parsing summaries.
+## Shortest supported path
 
-Read `koan://self` for a caller-specific introduction to the application. Its structured contract
-contains the Entity surface and custom `[McpTool]` workflows visible to that caller; its prose face is
-derived from the same projection. `koan://entities` remains intentionally entity-specific and may be
-empty in an application that exposes only custom workflow tools.
-
-## Quick start
-
-To expose a Koan entity over the Model Context Protocol (MCP), simply annotate your entity class with the `[McpEntity]` attribute. The framework's Zero-DX scanner will automatically discover the entity, map its relational/data endpoints to MCP tools, and host them.
-
-### 1. Annotate the Entity
-
-Decorate your entity class with `[McpEntity]`. Set `AllowMutations = false` if you want to expose a safe, read-only surface (collection listing, query, and get-by-id) without leaking modification tools.
+The repository currently demonstrates this contract from source and from staged clean-room
+artifacts; the public 0.17.0 package set is not a coherent install path. Add `Koan.Mcp` to the
+application closure (`Sylin.Koan.Mcp` is the package identity), annotate the entity, and keep the
+normal Koan bootstrap:
 
 ```csharp
-using Koan.Mcp;
 using Koan.Data.Core.Model;
+using Koan.Mcp;
 
-namespace MyApp;
-
-[McpEntity(Name = "Product", Description = "Public product catalog", AllowMutations = false)]
+[McpEntity(Name = "product", Description = "A product in the public catalog", AllowMutations = false)]
 public sealed class Product : Entity<Product>
 {
-    public string Name { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
     public decimal Price { get; set; }
 }
 ```
 
-### 2. Configure and Map Endpoints
-
-In your `Program.cs`, register the core Koan, Web, and MCP services, then call `MapKoanMcpEndpoints()` to expose the protocol.
-
 ```csharp
 using Koan.Core;
-using Koan.Core.Hosting.App;
-using Koan.Mcp;
-using Koan.Mcp.Extensions;
-using Koan.Mcp.Options;
-using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Register Koan core, Web, and MCP services
-builder.Services.AddKoan().AsProxiedApi();
-builder.Services.AddKoanWeb();
-builder.Services.AddKoanMcp();
-
-// Configure MCP server options (e.g., enable HTTP+SSE transport)
-builder.Services.Configure<McpServerOptions>(o =>
-{
-    o.Exposure = McpExposureMode.Full;
-    o.EnableHttpSseTransport = true;
-    o.HttpSseRoute = "/mcp";
-});
-
+builder.Services.AddKoan();
 var app = builder.Build();
-
-// Initialize the static service locator
-AppHost.Current = app.Services;
-
-// Map the MCP endpoints (SSE stream and RPC endpoints)
-app.MapKoanMcpEndpoints();
-
-await app.RunAsync();
+app.Run();
 ```
 
-### 3. Consume via MCP Client
+The package reference is the registration. Do not add `AddKoanMcp()`, manually map protocol
+endpoints, or assign `AppHost.Current` in application code.
 
-The application hosts the MCP SSE transport at:
-- **SSE Handshake Stream**: `GET /mcp/sse` (initiates session, returns header `X-Mcp-Session: <id>` and event `endpoint`)
-- **POST RPC Endpoint**: `POST /mcp/rpc?sessionId=<id>` (receives client requests and executes tools)
+STDIO is enabled by default. To add the HTTP transport in an application that also references
+Koan Web, declare the intent in configuration:
 
-A standard MCP client can query the tools using standard protocol envelopes:
-- `tools/list`: Enumerate available tools (`product.collection`, `product.get-by-id`).
-- `tools/call`: Execute a tool (e.g., `product.collection` with query arguments).
+```json
+{
+  "Koan": {
+    "Mcp": {
+      "EnableHttpSseTransport": true,
+      "Exposure": "Tools"
+    }
+  }
+}
+```
 
-## Safe Public Exposure & Auth Posture
+The historical option name is retained for compatibility; enabling it selects modern Streamable
+HTTP by default. The deprecated two-endpoint SSE transport remains off unless
+`EnableLegacySseTransport` is explicitly enabled.
 
-When exposing MCP to public networks, adopt the following security guidelines:
-1. **Disable mutations**: Always set `AllowMutations = false` on exposed entities. This prevents any data-modification tools (`upsert`, `delete`, `patch`) from being registered or executed.
-2. **Require Authentication**: By default, endpoints mapped via `MapKoanMcpEndpoints()` respect host auth policies. To force authentication, configure `McpServerOptions`:
-   ```csharp
-   builder.Services.Configure<McpServerOptions>(o =>
-   {
-       o.RequireAuthentication = true;
-   });
-   ```
-   This gates the SSE and RPC endpoints behind the ASP.NET Core authorization middleware. For public read-only access, leave `RequireAuthentication = false` but ensure the underlying models are strictly read-only (`AllowMutations = false`).
+## Streamable HTTP
+
+The default base route is `/mcp`:
+
+| Request | Meaning |
+|---|---|
+| `POST /mcp` | Send one JSON-RPC message, including the initial `initialize` request and tool calls. |
+| `GET /mcp` | Open the optional resumable server-push stream for an established session. It is not the initialization handshake. |
+| `DELETE /mcp` | Terminate the session named by `Mcp-Session-Id`. |
+
+The first `POST /mcp` carries `initialize` without a session header. Its response mints
+`Mcp-Session-Id`; echo that header on later requests and send the negotiated
+`MCP-Protocol-Version`. A normal MCP client performs this negotiation—application developers do not
+write JSON-RPC handlers.
+
+The old `GET /mcp/sse` plus `POST /mcp/rpc` shape exists only when the deprecated legacy transport
+is explicitly enabled.
+
+## Governance
+
+`AllowMutations = false` removes generated mutation tools, but it is not an authorization system.
+Use Koan's entity `[Access]` declarations for data authority and tool access policies/scopes for
+custom workflows. HTTP authentication is required by default in production and containers; local
+Development may be open so the first-use path remains observable.
+
+Tool advertisement and enforcement share the same caller-aware projection. A denied or disabled
+tool is not offered and cannot be reached by calling its name directly.
+
+## Runtime inspection
+
+- `koan://self` introduces the caller-visible Entity and custom-workflow surface.
+- `koan://entities` remains Entity-specific and can honestly be empty in a custom-tool-only app.
+- `koan://facts` returns the same versioned, redacted runtime-fact envelope as startup, health, and
+  `/.well-known/Koan/facts`. Check `complete` and branch on stable fact codes rather than prose.
 
 ## Related packages
-- `Koan.Core` – DI patterns, boot reporting, and environment helpers.
-- `Koan.Data.Core` – provides entity paging/streaming and repository facades.
-- `Koan.Core.Adapters` – adapter discovery feeding into MCP tool projection.
 
-## Reference
-- `McpEntityAttribute` – decorator to mark entities for MCP exposure.
-- `RuntimeFactsResourceProvider` – projects the current host's canonical runtime facts.
-- `DescriptorMapper` – maps data descriptors to MCP-compliant schemas and tools.
-- `McpRpcHandler` – handles incoming JSON-RPC calls for tool discovery and execution.
+- `Koan.Core` — composition, startup reporting, and runtime facts.
+- `Koan.Data.Core` — Entity persistence and query semantics.
+- `Koan.Web` — governed REST and Streamable HTTP hosting.
+- `Koan.Mcp.Explorer` — an optional human inspection surface over the same projection.
 
+See [TECHNICAL.md](TECHNICAL.md) for composition and transport details.

@@ -107,7 +107,7 @@ public readonly record struct CacheKey
 
     /// <summary>
     /// Stable, collision-free type token for cache keys and tags. For a non-generic type this is
-    /// <see cref="System.Type.Name"/> (unchanged). For a closed generic it strips the arity marker AND appends
+    /// <c>Type.Name</c> (unchanged). For a closed generic it strips the arity marker AND appends
     /// the (recursive) type-argument tokens — so <c>EmbeddingState&lt;Produce&gt;</c> and
     /// <c>EmbeddingState&lt;Other&gt;</c> don't both collapse to <c>EmbeddingState`1</c> (a silent cross-type
     /// cache collision) the way <c>Type.Name</c> does. Cache keys are ephemeral, so no migration is needed.

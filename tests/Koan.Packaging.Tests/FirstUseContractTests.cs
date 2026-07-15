@@ -15,7 +15,7 @@ public sealed class FirstUseContractTests
         var application = Path.Combine(root, "samples", "FirstUse");
         await new ProcessRunner().RequireAsync(
             "dotnet",
-            ["build", "FirstUse.csproj", "-c", "Release", "--nologo"],
+            ["build", "FirstUse.csproj", "-c", "Release", "--nologo", "-warnaserror"],
             application,
             TestContext.Current.CancellationToken);
 
