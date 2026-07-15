@@ -144,14 +144,20 @@ solution invocation cannot accidentally start Docker or native model work: xUnit
 a class fixture even when every fact is explicit. Direct `dotnet test` is intentionally not an
 execution path for that project; use the bounded runner shown above.
 
-```pwsh
-dotnet test Koan.sln
-```
-
-For targeted validation, invoke an individual suite project:
+For normal development validation, invoke the smallest owning suite project:
 
 ```pwsh
 dotnet test tests/Suites/Data/Core/Koan.Tests.Data.Core/Koan.Tests.Data.Core.csproj
+```
+
+Use three execution rings: affected facts/project for ordinary changes, a named bounded consumer matrix
+for cross-package or architectural claims, and the complete solution/green ratchet only at a tranche,
+merge, or release-certification boundary. A red certification run is evidence to isolate; do not rerun
+the whole solution after each focused repair or for unrelated work.
+
+```pwsh
+# Certification boundary only
+dotnet test Koan.sln
 ```
 
 ## Integration tests are canon (ARCH-0079)

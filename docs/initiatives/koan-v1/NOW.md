@@ -45,12 +45,22 @@ Replace this file at every handoff. It is a restart point, not a diary.
   [ARCH-0114](../../decisions/ARCH-0114-layered-capability-activation.md): Core Unit passes 112/112 and
   Mongo passes 70/70. Couchbase builds clean and its Docker-free surface passes 9/9, but two isolated
   full-suite attempts did not reach test execution because the Testcontainers node remained unready at
-  five minutes. That live 17/17 recheck and the exact aggregate ratchet remain before Lifecycle.
+  five minutes. The clean exact aggregate later completed in 14 minutes 35 seconds and remained red only
+  in its solution-test leg: one Jobs timing/concurrency fact each on SQLite, PostgreSQL, and SQL Server.
 - Lifecycle remains the next semantic clean 0.18 public break. Retain the no-alias greenfield decision
   and keep Communication/Pipeline work out of the release-foundation slice.
 - Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
+
+## Validation economy — persistent operating rule
+
+- Ordinary implementation uses the smallest affected fact/project proof.
+- Architectural claims add only a named, bounded capability/consumer matrix.
+- Full-solution and public-release ratchets run only at tranche, merge, or release-certification
+  boundaries, or when explicitly requested. They are not the normal development loop.
+- One red certification result is recorded. Diagnose and repair its named owners with focused evidence;
+  do not rerun certification until an owner or the certification topology has materially changed.
 
 ## Accepted model
 
@@ -200,10 +210,10 @@ Only the next slice has a detailed child card. Do not open broker breadth before
 
 ## Next safe action
 
-Continue [R07-04](work-items/r07/R07-04-public-release-ratchet.md): commit the accepted layered-capability
-contract, then run the exact public-release ratchet from a clean checkout. The ratchet owns Couchbase's
-live 17/17 recheck; record a deterministic fixture failure rather than weakening assertions or excluding
-a runnable suite.
+Continue [R07-04](work-items/r07/R07-04-public-release-ratchet.md) through the change ring: reproduce the
+three named Jobs facts individually, then decide whether the remaining owner is behavior or aggregate
+test topology. Do not rerun the exact ratchet until that owner materially changes. Do not weaken
+assertions or exclude a runnable suite.
 
 Do not start Lifecycle, Communication Events, Transport, a router, a unit-of-work coordinator, or
 Messaging compatibility work while the release floor is red.

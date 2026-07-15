@@ -4,11 +4,11 @@ domain: engineering
 title: "Test authoring guidance"
 audience: [developers, maintainers]
 status: current
-last_updated: 2026-07-14
+last_updated: 2026-07-15
 framework_version: pre-1.0
 validation:
   status: verified
-  scope: tests/README.md
+  scope: tests/README.md and the three-ring execution policy
 ---
 
 # Test authoring guidance
@@ -28,6 +28,25 @@ ARCH-0091; do not copy it from history or add general test-harness primitives to
 
 Reference = Intent is a runtime property. A hand-built service provider cannot prove that a referenced
 module is discovered, ordered, started, and composed correctly.
+
+## Use three validation rings
+
+Validation cost must match the decision being made. Do not use release certification as the normal
+development loop.
+
+1. **Change ring — seconds.** Run the directly affected facts and owning project. This is the default
+   after an implementation step.
+2. **Capability ring — bounded minutes.** Run the smallest consumer/provider matrix that proves an
+   architectural or cross-package claim. Name the matrix before running it; unrelated providers do not
+   join merely because they exist in the solution.
+3. **Certification ring — tranche or release boundary.** Run `Koan.sln` and the exact green ratchet only
+   when closing a major work item, preparing a merge/release, or when explicitly requested. Record one
+   red certification result and return to focused diagnosis; do not repeatedly pay the complete gate
+   while developing unrelated repairs.
+
+A larger ring complements the smaller evidence; it does not replace judgment about the current change.
+When certification is red, isolate each reported owner first. Rerun the complete certification only
+after those owners have changed or the certification topology itself has been repaired.
 
 ## Place and shape the suite
 
@@ -79,6 +98,7 @@ a false pass.
 
 ```powershell
 dotnet test tests/Suites/<Domain>/<Scope>/<ProjectName>/<ProjectName>.csproj -c Release
+# Certification boundary only:
 dotnet test Koan.sln -c Release
 ```
 
