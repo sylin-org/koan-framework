@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-14
   status: reviewed
-  scope: R05 fresh package journey passed; independent rehearsal active
+  scope: R05 independent agent rehearsal entered repair-and-repeat
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T5 — golden V0-to-V1 proof`
 - Active work item: R05-03 — package clean room and independent rehearsal
-- Next decision: obtain independent human and fresh-agent journey observations
+- Next decision: finish the bounded agent-rehearsal repair queue, then repeat with a fresh agent and human
 - V1 readiness: `not assessed`
 
 ## Work items
@@ -34,7 +34,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R02 | [Build the capability truth baseline](work-items/R02-capability-baseline.md) | T2 | passed | R01 | Codex · 2026-07-13 | All 13 surfaces are classified with reproducible evidence; no capability is mislabeled as supported while packaging is incoherent. |
 | R03 | [Define the Entity Semantics Contract](work-items/R03-entity-semantics-contract.md) | T3 | passed | R02 | Codex · 2026-07-13 | ARCH-0106 ratifies five semantic locations, strict Entity admission, C# 14 module facets, and host/context/event boundaries. |
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
-| R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | in-progress | R04 | Codex · 2026-07-14 | R05-01/02 and the fresh R05-03 package gate pass; independent human/agent rehearsal remains. See `R05-BACKLOG.md`. |
+| R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | in-progress | R04 | Codex · 2026-07-14 | R05-01/02 and the fresh package gate pass; independent agent review confirmed the core and opened a five-item repair/repeat queue. Readiness repair 1/5 is complete. See `R05-BACKLOG.md`. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -48,7 +48,7 @@ item should normally be `in-progress`.
 | R02 | passed | Capability ledger, focused execution record, public-claim audit, and ranked dispositions accepted. |
 | R03 | passed | Entity inventory, ecosystem dispositions, canonical contract, and ARCH-0106 accepted. |
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
-| R05 | active | GoldenJourney source and fresh package-only proofs pass; independent human/agent rehearsal remains. |
+| R05 | active | Source/package proofs pass; finish the bounded independent-review repairs, rerun a fresh agent, and obtain the human record. |
 
 ## Divergence and risk log
 
@@ -100,6 +100,8 @@ item should normally be `in-progress`.
 | 2026-07-14 | R05-03 | A disposable rehearsal over the older R04-04 closure failed at the expected missing `IBoundedQueryRepository` ABI; the later R04-08 verified closure plus current Data.Core/Jobs/Web passed external FirstUse 8/8 and GoldenJourney 11/11. | Record the 4.793s/10.242s observations as local implementation evidence only. Require a fresh Git-derived release set and independent rehearsal before passing R05-03. |
 | 2026-07-14 | R05-03 | A disposable Git snapshot and clean clone compiled 113 owners into an 84-package set: 45 version changes plus 39 unpublished-current registry repairs. All artifacts passed metadata, symbol, dependency, hash, audit, and embedded-commit checks; external FirstUse passed 8/8 in 4.129s and GoldenJourney 11/11 in 8.769s with zero build warnings/errors. | Accept the fresh package gate. Preserve public-package caution because nothing was published; keep R05-03 open only for an independent human and fresh-agent rehearsal. |
 | 2026-07-14 | R05-03 | The release compiler cannot discover a linked-worktree root because it recognizes only a `.git` directory, and its captured child output makes long full-graph runs look silent between packages. | These do not weaken the clean-clone release path. Record them as bounded packaging UX follow-ups; do not invalidate the accepted artifact evidence or widen R05 before independent review. |
+| 2026-07-14 | R05-03 | Two independent agent readers reproduced the central business journey. The deeper run returned `repair-and-repeat`: unused JSON made readiness 503, MCP self-description ignored live custom tools, source lockfile behavior contradicted README wording, and V5/warning/transport guidance was incomplete. | Accept the core experience, reject the narrower reader's `pass` as insufficient to overrule unexercised surfaces, and execute the five repairs in dependency order before a fresh repeat. |
+| 2026-07-14 | R05-03 | The foundation bundle makes JSON available beside explicitly referenced SQLite; JSON treated a normal unmaterialized directory as a critical failure even when unelected. Its observed-Entity diagnostic also reflected over a removed cache field and was permanently empty. | Add a data-pillar health participation base, make inactive providers `Unknown` and inert, align active JSON probing with repository provisioning, and record observed configs directly into a host-owned diagnostic store. Commit `977f33b9`; Data.Core 301/301, JSON 19/19, both `/health/ready`-gated journeys, strict docs, and inventory pass. |
 | 2026-07-13 | R04-02 | The isolated VectorModel guard spec passed, but the 79-test Data.AI process produced 31 failures after `EmbeddingMetadata` captured a logger from a disposed first-host provider. | Treat the static initializer as the root failure; lease generic-host binding and resolve host services only when an operation runs. |
 | 2026-07-13 | R04-02 | Owner-checked host leases, late Data.AI logger resolution, and a two-host Entity/storage probe are green; Core passes 195/195 and Data.AI passes 80/80. Backend-dependent caches and alternate binding paths remain unaudited. | Keep R04-02 `in-progress` and migrate one runtime owner at a time rather than claiming host scope from the first repair. |
 | 2026-07-13 | R04-02 | `VectorModelGuard._confirmed` let host B skip its durable registry because host A had confirmed the same entity/partition/model process-wide; the red two-host probe left B's empty backend unrecorded. | Remove the cache rather than invent another scope: every guard reads the current host's O(1) durable record. Data.AI passes 81/81. |

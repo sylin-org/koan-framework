@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-14
   status: reviewed
-  scope: R05 source and fresh package journeys passed; independent rehearsal active
+  scope: R05 independent agent rehearsal entered repair-and-repeat
 ---
 
 # Koan V1 reorganization current handoff
@@ -21,7 +21,8 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - R04 remains passed; FirstUse remains the stable shortest executable result.
 - R05 is `in-progress` under [`R05-BACKLOG.md`](R05-BACKLOG.md).
 - R05-01 business spine and R05-02 reactive/agentic collaboration pass.
-- R05-03's fresh package clean room passes; only independent human/agent rehearsal remains.
+- R05-03's fresh package clean room passes. Two independent agent rehearsals confirmed the central
+  journey; the deeper run returned `repair-and-repeat`, so a bounded truthfulness repair loop is active.
 - No public package was published and no branch was pushed by this work.
 
 ## What now exists
@@ -67,6 +68,16 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
 - GoldenJourney solution membership and Release project build: 0 errors; two existing Koan.Web XML
   documentation warnings appear when that dependency rebuilds.
 - Full Release solution build: 0 errors / 30 existing warnings.
+- Independent agent rehearsal: the exhaustive reader reproduced FirstUse, GoldenJourney, REST, MCP,
+  persistence, Jobs, and converged facts, then identified three responsible repairs. A second,
+  narrower reader independently passed the business path and corroborated the missing V5
+  reproduction and warning noise, but did not exercise readiness or MCP resources deeply enough to
+  overrule the first result.
+- Readiness repair commit `977f33b9`: connector availability is now distinct from application
+  dependency; inactive bundled JSON reports `Unknown` without touching disk, selected JSON follows
+  repository auto-provisioning, and host-owned Entity diagnostics no longer reflect over a removed
+  cache field. Data.Core passes 301/301, JSON 19/19, both executable journeys use `/health/ready` and
+  pass, strict docs build passes, and the package inventory still recognizes 113 owners.
 
 ## Important discoveries
 
@@ -86,17 +97,26 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
 - A linked worktree cannot currently host the release compiler because repository discovery accepts
   only a `.git` directory; a clean disposable clone works. Long full-graph runs also buffer child
   output enough to look quiet between packages. Both are bounded packaging UX follow-ups.
+- Package references to the foundation bundle compose JSON as an available fallback. Before
+  `977f33b9`, its missing default directory made a SQLite-selected application return readiness 503.
+  Health now gates only default-elected, configured, or observed providers; availability alone is
+  inspectable but inert.
+- The independent run also found that custom MCP tools are live while `koan://self` says there is
+  nothing usable, source builds do not emit the lockfile promised by the README, the V5
+  rejection/recovery command is not public, and several warning/transport details need tightening.
 
 ## Next safe action
 
-Ask a new human and a genuinely fresh coding-agent context to follow the public FirstUse-to-
-GoldenJourney path independently. Record time, confusion, corrective steps, whether the code reads as
-business without framework archaeology, and whether operator/agent facts make composition legible.
-Do not coach either reader from this session's hidden context.
+Continue the bounded repair-and-repeat queue in this order:
 
-If both rehearsals pass without material correction, update R05-03, the parent R05 card, backlog,
-progress ledger, and capability maturity together. If they expose a problem, prefer one small durable
-repair and rerun the affected source/package contract before closing the tranche.
+1. make `koan://self` describe live custom MCP tools while keeping `koan://entities` entity-specific;
+2. make the lockfile claim true on supported source/package front doors, or narrow the claim to the
+   exact supported build shape;
+3. document the exact V5 rejection/recovery command and its default-vs-entity routing semantics;
+4. remove genuine warning noise and clarify Streamable HTTP `POST /mcp` plus one REST query example.
+
+After each material repair, rerun the affected source contracts. Then obtain a genuinely fresh agent
+repeat and the remaining human rehearsal before closing R05-03.
 
 ## Do not infer
 
@@ -109,6 +129,6 @@ repair and rerun the affected source/package contract before closing the tranche
 
 ## Repository state
 
-R04 and R05 travel as one coherent local candidate commit so an independent reader can use an exact
-fresh checkout. The working tree should remain clean after that freeze. Do not amend, publish, push,
-tag, or release the candidate without a separate operator request.
+The coherent R04/R05 candidate is `d1dbbe35`; the first independent-rehearsal repair is the local
+commit `977f33b9`. Only evaluator reports remain untracked under `tmp/`. Do not stage those reports,
+or publish, push, tag, or release the candidate without a separate operator request.

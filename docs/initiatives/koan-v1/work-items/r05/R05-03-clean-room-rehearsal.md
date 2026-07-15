@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-14
   status: reviewed
-  scope: fresh Git-derived dual-application package rehearsal passed; independent review pending
+  scope: independent agent review entered bounded repair-and-repeat
 ---
 
 # R05-03 — Prove the clean room and independent rehearsal
@@ -71,3 +71,26 @@ intended route or provide this session's implementation context. For each reader
 
 R05-03 passes only after both records exist and any material repair has rerun its affected automated
 source/package contract.
+
+### First independent agent round
+
+Two clean, detached readers evaluated the exact candidate. The deeper reader reproduced the public
+shortest path, cumulative business journey, persistence, Jobs, MCP mutation, and byte-identical Web/
+MCP facts, then returned `repair-and-repeat`. The second reader returned `pass` over a narrower path
+and independently confirmed business readability, composition delight, the missing public V5
+reproduction, and warning noise; it did not exercise MCP resources or readiness deeply enough to
+close the first reader's findings.
+
+The responsible repair queue is:
+
+1. readiness must ignore available-but-unused connectors;
+2. `koan://self` must acknowledge live custom tools;
+3. build-time lockfile wording and behavior must agree on supported source and package paths;
+4. the V5 rejection/recovery command and routing boundary must be reproducible from public docs;
+5. genuine warning noise and minor MCP/REST transport guidance should be tightened.
+
+Repair 1 is complete in local commit `977f33b9`. It introduces selection-aware data health, aligns
+JSON readiness with repository auto-provisioning, repairs host-owned observed-Entity diagnostics, and
+makes both executable application probes gate on `/health/ready`. Verification passes Data.Core
+301/301, JSON 19/19, both source journeys, strict docs, and the 113-owner package inventory. A fresh
+agent repeat and human record remain required after the bounded queue.
