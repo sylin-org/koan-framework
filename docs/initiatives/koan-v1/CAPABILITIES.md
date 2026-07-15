@@ -4,10 +4,10 @@ domain: framework
 title: "Koan V1 Capability Evidence Ledger"
 audience: [architects, maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-14
+last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-14
+  date_last_tested: 2026-07-15
   status: reviewed
   scope: evidence vocabulary and initial assessment queue
 ---
@@ -87,6 +87,11 @@ Every record below was initially assessed by Codex on 2026-07-13 at
 `4471e9c7ffeaa2cd198a62589a9763c4555d9b7f`. R04 evidence amendments are dated in their text and the
 initiative progress ledger; they do not silently promote the original maturity labels.
 
+R05 closure adds one cumulative source/package journey, independent-reader evidence, backend
+rejection/recovery, and converged operator/agent inspection. It strengthens the records below but does
+not promote any maturity label: the coherent package closure has not been published and compatibility
+boundaries remain pre-V1 work.
+
 ### Bootstrap, discovery, and startup reporting
 
 - **Outcome and shortest path:** call `builder.Services.AddKoan()`; referenced modules are discovered,
@@ -121,8 +126,8 @@ initiative progress ledger; they do not silently promote the original maturity l
 - **Entry point and owner:** `Koan.Data.Core.Model.Entity<T>` in `Sylin.Koan.Data.Core`; ambient behavior
   is carried by [`EntityContext`](../../../src/Koan.Data.Core/EntityContext.cs) and
   [`EntityEventContext`](../../../src/Koan.Data.Core/Events/EntityEventContext.cs).
-- **Executable evidence:** [283 data-core tests](../../../tests/Suites/Data/Core/Koan.Tests.Data.Core/Koan.Tests.Data.Core.csproj)
-  pass. [`S0.ConsoleJsonRepo`](../../../samples/S0.ConsoleJsonRepo/Program.cs) and
+- **Executable evidence:** Data.Core passes 301/301, including current health-participation and
+  observed-Entity diagnostics. [`S0.ConsoleJsonRepo`](../../../samples/S0.ConsoleJsonRepo/Program.cs) and
   [`S1.Web`](../../../samples/S1.Web/Todo.cs) demonstrate console and web paths.
 - **Inspection and failure:** repositories and capabilities are resolvable through the static data
   facade; missing/unsupported operations use explicit exceptions rather than silent client-side
@@ -132,8 +137,8 @@ initiative progress ledger; they do not silently promote the original maturity l
   pre-1.0.
 - **Maturity / safe claim:** `verified`. Core `Entity<T>` persistence semantics are automated and are
   Koan's strongest first-class application language; provider-specific claims require their suites.
-- **Open risks:** R03 must define which extensions belong on Entity, which context flows are stable,
-  and how capability additions remain IntelliSense-coherent.
+- **Open risks:** graduate the defined Entity semantic locations ring by ring; provider parity,
+  concurrency, schema evolution, and compatibility remain separate claims.
 
 ### Backend discovery and negotiation
 
@@ -143,9 +148,9 @@ initiative progress ledger; they do not silently promote the original maturity l
   [`DataAdapterAttribute`](../../../src/Koan.Data.Abstractions/DataAdapterAttribute.cs),
   [`DataCaps`](../../../src/Koan.Data.Abstractions/Capabilities/DataCaps.cs), and core
   [`CapabilitySet`](../../../src/Koan.Core/Capabilities/CapabilitySet.cs).
-- **Executable evidence:** Data.Core passes 299/299. Relationship cells execute InMemory, JSON, and
+- **Executable evidence:** Data.Core passes 301/301. Relationship cells execute InMemory, JSON, and
   SQLite selection/rejection/bounds; Web relationship passes 7/7; MCP relationship passes 2/2 and MCP
-  conformance 73/73. [`S10.DevPortal`](../../../samples/S10.DevPortal/README.md) demonstrates provider switching.
+  conformance 74/74. [`S10.DevPortal`](../../../samples/S10.DevPortal/README.md) demonstrates provider switching.
 - **Inspection and failure:** [`AdapterResolutionDecision`](../../../src/Koan.Data.Core/Routing/AdapterResolutionDecision.cs)
   is the single calculation for configured/default data selection used by runtime behavior, lockfile,
   and schema-1 facts. [ARCH-0112](../../decisions/ARCH-0112-bounded-relationship-negotiation.md) adds
@@ -271,7 +276,8 @@ initiative progress ledger; they do not silently promote the original maturity l
 - **Entry point and owner:** `Sylin.Koan.Mcp`; registration and transports live under
   [`Koan.Mcp`](../../../src/Koan.Mcp/Koan.Mcp.csproj), with optional operations and explorer packages.
 - **Executable evidence:** [MCP conformance](../../../tests/Suites/Mcp/Koan.Mcp.Conformance.Tests/Koan.Mcp.Conformance.Tests.csproj)
-  passes 73/73, including custom-tool projection and caller-specific `koan://self` behavior alongside
+  passes 74/74, including custom-tool projection, caller-specific `koan://self` behavior, quiet
+  convention-based schemas, and discoverable custom-mutation `dry_run` alongside
   canonical `koan://facts` serialization. `FirstUseContractTests` additionally prove Streamable HTTP
   initialization, resource discovery, identical Web/MCP facts, remote-origin operation filtering,
   dry-run non-mutation, and a real agent upsert observed through REST. The cumulative GoldenJourney
@@ -315,7 +321,7 @@ initiative progress ledger; they do not silently promote the original maturity l
 - **Entry point and owner:** `Sylin.Koan.Testing` and `Sylin.Koan.Testing.Hosting`.
 - **Executable evidence:** [testing meta-tests](../../../tests/Suites/Testing/Koan.Testing.Tests/Koan.Testing.Tests.csproj)
   report 11 passed and 3 intentional skips; cache and embedding batteries were skipped. Bootstrap is
-  split into bounded 17/17 Fast, 16/16 Pillars, and 7/7 Infrastructure lanes. The 15/15 packaging suite
+  split into bounded 17/17 Fast, 16/16 Pillars, and 7/7 Infrastructure lanes. The 16/16 packaging suite
   includes serialized isolated source-checkout FirstUse and GoldenJourney process proofs.
 - **Inspection and failure:** capability-gated conformance can explain why some batteries do not apply;
   bounded runners report the lane, phase, command, deadline, and captured diagnostics on failure.
@@ -351,7 +357,9 @@ initiative progress ledger; they do not silently promote the original maturity l
   was not published. A later lockfile-focused rehearsal at `a2780672` verified another 84-package
   closure: Core carried its composition target through `buildTransitive`, and external FirstUse plus
   GoldenJourney both emitted and validated checked-in lockfiles while passing their complete 8-step
-  and 11-step contracts with zero build warnings/errors.
+  and 11-step contracts with zero build warnings/errors. Independent readers then reproduced the
+  supported path, generated two bounded repair queues, and verified the affected contracts. The
+  maintainer accepted the resulting evidence without promoting unpublished packages.
 - **Inspection and failure:** the restore fails loudly, which is safer than an ABI mismatch, but the
   public docs previously described packages only as lagging and offered a broken copy/paste path.
 - **Unsupported / compatibility:** the staged package set is coherent, but public package-first install,
@@ -372,8 +380,8 @@ initiative progress ledger; they do not silently promote the original maturity l
   and core health under [`Koan.Core/Observability`](../../../src/Koan.Core/Observability), plus
   [`Sylin.Koan.Observability`](../../../src/Koan.Observability/Koan.Observability.csproj) and module
   contributors.
-- **Executable evidence:** focused facts pass 7/7; Core 211/211, Data.Core 299/299, Web WellKnown 3/3,
-  Web relationship 7/7, MCP relationship 2/2, and MCP conformance 73/73. These prove ordering, schema round-trip, redaction, host isolation,
+- **Executable evidence:** focused facts pass 7/7; Core 211/211, Data.Core 301/301, Web WellKnown 3/3,
+  Web relationship 7/7, MCP relationship 2/2, and MCP conformance 74/74. These prove ordering, schema round-trip, redaction, host isolation,
   unknown/degraded health, and identical Web/MCP serialization for the vertical slice. FirstUse proves
   the operator and agent projections against the same running SQLite-backed business application.
 - **Inspection and failure:** collection starts incomplete/unknown; safe collection failures and

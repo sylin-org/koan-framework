@@ -4,10 +4,10 @@ domain: framework
 title: "R05 - Prove the Golden V0-to-V1 Journey"
 audience: [architects, maintainers, ai-agents]
 status: current
-last_updated: 2026-07-14
+last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-14
+  date_last_tested: 2026-07-15
   status: reviewed
   scope: golden-journey proof work-item specification
 ---
@@ -15,7 +15,7 @@ validation:
 # R05 — Prove the golden V0-to-V1 journey
 
 - Tranche: `T5 — golden V0-to-V1 proof`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R04
 - Unlocks: capability-ring expansion and V1 readiness assessment
 - Owner: maintainer
@@ -60,16 +60,15 @@ must rest on assessed and hardened foundations rather than an aspirational sampl
   same business story.
 - Record both application code and Koan's composition explanation at every step.
 
-### OPEN
-
-- What observations emerge when a new human and a fresh coding-agent context independently rehearse
-  the public path?
-
 ### RESOLVED
 
 - A fresh staged-package release reproduces both application contracts without retained artifacts:
   84 packages were compiled from one Git snapshot; FirstUse passed 8/8 and GoldenJourney 11/11 from
   the hydrated package-only feed.
+- Independent readers and a context-free repeat reproduced the central journey, exposed two smaller
+  truth queues, and verified their repairs. The maintainer accepted that evidence plus ongoing review
+  and dogfeeding as sufficient; an extra identity-specific walkthrough would add ceremony, not a new
+  acceptance signal.
 
 ## Scope
 
@@ -97,12 +96,13 @@ must rest on assessed and hardened foundations rather than an aspirational sampl
 5. **Agentic:** one bounded AI- or agent-facing behavior adds business value with explicit backend
    negotiation and failure behavior.
 6. **V1 proof:** clean checkout, tests, startup report, operational inspection, and recovery guidance
-   are reproducible by a new human and a coding agent.
+   are reproducible by independent readers and executable clean-room evidence.
 
 ## Verification
 
 - Run from an environment without prior Koan build artifacts or hidden local services.
-- A human and an AI coding agent independently follow the supported path.
+- Independent readers reproduce the supported path, record their coverage, and expose material
+  confusion; the maintainer explicitly accepts the resulting evidence as sufficient.
 - Every checkpoint has automated business assertions and captured composition facts.
 - Forced provider/configuration failures produce actionable, redacted explanations.
 - Reviewers can trace business behavior without reading framework bootstrap plumbing.
@@ -119,3 +119,20 @@ must rest on assessed and hardened foundations rather than an aspirational sampl
 - Stop if the sample requires undocumented setup, local residue, or application-owned infrastructure
   scaffolding to appear simple.
 - Stop if the domain starts encoding identifying downstream details.
+
+## Acceptance result
+
+- Outcome: PASS
+- Date and commit: 2026-07-15; evidence through `0e40b455`, closure recorded by the following
+  documentation commit.
+- Evidence: the stable FirstUse result; the cumulative GoldenJourney; fresh source/package proofs;
+  converged operator/agent facts; forced backend rejection and recovery; independent evaluations and
+  completed repair queues documented in `R05-BACKLOG.md` and R05-03.
+- Tests / validation: external FirstUse 8/8 and GoldenJourney 11/11; current focused source journeys
+  3/3; Jobs 76/76; MCP conformance 74/74; Streamable HTTP 18/18; affected warning-as-error builds;
+  strict documentation validation.
+- Unsupported scenarios: public package installation, distributed transports, exhaustive providers,
+  production authorization/security design, and compatibility guarantees outside the stated proofs.
+- Follow-up work: assess T6 capability-ring graduation, observe the first real `dev` publication, and
+  handle bounded post-cycle items only through explicit compatibility decisions.
+- Reviewer: maintainer and Codex; evidence sufficiency ratified by the maintainer on 2026-07-15.

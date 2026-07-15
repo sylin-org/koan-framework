@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R05 fresh-agent repeat repair queue complete; human rehearsal remains
+  scope: R05 passed; T6 capability-ring assessment is next
 ---
 
 # Koan V1 reorganization current handoff
@@ -19,10 +19,13 @@ Replace this file at every handoff. It is a restart point, not a diary.
 ## Current state
 
 - R04 remains passed; FirstUse remains the stable shortest executable result.
-- R05 is `in-progress` under [`R05-BACKLOG.md`](R05-BACKLOG.md).
-- R05-01 business spine and R05-02 reactive/agentic collaboration pass.
-- R05-03's fresh package clean room passes. Two independent agent rehearsals confirmed the central
-  journey; the deeper run returned `repair-and-repeat`, and all five bounded repairs now pass.
+- R05 is `passed` under [`R05-BACKLOG.md`](R05-BACKLOG.md); all three child cards pass.
+- R05-03's clean-room package proof, two independent agent rounds, context-free repeat, and both
+  repair queues are complete. The maintainer explicitly accepted their combined evidence as
+  sufficient on 2026-07-15.
+- The initiative no longer requires an identity-specific human walkthrough when equivalent evidence
+  already triangulates the result. Independent coverage, material-finding repair, affected-contract
+  reruns, and explicit maintainer acceptance remain mandatory.
 - A genuinely fresh repeat over candidate `47ce8915` again confirmed the complete FirstUse and
   GoldenJourney business paths, modern HTTP MCP, persistence, facts convergence, agent mutation, and
   V5 rejection/recovery. It returned `repair-and-repeat` on a smaller second-round truth queue.
@@ -38,6 +41,8 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - The fourth and final fresh-repeat slice is repaired: ordinary Entity schema fallback is quiet,
   custom mutations advertise the `dry_run` control they already honor, and the HTTP guide is now a
   compact Streamable-first contract rather than a deprecated-transport tutorial.
+- T6 capability-ring graduation is next. T7/V1 release readiness is not yet achieved because T6 is
+  unevaluated and the coherent package closure has not been published and observed.
 - No public package was published and no branch was pushed by this work.
 
 ## What now exists
@@ -175,11 +180,10 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
 
 ## Next safe action
 
-Obtain the remaining independent human rehearsal from a clean checkout using only the public front
-door and the record format in R05-03. If it passes, rerun only any contract affected by a material
-correction, close R05-03, and evaluate R05/V1 acceptance without upgrading public-package maturity.
-If it returns `repair-and-repeat`, promote only correctness, security, release, or central-experience
-findings; preserve small design choices in `POST-CYCLE-TODO.md`.
+Assess T6 ring 1—Entity/data/composition/testing—against `CAPABILITIES.md` and `ACCEPTANCE.md`. Create
+one bounded work item only for the smallest missing lower-ring foundation that blocks honest
+graduation. Keep public package maturity at `specified` until an actual `dev` publication is observed,
+and keep unrelated polish or compatibility choices in `POST-CYCLE-TODO.md`.
 
 ## Do not infer
 
@@ -192,9 +196,9 @@ findings; preserve small design choices in `POST-CYCLE-TODO.md`.
 
 ## Repository state
 
-The coherent R04/R05 candidate is `d1dbbe35`; the first independent-rehearsal repair sequence ends at
-`ffc1ed27`, and its closure record is `47ce8915`. Commits `f66bc8f5`, `88e3be69`, and `46c523d8`
-repair the fresh-repeat filter, composition truth, and readiness/operator behavior; `0e40b455`
-closes MCP discoverability. Only evaluator reports remain untracked under `tmp/`.
+The coherent R04/R05 candidate begins at `d1dbbe35`; the first independent-rehearsal repair sequence
+ends at `ffc1ed27`, and its closure record is `47ce8915`. Commits `f66bc8f5`, `88e3be69`,
+`46c523d8`, and `0e40b455` close the fresh-repeat truth queue. The next documentation commit records
+R05 acceptance. Only evaluator reports remain untracked under `tmp/`.
 Do not stage those reports, or publish, push, tag, or release the candidate without a separate
 operator request.

@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R05 fresh-agent repeat repair queue complete; human rehearsal remains
+  scope: R05 passed; T6 capability-ring assessment is next
 ---
 
 # Koan V1 Reorganization Progress
@@ -20,10 +20,10 @@ or completes a work item. The roadmap describes order; it does not report progre
 ## Initiative state
 
 - Overall: `active`
-- Current tranche: `T5 — golden V0-to-V1 proof`
-- Active work item: R05-03 — package clean room and independent rehearsal
-- Next decision: close the fresh-repeat truth queue, then obtain the human rehearsal
-- V1 readiness: `not assessed`
+- Current tranche: `T6 — capability-ring graduation`
+- Active work item: none; R05 is closed and the first T6 card is not yet opened
+- Next decision: assess the first capability ring and create the smallest evidence-backed T6 card
+- V1 readiness: `not ready`; T7 remains gated by T6 and an observed public package publication
 
 ## Work items
 
@@ -34,7 +34,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R02 | [Build the capability truth baseline](work-items/R02-capability-baseline.md) | T2 | passed | R01 | Codex · 2026-07-13 | All 13 surfaces are classified with reproducible evidence; no capability is mislabeled as supported while packaging is incoherent. |
 | R03 | [Define the Entity Semantics Contract](work-items/R03-entity-semantics-contract.md) | T3 | passed | R02 | Codex · 2026-07-13 | ARCH-0106 ratifies five semantic locations, strict Entity admission, C# 14 module facets, and host/context/event boundaries. |
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
-| R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | in-progress | R04 | Codex · 2026-07-15 | R05-01/02 and the fresh package gate pass. A fresh-agent repeat confirmed the central journey and opened a smaller truth queue; its filtered-query and composition-truth repairs pass. Remaining repairs and the human record remain. See `R05-BACKLOG.md`. |
+| R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -48,7 +48,7 @@ item should normally be `in-progress`.
 | R02 | passed | Capability ledger, focused execution record, public-claim audit, and ranked dispositions accepted. |
 | R03 | passed | Entity inventory, ecosystem dispositions, canonical contract, and ARCH-0106 accepted. |
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
-| R05 | active | Source/package proofs and the first repair sequence pass; fresh-repeat repairs 1–2 pass. Close its readiness and MCP findings, then obtain the human record. |
+| R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 
 ## Divergence and risk log
 
@@ -109,7 +109,8 @@ item should normally be `in-progress`.
 | 2026-07-15 | R05-03 | A context-free repeat over `47ce8915` reproduced both supported journeys, modern HTTP MCP, persistence, converged facts, agent mutation, and V5 recovery, but returned `repair-and-repeat`: the exact camelCase filter silently matched nothing; both lockfiles reported their app assembly as runtime module drift; health guidance named nonexistent readiness routes; rejected Jobs emitted repeated failures; and MCP metadata/dry-run discoverability plus the legacy-heavy HTTP guide remained rough. | Accept the central experience but keep R05-03 open. Repair in bounded truth slices, keeping compatibility-sensitive MCP casing in the explicit post-cycle decision queue. First slice: retain canonical member paths in `ResolvedField`, use them at the shared relational translation boundary, add lowercase/mixed-case convergence cases, and make the exact FirstUse filter executable evidence. Relational warning-as-error build, SQLite convergence 1/1, and FirstUse contract 1/1 pass. Composition drift is next. |
 | 2026-07-15 | R05-03 | Runtime composition counted the `Koan.*` executable as a module even though MSBuild correctly records it only under `app`. Excluding it then revealed the resolved twin used friendly product identity while the build file used assembly identity, producing a second `app` drift. | Resolve the application assembly from host identity with entry-assembly fallback; use its assembly name for `app`, exclude it from `modules`, and retain friendly identity only in operator/runtime facts. Make both executable probes require the matched fact. Core lockfile contracts pass 15/15; warning-free Release builds and both live contracts pass 1/1 with `CompositionLockfileMatched=true`. Readiness/operator behavior is next. |
 | 2026-07-15 | R05-03 | Public docs extrapolated nonexistent `/api/health/live` and `/api/health/ready` routes from the shallow compatibility up-check, the rejected application proof never called canonical readiness, and its unavailable Jobs ledger emitted an Error every poll. | Name `/health/live` and `/health/ready` as canonical, prove rejected intent returns readiness 503/`unhealthy`, and make the worker pace failed iterations at its existing `PollInterval` while logging only failure/recovery transitions at operator levels. Commit `46c523d8`; Jobs and packaging warning-as-error builds pass; GoldenJourney passes 2/2 and rejects repeated iteration errors during a bounded observation window. MCP discoverability is next. |
-| 2026-07-15 | R05-03 | Convention-based Entity schema descriptions emitted a supported-path warning, mutating custom tools accepted reserved `dry_run` without advertising it, and the 1,752-line HTTP guide devoted most of its surface to deprecated routes plus invented options and performance claims. | Treat property names as the normal quiet fallback; advertise the centralized `dry_run` control only for `IsMutation=true` custom tools; prove quiet FirstUse and truthful GoldenJourney discovery; rebuild the existing guide in place as a 250-line Streamable-first contract. Commit `0e40b455`; MCP warning-as-error build, conformance 74/74, Streamable HTTP 18/18, executable journeys 3/3, and strict docs pass. The fresh-repeat repair queue is complete; only the independent human record remains. |
+| 2026-07-15 | R05-03 | Convention-based Entity schema descriptions emitted a supported-path warning, mutating custom tools accepted reserved `dry_run` without advertising it, and the 1,752-line HTTP guide devoted most of its surface to deprecated routes plus invented options and performance claims. | Treat property names as the normal quiet fallback; advertise the centralized `dry_run` control only for `IsMutation=true` custom tools; prove quiet FirstUse and truthful GoldenJourney discovery; rebuild the existing guide in place as a 250-line Streamable-first contract. Commit `0e40b455`; MCP warning-as-error build, conformance 74/74, Streamable HTTP 18/18, executable journeys 3/3, and strict docs pass. The fresh-repeat repair queue is complete. |
+| 2026-07-15 | R05 | The remaining gate required one more identity-specific human walkthrough even though repeated clean-room automation, two independent agent readers, a context-free repeat, two repair queues, and ongoing maintainer review/dogfeeding already triangulated the central experience. | Remove the ceremonial identity gate without weakening evidence quality. Require coverage-aware independent records, affected-contract reruns after material repairs, and explicit maintainer acceptance of sufficiency. The maintainer accepted the accumulated evidence and R05 passes; public package maturity remains `specified`. |
 | 2026-07-13 | R04-02 | The isolated VectorModel guard spec passed, but the 79-test Data.AI process produced 31 failures after `EmbeddingMetadata` captured a logger from a disposed first-host provider. | Treat the static initializer as the root failure; lease generic-host binding and resolve host services only when an operation runs. |
 | 2026-07-13 | R04-02 | Owner-checked host leases, late Data.AI logger resolution, and a two-host Entity/storage probe are green; Core passes 195/195 and Data.AI passes 80/80. Backend-dependent caches and alternate binding paths remain unaudited. | Keep R04-02 `in-progress` and migrate one runtime owner at a time rather than claiming host scope from the first repair. |
 | 2026-07-13 | R04-02 | `VectorModelGuard._confirmed` let host B skip its durable registry because host A had confirmed the same entity/partition/model process-wide; the red two-host probe left B's empty backend unrecorded. | Remove the cache rather than invent another scope: every guard reads the current host's O(1) durable record. Data.AI passes 81/81. |

@@ -42,7 +42,7 @@ R05-01 business spine
 |---|---|---|---|---|
 | [R05-01](work-items/r05/R05-01-business-spine.md) | passed | The cumulative app reads as a review workflow and persists/reaches one business result. | R04 | GoldenJourney domain/controller; pure rule and running REST assertions |
 | [R05-02](work-items/r05/R05-02-reactive-agentic.md) | passed | Durable assessment and bounded agent recommendation remain inspectable and honest. | R05-01 | Jobs facts/progress suites; 11-step source process proof |
-| [R05-03](work-items/r05/R05-03-clean-room-rehearsal.md) | in-progress | A package-only checkout and independent readers reproduce the supported journey. | R05-02 | fresh 84-package clean room, both agent rounds, and both repair queues pass; independent human record remains |
+| [R05-03](work-items/r05/R05-03-clean-room-rehearsal.md) | passed | A package-only checkout and independent readers reproduce the supported journey. | R05-02 | fresh 84-package clean rooms, two agent rounds, two repair queues, and explicit maintainer evidence acceptance |
 
 ## Program rules
 
@@ -51,5 +51,7 @@ R05-01 business spine
   MCP protocol plumbing, runtime-fact construction, or backend-election logic.
 - A public claim requires current code plus executable evidence; retained artifacts from an earlier
   dirty-tree state cannot close the package gate.
-- Human and AI rehearsals are final acceptance evidence, not automation substitutes.
+- Independent rehearsals, executable contracts, and maintainer dogfeeding are complementary evidence.
+  No single scripted walkthrough is mandatory when equivalent evidence is recorded and the maintainer
+  explicitly accepts its sufficiency.
 - Private downstream applications inform questions only and are never named or copied into evidence.

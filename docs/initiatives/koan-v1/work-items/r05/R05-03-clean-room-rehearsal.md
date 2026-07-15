@@ -9,12 +9,12 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: both agent rounds and repair queues complete; human rehearsal remains
+  scope: package clean room, independent rehearsals, and repair queues accepted
 ---
 
 # R05-03 — Prove the clean room and independent rehearsal
 
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R05-02
 - Owner: packaging, documentation, acceptance
 
@@ -47,13 +47,19 @@ built with zero warnings and zero errors. The retained ignored evidence lives un
 `artifacts/r05-fresh-release-540a84c9b433/` and names source commit
 `540a84c9b4339458c69362cbd1c0aae8b8bc4668`.
 
-## Remaining acceptance gate
+## Acceptance basis
 
-- Have a new human independently follow the public path; record confusion, corrections, and whether
-  business behavior can be reviewed without framework internals. Both coding-agent rounds and their
-  material repair queues are complete.
-- Update capability maturity and package-install wording only if the resulting public release state
-  supports those claims.
+The maintainer accepted the accumulated evidence as sufficient on 2026-07-15. Two independent agent
+readers, a context-free repeat, repeated clean-room package runs, executable source/package
+contracts, and ongoing maintainer review and dogfeeding all tested the same experience from different
+angles. Their material findings produced two bounded repair queues, and every promoted repair was
+rerun against its affected contract.
+
+An additional scripted human walkthrough would repeat the same maintained path without adding a
+meaningfully independent signal. R05 therefore requires explicit maintainer acceptance of evidence
+sufficiency, not a ceremonial reader identity. Future independent readers remain valuable discovery
+inputs; they are not a permanent release checkbox when current evidence already triangulates the
+claim.
 
 The fresh local release proves artifact coherence, not public availability. Public install wording
 remains gated until the `dev` workflow publishes and the registry exposes the resulting identities.
@@ -70,8 +76,8 @@ intended route or provide this session's implementation context. For each reader
 - whether startup, Web, and MCP facts explained the composed backend and a forced rejection; and
 - `pass`, `repair-and-repeat`, or `stop`, with the smallest responsible repair if needed.
 
-R05-03 passes only after both records exist and any material repair has rerun its affected automated
-source/package contract.
+Independent records must identify their coverage and limits. Any material repair must rerun its
+affected automated source/package contract before its evidence can support acceptance.
 
 ### Fresh independent agent repeat
 
@@ -91,7 +97,7 @@ a smaller truth queue. Four bounded shared repairs now close it:
 Verification for the final slice passes Koan.Mcp warning-as-error, MCP conformance 74/74,
 Streamable HTTP 18/18, both executable journey classes 3/3, and strict docs. Compatibility-sensitive
 MCP casing and legacy option names remain explicit post-cycle decisions, not hidden changes. The
-coding-agent record is complete; automation cannot substitute for the remaining human record.
+independent repeat and its repair queue are complete.
 
 ### First independent agent round
 
@@ -151,3 +157,22 @@ GoldenJourney's exact public command passes 1/1, the focused SQLite filter contr
 strict docs pass. Broader small design debts, including the intentional `JobMetric.Count` collision,
 are retained with required decisions and evidence in
 [`POST-CYCLE-TODO.md`](../../POST-CYCLE-TODO.md) rather than widening R05.
+
+## Acceptance result
+
+- Outcome: PASS
+- Date and commit: 2026-07-15; evidence through `0e40b455`, closure recorded by the following
+  documentation commit.
+- Evidence: fresh 84-package clean rooms; FirstUse and GoldenJourney source/package contracts; two
+  independent agent evaluations; one context-free repeat; two completed repair queues; explicit
+  maintainer acceptance of evidence sufficiency.
+- Tests / validation: external FirstUse 8/8 and GoldenJourney 11/11; Jobs 76/76; MCP conformance
+  74/74; Streamable HTTP 18/18; focused executable journeys 3/3; affected warning-as-error builds;
+  strict documentation validation.
+- Unsupported scenarios: the unpublished public package closure, distributed Jobs transports,
+  hostile-client security, every adapter/provider, full custom-tool rehearsal, and production
+  authorization design.
+- Follow-up work: observe a real `dev` publication before promoting package maturity; assess the T6
+  capability rings; retain bounded design and polish issues in `POST-CYCLE-TODO.md`.
+- Reviewer: maintainer and Codex; the maintainer explicitly ratified evidence sufficiency on
+  2026-07-15.
