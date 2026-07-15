@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -50,21 +49,18 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             ("environment", KoanEnv.EnvironmentName),
             ("mode", KoanEnv.OrchestrationMode.ToString()));
         KoanLog.ConfigDebug(Logger, LogActions.Config, "initial",
-            ("connection", options.ConnectionString));
+            ("connection", Redaction.DeIdentify(options.ConnectionString)));
 
-        var explicitConnectionString = ReadProviderConfiguration("",
-            Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlite,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+        var explicitConnectionString = Infrastructure.SqliteConnectionConfiguration
+            .ReadProviderFallback(Configuration);
 
-        if (!string.IsNullOrWhiteSpace(explicitConnectionString))
+        if (!string.IsNullOrWhiteSpace(explicitConnectionString) && !IsAuto(explicitConnectionString))
         {
             KoanLog.ConfigInfo(Logger, LogActions.Config, "explicit",
                 ("source", "configuration"));
             options.ConnectionString = explicitConnectionString;
         }
-        else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
+        else if (IsAuto(explicitConnectionString) || IsAuto(options.ConnectionString) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
         {
             KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto");
@@ -97,7 +93,7 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             options.AllowProductionDdl);
 
         KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomeValues.Final,
-            ("connection", options.ConnectionString));
+            ("connection", Redaction.DeIdentify(options.ConnectionString)));
         KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomes.Complete);
     }
 
@@ -123,6 +119,9 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             var context = new DiscoveryContext
             {
                 OrchestrationMode = KoanEnv.OrchestrationMode,
+                // Target selection is configuration, not readiness. Repository use and the active health contributor
+                // own authoritative I/O, so an available-but-unelected connector cannot create a database here.
+                RequireHealthValidation = false,
                 HealthCheckTimeout = TimeSpan.FromMilliseconds(500),
                 Parameters = new Dictionary<string, object>()
             };
@@ -134,7 +133,7 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             if (result.IsSuccessful)
             {
                 KoanLog.ConfigInfo(logger, LogActions.Discovery, LogOutcomeValues.Success,
-                    ("url", result.ServiceUrl));
+                    ("url", Redaction.DeIdentify(result.ServiceUrl)));
                 return result.ServiceUrl;
             }
             else
@@ -147,7 +146,7 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
         catch (Exception ex)
         {
             KoanLog.ConfigError(logger, LogActions.Discovery, "exception",
-                ("error", ex.Message));
+                ("error", Redaction.DeIdentify(ex.Message)));
             return BuildSqliteConnectionString(".koan/data/Koan.sqlite");
         }
     }
@@ -158,16 +157,10 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
     }
 
     private static string BuildSqliteConnectionString(string filePath)
-    {
-        // Ensure directory exists for SQLite file
-        var directory = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
+        => $"Data Source={filePath}";
 
-        return $"Data Source={filePath}";
-    }
+    private static bool IsAuto(string? value)
+        => Infrastructure.SqliteConnectionConfiguration.IsAuto(value);
 
     private static class LogActions
     {

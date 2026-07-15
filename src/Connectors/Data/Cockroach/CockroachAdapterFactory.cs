@@ -47,7 +47,7 @@ public sealed class CockroachAdapterFactory : IDataAdapterFactory
         // relies on discovery and resolves to "auto") collapses onto the discovery-resolved base connection, so a
         // routed source never keys its store on the unresolved sentinel (ARCH-0103 P5 fleet hoist).
         var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "Cockroach", source, baseOpts.ConnectionString);
+            config, sourceRegistry, "Cockroach", source, baseOpts.ConnectionString, CanHandle);
 
         // Create source-specific options
         var sourceOpts = new CockroachOptions
@@ -82,4 +82,3 @@ public sealed class CockroachAdapterFactory : IDataAdapterFactory
         };
     }
 }
-

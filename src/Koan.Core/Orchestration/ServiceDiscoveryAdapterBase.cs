@@ -48,14 +48,14 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
             KoanLog.ConfigDebug(_logger, LogActions.Try, null,
                 ("service", ServiceName),
                 ("method", candidate.Method),
-                ("url", candidate.Url));
+                ("url", Redaction.DeIdentify(candidate.Url)));
 
             if (await ValidateCandidate(candidate.Url, context, cancellationToken))
             {
                 KoanLog.ConfigInfo(_logger, LogActions.Decide, LogOutcomes.Success,
                     ("service", ServiceName),
                     ("method", candidate.Method),
-                    ("url", candidate.Url));
+                    ("url", Redaction.DeIdentify(candidate.Url)));
 
                 return AdapterDiscoveryResult.Success(ServiceName, candidate.Url, candidate.Method, true);
             }
@@ -99,7 +99,7 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
                     KoanLog.ConfigDebug(_logger, "discovery.candidate", null,
                         ("service", ServiceName),
                         ("method", contributed.Method),
-                        ("url", contributed.Url));
+                        ("url", Redaction.DeIdentify(contributed.Url)));
                 }
             }
         }
@@ -122,7 +122,7 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
                 KoanLog.ConfigDebug(_logger, "discovery.candidate", null,
                     ("service", ServiceName),
                     ("method", "container-instance"),
-                    ("url", containerUrl));
+                    ("url", Redaction.DeIdentify(containerUrl)));
             }
 
             // Reach a service on the Docker HOST from inside a container. `host.docker.internal` is the
@@ -137,7 +137,7 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
                 KoanLog.ConfigDebug(_logger, "discovery.candidate", null,
                     ("service", ServiceName),
                     ("method", "docker-host"),
-                    ("url", dockerHostUrl));
+                    ("url", Redaction.DeIdentify(dockerHostUrl)));
             }
 
             // Local fallback when in container
@@ -148,7 +148,7 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
                 KoanLog.ConfigDebug(_logger, "discovery.candidate", null,
                     ("service", ServiceName),
                     ("method", "local-fallback"),
-                    ("url", localhostUrl));
+                    ("url", Redaction.DeIdentify(localhostUrl)));
             }
         }
         else
@@ -161,7 +161,7 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
                 KoanLog.ConfigDebug(_logger, "discovery.candidate", null,
                     ("service", ServiceName),
                     ("method", "local"),
-                    ("url", localhostUrl));
+                    ("url", Redaction.DeIdentify(localhostUrl)));
             }
         }
 
@@ -176,7 +176,7 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
                 KoanLog.ConfigDebug(_logger, "discovery.candidate", null,
                     ("service", ServiceName),
                     ("method", "aspire-discovery"),
-                    ("url", aspireUrl));
+                    ("url", Redaction.DeIdentify(aspireUrl)));
             }
         }
 
@@ -251,15 +251,15 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
         {
             KoanLog.ConfigDebug(_logger, LogActions.Health, LogOutcomes.Timeout,
                 ("service", ServiceName),
-                ("url", serviceUrl));
+                ("url", Redaction.DeIdentify(serviceUrl)));
             return false;
         }
         catch (Exception ex)
         {
             KoanLog.ConfigDebug(_logger, LogActions.Health, LogOutcomes.Failure,
                 ("service", ServiceName),
-                ("url", serviceUrl),
-                ("error", ex.Message));
+                ("url", Redaction.DeIdentify(serviceUrl)),
+                ("error", Redaction.DeIdentify(ex.Message)));
             return false;
         }
     }

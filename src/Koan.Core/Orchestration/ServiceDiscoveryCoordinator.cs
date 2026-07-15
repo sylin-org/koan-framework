@@ -55,7 +55,7 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
             var outcome = result.IsSuccessful ? LogOutcomes.Success : LogOutcomes.Failure;
             KoanLog.ConfigInfo(_logger, LogActions.Result, outcome,
                 ("service", serviceName),
-                ("url", result.ServiceUrl));
+                ("url", Redaction.DeIdentify(result.ServiceUrl)));
 
             return result;
         }
@@ -64,7 +64,7 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
             KoanLog.ConfigError(_logger, LogActions.Result, "exception",
                 ("service", serviceName),
                 ("adapter", adapter.GetType().Name),
-                ("error", ex.Message));
+                ("error", Redaction.DeIdentify(ex.Message)));
             return AdapterDiscoveryResult.Failed(serviceName, $"Adapter exception: {ex.Message}");
         }
     }
@@ -99,7 +99,7 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
                 KoanLog.ConfigDebug(_logger, LogActions.Delegate, "contributor-failed",
                     ("service", serviceName),
                     ("contributor", contributor.GetType().Name),
-                    ("error", ex.Message));
+                    ("error", Redaction.DeIdentify(ex.Message)));
             }
         }
 

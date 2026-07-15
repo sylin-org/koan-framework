@@ -66,6 +66,9 @@ validation:
 - `IDataDiagnostics.GetEntityConfigsSnapshot()` is host-owned and contains only configurations
   observed by that host. Aggregate resolution records into it directly; diagnostics do not reflect
   over private cache implementation details.
+- `IDataDiagnostics.GetAdapterParticipationsSnapshot()` is a separate host-owned execution fact. Merely
+  describing an Entity or its route does not activate an adapter; successful repository construction or
+  a Direct connection request records the canonical provider and logical source idempotently.
 - `AggregateConfigs.Reset()` remains available for test-matrix discovery cleanup, but repeated-host
   correctness does not depend on calling it.
 
@@ -73,7 +76,7 @@ validation:
 
 - `DataAdapterHealthContributorBase` distinguishes connector availability from application
   dependency. A provider participates when it wins default election, owns a configured source, or
-  appears in the host-owned entity diagnostics snapshot.
+  is selected by a runtime repository or Direct request in that host.
 - An available but inactive provider returns `Unknown`, remains non-critical, and must not open a
   connection or mutate backing infrastructure.
 - An active provider probes every participating source and is critical. Provider implementations
@@ -81,6 +84,14 @@ validation:
   contract already provisions.
 - Selection uses `AdapterResolver`, `DataSourceRegistry`, and `IDataDiagnostics`; connector health
   implementations must not introduce a parallel configuration hierarchy or fallback election.
+
+## Direct physical routing
+
+- Source- and adapter-routed Direct sessions ask the selected provider factory to resolve the
+  physical connection, so normal provider configuration and autonomous discovery remain provider-owned.
+- `WithConnectionString(...)` is the explicit escape hatch: its value is used literally and never
+  reinterpreted as a source or replaced by a configured default. Blank values and `auto` reject before
+  provider I/O; use source or adapter routing when Koan should resolve intent.
 
 ## Configuration
 

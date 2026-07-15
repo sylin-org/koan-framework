@@ -25,7 +25,6 @@ using Koan.Data.Relational.Orchestration;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Data;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using Newtonsoft.Json;
 
@@ -69,15 +68,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private readonly ILogger _logger;
     private readonly RelationalMaterializationOptions _relOptions;
     private readonly StorageOptimizationInfo _optimizationInfo;
-    private static readonly ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
-    private static readonly ConcurrentDictionary<string, bool> _visibilityCache = new(StringComparer.Ordinal);
+    private readonly SqliteConnectionLifecycle _connections;
+    private readonly string _source;
+    private readonly ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, bool> _visibilityCache = new(StringComparer.Ordinal);
 
-    // Performance caches to eliminate redundant parsing/checks
-    private static readonly ConcurrentDictionary<string, (string dataSource, string? directory)> _connectionInfoCache = new(StringComparer.Ordinal);
+    // Immutable reflection metadata is safe to share across repositories and host lifetimes.
     private static readonly ConcurrentDictionary<string, System.Reflection.PropertyInfo?> _propertyInfoCache = new(StringComparer.Ordinal);
-
-    // Connection pooling infrastructure to eliminate connection creation overhead
-    private static readonly ConcurrentDictionary<string, ConnectionPool> _connectionPools = new(StringComparer.Ordinal);
 
     private static string BuildCacheKey(SqliteConnection conn, string table)
         => ($"{conn.DataSource}/{conn.Database}::{table}");
@@ -107,11 +104,18 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     // Storage optimization support
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
-    public SqliteRepository(IServiceProvider sp, SqliteOptions options, IStorageNameResolver resolver)
+    public SqliteRepository(
+        IServiceProvider sp,
+        SqliteOptions options,
+        IStorageNameResolver resolver,
+        SqliteConnectionLifecycle connections,
+        string source)
     {
         _sp = sp;
         _options = options;
         _nameResolver = resolver;
+        _connections = connections;
+        _source = string.IsNullOrWhiteSpace(source) ? "Default" : source;
         // Initialize runtime snapshot so AllowMagicInProduction and environment are honored in tests and apps
         KoanEnv.TryInitialize(sp);
         // Logger: prefer typed logger; fall back to category
@@ -140,161 +144,61 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     private SqliteConnection CreateConnection()
     {
-        var cs = _options.ConnectionString;
-
-        // Cache connection string parsing and directory resolution
-        if (!_connectionInfoCache.TryGetValue(cs, out var info))
-        {
-            try
-            {
-                // Best-effort: create directory for file-based connection strings
-                var builder = new SqliteConnectionStringBuilder(cs);
-                var dataSource = builder.DataSource;
-                string? directory = null;
-
-                if (!string.IsNullOrWhiteSpace(dataSource))
-                {
-                    var fullPath = dataSource;
-                    // Degradable: if the data source can't be canonicalized (e.g. ":memory:" or an
-                    // unusual path), keep the raw value — GetDirectoryName below simply yields no dir.
-                    try { fullPath = Path.GetFullPath(dataSource); }
-                    catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException or System.Security.SecurityException)
-                    {
-                        KoanLog.DataDebug(_logger, "resolve_path", "fullpath-failed", ("dataSource", dataSource), ("error", ex.Message));
-                    }
-                    directory = Path.GetDirectoryName(fullPath);
-                }
-
-                info = (dataSource, directory);
-                _connectionInfoCache[cs] = info;
-            }
-            catch (ArgumentException ex)
-            {
-                // Malformed connection string: cache empty info so we don't reparse on every call. The
-                // subsequent conn.Open() surfaces the real error to the caller — warn so the cause is visible.
-                KoanLog.DataWarning(_logger, "resolve_connection", "parse-failed", ("connectionString", Redaction.DeIdentify(cs)), ("error", ex.Message));
-                info = ("", null);
-                _connectionInfoCache[cs] = info;
-            }
-        }
-
-        // Create directory if needed (only on first access or if it doesn't exist)
-        if (!string.IsNullOrWhiteSpace(info.directory))
-        {
-            try { Directory.CreateDirectory(info.directory); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
-            {
-                // Non-fatal: conn.Open() below produces the actionable error if the directory is truly needed.
-                KoanLog.DataDebug(_logger, "ensure_directory", "create-failed", ("directory", info.directory), ("error", ex.Message));
-            }
-        }
-
-        var conn = new SqliteConnection(cs);
+        var conn = _connections.Create(_options.ConnectionString, _source);
         conn.Open();
         return conn;
     }
 
-    private IDbConnection Open()
+    private SqliteConnection Open()
     {
-        var cs = _options.ConnectionString;
-
-        // Ensure directory exists before renting from pool
-        if (!_connectionInfoCache.TryGetValue(cs, out var info))
-        {
-            try
-            {
-                var builder = new SqliteConnectionStringBuilder(cs);
-                var dataSource = builder.DataSource;
-                string? directory = null;
-
-                if (!string.IsNullOrWhiteSpace(dataSource))
-                {
-                    var fullPath = dataSource;
-                    // Degradable: keep the raw data source when it can't be canonicalized.
-                    try { fullPath = Path.GetFullPath(dataSource); }
-                    catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException or System.Security.SecurityException)
-                    {
-                        KoanLog.DataDebug(_logger, "resolve_path", "fullpath-failed", ("dataSource", dataSource), ("error", ex.Message));
-                    }
-                    directory = Path.GetDirectoryName(fullPath);
-                }
-
-                info = (dataSource, directory);
-                _connectionInfoCache[cs] = info;
-            }
-            catch (ArgumentException ex)
-            {
-                // Malformed connection string: cache empty info; the pool's conn.Open() surfaces the real error.
-                KoanLog.DataWarning(_logger, "resolve_connection", "parse-failed", ("connectionString", Redaction.DeIdentify(cs)), ("error", ex.Message));
-                info = ("", null);
-                _connectionInfoCache[cs] = info;
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(info.directory))
-        {
-            try { Directory.CreateDirectory(info.directory); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
-            {
-                // Non-fatal: the pooled conn.Open() produces the actionable error if the directory is truly needed.
-                KoanLog.DataDebug(_logger, "ensure_directory", "create-failed", ("directory", info.directory), ("error", ex.Message));
-            }
-        }
-
-        // Rent connection from pool - eliminates connection creation overhead
-        var pool = _connectionPools.GetOrAdd(cs, key => new ConnectionPool(key));
-        var pooledConn = pool.Rent();
-
-        // Extract underlying SqliteConnection for EnsureOrchestrated
-        var connField = typeof(PooledConnection).GetField("_connection",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var conn = (SqliteConnection)connField!.GetValue(pooledConn)!;
-
-        EnsureOrchestrated(conn);
-
-        // Extra barrier: ensure the table and projected columns are visible on this connection
-        // Use cache to avoid expensive PRAGMA queries on every connection
-        var cacheKey = BuildCacheKey(conn, TableName);
-        if (_visibilityCache.TryGetValue(cacheKey, out var visible) && visible)
-        {
-            return pooledConn; // Return wrapper, not raw connection
-        }
-
+        var conn = CreateConnection();
         try
         {
-            var ddl = new SqliteDdlExecutor(conn, TableName);
-            var projections = ProjectionResolver.Get(typeof(TEntity));
-            var required = projections.Select(p => p.ColumnName).ToArray();
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var maxMs = 2000;
-            var delay = 5;
-            while (sw.ElapsedMilliseconds < maxMs)
+            EnsureOrchestrated(conn);
+
+            // Extra barrier: ensure the table and projected columns are visible on this connection.
+            var cacheKey = BuildCacheKey(conn, TableName);
+            if (_visibilityCache.TryGetValue(cacheKey, out var visible) && visible) return conn;
+
+            try
             {
-                try
+                var ddl = new SqliteDdlExecutor(conn, TableName);
+                var projections = ProjectionResolver.Get(typeof(TEntity));
+                var required = projections.Select(p => p.ColumnName).ToArray();
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var maxMs = 2000;
+                var delay = 5;
+                while (sw.ElapsedMilliseconds < maxMs)
                 {
-                    if (ddl.TableExists("", TableName) && required.All(cn => ddl.ColumnExists("", TableName, cn)))
+                    try
                     {
-                        // Cache successful visibility check
-                        _visibilityCache[cacheKey] = true;
-                        break;
+                        if (ddl.TableExists("", TableName) && required.All(cn => ddl.ColumnExists("", TableName, cn)))
+                        {
+                            _visibilityCache[cacheKey] = true;
+                            break;
+                        }
                     }
+                    catch (SqliteException)
+                    {
+                        // A transient PRAGMA/probe error mid-poll means "not visible yet"; retry with backoff.
+                    }
+                    Thread.Sleep(delay);
+                    delay = Math.Min(200, delay * 2);
                 }
-                catch (SqliteException)
-                {
-                    // Degradable: a transient PRAGMA/probe error mid-poll just means "not visible yet";
-                    // the loop retries with backoff. A persistent failure is surfaced by the actual query.
-                }
-                Thread.Sleep(delay);
-                delay = Math.Min(200, delay * 2);
             }
+            catch (Exception ex)
+            {
+                // This is only a visibility warm-up barrier. The real query path retains its ensure-and-retry.
+                KoanLog.DataDebug(_logger, "visibility_barrier", "failed", ("table", TableName), ("error", ex.Message));
+            }
+
+            return conn;
         }
-        catch (Exception ex)
+        catch
         {
-            // Degradable: this is only a visibility warm-up barrier. If it fails the connection is still
-            // returned; the real query path has its own no-such-table ensure-and-retry (IsNoSuchTableForEntity).
-            KoanLog.DataDebug(_logger, "visibility_barrier", "failed", ("table", TableName), ("error", ex.Message));
+            conn.Dispose();
+            throw;
         }
-        return pooledConn; // Return wrapper, not raw connection
     }
 
     private Task EnsureOrchestrated(SqliteConnection conn, CancellationToken ct)
@@ -1002,7 +906,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     {
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.instruction");
         act?.SetTag("entity", typeof(TEntity).FullName);
-        using var conn = new SqliteConnection(_options.ConnectionString);
+        using var conn = _connections.Create(_options.ConnectionString, _source);
         await conn.OpenAsync(ct);
         switch (instruction.Name)
         {
@@ -1475,128 +1379,6 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         public bool SupportsPersistedComputedColumns => false;
         public bool SupportsIndexesOnComputedColumns => true;
         public string ProviderName => "sqlite";
-    }
-
-    /// <summary>
-    /// Connection pool for SQLite to eliminate connection creation overhead.
-    /// Manages a pool of reusable connections per connection string.
-    /// </summary>
-    private sealed class ConnectionPool
-    {
-        private readonly string _connectionString;
-        private readonly ConcurrentBag<SqliteConnection> _availableConnections = new();
-        private readonly SemaphoreSlim _semaphore = new(20, 20); // Max 20 concurrent connections
-        private int _totalCreated;
-
-        public ConnectionPool(string connectionString)
-        {
-            _connectionString = connectionString;
-        }
-
-        public PooledConnection Rent()
-        {
-            _semaphore.WaitAsync();
-
-            // Try to get an existing connection from the pool
-            if (_availableConnections.TryTake(out var conn))
-            {
-                try
-                {
-                    // Verify connection is still valid
-                    if (conn.State == ConnectionState.Open)
-                    {
-                        return new PooledConnection(conn, this);
-                    }
-                    // Connection was closed, reopen it
-                    conn.Open();
-                    return new PooledConnection(conn, this);
-                }
-                catch (Exception ex)
-                {
-                    // Benign recovery: a stale pooled connection that won't reopen is discarded and a fresh
-                    // one is created below — recovery is correct for any reopen failure.
-                    System.Diagnostics.Debug.WriteLine($"[POOL] Discarding stale connection: {ex.Message}");
-                    // Disposing an already-bad connection can itself fault; that's non-actionable here.
-                    try { conn.Dispose(); } catch (Exception disposeEx) { System.Diagnostics.Debug.WriteLine($"[POOL] Dispose of bad connection failed: {disposeEx.Message}"); }
-                }
-            }
-
-            // Create a new connection
-            var newConn = new SqliteConnection(_connectionString);
-            newConn.Open();
-            Interlocked.Increment(ref _totalCreated);
-            return new PooledConnection(newConn, this);
-        }
-
-        public void Return(SqliteConnection conn)
-        {
-            try
-            {
-                if (conn.State == ConnectionState.Open)
-                {
-                    // Return connection to pool for reuse
-                    _availableConnections.Add(conn);
-                }
-                else
-                {
-                    // Connection is closed, dispose it. A dispose fault on an already-closed connection is
-                    // non-actionable (the slot is freed in finally regardless).
-                    try { conn.Dispose(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[POOL] Dispose of closed connection failed: {ex.Message}"); }
-                }
-            }
-            finally
-            {
-                _semaphore.Release();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Wrapper around SqliteConnection that returns to pool on Dispose.
-    /// </summary>
-    private sealed class PooledConnection : IDbConnection
-    {
-        private SqliteConnection? _connection;
-        private readonly ConnectionPool _pool;
-        private bool _disposed;
-
-        public PooledConnection(SqliteConnection connection, ConnectionPool pool)
-        {
-            _connection = connection;
-            _pool = pool;
-        }
-
-        [AllowNull]
-        public string ConnectionString
-        {
-            get => _connection?.ConnectionString ?? "";
-            set
-            {
-                if (_connection != null) _connection.ConnectionString = value ?? "";
-            }
-        }
-
-        public int ConnectionTimeout => _connection?.ConnectionTimeout ?? 0;
-        public string Database => _connection?.Database ?? "";
-        public ConnectionState State => _connection?.State ?? ConnectionState.Closed;
-
-        public IDbTransaction BeginTransaction() => _connection!.BeginTransaction();
-        public IDbTransaction BeginTransaction(IsolationLevel il) => _connection!.BeginTransaction(il);
-        public void ChangeDatabase(string databaseName) => _connection?.ChangeDatabase(databaseName);
-        public void Close() { } // Don't actually close - return to pool on Dispose
-        public IDbCommand CreateCommand() => _connection!.CreateCommand();
-        public void Open() => _connection?.Open();
-
-        public void Dispose()
-        {
-            if (!_disposed && _connection != null)
-            {
-                _disposed = true;
-                // Return connection to pool instead of disposing it
-                _pool.Return(_connection);
-                _connection = null;
-            }
-        }
     }
 
     private string RewriteEntityToken(string sql)

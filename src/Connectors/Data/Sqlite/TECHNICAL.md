@@ -4,7 +4,7 @@ title: Koan.Data.Connector.Sqlite - Technical Reference
 description: SQLite adapter for Koan data.
 since: 0.2.x
 packages: [Sylin.Koan.Data.Connector.Sqlite]
-source: src/Koan.Data.Connector.Sqlite/
+source: src/Connectors/Data/Sqlite/
 ---
 
 ## Contract
@@ -15,14 +15,32 @@ source: src/Koan.Data.Connector.Sqlite/
 
 ## Configuration
 
-- Connection strings and file paths; follow options conventions.
+Reference the connector and call the application's normal `AddKoan()` bootstrap. With no configuration, SQLite
+uses `.koan/data/Koan.sqlite`; the directory is created on first elected use, not while an available-but-unused
+connector reports its boot facts.
 
-### Options (typical keys)
+The effective Default-source connection is selected in this order:
 
-- ConnectionStrings:Default (first-win)
-- Koan:Data:Sources:Default:ConnectionString
-- Koan:Data:Sqlite:ConnectionString (file path or `Data Source=:memory:`)
-- Koan:Data:Sqlite:CommandTimeoutSeconds (default 30)
+1. `Koan:Data:Sources:Default:ConnectionString`
+2. `Koan:Data:Sources:Default:sqlite:ConnectionString`
+3. `Koan:Data:Sqlite:ConnectionString`
+4. `ConnectionStrings:Sqlite`
+5. `ConnectionStrings:Default`, only when Default is unowned or owned by SQLite
+6. autonomous discovery, then `.koan/data/Koan.sqlite`
+
+Blank values are absent. Generic Default-source declarations are consumed only when SQLite owns that source; a
+generic `auto` delegates to SQLite's provider path. At provider levels 2–4, the first present `auto` requests
+discovery and does not fall through to a lower configuration key. Named sources use
+`Koan:Data:Sources:{name}:{Adapter,ConnectionString}`. Use a complete
+`Data Source=...` connection string; raw path shorthand is not supported.
+
+`Data Source=:memory:` and explicit `Mode=Memory` targets are source-isolated and host-owned. The connector maps
+each to a named shared-memory database, keeps it alive for the Koan host lifetime, and disables driver pooling for
+that target. For file databases, `Microsoft.Data.Sqlite` owns process-wide pooling; Koan records the exact
+connection-string pool groups observed by a host and clears those groups on host disposal. Two simultaneous hosts
+using an identical connection string can therefore share a driver pool group; clearing it preserves correctness
+but may make the other host reopen an idle connection. Live caller-owned direct connections must still be disposed
+by their caller.
 
 ## LINQ and pushdowns
 
@@ -52,8 +70,13 @@ source: src/Koan.Data.Connector.Sqlite/
 
 ## Operations
 
-- Health: file reachable and simple query round-trip.
-- Logs: SQL with parameter redaction.
+- Readiness is critical only when SQLite wins provider election, owns a configured source, or participates in a
+  runtime repository or Direct connection request. Available-but-unused SQLite reports `Unknown` and does not
+  touch disk.
+- Active readiness resolves and probes every participating source through the same routing path repositories use.
+- Host disposal closes its in-memory keepers and clears the driver pool groups it observed; a new host may recreate
+  the same file path.
+- Connection and discovery logs de-identify credentials and other connection-string secrets.
 
 ## References
 

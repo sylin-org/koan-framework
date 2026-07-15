@@ -1,6 +1,5 @@
 using System.IO;
 using Koan.Core;
-using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
@@ -21,13 +20,11 @@ namespace Koan.Jobs.TestKit;
 public sealed class JobsHarness : IAsyncDisposable
 {
     private readonly IntegrationHost _host;
-    private readonly IServiceProvider? _prev;
     private readonly string? _dbPath;
 
-    private JobsHarness(IntegrationHost host, IServiceProvider? prev, FakeTimeProvider clock, string? dbPath)
+    private JobsHarness(IntegrationHost host, FakeTimeProvider clock, string? dbPath)
     {
         _host = host;
-        _prev = prev;
         _dbPath = dbPath;
         Clock = clock;
         Orchestrator = host.Services.GetRequiredService<JobOrchestrator>();
@@ -57,7 +54,7 @@ public sealed class JobsHarness : IAsyncDisposable
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
-            ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={dbPath}",
+            ["Koan:Data:Sources:Default:ConnectionString"] = SqliteConnectionString(dbPath),
         };
         return StartCore(configure, settings, dbPath, configureServices: configureServices);
     }
@@ -74,7 +71,7 @@ public sealed class JobsHarness : IAsyncDisposable
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
-            ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={dbPath}",
+            ["Koan:Data:Sources:Default:ConnectionString"] = SqliteConnectionString(dbPath),
         };
         return StartCore(configure, settings, ownsDb ? dbPath : null, clearOnStart, configureServices);
     }
@@ -99,8 +96,6 @@ public sealed class JobsHarness : IAsyncDisposable
             })
             .Build();
         await host.StartAsync();
-        var prev = AppHost.Current;
-        AppHost.Current = host.Services;
         if (clearOnStart)
         {
             await EnsureJobSchema();   // framework-defined entities need their tables ensured on some adapters
@@ -113,8 +108,11 @@ public sealed class JobsHarness : IAsyncDisposable
             await JobClaimTicket.RemoveAll(RemoveStrategy.Safe);
             await JobMetric.RemoveAll(RemoveStrategy.Safe);
         }
-        return new JobsHarness(host, prev, clock, dbPath);
+        return new JobsHarness(host, clock, dbPath);
     }
+
+    private static string SqliteConnectionString(string dbPath)
+        => $"Data Source={dbPath};Pooling=False";
 
     private static async Task EnsureJobSchema()
     {
@@ -147,12 +145,7 @@ public sealed class JobsHarness : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        AppHost.Current = _prev!;
-        try { await _host.StopAsync(); } catch { /* best-effort */ }
         await _host.DisposeAsync();
-        if (_dbPath is not null)
-        {
-            try { if (File.Exists(_dbPath)) File.Delete(_dbPath); } catch { /* best-effort */ }
-        }
+        if (_dbPath is not null && File.Exists(_dbPath)) File.Delete(_dbPath);
     }
 }

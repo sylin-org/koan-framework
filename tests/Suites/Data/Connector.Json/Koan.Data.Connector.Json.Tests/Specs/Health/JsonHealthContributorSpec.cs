@@ -79,14 +79,15 @@ public sealed class JsonHealthContributorSpec
     }
 
     [Fact]
-    public async Task Observed_json_entity_makes_the_provider_participate()
+    public async Task Runtime_json_repository_use_makes_the_provider_participate()
     {
         var path = TempPath();
         var configuration = Configuration();
         var registry = Registry(configuration);
         using var services = Services(includeHigherPriorityAdapter: true);
-        var diagnostics = new StubDiagnostics([
-            new EntityConfigInfo("Example.Document", typeof(string).FullName!, "json", "Id")
+        var diagnostics = new StubDiagnostics(participations:
+        [
+            new DataAdapterParticipationInfo("json", "Default")
         ]);
         var contributor = Contributor(services, configuration, registry, path, diagnostics);
 
@@ -182,9 +183,12 @@ public sealed class JsonHealthContributorSpec
         }
     }
 
-    private sealed class StubDiagnostics(IReadOnlyList<EntityConfigInfo>? configs = null) : IDataDiagnostics
+    private sealed class StubDiagnostics(
+        IReadOnlyList<EntityConfigInfo>? configs = null,
+        IReadOnlyList<DataAdapterParticipationInfo>? participations = null) : IDataDiagnostics
     {
         public IReadOnlyList<EntityConfigInfo> GetEntityConfigsSnapshot() => configs ?? [];
+        public IReadOnlyList<DataAdapterParticipationInfo> GetAdapterParticipationsSnapshot() => participations ?? [];
     }
 
     [ProviderPriority(100)]

@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core.Configuration;
+using Koan.Data.Abstractions;
 
 namespace Koan.Data.Core.Direct;
 
@@ -26,7 +27,16 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     public IDirectSession WithConnectionString(string value)
     {
-        _connectionString = value; return this;
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        if (!IsConcreteConnection(value))
+        {
+            throw new ArgumentException(
+                "WithConnectionString requires a concrete physical connection string; use Direct(source: ...) or Direct(adapter: ...) for provider resolution and 'auto' discovery.",
+                nameof(value));
+        }
+
+        _connectionString = value;
+        return this;
     }
     public IDirectSession WithTimeout(TimeSpan timeout)
     {
@@ -39,8 +49,8 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     public IDirectTransaction Begin(CancellationToken ct = default)
     {
-        var (provider, connStr) = Resolve();
-        var conn = CreateConnection(_sp, provider, connStr);
+        var route = Resolve();
+        var conn = CreateConnection(_sp, route.Provider, route.ConnectionString, route.Source);
         conn.Open();
         var tx = conn.BeginTransaction();
         return new DirectTransaction(conn, tx, _timeout, _maxRows);
@@ -163,8 +173,8 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     private async Task<ConnCtx> Open(CancellationToken ct)
     {
-        var (provider, connStr) = Resolve();
-        var conn = CreateConnection(_sp, provider, connStr);
+        var route = Resolve();
+        var conn = CreateConnection(_sp, route.Provider, route.ConnectionString, route.Source);
         await conn.OpenAsync(ct);
         return new ConnCtx(conn);
     }
@@ -187,40 +197,50 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         return cmd;
     }
 
-    private (string provider, string connectionString) Resolve()
+    private ConnectionRoute Resolve()
     {
         var resolver = _sp.GetService(typeof(IDataConnectionResolver)) as IDataConnectionResolver;
         var sourceRegistry = _sp.GetService(typeof(Core.DataSourceRegistry)) as Core.DataSourceRegistry;
 
         // Priority 1: Explicit connection string override via WithConnectionString
-        if (!string.IsNullOrWhiteSpace(_connectionString))
+        if (_connectionString is not null)
         {
             var value = _connectionString!;
-            var providerHint = _adapter ?? _source ?? "Default";
-
-            var byResolver = resolver?.Resolve(providerHint, value);
-            if (!string.IsNullOrWhiteSpace(byResolver))
-                return (providerHint, byResolver!);
-
-            var named = _cfg[$"ConnectionStrings:{value}"] ?? _cfg[ConfigurationConstants.Keys.SourceConnectionString(value)];
-            if (!string.IsNullOrWhiteSpace(named))
-                return (providerHint, named!);
-
-            return (providerHint, value);
+            var sourceKey = string.IsNullOrWhiteSpace(_source) ? "Default" : _source!;
+            var providerHint = _adapter;
+            if (string.IsNullOrWhiteSpace(providerHint)
+                && !string.IsNullOrWhiteSpace(_source)
+                && sourceRegistry?.TryGetSource(_source, out var configuredSource) == true)
+            {
+                providerHint = configuredSource.Adapter;
+            }
+            providerHint ??= _source ?? "Default";
+            return new ConnectionRoute(providerHint, value, sourceKey);
         }
 
-        // Priority 2: Source routing (look up source definition to get adapter + connection)
+        // Priority 2: Source routing. The provider connection factory owns physical resolution so Direct shares
+        // provider-scoped configuration, discovery, and unresolved-intent handling with Entity repositories.
         if (!string.IsNullOrWhiteSpace(_source))
         {
             if (sourceRegistry?.TryGetSource(_source, out var sourceDef) == true)
             {
-                return (sourceDef.Adapter, sourceDef.ConnectionString);
+                if (string.IsNullOrWhiteSpace(sourceDef.Adapter))
+                {
+                    throw new InvalidOperationException(
+                        $"Source '{_source}' does not specify an adapter. Add 'Adapter' to Koan:Data:Sources:{_source}.");
+                }
+
+                return ResolveProviderSource(
+                    sourceDef.Adapter,
+                    _source,
+                    sourceDef.ConnectionString,
+                    resolver);
             }
 
             // Fallback: Try config-based resolution for backward compatibility
             var byCfg = _cfg[$"ConnectionStrings:{_source}"] ?? _cfg[ConfigurationConstants.Keys.SourceConnectionString(_source)];
             if (!string.IsNullOrWhiteSpace(byCfg))
-                return (_source, byCfg!);
+                return ResolveProviderSource(_source, _source, byCfg, resolver);
 
             throw new InvalidOperationException(
                 $"Source '{_source}' not found in DataSourceRegistry. Configure Koan:Data:Sources:{_source} or use WithConnectionString().");
@@ -229,37 +249,77 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         // Priority 3: Adapter routing (use adapter as provider, resolve default connection)
         if (!string.IsNullOrWhiteSpace(_adapter))
         {
-            var byResolver = resolver?.Resolve(_adapter, _adapter);
-            if (!string.IsNullOrWhiteSpace(byResolver))
-                return (_adapter, byResolver!);
-
-            // Try adapter-specific config path
-            var adapterCfg = _cfg[ConfigurationConstants.Keys.AdapterConnectionString(_adapter)];
-            if (!string.IsNullOrWhiteSpace(adapterCfg))
-                return (_adapter, adapterCfg!);
-
-            // Try default source for this adapter
+            string? sourceFallback = null;
             if (sourceRegistry?.TryGetSource("Default", out var defaultSource) == true)
             {
                 if (string.Equals(defaultSource.Adapter, _adapter, StringComparison.OrdinalIgnoreCase))
-                    return (_adapter, defaultSource.ConnectionString);
+                    sourceFallback = defaultSource.ConnectionString;
             }
 
-            throw new InvalidOperationException(
-                $"Connection string for adapter '{_adapter}' could not be resolved. Use WithConnectionString() or configure Koan:Data:{_adapter}:ConnectionString.");
+            sourceFallback ??= _cfg[ConfigurationConstants.Keys.AdapterConnectionString(_adapter)];
+            return ResolveProviderSource(_adapter, "Default", sourceFallback, resolver);
         }
 
         // Priority 4: No routing specified - use default source
         if (sourceRegistry?.TryGetSource("Default", out var defSource) == true)
         {
-            return (defSource.Adapter, defSource.ConnectionString);
+            if (string.IsNullOrWhiteSpace(defSource.Adapter))
+            {
+                throw new InvalidOperationException(
+                    "The Default source does not specify an adapter. Add Koan:Data:Sources:Default:Adapter.");
+            }
+
+            return ResolveProviderSource(
+                defSource.Adapter,
+                "Default",
+                defSource.ConnectionString,
+                resolver);
         }
 
         throw new InvalidOperationException(
             "No source or adapter specified, and no 'Default' source configured. Specify Direct(source: ...) or Direct(adapter: ...) or configure Koan:Data:Sources:Default.");
     }
 
-    private static DbConnection CreateConnection(IServiceProvider sp, string provider, string connectionString)
+    private ConnectionRoute ResolveProviderSource(
+        string provider,
+        string source,
+        string? concreteFallback,
+        IDataConnectionResolver? resolver)
+    {
+        var factory = _sp.GetServices<IDataProviderConnectionFactory>()
+            .FirstOrDefault(candidate => candidate.CanHandle(provider))
+            ?? throw new NotSupportedException(
+                $"No IDataProviderConnectionFactory registered for provider '{provider}'. " +
+                "Make sure the corresponding adapter package is referenced and registered.");
+
+        var resolved = factory.ResolveConnectionString(source);
+        if (!IsConcreteConnection(resolved))
+        {
+            resolved = resolver?.Resolve(provider, source);
+        }
+        if (!IsConcreteConnection(resolved))
+        {
+            resolved = concreteFallback;
+        }
+        if (!IsConcreteConnection(resolved))
+        {
+            throw new InvalidOperationException(
+                $"Connection string for provider '{provider}', source '{source}' remains '{resolved ?? "unconfigured"}'. " +
+                "Configure a concrete provider/source connection or reference a provider that resolves autonomous discovery for Direct operations.");
+        }
+
+        return new ConnectionRoute(provider, resolved!, source);
+    }
+
+    private static bool IsConcreteConnection(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+           && !string.Equals(value.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
+
+    private static DbConnection CreateConnection(
+        IServiceProvider sp,
+        string provider,
+        string connectionString,
+        string source)
     {
         var factories = sp.GetServices<IDataProviderConnectionFactory>()
                         ?? Enumerable.Empty<IDataProviderConnectionFactory>();
@@ -268,8 +328,15 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         {
             throw new NotSupportedException($"No IDataProviderConnectionFactory registered for provider '{provider}'. Make sure the corresponding adapter package is referenced and registered.");
         }
-        return factory.Create(connectionString);
+        var connection = factory.Create(connectionString, source);
+        var canonicalProvider = sp.GetServices<IDataAdapterFactory>()
+            .FirstOrDefault(candidate => candidate.CanHandle(provider))
+            ?.Provider ?? provider;
+        sp.GetService<DataDiagnostics>()?.ObserveParticipation(canonicalProvider, source);
+        return connection;
     }
+
+    private sealed record ConnectionRoute(string Provider, string ConnectionString, string Source);
 
     internal static async Task<IReadOnlyList<object>> MaterializeAsJsonObjects(DbDataReader reader, int maxRows, CancellationToken ct)
     {

@@ -57,7 +57,7 @@ The providers below are deliberately not described as interchangeable.
 
 | Provider | Role in the foundation | Current evidence | Explicit limits |
 |---|---|---|---|
-| SQLite | Durable local/single-node application path | connector 15/15; FirstUse 8-step and GoldenJourney 11-step source/package proofs | No claim for multi-node writes, every transaction shape, production migration policy, or remote-database behavior. |
+| SQLite | Durable local/single-node application path | connector 35/35; FirstUse 8-step and GoldenJourney 11-step source/package proofs | No claim for multi-node writes, every transaction shape, production migration policy, or remote-database behavior. |
 | InMemory | Fast conformance oracle and ephemeral test/development store | connector 55/55; Koan.Testing 12 passed with 3 capability/trait skips | Process-local and non-durable; never a production persistence claim. |
 | JSON | Zero-infrastructure fallback carried by `Sylin.Koan` | connector 14/14; selection-aware readiness 19/19 | File-backed, limited concurrency, and not the durable V1 application proof. |
 

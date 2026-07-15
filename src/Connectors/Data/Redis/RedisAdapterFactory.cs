@@ -50,7 +50,7 @@ public sealed class RedisAdapterFactory : IDataAdapterFactory
         // Configure a distinct 'Database' index per Redis source. A boot-time cross-source collision check (the analogue
         // of the overlapping-Database-predicate detection ARCH-0102 §3 pins) is the durable fix.
         var database = AdapterConnectionResolver.GetSourceSetting(
-            config, sourceRegistry, "redis", source, "Database", baseOpts.Database);
+            config, sourceRegistry, "redis", source, "Database", baseOpts.Database, CanHandle);
 
         return new RedisRepository<TEntity, TKey>(muxer, database);
     }

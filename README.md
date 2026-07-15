@@ -18,8 +18,9 @@ that remains inspectable.
 > **Status: pre-1.0, consolidation phase** (version via [NBGV](version.json), currently 0.17.x).
 > Capability maturity is being re-baselined from current code and executable evidence by the
 > [Koan V1 initiative](docs/initiatives/koan-v1/README.md); do not infer support from package or sample
-> existence. **Build from source today.** The public 0.17.0 packages are not a coherent install set:
-> an internal dependency requires an unpublished Core patch. See the
+> existence. **Build from source today.** Koan does not currently support a public-package install
+> path: the coherent package graph is proven from staged artifacts but has not yet been observed as
+> one public publication. See the
 > [current capability evidence](docs/initiatives/koan-v1/R02-EVIDENCE.md#clean-package-install-probe).
 
 ---
@@ -77,7 +78,7 @@ public sealed class ApprovalsController : EntityController<Approval>;
 
 That's a full REST API: GET/POST/DELETE with pagination and querying, GUID v7 ids generated on
 first read, `/health/live` and dependency-aware `/health/ready` probes, structured logging, and
-zero-config SQLite (`./data/app.db`). Schema
+zero-config SQLite (`.koan/data/Koan.sqlite`). Schema
 is created automatically in development. JSON defaults: camelCase, nulls omitted
 (Newtonsoft.Json — chosen for predictable polymorphic serialization).
 

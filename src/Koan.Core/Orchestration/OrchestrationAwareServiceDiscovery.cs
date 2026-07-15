@@ -46,18 +46,26 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
 
             if (result.IsSuccessful)
             {
-                _logger.LogDebug("Resolved {ServiceName} connection via adapter: {ServiceUrl}", serviceName, result.ServiceUrl);
+                _logger.LogDebug("Resolved {ServiceName} connection via adapter: {ServiceUrl}",
+                    serviceName,
+                    Redaction.DeIdentify(result.ServiceUrl));
                 return result.ServiceUrl;
             }
             else
             {
-                _logger.LogWarning("Adapter discovery failed for {ServiceName}, falling back to hints: {Error}", serviceName, result.ErrorMessage);
+                _logger.LogWarning("Adapter discovery failed for {ServiceName}, falling back to hints: {Error}",
+                    serviceName,
+                    Redaction.DeIdentify(result.ErrorMessage));
                 return FallbackToHints(hints);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Exception during adapter discovery for {ServiceName}, falling back to hints", serviceName);
+            _logger.LogWarning(
+                "Exception during adapter discovery for {ServiceName}, falling back to hints ({ExceptionType}): {Error}",
+                serviceName,
+                ex.GetType().Name,
+                Redaction.DeIdentify(ex.Message));
             return FallbackToHints(hints);
         }
     }
@@ -89,13 +97,18 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
             }
             else
             {
-                _logger.LogWarning("Adapter discovery failed for {ServiceName}: {Error}", serviceName, adapterResult.ErrorMessage);
+                _logger.LogWarning("Adapter discovery failed for {ServiceName}: {Error}",
+                    serviceName,
+                    Redaction.DeIdentify(adapterResult.ErrorMessage));
                 throw new InvalidOperationException($"Service discovery failed for '{serviceName}': {adapterResult.ErrorMessage}");
             }
         }
         catch (Exception ex) when (ex is not InvalidOperationException)
         {
-            _logger.LogError(ex, "Exception during adapter discovery for {ServiceName}", serviceName);
+            _logger.LogError("Exception during adapter discovery for {ServiceName} ({ExceptionType}): {Error}",
+                serviceName,
+                ex.GetType().Name,
+                Redaction.DeIdentify(ex.Message));
             throw new InvalidOperationException($"Service discovery failed for '{serviceName}': {ex.Message}", ex);
         }
     }

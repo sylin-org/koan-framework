@@ -26,7 +26,7 @@ else is required:
 2. Entity statics & instance verbs — `Get` / `All` / `Query` / `Save()` / `Remove()`
 3. `EntityController<T>` — the REST surface over an entity
 4. `AddKoan()` — the single bootstrap call ("Reference = Intent": referenced packages register themselves)
-5. Provider election — the referenced data connector wins; zero-config defaults (SQLite → `./data/app.db`)
+5. Provider election — the referenced data connector wins; zero-config defaults (SQLite → `.koan/data/Koan.sqlite`)
 6. The boot report — what the app prints at startup is the primary debugging surface
 7. Auto schema ("magic") — created in Development; gated by `Koan:AllowMagicInProduction` elsewhere
 8. Web defaults — controllers, `/health`, secure headers auto-wired; JSON is **camelCase,

@@ -9,7 +9,7 @@ namespace Koan.Data.Core.Diagnostics;
 /// <remarks>
 /// Referencing a connector makes it available; it does not necessarily make that connector an
 /// application dependency. A provider participates when it wins the default election, owns an
-/// explicitly configured source, or has been observed in an entity configuration.
+/// explicitly configured source, or is selected by a runtime repository or Direct operation.
 /// </remarks>
 public abstract class DataAdapterHealthContributorBase(
     string provider,
@@ -19,6 +19,8 @@ public abstract class DataAdapterHealthContributorBase(
 {
     private const string ComponentPrefix = "data:";
     private const string DefaultSource = "Default";
+    private readonly IDataDiagnostics _runtimeDiagnostics =
+        services.GetService(typeof(DataDiagnostics)) as IDataDiagnostics ?? diagnostics;
 
     /// <summary>The adapter identifier used by routing and source configuration.</summary>
     protected string Provider { get; } = provider;
@@ -60,7 +62,7 @@ public abstract class DataAdapterHealthContributorBase(
             return new HealthReport(
                 Name,
                 HealthState.Unhealthy,
-                ex.Message,
+                Redaction.DeIdentify(ex.Message),
                 null,
                 new Dictionary<string, object?>
                 {
@@ -103,9 +105,10 @@ public abstract class DataAdapterHealthContributorBase(
             }
         }
 
-        if (diagnostics.GetEntityConfigsSnapshot().Any(entity => Matches(entity.Provider)))
+        foreach (var participation in _runtimeDiagnostics.GetAdapterParticipationsSnapshot()
+                     .Where(participation => Matches(participation.Provider)))
         {
-            sources.Add(DefaultSource);
+            sources.Add(participation.Source);
         }
 
         return sources.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();

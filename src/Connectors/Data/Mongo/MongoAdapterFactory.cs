@@ -68,8 +68,10 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
         // resolver collapses a non-Default source's "auto"/blank discovery sentinel onto the discovery-resolved Default
         // (so the per-source pool never keys on the unresolved literal) — the fleet hoist of the local
         // MongoConnectionString.ResolveRoutedConnection, which stays as the test-pinned pure 2-arg helper.
-        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(config, sourceRegistry, "Mongo", source, baseOptions.ConnectionString);
-        var database = AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Mongo", source, "Database", baseOptions.Database);
+        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
+            config, sourceRegistry, "Mongo", source, baseOptions.ConnectionString, CanHandle);
+        var database = AdapterConnectionResolver.GetSourceSetting(
+            config, sourceRegistry, "Mongo", source, "Database", baseOptions.Database, CanHandle);
 
         // Dedup (ARCH-0103 §9.15): a routed source whose resolved physical placement (connection + database) coincides
         // with Default — e.g. a source that relies on discovery, so ResolveRoutedConnection collapsed its sentinel onto

@@ -79,6 +79,54 @@ public sealed class DirectDataAccessSpec
         rows[0].Name.Should().Be("committed");
     }
 
+    [Fact]
+    public async Task Explicit_connection_string_is_used_literally_instead_of_the_configured_default()
+    {
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(includeSqlite: true);
+
+        var overridePath = Path.Combine(runtime.RootPath, "direct-override.sqlite");
+        overridePath.Should().NotBe(runtime.SqlitePath);
+
+        var data = runtime.Services.GetRequiredService<IDataService>();
+        await data.Direct(adapter: "sqlite")
+            .WithConnectionString($"Data Source={overridePath}")
+            .Execute("CREATE TABLE explicit_override (id INTEGER PRIMARY KEY)");
+
+        File.Exists(overridePath).Should().BeTrue(
+            "WithConnectionString is a literal physical override and must not be resolved back to the provider default");
+    }
+
+    [Fact]
+    public async Task Explicit_connection_string_rejects_auto_intent_before_provider_io()
+    {
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(includeSqlite: true);
+        var data = runtime.Services.GetRequiredService<IDataService>();
+
+        var act = () => data.Direct(adapter: "sqlite").WithConnectionString("auto");
+
+        act.Should().Throw<ArgumentException>()
+            .WithParameterName("value")
+            .WithMessage("*concrete physical connection string*");
+    }
+
+    [Fact]
+    public async Task Compatibility_source_auto_is_resolved_by_the_provider_before_physical_io()
+    {
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(
+            includeSqlite: true,
+            extraSettings: new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:sqlite"] = "auto"
+            });
+        var data = runtime.Services.GetRequiredService<IDataService>();
+
+        await data.Direct(source: "sqlite")
+            .Execute("CREATE TABLE resolved_auto (id INTEGER PRIMARY KEY)");
+
+        File.Exists(runtime.SqlitePath).Should().BeTrue(
+            "provider-owned resolution must turn auto intent into the configured or discovered physical target");
+    }
+
     private sealed class ProbeRow
     {
         public long Id { get; set; }

@@ -1,18 +1,25 @@
-using Koan.Data.Core.Infrastructure;
+using Koan.Data.Abstractions;
 using Microsoft.Extensions.Configuration;
 
 namespace Koan.Data.Core.Configuration;
 
-internal sealed class DefaultDataConnectionResolver(IConfiguration config) : IDataConnectionResolver
+internal sealed class DefaultDataConnectionResolver(
+    IConfiguration config,
+    DataSourceRegistry sourceRegistry,
+    IEnumerable<IDataAdapterFactory> factories) : IDataConnectionResolver
 {
     public string? Resolve(string providerId, string name)
     {
-        // Priority 1: Koan:Data:Sources:{name}:{providerId}:ConnectionString
-        var cs = Koan.Core.Configuration.Read<string?>(config, ConfigurationConstants.Sources.ConnectionString(name, providerId), null);
-        if (!string.IsNullOrWhiteSpace(cs)) return cs;
-        // Priority 2: ConnectionStrings:{name}
-        cs = config.GetConnectionString(name);
-        if (!string.IsNullOrWhiteSpace(cs)) return cs;
-        return null;
+        var owner = factories.FirstOrDefault(factory => factory.CanHandle(providerId));
+        try
+        {
+            return owner is null
+                ? AdapterConnectionResolver.ResolveConnectionString(config, sourceRegistry, providerId, name)
+                : AdapterConnectionResolver.ResolveConnectionString(config, sourceRegistry, providerId, name, owner.CanHandle);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
     }
 }

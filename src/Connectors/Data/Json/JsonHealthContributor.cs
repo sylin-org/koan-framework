@@ -39,7 +39,11 @@ internal sealed class JsonHealthContributor : DataAdapterHealthContributorBase
                 Constants.Provider.Name,
                 source,
                 Constants.Configuration.Keys.DirectoryPath,
-                _options.Value.DirectoryPath);
+                _options.Value.DirectoryPath,
+                static provider => string.Equals(
+                    provider,
+                    Constants.Provider.Name,
+                    StringComparison.OrdinalIgnoreCase));
 
             if (string.IsNullOrWhiteSpace(path))
             {

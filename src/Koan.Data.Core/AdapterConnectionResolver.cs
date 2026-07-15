@@ -16,43 +16,47 @@ public static class AdapterConnectionResolver
     /// Resolve connection string for adapter and source combination.
     ///
     /// Priority:
-    /// 1. <see cref="ConfigurationConstants.Sources"/>.ConnectionString(source, providerId)
-    /// 2. ConnectionStrings:{source}
-    /// 3. <see cref="ConfigurationConstants.Adapter"/>.ConnectionString(providerId)
-    /// 4. Fallback to "Default" source if current source != "Default"
+    /// 1. The source definition's generic connection, when the source is unowned or belongs to this provider.
+    /// 2. <see cref="ConfigurationConstants.Sources"/>.ConnectionString(source, providerId).
+    /// 3. ConnectionStrings:{source}, under the same source-ownership rule as priority 1.
+    /// 4. <see cref="ConfigurationConstants.Adapter"/>.ConnectionString(providerId).
+    /// 5. Fallback to the "Default" source when the requested source is not Default.
     /// </summary>
     public static string ResolveConnectionString(
         IConfiguration config,
         DataSourceRegistry sourceRegistry,
         string providerId,
         string source)
+        => ResolveConnectionStringCore(config, sourceRegistry, providerId, source, null);
+
+    /// <summary>
+    /// Resolve a connection while enforcing ownership of generic source declarations. Built-in factories pass their
+    /// existing <c>CanHandle</c> predicate so aliases remain provider-owned without a central alias registry.
+    /// </summary>
+    public static string ResolveConnectionString(
+        IConfiguration config,
+        DataSourceRegistry sourceRegistry,
+        string providerId,
+        string source,
+        Func<string, bool> ownsSourceAdapter)
+        => ResolveConnectionStringCore(config, sourceRegistry, providerId, source, ownsSourceAdapter);
+
+    private static string ResolveConnectionStringCore(
+        IConfiguration config,
+        DataSourceRegistry sourceRegistry,
+        string providerId,
+        string source,
+        Func<string, bool>? ownsSourceAdapter)
     {
-        // Priority 1: Source-specific connection from source definition
-        var sourceDefinition = sourceRegistry.GetSource(source);
-        if (sourceDefinition != null && !string.IsNullOrWhiteSpace(sourceDefinition.ConnectionString))
-        {
-            return sourceDefinition.ConnectionString;
-        }
-
-        // Priority 2: Koan:Data:Sources:{source}:{providerId}:ConnectionString
-        var sourceSpecific = config[ConfigurationConstants.Sources.ConnectionString(source, providerId)];
-        if (!string.IsNullOrWhiteSpace(sourceSpecific))
-            return sourceSpecific;
-
-        // Priority 3: ConnectionStrings:{source}
-        var connStr = config.GetConnectionString(source);
-        if (!string.IsNullOrWhiteSpace(connStr))
-            return connStr;
-
-        // Priority 4: Adapter defaults (Koan:Data:{providerId}:ConnectionString)
-        var adapterDefault = config[ConfigurationConstants.Adapter.ConnectionString(providerId)];
-        if (!string.IsNullOrWhiteSpace(adapterDefault))
-            return adapterDefault;
+        var configured = TryResolveConfiguredConnection(
+            config, sourceRegistry, providerId, source, ownsSourceAdapter);
+        if (configured is not null) return configured;
 
         // Priority 5: Fallback to Default source if not already trying it
         if (!string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase))
         {
-            return ResolveConnectionString(config, sourceRegistry, providerId, "Default");
+            return ResolveConnectionStringCore(
+                config, sourceRegistry, providerId, "Default", ownsSourceAdapter);
         }
 
         throw new InvalidOperationException(
@@ -65,10 +69,10 @@ public static class AdapterConnectionResolver
     /// Resolve the per-source connection string for a Database-mode routed source, collapsing the <c>"auto"</c> /
     /// blank discovery sentinel onto the already-resolved Default connection (ARCH-0103 P5 fleet hoist). The flow:
     /// <list type="number">
-    /// <item>The Default source (or blank) returns <paramref name="resolvedDefault"/> when present — the
-    /// discovery-resolved base connection the adapter's options configurator already produced (byte-identical to the
-    /// pre-routing single path); otherwise it falls through to <see cref="ResolveConnectionString"/>.</item>
-    /// <item>A non-Default source resolves via <see cref="ResolveConnectionString"/>; if that yields the literal
+    /// <item>The Default source (or blank) first honors a concrete configured connection. An absent, blank, or
+    /// <c>"auto"</c> source falls back to <paramref name="resolvedDefault"/> — the physical connection the adapter's
+    /// options configurator already discovered.</item>
+    /// <item>A non-Default source resolves via <c>ResolveConnectionString</c>; if that yields the literal
     /// <c>"auto"</c> or blank — a source relying on runtime discovery, which this resolver cannot perform — it collapses
     /// onto <paramref name="resolvedDefault"/> so the per-source pool/store never keys on the unresolved sentinel.</item>
     /// </list>
@@ -82,22 +86,110 @@ public static class AdapterConnectionResolver
         string providerId,
         string source,
         string? resolvedDefault)
+        => ResolveRoutedConnection(
+            config, sourceRegistry, providerId, source, resolvedDefault, null);
+
+    /// <summary>
+    /// Source-aware routed resolution for factories that can identify their provider aliases. A generic source
+    /// connection is consumed only when that source is unowned or <paramref name="ownsSourceAdapter"/> confirms the
+    /// configured adapter belongs to this provider; provider-scoped source configuration remains available.
+    /// </summary>
+    public static string ResolveRoutedConnection(
+        IConfiguration config,
+        DataSourceRegistry sourceRegistry,
+        string providerId,
+        string source,
+        string? resolvedDefault,
+        Func<string, bool>? ownsSourceAdapter)
     {
         if (string.IsNullOrWhiteSpace(source) || string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase))
         {
-            return string.IsNullOrWhiteSpace(resolvedDefault)
-                ? ResolveConnectionString(config, sourceRegistry, providerId, source)
-                : resolvedDefault!;
+            const string defaultSource = "Default";
+            var defaultConfigured = TryResolveConfiguredConnection(
+                config, sourceRegistry, providerId, defaultSource, ownsSourceAdapter);
+
+            if (!IsUnresolvedSentinel(defaultConfigured)) return defaultConfigured!;
+            if (!string.IsNullOrWhiteSpace(resolvedDefault)) return resolvedDefault!;
+
+            // Preserve the unresolved sentinel when there is no discovery result; otherwise retain the existing
+            // fail-loud contract for a completely unconfigured provider.
+            return defaultConfigured ?? ResolveConnectionStringCore(
+                config, sourceRegistry, providerId, defaultSource, ownsSourceAdapter);
         }
 
-        var resolved = ResolveConnectionString(config, sourceRegistry, providerId, source);
-        return IsUnresolvedSentinel(resolved) && !string.IsNullOrWhiteSpace(resolvedDefault) ? resolvedDefault! : resolved;
+        var configured = TryResolveConfiguredConnection(
+            config, sourceRegistry, providerId, source, ownsSourceAdapter);
+        if (!IsUnresolvedSentinel(configured)) return configured!;
+        if (!string.IsNullOrWhiteSpace(resolvedDefault)) return resolvedDefault!;
+
+        // Preserve an explicit unresolved intent when no runtime discovery result exists; an entirely absent
+        // placement retains the legacy fail-loud path and its actionable configuration error.
+        return configured ?? ResolveConnectionStringCore(
+            config, sourceRegistry, providerId, source, ownsSourceAdapter);
     }
 
     // Blank or the literal "auto" discovery sentinel — a source whose physical connection the static resolver cannot
     // produce (it relies on runtime discovery, which only the Default source's options configurator performed at boot).
     private static bool IsUnresolvedSentinel(string? connection)
         => string.IsNullOrWhiteSpace(connection) || string.Equals(connection.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
+
+    // The shared priorities used by the full connection path. Provider configurators supply only provider-owned
+    // configuration/discovery defaults; generic ConnectionStrings:{source} stays here so source ownership is decided
+    // once, with the actual registry and the factory's provider predicate.
+    private static string? TryResolveConfiguredConnection(
+        IConfiguration config,
+        DataSourceRegistry sourceRegistry,
+        string providerId,
+        string source,
+        Func<string, bool>? ownsSourceAdapter)
+    {
+        var sourceDefinition = sourceRegistry.GetSource(source);
+        var sourceBelongsToProvider = SourceBelongsToProvider(sourceDefinition, ownsSourceAdapter);
+        var sourceConnection = TryResolveSourceConnection(
+            config, sourceRegistry, providerId, source, ownsSourceAdapter);
+        if (sourceConnection is not null) return sourceConnection;
+
+        // Priority 3: ConnectionStrings:{source}. This is another generic source declaration, so an adapter must not
+        // consume it when the source explicitly belongs to a different provider. Provider-scoped source configuration
+        // above remains available for an intentional adapter override.
+        if (sourceBelongsToProvider)
+        {
+            var connectionString = config.GetConnectionString(source);
+            if (!string.IsNullOrWhiteSpace(connectionString))
+                return connectionString;
+        }
+
+        // Priority 4: Adapter defaults (Koan:Data:{providerId}:ConnectionString)
+        var adapterDefault = config[ConfigurationConstants.Adapter.ConnectionString(providerId)];
+        return string.IsNullOrWhiteSpace(adapterDefault) ? null : adapterDefault;
+    }
+
+    private static string? TryResolveSourceConnection(
+        IConfiguration config,
+        DataSourceRegistry sourceRegistry,
+        string providerId,
+        string source,
+        Func<string, bool>? ownsSourceAdapter)
+    {
+        // Priority 1: Source-specific connection from source definition
+        var sourceDefinition = sourceRegistry.GetSource(source);
+        var sourceBelongsToProvider = SourceBelongsToProvider(sourceDefinition, ownsSourceAdapter);
+        if (sourceBelongsToProvider && !string.IsNullOrWhiteSpace(sourceDefinition?.ConnectionString))
+            return sourceDefinition.ConnectionString;
+
+        // Priority 2: Koan:Data:Sources:{source}:{providerId}:ConnectionString
+        var sourceSpecific = config[ConfigurationConstants.Sources.ConnectionString(source, providerId)];
+        return string.IsNullOrWhiteSpace(sourceSpecific) ? null : sourceSpecific;
+    }
+
+    // A missing/implicit source is provider-neutral. The null predicate preserves the legacy overload's behavior;
+    // provider factories use their own CanHandle predicate so aliases remain provider-owned without central duplication.
+    private static bool SourceBelongsToProvider(
+        DataSourceRegistry.SourceDefinition? sourceDefinition,
+        Func<string, bool>? ownsSourceAdapter)
+        => string.IsNullOrWhiteSpace(sourceDefinition?.Adapter) ||
+           ownsSourceAdapter is null ||
+           ownsSourceAdapter(sourceDefinition.Adapter);
 
     /// <summary>
     /// Get source-specific setting or fall back to adapter default.
@@ -108,11 +200,14 @@ public static class AdapterConnectionResolver
         string providerId,
         string source,
         string settingKey,
-        T defaultValue)
+        T defaultValue,
+        Func<string, bool>? ownsSourceAdapter = null)
     {
-        // Try source definition first
+        // Generic source settings belong to the source's adapter. Provider-scoped settings below remain an explicit
+        // override, just like provider-scoped connection strings.
         var sourceDefinition = sourceRegistry.GetSource(source);
-        if (sourceDefinition?.Settings.TryGetValue(settingKey, out var value) == true)
+        if (SourceBelongsToProvider(sourceDefinition, ownsSourceAdapter) &&
+            sourceDefinition?.Settings.TryGetValue(settingKey, out var value) == true)
         {
             try
             {

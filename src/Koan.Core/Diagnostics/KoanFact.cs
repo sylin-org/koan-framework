@@ -3,8 +3,8 @@ using System.Text.Json.Serialization;
 namespace Koan.Core.Diagnostics;
 
 /// <summary>
-/// One redacted, provider-neutral runtime decision or failure. The schema deliberately has no
-/// arbitrary payload bag: provider configuration and exception messages cannot leak through it.
+/// One credential-redacted, provider-neutral runtime decision or failure. The schema deliberately has no
+/// arbitrary payload bag, and every bounded text field passes through the shared credential-shaped redactor.
 /// </summary>
 public sealed class KoanFact
 {

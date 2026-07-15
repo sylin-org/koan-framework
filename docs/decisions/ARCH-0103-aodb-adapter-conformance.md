@@ -290,3 +290,31 @@ InMemory (sidecar; the Docker-free convergence oracle) → Json (JSON injector; 
 - **The migration surfaced a real kit-design gap (caught only by live Docker).** The by-id enrichment initially assumed universal `GetEmbedding` support, but **SearchEngine (ElasticSearch/OpenSearch) and Milvus do not implement by-id retrieval** (`NotSupportedException`) — they failed Container+Database until the assertion was gated behind a `SupportsGetEmbedding` probe. Now Qdrant/Weaviate/InMemoryVector/SqliteVec get the stronger by-id proof; ES/OpenSearch/Milvus prove isolation by the kNN Search alone (which all support). Zero coverage loss vs the bespoke specs (the bespoke Qdrant used by-id; the bespoke ES/OS/Milvus used Search), and no adapter over-asserts.
 - **Non-isolation specs preserved untouched** (only the bespoke `*VectorIsolationSpec` files were deleted): the Weaviate matrix + `WeaviateOverlayIsolationSpec` (the ARCH-0102 `__`→`koan_` overlay rename proof), and each adapter's `*MatrixSpecs`/`*QuantizationSpecs`.
 - **Gates (live Docker):** all five HTTP cells 4/4 — Qdrant · Weaviate (with the WaitIndexed settle) · ElasticSearch · OpenSearch · Milvus (etcd+minio+milvus stack) — plus InMemoryVector 33/33 + SqliteVec 4/4. The full vector fleet's AODB three-mode isolation is now co-defined and live-proven through the single kit.
+
+### 9.17 Status — source ownership and the SQLite host boundary
+
+- **Built-in routed placement is ownership-aware.** A source definition's generic connection/settings
+  and `ConnectionStrings:{source}` are eligible on the predicate-bearing built-in path only when the
+  source is unowned or its configured adapter is accepted by the candidate factory's existing
+  `CanHandle` predicate. Provider-scoped source configuration remains an explicit override. The legacy
+  public overload without a predicate preserves compatibility and does not make this stronger claim.
+- **SQLite closes the opaque-default bypass.** Its options/discovery authority resolves only
+  provider-owned defaults; generic `ConnectionStrings:Default` remains in Data.Core, where actual
+  source ownership is known. Remote providers still pre-resolve that generic key and therefore require
+  the provenance repair recorded in PMC-018 before receiving the same complete claim.
+- **Participation is use, not discovery.** Data diagnostics keep configuration observations and adapter
+  participation as separate host-owned ledgers. A repository request or an executed Direct connection
+  records the canonical provider and logical source after successful construction; merely describing
+  an Entity, constructing a Direct session, or discovering an available connector does not activate
+  readiness.
+- **SQLite has one host-owned lifecycle.** The repository no longer owns a process-static custom pool or
+  a second concurrency semaphore over `Microsoft.Data.Sqlite`. File operations create ordinary
+  per-operation connections and use driver pooling. `:memory:` and explicit `Mode=Memory` targets are
+  rewritten to host/source-isolated shared-memory databases with one keeper for the host lifetime.
+  Disposal closes every keeper independently and clears the exact driver pool groups the host observed.
+- **Clarification of the earlier fallback text.** Falling back to Default still means selecting a
+  missing physical placement for the same adapter. It never authorizes one adapter to consume a generic
+  connection explicitly owned by another adapter.
+- **Current gates:** resolver routing 19/19; Data.Core 349/349; SQLite 35/35; Jobs SQLite 79/79 on
+  repeated and simultaneous complete runs; Jobs core 77/77; Core Unit 105/105; JSON 20/20; Data axes
+  integration 18/18; Web SQLite 49/49; Tenancy 110/110.

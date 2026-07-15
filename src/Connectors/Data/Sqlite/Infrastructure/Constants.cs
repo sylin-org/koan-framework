@@ -9,6 +9,7 @@ public static class Constants
             public const string Section = "Koan:Data:Sqlite";
             public const string AltSection = "Koan:Data:Sources:Default:sqlite";
 
+            public const string DefaultSourceConnectionString = "Koan:Data:Sources:Default:ConnectionString";
             public const string ConnectionString = Section + ":ConnectionString";
             public const string AltConnectionString = AltSection + ":ConnectionString";
             public const string ConnectionStringsSqlite = "ConnectionStrings:Sqlite";

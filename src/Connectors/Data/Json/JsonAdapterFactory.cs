@@ -35,7 +35,8 @@ public sealed class JsonAdapterFactory : IDataAdapterFactory
             Infrastructure.Constants.Provider.Name,
             source,
             "DirectoryPath",
-            baseOpts.DirectoryPath);
+            baseOpts.DirectoryPath,
+            CanHandle);
 
         // Create source-specific options
         var sourceOpts = new JsonDataOptions

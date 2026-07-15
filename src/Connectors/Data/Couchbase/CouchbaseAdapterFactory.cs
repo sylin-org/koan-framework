@@ -68,11 +68,16 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IAsyncDisposa
         // Resolve the source's physical placement (connection + bucket) — Database mode (ARCH-0103). The shared resolver
         // collapses a non-Default source's "auto"/blank discovery sentinel onto the discovery-resolved Default (so the
         // per-source pool never keys on the unresolved literal) — the fleet form of the local helper this replaces.
-        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(config, sourceRegistry, "Couchbase", source, baseOptions.ConnectionString);
-        var bucket = AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Couchbase", source, "Bucket", baseOptions.Bucket);
-        var username = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Couchbase", source, "Username", baseOptions.Username ?? ""));
-        var password = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Couchbase", source, "Password", baseOptions.Password ?? ""));
-        var managementUrl = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Couchbase", source, "ManagementUrl", baseOptions.ManagementUrl ?? ""));
+        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
+            config, sourceRegistry, "Couchbase", source, baseOptions.ConnectionString, CanHandle);
+        var bucket = AdapterConnectionResolver.GetSourceSetting(
+            config, sourceRegistry, "Couchbase", source, "Bucket", baseOptions.Bucket, CanHandle);
+        var username = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(
+            config, sourceRegistry, "Couchbase", source, "Username", baseOptions.Username ?? "", CanHandle));
+        var password = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(
+            config, sourceRegistry, "Couchbase", source, "Password", baseOptions.Password ?? "", CanHandle));
+        var managementUrl = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(
+            config, sourceRegistry, "Couchbase", source, "ManagementUrl", baseOptions.ManagementUrl ?? "", CanHandle));
 
         // Dedup (ARCH-0103 §9.15): a routed source whose resolved physical placement coincides with Default — same
         // connection, bucket, AND credentials/management endpoint (so reusing Default's provider can't cross to a

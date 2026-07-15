@@ -97,6 +97,15 @@ public sealed class AggregateConfigHostOwnershipSpec
             && info.KeyType == typeof(string).FullName
             && info.Provider == RecordingAdapterFactory.ProviderId
             && info.IdProperty == nameof(AggregateOwnershipEntity.Id));
+
+        diagnostics.GetAdapterParticipationsSnapshot().Should().BeEmpty(
+            "describing aggregate configuration must not activate a backing adapter");
+
+        _ = AggregateConfigs.Get<AggregateOwnershipEntity, string>(host.Services).Repository;
+
+        diagnostics.GetAdapterParticipationsSnapshot().Should().ContainSingle(info =>
+            info.Provider == RecordingAdapterFactory.ProviderId
+            && info.Source == "Default");
     }
 
     private static Task<IntegrationHost> StartHost(RecordingAdapterFactory factory)

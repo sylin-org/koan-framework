@@ -102,6 +102,30 @@ Isolated reruns show that the red result is not only whole-solution contention:
   hostless custom store, rebuild through that store, failure propagation, and provider-scope
   restoration.
 
+### Jobs SQLite source and connection ownership — passed
+
+- The five Jobs failures shared one root rather than five scheduling defects. An explicit generic
+  Default source could be consumed by a foreign adapter fallback; the test harness manually changed
+  the process host; and SQLite layered a process-static repository pool over the driver's own pool
+  without a host disposal boundary.
+- Built-in routed factories now filter generic source connections and settings through their existing
+  `CanHandle` predicates, so aliases remain adapter-owned without a central alias table; provider-scoped
+  source configuration remains an intentional override. SQLite additionally keeps its pre-resolved
+  provider default free of generic `ConnectionStrings:Default`, closing the opaque-fallback bypass for
+  the supported local path. Equivalent remote-provider provenance is tracked in PMC-018.
+- Repository and Direct use record a separate host-owned adapter-participation ledger. Readiness is
+  active for sources actually requested at runtime, while type discovery and an available-but-unused
+  connector remain inert. Direct source/adapter/default intent resolves through the provider factory;
+  `WithConnectionString(...)` remains a literal physical override, and unresolved blank/`auto` intent
+  rejects before provider I/O.
+- SQLite now has one host-owned connection lifecycle. File operations use ordinary driver-owned pooled
+  connections; memory targets are host/source-isolated named databases with one lifetime keeper;
+  directories are created on elected use; and disposal closes keepers and clears observed driver pool
+  groups. The Jobs harness relies on the normal host binder and owns only its explicit test placement.
+- Jobs core passes 77/77. Jobs SQLite passes 79/79 on three complete sequential runs and on two
+  simultaneous complete processes. SQLite passes 35/35, Data.Core 349/349, Core Unit 105/105, JSON
+  20/20, Data axes integration 18/18, Web SQLite 49/49, and Tenancy 110/110.
+
 ## Decisions
 
 ### DECIDED
@@ -126,8 +150,7 @@ Isolated reruns show that the red result is not only whole-solution contention:
 
 ### OPEN
 
-- Provider Jobs failures may disappear once local test isolation is restored; only isolated reruns may
-  promote them into separate work.
+- Mongo's recorded endpoint-precedence decision and the exact aggregate ratchet remain.
 
 ## Red/green plan
 
@@ -140,12 +163,11 @@ Isolated reruns show that the red result is not only whole-solution contention:
    boundary; rerun both complete projects and their focused regressions.
 4. **Complete.** Make packaging subprocess lifetime deterministic and pass the complete 53-test suite
    without an operator environment override.
-5. Reproduce the five Jobs SQLite failures from a clean isolated output, group them by root, and repair
-   behavior or isolation without lowering assertions.
+5. **Complete.** Reproduce the five Jobs SQLite failures from a clean isolated output, group them by
+   root, and repair behavior or isolation without lowering assertions.
 6. Resolve the explicit endpoint-precedence decision in
    [PMC-012](../../POST-CYCLE-TODO.md#current-register) and rerun Mongo 68/68.
-7. Rerun any remaining provider Jobs failures individually, then run the exact public-release ratchet
-   from a clean checkout.
+7. Run the exact public-release ratchet from a clean checkout.
 8. Record exact counts, duration, environment-dependent skips, warnings, and the absence of publication
    or remote mutation before passing this child.
 

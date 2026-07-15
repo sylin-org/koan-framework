@@ -128,7 +128,7 @@ boundaries remain pre-V1 work.
   generic logical-flow state and durable carriage now live in
   [`Koan.Core.Context`](../../../src/Koan.Core/Context/) through `KoanContext`,
   `IKoanContextCarrier`, and the host-owned `KoanContextCarrierRegistry`.
-- **Executable evidence:** Data.Core passes 325/325, including current health-participation and
+- **Executable evidence:** Data.Core passes 349/349, including current health-participation and
   observed-Entity diagnostics. [`S0.ConsoleJsonRepo`](../../../samples/S0.ConsoleJsonRepo/Program.cs) and
   [`S1.Web`](../../../samples/S1.Web/Todo.cs) demonstrate console and web paths.
 - **Inspection and failure:** repositories and capabilities are resolvable through the static data
@@ -140,7 +140,7 @@ boundaries remain pre-V1 work.
   inside opaque drivers. The surface is pre-1.0.
 - **Maturity / safe claim:** `verified`. Core `Entity<T>` persistence semantics are automated and are
   Koan's strongest first-class application language; provider-specific claims require their suites.
-- **Current T6 boundary:** SQLite is the durable Level-1 application provider (17/17 plus both
+- **Current T6 boundary:** SQLite is the durable Level-1 application provider (35/35 plus both
   executable journeys); InMemory is the ephemeral conformance oracle (56/56); JSON is the bundled
   zero-infrastructure fallback (20/20), not a durable application claim. The canonical
   [Data foundation reference](../../reference/data/index.md) publishes selection, inspection, and
@@ -174,7 +174,7 @@ boundaries remain pre-V1 work.
   [`DataAdapterAttribute`](../../../src/Koan.Data.Abstractions/DataAdapterAttribute.cs),
   [`DataCaps`](../../../src/Koan.Data.Abstractions/Capabilities/DataCaps.cs), and core
   [`CapabilitySet`](../../../src/Koan.Core/Capabilities/CapabilitySet.cs).
-- **Executable evidence:** Data.Core passes 325/325. Relationship cells execute InMemory, JSON, and
+- **Executable evidence:** Data.Core passes 349/349. Relationship cells execute InMemory, JSON, and
   SQLite selection/rejection/bounds; Web relationship passes 7/7; MCP relationship passes 2/2 and MCP
   conformance 74/74. R07-02 adds a 42/42 focused stream coordinator proof, one focused SQLite provider
   proof, six shared provider-bounded realization cells, three shared fail-closed cells, and a 5/5
@@ -246,7 +246,7 @@ boundaries remain pre-V1 work.
   [`JobsServiceCollectionExtensions`](../../../src/Koan.Jobs/JobsServiceCollectionExtensions.cs) in
   `Sylin.Koan.Jobs`.
 - **Executable evidence:** [77/77 core jobs tests](../../../tests/Suites/Jobs/Koan.Jobs.Tests/Koan.Jobs.Tests.csproj)
-  and 78/78 SQLite ledger tests pass. [`S14.AdapterBench`](../../../samples/S14.AdapterBench/Jobs/BenchmarkJob.cs) demonstrates a
+  and 79/79 SQLite ledger tests pass. [`S14.AdapterBench`](../../../samples/S14.AdapterBench/Jobs/BenchmarkJob.cs) demonstrates a
   business-facing job. The shared terminal-progress contract additionally passes against the
   in-memory and SQLite ledgers, and [`GoldenJourney`](../../../samples/GoldenJourney/README.md)
   observes the completed business priority and 100% progress from a running source application.
@@ -369,7 +369,7 @@ boundaries remain pre-V1 work.
   test-kit APIs.
 - **Maturity / safe claim:** `demonstrated`. Koan provides useful reusable conformance tests; applications
   do not yet inherit a fully verified, package-installable test contract.
-- **Current R06 result:** the testing portion of the foundation ring is internally verified: the
+- **R06 graduation result:** the testing portion of the foundation ring was internally verified: the
   parallel-enabled meta-suite passes 12 with 3 explicit capability/trait skips, and local connector
   suites pass InMemory 55/55, SQLite 15/15, and JSON 14/14. The row remains `demonstrated` because the
   public package path and stable test-kit compatibility boundary are not yet established.
@@ -391,10 +391,11 @@ boundaries remain pre-V1 work.
   [`FirstUse`](../../../samples/FirstUse/FirstUse.csproj) and
   [`GoldenJourney`](../../../samples/GoldenJourney/GoldenJourney.csproj) apps outside the checkout,
   hydrated one local feed, and passed FirstUse 8/8 in 4.129s plus GoldenJourney 11/11 in 8.769s. Both
-  external restores/builds emitted zero warnings and zero errors. Separately, a
-  disposable exact-0.17.0 public-NuGet application fails restore because
-  `Sylin.Koan.Data.Abstractions` requires Core `>= 0.17.3`, while public Core is 0.17.0; that probe also
-  reports a high-severity advisory in a transitive SQLite native dependency.
+  external restores/builds emitted zero warnings and zero errors. An earlier exact-0.17.0
+  public-NuGet probe also failed restore, but its dependency-specific diagnosis is historical and is
+  not treated as current registry metadata. The maintained boundary is the one current evidence
+  proves: the coherent set has passed staged clean rooms and has not yet passed an observed public
+  publication clean room.
 - **Current R05 change:** the fresh package proof embeds one source commit across independently
   selected App, SQLite, Jobs, and MCP versions and writes separate evidence for both applications.
   This proves local artifact coherence; it is not a public package-path claim because the release set
@@ -434,7 +435,7 @@ boundaries remain pre-V1 work.
   and core health under [`Koan.Core/Observability`](../../../src/Koan.Core/Observability), plus
   [`Sylin.Koan.Observability`](../../../src/Koan.Observability/Koan.Observability.csproj) and module
   contributors.
-- **Executable evidence:** focused facts pass 7/7; Core 211/211, Data.Core 325/325, Web WellKnown 3/3,
+- **Executable evidence:** focused facts pass 7/7; Core 211/211, Data.Core 349/349, Web WellKnown 3/3,
   Web relationship 7/7, MCP relationship 2/2, and MCP conformance 74/74. These prove ordering, schema round-trip, redaction, host isolation,
   unknown/degraded health, and identical Web/MCP serialization for the vertical slice. FirstUse proves
   the operator and agent projections against the same running SQLite-backed business application.

@@ -26,7 +26,9 @@ public sealed class AggregateConfig<TEntity, TKey>
             var repo = factory.Create<TEntity, TKey>(sp);
             var guards = sp.GetServices<Pipeline.IStorageGuard>().ToArray();
             var readContributors = sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
-            return new RepositoryFacade<TEntity, TKey>(repo, guards, readContributors);
+            var facade = new RepositoryFacade<TEntity, TKey>(repo, guards, readContributors);
+            sp.GetService<DataDiagnostics>()?.ObserveParticipation(factory.Provider, "Default");
+            return facade;
         }, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 }

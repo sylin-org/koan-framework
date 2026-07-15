@@ -101,7 +101,7 @@ curl http://localhost:5000/api/approvals
 ```
 
 You now have REST CRUD with pagination, GUID v7 ids, `/health`, structured logging, and a
-zero-config SQLite database at `./data/app.db`. JSON defaults: camelCase, nulls omitted.
+zero-config SQLite database at `.koan/data/Koan.sqlite`. JSON defaults: camelCase, nulls omitted.
 
 **Continue**: [the golden path](./overview.md) — the full concept-by-concept tour (database
 swap, caching, jobs, messaging, semantic search, agent tools).

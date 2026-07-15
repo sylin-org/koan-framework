@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 through R07-03 passed; R07-04 packaging, TestKit, host, and persistence roots repaired
+  scope: R07-01 through R07-03 passed; R07-04 packaging, host, persistence, and SQLite ownership roots repaired
 ---
 
 # Koan V1 reorganization current handoff
@@ -35,12 +35,13 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - [R07-03](work-items/r07/R07-03-automatic-package-lineage.md) passed. Its two production concepts—an
   evaluated `PackageGraph` and Git-native `ReleaseLineageCompiler`—automatically mint and prove the
   complete breaking reverse closure.
-- [R07-04](work-items/r07/R07-04-public-release-ratchet.md) is active. The automatic publisher now runs
-  the complete public-release ratchet and correctly stays red because several existing solution suites
-  fail independently. All five shared TestKits are fenced from solution test execution; Identity now
-  selects its shared host per fact and passes 114/114; Canon now has one complete replaceable
-  persistence boundary and passes unit 35/35 plus integration 6/6. Jobs SQLite is the next isolated
-  behavior root. Restore test truth before the Lifecycle break; do not narrow the release gate.
+- [R07-04](work-items/r07/R07-04-public-release-ratchet.md) is active. All five shared TestKits are
+  fenced from solution test execution; packaging subprocesses terminate deterministically; Identity
+  passes 114/114; and Canon passes unit 35/35 plus integration 6/6. The five Jobs SQLite failures were
+  one ownership root: generic source placement, host selection, and SQLite connection lifetime had
+  been blurred together. The shared repair passes Jobs core 77/77, Jobs SQLite 79/79 repeatedly and in
+  simultaneous complete processes, SQLite 35/35, Data.Core 349/349, and Core Unit 105/105. Mongo's
+  recorded endpoint-precedence case and the exact aggregate ratchet remain before Lifecycle.
 - Lifecycle remains the next semantic clean 0.18 public break. Retain the no-alias greenfield decision
   and keep Communication/Pipeline work out of the release-foundation slice.
 - Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
@@ -186,13 +187,18 @@ Only the next slice has a detailed child card. Do not open broker breadth before
   owns prior-state and rebuild reads, custom-store failures propagate, explicit provider overloads
   scope and restore correctly, and the intentional pre-1.0 breaking contract is recorded as the
   Domain package's 0.18 tier.
+- SQLite now resolves generic source configuration only for the provider that owns that source, while
+  provider-scoped overrides remain explicit. Repository and Direct use—not mere discovery—record
+  adapter participation for readiness. One host-owned lifecycle supplies per-operation connections,
+  source-isolated memory databases, lazy directory creation, and deterministic disposal. SQLite passes
+  35/35; Data.Core 349/349; Core Unit 105/105; JSON 20/20; Data axes integration 18/18; Web SQLite 49/49;
+  Tenancy 110/110; Jobs core 77/77; and Jobs SQLite 79/79 on repeated and simultaneous complete runs.
 
 ## Next safe action
 
-Continue [R07-04](work-items/r07/R07-04-public-release-ratchet.md): reproduce the five isolated Jobs
-SQLite failures from the repaired tree, group them by behavioral root, and repair the smallest owning
-seam without weakening assertions. Then resolve the recorded Mongo endpoint-precedence case, rerun
-the complete packaging suite successfully, and pass the exact public-release ratchet.
+Continue [R07-04](work-items/r07/R07-04-public-release-ratchet.md): resolve the recorded Mongo
+endpoint-precedence case in PMC-012, rerun Mongo's complete suite, then run the exact public-release
+ratchet. Do not weaken assertions or exclude a runnable suite.
 
 Do not start Lifecycle, Communication Events, Transport, a router, a unit-of-work coordinator, or
 Messaging compatibility work while the release floor is red.

@@ -32,7 +32,11 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
             // SQLite uses connection strings like "Data Source=path/to/file.db"
             var connectionString = NormalizeSqliteConnectionString(serviceUrl);
 
-            using var connection = new SqliteConnection(connectionString);
+            var probeConnection = new SqliteConnectionStringBuilder(connectionString)
+            {
+                Pooling = false,
+            }.ConnectionString;
+            using var connection = new SqliteConnection(probeConnection);
             await connection.OpenAsync(cancellationToken);
 
             // Simple query to test connectivity
@@ -40,14 +44,14 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
             await command.ExecuteScalarAsync(cancellationToken);
 
             KoanLog.ConfigDebug(_logger, LogActions.Health, LogOutcomes.Success,
-                ("connection", connectionString));
+                ("connection", Redaction.DeIdentify(connectionString)));
             return true;
         }
         catch (Exception ex)
         {
             KoanLog.ConfigDebug(_logger, LogActions.Health, LogOutcomes.Failure,
-                ("connection", serviceUrl),
-                ("error", ex.Message));
+                ("connection", Redaction.DeIdentify(serviceUrl)),
+                ("error", Redaction.DeIdentify(ex.Message)));
             return false;
         }
     }
@@ -55,10 +59,10 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
     /// <summary>SQLite adapter reads its own configuration sections</summary>
     protected override string? ReadExplicitConfiguration()
     {
-        // Check SQLite-specific configuration paths
-        return _configuration.GetConnectionString("SQLite") ??
-               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
-               _configuration[Infrastructure.Constants.Configuration.DataFallback.ConnectionString];
+        // Keep discovery's explicit candidate in lockstep with the options/boot fallback order. A higher-priority
+        // literal "auto" deliberately delegates to discovery instead of falling through to a lower concrete key.
+        var configured = Infrastructure.SqliteConnectionConfiguration.ReadProviderFallback(_configuration);
+        return Infrastructure.SqliteConnectionConfiguration.IsAuto(configured) ? null : configured;
     }
 
     /// <summary>SQLite-specific environment variable handling</summary>
@@ -86,7 +90,7 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
         try
         {
             var trimmed = value?.Trim() ?? "";
-            if (string.IsNullOrEmpty(trimmed)) return "Data Source=./data/app.db";
+            if (string.IsNullOrEmpty(trimmed)) return "Data Source=.koan/data/Koan.sqlite";
 
             // If already properly formatted, return as-is
             if (trimmed.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase))
@@ -100,8 +104,8 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
         catch (Exception ex)
         {
             KoanLog.ConfigDebug(_logger, LogActions.Normalize, LogOutcomes.Failure,
-                ("value", value),
-                ("error", ex.Message));
+                ("value", Redaction.DeIdentify(value)),
+                ("error", Redaction.DeIdentify(ex.Message)));
             return value; // Return original value if normalization fails
         }
     }

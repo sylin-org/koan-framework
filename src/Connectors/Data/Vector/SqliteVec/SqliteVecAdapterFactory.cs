@@ -46,7 +46,7 @@ public sealed class SqliteVecAdapterFactory : IVectorAdapterFactory
         var config = sp.GetRequiredService<IConfiguration>();
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
         var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "SqliteVec", source, baseOpts.ConnectionString);
+            config, sourceRegistry, "SqliteVec", source, baseOpts.ConnectionString, CanHandle);
 
         var sourceOpts = new SqliteVecOptions { ConnectionString = connectionString, DistanceMetric = baseOpts.DistanceMetric };
         return new SqliteVecVectorRepository<TEntity, TKey>(this, sp, sourceOpts);

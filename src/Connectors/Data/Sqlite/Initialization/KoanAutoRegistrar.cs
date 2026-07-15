@@ -4,13 +4,13 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
-using Koan.Core.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Logging;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Core;
 using Koan.Data.Relational.Orchestration;
 using Koan.Core.Provenance;
 using SqliteItems = Koan.Data.Connector.Sqlite.Infrastructure.SqliteProvenanceItems;
@@ -31,6 +31,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanOptions<SqliteOptions, SqliteOptionsConfigurator>(
             Infrastructure.Constants.Configuration.Keys.Section,
             configuratorLifetime: ServiceLifetime.Singleton);
+        services.TryAddSingleton<SqliteConnectionLifecycle>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
 
@@ -55,21 +56,13 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
-        // Autonomous discovery adapter handles all connection string resolution
-        // Boot report shows discovery results from SqliteDiscoveryAdapter
-        module.AddNote("SQLite discovery handled by autonomous SqliteDiscoveryAdapter");
+        module.AddNote("Runtime connection resolution supports autonomous discovery with a local .koan/data/Koan.sqlite fallback");
         module.AddNote("AODB isolation: RowScoped + ContainerScoped + DatabaseScoped (conformance: AodbConformanceSpecsBase)");
 
         // Configure default options for reporting with provenance metadata
         var defaultOptions = new SqliteOptions();
 
-        var connection = Koan.Core.Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlite,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+        var connection = ResolveDefaultConnectionForReport(cfg, defaultOptions);
 
         var defaultPageSize = Koan.Core.Configuration.ReadFirstWithSource(
             cfg,
@@ -99,20 +92,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             : connection.Value;
         var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
 
-        var bootOptions = AdapterBootReporting.ConfigureForBootReportWithConfigurator<SqliteOptions, SqliteOptionsConfigurator>(
-            cfg,
-            (configuration, readiness) => new SqliteOptionsConfigurator(configuration),
-            static () => new SqliteOptions());
-
-        var resolvedConnectionString = connectionIsAuto ? bootOptions.ConnectionString : connectionValue;
-        if (string.IsNullOrWhiteSpace(resolvedConnectionString))
-        {
-            resolvedConnectionString = connectionValue;
-        }
-
-        var displayConnection = connectionIsAuto || string.IsNullOrWhiteSpace(resolvedConnectionString)
+        // Provenance is descriptive and side-effect free. Runtime discovery and directory creation happen only when
+        // the elected adapter is actually used; an unresolved target is therefore reported honestly as "auto".
+        var displayConnection = connectionIsAuto || string.IsNullOrWhiteSpace(connectionValue)
             ? "auto"
-            : resolvedConnectionString;
+            : connectionValue;
 
         var connectionMode = connectionIsAuto
             ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
@@ -132,6 +116,69 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.PublishConfigValue(SqliteItems.EnsureCreatedSupported, ensureCreated);
         module.PublishConfigValue(SqliteItems.DefaultPageSize, defaultPageSize);
     }
+
+    private static ConfigurationValue<string> ResolveDefaultConnectionForReport(
+        IConfiguration cfg,
+        SqliteOptions defaults)
+    {
+        var fallback = Infrastructure.SqliteConnectionConfiguration
+            .ReadProviderFallbackWithSource(cfg, defaults.ConnectionString);
+
+        var registry = new DataSourceRegistry();
+        registry.DiscoverFromConfiguration(cfg);
+        var defaultSource = registry.GetSource("Default");
+        if (!string.IsNullOrWhiteSpace(defaultSource?.Adapter) &&
+            !string.Equals(defaultSource.Adapter, "sqlite", StringComparison.OrdinalIgnoreCase))
+        {
+            return fallback;
+        }
+
+        var resolved = AdapterConnectionResolver.ResolveRoutedConnection(
+            cfg,
+            registry,
+            "sqlite",
+            "Default",
+            fallback.Value,
+            static provider => string.Equals(provider, "sqlite", StringComparison.OrdinalIgnoreCase));
+
+        var genericSource = Koan.Core.Configuration.ReadWithSource<string?>(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.DefaultSourceConnectionString,
+            null);
+        if (!genericSource.UsedDefault && IsConcrete(genericSource.Value))
+        {
+            return From(genericSource, resolved);
+        }
+
+        // An explicit generic "auto" delegates to the adapter configurator. Otherwise a concrete provider-scoped
+        // source is authoritative over the adapter/global fallback, exactly as the runtime resolver applies it.
+        var genericRequestsAuto = !genericSource.UsedDefault && IsAuto(genericSource.Value);
+        var providerSource = Koan.Core.Configuration.ReadWithSource<string?>(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            null);
+        if (!genericRequestsAuto && !providerSource.UsedDefault && IsConcrete(providerSource.Value))
+        {
+            return From(providerSource, resolved);
+        }
+
+        if (genericRequestsAuto && IsAuto(resolved) && fallback.UsedDefault)
+        {
+            return From(genericSource, resolved);
+        }
+
+        return new ConfigurationValue<string>(
+            resolved,
+            fallback.Source,
+            fallback.ResolvedKey,
+            fallback.UsedDefault);
+    }
+
+    private static ConfigurationValue<string> From(ConfigurationValue<string?> source, string resolved)
+        => new(resolved, source.Source, source.ResolvedKey, source.UsedDefault);
+
+    private static bool IsConcrete(string? value) => !string.IsNullOrWhiteSpace(value) && !IsAuto(value);
+    private static bool IsAuto(string? value) => Infrastructure.SqliteConnectionConfiguration.IsAuto(value);
 
     private static class LogActions
     {

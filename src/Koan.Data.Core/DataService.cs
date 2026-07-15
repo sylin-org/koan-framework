@@ -52,6 +52,16 @@ public sealed class DataService(IServiceProvider sp) : IDataService
 
         var decorated = ApplyDecorators(typeof(TEntity), typeof(TKey), facade, sp);
 
+        // Repository construction is the activation boundary: inspection and route description remain pure, while
+        // any runtime path that actually asks for a repository makes that provider/source visible to readiness.
+        var diagnostics = sp.GetService<DataDiagnostics>();
+        diagnostics?.Observe(new EntityConfigInfo(
+            typeof(TEntity).FullName ?? typeof(TEntity).Name,
+            typeof(TKey).FullName ?? typeof(TKey).Name,
+            factory.Provider,
+            AggregateMetadata.GetIdSpec(typeof(TEntity))?.Prop.Name));
+        diagnostics?.ObserveParticipation(factory.Provider, source);
+
         _cache[key] = decorated;
         return decorated;
     }

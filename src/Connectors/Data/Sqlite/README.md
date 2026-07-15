@@ -1,18 +1,22 @@
 # Sylin.Koan.Data.Connector.Sqlite
 
-SQLite provider for Koan relational data - great for local dev, tests, and simple single-node apps.
+SQLite provider for Koan relational data—suited to local development, tests, and single-node applications.
 
 - Target framework: net10.0
 - License: Apache-2.0
 
 ## Capabilities
 
-- Zero-config file DB (connection string can be a file path)
+- Zero-config file database at `.koan/data/Koan.sqlite`
 - Basic LINQ predicate pushdown via Koan.Data.Relational translator
 - Schema helpers (create table/index) via Koan.Data.Relational
 - Provider-bounded Entity streams through `DataCaps.Query.ProviderBoundedPaging`
 
 ## Install
+
+> Current release status: the coherent package path is specified and exercised from staged artifacts, but the
+> existing public 0.17 package set is not a supported clean-room install. Until the next coherent publication, use
+> a source checkout/project reference. See the [repository installation status](../../../../README.md).
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Sqlite
@@ -20,8 +24,27 @@ dotnet add package Sylin.Koan.Data.Connector.Sqlite
 
 ## Minimal setup
 
-- Use an on-disk file for persistence or :memory: for tests.
-- Bind options at startup; don’t hardcode paths.
+Reference the package and keep the application's normal `services.AddKoan()` bootstrap. No provider registration,
+schema scaffold, or configuration is required. Configure a source only when the default target is not appropriate:
+
+```json
+{
+  "Koan": {
+    "Data": {
+      "Sources": {
+        "Default": {
+          "Adapter": "sqlite",
+          "ConnectionString": "Data Source=./data/app.db"
+        }
+      }
+    }
+  }
+}
+```
+
+Use a `Data Source=...` connection string for a durable file. `Data Source=:memory:` and explicit
+`Mode=Memory` targets create private, source-isolated databases that survive per-operation connections for one
+Koan host and disappear when that host is disposed.
 
 ## Usage - safe snippets
 
