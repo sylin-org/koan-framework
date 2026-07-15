@@ -9,4 +9,5 @@ internal sealed record PackageProject(
     string? Readme,
     string Description,
     string PackageTags,
-    IReadOnlyList<string> ProjectReferences);
+    IReadOnlyList<string> ProjectReferences,
+    IReadOnlyList<string> SharedInputs);

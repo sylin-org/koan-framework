@@ -51,14 +51,90 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
     public async Task<string> ResolveCommitAsync(string revision, CancellationToken cancellationToken) =>
         await processRunner.RequireAsync("git", ["rev-parse", "--verify", $"{revision}^{{commit}}"], repositoryRoot, cancellationToken);
 
-    public async Task<string?> TryGetVersionAsync(PackageProject package, string commit, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<string>> GetParentCommitsAsync(
+        string commit,
+        CancellationToken cancellationToken)
     {
-        var result = await processRunner.RunAsync(
-            "dotnet",
-            ["nbgv", "get-version", commit, "-p", package.ProjectDirectory, "--public-release=true", "--variable", "NuGetPackageVersion"],
+        var output = await processRunner.RequireAsync(
+            "git",
+            ["rev-list", "--parents", "-n", "1", commit],
             repositoryRoot,
             cancellationToken);
-        return result.ExitCode == 0 ? result.StandardOutput.Trim() : null;
+        return output.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
+    }
+
+    public async Task<IReadOnlyDictionary<string, string>> ReadTreeAsync(
+        string commit,
+        CancellationToken cancellationToken)
+    {
+        var output = await processRunner.RequireAsync(
+            "git",
+            ["ls-tree", "-r", "--full-tree", commit],
+            repositoryRoot,
+            cancellationToken);
+        return output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split('\t', 2))
+            .ToDictionary(
+                fields => fields[1].Replace('\\', '/'),
+                fields => fields[0],
+                StringComparer.Ordinal);
+    }
+
+    public async Task<IReadOnlyList<string>> GetChangedPathsAsync(
+        string previousCommit,
+        string currentCommit,
+        CancellationToken cancellationToken)
+    {
+        var output = await processRunner.RequireAsync(
+            "git",
+            ["diff", "--name-only", previousCommit, currentCommit, "--"],
+            repositoryRoot,
+            cancellationToken);
+        return output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(path => path.Replace('\\', '/'))
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyDictionary<string, string?>> CalculateVersionsAsync(
+        IReadOnlyCollection<PackageProject> projects,
+        string commit,
+        CancellationToken cancellationToken)
+    {
+        var resolvedCommit = await ResolveCommitAsync(commit, cancellationToken);
+        var head = await ResolveCommitAsync("HEAD", cancellationToken);
+        if (!string.Equals(resolvedCommit, head, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Version calculation requires exact commit {resolvedCommit} to be checked out; HEAD is {head}.");
+        }
+
+        var versions = new ConcurrentDictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        await Parallel.ForEachAsync(
+            projects,
+            new ParallelOptions
+            {
+                MaxDegreeOfParallelism = PackagingConstants.EvaluationParallelism,
+                CancellationToken = cancellationToken
+            },
+            async (project, ct) =>
+            {
+                var result = await processRunner.RunAsync(
+                    "dotnet",
+                    [
+                        "nbgv", "get-version", "HEAD", "-p", project.ProjectDirectory,
+                        "--public-release=true", "--variable", "NuGetPackageVersion"
+                    ],
+                    repositoryRoot,
+                    ct);
+                if (result.ExitCode != 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Unable to calculate {project.PackageId} at exact commit {resolvedCommit}: " +
+                        $"{result.StandardError}{result.StandardOutput}".Trim());
+                }
+                versions[project.PackageId] = result.StandardOutput.Trim();
+            });
+        return new Dictionary<string, string?>(versions, StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task<string?> TryReadFileAsync(string commit, string repositoryPath, CancellationToken cancellationToken)
@@ -78,7 +154,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             [
                 "msbuild", project, "-nologo",
                 "-getProperty:IsPackable,PackageId,KoanPackageKind,IncludeSymbols,PackageReadmeFile,Description,PackageTags",
-                "-getItem:ProjectReference", "-p:PublicRelease=true"
+                "-getItem:ProjectReference,None", "-p:PublicRelease=true"
             ],
             repositoryRoot,
             cancellationToken);
@@ -100,6 +176,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
         }
 
         var references = new List<string>();
+        var sharedInputs = SharedBuildInputs(projectDirectory).ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (document.RootElement.TryGetProperty("Items", out var items) &&
             items.TryGetProperty("ProjectReference", out var projectReferences))
         {
@@ -115,6 +192,17 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
                 if (!string.IsNullOrWhiteSpace(fullPath)) references.Add(Path.GetFullPath(fullPath));
             }
         }
+        if (document.RootElement.TryGetProperty("Items", out items) &&
+            items.TryGetProperty("None", out var noneItems))
+        {
+            foreach (var item in noneItems.EnumerateArray())
+            {
+                if (!ReadBoolean(item, "Pack", defaultValue: false)) continue;
+                var fullPath = ReadString(item, "FullPath");
+                if (string.IsNullOrWhiteSpace(fullPath) || IsWithin(fullPath, projectDirectory)) continue;
+                if (TryRelative(fullPath, out var relative)) sharedInputs.Add(relative);
+            }
+        }
 
         return new PackageProject(
             Relative(project),
@@ -125,7 +213,63 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             ReadString(properties, "PackageReadmeFile"),
             ReadString(properties, "Description") ?? string.Empty,
             ReadString(properties, "PackageTags") ?? string.Empty,
-            references);
+            references,
+            sharedInputs.Order(StringComparer.OrdinalIgnoreCase).ToArray());
+    }
+
+    private IEnumerable<string> SharedBuildInputs(string projectDirectory)
+    {
+        string[] repositoryWide =
+        [
+            "Directory.Build.props",
+            "Directory.Build.targets",
+            "Directory.Packages.props",
+            "Directory.Packages.targets",
+            "global.json",
+            ".editorconfig",
+            ".config/dotnet-tools.json",
+            "NuGet.Config",
+            "README.md",
+            "icon.png",
+            "resources/image/0_2.jpg",
+            "build/compat-ranges.targets"
+        ];
+        foreach (var path in repositoryWide) yield return path;
+
+        var directory = new DirectoryInfo(projectDirectory).Parent;
+        while (directory is not null && IsWithin(directory.FullName, repositoryRoot))
+        {
+            if (!string.Equals(directory.FullName, repositoryRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var fileName in new[]
+                         {
+                             "Directory.Build.props",
+                             "Directory.Build.targets",
+                             "Directory.Packages.props",
+                             "Directory.Packages.targets"
+                         })
+                {
+                    yield return Relative(Path.Combine(directory.FullName, fileName));
+                }
+            }
+            directory = directory.Parent;
+        }
+    }
+
+    private bool TryRelative(string path, out string relative)
+    {
+        relative = string.Empty;
+        if (!IsWithin(path, repositoryRoot)) return false;
+        relative = Relative(path);
+        return true;
+    }
+
+    private static bool IsWithin(string path, string root)
+    {
+        var relative = Path.GetRelativePath(root, Path.GetFullPath(path));
+        return !Path.IsPathRooted(relative) &&
+               !string.Equals(relative, "..", StringComparison.Ordinal) &&
+               !relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
     }
 
     private string Relative(string path) => Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/');

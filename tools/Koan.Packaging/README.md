@@ -32,11 +32,15 @@ dotnet run --project tools/Koan.Packaging -- pack `
 
 `lineage` intentionally switches a clean checkout to its dedicated local lineage branch and creates
 one commit. Run that command only in the protected workflow or a disposable rehearsal checkout. Omit
-`--previous-lineage` only when initializing a new lineage.
+`--previous-lineage` only when initializing a new lineage. That first projection is an explicit
+bootstrap wave: every package owner receives a fresh identity so no prior source-commit artifact can
+be rebuilt under the same package version with different repository metadata.
 
 `SourceCommit` identifies the developer's `dev` event. `VersionCommit` identifies the exact linear
 projection that NBGV versions, packing, SourceLink metadata, resumable state, and release evidence use.
 The committed lineage state must match the external lineage artifact before planning can begin.
+Repository-wide build policy, ancestor `Directory.*` policy, and external packed files are evaluated
+as shared package inputs. Changing one automatically selects only its evaluated package consumers.
 
 For a long reconciliation rehearsal, add `--resume` to `pack`. Existing artifacts are reused only
 after their identity, metadata, symbols policy, and embedded version commit match the manifest.
@@ -48,4 +52,6 @@ directory, obtains its credential from the named environment variable, and recor
 per-package state.
 
 `--clean-room` proves FirstUse and GoldenJourney outside the checkout against only the staged/local
-package feed. Each proof writes separate JSON evidence.
+package feed. Each proof writes separate JSON evidence. Packing also proves that the nupkg's exact
+Koan dependencies equal the evaluated project graph and that every selected dependency floor names
+the selected identity.

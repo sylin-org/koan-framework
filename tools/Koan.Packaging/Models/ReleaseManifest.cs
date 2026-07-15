@@ -5,11 +5,16 @@ namespace Koan.Packaging.Models;
 
 internal sealed class ReleaseManifest
 {
+    [JsonRequired]
     public int SchemaVersion { get; init; } = PackagingConstants.ReleaseManifestSchema;
     public required string PreviousVersionCommit { get; init; }
     public required string SourceCommit { get; init; }
     public required string VersionCommit { get; init; }
+    [JsonRequired]
+    public bool IsLineageBootstrap { get; init; }
     public List<string> BreakingRoots { get; init; } = [];
+    [JsonRequired]
+    public List<string> SharedInputs { get; init; } = [];
     public required DateTimeOffset CreatedAtUtc { get; init; }
     public List<ReleasePackage> Packages { get; init; } = [];
 }
@@ -41,6 +46,7 @@ internal sealed record PackageDependency(string PackageId, string VersionRange, 
 
 internal sealed class ReleaseState
 {
+    [JsonRequired]
     public int SchemaVersion { get; init; } = PackagingConstants.ReleaseManifestSchema;
     public required string VersionCommit { get; init; }
     public Dictionary<string, string> Packages { get; init; } = new(StringComparer.OrdinalIgnoreCase);
@@ -48,38 +54,54 @@ internal sealed class ReleaseState
 
 internal sealed class ReleaseLineage
 {
+    [JsonRequired]
     public int SchemaVersion { get; init; } = PackagingConstants.ReleaseLineageSchema;
     public required string PreviousSourceCommit { get; init; }
     public required string SourceCommit { get; init; }
     public required string PreviousVersionCommit { get; init; }
     public required string VersionCommit { get; init; }
+    [JsonRequired]
+    public bool IsBootstrap { get; init; }
     public List<string> BreakingRoots { get; init; } = [];
-    public List<string> ClosurePackages { get; init; } = [];
-    public List<string> MarkerPackages { get; init; } = [];
-    public List<ReleaseLineageTrigger> Triggers { get; init; } = [];
-}
-
-internal sealed class ReleaseLineageState
-{
-    public int SchemaVersion { get; init; } = PackagingConstants.ReleaseLineageSchema;
-    public required string PreviousSourceCommit { get; init; }
-    public required string SourceCommit { get; init; }
-    public required string PreviousVersionCommit { get; init; }
-    public List<string> BreakingRoots { get; init; } = [];
+    [JsonRequired]
+    public List<string> SharedInputs { get; init; } = [];
     public List<string> ClosurePackages { get; init; } = [];
     public List<string> MarkerPackages { get; init; } = [];
     public List<ReleaseLineageTrigger> Triggers { get; init; } = [];
     public List<ReleaseLineagePackage> Packages { get; init; } = [];
 }
 
-internal sealed record ReleaseLineagePackage(string PackageId, string ProjectPath);
+internal sealed class ReleaseLineageState
+{
+    [JsonRequired]
+    public int SchemaVersion { get; init; } = PackagingConstants.ReleaseLineageSchema;
+    public required string PreviousSourceCommit { get; init; }
+    public required string SourceCommit { get; init; }
+    public required string PreviousVersionCommit { get; init; }
+    [JsonRequired]
+    public bool IsBootstrap { get; init; }
+    public List<string> BreakingRoots { get; init; } = [];
+    [JsonRequired]
+    public List<string> SharedInputs { get; init; } = [];
+    public List<string> ClosurePackages { get; init; } = [];
+    public List<string> MarkerPackages { get; init; } = [];
+    public List<ReleaseLineageTrigger> Triggers { get; init; } = [];
+    public List<ReleaseLineagePackage> Packages { get; init; } = [];
+}
 
-internal sealed record ReleaseLineageTrigger(string PackageId, IReadOnlyList<string> BreakingRoots);
+internal sealed record ReleaseLineagePackage(string PackageId, string ProjectPath, string? Version);
+
+internal sealed record ReleaseLineageTrigger(
+    string PackageId,
+    IReadOnlyList<string> BreakingRoots,
+    IReadOnlyList<string> SharedInputs);
 
 internal sealed class ReleaseLineageMarker
 {
+    [JsonRequired]
     public int SchemaVersion { get; init; } = PackagingConstants.ReleaseLineageSchema;
     public required string SourceCommit { get; init; }
     public required string PackageId { get; init; }
     public List<string> BreakingRoots { get; init; } = [];
+    public List<string> SharedInputs { get; init; } = [];
 }

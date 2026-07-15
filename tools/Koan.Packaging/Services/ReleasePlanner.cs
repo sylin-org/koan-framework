@@ -26,11 +26,27 @@ internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegist
         }
         var projects = await repository.DiscoverPackagesAsync(cancellationToken);
         var graph = new PackageGraph(projects);
-        var expectedClosure = graph.ReverseDependentClosure(lineage.BreakingRoots);
+        var expectedSharedInputs = ReleaseLineageCompiler.MapChangedSharedInputs(
+            graph,
+            await repository.GetChangedPathsAsync(
+                lineage.PreviousSourceCommit,
+                lineage.SourceCommit,
+                cancellationToken));
+        var expectedClosure = graph.ReverseDependentClosure(lineage.BreakingRoots).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        expectedClosure.UnionWith(lineage.IsBootstrap
+            ? graph.Projects.Select(project => project.PackageId)
+            : expectedSharedInputs.Keys);
         if (!expectedClosure.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(lineage.ClosurePackages))
         {
             throw new InvalidOperationException(
                 "Release lineage closure does not match the current evaluated package graph. Recompile lineage before planning.");
+        }
+        var expectedShared = expectedSharedInputs.Values.SelectMany(paths => paths)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!expectedShared.SetEquals(lineage.SharedInputs))
+        {
+            throw new InvalidOperationException(
+                "Release lineage shared-input impact does not match the current evaluated package inputs. Recompile lineage before planning.");
         }
         Console.WriteLine(
             $"compare  {previousVersionCommit[..12]} -> {versionCommit[..12]} across {projects.Count} package owner(s); " +
@@ -41,15 +57,43 @@ internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegist
             StringComparer.OrdinalIgnoreCase);
         var roots = lineage.BreakingRoots.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var markers = lineage.MarkerPackages.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var currentVersions = await repository.CalculateVersionsAsync(
+            projects,
+            versionCommit,
+            cancellationToken);
+        var recordedCurrent = lineage.Packages.ToDictionary(package => package.PackageId, StringComparer.OrdinalIgnoreCase);
+        if (!recordedCurrent.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase)
+                .SetEquals(projects.Select(project => project.PackageId)))
+        {
+            throw new InvalidOperationException(
+                "Committed package lineage inventory does not match the evaluated package graph.");
+        }
+        foreach (var project in projects)
+        {
+            var recorded = recordedCurrent[project.PackageId];
+            if (!string.Equals(recorded.ProjectPath, project.ProjectPath, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(recorded.Version, currentVersions[project.PackageId], StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"Committed package identity for {project.PackageId} does not match exact version commit {versionCommit}.");
+            }
+        }
+        IReadOnlyDictionary<string, string?> previousVersions = lineage.IsBootstrap
+            ? new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+            : (await ReleaseLineageCompiler.LoadCommittedAsync(repository, previousVersionCommit, cancellationToken))
+                .Packages.ToDictionary(
+                    package => package.PackageId,
+                    package => package.Version,
+                    StringComparer.OrdinalIgnoreCase);
         var packages = new List<ReleasePackage>();
         await Parallel.ForEachAsync(
             projects,
             new ParallelOptions { MaxDegreeOfParallelism = 6, CancellationToken = cancellationToken },
             async (project, ct) =>
             {
-                var current = await repository.TryGetVersionAsync(project, versionCommit, ct)
+                var current = currentVersions[project.PackageId]
                     ?? throw new InvalidOperationException($"Unable to calculate {project.PackageId} at {versionCommit}.");
-                var previous = await repository.TryGetVersionAsync(project, previousVersionCommit, ct);
+                previousVersions.TryGetValue(project.PackageId, out var previous);
                 var changed = !string.Equals(current, previous, StringComparison.OrdinalIgnoreCase);
                 if (offline && !changed) return;
                 var published = !offline && await registry.ExistsAsync(project.PackageId, current, ct);
@@ -60,7 +104,11 @@ internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegist
                 var reason = trigger is not null
                     ? roots.Contains(project.PackageId)
                         ? PackagingConstants.BreakingRootReason
-                        : PackagingConstants.BreakingDependentReason
+                        : trigger.BreakingRoots.Count > 0
+                            ? PackagingConstants.BreakingDependentReason
+                            : lineage.IsBootstrap
+                                ? PackagingConstants.LineageBootstrapReason
+                                : PackagingConstants.SharedPackageInputReason
                     : changed
                         ? PackagingConstants.VersionChangedReason
                         : PackagingConstants.RegistryRepairReason;
@@ -98,7 +146,9 @@ internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegist
             PreviousVersionCommit = previousVersionCommit,
             SourceCommit = sourceCommit,
             VersionCommit = versionCommit,
+            IsLineageBootstrap = lineage.IsBootstrap,
             BreakingRoots = lineage.BreakingRoots.ToList(),
+            SharedInputs = lineage.SharedInputs.ToList(),
             CreatedAtUtc = DateTimeOffset.UtcNow,
             Packages = ordered
         };

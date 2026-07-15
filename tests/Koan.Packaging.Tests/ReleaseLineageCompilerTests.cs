@@ -26,6 +26,19 @@ public sealed class ReleaseLineageCompilerTests
         Assert.Contains("backward", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("0.17.1")]
+    [InlineData("0.17-beta")]
+    [InlineData("1")]
+    [InlineData("1.2.3.4")]
+    public void VersionIntentMustBeExactlyMajorMinor(string value)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            ReleaseLineageCompiler.IsBreakingTierAdvance("0.17", value));
+
+        Assert.Contains("major.minor", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void MarkerPlanTouchesOnlyOtherwiseUnchangedClosureMembers()
     {
@@ -38,6 +51,8 @@ public sealed class ReleaseLineageCompilerTests
         var plan = ReleaseLineageCompiler.Plan(
             graph,
             [core.PackageId],
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
+            isBootstrap: false,
             Versions(core, data, app, unrelated),
             Versions(core, data, app, unrelated, fresh: [core.PackageId, data.PackageId]));
 
@@ -58,6 +73,8 @@ public sealed class ReleaseLineageCompilerTests
         var plan = ReleaseLineageCompiler.Plan(
             graph,
             [right.PackageId, left.PackageId],
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
+            isBootstrap: false,
             Versions(left, right, bridge),
             Versions(left, right, bridge, fresh: [left.PackageId, right.PackageId]));
 
@@ -68,14 +85,58 @@ public sealed class ReleaseLineageCompilerTests
     }
 
     [Fact]
+    public void SharedInputTouchesOnlyItsEvaluatedConsumers()
+    {
+        const string shared = "src/Connectors/Directory.Build.props";
+        var core = Project("Sylin.Koan.Core");
+        var connector = Project("Sylin.Koan.Connector") with { SharedInputs = [shared] };
+        var app = Project("Sylin.Koan.App", Reference(core));
+        var graph = new PackageGraph([connector, app, core]);
+        var impact = ReleaseLineageCompiler.MapChangedSharedInputs(graph, [shared]);
+
+        var plan = ReleaseLineageCompiler.Plan(
+            graph,
+            [],
+            impact,
+            isBootstrap: false,
+            Versions(core, connector, app),
+            Versions(core, connector, app));
+
+        var marker = Assert.Single(plan.Triggers);
+        Assert.Equal(connector.PackageId, marker.PackageId);
+        Assert.Equal([shared], marker.SharedInputs);
+        Assert.Equal([connector.PackageId], plan.MarkerPackages);
+    }
+
+    [Fact]
+    public void BootstrapTouchesEveryPackageOwnerOnce()
+    {
+        var core = Project("Sylin.Koan.Core");
+        var data = Project("Sylin.Koan.Data", Reference(core));
+        var app = Project("Sylin.Koan.App", Reference(data));
+        var graph = new PackageGraph([app, data, core]);
+
+        var plan = ReleaseLineageCompiler.Plan(
+            graph,
+            [],
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
+            isBootstrap: true,
+            Versions(core, data, app),
+            Versions(core, data, app));
+
+        Assert.Equal([core.PackageId, data.PackageId, app.PackageId], plan.ClosurePackages);
+        Assert.Equal(plan.ClosurePackages, plan.MarkerPackages);
+    }
+
+    [Fact]
     public void PreviousPackageDeletionFailsLoudly()
     {
         var core = Project("Sylin.Koan.Core");
         var graph = new PackageGraph([core]);
         var previous = new[]
         {
-            new ReleaseLineagePackage(core.PackageId, core.ProjectPath),
-            new ReleaseLineagePackage("Sylin.Koan.Removed", "src/removed/removed.csproj")
+            new ReleaseLineagePackage(core.PackageId, core.ProjectPath, "0.17.1"),
+            new ReleaseLineagePackage("Sylin.Koan.Removed", "src/removed/removed.csproj", "0.17.1")
         };
 
         var error = Assert.Throws<InvalidOperationException>(() =>
@@ -92,7 +153,7 @@ public sealed class ReleaseLineageCompilerTests
         var graph = new PackageGraph([current]);
         var previous = new[]
         {
-            new ReleaseLineagePackage(current.PackageId, "src/old/Koan.Core.csproj")
+            new ReleaseLineagePackage(current.PackageId, "src/old/Koan.Core.csproj", "0.17.1")
         };
 
         var error = Assert.Throws<InvalidOperationException>(() =>
@@ -109,7 +170,7 @@ public sealed class ReleaseLineageCompilerTests
         var app = Project("Sylin.Koan.App", Reference(core));
 
         ReleaseLineageCompiler.ValidatePackageContinuity(
-            [new ReleaseLineagePackage(core.PackageId, core.ProjectPath)],
+            [new ReleaseLineagePackage(core.PackageId, core.ProjectPath, "0.17.1")],
             new PackageGraph([app, core]));
     }
 
@@ -156,6 +217,7 @@ public sealed class ReleaseLineageCompilerTests
             "README.md",
             "Description",
             "koan;test",
-            references);
+            references,
+            []);
     }
 }

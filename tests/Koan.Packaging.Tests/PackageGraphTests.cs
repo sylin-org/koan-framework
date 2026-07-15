@@ -100,6 +100,7 @@ public sealed class PackageGraphTests
             "README.md",
             "Description",
             "koan;test",
-            references);
+            references,
+            []);
     }
 }

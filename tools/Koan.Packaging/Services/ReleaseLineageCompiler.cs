@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using Koan.Packaging.Infrastructure;
 using Koan.Packaging.Models;
@@ -32,9 +31,10 @@ internal sealed class ReleaseLineageCompiler(
 
         string previousSourceCommit;
         string previousVersionCommit;
+        var isBootstrap = string.IsNullOrWhiteSpace(previousLineageRevision);
         ReleaseLineageState? previousState = null;
         IReadOnlyList<ReleaseLineagePackage> previousInventory;
-        if (string.IsNullOrWhiteSpace(previousLineageRevision))
+        if (isBootstrap)
         {
             previousSourceCommit = await repository.ResolveCommitAsync(fallbackPreviousSourceRevision, cancellationToken);
             previousVersionCommit = previousSourceCommit;
@@ -43,14 +43,15 @@ internal sealed class ReleaseLineageCompiler(
             await SwitchBranchAsync(branchName, previousVersionCommit, cancellationToken);
             previousInventory = (await repository.DiscoverPackagesAsync(cancellationToken))
                 .OrderBy(project => project.PackageId, StringComparer.OrdinalIgnoreCase)
-                .Select(project => new ReleaseLineagePackage(project.PackageId, Normalize(project.ProjectPath)))
+                .Select(project => new ReleaseLineagePackage(project.PackageId, Normalize(project.ProjectPath), null))
                 .ToArray();
             await ApplySourceDeltaAsync(previousSourceCommit, sourceCommit, cancellationToken);
         }
         else
         {
-            previousVersionCommit = await repository.ResolveCommitAsync(previousLineageRevision, cancellationToken);
+            previousVersionCommit = await repository.ResolveCommitAsync(previousLineageRevision!, cancellationToken);
             previousState = await LoadStateAsync(previousVersionCommit, cancellationToken);
+            await ValidateCommittedLineageAsync(repository, previousVersionCommit, previousState, cancellationToken);
             previousSourceCommit = previousState.SourceCommit;
             previousInventory = previousState.Packages;
 
@@ -66,99 +67,138 @@ internal sealed class ReleaseLineageCompiler(
             await ApplySourceDeltaAsync(previousSourceCommit, sourceCommit, cancellationToken);
         }
 
-            var projects = await repository.DiscoverPackagesAsync(cancellationToken);
-            var graph = new PackageGraph(projects);
-            ValidatePackageContinuity(previousInventory, graph);
+        var projects = await repository.DiscoverPackagesAsync(cancellationToken);
+        var graph = new PackageGraph(projects);
+        ValidatePackageContinuity(previousInventory, graph);
+        var previousVersions = previousInventory.ToDictionary(
+            package => package.PackageId,
+            package => package.Version,
+            StringComparer.OrdinalIgnoreCase);
 
-            var breakingRoots = await FindBreakingRootsAsync(
-                graph,
-                previousSourceCommit,
-                sourceCommit,
-                cancellationToken);
-            var triggers = PlanTriggers(graph, breakingRoots);
-            var closurePackages = graph.ReverseDependentClosure(breakingRoots);
-            var inventory = graph.Projects
-                .OrderBy(project => project.PackageId, StringComparer.OrdinalIgnoreCase)
-                .Select(project => new ReleaseLineagePackage(project.PackageId, Normalize(project.ProjectPath)))
-                .ToList();
+        var breakingRoots = await FindBreakingRootsAsync(
+            graph,
+            previousSourceCommit,
+            sourceCommit,
+            cancellationToken);
+        var sharedInputsByPackage = await FindChangedSharedInputsAsync(
+            graph,
+            previousSourceCommit,
+            sourceCommit,
+            cancellationToken);
+        var sharedInputs = sharedInputsByPackage.Values
+            .SelectMany(paths => paths)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var triggers = PlanTriggers(graph, breakingRoots, sharedInputsByPackage, isBootstrap);
+        var closurePackages = triggers.Select(trigger => trigger.PackageId).ToArray();
+        var inventory = graph.Projects
+            .OrderBy(project => project.PackageId, StringComparer.OrdinalIgnoreCase)
+            .Select(project => new ReleaseLineagePackage(project.PackageId, Normalize(project.ProjectPath), null))
+            .ToList();
 
-            ReleaseLineageState BuildState(IEnumerable<string> markerPackages) => new()
-            {
-                PreviousSourceCommit = previousSourceCommit,
-                SourceCommit = sourceCommit,
-                PreviousVersionCommit = previousVersionCommit,
-                BreakingRoots = breakingRoots.ToList(),
-                ClosurePackages = closurePackages.ToList(),
-                MarkerPackages = markerPackages.ToList(),
-                Triggers = triggers.ToList(),
-                Packages = inventory
-            };
-
-            var state = BuildState([]);
-            await WriteJsonAsync(
-                Path.Combine(repositoryRoot, PackagingConstants.LineageStateFileName),
-                state,
-                cancellationToken);
-            await processRunner.RequireAsync(
-                "git",
-                ["add", "--", PackagingConstants.LineageStateFileName],
-                repositoryRoot,
-                cancellationToken);
-            await CommitAsync(sourceCommit, amend: false, cancellationToken);
-
-            var projectionCommit = await repository.ResolveCommitAsync("HEAD", cancellationToken);
-            var previousVersions = await CalculateVersionsAsync(
-                graph.Projects,
-                previousVersionCommit,
-                requireAll: false,
-                cancellationToken);
-            var projectionVersions = await CalculateVersionsAsync(
-                graph.Projects,
-                projectionCommit,
-                requireAll: true,
-                cancellationToken);
-            var plan = Plan(graph, breakingRoots, previousVersions, projectionVersions);
-            var markerIds = plan.MarkerPackages.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var markers = plan.Triggers.Where(trigger => markerIds.Contains(trigger.PackageId)).ToArray();
-
-            foreach (var marker in markers)
-            {
-                var project = graph.Project(marker.PackageId);
-                var markerPath = Path.Combine(project.ProjectDirectory, PackagingConstants.LineageMarkerFileName);
-                var content = new ReleaseLineageMarker
+        ReleaseLineageState BuildState(
+            IEnumerable<string> markerPackages,
+            IReadOnlyDictionary<string, string?> versions) => new()
+        {
+            PreviousSourceCommit = previousSourceCommit,
+            SourceCommit = sourceCommit,
+            PreviousVersionCommit = previousVersionCommit,
+            IsBootstrap = isBootstrap,
+            BreakingRoots = breakingRoots.ToList(),
+            SharedInputs = sharedInputs.ToList(),
+            ClosurePackages = closurePackages.ToList(),
+            MarkerPackages = markerPackages.ToList(),
+            Triggers = triggers.ToList(),
+            Packages = inventory
+                .Select(package => package with
                 {
-                    SourceCommit = sourceCommit,
-                    PackageId = marker.PackageId,
-                    BreakingRoots = marker.BreakingRoots.ToList()
-                };
-                await WriteJsonAsync(markerPath, content, cancellationToken);
-            }
+                    Version = versions.TryGetValue(package.PackageId, out var version) ? version : null
+                })
+                .ToList()
+        };
 
-            state = BuildState(plan.MarkerPackages);
-            await WriteJsonAsync(
-                Path.Combine(repositoryRoot, PackagingConstants.LineageStateFileName),
-                state,
-                cancellationToken);
+        var state = BuildState([], new Dictionary<string, string?>());
+        await WriteJsonAsync(
+            Path.Combine(repositoryRoot, PackagingConstants.LineageStateFileName),
+            state,
+            cancellationToken);
+        await processRunner.RequireAsync(
+            "git",
+            ["add", "--", PackagingConstants.LineageStateFileName],
+            repositoryRoot,
+            cancellationToken);
+        await CommitAsync(sourceCommit, amend: false, cancellationToken);
 
-            var generatedPaths = new[] { PackagingConstants.LineageStateFileName }
-                .Concat(markers.Select(marker => MarkerPath(graph.Project(marker.PackageId))))
-                .ToArray();
-            await processRunner.RequireAsync(
-                "git",
-                new[] { "add", "--" }.Concat(generatedPaths),
-                repositoryRoot,
-                cancellationToken);
-            if (markers.Length > 0) await CommitAsync(sourceCommit, amend: true, cancellationToken);
+        var projectionCommit = await repository.ResolveCommitAsync("HEAD", cancellationToken);
+        var projectionVersions = await repository.CalculateVersionsAsync(
+            graph.Projects,
+            projectionCommit,
+            cancellationToken);
+        var plan = Plan(graph, breakingRoots, sharedInputsByPackage, isBootstrap, previousVersions, projectionVersions);
+        var markerIds = plan.MarkerPackages.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var markers = plan.Triggers.Where(trigger => markerIds.Contains(trigger.PackageId)).ToArray();
 
-            var versionCommit = await repository.ResolveCommitAsync("HEAD", cancellationToken);
-            await VerifyFreshClosureVersionsAsync(
-                graph,
-                plan.ClosurePackages,
-                previousVersionCommit,
-                versionCommit,
-                cancellationToken);
-            await RequireCleanTrackedTreeAsync(cancellationToken);
-            return ToCompilation(state, versionCommit);
+        foreach (var marker in markers)
+        {
+            var project = graph.Project(marker.PackageId);
+            var markerPath = Path.Combine(project.ProjectDirectory, PackagingConstants.LineageMarkerFileName);
+            var content = new ReleaseLineageMarker
+            {
+                SourceCommit = sourceCommit,
+                PackageId = marker.PackageId,
+                BreakingRoots = marker.BreakingRoots.ToList(),
+                SharedInputs = marker.SharedInputs.ToList()
+            };
+            await WriteJsonAsync(markerPath, content, cancellationToken);
+        }
+
+        state = BuildState(plan.MarkerPackages, new Dictionary<string, string?>());
+        await WriteJsonAsync(
+            Path.Combine(repositoryRoot, PackagingConstants.LineageStateFileName),
+            state,
+            cancellationToken);
+
+        var generatedPaths = new[] { PackagingConstants.LineageStateFileName }
+            .Concat(markers.Select(marker => MarkerPath(graph.Project(marker.PackageId))))
+            .ToArray();
+        await processRunner.RequireAsync(
+            "git",
+            new[] { "add", "--" }.Concat(generatedPaths),
+            repositoryRoot,
+            cancellationToken);
+        if (markers.Length > 0) await CommitAsync(sourceCommit, amend: true, cancellationToken);
+
+        var markedCommit = await repository.ResolveCommitAsync("HEAD", cancellationToken);
+        var markedVersions = await repository.CalculateVersionsAsync(
+            graph.Projects,
+            markedCommit,
+            cancellationToken);
+        state = BuildState(plan.MarkerPackages, markedVersions);
+        await WriteJsonAsync(
+            Path.Combine(repositoryRoot, PackagingConstants.LineageStateFileName),
+            state,
+            cancellationToken);
+        await processRunner.RequireAsync(
+            "git",
+            ["add", "--", PackagingConstants.LineageStateFileName],
+            repositoryRoot,
+            cancellationToken);
+        await CommitAsync(sourceCommit, amend: true, cancellationToken);
+
+        var versionCommit = await repository.ResolveCommitAsync("HEAD", cancellationToken);
+        var finalVersions = await repository.CalculateVersionsAsync(
+            graph.Projects,
+            versionCommit,
+            cancellationToken);
+        RequireSameVersions(markedVersions, finalVersions, versionCommit);
+        await ValidateCommittedLineageAsync(repository, versionCommit, state, cancellationToken);
+        VerifyFreshClosureVersions(
+            plan.ClosurePackages,
+            previousVersions,
+            finalVersions);
+        await RequireCleanTrackedTreeAsync(cancellationToken);
+        return ToCompilation(state, versionCommit);
     }
 
     public static async Task SaveAsync(ReleaseLineage lineage, string path, CancellationToken cancellationToken) =>
@@ -183,6 +223,7 @@ internal sealed class ReleaseLineageCompiler(
         CancellationToken cancellationToken)
     {
         var state = await LoadCommittedStateAsync(repository, versionCommit, cancellationToken);
+        await ValidateCommittedLineageAsync(repository, versionCommit, state, cancellationToken);
         return ToCompilation(state, versionCommit);
     }
 
@@ -194,10 +235,13 @@ internal sealed class ReleaseLineageCompiler(
             Same(supplied.SourceCommit, committed.SourceCommit) &&
             Same(supplied.PreviousVersionCommit, committed.PreviousVersionCommit) &&
             Same(supplied.VersionCommit, committed.VersionCommit) &&
+            supplied.IsBootstrap == committed.IsBootstrap &&
             supplied.BreakingRoots.SequenceEqual(committed.BreakingRoots, StringComparer.OrdinalIgnoreCase) &&
+            supplied.SharedInputs.SequenceEqual(committed.SharedInputs, StringComparer.OrdinalIgnoreCase) &&
             supplied.ClosurePackages.SequenceEqual(committed.ClosurePackages, StringComparer.OrdinalIgnoreCase) &&
             supplied.MarkerPackages.SequenceEqual(committed.MarkerPackages, StringComparer.OrdinalIgnoreCase) &&
-            TriggersEqual(supplied.Triggers, committed.Triggers);
+            TriggersEqual(supplied.Triggers, committed.Triggers) &&
+            PackagesEqual(supplied.Packages, committed.Packages);
         if (matches) return;
         throw new InvalidOperationException(
             $"Release lineage artifact does not match committed state at {committed.VersionCommit}. Recreate it from that version commit.");
@@ -223,20 +267,27 @@ internal sealed class ReleaseLineageCompiler(
     internal static ReleaseLineagePlan Plan(
         PackageGraph graph,
         IEnumerable<string> breakingRoots,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> sharedInputsByPackage,
+        bool isBootstrap,
         IReadOnlyDictionary<string, string?> previousVersions,
         IReadOnlyDictionary<string, string?> currentVersions)
     {
-        var triggers = PlanTriggers(graph, breakingRoots);
+        var triggers = PlanTriggers(graph, breakingRoots, sharedInputsByPackage, isBootstrap);
         var closure = triggers.Select(trigger => trigger.PackageId).ToArray();
         var markers = closure.Where(packageId =>
         {
+            if (isBootstrap) return true;
             if (!currentVersions.TryGetValue(packageId, out var current) || current is null)
             {
                 throw new InvalidOperationException($"No current version was calculated for closure member '{packageId}'.");
             }
-            return previousVersions.TryGetValue(packageId, out var previous) &&
-                   previous is not null &&
-                   string.Equals(previous, current, StringComparison.OrdinalIgnoreCase);
+            if (!previousVersions.TryGetValue(packageId, out var previous)) return false;
+            if (previous is null)
+            {
+                throw new InvalidOperationException(
+                    $"Prior lineage has no durable version identity for existing closure member '{packageId}'.");
+            }
+            return string.Equals(previous, current, StringComparison.OrdinalIgnoreCase);
         }).ToArray();
         return new ReleaseLineagePlan(closure, markers, triggers);
     }
@@ -293,7 +344,9 @@ internal sealed class ReleaseLineageCompiler(
 
     private static IReadOnlyList<ReleaseLineageTrigger> PlanTriggers(
         PackageGraph graph,
-        IEnumerable<string> breakingRoots)
+        IEnumerable<string> breakingRoots,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> sharedInputsByPackage,
+        bool isBootstrap)
     {
         var triggers = new Dictionary<string, SortedSet<string>>(StringComparer.OrdinalIgnoreCase);
         foreach (var root in breakingRoots.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))
@@ -309,8 +362,23 @@ internal sealed class ReleaseLineageCompiler(
             }
         }
 
+        if (isBootstrap || sharedInputsByPackage.Count > 0)
+        {
+            foreach (var project in graph.Projects)
+            {
+                if ((isBootstrap || sharedInputsByPackage.ContainsKey(project.PackageId)) &&
+                    !triggers.ContainsKey(project.PackageId))
+                {
+                    triggers[project.PackageId] = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+                }
+            }
+        }
+
         return graph.TopologicalOrder(triggers.Keys)
-            .Select(packageId => new ReleaseLineageTrigger(packageId, triggers[packageId].ToArray()))
+            .Select(packageId => new ReleaseLineageTrigger(
+                packageId,
+                triggers[packageId].ToArray(),
+                sharedInputsByPackage.TryGetValue(packageId, out var inputs) ? inputs : []))
             .ToArray();
     }
 
@@ -333,61 +401,37 @@ internal sealed class ReleaseLineageCompiler(
         return roots;
     }
 
-    private async Task VerifyFreshClosureVersionsAsync(
-        PackageGraph graph,
+    private static void VerifyFreshClosureVersions(
         IEnumerable<string> closurePackages,
-        string previousVersionCommit,
-        string versionCommit,
-        CancellationToken cancellationToken)
+        IReadOnlyDictionary<string, string?> previousVersions,
+        IReadOnlyDictionary<string, string?> currentVersions)
     {
-        var projects = closurePackages.Select(graph.Project).ToArray();
-        var previousVersions = await CalculateVersionsAsync(
-            projects,
-            previousVersionCommit,
-            requireAll: false,
-            cancellationToken);
-        var currentVersions = await CalculateVersionsAsync(
-            projects,
-            versionCommit,
-            requireAll: true,
-            cancellationToken);
         foreach (var packageId in closurePackages)
         {
             previousVersions.TryGetValue(packageId, out var previous);
-            var current = currentVersions[packageId];
+            var current = currentVersions[packageId]
+                ?? throw new InvalidOperationException($"Closure member {packageId} has no final version identity.");
             if (previous is not null && string.Equals(previous, current, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
-                    $"Breaking closure member {packageId} retained published identity {current}; lineage compilation is incomplete.");
+                    $"Lineage closure member {packageId} retained prior identity {current}; compilation is incomplete.");
             }
         }
     }
 
-    private async Task<Dictionary<string, string?>> CalculateVersionsAsync(
-        IReadOnlyCollection<PackageProject> projects,
-        string commit,
-        bool requireAll,
-        CancellationToken cancellationToken)
+    private static void RequireSameVersions(
+        IReadOnlyDictionary<string, string?> expected,
+        IReadOnlyDictionary<string, string?> actual,
+        string versionCommit)
     {
-        var versions = new ConcurrentDictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        await Parallel.ForEachAsync(
-            projects,
-            new ParallelOptions
-            {
-                MaxDegreeOfParallelism = PackagingConstants.EvaluationParallelism,
-                CancellationToken = cancellationToken
-            },
-            async (project, ct) =>
-            {
-                var version = await repository.TryGetVersionAsync(project, commit, ct);
-                if (requireAll && version is null)
-                {
-                    throw new InvalidOperationException(
-                        $"Unable to calculate {project.PackageId} at lineage commit {commit}.");
-                }
-                versions[project.PackageId] = version;
-            });
-        return new Dictionary<string, string?>(versions, StringComparer.OrdinalIgnoreCase);
+        foreach (var packageId in expected.Keys.Union(actual.Keys, StringComparer.OrdinalIgnoreCase))
+        {
+            expected.TryGetValue(packageId, out var before);
+            actual.TryGetValue(packageId, out var after);
+            if (before is not null && string.Equals(before, after, StringComparison.OrdinalIgnoreCase)) continue;
+            throw new InvalidOperationException(
+                $"Final lineage state changed {packageId}'s calculated identity while amending {versionCommit}: {before} -> {after}.");
+        }
     }
 
     private async Task<ReleaseLineageState> LoadStateAsync(string commit, CancellationToken cancellationToken)
@@ -411,6 +455,156 @@ internal sealed class ReleaseLineageCompiler(
                 $"Lineage state at {commit} uses schema {state.SchemaVersion}; expected {PackagingConstants.ReleaseLineageSchema}.");
         }
         return state;
+    }
+
+    private static async Task ValidateCommittedLineageAsync(
+        RepositoryInspector repository,
+        string versionCommit,
+        ReleaseLineageState state,
+        CancellationToken cancellationToken)
+    {
+        var resolvedVersion = await repository.ResolveCommitAsync(versionCommit, cancellationToken);
+        var resolvedPrevious = await repository.ResolveCommitAsync(state.PreviousVersionCommit, cancellationToken);
+        var resolvedSource = await repository.ResolveCommitAsync(state.SourceCommit, cancellationToken);
+        var parents = await repository.GetParentCommitsAsync(resolvedVersion, cancellationToken);
+        if (parents.Count != 1 || !Same(parents[0], resolvedPrevious))
+        {
+            throw new InvalidOperationException(
+                $"Lineage commit {resolvedVersion} must have exactly one parent, {resolvedPrevious}; " +
+                $"found {(parents.Count == 0 ? "none" : string.Join(", ", parents))}.");
+        }
+
+        var resolvedPreviousSource = await repository.ResolveCommitAsync(state.PreviousSourceCommit, cancellationToken);
+        if (state.IsBootstrap)
+        {
+            if (!Same(resolvedPreviousSource, resolvedPrevious))
+            {
+                throw new InvalidOperationException(
+                    $"Bootstrap lineage {resolvedVersion} must start from its previous source commit {resolvedPreviousSource}; " +
+                    $"its parent is {resolvedPrevious}.");
+            }
+        }
+        else
+        {
+            var previousState = await LoadCommittedStateAsync(repository, resolvedPrevious, cancellationToken);
+            if (!Same(previousState.SourceCommit, resolvedPreviousSource))
+            {
+                throw new InvalidOperationException(
+                    $"Lineage source continuity is broken at {resolvedVersion}: previous state records " +
+                    $"{previousState.SourceCommit}, current state records {resolvedPreviousSource}.");
+            }
+        }
+
+        ValidateStateShape(state);
+        var sourceTree = await repository.ReadTreeAsync(resolvedSource, cancellationToken);
+        ValidateReservedSourcePaths(sourceTree.Keys);
+        var versionTree = await repository.ReadTreeAsync(resolvedVersion, cancellationToken);
+        var sourceProjection = sourceTree
+            .Where(entry => !IsGeneratedLineagePath(entry.Key))
+            .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
+        var versionProjection = versionTree
+            .Where(entry => !IsGeneratedLineagePath(entry.Key))
+            .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
+        var mismatch = FirstTreeMismatch(sourceProjection, versionProjection);
+        if (mismatch is not null)
+        {
+            throw new InvalidOperationException(
+                $"Lineage commit {resolvedVersion} is not an exact projection of source {resolvedSource}; " +
+                $"non-generated path '{mismatch}' differs.");
+        }
+
+        var packages = state.Packages.ToDictionary(package => package.PackageId, StringComparer.OrdinalIgnoreCase);
+        var expectedMarkers = state.MarkerPackages.ToDictionary(
+            packageId => MarkerPath(packages[packageId]),
+            packageId => packageId,
+            StringComparer.OrdinalIgnoreCase);
+        var actualMarkers = versionTree.Keys
+            .Where(IsLineageMarkerPath)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var missing = expectedMarkers.Keys.Where(path => !actualMarkers.Contains(path)).ToArray();
+        if (missing.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"Lineage commit {resolvedVersion} is missing generated marker(s): {string.Join(", ", missing)}.");
+        }
+
+        var parentTree = await repository.ReadTreeAsync(resolvedPrevious, cancellationToken);
+        var triggerByPackage = state.Triggers.ToDictionary(trigger => trigger.PackageId, StringComparer.OrdinalIgnoreCase);
+        foreach (var markerPath in actualMarkers)
+        {
+            if (!expectedMarkers.TryGetValue(markerPath, out var packageId))
+            {
+                if (parentTree.TryGetValue(markerPath, out var previousEntry) &&
+                    string.Equals(previousEntry, versionTree[markerPath], StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                throw new InvalidOperationException(
+                    $"Lineage commit {resolvedVersion} contains an unrecorded new or changed marker '{markerPath}'.");
+            }
+
+            var content = await repository.TryReadFileAsync(resolvedVersion, markerPath, cancellationToken)
+                ?? throw new InvalidOperationException($"Unable to read generated lineage marker '{markerPath}'.");
+            var marker = JsonSerializer.Deserialize<ReleaseLineageMarker>(content, JsonOptions)
+                ?? throw new InvalidOperationException($"Generated lineage marker '{markerPath}' is empty.");
+            var trigger = triggerByPackage[packageId];
+            if (marker.SchemaVersion != PackagingConstants.ReleaseLineageSchema ||
+                !Same(marker.SourceCommit, state.SourceCommit) ||
+                !Same(marker.PackageId, packageId) ||
+                !marker.BreakingRoots.SequenceEqual(trigger.BreakingRoots, StringComparer.OrdinalIgnoreCase) ||
+                !marker.SharedInputs.SequenceEqual(trigger.SharedInputs, StringComparer.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"Generated lineage marker '{markerPath}' does not match committed lineage state.");
+            }
+        }
+    }
+
+    private static void ValidateStateShape(ReleaseLineageState state)
+    {
+        if (state.Packages.Any(package => string.IsNullOrWhiteSpace(package.Version)) ||
+            state.Packages.Select(package => package.PackageId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != state.Packages.Count)
+        {
+            throw new InvalidOperationException(
+                "Committed package lineage state must record one durable version identity for every package owner.");
+        }
+        var packageIds = state.Packages.Select(package => package.PackageId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var triggerIds = state.Triggers.Select(trigger => trigger.PackageId).ToArray();
+        if (!state.ClosurePackages.SequenceEqual(triggerIds, StringComparer.OrdinalIgnoreCase) ||
+            state.MarkerPackages.Except(triggerIds, StringComparer.OrdinalIgnoreCase).Any() ||
+            triggerIds.Except(packageIds, StringComparer.OrdinalIgnoreCase).Any() ||
+            state.BreakingRoots.Except(triggerIds, StringComparer.OrdinalIgnoreCase).Any() ||
+            state.Triggers.SelectMany(trigger => trigger.BreakingRoots)
+                .Except(state.BreakingRoots, StringComparer.OrdinalIgnoreCase).Any())
+        {
+            throw new InvalidOperationException("Committed package lineage state has an inconsistent closure or trigger set.");
+        }
+        if (state.IsBootstrap && !packageIds.SetEquals(triggerIds))
+        {
+            throw new InvalidOperationException("Bootstrap package lineage must include every package owner.");
+        }
+        var recordedInputs = state.Triggers.SelectMany(trigger => trigger.SharedInputs)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!recordedInputs.SetEquals(state.SharedInputs))
+        {
+            throw new InvalidOperationException("Committed package lineage state has an inconsistent shared-input set.");
+        }
+    }
+
+    private static string? FirstTreeMismatch(
+        IReadOnlyDictionary<string, string> expected,
+        IReadOnlyDictionary<string, string> actual)
+    {
+        foreach (var path in expected.Keys.Union(actual.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal))
+        {
+            if (!expected.TryGetValue(path, out var expectedEntry) ||
+                !actual.TryGetValue(path, out var actualEntry) ||
+                !string.Equals(expectedEntry, actualEntry, StringComparison.Ordinal))
+            {
+                return path;
+            }
+        }
+        return null;
     }
 
     private async Task<string?> TryReadVersionIntentAsync(
@@ -443,6 +637,40 @@ internal sealed class ReleaseLineageCompiler(
             repositoryRoot,
             cancellationToken);
         return output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    private async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> FindChangedSharedInputsAsync(
+        PackageGraph graph,
+        string previousSourceCommit,
+        string sourceCommit,
+        CancellationToken cancellationToken)
+    {
+        return MapChangedSharedInputs(
+            graph,
+            await repository.GetChangedPathsAsync(previousSourceCommit, sourceCommit, cancellationToken));
+    }
+
+    internal static IReadOnlyDictionary<string, IReadOnlyList<string>> MapChangedSharedInputs(
+        PackageGraph graph,
+        IEnumerable<string> changedPaths)
+    {
+        var changed = changedPaths.Select(Normalize).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return graph.Projects
+            .Select(project => new
+            {
+                project.PackageId,
+                Inputs = project.SharedInputs
+                    .Select(Normalize)
+                    .Where(changed.Contains)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Order(StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+            })
+            .Where(item => item.Inputs.Length > 0)
+            .ToDictionary(
+                item => item.PackageId,
+                item => (IReadOnlyList<string>)item.Inputs,
+                StringComparer.OrdinalIgnoreCase);
     }
 
     private async Task RejectUnsupportedPackageMovesAsync(
@@ -510,6 +738,8 @@ internal sealed class ReleaseLineageCompiler(
         string sourceCommit,
         CancellationToken cancellationToken)
     {
+        if (Same(previousSourceCommit, sourceCommit)) return;
+
         var patchPath = Path.Combine(Path.GetTempPath(), $"koan-package-lineage-{Guid.NewGuid():N}.patch");
         try
         {
@@ -572,10 +802,13 @@ internal sealed class ReleaseLineageCompiler(
         SourceCommit = state.SourceCommit,
         PreviousVersionCommit = state.PreviousVersionCommit,
         VersionCommit = versionCommit,
+        IsBootstrap = state.IsBootstrap,
         BreakingRoots = state.BreakingRoots.ToList(),
+        SharedInputs = state.SharedInputs.ToList(),
         ClosurePackages = state.ClosurePackages.ToList(),
         MarkerPackages = state.MarkerPackages.ToList(),
-        Triggers = state.Triggers.ToList()
+        Triggers = state.Triggers.ToList(),
+        Packages = state.Packages.ToList()
     };
 
     private static async Task WriteJsonAsync(string path, object value, CancellationToken cancellationToken)
@@ -589,16 +822,30 @@ internal sealed class ReleaseLineageCompiler(
 
     private static Version ParseVersionIntent(string value)
     {
-        var numeric = value.Split(['-', '+'], 2)[0];
-        if (!Version.TryParse(numeric, out var version) || version.Minor < 0)
+        var parts = value.Split('.');
+        if (parts.Length != 2 ||
+            parts.Any(part => part.Length == 0 || !part.All(char.IsAsciiDigit)) ||
+            !int.TryParse(parts[0], out var major) ||
+            !int.TryParse(parts[1], out var minor))
         {
-            throw new InvalidOperationException($"Package version intent '{value}' is not a semantic major.minor value.");
+            throw new InvalidOperationException(
+                $"Package version intent '{value}' must be exactly unsigned major.minor (for example, 0.18 or 1.0).");
         }
-        return version;
+        return new Version(major, minor);
     }
 
     private static string MarkerPath(PackageProject project) =>
         Normalize(Path.Combine(Path.GetDirectoryName(project.ProjectPath) ?? string.Empty, PackagingConstants.LineageMarkerFileName));
+
+    private static string MarkerPath(ReleaseLineagePackage package) =>
+        Normalize(Path.Combine(Path.GetDirectoryName(package.ProjectPath) ?? string.Empty, PackagingConstants.LineageMarkerFileName));
+
+    private static bool IsGeneratedLineagePath(string path) =>
+        string.Equals(Normalize(path), PackagingConstants.LineageStateFileName, StringComparison.OrdinalIgnoreCase) ||
+        IsLineageMarkerPath(path);
+
+    private static bool IsLineageMarkerPath(string path) =>
+        string.Equals(Path.GetFileName(Normalize(path)), PackagingConstants.LineageMarkerFileName, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsPackageOwnershipPath(string path)
     {
@@ -621,7 +868,16 @@ internal sealed class ReleaseLineageCompiler(
         IReadOnlyList<ReleaseLineageTrigger> right) =>
         left.Count == right.Count && left.Zip(right).All(pair =>
             Same(pair.First.PackageId, pair.Second.PackageId) &&
-            pair.First.BreakingRoots.SequenceEqual(pair.Second.BreakingRoots, StringComparer.OrdinalIgnoreCase));
+            pair.First.BreakingRoots.SequenceEqual(pair.Second.BreakingRoots, StringComparer.OrdinalIgnoreCase) &&
+            pair.First.SharedInputs.SequenceEqual(pair.Second.SharedInputs, StringComparer.OrdinalIgnoreCase));
+
+    private static bool PackagesEqual(
+        IReadOnlyList<ReleaseLineagePackage> left,
+        IReadOnlyList<ReleaseLineagePackage> right) =>
+        left.Count == right.Count && left.Zip(right).All(pair =>
+            Same(pair.First.PackageId, pair.Second.PackageId) &&
+            Same(pair.First.ProjectPath, pair.Second.ProjectPath) &&
+            string.Equals(pair.First.Version, pair.Second.Version, StringComparison.OrdinalIgnoreCase));
 
     internal sealed record ReleaseLineagePlan(
         IReadOnlyList<string> ClosurePackages,

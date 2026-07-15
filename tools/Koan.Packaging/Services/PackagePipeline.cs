@@ -24,6 +24,7 @@ internal sealed class PackagePipeline(
         CancellationToken cancellationToken)
     {
         await RequireVersionCommitCheckoutAsync(manifest.VersionCommit, cancellationToken);
+        await RequireCleanPackageInputsAsync(cancellationToken);
         Directory.CreateDirectory(outputDirectory);
         if (!resume)
         {
@@ -78,6 +79,7 @@ internal sealed class PackagePipeline(
 
         await VerifyClosureAsync(manifest, cancellationToken);
         if (cleanRoom) await VerifyCleanRoomAsync(manifest, outputDirectory, cancellationToken);
+        await RequireCleanPackageInputsAsync(cancellationToken);
     }
 
     public async Task PublishAsync(
@@ -209,12 +211,26 @@ internal sealed class PackagePipeline(
             $"{packageId} is missing required transitive build asset '{PackagingConstants.CoreCompositionTargetPackagePath}'.");
     }
 
-    private async Task VerifyClosureAsync(ReleaseManifest manifest, CancellationToken cancellationToken)
+    internal async Task VerifyClosureAsync(ReleaseManifest manifest, CancellationToken cancellationToken)
     {
         var selected = manifest.Packages.ToDictionary(package => package.PackageId, StringComparer.OrdinalIgnoreCase);
         foreach (var package in manifest.Packages)
         {
-            foreach (var dependency in package.PackageDependencies.Where(IsKoanPackage))
+            var expectedDependencies = package.ProjectDependencies.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var packageDependencies = package.PackageDependencies.Where(IsKoanPackage).ToArray();
+            var actualDependencies = packageDependencies
+                .Select(dependency => dependency.PackageId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (!expectedDependencies.SetEquals(actualDependencies))
+            {
+                var missing = expectedDependencies.Except(actualDependencies, StringComparer.OrdinalIgnoreCase);
+                var unexpected = actualDependencies.Except(expectedDependencies, StringComparer.OrdinalIgnoreCase);
+                throw new InvalidOperationException(
+                    $"{package.Identity} internal dependency closure differs from its evaluated project graph; " +
+                    $"missing=[{string.Join(", ", missing)}], unexpected=[{string.Join(", ", unexpected)}].");
+            }
+
+            foreach (var dependency in packageDependencies)
             {
                 if (!IsExpectedCompatibilityBand(dependency.VersionRange))
                 {
@@ -224,9 +240,14 @@ internal sealed class PackagePipeline(
                 }
                 var minimum = dependency.MinimumVersion
                     ?? throw new InvalidOperationException($"{package.Identity} has an unbounded internal dependency on {dependency.PackageId}.");
-                if (selected.TryGetValue(dependency.PackageId, out var selectedDependency) &&
-                    string.Equals(selectedDependency.Version, minimum, StringComparison.OrdinalIgnoreCase))
+                if (selected.TryGetValue(dependency.PackageId, out var selectedDependency))
                 {
+                    if (!string.Equals(selectedDependency.Version, minimum, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException(
+                            $"{package.Identity} requires selected dependency {dependency.PackageId}/{minimum}, " +
+                            $"but this release set contains {selectedDependency.Identity}.");
+                    }
                     continue;
                 }
                 if (!await registry.ExistsAsync(dependency.PackageId, minimum, cancellationToken))
@@ -404,6 +425,28 @@ internal sealed class PackagePipeline(
         if (string.Equals(head, versionCommit, StringComparison.OrdinalIgnoreCase)) return;
         throw new InvalidOperationException(
             $"Package verification requires version commit {versionCommit}, but the checkout is {head}.");
+    }
+
+    private async Task RequireCleanPackageInputsAsync(CancellationToken cancellationToken)
+    {
+        string[] packageInputs =
+        [
+            "src", "packaging", "templates", "build",
+            "Directory.Build.props", "Directory.Build.targets",
+            "Directory.Packages.props", "Directory.Packages.targets",
+            "global.json", ".editorconfig", ".config/dotnet-tools.json",
+            "NuGet.Config", "README.md", "icon.png", "resources/image/0_2.jpg"
+        ];
+        var status = await processRunner.RequireAsync(
+            "git",
+            new[] { "status", "--porcelain", "--untracked-files=all", "--" }.Concat(packageInputs),
+            repositoryRoot,
+            cancellationToken);
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            throw new InvalidOperationException(
+                $"Package inputs differ from the exact version commit:{Environment.NewLine}{status}");
+        }
     }
 
     private async Task WaitUntilAvailableAsync(string packageId, string version, CancellationToken cancellationToken)

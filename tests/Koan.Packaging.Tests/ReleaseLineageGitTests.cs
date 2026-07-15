@@ -16,13 +16,27 @@ public sealed class ReleaseLineageGitTests
         var repository = new RepositoryInspector(fixture.Root, process);
         var compiler = new ReleaseLineageCompiler(fixture.Root, process, repository);
 
+        var bootstrap = await compiler.CompileAsync(
+            fixture.BaseCommit,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            previousLineageRevision: null,
+            CancellationToken.None);
+        Assert.True(bootstrap.IsBootstrap);
+        Assert.Equal(
+            [LineageRepository.CoreId, LineageRepository.DataId, LineageRepository.AppId, LineageRepository.UnrelatedId],
+            bootstrap.ClosurePackages);
+        Assert.Equal(bootstrap.ClosurePackages, bootstrap.MarkerPackages);
+        Assert.Equal(fixture.BaseCommit, await fixture.ParentAsync(bootstrap.VersionCommit));
+
+        await fixture.SwitchAsync("dev");
         fixture.WriteVersion(LineageRepository.CoreId, "0.18");
         var breakingSource = await fixture.CommitAsync("break core compatibility tier");
         var first = await compiler.CompileAsync(
             breakingSource,
             fixture.BaseCommit,
             "automation/package-lineage-dev",
-            previousLineageRevision: null,
+            bootstrap.VersionCommit,
             CancellationToken.None);
 
         Assert.Equal(
@@ -32,20 +46,25 @@ public sealed class ReleaseLineageGitTests
         Assert.Empty(first.BreakingRoots.Except([LineageRepository.CoreId], StringComparer.OrdinalIgnoreCase));
         Assert.True(File.Exists(fixture.MarkerPath(LineageRepository.DataId)));
         Assert.True(File.Exists(fixture.MarkerPath(LineageRepository.AppId)));
-        Assert.False(File.Exists(fixture.MarkerPath(LineageRepository.CoreId)));
-        Assert.False(File.Exists(fixture.MarkerPath(LineageRepository.UnrelatedId)));
+        Assert.True(File.Exists(fixture.MarkerPath(LineageRepository.CoreId)));
+        Assert.True(File.Exists(fixture.MarkerPath(LineageRepository.UnrelatedId)));
+        Assert.Equal(bootstrap.VersionCommit, await fixture.ParentAsync(first.VersionCommit));
+        Assert.All(
+            await fixture.DiffPathsAsync(first.SourceCommit, first.VersionCommit),
+            path => Assert.True(
+                string.Equals(path, PackagingConstants.LineageStateFileName, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(Path.GetFileName(path), PackagingConstants.LineageMarkerFileName, StringComparison.OrdinalIgnoreCase),
+                $"Unexpected lineage projection path: {path}"));
 
-        var firstProjects = (await repository.DiscoverPackagesAsync(CancellationToken.None))
-            .ToDictionary(project => project.PackageId, StringComparer.OrdinalIgnoreCase);
+        var bootstrapVersions = Versions(bootstrap);
+        var firstVersions = Versions(first);
         foreach (var packageId in first.ClosurePackages)
         {
-            var previous = await repository.TryGetVersionAsync(firstProjects[packageId], fixture.BaseCommit, CancellationToken.None);
-            var current = await repository.TryGetVersionAsync(firstProjects[packageId], first.VersionCommit, CancellationToken.None);
-            Assert.NotEqual(previous, current);
+            Assert.NotEqual(bootstrapVersions[packageId], firstVersions[packageId]);
         }
         Assert.Equal(
-            await repository.TryGetVersionAsync(firstProjects[LineageRepository.UnrelatedId], fixture.BaseCommit, CancellationToken.None),
-            await repository.TryGetVersionAsync(firstProjects[LineageRepository.UnrelatedId], first.VersionCommit, CancellationToken.None));
+            bootstrapVersions[LineageRepository.UnrelatedId],
+            firstVersions[LineageRepository.UnrelatedId]);
 
         using var http = new HttpClient();
         var planner = new ReleasePlanner(repository, new NuGetRegistry(http));
@@ -88,50 +107,151 @@ public sealed class ReleaseLineageGitTests
         Assert.Empty(second.BreakingRoots);
         Assert.Empty(second.ClosurePackages);
         Assert.Empty(second.MarkerPackages);
-        var secondProjects = (await repository.DiscoverPackagesAsync(CancellationToken.None))
-            .ToDictionary(project => project.PackageId, StringComparer.OrdinalIgnoreCase);
+        firstVersions = Versions(first);
+        var secondVersions = Versions(second);
         foreach (var packageId in first.ClosurePackages)
         {
-            var previous = await repository.TryGetVersionAsync(
-                secondProjects[packageId],
-                first.VersionCommit,
-                CancellationToken.None);
-            var current = await repository.TryGetVersionAsync(
-                secondProjects[packageId],
-                second.VersionCommit,
-                CancellationToken.None);
+            var previous = firstVersions[packageId];
+            var current = secondVersions[packageId];
             Assert.True(
                 string.Equals(previous, current, StringComparison.OrdinalIgnoreCase),
                 $"Ordinary leaf patch advanced unrelated closure package {packageId}: {previous} -> {current}.");
         }
         Assert.NotEqual(
-            await repository.TryGetVersionAsync(secondProjects[LineageRepository.UnrelatedId], first.VersionCommit, CancellationToken.None),
-            await repository.TryGetVersionAsync(secondProjects[LineageRepository.UnrelatedId], second.VersionCommit, CancellationToken.None));
+            firstVersions[LineageRepository.UnrelatedId],
+            secondVersions[LineageRepository.UnrelatedId]);
+
+        await fixture.SwitchAsync("dev");
+        fixture.TouchRootBuild("shared package policy");
+        var sharedSource = await fixture.CommitAsync("change shared package policy");
+        var shared = await compiler.CompileAsync(
+            sharedSource,
+            leafSource,
+            "automation/package-lineage-dev",
+            second.VersionCommit,
+            CancellationToken.None);
+        Assert.Equal(
+            [LineageRepository.CoreId, LineageRepository.DataId, LineageRepository.AppId, LineageRepository.UnrelatedId],
+            shared.ClosurePackages);
+        Assert.Equal(["Directory.Build.props"], shared.SharedInputs);
+        Assert.Equal(shared.ClosurePackages, shared.MarkerPackages);
 
         await fixture.SwitchAsync("dev");
         fixture.WriteVersion(LineageRepository.CoreId, "0.19");
         var secondBreakingSource = await fixture.CommitAsync("break core compatibility tier again");
         var third = await compiler.CompileAsync(
             secondBreakingSource,
-            leafSource,
+            sharedSource,
             "automation/package-lineage-dev",
-            second.VersionCommit,
+            shared.VersionCommit,
             CancellationToken.None);
 
         Assert.Equal(first.ClosurePackages, third.ClosurePackages);
         Assert.Equal([LineageRepository.DataId, LineageRepository.AppId], third.MarkerPackages);
-        var thirdProjects = (await repository.DiscoverPackagesAsync(CancellationToken.None))
-            .ToDictionary(project => project.PackageId, StringComparer.OrdinalIgnoreCase);
+        var sharedVersions = Versions(shared);
+        var thirdVersions = Versions(third);
         foreach (var packageId in third.ClosurePackages)
         {
-            Assert.NotEqual(
-                await repository.TryGetVersionAsync(thirdProjects[packageId], second.VersionCommit, CancellationToken.None),
-                await repository.TryGetVersionAsync(thirdProjects[packageId], third.VersionCommit, CancellationToken.None));
+            Assert.NotEqual(sharedVersions[packageId], thirdVersions[packageId]);
         }
         Assert.Equal(
-            await repository.TryGetVersionAsync(thirdProjects[LineageRepository.UnrelatedId], second.VersionCommit, CancellationToken.None),
-            await repository.TryGetVersionAsync(thirdProjects[LineageRepository.UnrelatedId], third.VersionCommit, CancellationToken.None));
+            sharedVersions[LineageRepository.UnrelatedId],
+            thirdVersions[LineageRepository.UnrelatedId]);
     }
+
+    [Fact]
+    public async Task ManualLineageCommitIsRejectedBeforeProjection()
+    {
+        await using var fixture = await LineageRepository.CreateAsync();
+        var process = new ProcessRunner();
+        var repository = new RepositoryInspector(fixture.Root, process);
+        var compiler = new ReleaseLineageCompiler(fixture.Root, process, repository);
+        var bootstrap = await compiler.CompileAsync(
+            fixture.BaseCommit,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            previousLineageRevision: null,
+            CancellationToken.None);
+
+        fixture.Touch(LineageRepository.UnrelatedId, "manual lineage contamination");
+        var contaminated = await fixture.CommitAsync("manual lineage contamination");
+        await fixture.SwitchAsync("dev");
+        fixture.Touch(LineageRepository.CoreId, "next source event");
+        var source = await fixture.CommitAsync("next source event");
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            compiler.CompileAsync(
+                source,
+                fixture.BaseCommit,
+                "automation/package-lineage-dev",
+                contaminated,
+                CancellationToken.None));
+
+        Assert.Contains("exactly one parent", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(bootstrap.VersionCommit, error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BootstrapAnchorsWithoutRecalculatingHistoricalIdentities()
+    {
+        await using var fixture = await LineageRepository.CreateAsync(malformedCoreVersion: true);
+        var process = new ProcessRunner();
+        var compiler = new ReleaseLineageCompiler(
+            fixture.Root,
+            process,
+            new RepositoryInspector(fixture.Root, process));
+        fixture.WriteVersion(LineageRepository.CoreId, "0.18");
+        var source = await fixture.CommitAsync("repair malformed package version");
+
+        var lineage = await compiler.CompileAsync(
+            source,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            previousLineageRevision: null,
+            CancellationToken.None);
+
+        Assert.True(lineage.IsBootstrap);
+        Assert.Equal(lineage.Packages.Count, lineage.ClosurePackages.Count);
+        Assert.All(lineage.Packages, package => Assert.False(string.IsNullOrWhiteSpace(package.Version)));
+    }
+
+    [Fact]
+    public async Task GenuinelyNewPackageMayHaveNoPreviousIdentity()
+    {
+        const string newPackageId = "Sylin.Koan.Test.New";
+        await using var fixture = await LineageRepository.CreateAsync();
+        var process = new ProcessRunner();
+        var repository = new RepositoryInspector(fixture.Root, process);
+        var compiler = new ReleaseLineageCompiler(fixture.Root, process, repository);
+        var bootstrap = await compiler.CompileAsync(
+            fixture.BaseCommit,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            previousLineageRevision: null,
+            CancellationToken.None);
+
+        await fixture.SwitchAsync("dev");
+        fixture.AddProject("New", newPackageId);
+        var source = await fixture.CommitAsync("add package owner");
+        var lineage = await compiler.CompileAsync(
+            source,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            bootstrap.VersionCommit,
+            CancellationToken.None);
+        var manifest = await new ReleasePlanner(repository, new NuGetRegistry(new HttpClient()))
+            .CreateAsync(lineage, offline: true, CancellationToken.None);
+
+        var package = Assert.Single(manifest.Packages, item => item.PackageId == newPackageId);
+        Assert.Null(package.PreviousVersion);
+        Assert.Empty(lineage.ClosurePackages);
+    }
+
+    private static IReadOnlyDictionary<string, string?> Versions(ReleaseLineage lineage) =>
+        lineage.Packages.ToDictionary(
+            package => package.PackageId,
+            package => package.Version,
+            StringComparer.OrdinalIgnoreCase);
 
     private sealed class LineageRepository : IAsyncDisposable
     {
@@ -153,7 +273,7 @@ public sealed class ReleaseLineageGitTests
         public string Root { get; }
         public string BaseCommit { get; }
 
-        public static async Task<LineageRepository> CreateAsync()
+        public static async Task<LineageRepository> CreateAsync(bool malformedCoreVersion = false)
         {
             var repositoryRoot = FindKoanRoot();
             var root = Path.Combine(repositoryRoot, "tmp", "package-lineage-tests", Guid.NewGuid().ToString("N"));
@@ -170,6 +290,12 @@ public sealed class ReleaseLineageGitTests
                 [UnrelatedId] = CreateProject(root, "Unrelated", UnrelatedId)
             };
             var fixture = new LineageRepository(root, directories, string.Empty);
+            if (malformedCoreVersion)
+            {
+                File.WriteAllText(
+                    Path.Combine(directories[CoreId], "version.json"),
+                    "{ \"version\": \"not-a-version\", \"pathFilters\": [\".\"] }" + Environment.NewLine);
+            }
             await fixture.GitAsync("init", "--initial-branch=dev");
             await fixture.GitAsync("config", "user.name", "Koan Packaging Tests");
             await fixture.GitAsync("config", "user.email", "packaging-tests@koan.invalid");
@@ -187,6 +313,12 @@ public sealed class ReleaseLineageGitTests
         public void Touch(string packageId, string value) =>
             File.AppendAllText(Path.Combine(directories[packageId], "Code.cs"), $"// {value}{Environment.NewLine}");
 
+        public void TouchRootBuild(string value) =>
+            File.AppendAllText(Path.Combine(Root, "Directory.Build.props"), $"<!-- {value} -->{Environment.NewLine}");
+
+        public void AddProject(string name, string packageId) =>
+            directories[packageId] = CreateProject(Root, name, packageId);
+
         public string MarkerPath(string packageId) =>
             Path.Combine(directories[packageId], PackagingConstants.LineageMarkerFileName);
 
@@ -198,6 +330,14 @@ public sealed class ReleaseLineageGitTests
         }
 
         public Task<string> SwitchAsync(string branch) => GitAsync("switch", branch);
+
+        public Task<string> ParentAsync(string commit) => GitAsync("rev-parse", $"{commit}^");
+
+        public async Task<IReadOnlyList<string>> DiffPathsAsync(string left, string right)
+        {
+            var output = await GitAsync("diff", "--name-only", left, right, "--");
+            return output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+        }
 
         public ValueTask DisposeAsync()
         {
