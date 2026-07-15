@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R05 fresh-agent repeat repairs 1 and 2 complete
+  scope: R05 fresh-agent repeat repairs 1 through 3 complete
 ---
 
 # Koan V1 reorganization current handoff
@@ -32,6 +32,9 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - The second promoted finding is repaired: runtime composition uses the executable assembly as the
   `app` identity and excludes it from `modules`; both supported journeys now require and report a
   matched lockfile fact.
+- The third promoted finding is repaired: current guidance names the real liveness/readiness routes,
+  rejected backend intent is proven to return readiness 503, and Jobs records one Error per failure
+  episode while pacing retries at its existing poll interval.
 - No public package was published and no branch was pushed by this work.
 
 ## What now exists
@@ -52,7 +55,7 @@ The source proof runs eleven observable steps across three isolated starts:
 7. durable assessment with Critical priority and completed 100% progress;
 8. honest non-executing custom-tool dry-run;
 9. agent recommendation observed through REST;
-10. unavailable default-adapter rejection with stable correction; and
+10. unavailable default-adapter rejection with stable correction and unhealthy readiness; and
 11. clean restart with restored SQLite election.
 
 FirstUse and GoldenJourney now share process lifecycle, isolated SQLite, MCP negotiation, bounded
@@ -115,6 +118,11 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
 - Fresh-repeat composition-truth repair: Core lockfile contracts pass 15/15; FirstUse and
   GoldenJourney each pass their exact live source contract with `CompositionLockfileMatched=true`;
   both Release builds remain warning-free.
+- Fresh-repeat readiness/operator repair: canonical `/health/live` and `/health/ready` guidance now
+  distinguishes dependency readiness from the legacy `/api/health` up-check. The rejected
+  GoldenJourney asserts readiness 503 plus `unhealthy`, observes the process for a bounded interval,
+  and rejects repeated Jobs iteration errors. Jobs and packaging warning-as-error builds pass; the
+  live GoldenJourney contract passes 2/2.
 
 ## Important discoveries
 
@@ -150,15 +158,18 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
   twin used friendly product identity while MSBuild correctly recorded executable assembly identity.
   Composition now uses the assembly for comparison and leaves the friendly name in startup/runtime
   facts, so changing operator-facing product copy cannot manufacture lockfile drift.
+- `/api/health` is an intentionally shallow compatibility up-check, not aggregate readiness. Public
+  docs had incorrectly extrapolated nonexistent `/api/health/live` and `/api/health/ready` routes
+  from it; the controller-owned canonical probes are `/health/live` and `/health/ready`.
 
 ## Next safe action
 
-Take the bounded readiness/operator slice next: correct public guidance to the canonical
-`/health/live` and `/health/ready` controller routes, prove rejected-default readiness through the
-actual readiness endpoint, and prevent the Jobs worker from flooding logs while its durable ledger is
-unavailable. Then address MCP discoverability and guide shape. Obtain the remaining human rehearsal
-only after this second repair queue is quiet. Do not begin the post-cycle todo register unless new
-evidence promotes an entry into a correctness, security, or release blocker.
+Take the bounded MCP discoverability slice next: remove supported-path schema warning noise, make
+accepted generic mutation controls such as `dry_run` discoverable on custom-tool input schemas, and
+reshape the public HTTP guidance around the canonical Streamable HTTP path without changing
+compatibility-sensitive result casing or legacy configuration names. Then obtain the remaining human
+rehearsal. Do not begin the post-cycle todo register unless new evidence promotes an entry into a
+correctness, security, or release blocker.
 
 ## Do not infer
 
@@ -172,7 +183,8 @@ evidence promotes an entry into a correctness, security, or release blocker.
 ## Repository state
 
 The coherent R04/R05 candidate is `d1dbbe35`; the first independent-rehearsal repair sequence ends at
-`ffc1ed27`, and its closure record is `47ce8915`. Commit `f66bc8f5` repairs the fresh-repeat filtered
-query; this commit repairs composition truth. Only evaluator reports remain untracked under `tmp/`.
+`ffc1ed27`, and its closure record is `47ce8915`. Commits `f66bc8f5` and `88e3be69` repair the
+fresh-repeat filter and composition truth; this change repairs readiness/operator behavior. Only
+evaluator reports remain untracked under `tmp/`.
 Do not stage those reports, or publish, push, tag, or release the candidate without a separate
 operator request.

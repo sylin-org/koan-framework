@@ -52,7 +52,8 @@ This playbook mirrors the canonical [Web Pillar Reference](../reference/web/inde
 
 - Install `Koan.Web` alongside your data adapters.
 - Call `AddKoan()` in `Program.cs`; health endpoints light up automatically.
-- Verify `/api/health`, `/api/health/live`, and `/api/health/ready` before layering features.
+- Verify `/health/live` and `/health/ready` before layering features. `/api/health` is only a
+  lightweight compatibility up-check and does not report dependency readiness.
 
 🔎 Reference: [Quick start](../reference/web/index.md#quick-start-two-file-api)
 

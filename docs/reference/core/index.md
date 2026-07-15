@@ -84,9 +84,10 @@ Built-in health endpoints with custom contributors.
 
 ### Endpoints
 
-- `GET /api/health` - Overall health
-- `GET /api/health/live` - Liveness probe
-- `GET /api/health/ready` - Readiness probe
+- `GET /health/live` - Process liveness; does not probe dependencies
+- `GET /health/ready` - Aggregated dependency readiness; returns `503` when unhealthy
+- `GET /health` - Human-friendly process up-check
+- `GET /api/health` - Lightweight compatibility up-check; not dependency readiness
 
 ### Custom Health Checks
 
@@ -96,16 +97,16 @@ public class DatabaseHealth : IHealthContributor
     public string Name => "database";
     public bool IsCritical => true;
 
-    public async Task<HealthReport> CheckAsync(CancellationToken ct)
+    public async Task<HealthReport> Check(CancellationToken ct = default)
     {
         try
         {
             await CheckDatabaseConnection();
-            return HealthReport.Healthy();
+            return new HealthReport(Name, HealthState.Healthy, "Database ready", null, null);
         }
         catch (Exception ex)
         {
-            return HealthReport.Unhealthy("Database down", ex);
+            return new HealthReport(Name, HealthState.Unhealthy, ex.Message, null, null);
         }
     }
 }

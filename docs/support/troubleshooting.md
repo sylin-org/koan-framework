@@ -27,7 +27,7 @@ last_updated: 2025-09-28
 
 ## Quick Triage Checklist
 
-1. **Confirm boot completed** – run `curl http://localhost:5000/api/health/ready`; if unhealthy, inspect logs for `Koan:modules` output and DI errors.
+1. **Confirm boot completed** – run `curl http://localhost:5000/health/ready`; if unhealthy, inspect logs for `Koan:modules` output and DI errors.
 2. **Inspect adapter state** – for containerized stacks `docker compose ps` and `docker logs <service> --tail 50`; look for `StartupProbe` / `Healthy` markers.
 3. **Verify configuration** – dump active configuration for suspect sections using `Configuration.Read` logging or `dotnet user-secrets list` (development).
 4. **Run smoke call** – `curl http://localhost:5000/api/todos` (or domain equivalent) and `curl http://localhost:5000/.well-known/auth/providers` to validate HTTP + auth surfaces.
@@ -201,11 +201,12 @@ public sealed class TodosController : EntityController<Todo> { }
 
 ### Health Endpoint Failures
 
-If `/api/health` is unhealthy, query liveness/readiness endpoints separately:
+Use the canonical probes to distinguish a running process from dependency readiness. `/api/health`
+is a lightweight compatibility up-check and does not aggregate dependencies:
 
 ```powershell
-curl http://localhost:5000/api/health/live
-curl http://localhost:5000/api/health/ready
+curl http://localhost:5000/health/live
+curl http://localhost:5000/health/ready
 ```
 
 Implement targeted checks for critical dependencies:
@@ -213,16 +214,19 @@ Implement targeted checks for critical dependencies:
 ```csharp
 public sealed class DatabaseHealthCheck : IHealthContributor
 {
-    public async Task<HealthReport> CheckAsync(CancellationToken ct)
+    public string Name => "database";
+    public bool IsCritical => true;
+
+    public async Task<HealthReport> Check(CancellationToken ct = default)
     {
         try
         {
             await Todo.FirstPage(1, ct);
-            return HealthReport.Healthy("database");
+            return new HealthReport(Name, HealthState.Healthy, "Database ready", null, null);
         }
         catch (Exception ex)
         {
-            return new HealthReport("database", false, ex.Message);
+            return new HealthReport(Name, HealthState.Unhealthy, ex.Message, null, null);
         }
     }
 }

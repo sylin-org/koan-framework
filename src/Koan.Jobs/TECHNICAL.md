@@ -52,12 +52,17 @@ Koan does not imply cross-provider transactions.
 
 - startup provenance reports the number of discovered job types;
 - runtime facts report ledger and transport elections;
-- `/health` reports bounded aggregate queue facts;
+- `/health/ready` reports bounded aggregate queue facts in Development and aggregate status in production;
 - `JobRecord` queries provide per-work-item transitions, progress, and failure text;
 - optional metrics preserve aggregate outcomes beyond ledger retention.
 
 Health inspection is intentionally bounded and does not scan every lane. `QueueAgeWarning` opts into a
 degraded signal; the underlying age and depth facts are always returned.
+
+If the ledger becomes unavailable, readiness becomes unhealthy. The worker logs the first failed
+iteration at Error, paces retries at `PollInterval`, keeps repeated failures at Debug, and reports one
+Information transition when it recovers. Health is the persistent operator signal; repeated Error lines
+are not.
 
 ## Unsupported claims
 

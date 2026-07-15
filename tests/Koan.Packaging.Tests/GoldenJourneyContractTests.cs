@@ -44,6 +44,8 @@ public sealed class GoldenJourneyContractTests
         Assert.True(evidence.AgentBoundaryObserved);
         Assert.True(evidence.AgentMutationObserved);
         Assert.True(evidence.AdapterRejectionExplained);
+        Assert.True(evidence.AdapterRejectionAffectedReadiness);
+        Assert.True(evidence.RejectedWorkerLogsCalm);
         Assert.True(evidence.AdapterRecoveryObserved);
         Assert.Equal(11, evidence.Steps.Count);
     }

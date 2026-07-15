@@ -32,8 +32,9 @@ wake transport through `AddKoan()` discovery. Application registration code is n
 | `Sylin.Koan.Jobs.Transport.Messaging` | Cross-node wake signal; the ledger remains the source of truth |
 
 Inspect `jobs:ledger` and `jobs:transport` through `/.well-known/Koan/facts` or `koan://facts`.
-The standard `/health` response includes queue depth, running depth, reclaim backlog, and oldest queued
-age. Per-work-item status and history are available through `entity.Job` and `Entity.Jobs`.
+The standard `/health/ready` response includes queue depth, running depth, reclaim backlog, and oldest
+queued age in Development; production returns only aggregate readiness. Per-work-item status and history
+are available through `entity.Job` and `Entity.Jobs`.
 
 ## Boundaries
 

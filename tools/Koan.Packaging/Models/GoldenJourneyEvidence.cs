@@ -14,5 +14,7 @@ internal sealed record GoldenJourneyEvidence(
     bool AgentBoundaryObserved,
     bool AgentMutationObserved,
     bool AdapterRejectionExplained,
+    bool AdapterRejectionAffectedReadiness,
+    bool RejectedWorkerLogsCalm,
     bool AdapterRecoveryObserved,
     IReadOnlyList<ApplicationStepEvidence> Steps);

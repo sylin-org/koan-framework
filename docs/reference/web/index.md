@@ -69,7 +69,8 @@ This delivers:
 - `PUT /api/products/{id}` – update
 - `DELETE /api/products/{id}` – delete
 
-Health endpoints (`/api/health`, `/api/health/live`, `/api/health/ready`) come from Koan.Core.
+Health endpoints are `/health/live` for process liveness and `/health/ready` for dependency-aware
+readiness. `/api/health` remains a lightweight compatibility up-check; it does not aggregate dependencies.
 
 ---
 

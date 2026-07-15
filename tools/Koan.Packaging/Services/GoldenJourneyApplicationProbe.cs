@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Koan.Packaging.Infrastructure;
@@ -34,6 +35,8 @@ internal sealed class GoldenJourneyApplicationProbe
         var agentBoundaryObserved = false;
         var agentMutationObserved = false;
         var adapterRejectionExplained = false;
+        var adapterRejectionAffectedReadiness = false;
+        var rejectedWorkerLogsCalm = false;
         var adapterRecoveryObserved = false;
 
         await using var host = ApplicationProbeHost.Start(
@@ -239,8 +242,24 @@ internal sealed class GoldenJourneyApplicationProbe
                     && rejection.GetProperty("correction").GetString()?.Contains("reference", StringComparison.OrdinalIgnoreCase) == true;
                 if (!adapterRejectionExplained)
                     throw new InvalidOperationException("The unavailable adapter was not explained with a stable reason and correction.");
+
+                using var readiness = await rejected.Http.GetAsync(
+                    PackagingConstants.ApplicationProbe.HealthPath,
+                    cancellationToken);
+                using var readinessDocument = JsonDocument.Parse(
+                    await readiness.Content.ReadAsStringAsync(cancellationToken));
+                adapterRejectionAffectedReadiness = readiness.StatusCode == HttpStatusCode.ServiceUnavailable
+                    && readinessDocument.RootElement.GetProperty("status").GetString() == "unhealthy";
+                if (!adapterRejectionAffectedReadiness)
+                    throw new InvalidOperationException("The unavailable elected adapter did not make canonical readiness unhealthy.");
             });
-            _ = await rejected.StopAsync();
+            await Task.Delay(PackagingConstants.ApplicationProbe.RejectedObservationMilliseconds, cancellationToken);
+            var rejectedLogs = await rejected.StopAsync();
+            rejectedWorkerLogsCalm = CountOccurrences(
+                rejectedLogs.StandardOutput + rejectedLogs.StandardError,
+                "Job worker iteration failed") <= PackagingConstants.ApplicationProbe.MaximumWorkerIterationErrors;
+            if (!rejectedWorkerLogsCalm)
+                throw new InvalidOperationException("The rejected adapter caused the Jobs worker to flood repeated iteration errors.");
         }
 
         await using (var recovered = ApplicationProbeHost.Start(
@@ -281,6 +300,8 @@ internal sealed class GoldenJourneyApplicationProbe
             agentBoundaryObserved,
             agentMutationObserved,
             adapterRejectionExplained,
+            adapterRejectionAffectedReadiness,
+            rejectedWorkerLogsCalm,
             adapterRecoveryObserved,
             steps);
     }
@@ -365,6 +386,18 @@ internal sealed class GoldenJourneyApplicationProbe
         }
         value = default;
         return false;
+    }
+
+    private static int CountOccurrences(string source, string value)
+    {
+        var count = 0;
+        var offset = 0;
+        while ((offset = source.IndexOf(value, offset, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += value.Length;
+        }
+        return count;
     }
 
     private static async Task StepAsync(string name, ICollection<ApplicationStepEvidence> steps, Func<Task> action)

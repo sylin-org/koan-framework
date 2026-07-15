@@ -51,6 +51,8 @@ internal static class PackagingConstants
         public const int StartupAttempts = 40;
         public const int StartupPollMilliseconds = 500;
         public const int HttpTimeoutSeconds = 5;
+        public const int RejectedObservationMilliseconds = 2500;
+        public const int MaximumWorkerIterationErrors = 1;
     }
 
     public static class FirstUse

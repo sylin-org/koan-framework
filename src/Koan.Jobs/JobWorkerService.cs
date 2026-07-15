@@ -52,6 +52,7 @@ internal sealed class JobWorkerService : BackgroundService
         var lastReap = _clock.GetUtcNow();
         var lastArchive = _clock.GetUtcNow();
         var lastFlush = _clock.GetUtcNow();
+        var iterationFailed = false;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -74,12 +75,32 @@ internal sealed class JobWorkerService : BackgroundService
                 }
                 await _scheduler.TriggerDueAsync(stoppingToken);   // recurring initiator: submit due scheduled actions
                 await _orchestrator.DrainAsync(stoppingToken);
+
+                if (iterationFailed)
+                {
+                    _logger.LogInformation("Job worker recovered after a failed iteration");
+                    iterationFailed = false;
+                }
             }
             catch (OperationCanceledException) { break; }
-            catch (Exception ex) { _logger.LogError(ex, "Job worker iteration failed"); }
+            catch (Exception ex)
+            {
+                if (!iterationFailed)
+                    _logger.LogError(ex, "Job worker iteration failed; retrying at the configured poll interval");
+                else
+                    _logger.LogDebug(ex, "Job worker iteration remains unavailable");
+                iterationFailed = true;
+            }
 
-            // Push-dispatch: wake immediately on a submit signal, else fall back to the poll interval.
-            try { await _transport.WaitForWork(_options.PollInterval, stoppingToken); }
+            // A healthy worker wakes immediately on a submit signal. After a failure, bypass pending wake signals so
+            // an unavailable ledger cannot create a hot retry loop; the health contributor remains the durable signal.
+            try
+            {
+                if (iterationFailed)
+                    await Task.Delay(_options.PollInterval, stoppingToken);
+                else
+                    await _transport.WaitForWork(_options.PollInterval, stoppingToken);
+            }
             catch (OperationCanceledException) { break; }
         }
 

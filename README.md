@@ -76,7 +76,8 @@ public sealed class ApprovalsController : EntityController<Approval>;
 ```
 
 That's a full REST API: GET/POST/DELETE with pagination and querying, GUID v7 ids generated on
-first read, `/health`, structured logging, and zero-config SQLite (`./data/app.db`). Schema
+first read, `/health/live` and dependency-aware `/health/ready` probes, structured logging, and
+zero-config SQLite (`./data/app.db`). Schema
 is created automatically in development. JSON defaults: camelCase, nulls omitted
 (Newtonsoft.Json — chosen for predictable polymorphic serialization).
 
