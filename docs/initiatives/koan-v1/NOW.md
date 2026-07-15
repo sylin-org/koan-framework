@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R05 passed; R06-01 conformance host isolation active
+  scope: R05 passed; R06 foundation support-boundary assessment active
 ---
 
 # Koan V1 reorganization current handoff
@@ -41,9 +41,9 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - The fourth and final fresh-repeat slice is repaired: ordinary Entity schema fallback is quiet,
   custom mutations advertise the `dry_run` control they already honor, and the HTTP guide is now a
   compact Streamable-first contract rather than a deprecated-transport tutorial.
-- The initial T6 assessment is recorded in R06. Entity/data/composition are strong, but Koan.Testing
-  still requires consumer assemblies to disable parallelization because ambient host ownership leaks
-  through the static Entity path. R06-01 is the first bounded repair.
+- The initial T6 assessment is recorded in R06. Entity/data/composition are strong. R06-01 now makes
+  every inherited conformance battery enter its creating host's async-flow scope, so consumers no
+  longer disable parallelization for the whole test assembly.
 - T7/V1 release readiness is not yet achieved because T6 is ungraduated and the coherent package
   closure has not been published and observed.
 - No public package was published and no branch was pushed by this work.
@@ -139,6 +139,11 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
   tests with quiet schema startup and discoverable custom-mutation `dry_run`; strict docs pass. The
   HTTP guide is reduced from 1,752 lines to a 250-line current contract and no longer publishes
   invented options, inline endpoint scaffolding, or unsupported performance claims.
+- R06-01 conformance isolation: the same-Entity concurrent-host proof fails against global resolution
+  and passes after each battery enters its creating host's flow scope. The parallel-enabled Testing
+  suite passes 12 with 3 explicit skips; Koan.Testing builds warning-free; Core host scope passes 8/8;
+  focused Data.Core host ownership passes 9/9. A bounded full Data.Core attempt did not complete in
+  180 seconds, so the earlier 301/301 baseline is not presented as a current rerun.
 
 ## Important discoveries
 
@@ -183,10 +188,10 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
 
 ## Next safe action
 
-Execute [`R06-01`](work-items/r06/R06-01-conformance-host-isolation.md): map the existing host-context
-seam, add a red concurrent-spec proof, and make Koan.Testing own its host scope without changing the
-Entity language. Do not remove unrelated test serialization attributes. Reassess the exact foundation
-support boundary after this slice; keep public package maturity at `specified` until a real `dev`
+Reassess the exact R06 foundation boundary: decide whether InMemory, SQLite, or
+InMemory/JSON/SQLite form the minimum graduated local-provider set; map each chosen claim to current
+source/package, negotiation, failure, inspection, and conformance evidence. Open another repair only
+for a material missing contract. Keep public package maturity at `specified` until a real `dev`
 publication is observed.
 
 ## Do not infer

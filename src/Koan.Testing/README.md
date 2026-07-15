@@ -47,19 +47,16 @@ skips when the selected adapter does not declare the required capability.
 Override `Mutate(TEntity)` only when a conformance extension needs a valid changed Entity. Override
 `Configure(IDictionary<string, string?>)` to select an adapter or supply test configuration.
 
-## Configure the test assembly
+## Host isolation is automatic
 
-Conformance batteries boot real generic hosts. Each host owns the process-default `AppHost` binding
-for its lifetime, so conformance classes in one test process must run sequentially:
-
-```csharp
-using Xunit;
-
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
-```
-
-The helper does not write or clear `AppHost.Current` itself. Host startup and teardown use Koan's
+Conformance batteries boot real generic hosts and bind every Entity operation to the creating host's
+async flow. Independent conformance classes can use normal xUnit scheduling; no assembly-level
+`DisableTestParallelization` attribute is required. Host startup/teardown still uses Koan's
 owner-checked generic-host binder, so an older battery cannot clear a newer host owner.
+
+This contract isolates Koan host/provider selection, Entity partitions, and temporary roots. A test
+suite that deliberately points multiple classes at the same external database, queue, container, or
+other shared resource still owns that resource's scheduling policy.
 
 ## Backing stores and skips
 
@@ -76,7 +73,8 @@ not evidence that the provider conforms.
 - These are correctness batteries, not performance or load tests.
 - The universal query battery filters on `Id`; application-specific predicates still deserve tests.
 - The embedding battery protects the save path, not end-to-end vector synchronization.
-- Data partitions isolate records but do not make concurrent process-default host selection safe.
+- Flow-scoped hosts and data partitions isolate independent conformance specifications; explicitly
+  shared external infrastructure is outside that boundary.
 - The suite does not replace business invariants or multi-Entity workflow tests.
 
 See [`TECHNICAL.md`](./TECHNICAL.md) for the lifecycle and gating contract and

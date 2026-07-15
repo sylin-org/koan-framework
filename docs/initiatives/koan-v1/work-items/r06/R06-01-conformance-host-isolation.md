@@ -14,7 +14,7 @@ validation:
 
 # R06-01 — Make conformance host isolation framework-owned
 
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R05
 - Owner: Koan.Testing plus the existing Core host-context seam
 
@@ -78,3 +78,19 @@ two independent specifications cannot see or dispose each other's state.
 This removes a consumer restriction without changing Entity source syntax. If the existing ambient
 seam cannot safely express per-spec ownership, stop and record the architectural gap; do not add a
 second service-locator path inside Koan.Testing.
+
+## Acceptance result
+
+- Outcome: PASS
+- Date and commit: 2026-07-15; closure recorded by the following implementation commit.
+- Evidence: every inherited battery and the reachability probe enter the creating host through the
+  existing `AppHost.PushScope`; the public API remains one subclass plus `NewValid()`.
+- Tests / validation: the new same-Entity concurrent-host proof fails before the repair and passes
+  after it; the parallel-enabled Koan.Testing meta-suite passes 12 with 3 explicit skips; affected
+  warning-as-error build, Core host-scope tests 8/8, focused Data.Core host-ownership tests 9/9,
+  strict docs, and diff validation. The unchanged full Data.Core suite did not complete within a
+  bounded 180-second attempt; its prior 301/301 baseline is not relabeled as current execution.
+- Unsupported scenarios: tests deliberately sharing external infrastructure, every repository test
+  fixture, container concurrency, and background services that intentionally use process-global state.
+- Follow-up work: reassess and publish the exact R06 foundation provider/support boundary.
+- Reviewer: Codex under the maintainer's standing autonomous approval.

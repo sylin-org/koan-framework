@@ -4,10 +4,10 @@ domain: engineering
 title: "Testing Your App — Conformance Kits"
 audience: [developers, architects]
 status: current
-last_updated: 2026-07-14
+last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-14
+  date_last_tested: 2026-07-15
   status: verified
   scope: EntityConformanceSpecs batteries + KoanDataSpec host ownership guidance
 ---
@@ -46,13 +46,10 @@ There is a second, optional hook — `protected override TEntity Mutate(TEntity 
 
 ## Two rules
 
-1. **Run sequentially.** Each booted host owns the process-default ambient provider used by the
-   static `Entity<T>` API. The testing helpers use the host's owner-checked lifecycle binding, but do
-   not make concurrent test classes flow-isolated. Add this once to your conformance test project:
-
-   ```csharp
-   [assembly: CollectionBehavior(DisableTestParallelization = true)]
-   ```
+1. **Let Koan own host isolation.** Each battery binds static `Entity<T>` operations to its own real
+   host through an async-flow scope. Independent conformance classes can follow normal xUnit
+   scheduling; no assembly-level parallelization switch is required. If tests deliberately share one
+   external database, queue, or container, coordinate that resource explicitly.
 
 2. **Provide a backing store (or let it skip).** Each battery boots its own isolated host with temp
    storage for the file adapters (json, sqlite). If your entity's adapter needs a container that isn't
@@ -77,8 +74,8 @@ binder. Dispose its returned `BoundHost` with `await using`; stopping an older h
 newer owner. Data partitions isolate records, not concurrent process-default host selection.
 
 `EntityConformanceSpecs<TEntity>` follows the same ownership rule: each inherited battery starts and
-disposes a binder-owned generic host without assigning `AppHost.Current` itself. The public consumer
-surface remains one subclass and one `NewValid()` method.
+disposes a binder-owned generic host, then enters that host's flow scope for every Entity operation.
+The public consumer surface remains one subclass and one `NewValid()` method.
 
 The pushdown battery reuses the framework's own `InMemoryFilterEvaluator` (the same oracle the
 cross-adapter convergence suite uses) — it is referenced, never re-implemented, so the conformance

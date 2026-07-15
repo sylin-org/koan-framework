@@ -34,10 +34,10 @@ namespace Koan.Testing;
 /// unreachable (no Docker), so the suite is green out of the box and meaningful when infra is present.
 /// </summary>
 /// <remarks>
-/// The static <c>Entity&lt;T&gt;</c> API resolves against the process-default ambient host owned by each
-/// booted generic host (<see cref="AppHost.Current"/>), so conformance test projects must run
-/// sequentially — add <c>[assembly: CollectionBehavior(DisableTestParallelization = true)]</c> to the
-/// test project.
+/// Every battery enters a flow-scoped <see cref="AppHost"/> binding for the host it created. Independent
+/// conformance specifications may therefore run concurrently without changing assembly-wide xUnit
+/// scheduling. Tests that deliberately share external infrastructure must still coordinate that
+/// infrastructure themselves.
 /// </remarks>
 public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
     where TEntity : Entity<TEntity>
@@ -83,8 +83,11 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
             // Reachability probe: a read against the entity's resolved adapter. If the store is absent
             // (e.g. a container that isn't running) this throws and every battery skips — distinguishing
             // "infra missing" (skip) from a real conformance defect (fail loud) once we know it's reachable.
-            using (EntityContext.Partition(_partition))
-                _ = await Entity<TEntity, string>.All().ConfigureAwait(false);
+            await RunInHost(async () =>
+            {
+                using (EntityContext.Partition(_partition))
+                    _ = await Entity<TEntity, string>.All().ConfigureAwait(false);
+            }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -102,7 +105,7 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RoundTrip_persists_and_reads_back_by_id()
+    public Task RoundTrip_persists_and_reads_back_by_id() => RunInHost(async () =>
     {
         RequireStore();
         using var _ = EntityContext.Partition(_partition);
@@ -112,10 +115,10 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
 
         var fetched = await Entity<TEntity, string>.Get(saved.Id);
         Assert.True(fetched is not null, $"a saved {typeof(TEntity).Name} must read back by id.");
-    }
+    });
 
     [Fact]
-    public async Task Paging_returns_every_row_exactly_once()
+    public Task Paging_returns_every_row_exactly_once() => RunInHost(async () =>
     {
         RequireStore();
         using var _ = EntityContext.Partition(_partition);
@@ -132,10 +135,10 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
         }
 
         Assert.Equal(total, seen.Count);
-    }
+    });
 
     [Fact]
-    public async Task QueryPushdown_agrees_with_reference_evaluator()
+    public Task QueryPushdown_agrees_with_reference_evaluator() => RunInHost(async () =>
     {
         RequireStore();
         if (!Data<TEntity, string>.Capabilities.Has(DataCaps.Query.Filter))
@@ -182,10 +185,10 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
 
         Assert.True(failures.Count == 0,
             "the adapter must converge with the in-memory oracle for every filter:\n  " + string.Join("\n  ", failures));
-    }
+    });
 
     [Fact]
-    public async Task Partition_isolates_writes()
+    public Task Partition_isolates_writes() => RunInHost(async () =>
     {
         RequireStore();
         var a = _partition + "-a";
@@ -197,10 +200,10 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
             "a write in partition A must not be visible in partition B.");
         using (EntityContext.Partition(a)) Assert.True(await Entity<TEntity, string>.Get(id) is not null,
             "the write must still be present in its own partition A.");
-    }
+    });
 
     [Fact]
-    public async Task Cacheable_invalidates_on_delete()
+    public Task Cacheable_invalidates_on_delete() => RunInHost(async () =>
     {
         RequireStore();
         if (!IsCacheable)
@@ -216,10 +219,10 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
         await saved.Remove();
         Assert.True(await Entity<TEntity, string>.Get(saved.Id) is null,
             "[Cacheable] must invalidate the cache on delete, not serve a stale hit.");
-    }
+    });
 
     [Fact]
-    public async Task Embedding_does_not_break_the_save_path()
+    public Task Embedding_does_not_break_the_save_path() => RunInHost(async () =>
     {
         RequireStore();
         if (!IsEmbedding)
@@ -235,6 +238,19 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
         var saved = await NewValid().Save();
         Assert.True(await Entity<TEntity, string>.Get(saved.Id) is not null,
             "a saved [Embedding] entity must still persist and read back.");
+    });
+
+    private async Task RunInHost(Func<Task> operation)
+    {
+        if (_host is null)
+        {
+            RequireStore();
+            throw new InvalidOperationException(
+                $"{GetType().Name} has no active conformance host. Ensure xUnit initialization completed before invoking a battery.");
+        }
+
+        using var scope = AppHost.PushScope(_host.Services);
+        await operation().ConfigureAwait(false);
     }
 
     private void RequireStore()

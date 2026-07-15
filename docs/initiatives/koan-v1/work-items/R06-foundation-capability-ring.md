@@ -35,10 +35,10 @@ The ring is strong but not yet graduated.
 | Entity language | Data.Core 301/301; R03 contract; module absence/presence/collision cells; FirstUse and GoldenJourney | The core Entity model is verified within its stated provider-neutral boundary. |
 | Local data | InMemory, JSON, and SQLite selection/rejection cells; SQLite source/package journeys | Useful paths are proven, but the foundation provider/support boundary still needs one explicit record. |
 | Composition | `AddKoan()`, schema-1 facts, matched lockfiles, warning-clean source apps, fresh package clean rooms | The mechanism is coherent; public package availability remains a T7 release fact. |
-| Testing | Reusable conformance batteries and bounded bootstrap/package lanes | Not foundation-ready: the public conformance kit requires consumers to disable assembly-wide parallelization because Entity operations resolve through a process-default host. |
+| Testing | Reusable conformance batteries, bounded bootstrap/package lanes, and concurrent same-Entity host isolation | R06-01 removes the assembly-wide scheduling leak; final maturity still follows the ring support-boundary assessment. |
 
-This is a `repair-and-assess` result, not a reason to broaden the work. The first repair removes the
-testing leak. The next assessment will name the exact foundation support boundary and determine
+The initial result was `repair-and-assess`, not a reason to broaden the work. R06-01 removes the
+testing leak. The active assessment now names the exact foundation support boundary and determines
 whether any other lower-ring gap is material.
 
 ## Decisions
@@ -66,7 +66,7 @@ whether any other lower-ring gap is material.
 
 [`R06-01`](r06/R06-01-conformance-host-isolation.md) makes conformance execution own its ambient host
 scope so independent Entity specifications can run concurrently without an assembly-level xUnit
-switch.
+switch. It passes; the parent ring now owns the remaining support-boundary decision.
 
 ## Exit gate
 

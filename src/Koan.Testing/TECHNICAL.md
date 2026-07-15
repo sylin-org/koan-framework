@@ -27,13 +27,16 @@ xUnit creates one conformance instance for each inherited battery. `InitializeAs
 4. starts a real `KoanIntegrationHost` with `AddKoan()`;
 5. probes the selected Entity adapter for reachability.
 
-`EntityConformanceSpecs` does not attach or clear `AppHost.Current` directly. The generic host's
-`AppHostBinderHostedService` owns the process-default provider with a compare-and-release lease.
-`DisposeAsync` delegates to integration-host disposal, then removes the temporary root best-effort.
-Stopping an older overlapping host cannot clear a newer owner.
+The generic host's `AppHostBinderHostedService` owns the process-default provider with a
+compare-and-release lease. Initialization's reachability probe and every inherited battery additionally
+enter `AppHost.PushScope(host.Services)`, so static Entity operations resolve the correct provider in
+their own async flow even while another conformance host is active. `DisposeAsync` delegates to
+integration-host disposal, then removes the temporary root best-effort. Stopping an older overlapping
+host cannot clear a newer owner.
 
-Conformance projects still disable test parallelization. Owner-safe teardown prevents cross-host
-clearing; it does not give simultaneous static Entity operations distinct process-default providers.
+The scope is deliberately battery-owned instead of being pushed once from xUnit `InitializeAsync`:
+async-local changes made inside a lifecycle callback are not a public scheduling contract for the
+later test-method invocation. Consumers therefore need no assembly-wide parallelization switch.
 
 ## Battery behavior
 
@@ -80,6 +83,7 @@ to the framework's later unified error/explanation work.
 
 ## Evidence boundary
 
-The meta-suite proves positive batteries, trait gating, a deliberately failing paging oracle, and
-host-owner preservation through generated module composition. S1 and S5 provide application-level
-consumer proofs using the unchanged one-method inheritance grammar.
+The meta-suite proves positive batteries, trait gating, a deliberately failing paging oracle,
+host-owner preservation, and concurrent same-Entity specifications resolving distinct hosts through
+generated module composition. S1 and S5 provide application-level consumer proofs using the unchanged
+one-method inheritance grammar.

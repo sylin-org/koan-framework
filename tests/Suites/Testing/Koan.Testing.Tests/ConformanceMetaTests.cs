@@ -3,10 +3,6 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using Xunit;
 
-// Each conformance host owns the process-default provider used by static Entity<T>, so the suite must
-// run sequentially. (Consumers add this same line to their own conformance test projects.)
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
-
 namespace Koan.Testing.Tests;
 
 /// <summary>
