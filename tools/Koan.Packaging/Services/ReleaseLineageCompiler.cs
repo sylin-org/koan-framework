@@ -297,7 +297,7 @@ internal sealed class ReleaseLineageCompiler(
         PackageGraph current) =>
         ValidateInventory(
             previousPackages,
-            current.Projects.Select(project => new ReleaseLineagePackage(project.PackageId, Normalize(project.ProjectPath))));
+            current.Projects.Select(project => new ReleaseLineagePackage(project.PackageId, Normalize(project.ProjectPath), null)));
 
     internal static void ValidateInventory(
         IEnumerable<ReleaseLineagePackage> previousPackages,
