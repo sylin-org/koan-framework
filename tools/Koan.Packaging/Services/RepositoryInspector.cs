@@ -61,6 +61,16 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
         return result.ExitCode == 0 ? result.StandardOutput.Trim() : null;
     }
 
+    public async Task<string?> TryReadFileAsync(string commit, string repositoryPath, CancellationToken cancellationToken)
+    {
+        var result = await processRunner.RunAsync(
+            "git",
+            ["show", $"{commit}:{repositoryPath.Replace('\\', '/')}"],
+            repositoryRoot,
+            cancellationToken);
+        return result.ExitCode == 0 ? result.StandardOutput : null;
+    }
+
     private async Task<PackageProject?> EvaluateProjectAsync(string project, CancellationToken cancellationToken)
     {
         var output = await processRunner.RequireAsync(

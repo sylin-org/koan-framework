@@ -1,23 +1,51 @@
 # Koan packaging
 
-The release compiler turns an advancement of `dev` into independently versioned NuGet artifacts.
-It derives package impact from NBGV at the two Git endpoints; maintainers do not select packages or
-calculate versions.
+Advancing `dev` is the complete package-release instruction. The protected workflow serializes the
+event, projects its source delta onto `automation/package-lineage-dev`, automatically mints any
+required reverse-dependent identities, proves the exact result, and publishes it. Maintainers do not
+select packages or calculate patch versions.
+
+The safe read-only diagnostic is:
 
 ```powershell
-dotnet run --project tools/Koan.Packaging -- plan --before <before-sha> --after <after-sha> --output artifacts/release/release-set.json
-dotnet run --project tools/Koan.Packaging -- pack --manifest artifacts/release/release-set.json --output artifacts/release/packages --clean-room
+dotnet run --project tools/Koan.Packaging -- inventory
 ```
 
-For a long local reconciliation rehearsal, add `--resume`. Existing artifacts are reused only after
-their identity, metadata, symbols policy, and embedded repository commit match the manifest. The
-protected workflow always starts from an empty artifact directory.
+The workflow's compiler sequence is:
 
-`publish` is intended for the protected GitHub workflow. It consumes the verified manifest and exact
-artifact directory, obtains its credential from the named environment variable, and records resumable
+```powershell
+dotnet run --project tools/Koan.Packaging -- lineage `
+  --source <dev-source-sha> `
+  --previous-source <prior-dev-source-sha> `
+  --previous-lineage <prior-lineage-sha> `
+  --output artifacts/release/release-lineage.json
+
+dotnet run --project tools/Koan.Packaging -- plan `
+  --lineage artifacts/release/release-lineage.json `
+  --output artifacts/release/release-set.json
+
+dotnet run --project tools/Koan.Packaging -- pack `
+  --manifest artifacts/release/release-set.json `
+  --output artifacts/release/packages `
+  --clean-room
+```
+
+`lineage` intentionally switches a clean checkout to its dedicated local lineage branch and creates
+one commit. Run that command only in the protected workflow or a disposable rehearsal checkout. Omit
+`--previous-lineage` only when initializing a new lineage.
+
+`SourceCommit` identifies the developer's `dev` event. `VersionCommit` identifies the exact linear
+projection that NBGV versions, packing, SourceLink metadata, resumable state, and release evidence use.
+The committed lineage state must match the external lineage artifact before planning can begin.
+
+For a long reconciliation rehearsal, add `--resume` to `pack`. Existing artifacts are reused only
+after their identity, metadata, symbols policy, and embedded version commit match the manifest.
+Selected identities are packed even when their nupkg is already public so an interrupted symbol/state
+reconciliation can replay safely.
+
+`publish` is protected-workflow machinery. It consumes the verified manifest and exact artifact
+directory, obtains its credential from the named environment variable, and records resumable
 per-package state.
 
-`--clean-room` proves two applications outside the checkout against only the staged/local-feed
-package closure: FirstUse preserves the shortest meaningful result, and GoldenJourney proves that
-the same composition model survives business rules, durable jobs, bounded agent collaboration, and
-an explained adapter rejection/recovery cycle. Each proof writes a separate JSON evidence file.
+`--clean-room` proves FirstUse and GoldenJourney outside the checkout against only the staged/local
+package feed. Each proof writes separate JSON evidence.

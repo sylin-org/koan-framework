@@ -2,7 +2,8 @@
 
 Koan packages version independently with Nerdbank.GitVersioning (NBGV). A package's `version.json`
 contains deliberate major/minor intent; Git history supplies the patch. Advancing `dev` is the release
-event, and the release compiler compares the public NBGV version at the event's two commits.
+event. A serialized compiler projects that source advancement onto one durable linear version branch,
+then compares the previous and resulting package identities.
 
 > Governing decisions: [ARCH-0085](../decisions/ARCH-0085-versioning-compatibility-and-automation.md)
 > and [ARCH-0110](../decisions/ARCH-0110-dev-release-compiler.md).
@@ -10,15 +11,15 @@ event, and the release compiler compares the public NBGV version at the event's 
 ## Mental model
 
 ```text
-package-local version.json + commits matching pathFilters
+dev source delta + package-local version.json
                          ↓
-               deterministic NBGV version
+          durable linear VersionCommit
                          ↓
-before version differs from after version? ── yes ──> release that package identity
-                         │
-                         no
-                         ↓
-                 leave it untouched
+     breaking root? ── yes ──> reverse-dependent closure
+                         │                  │
+                         │      unchanged member gets marker
+                         ↓                  ↓
+ previous identity differs from version identity? ──> release
 ```
 
 Every packable project must have a `version.json` in its own directory. There is no kernel lockstep,
@@ -42,8 +43,9 @@ root stamping pass, or package checklist. A typical file is:
   `.0`. Some migrated, already-existing packages deliberately use `0` so the first dedicated
   ownership commit cannot collide with an already published `.0`; preserve those baselines.
 
-The workflow passes `PublicRelease=true`, so a `dev` event produces a stable package identity. Local
-non-release builds may carry NBGV's commit suffix.
+The workflow passes `PublicRelease=true`, so the event's `VersionCommit` produces stable identities.
+`SourceCommit` remains the auditable developer input; it is not overloaded as the packed commit.
+Local non-release builds may carry NBGV's commit suffix.
 
 ## Common tasks
 
@@ -53,17 +55,16 @@ non-release builds may carry NBGV's commit suffix.
 dotnet nbgv get-version -p src/Koan.Core --public-release=true
 ```
 
-### Preview the exact event
+### Inspect the release surface
 
 ```powershell
-dotnet run --project tools/Koan.Packaging -- plan `
-  --before HEAD~1 --after HEAD --offline `
-  --output artifacts/release/release-set.json
+dotnet run --project tools/Koan.Packaging -- inventory
 ```
 
-The offline form shows only identities changed by Git. The protected workflow uses the online form,
-which also includes a current identity missing from nuget.org so interrupted or historical gaps heal
-without an operator-maintained list.
+The protected workflow is the canonical event preview because it owns the serialized lineage. A
+controlled local `lineage`/`plan` rehearsal must run in a clean disposable checkout; the command
+intentionally creates and switches to its dedicated local lineage branch. See the
+[packaging tool README](../../tools/Koan.Packaging/README.md) for that sequence.
 
 ### Make a normal patch release
 
@@ -76,8 +77,10 @@ Edit that package's `version.json` `version` field as part of the breaking/featu
 the minor is the breaking tier; at 1.0 and later, the major is. Internal dependencies pack as bounded
 ranges (`[0.17.x,0.18.0)` before 1.0), so incompatible combinations fail during restore.
 
-ARCH-0085's reverse-dependent republish rule for a breaking tier change remains explicit follow-up
-work. Do not describe that closure as automated until its version-graph gate exists.
+The release compiler derives the complete transitive reverse-dependent closure from evaluated
+ProjectReferences. A closure member whose source already created a fresh identity is left alone; an
+otherwise unchanged member receives a deterministic Git marker. Planning fails if the complete wave
+is not present.
 
 ### Add a package
 
@@ -94,14 +97,17 @@ ID.
 
 - **Unexpected prerelease suffix** — preview with `--public-release=true`; never compensate with a
   `<Version>` property.
-- **Unexpected patch** — inspect commits matching `pathFilters` and the package's intentional
-  baseline. Patch height counts Git history, including merge commits.
+- **Unexpected patch** — inspect commits matching `pathFilters` on
+  `automation/package-lineage-dev`, including any generated closure marker, and the package's
+  intentional baseline. The lineage is deliberately linear; source merge topology is not imported.
 - **Package absent from a release plan** — confirm its evaluated `IsPackable`, local `version.json`,
-  and whether the two endpoint versions actually differ.
+  and whether `PreviousVersionCommit` and `VersionCommit` actually differ.
 - **Current version is missing publicly** — use an online plan; reconciliation includes it even if
   the event itself did not change its version.
 - **Duplicate identity** — do not force-push or overwrite. Package identities are immutable; advance
   the package through Git.
+- **Lineage artifact mismatch** — regenerate `release-lineage.json` from the committed version
+  lineage; never edit its closure or commit fields.
 
 ## Anti-patterns
 

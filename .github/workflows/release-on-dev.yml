@@ -4,117 +4,22 @@ on:
   push:
     branches: [dev]
 
-# Every push remains its own release event. Publication is serialized by the lease step below;
-# GitHub concurrency groups are intentionally not used because they discard older pending runs.
+# Every dev advancement remains a release event. Runs wait instead of using a cancelling concurrency
+# group because dropping an intermediate event would discard package-version lineage.
 permissions: {}
 
 jobs:
-  build-verify:
+  release:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    permissions:
-      contents: read
-    outputs:
-      has-packages: ${{ steps.plan.outputs.has-packages }}
-    steps:
-      - name: Checkout release commit with full history
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.x
-
-      - name: Restore tools
-        run: dotnet tool restore
-
-      - name: Build release source
-        shell: pwsh
-        run: |
-          dotnet build Koan.sln -c Release --nologo -p:PublicRelease=true -p:NuGetAuditMode=all -p:NuGetAuditLevel=high -p:WarningsAsErrors=NU1903%3BNU1904
-          if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
-
-      - name: Test release source
-        shell: pwsh
-        run: |
-          dotnet test Koan.sln -c Release --no-build --nologo --blame-hang --blame-hang-timeout 5m
-          if ($LASTEXITCODE -ne 0) { throw 'Release tests failed.' }
-
-      - name: Compile release plan
-        id: plan
-        shell: pwsh
-        env:
-          EVENT_BEFORE: ${{ github.event.before }}
-          EVENT_AFTER: ${{ github.sha }}
-        run: |
-          $before = $env:EVENT_BEFORE
-          if ($before -match '^0+$') { $before = "$($env:EVENT_AFTER)^" }
-          git rev-parse --verify "$before^{commit}" *> $null
-          if ($LASTEXITCODE -ne 0) {
-            git fetch --no-tags --depth=1 origin $before
-            if ($LASTEXITCODE -ne 0) { throw "Unable to fetch release event predecessor $before." }
-          }
-          dotnet run --project tools/Koan.Packaging -c Release --no-build -- plan `
-            --before $before `
-            --after $env:EVENT_AFTER `
-            --output artifacts/release/release-set.json
-          if ($LASTEXITCODE -ne 0) { throw 'Release planning failed.' }
-          $manifest = Get-Content artifacts/release/release-set.json -Raw | ConvertFrom-Json
-          $newCount = @($manifest.packages | Where-Object { -not $_.alreadyPublished }).Count
-          $hasPackages = if ($newCount -gt 0) { 'true' } else { 'false' }
-          "has-packages=$hasPackages" | Out-File $env:GITHUB_OUTPUT -Append
-          "new-count=$newCount" | Out-File $env:GITHUB_OUTPUT -Append
-
-      - name: Pack and prove package closure
-        if: steps.plan.outputs.has-packages == 'true'
-        shell: pwsh
-        run: |
-          dotnet run --project tools/Koan.Packaging -c Release --no-build -- pack `
-            --manifest artifacts/release/release-set.json `
-            --output artifacts/release/packages `
-            --clean-room
-          if ($LASTEXITCODE -ne 0) { throw 'Package verification failed.' }
-
-      - name: Upload exact verified release set
-        if: steps.plan.outputs.has-packages == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: koan-release-${{ github.sha }}
-          path: artifacts/release
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Summary
-        shell: pwsh
-        run: |
-          $manifest = Get-Content artifacts/release/release-set.json -Raw | ConvertFrom-Json
-          $rows = @($manifest.packages | ForEach-Object { "| $($_.packageId) | $($_.previousVersion) | $($_.version) | $($_.reason) |" })
-          @(
-            '# Koan package release impact'
-            ''
-            "Source: ``$($manifest.sourceCommit)``"
-            ''
-            '| Package | Previous | Minted | Reason |'
-            '| --- | --- | --- | --- |'
-            $rows
-          ) | Out-File $env:GITHUB_STEP_SUMMARY -Append
-
-  publish:
-    needs: build-verify
-    if: needs.build-verify.outputs.has-packages == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 360
     permissions:
       actions: read
       contents: write
       id-token: write
     steps:
-      - name: Checkout exact release commit
+      - name: Checkout source event with full history
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Setup .NET
@@ -122,11 +27,8 @@ jobs:
         with:
           dotnet-version: 10.x
 
-      - name: Download verified release set
-        uses: actions/download-artifact@v4
-        with:
-          name: koan-release-${{ github.sha }}
-          path: artifacts/release
+      - name: Restore repository tools
+        run: dotnet tool restore
 
       - name: Wait for earlier dev release events
         shell: pwsh
@@ -140,6 +42,7 @@ jobs:
             $runs = @()
             for ($page = 1; $page -le 10; $page++) {
               $response = gh api "repos/$($env:REPOSITORY)/actions/workflows/release-on-dev.yml/runs?branch=dev&per_page=100&page=$page" | ConvertFrom-Json
+              if ($LASTEXITCODE -ne 0) { throw 'Unable to inspect the dev release queue.' }
               $runs += @($response.workflow_runs)
               if (@($response.workflow_runs).Count -lt 100) { break }
             }
@@ -155,7 +58,132 @@ jobs:
           }
           throw 'Timed out after four hours waiting for the dev release queue.'
 
+      - name: Resolve source and durable lineage
+        id: revisions
+        shell: pwsh
+        env:
+          EVENT_BEFORE: ${{ github.event.before }}
+          EVENT_AFTER: ${{ github.sha }}
+        run: |
+          $before = $env:EVENT_BEFORE
+          if ($before -match '^0+$') { $before = "$($env:EVENT_AFTER)^" }
+          git rev-parse --verify "$before^{commit}" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            git fetch --no-tags --depth=1 origin $before
+            if ($LASTEXITCODE -ne 0) { throw "Unable to fetch source predecessor $before." }
+          }
+          $before = (git rev-parse --verify "$before^{commit}").Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to resolve the source predecessor.' }
+          "previous-source=$before" | Out-File $env:GITHUB_OUTPUT -Append
+
+          $branch = 'automation/package-lineage-dev'
+          $remoteRef = "refs/heads/$branch"
+          $remote = @(git ls-remote --heads origin $remoteRef)
+          if ($LASTEXITCODE -ne 0) { throw "Unable to inspect $remoteRef." }
+          if ($remote.Count -gt 0) {
+            git fetch --no-tags origin "$($remoteRef):refs/remotes/origin/$branch"
+            if ($LASTEXITCODE -ne 0) { throw "Unable to fetch $remoteRef." }
+            $previousLineage = (git rev-parse --verify "refs/remotes/origin/$branch^{commit}").Trim()
+            "previous-lineage=$previousLineage" | Out-File $env:GITHUB_OUTPUT -Append
+            Write-Host "Previous version lineage: $previousLineage"
+          }
+          else {
+            "previous-lineage=" | Out-File $env:GITHUB_OUTPUT -Append
+            Write-Host 'No prior version lineage; this event will initialize it.'
+          }
+
+      - name: Build release compiler
+        shell: pwsh
+        run: |
+          dotnet build tools/Koan.Packaging/Koan.Packaging.csproj -c Release --nologo -p:NuGetAuditMode=all -p:NuGetAuditLevel=high -p:WarningsAsErrors=NU1903%3BNU1904
+          if ($LASTEXITCODE -ne 0) { throw 'Release compiler build failed.' }
+
+      - name: Compile durable package lineage
+        id: lineage
+        shell: pwsh
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+          PREVIOUS_SOURCE: ${{ steps.revisions.outputs.previous-source }}
+          PREVIOUS_LINEAGE: ${{ steps.revisions.outputs.previous-lineage }}
+        run: |
+          $arguments = @(
+            'run', '--project', 'tools/Koan.Packaging', '-c', 'Release', '--no-build', '--',
+            'lineage',
+            '--source', $env:SOURCE_COMMIT,
+            '--previous-source', $env:PREVIOUS_SOURCE,
+            '--branch', 'automation/package-lineage-dev',
+            '--output', 'artifacts/release/release-lineage.json'
+          )
+          if (-not [string]::IsNullOrWhiteSpace($env:PREVIOUS_LINEAGE)) {
+            $arguments += @('--previous-lineage', $env:PREVIOUS_LINEAGE)
+          }
+          & dotnet @arguments
+          if ($LASTEXITCODE -ne 0) { throw 'Package lineage compilation failed.' }
+          $lineage = Get-Content artifacts/release/release-lineage.json -Raw | ConvertFrom-Json
+          "version-commit=$($lineage.versionCommit)" | Out-File $env:GITHUB_OUTPUT -Append
+          "closure-count=$(@($lineage.closurePackages).Count)" | Out-File $env:GITHUB_OUTPUT -Append
+          "marker-count=$(@($lineage.markerPackages).Count)" | Out-File $env:GITHUB_OUTPUT -Append
+
+      - name: Persist exact version lineage
+        shell: pwsh
+        run: |
+          git push origin 'HEAD:refs/heads/automation/package-lineage-dev'
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Unable to persist package version lineage. A concurrent or non-forward update must be reconciled before publication.'
+          }
+
+      - name: Build exact version commit
+        shell: pwsh
+        run: |
+          $head = (git rev-parse HEAD).Trim()
+          if ($head -ne '${{ steps.lineage.outputs.version-commit }}') {
+            throw "Checkout $head does not match compiled version commit ${{ steps.lineage.outputs.version-commit }}."
+          }
+          dotnet build Koan.sln -c Release --nologo -p:PublicRelease=true -p:NuGetAuditMode=all -p:NuGetAuditLevel=high -p:WarningsAsErrors=NU1903%3BNU1904
+          if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
+
+      - name: Test exact version commit
+        shell: pwsh
+        run: |
+          dotnet test Koan.sln -c Release --no-build --nologo --blame-hang --blame-hang-timeout 5m
+          if ($LASTEXITCODE -ne 0) { throw 'Release tests failed.' }
+
+      - name: Compile exact release plan
+        id: plan
+        shell: pwsh
+        run: |
+          dotnet run --project tools/Koan.Packaging -c Release --no-build -- plan `
+            --lineage artifacts/release/release-lineage.json `
+            --output artifacts/release/release-set.json
+          if ($LASTEXITCODE -ne 0) { throw 'Release planning failed.' }
+          $manifest = Get-Content artifacts/release/release-set.json -Raw | ConvertFrom-Json
+          $releaseCount = @($manifest.packages).Count
+          $hasPackages = if ($releaseCount -gt 0) { 'true' } else { 'false' }
+          "has-packages=$hasPackages" | Out-File $env:GITHUB_OUTPUT -Append
+          "release-count=$releaseCount" | Out-File $env:GITHUB_OUTPUT -Append
+
+      - name: Pack and prove package closure
+        if: steps.plan.outputs.has-packages == 'true'
+        shell: pwsh
+        run: |
+          dotnet run --project tools/Koan.Packaging -c Release --no-build -- pack `
+            --manifest artifacts/release/release-set.json `
+            --output artifacts/release/packages `
+            --clean-room
+          if ($LASTEXITCODE -ne 0) { throw 'Package verification failed.' }
+
+      - name: Preserve exact verified release set
+        if: steps.plan.outputs.has-packages == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: koan-release-${{ github.sha }}
+          path: artifacts/release
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+
       - name: Require trusted-publishing identity
+        if: steps.plan.outputs.has-packages == 'true'
         shell: pwsh
         env:
           NUGET_USER: ${{ vars.NUGET_USER }}
@@ -165,50 +193,87 @@ jobs:
           }
 
       - name: Exchange GitHub identity for a short-lived NuGet credential
+        if: steps.plan.outputs.has-packages == 'true'
         id: nuget-login
         uses: NuGet/login@v1
         with:
           user: ${{ vars.NUGET_USER }}
 
       - name: Publish and reconcile exact artifacts
+        if: steps.plan.outputs.has-packages == 'true'
         shell: pwsh
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: |
-          dotnet run --project tools/Koan.Packaging -c Release -- publish `
+          dotnet run --project tools/Koan.Packaging -c Release --no-build -- publish `
             --manifest artifacts/release/release-set.json `
             --artifacts artifacts/release/packages `
             --state artifacts/release/release-state.json
           if ($LASTEXITCODE -ne 0) { throw 'Package publication did not converge.' }
 
       - name: Record completed release set
+        if: steps.plan.outputs.has-packages == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $short = '${{ github.sha }}'.Substring(0, 12)
-          $tag = "release/dev/$short"
           $manifest = Get-Content artifacts/release/release-set.json -Raw | ConvertFrom-Json
+          $sourceShort = $manifest.sourceCommit.Substring(0, 12)
+          $versionShort = $manifest.versionCommit.Substring(0, 12)
+          $tag = "release/dev/$sourceShort"
           $notes = @(
-            "Automated package release from ``dev`` at ``${{ github.sha }}``."
+            "Automated package release from ``dev`` source ``$($manifest.sourceCommit)``."
             ''
-            "Published $(@($manifest.packages | Where-Object { -not $_.alreadyPublished }).Count) independently versioned package(s)."
+            "Exact version commit: ``$($manifest.versionCommit)``."
+            ''
+            "Reconciled $(@($manifest.packages).Count) independently versioned package(s)."
           ) -join "`n"
+          $evidence = @(
+            'artifacts/release/release-lineage.json',
+            'artifacts/release/release-set.json',
+            'artifacts/release/release-state.json'
+          )
           for ($attempt = 1; $attempt -le 5; $attempt++) {
             gh release view $tag *> $null
             if ($LASTEXITCODE -eq 0) {
-              gh release upload $tag artifacts/release/release-set.json artifacts/release/release-state.json --clobber
+              gh release upload $tag @evidence --clobber
               if ($LASTEXITCODE -eq 0) {
-                gh release edit $tag --title "Koan package release $short" --notes $notes
+                gh release edit $tag --target $manifest.versionCommit --title "Koan package release $sourceShort / $versionShort" --notes $notes
               }
             }
             else {
-              gh release create $tag artifacts/release/release-set.json artifacts/release/release-state.json `
-                --target '${{ github.sha }}' `
-                --title "Koan package release $short" `
+              gh release create $tag @evidence `
+                --target $manifest.versionCommit `
+                --title "Koan package release $sourceShort / $versionShort" `
                 --notes $notes
             }
             if ($LASTEXITCODE -eq 0) { exit 0 }
             if ($attempt -eq 5) { throw "Failed to record release evidence after $attempt attempts." }
             Start-Sleep -Seconds ([Math]::Pow(2, $attempt))
           }
+
+      - name: Summary
+        if: always() && steps.lineage.outcome == 'success'
+        shell: pwsh
+        run: |
+          $lineage = Get-Content artifacts/release/release-lineage.json -Raw | ConvertFrom-Json
+          $lines = @(
+            '# Koan package release impact'
+            ''
+            "Source: ``$($lineage.sourceCommit)``"
+            ''
+            "Version commit: ``$($lineage.versionCommit)``"
+            ''
+            "Breaking closure: $(@($lineage.closurePackages).Count) package(s); generated markers: $(@($lineage.markerPackages).Count)."
+          )
+          if (Test-Path artifacts/release/release-set.json) {
+            $manifest = Get-Content artifacts/release/release-set.json -Raw | ConvertFrom-Json
+            $rows = @($manifest.packages | ForEach-Object { "| $($_.packageId) | $($_.previousVersion) | $($_.version) | $($_.reason) |" })
+            $lines += @(
+              ''
+              '| Package | Previous | Version | Reason |'
+              '| --- | --- | --- | --- |'
+              $rows
+            )
+          }
+          $lines | Out-File $env:GITHUB_STEP_SUMMARY -Append

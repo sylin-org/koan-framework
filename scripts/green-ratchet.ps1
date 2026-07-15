@@ -6,6 +6,7 @@
 .DESCRIPTION
   Runs the consolidation gate and fails if any leg fails:
 
+    0.  Tools       dotnet tool restore      — pinned repository tools used by executable proofs.
     A.  Build       dotnet build Koan.sln   — framework + every dogfood sample
                     (the samples live in Koan.sln, so one build covers both).
     A'. Test        dotnet test  Koan.sln    — container-gated integration specs skip
@@ -66,6 +67,8 @@ try {
         $Base = if ($LASTEXITCODE -eq 0) { 'origin/main' } else { 'main' }
     }
     Write-Host "[ratchet] config=$Configuration  docs-base=$Base  skipTests=$SkipTests  fullDocs=$FullDocs"
+
+    Invoke-Leg '0. tools' { & dotnet tool restore }
 
     Invoke-Leg 'A. build' { & dotnet build "$root/Koan.sln" -c $Configuration --nologo }
 

@@ -3,30 +3,51 @@
 ## Authority
 
 Git and evaluated MSBuild projects are authoritative. Every packable project under `src/`,
-`packaging/`, or the top-level template package owns a project-local `version.json`. The release
-compiler compares the public NBGV version at the push event's before and after commits. A changed
-version is a touched package; an unchanged identity is reconciled only when absent from nuget.org.
+`packaging/`, or the top-level template package owns a project-local `version.json`. Evaluated
+`ProjectReference`s form one `PackageGraph`; no XML parser or maintained package list participates.
+
+The human signal is a compatibility-tier change in `version.json`. Before 1.0, a minor advance is
+breaking; from 1.0 onward, a major advance is breaking.
+
+## Durable lineage
+
+Release events serialize before version calculation. The compiler starts at the previous durable
+version commit and applies exactly the Git tree delta between the previous and current `dev` source
+commits. This creates a linear projection rather than a merge graph, so NBGV path heights remain
+package-independent.
+
+For every breaking root, the graph computes its complete transitive reverse closure. After a
+provisional projection commit exposes the actual NBGV identities, only closure members that still
+match their previous identity receive a deterministic package-local marker. The commit is amended,
+and every closure member is checked again for a fresh identity. Source-owned reserved state/marker
+paths, deletion/rename, non-forward source, graph cycles, and incomplete identity waves fail closed.
+
+`.koan-package-lineage.json` is committed on `automation/package-lineage-dev`. The external
+`release-lineage.json` adds the resulting `VersionCommit`; planning rejects it unless every field
+matches the committed state.
 
 ## Artifact contract
 
-`release-set.json` records the source commit, individual versions, topological project dependencies,
-package dependencies, artifact names, and SHA-256 values. Packing is fail-fast, enables transitive
-NuGet audit, and rejects high or critical advisories. Publication consumes this exact manifest and
-artifact directory and records progress in `release-state.json`.
+`SourceCommit` is audit intent. `PreviousVersionCommit` and `VersionCommit` are version truth.
+`release-set.json` records those identities, breaking causes, dependency order, package dependencies,
+artifact names, and SHA-256 values. Packing requires `HEAD == VersionCommit`, validates package
+repository metadata against that commit, enables transitive NuGet audit, and rejects high or critical
+advisories.
+
+Every selected identity is packed, including an already-public identity selected during replay. This
+lets publication reconcile its symbol artifact and state without minting replacement bits. Publication
+consumes the exact manifest/artifact directory and keys `release-state.json` to `VersionCommit`.
 
 ## Clean room
 
 The verifier builds FirstUse and GoldenJourney in temporary directories outside the checkout. All
-`Sylin.Koan*` packages are source-mapped to a hydrated local feed containing the release artifacts
-and their public Koan closure. FirstUse protects the shortest result. GoldenJourney protects
-persistence, durable Jobs progress and composition facts, operator/agent fact convergence, bounded
-custom tools, honest dry-run behavior, and unavailable-adapter rejection/recovery. The two evidence
-files remain separate so a release cannot hide a front-door regression behind the larger journey.
+`Sylin.Koan*` packages are source-mapped to a hydrated local feed containing the release artifacts and
+their public Koan closure. Separate evidence files prevent the larger journey from hiding a shortest-
+path regression.
 
 ## Failure behavior
 
-Missing version ownership, duplicate IDs, dependency cycles, absent internal dependency floors,
-package metadata defects, non-canonical internal ranges, audit failures, clean-room failures, and
-publication timeouts are fatal and name the affected package identity. Package publication from
-`dev` is dependency-first and retried with
-bounded backoff.
+Missing version ownership, duplicate IDs, dependency cycles, lineage drift, reserved-path collisions,
+unsupported package moves, non-forward source, stale closure identities, wrong-checkout packing,
+absent internal dependency floors, metadata defects, non-canonical ranges, audit failures, clean-room
+failures, and publication timeouts are fatal and name the relevant commit, package, or path.

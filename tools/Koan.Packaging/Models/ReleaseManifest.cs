@@ -1,12 +1,15 @@
+using Koan.Packaging.Infrastructure;
 using System.Text.Json.Serialization;
 
 namespace Koan.Packaging.Models;
 
 internal sealed class ReleaseManifest
 {
-    public int SchemaVersion { get; init; } = 1;
-    public required string BeforeCommit { get; init; }
+    public int SchemaVersion { get; init; } = PackagingConstants.ReleaseManifestSchema;
+    public required string PreviousVersionCommit { get; init; }
     public required string SourceCommit { get; init; }
+    public required string VersionCommit { get; init; }
+    public List<string> BreakingRoots { get; init; } = [];
     public required DateTimeOffset CreatedAtUtc { get; init; }
     public List<ReleasePackage> Packages { get; init; } = [];
 }
@@ -19,6 +22,8 @@ internal sealed class ReleasePackage
     public required string ProjectPath { get; init; }
     public required string Kind { get; init; }
     public required string Reason { get; init; }
+    public List<string> BreakingRoots { get; init; } = [];
+    public bool LineageMarkerGenerated { get; init; }
     public bool AlreadyPublished { get; set; }
     public bool IncludeSymbols { get; init; }
     public List<string> ProjectDependencies { get; init; } = [];
@@ -36,6 +41,45 @@ internal sealed record PackageDependency(string PackageId, string VersionRange, 
 
 internal sealed class ReleaseState
 {
-    public required string SourceCommit { get; init; }
+    public int SchemaVersion { get; init; } = PackagingConstants.ReleaseManifestSchema;
+    public required string VersionCommit { get; init; }
     public Dictionary<string, string> Packages { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
+internal sealed class ReleaseLineage
+{
+    public int SchemaVersion { get; init; } = PackagingConstants.ReleaseLineageSchema;
+    public required string PreviousSourceCommit { get; init; }
+    public required string SourceCommit { get; init; }
+    public required string PreviousVersionCommit { get; init; }
+    public required string VersionCommit { get; init; }
+    public List<string> BreakingRoots { get; init; } = [];
+    public List<string> ClosurePackages { get; init; } = [];
+    public List<string> MarkerPackages { get; init; } = [];
+    public List<ReleaseLineageTrigger> Triggers { get; init; } = [];
+}
+
+internal sealed class ReleaseLineageState
+{
+    public int SchemaVersion { get; init; } = PackagingConstants.ReleaseLineageSchema;
+    public required string PreviousSourceCommit { get; init; }
+    public required string SourceCommit { get; init; }
+    public required string PreviousVersionCommit { get; init; }
+    public List<string> BreakingRoots { get; init; } = [];
+    public List<string> ClosurePackages { get; init; } = [];
+    public List<string> MarkerPackages { get; init; } = [];
+    public List<ReleaseLineageTrigger> Triggers { get; init; } = [];
+    public List<ReleaseLineagePackage> Packages { get; init; } = [];
+}
+
+internal sealed record ReleaseLineagePackage(string PackageId, string ProjectPath);
+
+internal sealed record ReleaseLineageTrigger(string PackageId, IReadOnlyList<string> BreakingRoots);
+
+internal sealed class ReleaseLineageMarker
+{
+    public int SchemaVersion { get; init; } = PackagingConstants.ReleaseLineageSchema;
+    public required string SourceCommit { get; init; }
+    public required string PackageId { get; init; }
+    public List<string> BreakingRoots { get; init; } = [];
 }

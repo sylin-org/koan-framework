@@ -23,6 +23,7 @@ internal sealed class PackagePipeline(
         bool resume,
         CancellationToken cancellationToken)
     {
+        await RequireVersionCommitCheckoutAsync(manifest.VersionCommit, cancellationToken);
         Directory.CreateDirectory(outputDirectory);
         if (!resume)
         {
@@ -30,7 +31,7 @@ internal sealed class PackagePipeline(
             foreach (var file in Directory.EnumerateFiles(outputDirectory, "*.snupkg")) File.Delete(file);
         }
 
-        foreach (var package in manifest.Packages.Where(package => !package.AlreadyPublished))
+        foreach (var package in manifest.Packages)
         {
             var artifact = resume ? FindPackage(outputDirectory, package.PackageId, package.Version) : null;
             if (artifact is null)
@@ -56,7 +57,7 @@ internal sealed class PackagePipeline(
                 Console.WriteLine($"reuse  {package.PackageId} {package.Version}");
             }
             var inspected = InspectPackage(artifact);
-            ValidateMetadata(package, inspected, manifest.SourceCommit);
+            ValidateMetadata(package, inspected, manifest.VersionCommit);
             ValidateRequiredBuildAssets(package.PackageId, artifact);
             package.PackageDependencies = inspected.Dependencies;
             package.PackageFile = Path.GetFileName(artifact);
@@ -90,10 +91,15 @@ internal sealed class PackagePipeline(
         var state = File.Exists(statePath)
             ? JsonSerializer.Deserialize<ReleaseState>(await File.ReadAllTextAsync(statePath, cancellationToken), JsonOptions)
             : null;
-        state ??= new ReleaseState { SourceCommit = manifest.SourceCommit };
-        if (!string.Equals(state.SourceCommit, manifest.SourceCommit, StringComparison.OrdinalIgnoreCase))
+        if (state is not null && state.SchemaVersion != PackagingConstants.ReleaseManifestSchema)
         {
-            throw new InvalidOperationException("Release state belongs to a different source commit.");
+            throw new InvalidOperationException(
+                $"Release state uses schema {state.SchemaVersion}; expected {PackagingConstants.ReleaseManifestSchema}.");
+        }
+        state ??= new ReleaseState { VersionCommit = manifest.VersionCommit };
+        if (!string.Equals(state.VersionCommit, manifest.VersionCommit, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Release state belongs to a different version commit.");
         }
 
         foreach (var package in manifest.Packages)
@@ -101,14 +107,6 @@ internal sealed class PackagePipeline(
             if (state.Packages.TryGetValue(package.Identity, out var disposition) &&
                 string.Equals(disposition, "available", StringComparison.OrdinalIgnoreCase))
             {
-                continue;
-            }
-
-            if (package.AlreadyPublished)
-            {
-                Console.WriteLine($"exists  {package.Identity}");
-                state.Packages[package.Identity] = "available";
-                await SaveStateAsync(state, statePath, cancellationToken);
                 continue;
             }
 
@@ -151,9 +149,19 @@ internal sealed class PackagePipeline(
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(manifest, JsonOptions) + Environment.NewLine, cancellationToken);
     }
 
-    public static async Task<ReleaseManifest> LoadManifestAsync(string path, CancellationToken cancellationToken) =>
-        JsonSerializer.Deserialize<ReleaseManifest>(await File.ReadAllTextAsync(path, cancellationToken), JsonOptions)
-        ?? throw new InvalidOperationException($"Unable to deserialize release manifest '{path}'.");
+    public static async Task<ReleaseManifest> LoadManifestAsync(string path, CancellationToken cancellationToken)
+    {
+        var manifest = JsonSerializer.Deserialize<ReleaseManifest>(
+            await File.ReadAllTextAsync(path, cancellationToken),
+            JsonOptions)
+            ?? throw new InvalidOperationException($"Unable to deserialize release manifest '{path}'.");
+        if (manifest.SchemaVersion != PackagingConstants.ReleaseManifestSchema)
+        {
+            throw new InvalidOperationException(
+                $"Release manifest '{path}' uses schema {manifest.SchemaVersion}; expected {PackagingConstants.ReleaseManifestSchema}.");
+        }
+        return manifest;
+    }
 
     internal static string? MinimumVersion(string range)
     {
@@ -204,7 +212,7 @@ internal sealed class PackagePipeline(
     private async Task VerifyClosureAsync(ReleaseManifest manifest, CancellationToken cancellationToken)
     {
         var selected = manifest.Packages.ToDictionary(package => package.PackageId, StringComparer.OrdinalIgnoreCase);
-        foreach (var package in manifest.Packages.Where(package => !package.AlreadyPublished))
+        foreach (var package in manifest.Packages)
         {
             foreach (var dependency in package.PackageDependencies.Where(IsKoanPackage))
             {
@@ -384,6 +392,18 @@ internal sealed class PackagePipeline(
             if (attempt == PackagingConstants.PublishAttempts) throw new InvalidOperationException($"Failed to publish {Path.GetFileName(packagePath)} after {attempt} attempts.");
             await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
         }
+    }
+
+    private async Task RequireVersionCommitCheckoutAsync(string versionCommit, CancellationToken cancellationToken)
+    {
+        var head = await processRunner.RequireAsync(
+            "git",
+            ["rev-parse", "--verify", "HEAD^{commit}"],
+            repositoryRoot,
+            cancellationToken);
+        if (string.Equals(head, versionCommit, StringComparison.OrdinalIgnoreCase)) return;
+        throw new InvalidOperationException(
+            $"Package verification requires version commit {versionCommit}, but the checkout is {head}.");
     }
 
     private async Task WaitUntilAvailableAsync(string packageId, string version, CancellationToken cancellationToken)

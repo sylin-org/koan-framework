@@ -17,6 +17,7 @@ internal static class PackagingProgram
             http.DefaultRequestHeaders.UserAgent.ParseAdd("Koan.Packaging/1.0");
             var registry = new NuGetRegistry(http);
             var repository = new RepositoryInspector(root, process);
+            var lineageCompiler = new ReleaseLineageCompiler(root, process, repository);
             var planner = new ReleasePlanner(repository, registry);
             var pipeline = new PackagePipeline(root, process, registry);
             var command = args.FirstOrDefault()?.ToLowerInvariant() ?? "help";
@@ -34,14 +35,27 @@ internal static class PackagingProgram
                 }
                 case "plan":
                 {
-                    var manifest = await planner.CreateAsync(
-                        options.Value("before") ?? PackagingConstants.DefaultBeforeRevision,
-                        options.Value("after") ?? PackagingConstants.DefaultAfterRevision,
-                        options.Has("offline"),
-                        cancellationToken);
+                    var lineagePath = options.Value("lineage")
+                        ?? Path.Combine(root, "artifacts", "release", PackagingConstants.LineageArtifactFileName);
+                    var lineage = await ReleaseLineageCompiler.LoadAsync(lineagePath, cancellationToken);
+                    var manifest = await planner.CreateAsync(lineage, options.Has("offline"), cancellationToken);
                     var output = options.Value("output") ?? Path.Combine(root, "artifacts", "release", PackagingConstants.ManifestFileName);
                     await PackagePipeline.SaveManifestAsync(manifest, output, cancellationToken);
                     PrintPlan(manifest, output);
+                    return 0;
+                }
+                case "lineage":
+                {
+                    var lineage = await lineageCompiler.CompileAsync(
+                        options.Value("source") ?? PackagingConstants.DefaultAfterRevision,
+                        options.Value("previous-source") ?? PackagingConstants.DefaultBeforeRevision,
+                        options.Value("branch") ?? PackagingConstants.DefaultLineageBranch,
+                        options.Value("previous-lineage"),
+                        cancellationToken);
+                    var output = options.Value("output")
+                        ?? Path.Combine(root, "artifacts", "release", PackagingConstants.LineageArtifactFileName);
+                    await ReleaseLineageCompiler.SaveAsync(lineage, output, cancellationToken);
+                    PrintLineage(lineage, output);
                     return 0;
                 }
                 case "pack":
@@ -56,7 +70,7 @@ internal static class PackagingProgram
                         options.Has("resume"),
                         cancellationToken);
                     await PackagePipeline.SaveManifestAsync(manifest, manifestPath, cancellationToken);
-                    Console.WriteLine($"verified  {manifest.Packages.Count(package => !package.AlreadyPublished)} new package(s)");
+                    Console.WriteLine($"verified  {manifest.Packages.Count} release artifact(s)");
                     return 0;
                 }
                 case "publish":
@@ -69,7 +83,9 @@ internal static class PackagingProgram
                         ?? throw new InvalidOperationException($"Environment variable '{credentialVariable}' is not set.");
                     var manifest = await PackagePipeline.LoadManifestAsync(manifestPath, cancellationToken);
                     await pipeline.PublishAsync(manifest, artifacts, credential, state, cancellationToken);
-                    Console.WriteLine($"published  release set {manifest.SourceCommit[..Math.Min(12, manifest.SourceCommit.Length)]}");
+                    Console.WriteLine(
+                        $"published  release set {manifest.VersionCommit[..Math.Min(12, manifest.VersionCommit.Length)]}; " +
+                        $"source={manifest.SourceCommit[..Math.Min(12, manifest.SourceCommit.Length)]}");
                     return 0;
                 }
                 case "help":
@@ -90,20 +106,30 @@ internal static class PackagingProgram
 
     private static void PrintPlan(Koan.Packaging.Models.ReleaseManifest manifest, string output)
     {
-        Console.WriteLine($"release  {manifest.BeforeCommit[..12]} -> {manifest.SourceCommit[..12]}");
+        Console.WriteLine($"release  {manifest.PreviousVersionCommit[..12]} -> {manifest.VersionCommit[..12]}");
+        Console.WriteLine($"source   {manifest.SourceCommit}");
         foreach (var package in manifest.Packages)
         {
-            var disposition = package.AlreadyPublished ? "exists" : "mint";
+            var disposition = package.AlreadyPublished ? "repair" : "mint";
             Console.WriteLine($"{disposition,-7} {package.PackageId} {package.PreviousVersion ?? "new"} -> {package.Version} ({package.Reason})");
         }
         Console.WriteLine($"manifest {Path.GetFullPath(output)}");
+    }
+
+    private static void PrintLineage(Koan.Packaging.Models.ReleaseLineage lineage, string output)
+    {
+        Console.WriteLine($"lineage  {lineage.PreviousVersionCommit[..12]} -> {lineage.VersionCommit[..12]}");
+        Console.WriteLine($"source   {lineage.SourceCommit}");
+        Console.WriteLine($"closure  {lineage.ClosurePackages.Count} package(s), {lineage.MarkerPackages.Count} generated marker(s)");
+        Console.WriteLine($"artifact {Path.GetFullPath(output)}");
     }
 
     private static void PrintHelp() => Console.WriteLine("""
         Koan package release compiler
 
           inventory [--output PATH]
-          plan      [--before GIT] [--after GIT] [--output PATH] [--offline]
+          lineage   [--source GIT] [--previous-source GIT] [--previous-lineage GIT] [--branch NAME] [--output PATH]
+          plan      [--lineage PATH] [--output PATH] [--offline]
           pack      --manifest PATH [--output DIR] [--clean-room] [--resume]
           publish   --manifest PATH [--artifacts DIR] [--state PATH] [--api-key-env NAME]
         """);

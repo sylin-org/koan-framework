@@ -4,6 +4,16 @@ internal static class PackagingConstants
 {
     public const string ManifestFileName = "release-set.json";
     public const string StateFileName = "release-state.json";
+    public const string LineageArtifactFileName = "release-lineage.json";
+    public const string LineageStateFileName = ".koan-package-lineage.json";
+    public const string LineageMarkerFileName = ".koan-package-lineage-marker.json";
+    public const string DefaultLineageBranch = "automation/package-lineage-dev";
+    public const string LineageCommitterName = "Koan Release Automation";
+    public const string LineageCommitterEmail = "release-automation@koan.dev";
+    public const string VersionChangedReason = "version-changed";
+    public const string BreakingRootReason = "breaking-root";
+    public const string BreakingDependentReason = "breaking-dependent";
+    public const string RegistryRepairReason = "unpublished-current-version";
     public const string NuGetSource = "https://api.nuget.org/v3/index.json";
     public const string NuGetFlatContainer = "https://api.nuget.org/v3-flatcontainer";
     public const string PackagePrefix = "Sylin.Koan";
@@ -15,6 +25,8 @@ internal static class PackagingConstants
     public const int PublishAttempts = 5;
     public const int RegistryAttempts = 20;
     public const int RegistryHttpAttempts = 5;
+    public const int ReleaseManifestSchema = 2;
+    public const int ReleaseLineageSchema = 1;
 
     public static class ApplicationProbe
     {
