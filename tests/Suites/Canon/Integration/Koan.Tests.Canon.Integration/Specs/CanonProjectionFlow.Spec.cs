@@ -236,6 +236,25 @@ public sealed class CanonProjectionFlowSpec
             }
         }
 
+        public Task<TModel?> GetCanonicalAsync<TModel>(string canonicalId, CancellationToken cancellationToken)
+            where TModel : CanonEntity<TModel>, new()
+        {
+            lock (_gate)
+            {
+                if (typeof(TModel) == typeof(CustomerCanon))
+                {
+                    var snapshot = _canonical.LastOrDefault(existing =>
+                        string.Equals(existing.Id, canonicalId, StringComparison.OrdinalIgnoreCase));
+                    if (snapshot is not null)
+                    {
+                        return Task.FromResult<TModel?>((TModel)(object)snapshot.ToEntity());
+                    }
+                }
+
+                return Task.FromResult<TModel?>(null);
+            }
+        }
+
         public Task<TModel> PersistCanonicalAsync<TModel>(TModel entity, CancellationToken cancellationToken)
             where TModel : CanonEntity<TModel>, new()
         {
@@ -351,6 +370,8 @@ public sealed class CanonProjectionFlowSpec
         internal sealed class CustomerSnapshot
         {
             public required string Id { get; init; }
+            public required string Email { get; init; }
+            public required string Dummy { get; init; }
             public required string DisplayName { get; init; }
             public required CanonMetadata Metadata { get; init; }
 
@@ -358,8 +379,20 @@ public sealed class CanonProjectionFlowSpec
                 => new()
                 {
                     Id = customer.Id,
+                    Email = customer.Email,
+                    Dummy = customer.Dummy,
                     DisplayName = customer.DisplayName ?? "",
                     Metadata = customer.Metadata.Clone()
+                };
+
+            public CustomerCanon ToEntity()
+                => new()
+                {
+                    Id = Id,
+                    Email = Email,
+                    Dummy = Dummy,
+                    DisplayName = DisplayName,
+                    Metadata = Metadata.Clone()
                 };
         }
 

@@ -19,10 +19,10 @@ namespace Koan.Identity.Tests;
 /// requirement (through the live dispatcher), and the Security Checkup amber → green journey (the delight).
 /// </summary>
 [Collection("identity")]
-public sealed class MfaFactorSpec
+public sealed class MfaFactorSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public MfaFactorSpec(IdentityHostFixture fx) => _fx = fx;
+    public MfaFactorSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     private TotpService Totp => _fx.Services.GetRequiredService<TotpService>();
     private RecoveryCodeService Recovery => _fx.Services.GetRequiredService<RecoveryCodeService>();

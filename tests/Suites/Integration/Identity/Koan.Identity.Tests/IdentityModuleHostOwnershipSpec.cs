@@ -9,8 +9,13 @@ using Xunit;
 namespace Koan.Identity.Tests;
 
 [Collection("identity")]
-public sealed class IdentityModuleHostOwnershipSpec(IdentityHostFixture fixture)
+public sealed class IdentityModuleHostOwnershipSpec : IdentityHostScopedSpec
 {
+    private readonly IdentityHostFixture _fixture;
+
+    public IdentityModuleHostOwnershipSpec(IdentityHostFixture fixture) : base(fixture)
+        => _fixture = fixture;
+
     [Fact]
     public async Task Parallel_module_starts_use_their_supplied_provider_and_restore_the_attached_host()
     {
@@ -22,7 +27,7 @@ public sealed class IdentityModuleHostOwnershipSpec(IdentityHostFixture fixture)
         var attachedHost = AppHost.Current;
         attachedHost.Should().NotBeNull();
         attachedHost!.GetService(typeof(IIdentityReconciler)).Should()
-            .BeSameAs(fixture.Services.GetRequiredService<IIdentityReconciler>());
+            .BeSameAs(_fixture.Services.GetRequiredService<IIdentityReconciler>());
 
         await Task.WhenAll(
             new SecIdentityModule().Start(firstHost.Services, TestContext.Current.CancellationToken),

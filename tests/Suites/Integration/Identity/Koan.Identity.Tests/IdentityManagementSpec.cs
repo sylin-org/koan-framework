@@ -14,10 +14,10 @@ namespace Koan.Identity.Tests;
 /// audit batch, lifecycle-aware delete, and nestable ambient-exempt groups.
 /// </summary>
 [Collection("identity")]
-public sealed class IdentityManagementSpec
+public sealed class IdentityManagementSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public IdentityManagementSpec(IdentityHostFixture fx) => _fx = fx;
+    public IdentityManagementSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     private SessionService Sessions => _fx.Services.GetRequiredService<SessionService>();
     private ApiTokenService Tokens => _fx.Services.GetRequiredService<ApiTokenService>();

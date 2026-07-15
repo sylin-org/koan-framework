@@ -144,6 +144,10 @@ public sealed class CanonParkAndSweepFlowSpec
             }
         }
 
+        public Task<TModel?> GetCanonicalAsync<TModel>(string canonicalId, CancellationToken cancellationToken)
+            where TModel : CanonEntity<TModel>, new()
+            => Task.FromResult<TModel?>(null);
+
         public Task<TModel> PersistCanonicalAsync<TModel>(TModel entity, CancellationToken cancellationToken)
             where TModel : CanonEntity<TModel>, new()
             => Task.FromResult(entity);

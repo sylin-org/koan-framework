@@ -14,10 +14,10 @@ namespace Koan.Identity.Tests;
 /// and grant contributors — no code-path fork — and degrades to empty in the global (no-tenant) view.
 /// </summary>
 [Collection("identity")]
-public sealed class IdentityTenancyAccessSpec
+public sealed class IdentityTenancyAccessSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public IdentityTenancyAccessSpec(IdentityHostFixture fx) => _fx = fx;
+    public IdentityTenancyAccessSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     private IdentityRoleService Roles => _fx.Services.GetRequiredService<IdentityRoleService>();
     private EffectiveAccessResolver NewResolver(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<EffectiveAccessResolver>();

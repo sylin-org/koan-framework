@@ -5,7 +5,6 @@ using Koan.Canon.Domain.Metadata;
 using Koan.Canon.Domain.Runtime;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core.Model;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Canon.Domain.Model;
 
@@ -181,14 +180,5 @@ public abstract class CanonEntity<TModel> : Entity<TModel>
     }
 
     private static ICanonRuntime ResolveRuntime()
-    {
-        var services = AppHost.Current ?? throw new InvalidOperationException("AppHost.Current is not set. Ensure builder.Services.AddKoan() executes during startup.");
-        var runtime = services.GetService<ICanonRuntime>();
-        if (runtime is null)
-        {
-            throw new InvalidOperationException("ICanonRuntime is not registered. Ensure builder.Services.AddKoan() wires Canon runtime services.");
-        }
-
-        return runtime;
-    }
+        => AppHost.GetRequiredService<ICanonRuntime>("entity canonization");
 }

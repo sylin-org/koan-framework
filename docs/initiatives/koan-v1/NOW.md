@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 through R07-03 passed; R07-04 public-release ratchet rehabilitation is active
+  scope: R07-01 through R07-03 passed; R07-04 TestKit and host/persistence roots repaired
 ---
 
 # Koan V1 reorganization current handoff
@@ -37,9 +37,10 @@ Replace this file at every handoff. It is a restart point, not a diary.
   complete breaking reverse closure.
 - [R07-04](work-items/r07/R07-04-public-release-ratchet.md) is active. The automatic publisher now runs
   the complete public-release ratchet and correctly stays red because several existing solution suites
-  fail independently. Its first slice explicitly fences all five shared TestKits from solution test
-  execution; shared Identity/Canon host ownership is next. Restore test truth before the Lifecycle
-  break; do not narrow the release gate.
+  fail independently. All five shared TestKits are fenced from solution test execution; Identity now
+  selects its shared host per fact and passes 114/114; Canon now has one complete replaceable
+  persistence boundary and passes unit 35/35 plus integration 6/6. Jobs SQLite is the next isolated
+  behavior root. Restore test truth before the Lifecycle break; do not narrow the release gate.
 - Lifecycle remains the next semantic clean 0.18 public break. Retain the no-alias greenfield decision
   and keep Communication/Pipeline work out of the release-foundation slice.
 - Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
@@ -174,16 +175,25 @@ Only the next slice has a detailed child card. Do not open broker breadth before
   blueprint legs. Its solution-test leg is red and fails closed. Isolated evidence is recorded in
   R07-04; no publication or remote mutation occurred.
 - All five shared TestKit projects now evaluate `IsTestProject=false`; the previously aborting Jobs
-  helper exits without a test host, and the release-workflow contract passes 2/2. A complete 53-test
-  packaging rerun exceeded its outer 240-second timeout without a result, so aggregate green is not
-  claimed.
+  helper exits without a test host, and focused packaging contracts pass 30/30. Complete 53-test
+  reruns exceeded 240- and 300-second outer timeouts because reusable MSBuild workers retained the
+  Golden Journey build probe's redirected pipe handles. Disabling node reuse externally proves the
+  probe 2/2 and aggregate 53/53; the repository default still requires the bounded harness repair,
+  so aggregate green is not yet claimed.
+- Identity passes 114/114 after one test-local flow-scope base separated fixture lifetime from ambient
+  host selection. The expected failed nested host still rejects correctly; no production fallback or
+  lease behavior changed.
+- Canon unit passes 35/35 and integration passes 6/6. `ICanonPersistence.GetCanonicalAsync<T>` now
+  owns prior-state and rebuild reads, custom-store failures propagate, explicit provider overloads
+  scope and restore correctly, and the intentional pre-1.0 breaking contract is recorded as the
+  Domain package's 0.18 tier.
 
 ## Next safe action
 
-Continue [R07-04](work-items/r07/R07-04-public-release-ratchet.md): compare Identity and Canon with the
-closest passing host-owned Entity suites, then repair their smallest shared ownership seam. After both
-projects pass completely, restore Jobs SQLite behavior, resolve the recorded Mongo endpoint-precedence
-case, and pass the exact public-release ratchet.
+Continue [R07-04](work-items/r07/R07-04-public-release-ratchet.md): reproduce the five isolated Jobs
+SQLite failures from the repaired tree, group them by behavioral root, and repair the smallest owning
+seam without weakening assertions. Then resolve the recorded Mongo endpoint-precedence case, rerun
+the complete packaging suite successfully, and pass the exact public-release ratchet.
 
 Do not start Lifecycle, Communication Events, Transport, a router, a unit-of-work coordinator, or
 Messaging compatibility work while the release floor is red.

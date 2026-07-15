@@ -10,6 +10,16 @@ namespace Koan.Canon.Domain.Runtime;
 public interface ICanonPersistence
 {
     /// <summary>
+    /// Retrieves a canonical entity by identifier, or <see langword="null"/> when it does not exist.
+    /// </summary>
+    /// <remarks>
+    /// Custom persistence implementations own this read together with canonical writes. Returning
+    /// <see langword="null"/> means the record is absent; storage and provider failures must propagate.
+    /// </remarks>
+    Task<TModel?> GetCanonicalAsync<TModel>(string canonicalId, CancellationToken cancellationToken)
+        where TModel : CanonEntity<TModel>, new();
+
+    /// <summary>
     /// Persists the canonical entity and returns the materialized snapshot.
     /// </summary>
     Task<TModel> PersistCanonicalAsync<TModel>(TModel entity, CancellationToken cancellationToken)

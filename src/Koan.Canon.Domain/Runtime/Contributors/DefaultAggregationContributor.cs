@@ -144,16 +144,7 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
             return;
         }
 
-        TModel? existing;
-
-        try
-        {
-            existing = await CanonEntity<TModel>.Get(canonicalId, cancellationToken);
-        }
-        catch (InvalidOperationException ex) when (IsAppHostUnavailable(ex))
-        {
-            return;
-        }
+        var existing = await context.Persistence.GetCanonicalAsync<TModel>(canonicalId, cancellationToken);
 
         if (existing is null)
         {
@@ -174,9 +165,6 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
         merged.AssignCanonicalId(canonicalId);
         context.ApplyMetadata(merged);
     }
-
-    private static bool IsAppHostUnavailable(InvalidOperationException exception)
-        => exception.Message.IndexOf("AppHost.Current", StringComparison.OrdinalIgnoreCase) >= 0;
 
     private string ResolveArrivalToken(CanonPipelineContext<TModel> context)
     {

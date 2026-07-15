@@ -192,7 +192,7 @@ public sealed class CanonRuntime : ICanonRuntime
             throw new ArgumentException("Canonical identifier must be provided.", nameof(canonicalId));
         }
 
-        var entity = await CanonEntity<T>.Get(canonicalId, cancellationToken)
+        var entity = await _persistence.GetCanonicalAsync<T>(canonicalId, cancellationToken)
             ?? throw new InvalidOperationException($"Canonical entity '{typeof(T).Name}' with identifier '{canonicalId}' was not found.");
 
         var options = CanonizationOptions.Default.Copy();

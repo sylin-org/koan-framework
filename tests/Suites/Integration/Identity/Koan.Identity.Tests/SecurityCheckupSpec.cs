@@ -14,10 +14,10 @@ namespace Koan.Identity.Tests;
 /// amber nudges that make the amber → green journey real.
 /// </summary>
 [Collection("identity")]
-public sealed class SecurityCheckupSpec
+public sealed class SecurityCheckupSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public SecurityCheckupSpec(IdentityHostFixture fx) => _fx = fx;
+    public SecurityCheckupSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     private const string AmberPrefix = "ck-amber-";
 

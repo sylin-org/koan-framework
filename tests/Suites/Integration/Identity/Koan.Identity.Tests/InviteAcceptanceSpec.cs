@@ -14,10 +14,10 @@ namespace Koan.Identity.Tests;
 /// idempotent (no duplicate seat).
 /// </summary>
 [Collection("identity")]
-public sealed class InviteAcceptanceSpec
+public sealed class InviteAcceptanceSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public InviteAcceptanceSpec(IdentityHostFixture fx) => _fx = fx;
+    public InviteAcceptanceSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     private InviteAcceptanceService Invites => _fx.Services.GetRequiredService<InviteAcceptanceService>();
 

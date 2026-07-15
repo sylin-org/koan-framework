@@ -212,7 +212,21 @@ public sealed class CanonRuntimeFlowSpec
         {
             lock (_gate)
             {
-                return _canonicals.TryGetValue(id, out var value) ? value : null;
+                return _canonicals.TryGetValue(id, out var value) ? Clone(value) : null;
+            }
+        }
+
+        public Task<TModel?> GetCanonicalAsync<TModel>(string canonicalId, CancellationToken cancellationToken)
+            where TModel : CanonEntity<TModel>, new()
+        {
+            lock (_gate)
+            {
+                if (typeof(TModel) == typeof(ContactCanon) && _canonicals.TryGetValue(canonicalId, out var value))
+                {
+                    return Task.FromResult<TModel?>((TModel)(object)Clone(value));
+                }
+
+                return Task.FromResult<TModel?>(null);
             }
         }
 
@@ -232,7 +246,7 @@ public sealed class CanonRuntimeFlowSpec
             {
                 lock (_gate)
                 {
-                    _canonicals[entity.Id] = contact;
+                    _canonicals[entity.Id] = Clone(contact);
                 }
             }
 
@@ -284,6 +298,16 @@ public sealed class CanonRuntimeFlowSpec
 
         private static string MakeKey(string entityType, string key)
             => $"{entityType}::{key}";
+
+        private static ContactCanon Clone(ContactCanon source)
+            => new()
+            {
+                Id = source.Id,
+                Email = source.Email,
+                PhoneNumber = source.PhoneNumber,
+                DisplayName = source.DisplayName,
+                Metadata = source.Metadata.Clone()
+            };
     }
 
     private sealed class NoopAuditSink : ICanonAuditSink

@@ -66,9 +66,34 @@ Isolated reruns show that the red result is not only whole-solution contention:
 - A release-workflow contract requires every TestKit under `tests/` to retain exactly that explicit
   boundary. The contract class passes 2/2, all five projects evaluate false, and the previously
   aborting direct Jobs TestKit invocation exits successfully without launching a test host.
-- A subsequent complete 53-test packaging invocation produced no result before its outer 240-second
-  timeout; the child process tree was cleaned. This is not recorded as green. R07-03's prior 52/52
-  evidence remains valid, while R07-04 still requires a successful aggregate rerun.
+- Complete 53-test packaging reruns produced no result before 240- and 300-second outer timeouts;
+  the known child trees were cleaned. Focused lineage, graph, and workflow contracts pass 30/30.
+  A bounded blame run located the wait in the Golden Journey probe's `dotnet build`: reusable MSBuild
+  workers retain redirected pipe handles after the parent exits. With node reuse disabled externally,
+  that probe passes 2/2 and the full suite passes 53/53 in 83 seconds. The repository default remains
+  unproved until that process-lifetime policy is encoded and rerun, so aggregate green is not claimed.
+
+### Identity host selection and Canon persistence — passed
+
+- Identity's 44 failures were one order-dependent test ownership cascade. Its shared fixture started a
+  correct `AddKoan()` host; the intentional failed-start fact then replaced and correctly released the
+  process default. Core deliberately did not resurrect the older fixture provider.
+- One test-local base now selects `fixture.Services` through `AppHost.PushScope` for every complete
+  xUnit fact flow. The negative host test selects its nested provider explicitly. No production host,
+  lease, Entity, or Data fallback changed; Identity passes 114/114.
+- Canon's 2 failures had a different root. `ICanonPersistence` owned canonical writes and indexes, but
+  aggregation and rebuild bypassed it through `CanonEntity<T>.Get`; a legacy exception-message filter
+  silently treated the former host error as an absent snapshot.
+- `ICanonPersistence.GetCanonicalAsync<T>` now completes the storage boundary. Aggregation and rebuild
+  load only through the configured implementation, default persistence alone lowers to Entity/Data,
+  provider failures propagate, and explicit-service-provider extensions select that provider for the
+  full operation. The obsolete message parser is deleted.
+- The public interface addition intentionally advances `Sylin.Koan.Canon.Domain` from compatibility
+  tier 0.17 to 0.18; automatic lineage owns its reverse-dependent rebuild. Package companions and the
+  current Canon reference now state the exact default/custom persistence and host boundary.
+- Canon unit passes 35/35 and integration passes 6/6. Focused proofs cover prior-state loading from a
+  hostless custom store, rebuild through that store, failure propagation, and provider-scope
+  restoration.
 
 ## Decisions
 
@@ -80,6 +105,8 @@ Isolated reruns show that the red result is not only whole-solution contention:
   through their real consumer suites.
 - Repair host ownership at its shared test/application seam. Do not reintroduce a process-static
   production fallback to satisfy tests.
+- Treat Identity and Canon as distinct roots despite their shared exception: Identity owns explicit
+  test-flow selection; Canon owns one complete replaceable persistence boundary.
 - Treat Jobs behavior failures and Mongo endpoint election as their own behavioral roots, with focused
   evidence before the aggregate rerun.
 - Lifecycle production changes remain stopped until this base is green. Stable release truth is a
@@ -92,8 +119,6 @@ Isolated reruns show that the red result is not only whole-solution contention:
 
 ### OPEN
 
-- Whether the Identity and Canon failures share one stale test-host pattern or expose a missing
-  framework-owned host boundary must be determined from their setup and the closest passing suites.
 - Provider Jobs failures may disappear once local test isolation is restored; only isolated reruns may
   promote them into separate work.
 
@@ -104,8 +129,8 @@ Isolated reruns show that the red result is not only whole-solution contention:
    project state.
 2. **Complete.** Correct shared-library classification using the existing `IsTestProject=false`
    pattern and add a structural regression so another test kit cannot silently enter the release run.
-3. Compare Identity/Canon setup with the closest passing host-owned Entity suites. Repair the smallest
-   shared ownership seam and rerun both complete projects.
+3. **Complete.** Repair Identity's explicit test-flow selection and Canon's complete persistence
+   boundary; rerun both complete projects and their focused regressions.
 4. Reproduce the five Jobs SQLite failures from a clean isolated output, group them by root, and repair
    behavior or isolation without lowering assertions.
 5. Resolve the explicit endpoint-precedence decision in

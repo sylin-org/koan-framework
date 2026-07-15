@@ -1,5 +1,9 @@
 # Canon Runtime Implementation Delta Analysis
 
+> Historical reconciliation snapshot (2025-10-05). Its percentage and production-readiness labels
+> are not current maturity claims. Use the [current Canon reference](../reference/canon/index.md) and
+> [ARCH-0058](../decisions/ARCH-0058-canon-runtime-architecture.md) for today's supported boundary.
+
 **Analysis Date**: 2025-10-05 (Updated)
 **Spec Version**: SPEC-canon-runtime.md v1.0 (Synchronized)
 **Implementation**: src/Koan.Canon.Domain + src/Koan.Canon.Web
@@ -8,9 +12,11 @@
 
 ## Executive Summary
 
-**Overall Implementation Status**: **100% Complete ✅ PRODUCTION READY**
+**Historical 2025 assessment**: **reported as 100% complete / production-ready**
 
-The Canon runtime implementation is **feature-complete** and production-ready. All core architecture, domain model, pipeline execution, persistence, and web integration are fully implemented, tested, and documented. Spec has been updated to match implementation signatures.
+At the time, this reconciliation rated the Canon runtime feature-complete and production-ready against
+its then-current specification. That rating is preserved as historical evidence, not repeated as a
+current support claim. The current reference defines today's tested and unsupported boundaries.
 
 **Milestones**: M1 ✅ Complete | M2 ✅ Complete | M3-M5 ⏳ Pending
 
@@ -60,8 +66,8 @@ The Canon runtime implementation is **feature-complete** and production-ready. A
 - `src/Koan.Canon.Domain/Runtime/CanonRuntimeBuilder.cs`
 - Tests: `tests/Koan.Canon.Domain.Tests/CanonRuntimeTests.cs` (21 passing tests)
 
-#### 3. Persistence (100%)
-- ✅ `ICanonPersistence` interface (`PersistCanonicalAsync`, `PersistStageAsync`)
+#### 3. Persistence (historical snapshot; completed read boundary added in 0.18)
+- ✅ `ICanonPersistence` interface (canonical read/write, stage write, and index lookup/upsert)
 - ✅ `DefaultCanonPersistence` delegates to `entity.Save()` and `stage.Save()`
 - ✅ Runtime builder `.UsePersistence()` override support
 - ✅ Provider-transparent (works with SQL, MongoDB, JSON stores)
@@ -130,12 +136,16 @@ public interface ICanonPersistence
 ```csharp
 public interface ICanonPersistence
 {
+    Task<TModel?> GetCanonicalAsync<TModel>(string id, CancellationToken ct);
     Task<TModel> PersistCanonicalAsync<TModel>(TModel entity, CancellationToken ct);
     Task<CanonStage<TModel>> PersistStageAsync<TModel>(CanonStage<TModel> stage, CancellationToken ct);
+    Task<CanonIndex?> GetIndex(string entityType, string key, CancellationToken ct);
+    Task UpsertIndex(CanonIndex index, CancellationToken ct);
 }
 ```
 
-**Impact**: Method names differ (`SaveCanonicalAsync` vs `PersistCanonicalAsync`) and return types (`void` vs `Task<T>`)
+**Impact**: Method names differ (`SaveCanonicalAsync` vs `PersistCanonicalAsync`), return types
+materialize stored values, and the current contract owns prior-state/index reads as well as writes.
 **Assessment**: **Implementation is superior** - returning entities enables caller to access generated IDs and updated timestamps
 **Action**: Update spec to match implementation
 
@@ -344,6 +354,8 @@ All spec deviations have been resolved. The specification now accurately reflect
 ### 1. ICanonPersistence ✅ UPDATED
 - Spec updated to return `Task<TModel>` and `Task<CanonStage<TModel>>`
 - Method names changed to `PersistCanonicalAsync` and `PersistStageAsync`
+- Current 0.18 code additionally requires `GetCanonicalAsync<TModel>` so custom persistence owns
+  aggregation and rebuild reads; index lookup/upsert are also part of the interface.
 
 ### 2. ICanonPipelineObserver ✅ UPDATED
 - Spec updated to async pattern (`ValueTask BeforePhaseAsync`, etc.)
@@ -397,7 +409,9 @@ All spec deviations have been resolved. The specification now accurately reflect
 
 ## 📌 Conclusion
 
-The Canon runtime implementation is **100% COMPLETE and PRODUCTION-READY** ✅
+The 2025 reconciliation concluded that the runtime was **100% complete and production-ready** against
+the archived specification. This is not a current maturity certification; see the current Canon
+reference linked at the top of this document.
 
 1. **Core functionality**: 100% complete
 2. **Spec alignment**: 100% synchronized (all signatures updated)

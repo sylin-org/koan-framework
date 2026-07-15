@@ -23,10 +23,10 @@ namespace Koan.Identity.Tests;
 /// and tamper-evident audit. (Local-credential/passkey/MFA/recovery — group 4 — is scoped separately.)
 /// </summary>
 [Collection("identity")]
-public sealed class IdentityDayTwoSpec
+public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public IdentityDayTwoSpec(IdentityHostFixture fx) => _fx = fx;
+    public IdentityDayTwoSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     [Fact]
     public async Task Impersonation_requires_dual_control_and_is_time_boxed()

@@ -12,10 +12,10 @@ namespace Koan.Identity.Tests;
 /// BCrypt hash (D2), fail-closed verify, and upgrade-on-verify rehash.
 /// </summary>
 [Collection("identity")]
-public sealed class PasswordFactorSpec
+public sealed class PasswordFactorSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public PasswordFactorSpec(IdentityHostFixture fx) => _fx = fx;
+    public PasswordFactorSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     private PasswordCredentialService Passwords => _fx.Services.GetRequiredService<PasswordCredentialService>();
 

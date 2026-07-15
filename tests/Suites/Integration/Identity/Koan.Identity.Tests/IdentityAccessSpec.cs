@@ -19,10 +19,10 @@ namespace Koan.Identity.Tests;
 /// (reverse "why" + one-click revoke; forward "can" through the real authorize engine).
 /// </summary>
 [Collection("identity")]
-public sealed class IdentityAccessSpec
+public sealed class IdentityAccessSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public IdentityAccessSpec(IdentityHostFixture fx) => _fx = fx;
+    public IdentityAccessSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     private IdentityRoleService Roles => _fx.Services.GetRequiredService<IdentityRoleService>();
 

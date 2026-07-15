@@ -18,10 +18,10 @@ namespace Koan.Identity.Tests;
 /// scoped in, which is the whole point of the SnapVault D1 gap this closes.
 /// </summary>
 [Collection("identity")]
-public sealed class TenantResolutionSpec
+public sealed class TenantResolutionSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public TenantResolutionSpec(IdentityHostFixture fx) => _fx = fx;
+    public TenantResolutionSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     // ── The pure carrier extractors (no host needed) ─────────────────────────────────────────────────────────────
 

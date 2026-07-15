@@ -19,10 +19,10 @@ namespace Koan.Identity.Tests;
 /// the Mfa package and stays inert for every other sign-in in the suite.
 /// </summary>
 [Collection("identity")]
-public sealed class StepUpSeamSpec
+public sealed class StepUpSeamSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public StepUpSeamSpec(IdentityHostFixture fx) => _fx = fx;
+    public StepUpSeamSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     private const string NeedsMfaPrefix = "stepup-needs-mfa-";
 

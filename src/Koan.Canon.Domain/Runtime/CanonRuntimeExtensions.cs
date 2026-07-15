@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Koan.Canon.Domain.Model;
 
+using Koan.Core.Hosting.App;
+
 namespace Koan.Canon.Domain.Runtime;
 
 /// <summary>
@@ -9,9 +11,9 @@ namespace Koan.Canon.Domain.Runtime;
 public static class CanonRuntimeExtensions
 {
     /// <summary>
-    /// Canonizes the entity using a runtime resolved from the provided service provider.
+    /// Canonizes the entity using a runtime resolved from, and flow-scoped to, the provided service provider.
     /// </summary>
-    public static Task<CanonizationResult<T>> Canonize<T>(this T entity, IServiceProvider services, CanonizationOptions? options = null, CancellationToken cancellationToken = default)
+    public static async Task<CanonizationResult<T>> Canonize<T>(this T entity, IServiceProvider services, CanonizationOptions? options = null, CancellationToken cancellationToken = default)
         where T : CanonEntity<T>, new()
     {
         if (entity is null)
@@ -24,13 +26,18 @@ public static class CanonRuntimeExtensions
             throw new ArgumentNullException(nameof(services));
         }
 
+        using var hostScope = AppHost.PushScope(services);
         var runtime = services.GetRequiredService<ICanonRuntime>();
-        return runtime.Canonize(entity, options, cancellationToken);
+        return await runtime.Canonize(entity, options, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Canonizes the entity using the provided runtime instance.
     /// </summary>
+    /// <remarks>
+    /// The caller owns host selection for this overload. A runtime using default persistence requires
+    /// the intended Koan provider to be active for the complete operation.
+    /// </remarks>
     public static Task<CanonizationResult<T>> Canonize<T>(this T entity, ICanonRuntime runtime, CanonizationOptions? options = null, CancellationToken cancellationToken = default)
         where T : CanonEntity<T>, new()
     {
@@ -48,9 +55,9 @@ public static class CanonRuntimeExtensions
     }
 
     /// <summary>
-    /// Rebuilds views for the entity using a runtime resolved from the provider.
+    /// Rebuilds views using a runtime resolved from, and flow-scoped to, the provided service provider.
     /// </summary>
-    public static Task RebuildViews<T>(this T entity, IServiceProvider services, string[]? views = null, CancellationToken cancellationToken = default)
+    public static async Task RebuildViews<T>(this T entity, IServiceProvider services, string[]? views = null, CancellationToken cancellationToken = default)
         where T : CanonEntity<T>, new()
     {
         if (entity is null)
@@ -63,7 +70,8 @@ public static class CanonRuntimeExtensions
             throw new ArgumentNullException(nameof(services));
         }
 
+        using var hostScope = AppHost.PushScope(services);
         var runtime = services.GetRequiredService<ICanonRuntime>();
-        return runtime.RebuildViews<T>(entity.Id, views, cancellationToken);
+        await runtime.RebuildViews<T>(entity.Id, views, cancellationToken).ConfigureAwait(false);
     }
 }

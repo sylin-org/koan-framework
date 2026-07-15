@@ -135,41 +135,34 @@ public sealed class CanonRuntimeAggregationSpec
         };
         secondaryIndex.Update("canon-alpha", origin: "legacy", attributes: null);
 
+        var existing = new LinkedCanon
+        {
+            Primary = "alpha-existing",
+            Secondary = "beta"
+        };
+        existing.Id = "canon-alpha";
+        existing.Metadata.AssignCanonicalId("canon-alpha");
+        existing.Metadata.SetOrigin("crm");
+        existing.Metadata.PropertyFootprints[nameof(LinkedCanon.Primary)] = new CanonPropertyFootprint
+        {
+            Property = nameof(LinkedCanon.Primary),
+            SourceKey = "crm",
+            ArrivalToken = "existing-token",
+            ArrivedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
+            Value = "alpha-existing",
+            Policy = "Primary:SourceOfTruth",
+            Evidence = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["winner"] = "existing"
+            }
+        };
+
         var persistence = new StubCanonPersistence((_, key) => key == secondaryIndex.Key ? secondaryIndex : null);
+        persistence.SeedCanonical(existing);
 
         var builder = new CanonRuntimeBuilder();
         builder.UsePersistence(persistence);
-        builder.ConfigurePipeline<LinkedCanon>(pipeline =>
-        {
-            pipeline.AddStep(CanonPipelinePhase.Intake, (context, cancellationToken) =>
-            {
-                var existing = new LinkedCanon
-                {
-                    Primary = "alpha-existing",
-                    Secondary = "beta"
-                };
-                existing.Id = "canon-alpha";
-                existing.Metadata.AssignCanonicalId("canon-alpha");
-                existing.Metadata.SetOrigin("crm");
-                existing.Metadata.PropertyFootprints[nameof(LinkedCanon.Primary)] = new CanonPropertyFootprint
-                {
-                    Property = nameof(LinkedCanon.Primary),
-                    SourceKey = "crm",
-                    ArrivalToken = "existing-token",
-                    ArrivedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
-                    Value = "alpha-existing",
-                    Policy = "Primary:SourceOfTruth",
-                    Evidence = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
-                    {
-                        ["winner"] = "existing"
-                    }
-                };
-
-                context.SetItem(ExistingEntityContextKey, existing);
-                context.SetItem(ExistingMetadataContextKey, existing.Metadata.Clone());
-                return ValueTask.CompletedTask;
-            });
-        });
+        builder.ConfigurePipeline<LinkedCanon>(_ => { });
 
         var runtime = builder.Build();
         var entity = new LinkedCanon
@@ -187,6 +180,7 @@ public sealed class CanonRuntimeAggregationSpec
         var footprint = result.Metadata.PropertyFootprints[nameof(LinkedCanon.Primary)];
         footprint.SourceKey.Should().Be("crm");
         footprint.Evidence.Should().ContainKey("winner").WhoseValue.Should().Be("existing");
+        persistence.CanonicalReads.Should().ContainSingle().Which.Should().Be("canon-alpha");
     }
 
     [Fact]
@@ -260,12 +254,45 @@ public sealed class CanonRuntimeAggregationSpec
         stored!.Primary.Should().Be("alpha-authoritative");
     }
 
+    [Fact]
+    public async Task Canonical_read_failures_from_custom_persistence_propagate()
+    {
+        var entityType = typeof(LinkedCanon).FullName ?? typeof(LinkedCanon).Name;
+        var index = new CanonIndex
+        {
+            EntityType = entityType,
+            Key = "Secondary=unavailable",
+            Kind = CanonIndexKeyKind.Aggregation
+        };
+        index.Update("canon-unavailable", origin: "legacy", attributes: null);
+
+        var failure = new InvalidOperationException("custom canon store unavailable");
+        var persistence = new StubCanonPersistence((_, key) => key == index.Key ? index : null)
+        {
+            CanonicalReadFailure = failure
+        };
+        var builder = new CanonRuntimeBuilder();
+        builder.UsePersistence(persistence);
+        builder.ConfigurePipeline<LinkedCanon>(_ => { });
+        var runtime = builder.Build();
+
+        var act = () => runtime.Canonize(new LinkedCanon
+        {
+            Primary = "incoming",
+            Secondary = "unavailable"
+        });
+
+        var assertion = await act.Should().ThrowAsync<InvalidOperationException>();
+        assertion.Which.Should().BeSameAs(failure);
+    }
+
     private sealed class StubCanonPersistence : ICanonPersistence
     {
         private readonly Func<string, string, CanonIndex?> _lookup;
         private readonly List<CanonIndex> _upserts = new();
         private readonly List<object> _canonicals = new();
         private readonly List<object> _stages = new();
+        private readonly List<string> _canonicalReads = new();
 
         public StubCanonPersistence()
             : this((_, _) => null)
@@ -280,6 +307,26 @@ public sealed class CanonRuntimeAggregationSpec
         public IReadOnlyList<CanonIndex> Upserts => _upserts;
         public IReadOnlyList<object> CanonicalSnapshots => _canonicals;
         public IReadOnlyList<object> StageSnapshots => _stages;
+        public IReadOnlyList<string> CanonicalReads => _canonicalReads;
+        public Exception? CanonicalReadFailure { get; init; }
+
+        public void SeedCanonical<TModel>(TModel entity)
+            where TModel : CanonEntity<TModel>, new()
+            => _canonicals.Add(entity);
+
+        public Task<TModel?> GetCanonicalAsync<TModel>(string canonicalId, CancellationToken cancellationToken)
+            where TModel : CanonEntity<TModel>, new()
+        {
+            _canonicalReads.Add(canonicalId);
+            if (CanonicalReadFailure is not null)
+            {
+                return Task.FromException<TModel?>(CanonicalReadFailure);
+            }
+
+            return Task.FromResult(_canonicals
+                .OfType<TModel>()
+                .LastOrDefault(entity => string.Equals(entity.Id, canonicalId, StringComparison.OrdinalIgnoreCase)));
+        }
 
         public Task<TModel> PersistCanonicalAsync<TModel>(TModel entity, CancellationToken cancellationToken) where TModel : CanonEntity<TModel>, new()
         {

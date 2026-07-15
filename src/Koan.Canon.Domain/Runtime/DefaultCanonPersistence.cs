@@ -11,6 +11,10 @@ namespace Koan.Canon.Domain.Runtime;
 /// </summary>
 internal sealed class DefaultCanonPersistence : ICanonPersistence
 {
+    public Task<TModel?> GetCanonicalAsync<TModel>(string canonicalId, CancellationToken cancellationToken)
+        where TModel : CanonEntity<TModel>, new()
+        => CanonEntity<TModel>.Get(canonicalId, cancellationToken);
+
     public Task<TModel> PersistCanonicalAsync<TModel>(TModel entity, CancellationToken cancellationToken)
         where TModel : CanonEntity<TModel>, new()
         => entity.Save(cancellationToken);

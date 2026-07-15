@@ -86,6 +86,26 @@ public sealed class CanonRuntimeSpec
         stage.Metadata.Should().ContainKey("runtime:stage-behavior").WhoseValue.Should().Be(CanonStageBehavior.StageOnly.ToString());
     }
 
+    [Fact]
+    public async Task Rebuild_views_loads_from_the_configured_persistence()
+    {
+        var (persistence, runtime) = BuildRuntime();
+        var entity = new ContactCanon
+        {
+            Email = $"rebuild-{Guid.CreateVersion7():N}@example.com",
+            PhoneNumber = "555-0300",
+            DisplayName = "Katherine Johnson"
+        };
+
+        var canonical = await runtime.Canonize(entity, CanonizationOptions.Default.WithOrigin("unit-spec"));
+
+        await runtime.RebuildViews<ContactCanon>(canonical.Canonical.Id, ["canonical"]);
+
+        persistence.CanonicalReads.Should().Contain(canonical.Canonical.Id);
+        persistence.CanonicalEntities.OfType<ContactCanon>()
+            .Should().Contain(item => item.Id == canonical.Canonical.Id);
+    }
+
     private static (InMemoryCanonPersistence Persistence, CanonRuntime Runtime) BuildRuntime()
     {
         var persistence = new InMemoryCanonPersistence();
@@ -111,6 +131,7 @@ public sealed class CanonRuntimeSpec
         private readonly Dictionary<string, CanonIndex> _indices = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<object> _canonicalEntities = new();
         private readonly List<object> _stageRecords = new();
+        private readonly List<string> _canonicalReads = new();
 
         public IReadOnlyCollection<object> CanonicalEntities
         {
@@ -134,11 +155,34 @@ public sealed class CanonRuntimeSpec
             }
         }
 
+        public IReadOnlyCollection<string> CanonicalReads
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _canonicalReads.ToArray();
+                }
+            }
+        }
+
         public CanonIndex? FindIndex(string entityType, string key)
         {
             lock (_gate)
             {
                 return _indices.TryGetValue(MakeKey(entityType, key), out var index) ? index : null;
+            }
+        }
+
+        public Task<TModel?> GetCanonicalAsync<TModel>(string canonicalId, CancellationToken cancellationToken)
+            where TModel : CanonEntity<TModel>, new()
+        {
+            lock (_gate)
+            {
+                _canonicalReads.Add(canonicalId);
+                return Task.FromResult(_canonicalEntities
+                    .OfType<TModel>()
+                    .LastOrDefault(entity => string.Equals(entity.Id, canonicalId, StringComparison.OrdinalIgnoreCase)));
             }
         }
 

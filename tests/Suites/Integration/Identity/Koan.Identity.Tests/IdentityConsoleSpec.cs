@@ -16,10 +16,10 @@ namespace Koan.Identity.Tests;
 /// shared offline host; ASP.NET's <c>[Authorize]</c> gate is framework-enforced and not re-proven here.
 /// </summary>
 [Collection("identity")]
-public sealed class IdentityConsoleSpec
+public sealed class IdentityConsoleSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public IdentityConsoleSpec(IdentityHostFixture fx) => _fx = fx;
+    public IdentityConsoleSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     private IdentitySelfServiceController SelfService(string subject)
         => WithUser(new IdentitySelfServiceController(

@@ -33,8 +33,8 @@ module is discovered, ordered, started, and composed correctly.
 
 1. Put it under `tests/Suites/<Domain>/<Scope>/<ProjectName>/`, mirroring the source module.
 2. Use the repository's xUnit v3 package versions and `<OutputType>Exe</OutputType>`.
-3. Add `[assembly: CollectionBehavior(DisableTestParallelization = true)]` when the suite boots Koan;
-   process-default `AppHost` ownership makes parallel hosts unsafe.
+3. Serialize suites that intentionally rely on one process-default Koan host. When facts can nest or
+   overlap hosts, select the owned provider with `AppHost.PushScope` for each complete operation.
 4. Keep behavior-focused specs under `Specs/<Feature>/`.
 5. Reuse seed packs from `tests/SeedPacks` and fixtures from `Koan.Testing.Containers`.
 6. Add the project to `Koan.sln` unless it is an explicitly documented bounded infrastructure lane.
@@ -66,6 +66,9 @@ a false pass.
 ## Reliability rules
 
 - Use `TestContext.Current.CancellationToken` and bounded polling; avoid unbounded waits and hard sleeps.
+- Treat fixture lifetime and ambient host selection as separate concerns. A stopped or failed newer
+  host correctly does not resurrect an earlier process default; scope fixture-owned Entity work to
+  `fixture.Services` instead of assigning `AppHost.Current`.
 - Give every execution an isolated partition, database, port, or temporary root as appropriate.
 - Assert the user-visible contract and the failure message, not private implementation structure.
 - Keep environment-dependent facts explicit. Unknown or unavailable is not success.

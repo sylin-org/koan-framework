@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using AwesomeAssertions;
 using Koan.Core;
+using Koan.Core.Hosting.App;
 using Koan.Data.Core;
 using Koan.Identity.Infrastructure;
 using Koan.Identity.Initialization;
@@ -24,10 +25,10 @@ namespace Koan.Identity.Tests;
 /// the dev-open / prod-closed fail-closed boot guard.
 /// </summary>
 [Collection("identity")]
-public sealed class IdentityReconciliationSpec
+public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public IdentityReconciliationSpec(IdentityHostFixture fx) => _fx = fx;
+    public IdentityReconciliationSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     private IIdentityReconciler Reconciler => _fx.Services.GetRequiredService<IIdentityReconciler>();
 
@@ -300,14 +301,24 @@ public sealed class IdentityReconciliationSpec
         // (Open auto-seeds dev users and is legal only in Development). Trust/Tenancy do not throw in "Test".
         var act = async () =>
         {
-            await using var host = await KoanIntegrationHost.Configure()
+            await using var host = KoanIntegrationHost.Configure()
                 .WithEnvironment("Test")
                 .WithSetting("Koan:Orchestration:EnableSelfOrchestration", "false")
                 .WithSetting("Koan:Identity:Posture", "Open")
                 .ConfigureServices(s => s.AddKoan())
-                .StartAsync();
+                .Build();
+
+            using var hostScope = AppHost.PushScope(host.Services);
+            await host.StartAsync(TestContext.Current.CancellationToken);
         };
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Open*Development*");
+
+        AppHost.Current.Should().BeSameAs(_fx.Services,
+            "nested host cleanup must restore the fixture selected for this fact flow");
+        var probeId = $"post-failed-host-{Guid.CreateVersion7():N}";
+        await new Identity { Id = probeId, DisplayName = "Fixture Still Selected" }.Save();
+        (await Identity.Get(probeId)).Should().NotBeNull(
+            "the surrounding fact scope must keep selecting the shared fixture after nested host cleanup");
     }
 }

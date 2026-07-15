@@ -45,16 +45,22 @@ project opts in with:
 
 Differences from the old xUnit v2 DSL that every spec must respect:
 
-- **Serialize the assembly.** Each booted Koan host owns the process-default `AppHost` binding, so
-  concurrent spec classes would race on host selection. Add
-  `[assembly: CollectionBehavior(DisableTestParallelization = true)]` (in
-  `AssemblyInfo.cs` or `GlobalUsings.cs`).
+- **Own host selection.** A suite that relies on one process-default Koan host must serialize its
+  classes with `[assembly: CollectionBehavior(DisableTestParallelization = true)]`. When a fact can
+  overlap, nest, start, or stop another host, enter `AppHost.PushScope(ownedHost.Services)` for the
+  complete operation instead. Flow-scoped specs may run concurrently when every Entity-static path
+  is covered.
 - **`IAsyncLifetime` returns `ValueTask`** (not `Task`) — both `InitializeAsync` and `DisposeAsync`.
 - **Native skips** — use `Assert.Skip(reason)` / `Assert.SkipWhen(cond, reason)` /
   `Assert.SkipUnless(cond, reason)`. `SkippableFact` and the `Xunit.Abstractions` namespace are gone;
   `ITestOutputHelper` now lives in the `Xunit` namespace.
 - **Ambient cancellation** — use `TestContext.Current.CancellationToken` instead of threading a token
   through fixtures.
+
+Serialization protects scheduling; it does not resurrect an earlier process-default provider after a
+newer host stops or fails startup. A long-lived shared fixture therefore owns data/host lifetime only.
+Its specs must select `fixture.Services` for each complete Entity-backed fact flow. Never repair a test
+by assigning `AppHost.Current`, restoring a predecessor globally, or adding a production fallback.
 
 ## Container fixtures (`Koan.Testing.Containers`)
 

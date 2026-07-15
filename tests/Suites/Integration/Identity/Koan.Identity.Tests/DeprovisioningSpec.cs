@@ -16,10 +16,10 @@ namespace Koan.Identity.Tests;
 /// (the middleware stops scoping the person in), and each is recorded by a tamper-evident <see cref="DeprovisioningReceipt"/>.
 /// </summary>
 [Collection("identity")]
-public sealed class DeprovisioningSpec
+public sealed class DeprovisioningSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public DeprovisioningSpec(IdentityHostFixture fx) => _fx = fx;
+    public DeprovisioningSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     private DeprovisioningService Service => _fx.Services.GetRequiredService<DeprovisioningService>();
 
