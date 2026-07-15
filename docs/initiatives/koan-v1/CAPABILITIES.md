@@ -61,7 +61,7 @@ it here.
 | Surface | Assessment state | Maturity | Evidence record | Principal question |
 |---|---|---|---|---|
 | Bootstrap, discovery, and startup reporting | assessed | `demonstrated` | [record](#bootstrap-discovery-and-startup-reporting) | Bounded lanes pass; a shared fact model now proves one vertical slice, not exhaustive runtime narration. |
-| `Entity<T>` data semantics and context | assessed | `verified` | [record](#entityt-data-semantics-and-context) | Strong core semantics; external-provider parity remains test-scoped. |
+| `Entity<T>` data semantics and context | assessed | `verified` | [record](#entityt-data-semantics-and-context) | Foundation boundary is explicit: SQLite durable local, InMemory conformance, JSON fallback; broader parity remains separate. |
 | Backend discovery and negotiation | assessed | `demonstrated` | [record](#backend-discovery-and-negotiation) | Child-edge cost is explicit and bounded for three proven providers; fleet-wide parity is not certified. |
 | Web/API conventions | assessed | `verified` | [record](#webapi-conventions) | In-memory API behavior is well tested; package installation is blocked. |
 | Events and messaging | assessed | `demonstrated` | [record](#events-and-messaging) | A real sample and providers exist; no current broker conformance result was obtained. |
@@ -137,6 +137,11 @@ boundaries remain pre-V1 work.
   pre-1.0.
 - **Maturity / safe claim:** `verified`. Core `Entity<T>` persistence semantics are automated and are
   Koan's strongest first-class application language; provider-specific claims require their suites.
+- **Current T6 boundary:** SQLite is the durable Level-1 application provider (15/15 plus both
+  executable journeys); InMemory is the ephemeral conformance oracle (55/55); JSON is the bundled
+  zero-infrastructure fallback (14/14), not a durable application claim. The canonical
+  [Data foundation reference](../../reference/data/index.md) publishes selection, inspection, and
+  unsupported scenarios without promoting public package maturity.
 - **Open risks:** graduate the defined Entity semantic locations ring by ring; provider parity,
   concurrency, schema evolution, and compatibility remain separate claims.
 
@@ -334,6 +339,10 @@ boundaries remain pre-V1 work.
   test-kit APIs.
 - **Maturity / safe claim:** `demonstrated`. Koan provides useful reusable conformance tests; applications
   do not yet inherit a fully verified, package-installable test contract.
+- **Current R06 result:** the testing portion of the foundation ring is internally verified: the
+  parallel-enabled meta-suite passes 12 with 3 explicit capability/trait skips, and local connector
+  suites pass InMemory 55/55, SQLite 15/15, and JSON 14/14. The row remains `demonstrated` because the
+  public package path and stable test-kit compatibility boundary are not yet established.
 - **Open risks:** publish the foundation ring's exact support boundary; keep every skipped capability
   reason explicit; consolidate provider-specific runners without accidentally starting infrastructure
   from routine solution tests.

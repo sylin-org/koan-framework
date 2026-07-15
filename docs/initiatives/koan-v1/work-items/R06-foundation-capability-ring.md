@@ -15,7 +15,7 @@ validation:
 # R06 — Graduate the foundation capability ring
 
 - Tranche: `T6 — capability-ring graduation`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R05
 - Unlocks: later capability rings and T7 release readiness
 - Owner: Core, Data.Core, Testing, and packaging boundaries
@@ -54,19 +54,23 @@ whether any other lower-ring gap is material.
 - Conditional capability batteries may report explicit skips. Missing ambient host ownership must
   never turn into a skip or cross-test contamination.
 
-### OPEN
+### RESOLVED
 
-- Which local providers are named in the graduated foundation boundary: InMemory only, InMemory plus
-  SQLite, or InMemory/JSON/SQLite with separate durability claims?
-- After host isolation is repaired, does composition need a broader proof than the existing
-  FirstUse/GoldenJourney and lockfile contracts?
-- Which compatibility statement is honest before the first observed public `dev` package set?
+- SQLite owns the durable Level-1 application path; InMemory owns the ephemeral conformance role;
+  JSON remains the zero-infrastructure bundled fallback without inheriting the durable claim.
+- Existing FirstUse/GoldenJourney source/package and lockfile contracts are sufficient for this ring;
+  remote providers and production progression require later evidence.
+- Before an observed public `dev` package set, the ring is a verified pre-1.0 candidate boundary, not
+  a public `supported-foundation` or compatibility promise.
 
-## First bounded repair
+## Bounded repairs
 
 [`R06-01`](r06/R06-01-conformance-host-isolation.md) makes conformance execution own its ambient host
 scope so independent Entity specifications can run concurrently without an assembly-level xUnit
 switch. It passes; the parent ring now owns the remaining support-boundary decision.
+
+[`R06-02`](r06/R06-02-foundation-support-boundary.md) replaces the stale public Data catalogue with
+the exact Entity/local-provider contract and repairs the InMemory package front door. It passes.
 
 ## Exit gate
 
@@ -87,3 +91,19 @@ switch. It passes; the parent ring now owns the remaining support-boundary decis
 - Stop a slice that attempts to make every Koan test project parallel-safe at once.
 - Stop if isolation requires application-owned service-provider routing or a second Entity API.
 - Split provider-specific correctness from the provider-neutral foundation contract.
+
+## Acceptance result
+
+- Outcome: PASS
+- Date and commit: 2026-07-15; implementation through `caae9c94`, support-boundary closure recorded by
+  the following documentation commit.
+- Evidence: R03 Entity contract; Data.Core 301/301 baseline; InMemory 55/55, SQLite 15/15, JSON 14/14;
+  FirstUse/GoldenJourney source and staged-package contracts; R06-01 concurrent host proof; canonical
+  Data foundation reference.
+- Tests / validation: R06-01 red/green and focused host suites; current local connector Release
+  assemblies 84/84 combined; strict full-site docs; diff validation.
+- Unsupported scenarios: public package installation, remote-provider certification, production
+  schema/migration/recovery, cross-provider transactions, and compatibility guarantees.
+- Follow-up work: T7 observes/polices package publication; the next T6 ring assesses events, context,
+  and isolation without inheriting unsupported production claims.
+- Reviewer: Codex under the maintainer's standing autonomous approval.

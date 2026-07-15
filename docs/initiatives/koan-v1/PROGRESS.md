@@ -21,8 +21,8 @@ or completes a work item. The roadmap describes order; it does not report progre
 
 - Overall: `active`
 - Current tranche: `T6 — capability-ring graduation`
-- Active work item: R06 — foundation capability-ring support boundary
-- Next decision: elect the minimum local-provider boundary and test it against existing evidence
+- Active work item: none; R06 is closed and the next capability ring is not yet opened
+- Next decision: assess the events/context/isolation ring and open only its smallest material gap
 - V1 readiness: `not ready`; T7 remains gated by T6 and an observed public package publication
 
 ## Work items
@@ -35,7 +35,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R03 | [Define the Entity Semantics Contract](work-items/R03-entity-semantics-contract.md) | T3 | passed | R02 | Codex · 2026-07-13 | ARCH-0106 ratifies five semantic locations, strict Entity admission, C# 14 module facets, and host/context/event boundaries. |
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
-| R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | in-progress | R05 | Codex · 2026-07-15 | Entity/data/composition are strong; R06-01 now makes concurrent conformance host isolation framework-owned. The exact local-provider/support boundary is the remaining assessment. |
+| R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -50,7 +50,7 @@ item should normally be `in-progress`.
 | R03 | passed | Entity inventory, ecosystem dispositions, canonical contract, and ARCH-0106 accepted. |
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
-| R06 | active | R06-01 passes. Publish the exact foundation provider/support boundary, then assess whether the ring can graduate without a broader repair. |
+| R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
 
 ## Divergence and risk log
 
@@ -115,6 +115,7 @@ item should normally be `in-progress`.
 | 2026-07-15 | R05 | The remaining gate required one more identity-specific human walkthrough even though repeated clean-room automation, two independent agent readers, a context-free repeat, two repair queues, and ongoing maintainer review/dogfeeding already triangulated the central experience. | Remove the ceremonial identity gate without weakening evidence quality. Require coverage-aware independent records, affected-contract reruns after material repairs, and explicit maintainer acceptance of sufficiency. The maintainer accepted the accumulated evidence and R05 passes; public package maturity remains `specified`. |
 | 2026-07-15 | R06-01 | The public conformance kit promises a one-subclass testing path but requires every consumer to disable parallelization for the whole assembly because static Entity operations use the process-default host. | Treat this as framework-owned foundation debt, not a documentation footnote. Prove two independently owned concurrent conformance hosts through the existing host-context seam; do not widen the slice to every sequential integration suite. |
 | 2026-07-15 | R06-01 | Starting two conformance specifications for the same Entity made the first battery resolve the second host; the red proof failed on its owner-specific configuration. | Enter the existing async-flow `AppHost.PushScope` around reachability and every inherited battery. The proof turns green, the parallel-enabled meta-suite passes 12 with 3 explicit skips, and the public assembly-wide scheduling instruction is removed. |
+| 2026-07-15 | R06-02 | The public Data reference claimed production-ready patterns, universal connector coverage, silent in-memory fallback, and several stale APIs/configuration shapes; the InMemory README even taught an extension that might not exist. | Replace breadth with the exact foundation boundary: SQLite durable local, InMemory ephemeral conformance, JSON bundled fallback, and every remote provider separate. Current local suites pass 84/84 combined; public package maturity remains unchanged. |
 | 2026-07-13 | R04-02 | The isolated VectorModel guard spec passed, but the 79-test Data.AI process produced 31 failures after `EmbeddingMetadata` captured a logger from a disposed first-host provider. | Treat the static initializer as the root failure; lease generic-host binding and resolve host services only when an operation runs. |
 | 2026-07-13 | R04-02 | Owner-checked host leases, late Data.AI logger resolution, and a two-host Entity/storage probe are green; Core passes 195/195 and Data.AI passes 80/80. Backend-dependent caches and alternate binding paths remain unaudited. | Keep R04-02 `in-progress` and migrate one runtime owner at a time rather than claiming host scope from the first repair. |
 | 2026-07-13 | R04-02 | `VectorModelGuard._confirmed` let host B skip its durable registry because host A had confirmed the same entity/partition/model process-wide; the red two-host probe left B's empty backend unrecorded. | Remove the cache rather than invent another scope: every guard reads the current host's O(1) durable record. Data.AI passes 81/81. |

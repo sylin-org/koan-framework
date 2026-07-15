@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R05 passed; R06 foundation support-boundary assessment active
+  scope: R05 and R06 passed; events/context/isolation assessment next
 ---
 
 # Koan V1 reorganization current handoff
@@ -44,6 +44,10 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - The initial T6 assessment is recorded in R06. Entity/data/composition are strong. R06-01 now makes
   every inherited conformance battery enter its creating host's async-flow scope, so consumers no
   longer disable parallelization for the whole test assembly.
+- R06-02 publishes the narrow foundation boundary: SQLite is the durable Level-1 application path,
+  InMemory is the ephemeral conformance oracle, and JSON is the zero-infrastructure bundled fallback
+  without inheriting the durable claim. The stale universal-provider Data reference is removed.
+- R06 is `passed`. T6 remains active because later capability rings are not yet assessed.
 - T7/V1 release readiness is not yet achieved because T6 is ungraduated and the coherent package
   closure has not been published and observed.
 - No public package was published and no branch was pushed by this work.
@@ -188,10 +192,10 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
 
 ## Next safe action
 
-Reassess the exact R06 foundation boundary: decide whether InMemory, SQLite, or
-InMemory/JSON/SQLite form the minimum graduated local-provider set; map each chosen claim to current
-source/package, negotiation, failure, inspection, and conformance evidence. Open another repair only
-for a material missing contract. Keep public package maturity at `specified` until a real `dev`
+Assess the next T6 ring—events, context, and isolation—against current code, the Entity Semantics
+Contract, and `CAPABILITIES.md`. Preserve the same discipline: define the smallest business-capable
+boundary, distinguish in-process facts from integration delivery, and open a repair only for a
+material correctness or delight gap. Keep public package maturity at `specified` until a real `dev`
 publication is observed.
 
 ## Do not infer
