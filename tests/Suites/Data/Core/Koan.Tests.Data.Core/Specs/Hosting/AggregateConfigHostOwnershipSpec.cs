@@ -81,6 +81,24 @@ public sealed class AggregateConfigHostOwnershipSpec
         factory.CreateCalls.Should().Be(1);
     }
 
+    [Fact]
+    public async Task Diagnostics_report_the_configs_observed_by_the_current_host()
+    {
+        var factory = new RecordingAdapterFactory();
+        await using var host = await StartHost(factory);
+        var diagnostics = host.Services.GetRequiredService<IDataDiagnostics>();
+
+        diagnostics.GetEntityConfigsSnapshot().Should().BeEmpty();
+
+        _ = AggregateConfigs.Get<AggregateOwnershipEntity, string>(host.Services);
+
+        diagnostics.GetEntityConfigsSnapshot().Should().ContainSingle(info =>
+            info.EntityType == typeof(AggregateOwnershipEntity).FullName
+            && info.KeyType == typeof(string).FullName
+            && info.Provider == RecordingAdapterFactory.ProviderId
+            && info.IdProperty == nameof(AggregateOwnershipEntity.Id));
+    }
+
     private static Task<IntegrationHost> StartHost(RecordingAdapterFactory factory)
         => KoanIntegrationHost.Configure()
             .ConfigureServices(services =>

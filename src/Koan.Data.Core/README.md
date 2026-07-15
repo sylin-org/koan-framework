@@ -9,6 +9,7 @@ Data access core for Koan: common primitives, options, and helpers used by relat
 
 - Entity contracts and helpers for aggregate storage
 - Options and conventions shared across data adapters
+- Selection-aware health semantics for data connectors
 - Support for paging, streaming, and batching semantics (see references)
 
 ## Install (minimal setup)

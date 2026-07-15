@@ -83,7 +83,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Direct.IDirectDataService, Direct.DirectDataService>();
         // EntitySchemaGuard + ISchemaHealthContributor were removed in DATA-0095 Phase 1c.1.
         // Adapters now implement IDataRepository.EnsureReady directly; the facade calls it.
-        services.AddSingleton<IDataDiagnostics, DataDiagnostics>();
+        services.AddSingleton<DataDiagnostics>();
+        services.AddSingleton<IDataDiagnostics>(sp => sp.GetRequiredService<DataDiagnostics>());
         // Decorate repositories registered as IDataRepository<,>
         services.TryDecorate(typeof(IDataRepository<,>), typeof(RepositoryFacade<,>));
         // Relationship metadata scanning (ParentAttribute, etc.)

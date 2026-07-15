@@ -46,8 +46,24 @@ source: src/Koan.Data.Core/
   may safely close over their owning provider because the entire entry releases with that provider.
 - `AggregateConfigs.GetRegisteredTypes()` exposes process-wide entity/key discovery facts only. It
   never exposes or retains a provider, repository, configuration snapshot, or service instance.
+- `IDataDiagnostics.GetEntityConfigsSnapshot()` is host-owned and contains only configurations
+  observed by that host. Aggregate resolution records into it directly; diagnostics do not reflect
+  over private cache implementation details.
 - `AggregateConfigs.Reset()` remains available for test-matrix discovery cleanup, but repeated-host
   correctness does not depend on calling it.
+
+## Data-adapter health participation
+
+- `DataAdapterHealthContributorBase` distinguishes connector availability from application
+  dependency. A provider participates when it wins default election, owns a configured source, or
+  appears in the host-owned entity diagnostics snapshot.
+- An available but inactive provider returns `Unknown`, remains non-critical, and must not open a
+  connection or mutate backing infrastructure.
+- An active provider probes every participating source and is critical. Provider implementations
+  retain ownership of the physical probe and may provision only what their normal repository
+  contract already provisions.
+- Selection uses `AdapterResolver`, `DataSourceRegistry`, and `IDataDiagnostics`; connector health
+  implementations must not introduce a parallel configuration hierarchy or fallback election.
 
 ## Configuration
 

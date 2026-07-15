@@ -16,7 +16,7 @@ internal static class PackagingConstants
 
     public static class ApplicationProbe
     {
-        public const string HealthPath = "health";
+        public const string HealthPath = "health/ready";
         public const string FactsPath = ".well-known/Koan/facts";
         public const string McpPath = "mcp";
         public const string McpSessionHeader = "Mcp-Session-Id";

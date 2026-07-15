@@ -2,27 +2,16 @@ namespace Koan.Data.Core;
 
 internal sealed class DataDiagnostics : IDataDiagnostics
 {
-    public IReadOnlyList<EntityConfigInfo> GetEntityConfigsSnapshot()
-    {
-        // Reflect on AggregateConfigs.Cache (still the canonical discovery point for entities
-        // that have been resolved through Data<T,K>).
-        var list = new List<EntityConfigInfo>();
-        var cacheField = typeof(AggregateConfigs).GetField("Cache",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-        if (cacheField?.GetValue(null) is System.Collections.IDictionary dict)
-        {
-            foreach (System.Collections.DictionaryEntry de in dict)
-            {
-                var key = ((Type, Type))de.Key!;
-                var cfg = de.Value!;
-                var providerProp = cfg.GetType().GetProperty("Provider");
-                var idProp = cfg.GetType().GetProperty("Id");
-                var provider = providerProp?.GetValue(cfg) as string ?? "";
-                var idSpec = idProp?.GetValue(cfg);
-                var idName = idSpec?.GetType().GetProperty("Prop")?.GetValue(idSpec)?.GetType().GetProperty("Name")?.GetValue(idSpec)?.ToString();
-                list.Add(new EntityConfigInfo(key.Item1.FullName!, key.Item2.FullName!, provider, idName));
-            }
-        }
-        return list;
-    }
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<
+        (string EntityType, string KeyType),
+        EntityConfigInfo> _configs = new();
+
+    public IReadOnlyList<EntityConfigInfo> GetEntityConfigsSnapshot() =>
+        _configs.Values
+            .OrderBy(info => info.EntityType, StringComparer.Ordinal)
+            .ThenBy(info => info.KeyType, StringComparer.Ordinal)
+            .ToArray();
+
+    internal void Observe(EntityConfigInfo config) =>
+        _configs[(config.EntityType, config.KeyType)] = config;
 }

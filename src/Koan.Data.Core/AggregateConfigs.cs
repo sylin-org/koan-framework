@@ -24,12 +24,20 @@ public static class AggregateConfigs
             sp,
             static _ => new ConcurrentDictionary<(Type EntityType, Type KeyType), object>());
 
-        return (AggregateConfig<TEntity, TKey>)cache.GetOrAdd(key, _ =>
+        var config = (AggregateConfig<TEntity, TKey>)cache.GetOrAdd(key, _ =>
         {
             var provider = ResolveProvider(typeof(TEntity)) ?? DefaultProvider(sp);
             var idSpec = AggregateMetadata.GetIdSpec(typeof(TEntity));
             return new AggregateConfig<TEntity, TKey>(provider, idSpec, sp);
         });
+
+        sp.GetService<DataDiagnostics>()?.Observe(new EntityConfigInfo(
+            typeof(TEntity).FullName ?? typeof(TEntity).Name,
+            typeof(TKey).FullName ?? typeof(TKey).Name,
+            config.Provider,
+            config.Id?.Prop.Name));
+
+        return config;
     }
 
     /// <summary>

@@ -11,9 +11,12 @@ namespace Koan.Data.Connector.Json;
 [ProviderPriority(0)]
 public sealed class JsonAdapterFactory : IDataAdapterFactory
 {
-    public string Provider => "json";
+    public string Provider => Infrastructure.Constants.Provider.Name;
 
-    public bool CanHandle(string provider) => string.Equals(provider, "json", StringComparison.OrdinalIgnoreCase);
+    public bool CanHandle(string provider) => string.Equals(
+        provider,
+        Infrastructure.Constants.Provider.Name,
+        StringComparison.OrdinalIgnoreCase);
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,
@@ -29,7 +32,7 @@ public sealed class JsonAdapterFactory : IDataAdapterFactory
         var directoryPath = AdapterConnectionResolver.GetSourceSetting(
             config,
             sourceRegistry,
-            "json",
+            Infrastructure.Constants.Provider.Name,
             source,
             "DirectoryPath",
             baseOpts.DirectoryPath);
