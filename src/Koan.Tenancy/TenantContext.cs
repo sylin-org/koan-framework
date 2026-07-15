@@ -3,15 +3,13 @@ using System;
 namespace Koan.Tenancy;
 
 /// <summary>
-/// The immutable ambient <b>tenant slice</b> (ARCH-0095) — the flagship typed slice carried on the one
-/// Facet-3 ambient carrier (<c>EntityContext</c>, ARCH-0097), stored generically by this module so the data
-/// core never names it. Charter L1 forbids a second ambient mechanism; charter L2/L4 make it immutable and
-/// restore-on-dispose.
+/// The immutable ambient <b>tenant context</b> (ARCH-0095), stored as an exact-type value in Core's logical-flow
+/// context. Tenancy owns its meaning and developer vocabulary; Core and Data never name tenant fields.
 ///
 /// <para>It is deliberately <b>tri-state</b>, because tenancy needs to distinguish three situations the
 /// existing string dimensions cannot:</para>
 /// <list type="bullet">
-///   <item>no slice in scope — <b>no tenant in scope</b> (a tenant-scoped op fails closed);</item>
+///   <item>no <see cref="TenantContext"/> in scope — <b>no tenant in scope</b> (a tenant-scoped op fails closed);</item>
 ///   <item><see cref="IsHost"/> is <c>true</c> — <b>explicit host / control-plane scope</b> (the loud
 ///   <see cref="Tenant.None"/> escape), distinct from "unset";</item>
 ///   <item><see cref="Id"/> is set — <b>scoped to that immutable tenant surrogate id</b>

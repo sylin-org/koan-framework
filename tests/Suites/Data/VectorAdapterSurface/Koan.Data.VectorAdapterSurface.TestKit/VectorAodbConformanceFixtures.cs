@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Reflection;
 using Koan.Data.Abstractions;
-using Koan.Data.Core;
 using Koan.Data.Core.Axes;
 using Koan.Data.Core.Model;
 using Koan.Tenancy;
@@ -56,17 +55,6 @@ public static class VectorConformanceShardAmbient
     }
 }
 
-public sealed class VectorConformanceShardCarrier : IAmbientSliceCarrier
-{
-    public string AxisKey => "koan:vector-conformance-shard";
-    public string? Capture() => VectorConformanceShardAmbient.Current is { } s ? "v1:" + s : null;
-    public IDisposable Restore(string captured)
-        => captured.StartsWith("v1:", StringComparison.Ordinal)
-            ? VectorConformanceShardAmbient.Use(captured[3..])
-            : throw new InvalidOperationException($"VectorConformanceShardCarrier cannot restore '{captured}'.");
-    public IDisposable Suppress() => VectorConformanceShardAmbient.Use(null);
-}
-
 /// <summary>The Database-mode axis that folds the ambient shard into the routed source (and thence the vector name).</summary>
 public sealed class VectorConformanceShardAxis : IDataAxis
 {
@@ -74,6 +62,5 @@ public sealed class VectorConformanceShardAxis : IDataAxis
         .Named("vector-conformance-shard")
         .Mode(AxisMode.Database)
         .AppliesTo(VectorConformanceShardMetadata.IsSharded)
-        .Field("shard", static () => VectorConformanceShardAmbient.Current, typeof(string))
-        .Carries(new VectorConformanceShardCarrier());
+        .Field("shard", static () => VectorConformanceShardAmbient.Current, typeof(string));
 }

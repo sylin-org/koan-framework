@@ -1,6 +1,7 @@
 # Sylin.Koan.Core
 
-Core primitives for Koan: configuration helpers, environment snapshot (KoanEnv), constants, and foundational abstractions.
+Core primitives for Koan: configuration helpers, environment snapshot (`KoanEnv`), logical-flow
+context, durable context carriage, constants, and foundational abstractions.
 
 - Target framework: net10.0
 - License: Apache-2.0
@@ -14,6 +15,19 @@ dotnet add package Sylin.Koan.Core
 ## Notes
 - Options: bind with Microsoft.Extensions.Options
 - Environment: use `KoanEnv.Current` for machine/env metadata
+- Logical-flow context: `KoanContext.Get<T>()`, `Push<T>()`, and `Suppress<T>()` carry immutable,
+  exact-type values through async execution and restore the prior snapshot on scope disposal. Context
+  belongs to the logical flow, not to a host singleton.
+- Durable hops: modules implement `IKoanContextCarrier`; the host-owned
+  `KoanContextCarrierRegistry` captures opaque, versioned values and restores or suppresses every
+  registered axis. Unknown axes, malformed/version-incompatible values, and insufficient
+  `ContextIngressTrust` fail before user work begins.
+- `KoanContextCarrierRegistry.Descriptors` exposes only ordinally ordered axis identities and minimum
+  ingress trust for safe inspection. It never exposes captured values.
+- `KoanContextFingerprint.Compute(...)` produces one deterministic, value-opaque identity for dedupe
+  and durable keys. It is not encryption or proof of provenance.
+- Keep service providers, scoped services, mutable runtime state, and disposable resources out of
+  `KoanContext`. Dependencies remain host-owned in DI; carried values remain module-owned meaning.
 - Host ownership: `AddKoan()` hosts attach the ambient `AppHost` provider while running and release
   it when they stop. Use `AppHost.PushScope(provider)` when parallel flows must select different hosts.
 - A stopped host is never restored as a fallback when a newer host releases its lease.

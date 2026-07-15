@@ -35,6 +35,7 @@ var similar  = await someArticle.FindSimilar(limit: 5);
 ### Auto-embed on save (opt-in with `[Embedding]`)
 
 ```csharp
+[Embedding]
 public class Article : Entity<Article>
 {
     public string Title   { get; set; } = "";
@@ -58,15 +59,27 @@ public class Article : Entity<Article>
 
 ### Async embedding queue
 
-Large or slow-to-embed entities use `EmbedJob<TEntity>` for background processing:
+Large or slow-to-embed entities opt into the background queue on the Entity itself:
 
 ```csharp
-// Queue for async embedding rather than blocking the request
-await EmbedJob<Article>.QueueAsync(article.Id);
+[Embedding(Async = true)]
+public class Article : Entity<Article>
+{
+    public string Text { get; set; } = "";
+}
 
-// Job status
-EmbedJobStatus: Pending | Processing | Completed | Failed | FailedPermanent
+await article.Save(); // persists the Entity and enqueues its embedding work
 ```
+
+The lifecycle hook is the supported enqueue path today; there is no separate public `QueueAsync` API.
+It captures Koan's registered logical-flow context and restores it before loading the entity. The
+global queue identity includes a value-opaque context fingerprint, so equal Entity ids in different
+tenants or subjects cannot overwrite one another. No embedding-specific application plumbing is
+required. Queue states are `Pending`, `Processing`, `Completed`, `Failed`, and `FailedPermanent`.
+
+`RequeueJob<TEntity>(entityId)` targets the row in the caller's current Koan context. For a
+context-independent operator retry, take the durable `JobId` returned by `GetFailedJobs<TEntity>()`
+and pass it to `RequeueJobById<TEntity>(jobId)`.
 
 ---
 

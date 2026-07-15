@@ -177,7 +177,7 @@ semantics. Neither is a compatibility base for Events or Transport.
 
 | Order | Slice | Meaningful result | Principal deletion/supersession |
 |---|---|---|---|
-| 1 | [R07-01 Core context foundation](r07/R07-01-core-context-foundation.md) | Tenant and other module context survive durable work through a Core-owned, fail-closed contract | Data-owned generic slice/carrier APIs |
+| 1 | [R07-01 Core context foundation](r07/R07-01-core-context-foundation.md) | **Passed.** Tenant and other module context survive durable work through a Core-owned, fail-closed contract | Data-owned generic slice/carrier APIs |
 | 2 | Data semantic truth | Lifecycle is canonical/host-owned and Data streams are genuinely incremental | lifecycle `Events` name, bypassable hooks, materializing stream implementation |
 | 3 | Typed capability substrate | A minimal Data.Core cardinality adapter and pillar-owned execution replace generic public flow machinery | `PipelineBuilder` and pillar pipeline extensions |
 | 4 | In-process Transport flagship | a foundation + `AddKoan()` app gets local scalar/set/stream snapshots, stable typed receivers, source/ingress filters, isolated copies, bounded acceptance, operation-scoped settlement wait, and tenant-safe retry identity | old Messaging Core, proxy/buffer, broad `Send`, separate InMemory connector |
@@ -196,7 +196,9 @@ backlogs until their prerequisites pass.
 3. Classify existing types, projects, and public surfaces as keep, absorb, rebuild, rename, or delete.
    **Complete.**
 4. Amend the canonical contract and record the architecture decision. **Complete.**
-5. Execute R07-01 without changing current durable context behavior.
+5. Execute R07-01 without changing current durable context behavior. **Complete.** Core owns the typed
+   logical-flow state and durable carrier registry; Data, Tenancy, Access, Jobs, and Data.AI are
+   migrated, and the affected regression, compatibility, documentation, diff, and privacy gates pass.
 6. Open each later implementation slice only after its lower boundary passes.
 7. Prove in-process semantics before any broker migration or public maturity change.
 

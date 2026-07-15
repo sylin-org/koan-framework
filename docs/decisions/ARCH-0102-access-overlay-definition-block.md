@@ -1,5 +1,11 @@
 # ARCH-0102: The Access Overlay — isolation as a pushed-down, adapter-realized definition block
 
+> **R07 context amendment (2026-07-15):** AODB remains the Data realization contract. Durable
+> logical-flow carriage is now the independent Core contract `IKoanContextCarrier` plus
+> `KoanContextCarrierRegistry`; it is not a Data-axis plane and `.Carries(...)` has been removed.
+> Read carrier-only Database-mode statements below as historical implementation notes; current
+> Database routing derives from its declared Data field/source-key provider.
+
 **Status**: Accepted (shape ratified by the Enterprise Architect, 2026-06-25; implementation phased below). **Phases 0–2 realized on `dev`** — overlay naming, provenance flags, the one composer, tenancy+soft-delete on `[DataAxis]`, and **Database-mode auto-routing** (`DatabaseRouteRegistry` + the `AdapterResolver` Priority-1.5 hook; external-only fail-closed). Remaining: Tier-2 visibility surfaces + two pinned Phase-3 follow-ons (strict-isolation `NullKeyBehavior`; overlapping-route boot detection) — see [the implementation plan](../architecture/aodb-implementation-plan.md).
 **Date**: 2026-06-25
 **Deciders**: Enterprise Architect

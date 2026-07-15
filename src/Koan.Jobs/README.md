@@ -22,6 +22,12 @@ var status = await review.Job.Status();
 The package registers its coordinator, worker, ledger, health contributor, and default in-process
 wake transport through `AddKoan()` discovery. Application registration code is not required.
 
+Submission also captures every composed `IKoanContextCarrier` before its first asynchronous boundary.
+Execution restores that opaque context before loading the work item; an absent registered axis is
+explicitly suppressed. Unknown axes or invalid carrier data dead-letter the job before application
+handler code. Tenant and subject values therefore survive a durable hop without Jobs naming either
+concept or requiring application plumbing.
+
 ## Capability ladder
 
 | Composed infrastructure | Elected behavior |

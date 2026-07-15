@@ -4,8 +4,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core;
+using Koan.Core.Context;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
+using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core;
 using Koan.Data.Core.Pipeline;
 using Microsoft.Extensions.Configuration;
@@ -19,7 +21,8 @@ namespace Koan.Tenancy.Initialization;
 /// <summary>
 /// Lights tenancy up when the <c>Koan.Tenancy</c> package is referenced (Reference = Intent, ARCH-0099 §1): binds
 /// the posture options, resolves the runtime posture once (<see cref="TenancyRuntime"/>), registers the
-/// fail-closed tenant gate as a generic <see cref="IStorageGuard"/> contributor, and registers the invisible
+/// fail-closed tenant gate as a generic <see cref="IStorageGuard"/> contributor, registers durable tenant context
+/// carriage through Core, and declares the invisible
 /// <c>__koan_tenant</c> <see cref="ManagedFieldDescriptor"/> the data core stamps on writes and filters on reads
 /// (DATA-0105 §0/§3b). The data core never references this module; not referencing it leaves both seams empty
 /// (structural no-op). No tenant in scope → the descriptor is inert (its value provider returns <c>null</c>), so
@@ -36,10 +39,10 @@ public sealed class KoanAutoRegistrar : KoanModule
         services.TryAddSingleton<TenancyRuntime>();
         services.TryAddSingleton<TenancyDevState>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IStorageGuard, TenantStorageGuard>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanContextCarrier, TenantContextCarrier>());
 
-        // ARCH-0102 / ARCH-0101 §7: the tenant managed field + the durable async-hop carrier (ARCH-0100) are now
-        // declared in ONE place — TenantAxis : IDataAxis — discovered + expanded byte-identically by DataAxisExpander.
-        // The fail-closed guard above + the posture pre-flight / dev-seed (Start) stay here: they are policy, not a plane.
+        // TenantAxis owns only Data behavior. Durable carriage is a separate Core concern and remains available to
+        // Jobs or Communication without making either mechanism part of the Data-axis DSL.
     }
 
     public override Task Start(IServiceProvider services, CancellationToken ct)

@@ -5,6 +5,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
+using Koan.Core.Context;
+using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Data.AI.Attributes;
 using Koan.Data.Core;  // For .Save() extension method
@@ -18,6 +20,8 @@ namespace Koan.Data.AI.Initialization;
 /// </summary>
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
+    private const string ContextCaptureOperation = "embedding job context capture";
+
     public string ModuleName => "Koan.Data.AI";
     public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
 
@@ -409,17 +413,15 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Build embedding text now (to capture current state)
         var text = metadata.BuildEmbeddingText(entity);
 
-        // ARCH-0100: snapshot the ambient (tenant + access subject) at ENQUEUE — this hook runs inside the caller's
-        // Save, so the ambient is exactly the scope the entity lives in. The global embedding worker has no ambient
-        // of its own, so without this it reads a [AccessScoped]/tenant-scoped entity back as "not found" (fail-closed)
-        // and the embedding never lands. Resolved via AppHost (the hook is static); null when no carrier is registered.
-        var registry = Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(Koan.Data.Core.AmbientCarrierRegistry))
-            as Koan.Data.Core.AmbientCarrierRegistry;
-        var ambient = registry?.Capture();
+        // Snapshot the Koan context (tenant + access subject) at enqueue. This hook runs inside the caller's Save,
+        // so the captured context is exactly the scope the entity lives in. The global worker has no context of its
+        // own; resolving the required registry through AppHost makes an incomplete composition fail loudly here.
+        var registry = AppHost.GetRequiredService<KoanContextCarrierRegistry>(ContextCaptureOperation);
+        var ambient = registry.Capture();
         var carrierBag = ambient is null ? null : new Dictionary<string, string>(ambient);
 
         // Check if job already exists for this entity
-        var jobId = EmbedJob<TEntity>.MakeId(entity.Id);
+        var jobId = EmbedJob<TEntity>.MakeId(entity.Id, carrierBag);
         var existingJob = await EmbedJob<TEntity>.Get(jobId, ct);
 
         if (existingJob != null)

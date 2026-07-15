@@ -103,7 +103,7 @@ public sealed class InMemoryDatabaseRoutingSpec : IAsyncLifetime
     }
 }
 
-// ==================== Assembly-local shard fixtures (the [Sharded]/ambient/carrier triad, mirrors the Axes suite) ====================
+// ==================== Assembly-local shard fixtures (the [Sharded]/ambient axis, mirrors the Axes suite) ====================
 
 /// <summary>A discoverable Database-mode axis: an <see cref="InMemShardedAttribute"/> entity routes each op to the data
 /// source named by the ambient shard. Inert when no shard is in scope (the provider returns null ⇒ fall-through).</summary>
@@ -113,8 +113,7 @@ public sealed class InMemShardRouteAxis : IDataAxis
         .Named("inmem-shard-route")
         .Mode(AxisMode.Database)
         .AppliesTo(InMemShardMetadata.IsSharded)
-        .Field("shard", static () => InMemShardAmbient.Current, typeof(string))   // the per-operation SOURCE-KEY provider
-        .Carries(new InMemShardCarrier());
+        .Field("shard", static () => InMemShardAmbient.Current, typeof(string));   // the per-operation SOURCE-KEY provider
 }
 
 [AttributeUsage(AttributeTargets.Class, Inherited = true, AllowMultiple = false)]
@@ -143,25 +142,4 @@ public static class InMemShardAmbient
         private bool _done;
         public void Dispose() { if (_done) return; _done = true; _shard.Value = previous; }
     }
-}
-
-/// <summary>Carries the ambient shard across the durable async hop (ARCH-0100) — Database-mode axes must Carries.</summary>
-public sealed class InMemShardCarrier : IAmbientSliceCarrier
-{
-    public string AxisKey => "koan:inmem-shard-route";
-
-    public string? Capture()
-    {
-        var shard = InMemShardAmbient.Current;
-        return shard is null ? null : "v1:" + shard;
-    }
-
-    public IDisposable Restore(string captured)
-    {
-        if (captured.StartsWith("v1:", StringComparison.Ordinal))
-            return InMemShardAmbient.Use(captured.Substring(3));
-        throw new InvalidOperationException($"InMemShardCarrier cannot restore '{captured}' (unknown format).");
-    }
-
-    public IDisposable Suppress() => InMemShardAmbient.Use(null);
 }

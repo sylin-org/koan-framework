@@ -58,7 +58,7 @@ public static class StorageKeyScoper
         if (ManagedFieldRegistry.IsEmpty) return logicalKey;      // off ⇒ byte-identical (no axis)
         // A raw IStorageService caller has no entity type, so there is no [HostScoped] exemption nor AppliesTo
         // filter (a type-less op cannot be host-scoped — isolate by default). Use the descriptor's CLEAN
-        // ValueProvider value — NOT AmbientCarrierRegistry.Capture(), whose value is a versioned durable-restore
+        // ValueProvider value — NOT KoanContextCarrierRegistry.Capture(), whose value is a versioned durable-restore
         // token (e.g. "v1:id:acme"), not a path-clean segment.
         var all = ManagedFieldRegistry.All;
         RefuseNonEqualityScope(all);

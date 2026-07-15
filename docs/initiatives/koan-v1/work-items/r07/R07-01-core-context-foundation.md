@@ -1,24 +1,24 @@
 ---
 type: SPEC
 domain: framework
-title: "R07-01 - Move Ambient Context Beneath Data"
+title: "R07-01 - Move Logical Context Beneath Data"
 audience: [architects, maintainers, developers, ai-agents]
-status: draft
+status: current
 last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
-  status: not-run
+  status: reviewed
   scope: Core typed ambient state and durable carrier ownership
 ---
 
-# R07-01 — Move ambient context beneath Data
+# R07-01 — Move logical context beneath Data
 
 - Tranche: `T6 — semantic capability ring`
-- Status: `pending`
+- Status: `passed`
 - Depends on: ARCH-0113 and R06
 - Unlocks: Data semantic truth and context-safe Communication
-- Owner: Core context with Data, Tenancy, and Jobs migrations
+- Owner: Core context with Data, Tenancy, Access, Jobs, and Data.AI migrations
 
 ## Meaningful outcome
 
@@ -35,8 +35,8 @@ using (Tenant.Use(tenantId))
 }
 ```
 
-The handler observes that tenant before its Entity is loaded and throughout its invocation. Later
-settlement retains correlation and a safe context fingerprint, not a live ambient scope.
+The handler observes that tenant before its Entity is loaded and throughout its invocation. Durable
+records retain an opaque carrier bag for later restoration, never a live ambient scope.
 There is no new application registration step.
 
 ## Why now
@@ -48,10 +48,12 @@ proven contract before adding new consumers.
 
 ## Evidence to read first
 
+- `src/Koan.Core/Context/KoanContext.cs`
+- `src/Koan.Core/Context/IKoanContextCarrier.cs` and `KoanContextCarrierRegistry.cs`
+- `src/Koan.Core/Context/ContextIngressTrust.cs` and `KoanContextCarrierException.cs`
 - `src/Koan.Data.Core/EntityContext.cs`
-- `src/Koan.Data.Core/Ambient/IAmbientSliceCarrier.cs`
-- `src/Koan.Data.Core/Ambient/AmbientCarrierRegistry.cs`
 - `src/Koan.Tenancy/Tenant.cs`, `TenantContextCarrier.cs`, and `TenantAxis.cs`
+- `src/Koan.Data.Access/Subject.cs`, `SubjectContextCarrier.cs`, and `AccessAxis.cs`
 - Jobs capture/coalescing/orchestrator paths and durable-carrier tests
 - ARCH-0100, ARCH-0108, and ARCH-0113
 
@@ -59,7 +61,7 @@ proven contract before adding new consumers.
 
 ### DECIDED
 
-- Core owns one `AsyncLocal` typed context state, working name `KoanContext`.
+- Core owns one `AsyncLocal` typed context state, `Koan.Core.Context.KoanContext`.
 - That state belongs to the current logical execution flow, not to a host singleton. An explicit outer
   scope may intentionally span calls into multiple hosts; host-owned services and registrations may
   not.
@@ -71,6 +73,11 @@ proven contract before adding new consumers.
   no compatibility alias remains.
 - The carrier contract, registry, exception, and generic tests move to Core and are renamed around Koan
   context rather than Entity/Data.
+- The public Core seam is `IKoanContextCarrier`, `KoanContextCarrierRegistry`,
+  `KoanContextCarrierException`, `ContextIngressTrust`, and `KoanContextFingerprint`. The fingerprint
+  is a deterministic value-opaque identity for dedupe/record keys, not encryption or provenance.
+  Carrier bags remain `IReadOnlyDictionary<string,string>` snapshots; no second public
+  context-snapshot abstraction is needed by this slice.
 - Capture remains module-registered, opaque, versioned, deterministic, and allocation-free when empty.
 - Restore remains fail-closed for unknown axes and explicitly suppresses absent registered axes.
 - Malformed payloads and unsupported carrier versions fail before user code. A syntactically valid
@@ -92,9 +99,10 @@ proven contract before adding new consumers.
 
 ### OPEN
 
-- Exact Core namespace/type spelling after collision and IntelliSense probes.
-- Whether a non-public immutable snapshot type is sufficient or a public snapshot is needed by the
-  durable-carrier API.
+- No open API-shape question remains inside this slice. `KoanContextCarrierRegistry.Descriptors`
+  exposes ordinal, value-free `CarrierDescriptor(AxisKey, MinimumIngressTrust)` records. Projecting
+  those descriptors into shared runtime facts/startup belongs to the later Communication slice and
+  must not expose values.
 
 ## Scope
 
@@ -139,15 +147,17 @@ Data   Tenancy   Jobs   own their meanings and consume Core
 ## Red/green plan
 
 1. Add Core tests that fail because typed context and durable restoration currently require Data.Core.
+   **Implemented.**
 2. Implement the smallest Core context state and carrier registry that passes nesting, parallel-flow,
    duplicate-key, unknown-axis, malformed/version-invalid, minimum-ingress-trust, suppress,
-   partial-unwind, and empty-hot-path cells.
+   partial-unwind, and empty-hot-path cells. **Implemented; focused Core proofs are green.**
 3. Rebase `EntityContext` on that state and run its complete context/transaction suite unchanged.
-4. Migrate Tenancy and remove `.Carries(...)` from the Data-axis DSL.
+   **Implemented; focused Data context proofs are green.**
+4. Migrate Tenancy and remove `.Carries(...)` from the Data-axis DSL. **Implemented.**
 5. Migrate Jobs capture/restore/coalescing and prove concurrent Tenant A/B execution plus absent-context
-   suppression.
-6. Delete the old Data ambient types and all old namespace references.
-7. Run dependency, docs, diff, and privacy gates.
+   suppression. **Implemented and verified.**
+6. Delete the old Data ambient types and all old namespace references. **Implemented.**
+7. Run dependency, docs, diff, and privacy gates. **Complete.**
 
 ## Verification
 
@@ -178,6 +188,42 @@ Data   Tenancy   Jobs   own their meanings and consume Core
   reinterpretation is allowed.
 - Removing the Tenancy module makes its carrier absent and makes retained tenant payloads fail closed.
 - The resulting implementation contains one typed ambient state and one durable carrier registry.
+
+## Acceptance result
+
+**Result: PASS — 2026-07-15 (`this commit`).**
+
+- Core's complete suite passes 257/257. It covers exact-type logical-flow state, nested/parallel
+  restoration, host ownership, frozen carrier declarations, trust ordering, bounded/sanitized
+  failures, reverse disposal, value-free descriptors, and deterministic fingerprint boundaries.
+- The affected consumer matrix passes: Data context/transaction 35/35; Tenancy 110/110; Access 22/22;
+  Jobs core 77/77 and durable tenancy 11/11; Data.AI 84/84; Data axes 56/56 plus integration
+  18/18. The complete Data.Core suite did not finish within 184 seconds, so this acceptance claims the
+  focused affected matrix, not an unobserved full-suite result.
+- `dotnet build Koan.sln --no-restore --verbosity minimal` succeeds with 0 errors. Its 7 warnings are
+  pre-existing, repository-wide documentation/compatibility debt tracked outside this child.
+- `pwsh -NoProfile -File scripts/build-docs.ps1 -Strict`, `git diff --check`, the old-API structural
+  sweep, and the scoped privacy check pass. No Communication implementation or external publication
+  is included.
+- Jobs preserves the persisted `AmbientCarrier` property and the exact `koan:tenant` / `koan:subject`
+  versioned values. Terminal records and legacy coalesce keys still retain the opaque bag for
+  compatibility; migrating them to a narrower fingerprint is deliberately not claimed here. Jobs'
+  own durable ledger restores with `HostTrusted`; an external ledger/transport must prove its actual
+  provenance and is not certified by this slice.
+- Data.AI keeps the original unscoped queue id shape and can still process rows with legacy ids. New
+  scoped rows use a context fingerprint so equal Entity ids in different contexts cannot overwrite
+  each other; exact durable-job-id requeue gives operators an unambiguous recovery path.
+- The removed Data slice/carrier and `.Carries(...)` surfaces were introduced after the current public
+  0.17.0 release baseline and never shipped in a tagged/public package. No compatibility forwarder is
+  added because it would recreate two canonical context owners; future removal of a shipped surface
+  remains governed by ARCH-0085. Exact shipped constructor shapes for Jobs/Data.AI and
+  `EmbedJob<TEntity>.MakeId(string)` remain as bounded obsolete/delegating forwarders.
+- Carrier descriptors are safely inspectable through code today. Shared startup/runtime-fact
+  projection, authenticated external ingress, and Events/Transport remain later R07 work and are not
+  implied by this pass. No package is published, pushed, tagged, or released by this acceptance.
+
+Review: implementation plus independent regression, documentation-truth, API-compatibility, and
+adversarial passes. The next child is Data semantic truth; stop before Communication.
 
 ## Stop conditions
 

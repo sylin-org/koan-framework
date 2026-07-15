@@ -1,63 +1,68 @@
 using System;
 using System.Linq;
-using Koan.Data.Core;
+using Koan.Core.Context;
+using Koan.Data.Access.Infrastructure;
 
 namespace Koan.Data.Access;
 
 /// <summary>
-/// SEC-0008 / ARCH-0100: carries the ambient <see cref="SubjectContext"/> across a durable async-hop, so a background
-/// job (later: a message) runs under the subject that submitted it. This is what makes a <b>guest-triggered job
-/// inherently access-scoped</b> — the web-layer access hook could never reach a job. The captured string is
-/// <b>versioned</b> so a future format change fails closed at restore (dead-letter) rather than mis-restoring into a
-/// wrong/ghost subject. Capture reads only the explicit ambient slice: an unset scope captures nothing.
+/// Carries the ambient <see cref="SubjectContext"/> across a durable hop so work runs under its submitting subject.
+/// The opaque wire form is versioned and restoration requires authenticated ingress provenance. Malformed or
+/// unsupported data fails with a safe typed error before any subject scope is pushed.
 /// </summary>
-public sealed class SubjectContextCarrier : IAmbientSliceCarrier
+public sealed class SubjectContextCarrier : IKoanContextCarrier
 {
-    private const string SystemToken = "v1:system";
-    private const string IdPrefix = "v1:id:";          // unconstrained subject: "v1:id:<id>"
-    private const string ScopedPrefix = "v1:scoped:";  // constrained: "v1:scoped:<id><US><scope><US><scope>..."
-    private const char Unit = '\u001f';                // unit separator (a control char; scope tokens never contain it)
+    /// <inheritdoc />
+    public string AxisKey => Constants.ContextCarriage.AxisKey;
 
-    public string AxisKey => "koan:subject";
+    /// <inheritdoc />
+    public ContextIngressTrust MinimumIngressTrust => ContextIngressTrust.Authenticated;
 
+    /// <inheritdoc />
     public string? Capture()
     {
         var s = Subject.Current;
         if (s is null) return null;                     // unset → nothing to carry
-        if (s.IsSystem) return SystemToken;             // explicit elevated scope
-        if (!s.IsConstrained) return IdPrefix + s.Id;   // unconstrained subject
-        return ScopedPrefix + s.Id + Unit + string.Join(Unit, s.Scopes!);  // constrained (may be empty → trailing US)
+        if (s.IsSystem) return Constants.ContextCarriage.SystemToken;             // explicit elevated scope
+        if (!s.IsConstrained) return Constants.ContextCarriage.IdPrefix + s.Id;   // unconstrained subject
+        return Constants.ContextCarriage.ScopedPrefix + s.Id + Constants.ContextCarriage.UnitSeparator
+            + string.Join(
+                Constants.ContextCarriage.UnitSeparator,
+                s.Scopes!.OrderBy(static scope => scope, StringComparer.Ordinal)); // deterministic; empty → trailing US
     }
 
+    /// <inheritdoc />
     public IDisposable Restore(string captured)
     {
-        if (captured == SystemToken) return Subject.System();
+        if (captured is null)
+            throw KoanContextCarrierException.MalformedPayload(AxisKey);
 
-        if (captured.StartsWith(IdPrefix, StringComparison.Ordinal))
+        if (captured == Constants.ContextCarriage.SystemToken) return Subject.System();
+
+        if (captured.StartsWith(Constants.ContextCarriage.IdPrefix, StringComparison.Ordinal))
         {
-            var id = captured.Substring(IdPrefix.Length);
-            if (id.Length == 0)
-                throw new InvalidOperationException("SubjectContextCarrier: the captured subject id is empty — refusing to restore.");
+            var id = captured[Constants.ContextCarriage.IdPrefix.Length..];
+            if (string.IsNullOrWhiteSpace(id) || id.IndexOf(Constants.ContextCarriage.UnitSeparator) >= 0)
+                throw KoanContextCarrierException.MalformedPayload(AxisKey);
             return Subject.Unconstrained(id);
         }
 
-        if (captured.StartsWith(ScopedPrefix, StringComparison.Ordinal))
+        if (captured.StartsWith(Constants.ContextCarriage.ScopedPrefix, StringComparison.Ordinal))
         {
-            var parts = captured.Substring(ScopedPrefix.Length).Split(Unit);
+            var parts = captured[Constants.ContextCarriage.ScopedPrefix.Length..]
+                .Split(Constants.ContextCarriage.UnitSeparator);
             var id = parts[0];
-            if (id.Length == 0)
-                throw new InvalidOperationException("SubjectContextCarrier: the captured subject id is empty — refusing to restore.");
+            if (string.IsNullOrWhiteSpace(id))
+                throw KoanContextCarrierException.MalformedPayload(AxisKey);
             // parts[1..] are the scope tokens; drop any empties (a trailing US from an empty scope set → constrained-to-nothing).
             return Subject.Use(id, parts.Skip(1).Where(static p => p.Length > 0));
         }
 
-        // Unknown/future format — fail closed (named) so the orchestrator dead-letters rather than mis-restoring.
-        throw new InvalidOperationException(
-            $"SubjectContextCarrier: cannot restore subject from an unknown captured format '{captured}' (expected version 'v1').");
+        throw captured.StartsWith(Constants.ContextCarriage.VersionPrefix, StringComparison.Ordinal)
+            ? KoanContextCarrierException.MalformedPayload(AxisKey)
+            : KoanContextCarrierException.UnsupportedVersion(AxisKey);
     }
 
-    // Explicitly clear the ambient subject for this scope — so a job submitted with no subject never inherits the
-    // worker/inline-drain thread's subject. Subject.Current becomes null (unset); an access-scoped read then fails
-    // closed (or no-ops per AccessOptions), never leaking the carrier thread's subject.
-    public IDisposable Suppress() => EntityContext.WithSlice<SubjectContext>(null);
+    /// <inheritdoc />
+    public IDisposable Suppress() => KoanContext.Suppress<SubjectContext>();
 }

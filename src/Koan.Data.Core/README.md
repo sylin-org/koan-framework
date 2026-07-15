@@ -25,7 +25,9 @@ dotnet add package Sylin.Koan.Data.Core
   - `Item.Query(predicate, ct)`
   - `Item.FirstPage(pageSize, ct)` and `Item.Page(cursor, ct)`
   - `Item.QueryStream(predicate, ct)`
-- For large sets, use paging or streaming; don’t materialize unbounded results.
+- For large sets today, use explicit pages or `Pager`. `AllStream`/`QueryStream` expose async iteration
+  but currently materialize the complete result before the first yield and do not honor `batchSize`;
+  genuine bounded provider streaming is the next R07 Data-semantic repair.
 - If a first-class static isn’t available, you can fall back to the generic facade (second-class): `Data<TEntity, TKey>.Query(...)`.
 
 Child relationships are strict by default. Native and in-memory providers execute directly; a
@@ -42,6 +44,11 @@ This policy bounds candidates before rows escape and never returns a partial rel
 Required Entity/Data operations without a usable Koan host throw `KoanHostContextException`. Its
 `Failure`, `Operation`, and `RequiredService` properties distinguish an absent host, a disposed host,
 and a host where the Data module was not composed.
+
+`EntityContext` is deliberately Data-specific: it scopes source, adapter, partition, cache, and
+transaction routing. It stores that state in Core's logical-flow `KoanContext`, but it is not the
+generic API for tenancy, subjects, or other module-owned axes. Those modules own their business-facing
+facades and register durable carriage independently through `Koan.Core.Context`.
 
 For a synchronous, non-hosted process, `new ServiceCollection().StartKoan()` returns the active
 provider. The caller owns it; use `using var app = (IDisposable)services.StartKoan()` so disposal also

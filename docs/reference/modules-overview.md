@@ -3,16 +3,22 @@ type: REF
 domain: platform
 title: "Koan Modules Reference"
 audience: [developers, architects]
-status: draft
-last_updated: 2025-10-06
+status: deprecated
+last_updated: 2026-07-15
 framework_version: v0.6.3
 validation:
-  status: verified
-  date_last_tested: 2025-10-07
+  status: known-stale
+  date_last_tested: 2026-07-15
   scope: docs/reference/modules-overview.md
 ---
 
 # Koan Modules Reference
+
+> **Deprecated inventory — do not use this page to choose packages or infer support.** It preserves a
+> pre-v0.17 module catalog and contains packages, APIs, availability, and coverage claims that no
+> longer match the repository. Use the current
+> [capability assessment](../initiatives/koan-v1/CAPABILITIES.md), package-owned READMEs, and
+> [source tree](../../src/) instead. Replacement or retirement is tracked as `PMC-010`.
 
 
 **Test Coverage:**

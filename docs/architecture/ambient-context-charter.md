@@ -14,6 +14,13 @@ validation:
 
 # Ambient Context — Design Charter & Truth-Test (Facet 3)
 
+> **Current realization (2026-07-15):** [ARCH-0113](../decisions/ARCH-0113-entity-capability-communication.md)
+> and R07-01 establish `Koan.Core.Context.KoanContext` as the one generic, cross-pillar exact-type
+> logical-flow primitive and `KoanContextCarrierRegistry` as the host-owned durable-hop seam.
+> `EntityContext` now owns only Data
+> routing/transaction state. This first realization does not claim the charter's later AI/cache
+> convergence or a public scope-chain `Describe()` surface; those remain separate evidence-gated work.
+
 > **What this is.** Not a design. The **truth-test** a design must pass. It coalesces a full
 > investigation — an empirical survey of every ambient mechanism in Koan, an archaeology of *why*
 > each was built that way (genuine reasons vs cargo-cult), and external research into how the rest of

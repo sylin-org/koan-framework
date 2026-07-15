@@ -44,6 +44,20 @@ Calling more than one control signal in a handler fails immediately.
 The ledger is the queue. Wake transports reduce latency but never carry correctness. A dropped wake
 costs at most one poll interval. Claims, leases, retries, and reclaim behavior remain ledger-owned.
 
+## Logical-flow context
+
+- `JobCoordinator` captures the host's `KoanContextCarrierRegistry` exactly once before the first
+  await. Batch items share that submission snapshot, and coalescing folds the opaque bag so work from
+  distinct context axes cannot collapse together accidentally.
+- `JobOrchestrator` restores with `ContextIngressTrust.HostTrusted` before loading the work item or
+  invoking its handler. This states that the durable ledger is inside the application's administrative
+  trust boundary; it does not claim that opaque syntax is tamper detection.
+- A missing value suppresses that registered axis rather than inheriting the worker flow. Unknown axes,
+  malformed values, unsupported versions, or insufficient trust settle as
+  `DeadReason.CarrierRestoreFailed` before application code.
+- Jobs owns capture timing and durable settlement. Each module-owned `IKoanContextCarrier` owns the
+  meaning and versioned encoding of its axis; Jobs never names tenant, subject, or another axis.
+
 The contract is at-least-once. A process may stop after an external effect but before settlement, so
 handlers must make external effects idempotent or use a business-specific deduplication/outbox boundary.
 Koan does not imply cross-provider transactions.

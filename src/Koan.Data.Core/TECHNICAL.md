@@ -27,6 +27,17 @@ source: src/Koan.Data.Core/
 - Primary abstractions: `IEntity<TKey>`, helpers and extensions for data operations
 - Extension points: adapter/provider implementations consume these primitives
 
+## Context ownership
+
+- `EntityContext` is the Data facade for source, adapter, partition, cache, and transaction routing.
+- Its `ContextState` is one typed value in `Koan.Core.Context.KoanContext`, so nested Data scopes share
+  Core's logical-flow restoration without making Data the owner of cross-pillar context.
+- Tenancy, access subjects, and other modules use their own business-facing facades over
+  `KoanContext`; `EntityContext` exposes no generic slice API.
+- Durable context carriage is independently registered through `IKoanContextCarrier` and the
+  host-owned `KoanContextCarrierRegistry`. The Data-axis DSL describes Data realization only; it does
+  not register context carriers.
+
 ## Entity lifecycle ownership
 
 - `TEntity.Events` declares process-stable, host-independent behavior for an Entity type.
@@ -104,9 +115,11 @@ source: src/Koan.Data.Core/
 
 ## Streaming semantics
 
-- `AllStream/QueryStream` iterate lazily in batches; honor `batchSize` and `CancellationToken`.
-- Backpressure: awaiting inside the loop throttles production naturally.
-- Error handling: throw on first error; callers should checkpoint between batches if needed.
+- `AllStream/QueryStream` currently materialize `QueryWithCount` before the first yield. The
+  `batchSize` parameter is accepted but not yet applied, so these methods do not provide bounded
+  memory or provider backpressure today.
+- Cancellation reaches the materialized query. For genuinely bounded work, use explicit pages or
+  `EntityCursor` + `Pager` until the R07 Data-semantic streaming slice replaces this implementation.
 
 ## Edge cases and limits
 
@@ -149,7 +162,8 @@ source: src/Koan.Data.Core/
 
 ## Performance guidance
 
-- Prefer paging/streaming over materializing large sets
+- Prefer explicit paging or `EntityCursor` + `Pager` for large sets; current stream-shaped methods are
+  materialized compatibility surfaces
 - Batch operations according to adapter guarantees
 
 ## Compatibility and migrations

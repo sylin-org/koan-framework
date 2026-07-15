@@ -1,5 +1,10 @@
 # SnapVault conversion — the break-and-rebuild dogfood plan
 
+> **R07 context amendment (2026-07-15):** This public sample conversion record preserves the original
+> rollout history. Durable tenant carriage now uses Core's `IKoanContextCarrier` and
+> `KoanContextCarrierRegistry`; references below to the Data-owned `AmbientCarrierRegistry` are
+> historical, while the user guarantee (submit in tenant A, execute in tenant A) remains unchanged.
+
 - Date: 2026-06-22
 - Vehicle: `samples/S6.SnapVault` (study + target proposal: [snapvault-tenancy-proposal.md](./snapvault-tenancy-proposal.md)).
 - Companion (Koan-adoption axis): [snapvault-koan-modernization.md](./snapvault-koan-modernization.md) — the break-and-rebuild that strips bespoke code for Koan capabilities ("less but more meaningful parts"). This plan is the *tenancy* axis; Phase-1 tenancy is the shared foundation (DONE + green, 2026-06-26).

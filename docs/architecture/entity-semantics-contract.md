@@ -161,9 +161,9 @@ inflate every Entity base type. Prefer typed opt-in facets whose guarantees are 
 
 ## Context contract
 
-Core owns the immutable typed ambient carrier for one logical Koan flow. The working API name is
-`KoanContext`; applications normally use module vocabulary such as `Tenant.Use(...)` rather than raw
-context access. The ambient state is deliberately logical-flow scoped; an explicit outer scope may
+Core owns the immutable typed ambient carrier for one logical Koan flow through
+`Koan.Core.Context.KoanContext`; applications normally use module vocabulary such as
+`Tenant.Use(...)` rather than raw context access. The ambient state is deliberately logical-flow scoped; an explicit outer scope may
 span calls into more than one host. `EntityContext` remains the Entity/Data-facing facade for source,
 adapter, partition, and transaction intent because that is its semantic role, not for compatibility.
 It is not the owner of every cross-cutting concern, exposes no generic module-slice bag, and is never a
@@ -190,7 +190,9 @@ version fails before application code. Opaque syntax validation does not prove i
 security-sensitive axis crossing a process boundary requires authenticated adapter provenance or the
 route/ingress fails closed. Each carrier declares its generic ingress-trust requirement, allowing the
 router to compare it with adapter capabilities without learning the axis meaning. Restore spans the
-complete handler and disposal runs in reverse order.
+complete handler and disposal runs in reverse order. The host-owned registry's `Descriptors` surface
+exposes only ordinal axis identity and minimum ingress trust; values remain opaque. Shared runtime-fact
+and startup projection of those descriptors is a later Communication concern.
 
 ### Host ownership
 

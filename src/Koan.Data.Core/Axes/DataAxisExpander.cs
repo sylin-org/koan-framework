@@ -8,7 +8,6 @@ using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Pipeline;
 using Koan.Data.Core.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Koan.Data.Core.Axes;
 
@@ -16,13 +15,13 @@ namespace Koan.Data.Core.Axes;
 /// The boot-time engine that turns discovered <see cref="IDataAxis"/> authoring (ARCH-0101 §7) into the exact raw
 /// Phase A/B/C seam registrations — so a <c>[DataAxis]</c> and the equivalent hand-written registration produce
 /// byte-identical behavior. Invoked once from <c>RegisterKoanDataCoreServices</c> (before the IDataService add, after
-/// the built-in equality contributor + carrier registry); discovery is already populated by then (the manifest loader
+/// the built-in equality contributor); discovery is already populated by then (the manifest loader
 /// runs in the assembly-closure walk, before the initializer/Register loop).
 ///
 /// <para>The static registries (<see cref="ManagedFieldRegistry"/>, <see cref="StorageNameParticleRegistry"/>,
 /// <see cref="OperationOverrideRegistry"/>) dedup by key, so re-entrant / cross-host expansion is idempotent. The
-/// DI-enumerable seams (<see cref="IReadFilterContributor"/>, <see cref="IAmbientSliceCarrier"/>) are per-ServiceCollection
-/// — the expander runs once per collection (the IDataService guard), so NO static guard is needed for them.</para>
+/// DI-enumerable read-filter seams are per-ServiceCollection — the expander runs once per collection (the IDataService
+/// guard), so NO static guard is needed for them.</para>
 ///
 /// <para><b>Fail-loud collision detection (ARCH-0101 §8).</b> The within-batch checks name two colliding axes; a
 /// <b>cross-source</b> field collision — a <c>[DataAxis]</c> reusing a managed-field name a hand-written module
@@ -30,8 +29,7 @@ namespace Koan.Data.Core.Axes;
 /// — would otherwise be silently first-wins-dropped by the registry's idempotent dedup (a nondeterministic, boot-order
 /// dependent half-axis / isolation hole). The expander owns a per-field ledger (<see cref="_fieldOwners"/>) so it can
 /// tell <i>its own re-entrant re-expansion</i> (same axis, another host) from a genuine cross-source clash, and throws
-/// loudly on the latter — closing the asymmetry with the carrier plane (which already fails loud via
-/// <c>AmbientCarrierRegistry</c>). The override plane rides the field (its <c>OnDelete</c> name must equal a declared
+/// loudly on the latter. The override plane rides the field (its <c>OnDelete</c> name must equal a declared
 /// <c>.Field</c>), and the name-particle plane's axis id is the within-batch dedup key (only the expander registers
 /// particles), so both are covered.</para>
 /// </summary>
@@ -86,7 +84,6 @@ public static class DataAxisExpander
         // hand-written registrar already in the static registries) are caught in Pass 2 via the field-ownership ledger.
         var seenIds = new Dictionary<string, int>(StringComparer.Ordinal);          // axis id → index
         var seenFields = new Dictionary<string, string>(StringComparer.Ordinal);    // managed field name → axis id
-        var seenCarrierKeys = new Dictionary<string, string>(StringComparer.Ordinal); // carrier AxisKey → axis id
         for (var i = 0; i < axes.Count; i++)
         {
             var axis = axes[i];
@@ -104,9 +101,6 @@ public static class DataAxisExpander
             if (axis.AxisMode == AxisMode.Shared && axis.FieldName is { } f2)
                 seenFields[f2] = id;
 
-            if (axis.Carrier is { } carrier && !seenCarrierKeys.TryAdd(carrier.AxisKey, id))
-                throw new InvalidOperationException(
-                    $"Data axes '{seenCarrierKeys[carrier.AxisKey]}' and '{id}' both carry the ambient axis key '{carrier.AxisKey}'. A carrier AxisKey must be unique.");
         }
 
         // Pass 2 — register the planes. Order within an axis is moot (the registries fold deterministically).
@@ -118,11 +112,6 @@ public static class DataAxisExpander
     {
         var id = axis.Id!;
         var appliesTo = axis.AppliesToPredicate;
-
-        // The async-hop carrier rides any mode (ARCH-0100). DI-enumerable, distinct carrier types ⇒ TryAddEnumerable
-        // dedup-by-type is correct; AmbientCarrierRegistry also throws on a duplicate AxisKey (caught earlier per-axis).
-        if (axis.Carrier is { } carrier)
-            services.TryAddEnumerable(ServiceDescriptor.Singleton<IAmbientSliceCarrier>(carrier));
 
         switch (axis.AxisMode)
         {
@@ -173,8 +162,8 @@ public static class DataAxisExpander
 
             case AxisMode.Database:
                 // ARCH-0102 §3 (auto-routing): the .Field value provider is the per-operation SOURCE-KEY provider — register
-                // it as a route so AdapterResolver derives the data source from the ambient. The carrier (registered above)
-                // makes that ambient durable across the async hop (ARCH-0100); Validate requires both. Idempotent by axis id.
+                // it as a route so AdapterResolver derives the data source from the ambient. Durable carriage is registered
+                // independently by the module that owns that context; this Data seam remains persistence-only.
                 DatabaseRouteRegistry.Register(new DatabaseRouteDescriptor(id, appliesTo, axis.FieldValueProvider!));
                 break;
         }

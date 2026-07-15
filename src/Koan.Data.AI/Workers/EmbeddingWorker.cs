@@ -1,5 +1,6 @@
 using Koan.AI;
 using Koan.AI.Contracts.Options;
+using Koan.Core.Context;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Vector;
@@ -19,9 +20,19 @@ namespace Koan.Data.AI.Workers;
 public class EmbeddingWorker(
     ILogger<EmbeddingWorker> logger,
     IOptions<EmbeddingWorkerOptions> options,
-    EmbeddingTelemetry? telemetry = null,
-    AmbientCarrierRegistry? carrierRegistry = null) : BackgroundService
+    EmbeddingTelemetry? telemetry,
+    KoanContextCarrierRegistry contextCarriers) : BackgroundService
 {
+    /// <summary>Compatibility constructor for the public 0.17.0 infrastructure shape.</summary>
+    [Obsolete("Direct EmbeddingWorker construction is compatibility-only; let AddKoan compose Core context.")]
+    public EmbeddingWorker(
+        ILogger<EmbeddingWorker> logger,
+        IOptions<EmbeddingWorkerOptions> options,
+        EmbeddingTelemetry? telemetry = null)
+        : this(logger, options, telemetry, new KoanContextCarrierRegistry([]))
+    {
+    }
+
     // Rate limiting: track embeddings generated per minute
     private readonly ConcurrentQueue<DateTimeOffset> _recentEmbeddings = new();
     private readonly SemaphoreSlim _rateLimitSemaphore = new(1, 1);
@@ -213,11 +224,11 @@ public class EmbeddingWorker(
 
         try
         {
-            // ARCH-0100: rehydrate the ambient (tenant + access subject) captured at enqueue so this global worker
+            // Restore the Koan context (tenant + access subject) captured at enqueue so this global worker
             // reads/writes the scoped entity, vector, and state in the scope it belongs to. Without it, a
             // [AccessScoped]/tenant-scoped entity reads back null (fail-closed) → "not found". Fail-closed itself: an
             // unrestorable carrier throws here and the job is retried/dead-lettered, never silently mis-scoped.
-            using var _ambient = carrierRegistry?.Restore(job.AmbientCarrier);
+            using var _ambient = contextCarriers.Restore(job.AmbientCarrier, ContextIngressTrust.HostTrusted);
 
             // Load the entity to get fresh data
             var entity = await Data<TEntity, string>.Get(job.EntityId, ct);

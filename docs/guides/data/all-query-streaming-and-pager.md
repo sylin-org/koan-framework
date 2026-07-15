@@ -4,10 +4,10 @@ domain: data
 title: "All, Query, Streaming, and Pager"
 audience: [developers]
 status: current
-last_updated: 2025-10-09
+last_updated: 2026-07-15
 framework_version: v0.6.3
 validation:
-  date_last_tested: 2025-10-09
+  date_last_tested: 2026-07-15
   status: verified
   scope: docs/guides/data/all-query-streaming-and-pager.md
 ---
@@ -17,15 +17,15 @@ validation:
 ## Contract
 
 - Inputs: Entity models using `Entity<T>` statics; provider adapters installed.
-- Outputs: Correct usage patterns for materialization vs streaming vs cursor/pager.
+- Outputs: Correct usage patterns for materialization, current async iteration, and bounded cursor/pager work.
 - Error modes: OOM on large `All()`, paging inconsistencies, unstable ordering.
 - Success criteria: Clear guidance on when to materialize, how to stream/paginate, and stable Id ordering.
 
 ### Edge Cases
 
 - Provider caps: Check capabilities before relying on pushdown/filters.
-- Ordering: Cursor/pager/streaming must use stable Id ascending.
-- Cancellation: Always pass `CancellationToken` to streams.
+- Ordering: Cursor/pager traversal must use a stable order.
+- Cancellation: Always pass `CancellationToken` to data operations.
 
 ---
 
@@ -35,7 +35,7 @@ validation:
 var all = await Product.All(ct); // full set; avoid for very large tables
 ```
 
-## Stream in batches
+## Async iteration (currently materialized)
 
 ```csharp
 await foreach (var p in Product.AllStream(batchSize: 500, ct))
@@ -43,6 +43,10 @@ await foreach (var p in Product.AllStream(batchSize: 500, ct))
     // process
 }
 ```
+
+`AllStream` and `QueryStream` currently materialize the complete query before the first yield and do
+not apply `batchSize`. They provide an async-enumerable call shape, not bounded memory or provider
+backpressure. Use the pager below for large data until the R07 Data streaming repair lands.
 
 ## Explicit paging
 
@@ -65,7 +69,8 @@ while (!pager.End)
 
 ## Guidance
 
-- Use streaming or pager for jobs/exports.
+- Use `EntityCursor` + `Pager` for bounded jobs and exports today.
+- Treat `AllStream`/`QueryStream` as materialized compatibility surfaces for now.
 - Use page endpoints for APIs to control latency and memory.
 - Reserve `All()` for small sets or one-off maintenance scripts.
 

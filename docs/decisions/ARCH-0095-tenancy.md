@@ -1,5 +1,11 @@
 # ARCH-0095: First-class multi-tenancy — the ambient Tenant slice, the eight primitives, and the classification axis
 
+> **R07 context amendment (2026-07-15):** The Tenant developer surface and Data isolation policy remain
+> module-owned. [ARCH-0113](ARCH-0113-entity-capability-communication.md) moves the generic logical-flow
+> state beneath Data to `Koan.Core.Context.KoanContext`; Tenancy now implements
+> `IKoanContextCarrier` and registers it independently from `TenantAxis`. References below to
+> `EntityContext.GetSlice`/`WithSlice` describe the historical implementation, not the current API.
+
 **Status**: Accepted (2026-06-21) — *design complete; three-round external review returned a unanimous "ship." Implementation is phased/TDD (see §Implementation plan); this ADR records the decision and the empirically-verified enforcement seam.*
 > ⚠ **Realigned by [ARCH-0099](ARCH-0099-tenancy-realignment.md) (2026-06-22):** posture is **open-in-dev / closed-in-prod via `KoanEnv`**, not `Mode=Off`-default fail-closed-always; the **owner-admin rejection (§6.8 fork 4) is disentangled** (the cross-tenant backdoor stays dead, but first-user-becomes-Owner-of-their-own-tenant is built); the **mode ladder (§2) is mandatory surface** (all three rungs), and its storage-isolation rung is the **per-adapter native container** (ARCH-0099 §4), not relational-schema-only.
 **Date**: 2026-06-21

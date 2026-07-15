@@ -21,8 +21,8 @@ internal static class JobRecordFactory
             VisibleAt = visibleAt,
             FirstSubmittedAt = now,
             Lane = policy.Lane,
-            // ARCH-0100: the stored coalesce key folds in the captured ambient, so two tenants' idempotent submits
-            // never collide. Matches the coordinator's dedup lookup (same fold), keeping the dedup ambient-scoped.
+            // The stored coalesce key folds in the captured context, so two tenants' idempotent submits never
+            // collide. Matches the coordinator's dedup lookup (same fold), keeping dedup context-scoped.
             CoalesceKey = JobCoalesce.FoldAmbient(binding.CoalesceKey(workItem, action), ambientCarrier),
             PoolKey = binding.PoolName,           // pool name stamped at submit; GateKey resolved at claim (JOBS-0007)
             GateKey = binding.PoolName is not null ? null : gateKey,  // pool jobs: gate unset until claim-time election

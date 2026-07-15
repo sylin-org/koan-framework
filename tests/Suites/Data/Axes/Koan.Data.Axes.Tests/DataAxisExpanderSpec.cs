@@ -7,9 +7,9 @@ using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Axes.Tests.Support;
-using Koan.Data.Core;
 using Koan.Data.Core.Axes;
 using Koan.Data.Core.Pipeline;
+using Koan.Data.Core.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -116,6 +116,24 @@ public sealed class DataAxisExpanderSpec : IDisposable
         ResolveReadContributors(services).Should().BeEmpty();
     }
 
+    [Fact]
+    public void A_database_axis_expands_its_field_into_a_route_without_services()
+    {
+        var services = new ServiceCollection();
+        DataAxisExpander.ExpandAxes(new[]
+        {
+            new Axis()
+                .Named("shard")
+                .Mode(AxisMode.Database)
+                .AppliesTo(t => t == typeof(Doc))
+                .Field("shard", () => "tenant_a"),
+        }, services);
+
+        DatabaseRouteRegistry.ResolveSourceKey(typeof(Doc)).Should().Be("tenant_a");
+        DatabaseRouteRegistry.ResolveSourceKey(typeof(Other)).Should().BeNull();
+        services.Should().BeEmpty();
+    }
+
     // --- ARCH-0102 §3: provenance is a [Flags] type, so a field can be BOTH ambient-stamped AND operation-sourced
     //     (the future moderation shape — ambient __vis that an operation also flips — an XOR enum could not express).
     //     Representable today; the builder auto-derives the single-flag cases, a genuine both-axis declares it. ---
@@ -195,15 +213,6 @@ public sealed class DataAxisExpanderSpec : IDisposable
             .Should().Throw<InvalidOperationException>().WithMessage("*both declare the managed field '__same'*");
 
     [Fact]
-    public void Duplicate_carrier_axis_key_is_rejected()
-        => FluentActions.Invoking(() => DataAxisExpander.ExpandAxes(new[]
-        {
-            new Axis().Named("a").Field("__a", () => "v").Carries(new FakeCarrier("koan:dup")),
-            new Axis().Named("b").Field("__b", () => "v").Carries(new FakeCarrier("koan:dup")),
-        }, new ServiceCollection()))
-            .Should().Throw<InvalidOperationException>().WithMessage("*both carry the ambient axis key 'koan:dup'*");
-
-    [Fact]
     public void A_collision_in_the_batch_registers_nothing_first()
     {
         // Pass 1 validates + detects the collision before any registry write — never a half-applied batch.
@@ -263,14 +272,6 @@ public sealed class DataAxisExpanderSpec : IDisposable
         return provider.GetServices<IReadFilterContributor>().ToArray();
     }
 
-    private sealed class FakeCarrier(string key) : IAmbientSliceCarrier
-    {
-        public string AxisKey => key;
-        public string? Capture() => null;
-        public IDisposable Restore(string captured) => new Noop();
-        public IDisposable Suppress() => new Noop();
-        private sealed class Noop : IDisposable { public void Dispose() { } }
-    }
 }
 
 // Test axis types for the Expand(types) skip-guard. Discoverable but inert in this boot-less unit project (no AddKoan ⇒

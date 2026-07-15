@@ -14,6 +14,12 @@ validation:
 
 # Koan Tenancy — Design (Facet 3 flagship slice)
 
+> **Current context ownership (2026-07-15):** The packaging and module-ownership rule below still
+> applies, but the generic logical-flow seam is now `Koan.Core.Context.KoanContext`, not Data's
+> `EntityContext`. Tenancy registers `TenantContextCarrier : IKoanContextCarrier` independently from
+> its Data axis. See [ARCH-0113](../decisions/ARCH-0113-entity-capability-communication.md). Treat later
+> references to a Data-owned generic ambient carrier as historical design text.
+
 > **Packaging (canon, 2026-06-22).** Tenancy ships as a **separate `Koan.Tenancy` module**, not as code in
 > `Koan.Data.Core`. The data core exposes **generic, tenancy-agnostic seams** — the axis-generic ambient carrier
 > ([ARCH-0097](../decisions/ARCH-0097-axis-generic-ambient-carrier.md)) and the storage-pipeline contributor

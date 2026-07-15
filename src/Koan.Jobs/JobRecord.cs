@@ -88,10 +88,11 @@ public sealed class JobRecord : Entity<JobRecord>, IAmbientExempt
     public DateTimeOffset? Deadline { get; set; }
     public string? CorrelationId { get; set; }
 
-    /// <summary>ARCH-0100: the ambient slices (tenant, classification, …) captured at submit, keyed by axis —
-    /// rehydrated before the handler runs so the job executes in the ambient it was submitted under, across the
-    /// async-hop. Null when no cross-cutting slice was in scope (the hot-path common case; absent on the row).
-    /// Carried opaquely: this entity names no axis. Immutable after capture; deep-copied by <see cref="Clone"/>.</summary>
+    /// <summary>The Koan context (tenant, access subject, …) captured at submit, keyed by axis — restored before the
+    /// handler runs so the job executes in the context it was submitted under across the async hop. Null when no
+    /// cross-cutting axis was in scope (the hot-path common case; absent on the row). Carried opaquely: this entity
+    /// names no axis. The property name is retained for persisted-wire compatibility. Immutable after capture;
+    /// deep-copied by <see cref="Clone"/>.</summary>
     public Dictionary<string, string>? AmbientCarrier { get; set; }
 
     public double ProgressFraction { get; set; }
@@ -111,7 +112,7 @@ public sealed class JobRecord : Entity<JobRecord>, IAmbientExempt
         var c = (JobRecord)MemberwiseClone();
         c.Transitions = Transitions.ConvertAll(t => new JobTransition { At = t.At, From = t.From, To = t.To, Note = t.Note });
         // Deep-copy the carrier bag: the in-memory ledger stores/returns clones, so a shared dictionary instance
-        // would alias the captured ambient across jobs — the exact isolation path ARCH-0100 protects.
+        // would alias the captured context across jobs.
         c.AmbientCarrier = AmbientCarrier is null ? null : new Dictionary<string, string>(AmbientCarrier);
         return c;
     }

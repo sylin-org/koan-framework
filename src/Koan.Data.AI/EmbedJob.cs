@@ -1,5 +1,6 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
+using Koan.Core.Context;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 
@@ -20,11 +21,12 @@ public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>, IAmbientExempt
     public required string EntityId { get; set; }
 
     /// <summary>
-    /// ARCH-0100: the ambient slices (tenant, access subject, …) captured at ENQUEUE, keyed by axis. The embedding
-    /// worker is a global background service with no ambient of its own, so it rehydrates this before loading the
+    /// The Koan context (tenant, access subject, …) captured at enqueue, keyed by axis. The embedding worker is a
+    /// global background service with no context of its own, so it restores this before loading the
     /// entity + writing the vector/state — without it, a <c>[AccessScoped]</c> / tenant-scoped entity reads back as
-    /// "not found" (fail-closed) and its embedding never lands. Null when nothing cross-cutting was in scope.
+    /// "not found" (fail-closed) and its embedding never lands. Null when no cross-cutting axis was in scope.
     /// Carried opaquely (this record names no axis), mirroring <c>JobRecord.AmbientCarrier</c>.
+    /// The property name is retained for persisted-wire compatibility.
     /// </summary>
     public Dictionary<string, string>? AmbientCarrier { get; set; }
 
@@ -89,13 +91,30 @@ public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>, IAmbientExempt
     public int Priority { get; set; } = 0;
 
     /// <summary>
-    /// Creates a unique ID for an embed job based on entity ID.
-    /// Format: "embedjob:{EntityType}:{EntityId}"
+    /// Creates the durable queue identity for one Entity in one captured Koan context. The unscoped form retains the
+    /// original <c>embedjob:{EntityType}:{EntityId}</c> shape; a scoped form uses a value-opaque context fingerprint so
+    /// equal Entity ids in different tenants/subjects cannot overwrite or suppress one another.
     /// </summary>
     public static string MakeId(string entityId)
+        => MakeId(entityId, null);
+
+    /// <summary>
+    /// Creates the durable queue identity for one Entity in the supplied captured Koan context.
+    /// </summary>
+    public static string MakeId(
+        string entityId,
+        IReadOnlyDictionary<string, string>? capturedContext)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(entityId);
         var entityType = typeof(TEntity).Name;
-        return $"embedjob:{entityType}:{entityId}";
+        if (capturedContext is null || capturedContext.Count == 0)
+            return $"embedjob:{entityType}:{entityId}";
+
+        var fingerprint = KoanContextFingerprint.Compute(
+            capturedContext,
+            typeof(TEntity).FullName ?? entityType,
+            entityId);
+        return $"koan-context-embedjob:v1:{fingerprint}";
     }
 }
 

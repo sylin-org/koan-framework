@@ -11,12 +11,11 @@ namespace Koan.Data.Core.Axes;
 ///     public void Declare(Axis axis) => axis
 ///         .Named("tenant")
 ///         .AppliesTo(t =&gt; !IsHostScoped(t))
-///         .Field("__koan_tenant", () =&gt; TenancyAmbient.EffectiveTenantId())   // stamp + auto-equality read-filter + cache-key + index + fail-closed
-///         .Carries(new TenantContextCarrier());                               // ride the async-hop
+///         .Field("__koan_tenant", () =&gt; TenancyAmbient.EffectiveTenantId()); // stamp + equality read-filter + cache-key + index
 /// }
 /// </code>
 /// <see cref="Declare"/> EXPANDS to the exact raw seams — a <c>ManagedFieldDescriptor</c>, an
-/// <c>IReadFilterContributor</c>, an <c>IStorageNameParticleContributor</c>, an <c>IAmbientSliceCarrier</c>, and/or an
+/// <c>IReadFilterContributor</c>, an <c>IStorageNameParticleContributor</c>, and/or an
 /// <c>OperationOverrideDescriptor</c> — so a <c>[DataAxis]</c> and the equivalent hand-written registration produce
 /// <b>byte-identical behavior</b> (ARCH-0101 §7). The raw seams stay the canon a power author drops to (both/and).
 ///

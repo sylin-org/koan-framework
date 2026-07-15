@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Koan.Core.Context;
 using Koan.Data.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -22,17 +23,34 @@ public sealed class JobOrchestrator
     private readonly ILogger<JobOrchestrator> _logger;
     private readonly IServiceScopeFactory _scopes;
     private readonly IReadOnlyList<IJobPoolResolver> _poolResolvers;
-    private readonly AmbientCarrierRegistry _carrier;
+    private readonly KoanContextCarrierRegistry _contextCarriers;
 
     private readonly string _owner = Guid.CreateVersion7().ToString("N");
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _lanes = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _running = new(StringComparer.Ordinal);
     private readonly JobMetricsRecorder _metrics;
 
+    /// <summary>Compatibility constructor for the public 0.17.0 infrastructure shape.</summary>
+    [Obsolete("Direct JobOrchestrator construction is compatibility-only; let AddKoan compose pools and Core context.")]
+    public JobOrchestrator(
+        IJobLedger ledger, JobTypeRegistry registry, IOptions<JobsOptions> options,
+        TimeProvider clock, ILogger<JobOrchestrator> logger, IServiceScopeFactory scopes)
+        : this(
+            ledger,
+            registry,
+            options,
+            clock,
+            logger,
+            scopes,
+            [],
+            new KoanContextCarrierRegistry([]))
+    {
+    }
+
     public JobOrchestrator(
         IJobLedger ledger, JobTypeRegistry registry, IOptions<JobsOptions> options,
         TimeProvider clock, ILogger<JobOrchestrator> logger, IServiceScopeFactory scopes,
-        IEnumerable<IJobPoolResolver> poolResolvers, AmbientCarrierRegistry carrier)
+        IEnumerable<IJobPoolResolver> poolResolvers, KoanContextCarrierRegistry contextCarriers)
     {
         _ledger = ledger;
         _registry = registry;
@@ -41,7 +59,7 @@ public sealed class JobOrchestrator
         _logger = logger;
         _scopes = scopes;
         _poolResolvers = poolResolvers.ToList();
-        _carrier = carrier;
+        _contextCarriers = contextCarriers;
         _metrics = new JobMetricsRecorder(_options.MetricsEnabled, _owner, _clock);
     }
 
@@ -145,14 +163,17 @@ public sealed class JobOrchestrator
 
     private async Task<JobContext?> ExecuteClaimedAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy, CancellationToken workerCt)
     {
-        // ARCH-0100: rehydrate the ambient slices captured at submit BEFORE loading the (possibly tenant-scoped)
+        // Restore the Koan context captured at submit BEFORE loading the (possibly tenant-scoped)
         // work-item, and keep them in scope across load + execute + settle (the conditional auto-save included) so
         // every tenant-scoped read/write runs in the submitted tenant. A restore failure (an unregistered axis, or
         // an unknown carrier format) is deterministic and non-retryable → dead-letter; the handler never runs
-        // fail-open in a wrong/absent ambient. A null/empty bag restores nothing (the §1b request guard owns the
-        // unscoped-write refusal under Closed; dev-fallback under Open).
+        // fail-open in a wrong/absent context. A null/empty bag explicitly suppresses every registered axis (the §1b
+        // request guard owns the unscoped-write refusal under Closed; dev-fallback under Open).
         IDisposable ambientScope;
-        try { ambientScope = _carrier.Restore(rec.AmbientCarrier); }
+        try
+        {
+            ambientScope = _contextCarriers.Restore(rec.AmbientCarrier, ContextIngressTrust.HostTrusted);
+        }
         catch (Exception ex) { await SettleCarrierFailureAsync(rec, ex); return null; }
         using var _ambient = ambientScope;
 
@@ -297,9 +318,9 @@ public sealed class JobOrchestrator
         }
     }
 
-    /// <summary>ARCH-0100: the captured ambient could not be rehydrated (an unregistered axis, or an unknown
-    /// carrier format). Deterministic — retrying would fail identically — so dead-letter immediately rather than
-    /// run the handler in a wrong/absent ambient (fail-closed). The work-item is never loaded.</summary>
+    /// <summary>The captured Koan context could not be restored (unknown axis, invalid format/version, or insufficient
+    /// trust). Deterministic — retrying would fail identically — so dead-letter immediately rather than run the handler
+    /// in a wrong/absent context. The work item is never loaded.</summary>
     private async Task SettleCarrierFailureAsync(JobRecord rec, Exception ex)
     {
         var now = _clock.GetUtcNow();

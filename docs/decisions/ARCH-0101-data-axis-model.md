@@ -1,5 +1,12 @@
 # ARCH-0101: The data-axis model — segmentation as multi-plane contributors, with a premium authoring layer
 
+> **R07 context amendment (2026-07-15):** The Data contributor planes and isolation proof remain; the
+> async-hop plane is no longer authored through `Axis.Carries(...)`. Per
+> [ARCH-0113](ARCH-0113-entity-capability-communication.md), a module registers its
+> `IKoanContextCarrier` independently with Core, while its Data axis declares only Data realization.
+> Historical `.Carries(...)`, `IAmbientSliceCarrier`, and `AmbientCarrierRegistry` references below
+> document the implementation that R07-01 replaced.
+
 **Status**: Accepted (shape ratified by the Enterprise Architect, 2026-06-24; implementation phased below)
 **Date**: 2026-06-24
 **Deciders**: Enterprise Architect

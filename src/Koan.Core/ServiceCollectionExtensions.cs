@@ -14,6 +14,7 @@ using Koan.Core.Observability.Health;
 using Koan.Core.Modules.Pillars;
 using Microsoft.Extensions.Options;
 using Koan.Core.Hosting.App;
+using Koan.Core.Context;
 
 namespace Koan.Core;
 
@@ -65,6 +66,10 @@ public static class ServiceCollectionExtensions
         identityBuilder.Services.TryAdd(ServiceDescriptor.Singleton(
             typeof(ApplicationIdentitySnapshot),
             sp => sp.GetRequiredService<ApplicationIdentityOptions>().ToSnapshot()));
+
+        // R07-01: one host-owned registry carries module-owned logical-flow context across durable boundaries.
+        // The ambient KoanContext itself is flow-local and static; carrier instances and their composition stay in DI.
+        services.TryAddSingleton<KoanContextCarrierRegistry>();
 
         // Establish the canonical ambient host before other hosted services start. KoanLog and other
         // terse framework surfaces resolve host-owned services through this same owner.

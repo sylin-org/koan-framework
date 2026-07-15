@@ -152,8 +152,9 @@ fail-closed behaviour; the dev-open auto-seed is for local DX only and is never 
 
 ## 5. What gets isolated (and how)
 
-**Concept.** Isolation is uniform because it rides one model — the data-axis contributor pipeline (ARCH-0101). One
-ambient value drives every plane:
+**Concept.** Isolation feels uniform because one `Tenant.Use(...)` scope is interpreted at each pillar's own
+chokepoint. The responsibilities stay separate: Data owns row policy, Storage owns blob keys, Cache owns cache
+identity, and Core-owned context carriage lets Jobs preserve the scope across a durable hop.
 
 | Plane | What happens | Reference |
 |---|---|---|
@@ -161,7 +162,7 @@ ambient value drives every plane:
 | **Read** | A `__koan_tenant == <ambient>` equality filter is pushed down on every read; get-by-id returns null across tenants (IDOR-safe). | DATA-0106 |
 | **Blob storage** | `StorageEntity`/`MediaEntity` blob keys gain a leading tenant particle (`acme/photo.jpg`); the chokepoint is the `IStorageService` decorator, so the media/presign/raw paths are covered too. | STOR-0011 |
 | **Cache** | A `[Cacheable]` entity's cache key gains a tenant segment, so one tenant's cached row is never served to another; out-of-band `Uncache`/`Flush` evict the right scoped key. | DATA-0106 §5 + the cache scope-key convergence |
-| **Async-hop** | The ambient tenant is captured at job submit and restored at execute, so a job runs in its submitter's tenant. | ARCH-0100 |
+| **Async-hop** | The Core context carrier captures the tenant at job submit and Jobs restores it before loading the work item, so execution stays in the submitter's tenant. | R07-01 amendment to ARCH-0100 |
 
 **Recipe.** Nothing — this is automatic. Just be aware that a non-isolating adapter **fails closed** and that a
 **non-equality** axis (a future moderation/visibility predicate) excludes its entity from the cache and refuses a
@@ -174,8 +175,8 @@ blob-key (a physical path is equality-by-construction).
 ## 6. Tenancy and background jobs
 
 **Concept.** A job submitted under a tenant must *execute* under that tenant — even though it runs later, on another
-thread or node. The ambient tenant is a registered carrier (ARCH-0100): captured into the durable job record at
-submit, restored before `Execute`. A job submitted with **no** tenant carries nothing and is governed by the same
+thread or node. The tenant module independently registers a Core context carrier: Jobs captures it into the durable
+record at submit and restores it before loading the work item or calling `Execute`. A job submitted with **no** tenant carries nothing and is governed by the same
 posture (Closed → the handler's first tenant-scoped op fails closed; Open → dev-fallback).
 
 **Recipe.** Submit jobs as usual under `Tenant.Use(...)`. The framework threads the scope; you write no carrier code.
@@ -184,7 +185,7 @@ posture (Closed → the handler's first tenant-scoped op fails closed; Open → 
 
 ```csharp
 using (Tenant.Use("acme"))
-    await new SendInvoiceEmail { InvoiceId = id }.Submit();   // executes later, still scoped to "acme"
+    await new SendInvoiceEmail { InvoiceId = id }.Job.Submit(); // executes later, still scoped to "acme"
 ```
 
 **When to use it.** Any per-tenant async work (emails, exports, derivations). See the [Jobs how-to](jobs-howto.md).

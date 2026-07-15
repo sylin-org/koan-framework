@@ -1,9 +1,11 @@
 # ARCH-0100: The durable ambient carrier — slices that survive the async-hop
 
-> **2026-07-15 amendment:** ARCH-0113 retains this decision's fail-closed capture, restore, and
-> suppression behavior but moves the carrier beneath Data into Core. `EntityContext` is no longer the
-> cross-pillar owner; Data, Tenancy, Jobs, Events, and Transport consume one Core-owned ambient
-> context. The original implementation location below is historical.
+> **2026-07-15 amendment:** [ARCH-0113](ARCH-0113-entity-capability-communication.md) retains this
+> decision's fail-closed capture, restore, and suppression behavior but moves it beneath Data. The
+> current contracts are `Koan.Core.Context.KoanContext`, `IKoanContextCarrier`,
+> `KoanContextCarrierRegistry`, `KoanContextCarrierException`, and `ContextIngressTrust`.
+> `EntityContext` is no longer the cross-pillar owner, and the Data-axis DSL no longer registers
+> carriage. The original type names, implementation locations, and snippets below are historical.
 
 **Status**: Proposed (2026-06-24) · adversarially reviewed (3 lenses, all *ratifiable-with-fixes* — folded below)
 **Date**: 2026-06-24

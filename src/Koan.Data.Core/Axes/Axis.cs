@@ -18,7 +18,6 @@ namespace Koan.Data.Core.Axes;
 /// <item><see cref="Reads"/> ⇒ a non-equality <c>IReadFilterContributor</c> (RowScoped, excluded from cache); it also
 /// turns OFF the field's auto-equality.</item>
 /// <item><see cref="OnDelete"/> ⇒ an <c>OperationOverrideDescriptor</c>.</item>
-/// <item><see cref="Carries"/> ⇒ an <c>IAmbientSliceCarrier</c> (the async-hop, ARCH-0100).</item>
 /// <item><see cref="Field"/> (Container mode) ⇒ an <c>IStorageNameParticleContributor</c> (a leading container particle).</item>
 /// </list>
 /// </summary>
@@ -48,9 +47,6 @@ public sealed class Axis
 
     /// <summary>The operation-semantics override, or <c>null</c>. Set by <see cref="OnDelete"/>.</summary>
     internal LogicalDelete? OnDeleteValue { get; private set; }
-
-    /// <summary>The async-hop carrier, or <c>null</c>. Set by <see cref="Carries"/>.</summary>
-    internal IAmbientSliceCarrier? Carrier { get; private set; }
 
     /// <summary>Whether the field auto-derives an equality read-filter (DATA-0106) — <c>true</c> unless a
     /// <see cref="Reads"/> predicate replaces it. Derived, not stored: order-independent.</summary>
@@ -132,21 +128,12 @@ public sealed class Axis
         return this;
     }
 
-    /// <summary>Carry this axis's ambient slice across a durable async-hop (ARCH-0100) — pass a stateless
-    /// <see cref="IAmbientSliceCarrier"/> instance. Expands to a DI-enumerable carrier registration.</summary>
-    /// <exception cref="ArgumentNullException">The carrier is null.</exception>
-    public Axis Carries(IAmbientSliceCarrier carrier)
-    {
-        Carrier = carrier ?? throw new ArgumentNullException(nameof(carrier));
-        return this;
-    }
-
     /// <summary>
     /// Validate the accumulated declaration (ARCH-0101 §8 — fail loud at boot, never ship a half-axis). Run by the
     /// expander before any registry write. Enforces: a logical id; at least one plane; and the mode-specific shape —
     /// Shared <c>OnDelete</c> requires the matching <c>Field</c>; Container requires a <c>Field</c> and forbids
-    /// <c>Reads</c>/<c>OnDelete</c> (the container IS the isolation); Database requires both <c>Carries</c> and
-    /// <c>Field</c> (the source-key provider) and forbids <c>Reads</c>/<c>OnDelete</c> (a separate data source is the
+    /// <c>Reads</c>/<c>OnDelete</c> (the container IS the isolation); Database requires <c>Field</c> (the source-key
+    /// provider) and forbids <c>Reads</c>/<c>OnDelete</c> (a separate data source is the
     /// isolation — ARCH-0102 §3).
     /// </summary>
     /// <exception cref="InvalidOperationException">The declaration is malformed.</exception>
@@ -155,10 +142,10 @@ public sealed class Axis
         if (string.IsNullOrWhiteSpace(Id))
             throw new InvalidOperationException("A data axis must be .Named(...) with a non-empty logical id.");
 
-        var hasPlane = FieldName is not null || ReadPredicate is not null || OnDeleteValue is not null || Carrier is not null;
+        var hasPlane = FieldName is not null || ReadPredicate is not null || OnDeleteValue is not null;
         if (!hasPlane)
             throw new InvalidOperationException(
-                $"Data axis '{Id}' declares no plane — call at least one of .Field / .Reads / .OnDelete / .Carries.");
+                $"Data axis '{Id}' declares no plane — call at least one of .Field / .Reads / .OnDelete.");
 
         switch (AxisMode)
         {
@@ -202,14 +189,8 @@ public sealed class Axis
             case AxisMode.Database:
                 // ARCH-0102 §3 (auto-routing): in Database mode the .Field value provider is the per-operation SOURCE-KEY
                 // provider — its value selects the data source the framework routes to (DataAxisExpander registers it as a
-                // DatabaseRouteDescriptor; AdapterResolver derives the source from it). Both planes are REQUIRED and the
-                // shared-store planes are forbidden: a separate data source IS the isolation, so there is no read-filter or
-                // operation-override plane in Database mode.
-                if (Carrier is null)
-                    throw new InvalidOperationException(
-                        $"Database-mode axis '{Id}' must declare .Carries(...) — the source-routing key is read from the ambient at " +
-                        "resolution time; the carrier makes it durable across the async hop (ARCH-0100), without which a cross-hop " +
-                        "operation silently routes to the default source (a non-isolation hole).");
+                // DatabaseRouteDescriptor; AdapterResolver derives the source from it). Durable context is a separate,
+                // module-owned Core responsibility; Data's axis DSL owns only persistence routing.
                 if (FieldName is null)
                     throw new InvalidOperationException(
                         $"Database-mode axis '{Id}' must declare .Field(...) — in Database mode the .Field value provider is the " +
@@ -217,7 +198,7 @@ public sealed class Axis
                 if (ReadPredicate is not null || OnDeleteValue is not null)
                     throw new InvalidOperationException(
                         $"Database-mode axis '{Id}' cannot declare .Reads/.OnDelete — a separate data source IS the isolation; " +
-                        "there is no shared-store read-filter or operation-override plane in Database mode (declare .Field + .Carries only).");
+                        "there is no shared-store read-filter or operation-override plane in Database mode (declare .Field only).");
                 break;
         }
     }

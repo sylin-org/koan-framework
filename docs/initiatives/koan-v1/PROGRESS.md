@@ -8,8 +8,8 @@ last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
-  status: reviewed
-  scope: R06 passed; R07 semantic-capability architecture reset is active
+  status: in-progress
+  scope: R07-01 passed; R07 Data semantic truth is next
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T6 — capability-ring graduation`
 - Active work item: R07 — rebuild the semantic capability ring
-- Next decision: execute R07-01 and prove Core-owned ambient context without changing tenant/Jobs behavior
+- Next decision: bound the Data-semantic-truth child around canonical Lifecycle and genuine streaming
 - V1 readiness: `not ready`; T7 remains gated by T6 and an observed public package publication
 
 ## Work items
@@ -36,7 +36,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 | R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
-| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | ARCH-0113 ratifies pointwise capability lifting, Lifecycle/Events/Transport separation, Core context ownership, one Communication pillar, and the greenfield deletion map. R07-01 is the first implementation slice. |
+| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | ARCH-0113 ratifies pointwise capability lifting, Lifecycle/Events/Transport separation, Core context ownership, one Communication pillar, and the greenfield deletion map. R07-01 passes with one Core context/registry and the affected consumer matrix green; Data semantic truth is next. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -52,13 +52,15 @@ item should normally be `in-progress`.
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 | R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
-| R07 | in progress | ARCH-0113 and the canonical Entity contract define the target. R07-01 is ready to move typed ambient context and durable carriers beneath Data with existing Jobs/Tenant guarantees intact. |
+| R07 | in progress | ARCH-0113 and the canonical Entity contract define the target. R07-01 passed its Core/Data/Tenancy/Access/Jobs/Data.AI, solution-build, documentation, diff, compatibility, and privacy gates. Data semantic truth is the next child. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
-| 2026-07-15 | R07 | Persistence Lifecycle, arbitrary-object Messaging, mutable-bag Pipelines, Data-owned ambient carriage, and provider-specific message cardinality currently compete with the Entity language. InMemory shares mutable references while RabbitMQ creates type-wide competing consumers; neither implements tenant-safe Entity Event/Transport semantics. | Accept ARCH-0113: expose Lifecycle, Events, and Transport as three intents over one hidden Communication mechanism; rebuild rather than compatibility-wrap the current generation. |
+| 2026-07-15 | R07-01 | A global Data.AI embedding queue keyed only by Entity type/id allowed equal ids in different carried contexts to overwrite or suppress each other's work. Context-scoped identity also made the old entity-id-only admin retry ambiguous. | Keep the legacy unscoped id, derive scoped ids from a value-opaque Core fingerprint, prove two distinct durable rows end to end, make entity-id retry current-context-specific, and add an exact durable-job-id operator path. |
+| 2026-07-15 | R07-01 | Logical-flow context and durable carriage were Data-owned, forcing non-Data modules and future Communication through persistence abstractions; the Data-axis DSL also coupled Data realization to cross-hop carriage. | Move exact-type logical-flow state, carrier registration, ingress trust, safe failures, and fingerprints to `Koan.Core.Context`; retain `EntityContext` only for Data routing/transaction state; register Tenancy and Access carriers independently. The affected matrix, solution build, strict docs, compatibility, diff, and privacy gates pass. |
+| 2026-07-15 | R07 | At R07 opening, persistence Lifecycle, arbitrary-object Messaging, mutable-bag Pipelines, Data-owned ambient carriage, and provider-specific message cardinality competed with the Entity language. InMemory shared mutable references while RabbitMQ created type-wide competing consumers; neither implemented tenant-safe Entity Event/Transport semantics. | Accept ARCH-0113: expose Lifecycle, Events, and Transport as three intents over one hidden Communication mechanism; rebuild rather than compatibility-wrap the current generation. |
 | 2026-07-15 | R07 | Pointwise Entity operations preserve their meaning across scalar, finite-set, and lazy async-stream sources, but blanket pillar symmetry would add clutter and false semantics. Current provider `AllStream`/`QueryStream` also materialize complete results before yielding. | Make pointwise lifting a normative law; keep `IAsyncEnumerable<TEntity>` as the public substrate; gate provider-query terminals until Data proves real bounded streaming; reject a new public Flow/selection container. |
 | 2026-07-15 | R07 | Transport “idempotence” is ambiguous. Content-hash coalescing can incorrectly suppress a legitimate A → B → A state transition, while exactly-once external effects cannot be guaranteed by broker dedupe. | Guarantee logical-send retry idempotence per receiver group and isolation context. Treat every deliberate `Send` as new; require an explicit monotonic revision/idempotency contract for any later state-convergence mode. |
 | 2026-07-15 | R07 | The semantic ring would fail its V0 promise if Events/Transport required infrastructure, while blindly activating every referenced connector would create duplicates and hide weaker guarantees such as UDP best-effort delivery. Sophisticated routing also risks recreating the generic Pipeline DSL. | Put the complete in-process ring in the foundation; generate direct connector intent for PackageReference and ProjectReference paths; elect one semantically eligible outbound adapter per logical channel; bind each local group once; and limit V1 flow language to source `Where`, optional channel choice, receiver `Where`, and terminal intent. |

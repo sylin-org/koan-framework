@@ -9,6 +9,13 @@ last_updated: 2026-06-22
 
 # Redesign Completion Ledger
 
+> **Historical ledger (superseded 2026-07-15):** This file records the earlier autonomous redesign run;
+> live initiative status now belongs to [`koan-v1/PROGRESS.md`](../initiatives/koan-v1/PROGRESS.md).
+> [ARCH-0113](../decisions/ARCH-0113-entity-capability-communication.md) moved typed logical-flow context
+> and durable carriage from Data to `Koan.Core.Context`, removed `EntityContext.GetSlice`/`WithSlice`
+> and Data-axis `.Carries(...)`, and replaced the old carrier type names. Entries below remain
+> historical evidence, not current API guidance.
+
 > **The durable orchestration plan + status ledger for the autonomous run** that drives the remaining Koan
 > redesign — **Facet 3** (ambient + tenancy), **Facet 4**, and the cross-cutting capabilities
 > (storage-composition pipeline, classification, Adapter Forge) — to **FULL implementation + exhaustive

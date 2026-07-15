@@ -10,6 +10,12 @@ revision: v2 — chokepoint relocated to IStorageService after design review wf_
 
 # STOR-0011 — Storage blob-key axis isolation
 
+> **R07 context amendment (2026-07-15):** Blob-key scoping still reads Data-axis value providers and
+> guards; it no longer treats the durable carrier bag as the ambient value source. Cross-hop carriage
+> now belongs to `Koan.Core.Context.KoanContextCarrierRegistry`, whose opaque versioned values are not
+> valid storage-key particles. Historical `AmbientCarrierRegistry.Capture()` wording below records the
+> earlier implementation plan.
+
 > **Status: implemented + proven (`dev`, commits `9cff2a45`/`a7bb9029`/`9a1b89e3`/`a22c5e5e`).** The
 > `ScopedStorageService` decorator, `StorageScope`/`StorageKeyScoper`/`StorageKeyParticleFormatter`, the
 > `StorageEntity`/`MediaEntity` wiring, and the `StorageObjectExtensions` scope all ship. Proof:

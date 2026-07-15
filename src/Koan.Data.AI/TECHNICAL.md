@@ -28,6 +28,13 @@ source: src/Koan.Data.AI/
 - Vector model confirmations are never cached process-wide. Each guarded write reads the current
   host's keyed durable registry record before deciding whether the model is safe.
 - Parallel hosts or jobs use `AppHost.PushScope(provider)` around the flow that performs Entity work.
+- Async embedding enqueue captures the host-owned `KoanContextCarrierRegistry`; the worker restores
+  the opaque bag with `ContextIngressTrust.HostTrusted` before loading the entity. The worker names no
+  module axis, and absent registered axes are explicitly suppressed.
+- `EmbedJob<TEntity>` is host-scoped storage infrastructure but deliberately exempt from tenant Data
+  filtering so the global worker can claim it. Its scoped durable id therefore folds Entity identity
+  plus the complete captured bag through `KoanContextFingerprint`; equal Entity ids in different
+  contexts cannot collide, and the id never embeds raw carrier values.
 
 The discovery registries retain strong `Type` references for the process lifetime. Collectible plugin
 unloading is therefore not a supported scenario. Host activation derived from those facts—including

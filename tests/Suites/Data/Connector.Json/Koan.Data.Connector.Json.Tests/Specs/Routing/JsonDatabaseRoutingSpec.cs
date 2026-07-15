@@ -118,7 +118,7 @@ public sealed class JsonDatabaseRoutingSpec : IAsyncLifetime
     }
 }
 
-// ==================== Assembly-local shard fixtures (the [Sharded]/ambient/carrier triad, mirrors the Axes suite) ====================
+// ==================== Assembly-local shard fixtures (the [Sharded]/ambient axis, mirrors the Axes suite) ====================
 
 /// <summary>A discoverable Database-mode axis: a <see cref="JsonShardedAttribute"/> entity routes each op to the data
 /// source named by the ambient shard. Inert when no shard is in scope (the provider returns null ⇒ fall-through).</summary>
@@ -128,8 +128,7 @@ public sealed class JsonShardRouteAxis : IDataAxis
         .Named("json-shard-route")
         .Mode(AxisMode.Database)
         .AppliesTo(JsonShardMetadata.IsSharded)
-        .Field("shard", static () => JsonShardAmbient.Current, typeof(string))   // the per-operation SOURCE-KEY provider
-        .Carries(new JsonShardCarrier());
+        .Field("shard", static () => JsonShardAmbient.Current, typeof(string));   // the per-operation SOURCE-KEY provider
 }
 
 [AttributeUsage(AttributeTargets.Class, Inherited = true, AllowMultiple = false)]
@@ -158,25 +157,4 @@ public static class JsonShardAmbient
         private bool _done;
         public void Dispose() { if (_done) return; _done = true; _shard.Value = previous; }
     }
-}
-
-/// <summary>Carries the ambient shard across the durable async hop (ARCH-0100) — Database-mode axes must Carries.</summary>
-public sealed class JsonShardCarrier : IAmbientSliceCarrier
-{
-    public string AxisKey => "koan:json-shard-route";
-
-    public string? Capture()
-    {
-        var shard = JsonShardAmbient.Current;
-        return shard is null ? null : "v1:" + shard;
-    }
-
-    public IDisposable Restore(string captured)
-    {
-        if (captured.StartsWith("v1:", StringComparison.Ordinal))
-            return JsonShardAmbient.Use(captured.Substring(3));
-        throw new InvalidOperationException($"JsonShardCarrier cannot restore '{captured}' (unknown format).");
-    }
-
-    public IDisposable Suppress() => JsonShardAmbient.Use(null);
 }

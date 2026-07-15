@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Policies;
+using Koan.Core.Context;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Pipeline;
@@ -29,7 +30,7 @@ public static partial class DataAxis
     /// or a moderation/region scope verb — so the SAME proof rides any axis (the conformity-by-design promise: a future
     /// Moderation axis is proven by the identical call). Legs that the axis does not equip are skipped: the write-takeover
     /// runs only for a managed-field axis (the guarded upsert), the cache leg only for a <c>[Cacheable]</c> entity, the
-    /// async-hop only when the axis registers an <c>IAmbientSliceCarrier</c>. The harness writes a handful of throwaway
+    /// async-hop only when the host registers a matching <c>IKoanContextCarrier</c>. The harness writes a handful of throwaway
     /// rows in a fresh isolation <see cref="EntityContext.Partition"/> and deletes them; it reads the live registries
     /// (the axis is already registered by the host's boot), it registers nothing.</para>
     /// </summary>
@@ -104,7 +105,7 @@ public static partial class DataAxis
             // 5. ASYNC-HOP carrier round-trip (only when the axis registers a carrier) — capture A's slice, restore it in
             //    a fresh ambient (the durable-transport rehydrate), and prove the read is still scoped to A. A restore
             //    failure (a broken carrier) surfaces as the same leak exception so the proof never passes silently.
-            var carriers = AppHost.Current?.GetService<AmbientCarrierRegistry>();
+            var carriers = AppHost.Current?.GetService<KoanContextCarrierRegistry>();
             if (carriers is not null)
             {
                 IReadOnlyDictionary<string, string>? bag;
@@ -113,7 +114,7 @@ public static partial class DataAxis
                 {
                     try
                     {
-                        using (carriers.Restore(bag))   // re-establish A's axis from the captured bag, in the now-unscoped context
+                        using (carriers.Restore(bag, ContextIngressTrust.HostTrusted)) // app-owned proof ingress
                             AssertSameIds<TEntity, TKey>("async-hop", await Data<TEntity, TKey>.All(ct), a1, a2);
                     }
                     catch (DataAxisLeakDetectedException) { throw; }

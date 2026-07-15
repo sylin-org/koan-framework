@@ -1,5 +1,10 @@
 # ARCH-0102 (AODB) — the break-and-rebuild convergence plan
 
+> **R07 context amendment (2026-07-15):** This plan's shipped Data/AODB history remains useful, but
+> `.Carries(...)` is no longer part of `IDataAxis`. Modules register `IKoanContextCarrier` independently
+> with Core, and Database routing uses its declared Data field/source-key provider. Do not use the
+> carrier-coupled snippets below as current implementation instructions.
+
 - Date: 2026-06-25
 - Status: **PHASES 1 + 2 SHIPPED** on `dev`; Database-mode auto-routing is live. **NOW SUPERSEDED IN SCOPE by the fleet mandate** — see **[ARCH-0103: AODB adapter conformance](../decisions/ARCH-0103-aodb-adapter-conformance.md)**: every Koan-shipped data adapter MUST implement all three AODB modes (native-or-emulated, no exceptions, zero debt carried), realized via storage-model **family bases + helper modules**. The P1–P5 fleet build is tracked there. Tier-2 visibility + the two Phase-3 follow-ons below remain in-scope for ARCH-0102 proper.
 - Decision: [ARCH-0102 — the Access Overlay Definition Block](../decisions/ARCH-0102-access-overlay-definition-block.md)

@@ -9,7 +9,8 @@ source: src/Koan.Core/
 
 ## Contract
 
-- Inputs/Outputs: foundational types, result helpers, guards, and common abstractions.
+- Inputs/Outputs: foundational types, result helpers, guards, common abstractions, and the generic
+  logical-flow context/carriage contract used by higher pillars.
 - Options: follow ADR ARCH-0040 for constants/options.
 - Error modes: required terse host-backed surfaces use `KoanHostContextException`; avoid magic values.
 - Runtime ownership: the generic-host binder owns the process-default `AppHost` provider from host
@@ -18,6 +19,19 @@ source: src/Koan.Core/
 ## Key types
 
 - Core primitives surfaced by other modules (data, web, messaging, ai).
+- `KoanContext`: one exact-type-keyed immutable context snapshot for the current logical execution
+  flow. `Push<T>` and `Suppress<T>` restore the prior snapshot when their scopes are disposed.
+- `IKoanContextCarrier`: a module-owned serializer/restorer for one opaque, versioned context axis.
+- `KoanContextCarrierRegistry`: the host-owned, deterministic registry that captures registered axes,
+  validates all identities and trust requirements before restore, suppresses absent axes, and unwinds
+  partial scopes in reverse order. Its value-free `Descriptors` projection exposes only each
+  `CarrierDescriptor(AxisKey, MinimumIngressTrust)` in ordinal axis order.
+- `ContextIngressTrust`: provenance supplied by an ingress (`Unverified`, `Authenticated`, or
+  `HostTrusted`); it does not imply confidentiality, authorization, delivery, or payload correctness.
+- `KoanContextCarrierException`: safe machine-readable carriage failures containing bounded axis
+  identities and trust posture, never carried values or implementation exceptions.
+- `KoanContextFingerprint`: a domain-separated, length-delimited SHA-256 identity over a canonical
+  carrier bag and optional logical identity parts. It is for dedupe/keys, not confidentiality or trust.
 - `AppHost`: resolves the current flow-scoped provider, then the running host's leased default.
 - `AppHost.PushScope(IServiceProvider)`: selects a provider for one async flow and restores the prior
   flow value when disposed.
@@ -38,6 +52,12 @@ source: src/Koan.Core/
 ## Usage guidance
 
 - Prefer these utilities over bespoke helpers; keep concerns separated.
+- Put immutable, module-owned meaning in `KoanContext`; keep services and disposable runtime objects
+  in the host's DI container. Higher modules should expose business-named facades such as `Tenant`,
+  not require application code to manipulate generic context directly.
+- Register `IKoanContextCarrier` implementations through the module's normal composition path. The
+  caller restoring a durable bag must state its `ContextIngressTrust`; format validation alone is not
+  authentication.
 - Let `AddKoan()` and the generic host manage the default provider. Use `PushScope` for concurrent
   integration hosts, jobs, or other explicit execution contexts.
 - Custom hosting integrations that call `Attach` must keep its lease for exactly the provider's active
@@ -63,6 +83,9 @@ source: src/Koan.Core/
 
 - Runtime facts exclude arbitrary payloads, raw exception messages, stack traces, and configuration
   values. They still expose topology identifiers and should use an operational access boundary.
+- Context values and opaque carrier payloads must not enter runtime facts, startup prose, logs, or
+  exceptions. `KoanContextCarrierRegistry.Descriptors` is the current safe inspection boundary. A
+  later runtime-facts/startup projection may reuse it without widening the data disclosed.
 
 ## References
 
@@ -70,3 +93,4 @@ source: src/Koan.Core/
 - Engineering guardrails: `/docs/engineering/index.md`
 - Runtime facts: `/docs/engineering/runtime-facts.md`
 - ARCH-0111: `/docs/decisions/ARCH-0111-unified-runtime-facts.md`
+- ARCH-0113: `/docs/decisions/ARCH-0113-entity-capability-communication.md`

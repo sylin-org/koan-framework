@@ -1,5 +1,11 @@
 # ARCH-0097: The axis-generic ambient carrier — typed slices, not named fields
 
+> **Superseded implementation (2026-07-15):** [ARCH-0113](ARCH-0113-entity-capability-communication.md)
+> preserves the one typed logical-flow state and module ownership laws while moving that state to
+> `Koan.Core.Context.KoanContext`. `EntityContext` now contains only Data routing/transaction state and
+> no longer exposes `GetSlice`/`WithSlice`. The API and implementation text below is retained as the
+> historical step that removed named tenant fields from Data.
+
 **Status**: Proposed (2026-06-22)
 **Date**: 2026-06-22
 **Deciders**: Enterprise Architect

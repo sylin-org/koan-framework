@@ -67,7 +67,7 @@ it here.
 | Events and messaging | assessed | `demonstrated` | [record](#events-and-messaging) | A real sample and providers exist; no current broker conformance result was obtained. |
 | Jobs and scheduling | assessed | `verified` | [record](#jobs-and-scheduling) | Core/in-process behavior is strong; distributed tiers remain separate. |
 | Cache and distributed state | assessed | `verified` | [record](#cache-and-distributed-state) | Cross-engine behavior is tested; production coherence topologies are not certified. |
-| AI, vector, and semantic capabilities | assessed | `experimental` | [record](#ai-vector-and-semantic-capabilities) | Strong unit/in-memory evidence, with a current host-lifecycle integration failure. |
+| AI, vector, and semantic capabilities | assessed | `experimental` | [record](#ai-vector-and-semantic-capabilities) | Strong unit/in-memory evidence; external providers and the combined production lifecycle remain uncertified. |
 | MCP and agent-facing surfaces | assessed | `verified` | [record](#mcp-and-agent-facing-surfaces) | Core contract passes conformance; transports and operational authorization need broader proof. |
 | Authentication and authorization | assessed | `verified` | [record](#authentication-and-authorization) | Core identity passes; real external identity providers were not exercised. |
 | Testing and local infrastructure | assessed | `demonstrated` | [record](#testing-and-local-infrastructure) | Bounded lanes and concurrent conformance host isolation are coherent; the ring support boundary remains open. |
@@ -123,9 +123,11 @@ boundaries remain pre-V1 work.
 - **Outcome and shortest path:** inherit [`Entity<T>`](../../../src/Koan.Data.Core/Model/Entity.cs) and
   use `Get`, `Query`, `Save`, `Remove`, and streaming operations from business code without an
   application repository or `DbContext` layer.
-- **Entry point and owner:** `Koan.Data.Core.Model.Entity<T>` in `Sylin.Koan.Data.Core`; ambient behavior
-  is carried by [`EntityContext`](../../../src/Koan.Data.Core/EntityContext.cs) and
-  [`EntityEventContext`](../../../src/Koan.Data.Core/Events/EntityEventContext.cs).
+- **Entry point and owner:** `Koan.Data.Core.Model.Entity<T>` in `Sylin.Koan.Data.Core`. Data routing,
+  cache, and transaction intent remain in [`EntityContext`](../../../src/Koan.Data.Core/EntityContext.cs);
+  generic logical-flow state and durable carriage now live in
+  [`Koan.Core.Context`](../../../src/Koan.Core/Context/) through `KoanContext`,
+  `IKoanContextCarrier`, and the host-owned `KoanContextCarrierRegistry`.
 - **Executable evidence:** Data.Core passes 301/301, including current health-participation and
   observed-Entity diagnostics. [`S0.ConsoleJsonRepo`](../../../samples/S0.ConsoleJsonRepo/Program.cs) and
   [`S1.Web`](../../../samples/S1.Web/Todo.cs) demonstrate console and web paths.
@@ -142,6 +144,11 @@ boundaries remain pre-V1 work.
   zero-infrastructure fallback (14/14), not a durable application claim. The canonical
   [Data foundation reference](../../reference/data/index.md) publishes selection, inspection, and
   unsupported scenarios without promoting public package maturity.
+- **Current R07 evidence:** R07-01 passes after migrating Data, Tenancy, Access, Jobs, and Data.AI to
+  the Core-owned context seam and removing Data's generic slice/carrier APIs. The affected matrix
+  proves fail-closed durable restoration and context-isolated embedding queue identity. Safe carrier
+  descriptors are code-inspectable; startup/runtime-fact projection remains deferred. This is an
+  ownership repair, not a maturity promotion or a Communication claim.
 - **Open risks:** graduate the defined Entity semantic locations ring by ring; provider parity,
   concurrency, schema evolution, and compatibility remain separate claims.
 
@@ -217,7 +224,7 @@ boundaries remain pre-V1 work.
 - **Entry point and owner:** [`IKoanJob`](../../../src/Koan.Jobs/IKoanJob.cs) and
   [`JobsServiceCollectionExtensions`](../../../src/Koan.Jobs/JobsServiceCollectionExtensions.cs) in
   `Sylin.Koan.Jobs`.
-- **Executable evidence:** [76/76 core jobs tests](../../../tests/Suites/Jobs/Koan.Jobs.Tests/Koan.Jobs.Tests.csproj)
+- **Executable evidence:** [77/77 core jobs tests](../../../tests/Suites/Jobs/Koan.Jobs.Tests/Koan.Jobs.Tests.csproj)
   and 78/78 SQLite ledger tests pass. [`S14.AdapterBench`](../../../samples/S14.AdapterBench/Jobs/BenchmarkJob.cs) demonstrates a
   business-facing job. The shared terminal-progress contract additionally passes against the
   in-memory and SQLite ledgers, and [`GoldenJourney`](../../../samples/GoldenJourney/README.md)
@@ -265,7 +272,7 @@ boundaries remain pre-V1 work.
   pass 157/157 and the
   [in-memory vector surface](../../../tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.InMemory.Tests/Koan.Data.VectorAdapterSurface.InMemory.Tests.csproj)
   passes 33/33. [Data/AI integration](../../../tests/Suites/Data/AI/Koan.Data.AI.Tests/Koan.Data.AI.Tests.csproj)
-  passes 82/82 after the R04-02 repeated-host repairs.
+  passes 84/84 after the R04-02 repeated-host repairs and the R07-01 context-isolated queue proof.
 - **Inspection and failure:** models and vector capabilities are registrable/queryable. Common required
   AI client paths expose a typed host-context failure; optional availability probes remain nullable.
 - **Unsupported / compatibility:** external model servers, every vector database, background

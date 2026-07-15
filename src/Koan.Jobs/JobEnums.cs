@@ -16,8 +16,8 @@ public enum DeadReason
     Poison = 0,
     /// <summary>Reschedule/backoff hit the <c>Deadline</c> or <c>MaxReschedules</c> guard.</summary>
     PerpetuallyDeferred = 1,
-    /// <summary>ARCH-0100: the ambient carrier captured at submit could not be rehydrated at execute (an
-    /// unregistered axis, or an unknown carrier format) — deterministic, so dead-lettered rather than run fail-open.</summary>
+    /// <summary>The Core context carrier bag captured at submit could not be restored at execute (for example, an
+    /// unregistered axis or unsupported format) — deterministic, so dead-lettered rather than run fail-open.</summary>
     CarrierRestoreFailed = 2,
 }
 

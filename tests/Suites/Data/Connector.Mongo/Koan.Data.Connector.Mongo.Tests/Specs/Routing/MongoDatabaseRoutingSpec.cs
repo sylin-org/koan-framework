@@ -130,7 +130,7 @@ public sealed class MongoDatabaseRoutingSpec : IAsyncLifetime
     }
 }
 
-// ==================== Assembly-local shard fixtures (the [Sharded]/ambient/carrier triad, mirrors the Axes suite) ====================
+// ==================== Assembly-local shard fixtures (the [Sharded]/ambient axis, mirrors the Axes suite) ====================
 
 /// <summary>A discoverable Database-mode axis: a <see cref="MongoShardedAttribute"/> entity routes each op to the data
 /// source named by the ambient shard. Inert when no shard is in scope (the provider returns null ⇒ fall-through).</summary>
@@ -140,8 +140,7 @@ public sealed class MongoShardRouteAxis : IDataAxis
         .Named("mongo-shard-route")
         .Mode(AxisMode.Database)
         .AppliesTo(MongoShardMetadata.IsSharded)
-        .Field("shard", static () => MongoShardAmbient.Current, typeof(string))   // the per-operation SOURCE-KEY provider
-        .Carries(new MongoShardCarrier());
+        .Field("shard", static () => MongoShardAmbient.Current, typeof(string));   // the per-operation SOURCE-KEY provider
 }
 
 [AttributeUsage(AttributeTargets.Class, Inherited = true, AllowMultiple = false)]
@@ -170,25 +169,4 @@ public static class MongoShardAmbient
         private bool _done;
         public void Dispose() { if (_done) return; _done = true; _shard.Value = previous; }
     }
-}
-
-/// <summary>Carries the ambient shard across the durable async hop (ARCH-0100) — Database-mode axes must Carries.</summary>
-public sealed class MongoShardCarrier : IAmbientSliceCarrier
-{
-    public string AxisKey => "koan:mongo-shard-route";
-
-    public string? Capture()
-    {
-        var shard = MongoShardAmbient.Current;
-        return shard is null ? null : "v1:" + shard;
-    }
-
-    public IDisposable Restore(string captured)
-    {
-        if (captured.StartsWith("v1:", StringComparison.Ordinal))
-            return MongoShardAmbient.Use(captured.Substring(3));
-        throw new InvalidOperationException($"MongoShardCarrier cannot restore '{captured}' (unknown format).");
-    }
-
-    public IDisposable Suppress() => MongoShardAmbient.Use(null);
 }

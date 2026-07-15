@@ -85,8 +85,13 @@ public sealed class DurableCarrierSpec
         (await host.StatusOf<TenantChainJob>(id)).Should().Be(JobStatus.Completed);
     }
 
-    [Fact]
-    public async Task A_bag_naming_an_unregistered_axis_dead_letters_and_never_runs()
+    [Theory]
+    [InlineData("koan:ghost", "v1:whatever")]
+    [InlineData("koan:tenant", "v1:id:")]
+    [InlineData("koan:tenant", "v999:private-payload")]
+    public async Task An_unknown_malformed_or_unsupported_bag_dead_letters_before_the_handler(
+        string axisKey,
+        string payload)
     {
         TenantGatedProbe.Reset();
         await using var host = await JobsHarness.StartSqliteAsync();
@@ -94,17 +99,20 @@ public sealed class DurableCarrierSpec
         var id = j.Id;
         await j.Job.Submit();
 
-        // Inject a carrier bag naming an axis with no registered carrier (simulating a peer module absent on this
-        // node). Restore must fail closed — the job dead-letters, the handler never runs fail-open.
+        // Simulate a peer module absent on this node, malformed data, or a future carrier version. Every refusal must
+        // happen before work-item load/handler invocation and persist only the registry's safe failure message.
         var ledger = host.Services.GetRequiredService<IJobLedger>();
         var rec = await host.JobFor<TenantGatedProbe>(id);
-        rec!.AmbientCarrier = new Dictionary<string, string> { ["koan:ghost"] = "v1:whatever" };
+        rec!.AmbientCarrier = new Dictionary<string, string> { [axisKey] = payload };
         await ledger.Update(rec, default);
 
         await host.Drain();
 
         TenantGatedProbe.Executions.Should().Be(0);                                  // never ran fail-open
-        (await host.StatusOf<TenantGatedProbe>(id)).Should().BeOneOf(JobStatus.Failed, JobStatus.Dead);
+        var settled = await host.JobFor<TenantGatedProbe>(id);
+        settled!.Status.Should().Be(JobStatus.Dead);
+        settled.DeadReason.Should().Be(DeadReason.CarrierRestoreFailed.ToString());
+        settled.LastError.Should().NotContain(payload);
     }
 
     [Fact]

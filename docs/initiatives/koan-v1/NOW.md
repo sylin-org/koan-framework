@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07 semantic capability architecture accepted; Core context foundation next
+  scope: R07-01 passed; Data semantic truth is next
 ---
 
 # Koan V1 reorganization current handoff
@@ -23,8 +23,10 @@ Replace this file at every handoff. It is a restart point, not a diary.
   semantic-capability rebuild and supersedes the old lifecycle/event/messaging split.
 - The canonical [Entity Semantics Contract](../../architecture/entity-semantics-contract.md) now
   reflects that decision.
-- No production implementation has started under R07. The first executable child is
-  [R07-01](work-items/r07/R07-01-core-context-foundation.md).
+- [R07-01](work-items/r07/R07-01-core-context-foundation.md) passed. The working tree now has one
+  Core-owned typed logical-flow context and durable carrier registry; Data, Tenancy, Access, Jobs, and
+  Data.AI have moved to it. The old Data-owned generic slice/carrier APIs and Data-axis carriage hook
+  are removed, and the affected regression/docs/privacy gates are green.
 - Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -105,6 +107,7 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
 ## Implementation order
 
 1. R07-01: Core-owned typed ambient context and durable carrier, preserving current Jobs/Tenant proofs.
+   **Passed.**
 2. Data truth: canonical host-owned Lifecycle plus genuine bounded streaming.
 3. Minimal Data.Core Entity-cardinality adapter, pillar-owned execution, and deletion of the two real
    public Pipeline uses.
@@ -121,6 +124,9 @@ Only the next slice has a detailed child card. Do not open broker breadth before
 - `pwsh -NoProfile -File scripts/build-docs.ps1 -Strict` passes after the architecture and public-truth
   changes.
 - `git diff --check` passes.
+- `dotnet build Koan.sln --no-restore --verbosity minimal` succeeds with 0 errors.
+- Core 257/257; Data context/transactions 35/35; Tenancy 110/110; Access 22/22; Jobs core 77/77
+  and durable tenancy 11/11; Data.AI 84/84; Data axes 56/56 plus integration 18/18 pass.
 - The changed architecture artifacts contain no private downstream identity, path, persona, or
   workflow.
 - R07 code evidence was independently inventoried across Data Lifecycle/streams, ambient carriers,
@@ -128,12 +134,13 @@ Only the next slice has a detailed child card. Do not open broker breadth before
 
 ## Next safe action
 
-Claim R07-01, run the mandatory exploration workflow, then add a failing Core-owned context/carrier
-proof before moving implementation. Preserve the existing Data context, Tenancy, Jobs durable-hop,
-parallel Tenant A/B, absent-context suppression, unknown-axis refusal, and repeated-host behavior.
+Open and bound the Data-semantic-truth child. Start from executable red proofs for two claims only:
+Lifecycle is canonical and host-owned, and provider iteration is genuinely bounded rather than a
+materialized async-enumerable shape. Decide whether those outcomes need separate commits before
+changing production code; delete or rename old surfaces only as their replacement passes.
 
 Do not add Events, Transport, a router, a unit-of-work coordinator, or Messaging compatibility aliases
-inside R07-01.
+until Data's lower boundary is true.
 
 ## Repository boundary
 

@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Policies;
+using Koan.Core.Context;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core.Transactions;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,8 +26,6 @@ public static class EntityContext
 {
     private const string TransactionOperation = "entity transaction";
 
-    private static readonly AsyncLocal<ContextState?> _current = new();
-
     /// <summary>
     /// Routing context state combining source, adapter, partition, and transaction.
     /// </summary>
@@ -43,15 +41,6 @@ public static class EntityContext
         /// Null = honor the policy's declared strategy.
         /// </summary>
         public CacheBehavior? CacheBehavior { get; init; }
-
-        /// <summary>
-        /// Cross-cutting ambient axes that are NOT intrinsic to the data core (tenant, classification, …) ride
-        /// here as immutable, type-keyed <b>typed slices</b> (ARCH-0097) instead of named fields — so the data
-        /// core stays agnostic and each axis is owned by its own module. Read via
-        /// <see cref="EntityContext.GetSlice{T}"/>, pushed via <see cref="EntityContext.WithSlice{T}"/>;
-        /// inherited-unless-overridden like the routing dimensions.
-        /// </summary>
-        public ImmutableDictionary<Type, object> Slices { get; init; } = ImmutableDictionary<Type, object>.Empty;
 
         /// <summary>
         /// Transaction coordinator instance for deferred execution.
@@ -104,12 +93,12 @@ public static class EntityContext
     /// <summary>
     /// Get current routing context (null if not set).
     /// </summary>
-    public static ContextState? Current => _current.Value;
+    public static ContextState? Current => KoanContext.Get<ContextState>();
 
     /// <summary>
     /// Check if currently in a transaction.
     /// </summary>
-    public static bool InTransaction => _current.Value?.Transaction != null;
+    public static bool InTransaction => Current?.Transaction != null;
 
     /// <summary>
     /// The current transaction coordinator (null if not in a transaction) — exposes its declared
@@ -118,32 +107,7 @@ public static class EntityContext
     /// <see cref="Transactions.ITransactionCoordinator.TrackedOperationCount"/>.
     /// </summary>
     public static Transactions.ITransactionCoordinator? CurrentTransaction =>
-        _current.Value?.TransactionCoordinator;
-
-    /// <summary>
-    /// Read the current ambient typed slice of type <typeparamref name="T"/> (ARCH-0097), or <c>null</c> when
-    /// no such slice is in scope. Cross-cutting axes (tenant, classification) are stored by their own modules
-    /// and read here; the data core never names the type.
-    /// </summary>
-    public static T? GetSlice<T>() where T : class
-        => _current.Value?.Slices.TryGetValue(typeof(T), out var v) == true ? (T)v : null;
-
-    /// <summary>
-    /// Push an ambient typed slice for the lifetime of the returned scope (ARCH-0097); disposing restores the
-    /// previous context. A <c>null</c> slice clears any current slice of that type. The slice inherits through
-    /// nested <see cref="With"/> scopes. This is the generic carrier a cross-cutting module (e.g. tenancy)
-    /// builds its surface on — the data core stays axis-agnostic.
-    /// </summary>
-    public static IDisposable WithSlice<T>(T? slice) where T : class
-    {
-        var prev = _current.Value;
-        var basis = prev ?? new ContextState();
-        var slices = slice is null
-            ? basis.Slices.Remove(typeof(T))
-            : basis.Slices.SetItem(typeof(T), slice);
-        _current.Value = basis with { Slices = slices };
-        return new SliceScope(prev);
-    }
+        Current?.TransactionCoordinator;
 
     /// <summary>
     /// Push a routing context for the lifetime of the returned scope. The new context is built
@@ -180,7 +144,7 @@ public static class EntityContext
         CacheBehavior? cacheBehavior = null,
         bool preserveTransaction = true)
     {
-        var prev = _current.Value;
+        var prev = Current;
 
         // Prevent nested transactions when explicitly starting a new one
         if (!string.IsNullOrWhiteSpace(transaction) && prev?.Transaction != null)
@@ -198,12 +162,7 @@ public static class EntityContext
             : transaction;
         var effectiveCacheBehavior = cacheBehavior ?? prev?.CacheBehavior;
 
-        var newContext = new ContextState(effectiveSource, effectiveAdapter, effectivePartition, effectiveTransaction, effectiveCacheBehavior)
-        {
-            // Cross-cutting typed slices (tenant, classification, …) inherit unless overridden, like the
-            // routing dimensions — so a nested scope that changes one axis carries the slices through (ARCH-0097).
-            Slices = prev?.Slices ?? ImmutableDictionary<Type, object>.Empty,
-        };
+        var newContext = new ContextState(effectiveSource, effectiveAdapter, effectivePartition, effectiveTransaction, effectiveCacheBehavior);
         // Fail fast on partition names that would NOT survive identifier sanitization unchanged — their lossy
         // character replacement could collide a distinct partition onto the same physical store (data bleed).
         // GUIDs and already-identifier-safe names pass; see PartitionNameValidator.
@@ -224,8 +183,11 @@ public static class EntityContext
             newContext = newContext with { TransactionCoordinator = activeCoordinator };
         }
 
-        _current.Value = newContext;
-        return new TransactionScope(prev, coordinatorForScope);
+        var options = coordinatorForScope is null
+            ? null
+            : AppHost.Current?.GetService<IOptions<TransactionOptions>>()?.Value;
+        var contextScope = KoanContext.Push(newContext);
+        return new TransactionScope(contextScope, coordinatorForScope, options);
     }
 
     /// <summary>
@@ -277,7 +239,7 @@ public static class EntityContext
     /// <exception cref="TransactionException">Thrown when commit fails</exception>
     public static Task Commit(CancellationToken ct = default)
     {
-        var current = _current.Value;
+        var current = Current;
         if (current?.TransactionCoordinator == null)
             return Task.CompletedTask; // no active transaction → no-op
         return current.TransactionCoordinator.Commit(ct);
@@ -290,7 +252,7 @@ public static class EntityContext
     /// </summary>
     public static Task Rollback(CancellationToken ct = default)
     {
-        var current = _current.Value;
+        var current = Current;
         if (current?.TransactionCoordinator == null)
             return Task.CompletedTask; // no active transaction → no-op
         return current.TransactionCoordinator.Rollback(ct);
@@ -302,37 +264,21 @@ public static class EntityContext
         return factory.Create(name);
     }
 
-    private sealed class SliceScope : IDisposable
-    {
-        private readonly ContextState? _previous;
-        private bool _disposed;
-        public SliceScope(ContextState? previous) => _previous = previous;
-        public void Dispose()
-        {
-            if (_disposed) return;
-            _disposed = true;
-            _current.Value = _previous;
-        }
-    }
-
     private sealed class TransactionScope : IDisposable
     {
-        private readonly ContextState? _previous;
+        private readonly IDisposable _contextScope;
         private readonly ITransactionCoordinator? _coordinator;
         private readonly TransactionOptions? _options;
         private bool _disposed;
 
-        public TransactionScope(ContextState? previous, ITransactionCoordinator? coordinator)
+        public TransactionScope(
+            IDisposable contextScope,
+            ITransactionCoordinator? coordinator,
+            TransactionOptions? options)
         {
-            _previous = previous;
+            _contextScope = contextScope;
             _coordinator = coordinator;
-
-            // Get options for auto-commit behavior
-            if (coordinator != null)
-            {
-                var sp = AppHost.Current;
-                _options = sp?.GetService<IOptions<TransactionOptions>>()?.Value;
-            }
+            _options = options;
         }
 
         public void Dispose()
@@ -362,8 +308,7 @@ public static class EntityContext
             }
             finally
             {
-                // Restore previous context
-                _current.Value = _previous;
+                _contextScope.Dispose();
             }
         }
     }

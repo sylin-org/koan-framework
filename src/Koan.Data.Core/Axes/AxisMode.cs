@@ -2,8 +2,8 @@ namespace Koan.Data.Core.Axes;
 
 /// <summary>
 /// How a data-segmentation axis manifests (ARCH-0101 §7 — "mode is config"): the <i>same</i> axis declaration maps to
-/// a different composition plane depending on the mode. Mode selects the plane; the axis value source (<c>.Field</c> /
-/// <c>.Carries</c>) is mode-agnostic.
+/// a different composition plane depending on the mode. Mode selects the persistence plane; durable logical-flow
+/// carriage is registered independently through Core context carriers.
 /// </summary>
 public enum AxisMode
 {
@@ -25,8 +25,8 @@ public enum AxisMode
     /// A <b>separate data source</b> per axis value (DATA-0077 source routing, ARCH-0102 §3 auto-routing). <c>.Field</c>'s
     /// value provider is the per-operation SOURCE-KEY provider — its value (read from the ambient) selects the data source
     /// the framework routes to; the expander registers it as a <c>DatabaseRouteDescriptor</c> that <c>AdapterResolver</c>
-    /// consults (after an explicit <c>EntityContext.Source</c>, which always wins). <c>.Carries</c> is also required — it
-    /// makes the routing key durable across the async hop (ARCH-0100). No managed column, no read-filter (the separate
+    /// consults (after an explicit <c>EntityContext.Source</c>, which always wins). A module that crosses a durable hop
+    /// registers its Core context carrier independently. No managed column, no read-filter (the separate
     /// source IS the isolation); declaring <c>.Reads</c>/<c>.OnDelete</c> is rejected. The unconfigured-source posture is
     /// external-only (fail closed) until lazy provisioning lands (the P6 broker).
     /// </summary>

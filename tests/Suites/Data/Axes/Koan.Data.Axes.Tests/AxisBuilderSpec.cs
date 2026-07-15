@@ -1,7 +1,6 @@
 using System;
 using AwesomeAssertions;
 using Koan.Data.Abstractions.Filtering;
-using Koan.Data.Core;
 using Koan.Data.Core.Axes;
 using Xunit;
 
@@ -37,10 +36,6 @@ public sealed class AxisBuilderSpec
     [Fact]
     public void Reads_rejects_null_predicate()
         => FluentActions.Invoking(() => new Axis().Reads(null!)).Should().Throw<ArgumentNullException>();
-
-    [Fact]
-    public void Carries_rejects_null_carrier()
-        => FluentActions.Invoking(() => new Axis().Carries(null!)).Should().Throw<ArgumentNullException>();
 
     [Fact]
     public void AppliesTo_rejects_null_predicate()
@@ -115,7 +110,7 @@ public sealed class AxisBuilderSpec
     [Fact]
     public void Container_without_a_field_is_rejected()
         => FluentActions.Invoking(() => new Axis()
-            .Named("tenant").Mode(AxisMode.Container).Carries(new FakeCarrier("k"))
+            .Named("tenant").Mode(AxisMode.Container).Reads(_ => Hide)
             .Validate()).Should().Throw<InvalidOperationException>().WithMessage("*value source*");
 
     [Fact]
@@ -151,42 +146,26 @@ public sealed class AxisBuilderSpec
             .Validate()).Should().Throw<InvalidOperationException>().WithMessage("*cannot declare .OnDelete*");
 
     [Fact]
-    public void Database_without_a_carrier_is_rejected()
+    public void A_database_axis_with_a_field_validates()
         => FluentActions.Invoking(() => new Axis()
             .Named("shard").Mode(AxisMode.Database).Field("__s", () => "s")
-            .Validate()).Should().Throw<InvalidOperationException>().WithMessage("*must declare .Carries*");
-
-    // ARCH-0102 §3: Database mode now REQUIRES .Field (the per-operation source-key provider) alongside .Carries.
-    [Fact]
-    public void A_database_axis_with_a_carrier_and_field_validates()
-        => FluentActions.Invoking(() => new Axis()
-            .Named("shard").Mode(AxisMode.Database).Carries(new FakeCarrier("k")).Field("__s", () => "s")
             .Validate()).Should().NotThrow();
 
     [Fact]
     public void A_database_axis_without_a_field_is_rejected()
         => FluentActions.Invoking(() => new Axis()
-            .Named("shard").Mode(AxisMode.Database).Carries(new FakeCarrier("k"))
+            .Named("shard").Mode(AxisMode.Database).Reads(_ => Hide)
             .Validate()).Should().Throw<InvalidOperationException>().WithMessage("*must declare .Field*");
 
     [Fact]
     public void Database_with_Reads_is_rejected()
         => FluentActions.Invoking(() => new Axis()
-            .Named("shard").Mode(AxisMode.Database).Carries(new FakeCarrier("k")).Field("__s", () => "s").Reads(_ => Hide)
+            .Named("shard").Mode(AxisMode.Database).Field("__s", () => "s").Reads(_ => Hide)
             .Validate()).Should().Throw<InvalidOperationException>().WithMessage("*cannot declare .Reads*");
 
     [Fact]
     public void Database_with_OnDelete_is_rejected()
         => FluentActions.Invoking(() => new Axis()
-            .Named("shard").Mode(AxisMode.Database).Carries(new FakeCarrier("k")).Field("__s", () => "s").OnDelete(Logical.SetTrue("__s"))
+            .Named("shard").Mode(AxisMode.Database).Field("__s", () => "s").OnDelete(Logical.SetTrue("__s"))
             .Validate()).Should().Throw<InvalidOperationException>().WithMessage("*cannot declare*");
-
-    private sealed class FakeCarrier(string key) : IAmbientSliceCarrier
-    {
-        public string AxisKey => key;
-        public string? Capture() => null;
-        public IDisposable Restore(string captured) => new Noop();
-        public IDisposable Suppress() => new Noop();
-        private sealed class Noop : IDisposable { public void Dispose() { } }
-    }
 }

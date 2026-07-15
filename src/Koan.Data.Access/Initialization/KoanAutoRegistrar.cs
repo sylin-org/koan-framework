@@ -1,15 +1,15 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Core;
+using Koan.Core.Context;
 using Koan.Core.Modules;
 
 namespace Koan.Data.Access.Initialization;
 
 /// <summary>
-/// SEC-0008 — lights up data-layer access scoping when <c>Koan.Data.Access</c> is referenced (Reference = Intent). The
-/// read-filter contributor + the subject async-hop carrier are declared in <see cref="AccessAxis"/> (a
-/// <c>[KoanDiscoverable]</c> <c>IDataAxis</c>) and expanded byte-identically by <c>DataAxisExpander</c> at boot. This
-/// registrar binds <see cref="AccessOptions"/> and serves as the boot-report marker. The per-entity opt-in is
-/// <see cref="AccessScopedAttribute"/>.
+/// Lights up data-layer access scoping when <c>Koan.Data.Access</c> is referenced. The registrar binds policy and
+/// independently registers subject context carriage through Core; <see cref="AccessAxis"/> owns only the Data read
+/// plane. The per-entity opt-in is <see cref="AccessScopedAttribute"/>.
 /// </summary>
 public sealed class KoanAutoRegistrar : KoanModule
 {
@@ -18,5 +18,6 @@ public sealed class KoanAutoRegistrar : KoanModule
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<AccessOptions>(AccessOptions.SectionPath);
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanContextCarrier, SubjectContextCarrier>());
     }
 }

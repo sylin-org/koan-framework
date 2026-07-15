@@ -1,5 +1,11 @@
 # SEC-0008 — Access enforcement at the data layer (the ambient subject + the access read-axis)
 
+> **R07 context amendment (2026-07-15):** Subject semantics and the access read-axis remain
+> module-owned, but `Subject` now scopes `Koan.Core.Context.KoanContext` directly. Its
+> `SubjectContextCarrier : IKoanContextCarrier` is registered independently from `AccessAxis`;
+> `EntityContext.WithSlice` and Data-axis `.Carries(...)` are no longer current APIs. The original
+> declaration and source citations below are retained as historical implementation evidence.
+
 - Status: **Accepted — implementing (narrow increment)** · 2026-06-27
 - Deciders: framework architect
 - Supersedes/amends: amends **SEC-0004 §128** (resolves the deferred core-ward hoist of the read seam); resolves **ambient-charter Open Question #5** (the principal/subject slice). Builds on **DATA-0106** (the read-filter contributor seam), **ARCH-0101 §7** (the `IDataAxis` authoring surface), **ARCH-0102** (AODB push-down), **ARCH-0100** (the durable ambient carrier), **ARCH-0097** (the `EntityContext` one-carrier rule).

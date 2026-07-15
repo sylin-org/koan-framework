@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Koan.Core.Context;
 using Koan.Data.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -20,11 +21,27 @@ public sealed class JobCoordinator : IJobCoordinator
     private readonly IServiceProvider _services;
     private readonly JobsOptions _options;
     private readonly TimeProvider _clock;
-    private readonly AmbientCarrierRegistry _carrier;
+    private readonly KoanContextCarrierRegistry _contextCarriers;
+
+    /// <summary>Compatibility constructor for the public 0.17.0 infrastructure shape.</summary>
+    [Obsolete("Direct JobCoordinator construction is compatibility-only; let AddKoan compose the Core context registry.")]
+    public JobCoordinator(IJobLedger ledger, JobTypeRegistry registry, JobOrchestrator orchestrator,
+        IJobTransport transport, IServiceProvider services, IOptions<JobsOptions> options, TimeProvider clock)
+        : this(
+            ledger,
+            registry,
+            orchestrator,
+            transport,
+            services,
+            options,
+            clock,
+            services.GetService<KoanContextCarrierRegistry>() ?? new KoanContextCarrierRegistry([]))
+    {
+    }
 
     public JobCoordinator(IJobLedger ledger, JobTypeRegistry registry, JobOrchestrator orchestrator,
         IJobTransport transport, IServiceProvider services, IOptions<JobsOptions> options, TimeProvider clock,
-        AmbientCarrierRegistry carrier)
+        KoanContextCarrierRegistry contextCarriers)
     {
         _ledger = ledger;
         _registry = registry;
@@ -33,7 +50,7 @@ public sealed class JobCoordinator : IJobCoordinator
         _services = services;
         _options = options.Value;
         _clock = clock;
-        _carrier = carrier;
+        _contextCarriers = contextCarriers;
     }
 
     /// <summary>Resolve a job's gate key at submit. A property-based <c>[JobGate]</c> is read inline; a method-based
@@ -188,9 +205,9 @@ public sealed class JobCoordinator : IJobCoordinator
 
     private static string? Correlation() => Activity.Current?.TraceId.ToString();
 
-    // ARCH-0100: snapshot the ambient carriable slices on the submitting context (symmetric with Correlation()).
-    // Null in the common case (no cross-cutting slice) — zero allocation, absent on the row.
-    private IReadOnlyDictionary<string, string>? Carrier() => _carrier.Capture();
+    // Snapshot the Koan context axes on the submitting flow (symmetric with Correlation()). Null in the common case
+    // (no cross-cutting axis) — zero allocation, absent on the row.
+    private IReadOnlyDictionary<string, string>? Carrier() => _contextCarriers.Capture();
 
     private static string? Snapshot(object workItem)
     {

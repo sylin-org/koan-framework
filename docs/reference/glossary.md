@@ -4,10 +4,10 @@ domain: framework
 title: "Glossary"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-06-14
+last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-06-14
+  date_last_tested: 2026-07-15
   status: verified
   scope: docs/reference/glossary.md
 ---
@@ -27,11 +27,26 @@ verbs (`Save` / `Remove`) without writing a repository. The entity, not a servic
 is the unit of persistence. Defined by
 [`Entity<TEntity, TKey>` / `Entity<TEntity>`](../../src/Koan.Data.Core/Model/Entity.cs).
 
-**Ambient context** — The single immutable runtime snapshot Koan exposes statically so any
-code can read "where am I running" (environment, in-container, CI, orchestration mode,
-session id, application identity) without threading configuration through call sites. It is
-computed once at boot and read everywhere. Defined by
+**Environment snapshot** — The immutable process/runtime snapshot Koan exposes statically so code can
+read environment, container/CI/orchestration mode, session id, and application identity without
+threading configuration through call sites. It is configuration, not logical-flow context. Defined by
 [`KoanEnv`](../../src/Koan.Core/KoanEnv.cs).
+
+**Logical-flow context** — Exact-type, immutable-snapshot state attached to the current async execution
+flow. Module-owned values flow through `await`; nested scopes restore their predecessor; host services
+and disposable resources do not belong here. Defined by
+[`KoanContext`](../../src/Koan.Core/Context/KoanContext.cs).
+
+**Context carrier** — A module-owned, versioned serializer for one logical-flow axis. The Core registry
+captures opaque values for durable work, restores or suppresses them as a scope, and refuses unknown
+axes or insufficient ingress trust before user code. Defined by
+[`IKoanContextCarrier`](../../src/Koan.Core/Context/IKoanContextCarrier.cs) and
+[`KoanContextCarrierRegistry`](../../src/Koan.Core/Context/KoanContextCarrierRegistry.cs).
+
+**Ingress trust** — Provenance claimed by the mechanism delivering a carried context bag:
+`Unverified`, `Authenticated`, or `HostTrusted`. It says nothing about authorization,
+confidentiality, delivery, or payload correctness. Defined by
+[`ContextIngressTrust`](../../src/Koan.Core/Context/ContextIngressTrust.cs).
 
 ## Data routing
 

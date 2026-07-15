@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core;
+using Koan.Core.Context;
 using Koan.Core.Hosting.App;
 using Koan.Data.Access;
 using Koan.Data.Core;
@@ -34,6 +35,144 @@ public sealed class Plain : Entity<Plain>
     public string Title { get; set; } = "";
 }
 
+/// <summary>Focused contract for Subject's Core-owned logical-flow carrier.</summary>
+public sealed class SubjectContextCarrierSpec
+{
+    private static readonly IKoanContextCarrier Carrier = new SubjectContextCarrier();
+
+    [Fact]
+    public void Carrier_has_stable_identity_and_requires_authenticated_ingress()
+    {
+        Carrier.AxisKey.Should().Be("koan:subject");
+        Carrier.MinimumIngressTrust.Should().Be(ContextIngressTrust.Authenticated);
+    }
+
+    [Fact]
+    public void Subject_is_a_business_facade_over_the_Core_context_value()
+    {
+        using (Subject.Unconstrained("operator"))
+            KoanContext.Get<SubjectContext>().Should().BeSameAs(Subject.Current);
+
+        KoanContext.Get<SubjectContext>().Should().BeNull();
+    }
+
+    [Fact]
+    public void Capture_preserves_the_existing_v1_wire_encodings()
+    {
+        Carrier.Capture().Should().BeNull();
+
+        using (Subject.System())
+            Carrier.Capture().Should().Be("v1:system");
+
+        using (Subject.Unconstrained("operator"))
+            Carrier.Capture().Should().Be("v1:id:operator");
+
+        using (Subject.Use("guest", ["event:E1"]))
+            Carrier.Capture().Should().Be("v1:scoped:guest\u001fevent:E1");
+
+        using (Subject.Use("guest", []))
+            Carrier.Capture().Should().Be("v1:scoped:guest\u001f");
+    }
+
+    [Fact]
+    public void Capture_orders_scopes_ordinally_for_stable_wire_identity()
+    {
+        using (Subject.Use("guest", ["event:Z", "event:A", "event:M"]))
+            Carrier.Capture().Should().Be("v1:scoped:guest\u001fevent:A\u001fevent:M\u001fevent:Z");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Subject_ids_cannot_contain_the_wire_separator(bool constrained)
+    {
+        var enter = () => constrained
+            ? Subject.Use("alice\u001fadmin", ["event:E1"])
+            : Subject.Unconstrained("alice\u001fadmin");
+
+        enter.Should().Throw<ArgumentException>().Which.ParamName.Should().Be("subjectId");
+        Subject.Current.Should().BeNull();
+    }
+
+    [Fact]
+    public void Subject_scopes_are_not_cast_mutable_after_the_context_is_created()
+    {
+        using (Subject.Use("guest", ["event:E1"]))
+        {
+            var exposed = (ISet<string>)Subject.Current!.Scopes!;
+            Action add = () => { exposed.Add("event:E2"); };
+            Action remove = () => { exposed.Remove("event:E1"); };
+            Action clear = exposed.Clear;
+
+            add.Should().Throw<NotSupportedException>();
+            remove.Should().Throw<NotSupportedException>();
+            clear.Should().Throw<NotSupportedException>();
+            Subject.Current.Scopes.Should().Equal("event:E1");
+        }
+    }
+
+    [Fact]
+    public void Capture_then_restore_round_trips_a_constrained_subject()
+    {
+        string? captured;
+        using (Subject.Use("guest", ["event:E1"]))
+            captured = Carrier.Capture();
+
+        using (Carrier.Restore(captured!))
+        {
+            Subject.Current!.Id.Should().Be("guest");
+            Subject.Current.IsConstrained.Should().BeTrue();
+            Subject.Current.Scopes.Should().Equal("event:E1");
+        }
+
+        Subject.Current.Should().BeNull();
+    }
+
+    [Fact]
+    public void Suppress_clears_worker_context_then_restores_it()
+    {
+        using (Subject.Unconstrained("worker"))
+        {
+            using (Carrier.Suppress())
+                Subject.Current.Should().BeNull();
+
+            Subject.Current!.Id.Should().Be("worker");
+        }
+    }
+
+    [Theory]
+    [InlineData("v1:id:", KoanContextCarrierException.FailureKind.MalformedPayload)]
+    [InlineData("v1:id:alice\u001fadmin", KoanContextCarrierException.FailureKind.MalformedPayload)]
+    [InlineData("v1:scoped:\u001fscope", KoanContextCarrierException.FailureKind.MalformedPayload)]
+    [InlineData("v1:unknown", KoanContextCarrierException.FailureKind.MalformedPayload)]
+    [InlineData("v999:private-payload", KoanContextCarrierException.FailureKind.UnsupportedVersion)]
+    public void Restore_fails_closed_with_safe_typed_errors(
+        string captured,
+        KoanContextCarrierException.FailureKind expected)
+    {
+        var act = () => Carrier.Restore(captured);
+
+        var failure = act.Should().Throw<KoanContextCarrierException>().Which;
+        failure.Failure.Should().Be(expected);
+        failure.AxisKeys.Should().Equal("koan:subject");
+        failure.Message.Should().NotContain(captured);
+        failure.InnerException.Should().BeNull();
+        Subject.Current.Should().BeNull();
+    }
+
+    [Fact]
+    public void Access_module_registers_its_carrier_independently_with_Core()
+    {
+        var services = new ServiceCollection();
+        services.AddKoanCore();
+        new Koan.Data.Access.Initialization.KoanAutoRegistrar().Register(services);
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetServices<IKoanContextCarrier>()
+            .Should().ContainSingle().Which.Should().BeOfType<SubjectContextCarrier>();
+    }
+}
+
 /// <summary>
 /// A tiny subject-observing job, discovered by the same real <c>AddKoan()</c> boot. It records the ambient subject it
 /// executed under (proving the <see cref="SubjectContextCarrier"/> rehydrated the submitting subject across the async
@@ -61,7 +200,7 @@ public sealed class SubjectProbeJob : Entity<SubjectProbeJob>, IKoanJob<SubjectP
         Observed = s is not null;
         ObservedConstrained = s?.IsConstrained ?? false;
         ObservedScopes = s?.Scopes?.ToList() ?? (IReadOnlyList<string>)Array.Empty<string>();
-        // The job reads in the default partition (routing dimensions are not carried — only typed slices are);
+        // The job reads in the default partition (Data routing is not carried; only registered Koan context axes are);
         // the test seeds the job's docs in the default partition for exactly this reason.
         VisibleTitles = (await Doc.All()).Select(d => d.Title).OrderBy(t => t).ToList();
     }
@@ -189,7 +328,7 @@ public sealed class AccessAxisSpec : IClassFixture<AccessHostFixture>
     {
         SubjectProbeJob.Reset();
 
-        // Seed in the DEFAULT partition (routing dimensions are not carried across the hop; only typed slices are).
+        // Seed in the DEFAULT partition (Data routing is not carried across the hop; only registered context axes are).
         var stamp = Guid.NewGuid().ToString("n");
         await new Doc { EventId = "jobE1-" + stamp, Title = "seen-" + stamp }.Save();
         await new Doc { EventId = "jobE2-" + stamp, Title = "hidden-" + stamp }.Save();

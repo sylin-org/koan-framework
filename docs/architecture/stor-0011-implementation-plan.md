@@ -9,6 +9,11 @@ last_updated: 2026-06-24
 
 # STOR-0011 implementation plan (v2) — delegation prompts
 
+> **Context-carriage amendment (2026-07-15):** This shipped execution plan is preserved as historical
+> implementation evidence; do not execute its `AmbientCarrierRegistry` snippets. Current durable
+> carriage uses `Koan.Core.Context.KoanContextCarrierRegistry`. Current raw blob-key scoping reads the
+> Data-axis value providers directly because opaque versioned carrier payloads are not key particles.
+
 > Gap C step 0.4 (storage blob-key axis isolation). Design = [STOR-0011](../decisions/STOR-0011-storage-blob-key-axis-isolation.md)
 > **v2** (chokepoint at `IStorageService`, after design review `wf_ac5a1e07-54a` rejected the v1 `StorageEntity`
 > funnel). Hand each TASK to an implementer **verbatim**, prepending the **Shared Context**. Order matters; each

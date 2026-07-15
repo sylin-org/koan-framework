@@ -2,15 +2,15 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using Koan.Core.Context;
 using Koan.Data.Core;
 using Xunit;
 
 namespace Koan.Tenancy.Tests;
 
 /// <summary>
-/// Pins the ambient <c>Tenant</c> slice (ARCH-0095 slice 1a) — the flagship typed slice of the Facet-3 ambient
-/// carrier. It rides the ONE <see cref="EntityContext"/> carrier via the generic slice API (ARCH-0097), is
-/// immutable and restore-on-dispose, and models the three states tenancy needs: <b>unset</b> (no tenant in
+/// Pins the ambient <c>Tenant</c> context over Core's one typed logical-flow primitive. It is immutable and
+/// restore-on-dispose, and models the three states tenancy needs: <b>unset</b> (no tenant in
 /// scope), <b>host</b> (the loud <see cref="Tenant.None"/> escape), and <b>scoped</b>
 /// (<see cref="Tenant.Use"/> / <see cref="Tenant.WithTenant"/>). Enforcement is a separate spec.
 /// </summary>
@@ -36,6 +36,15 @@ public class TenantAmbientSpec
         }
 
         Tenant.Current.Should().BeNull(); // restored to unset
+    }
+
+    [Fact]
+    public void Tenant_is_a_business_facade_over_the_Core_context_value()
+    {
+        using (Tenant.Use("a1b2c3"))
+            KoanContext.Get<TenantContext>().Should().BeSameAs(Tenant.Current);
+
+        KoanContext.Get<TenantContext>().Should().BeNull();
     }
 
     [Fact]
@@ -74,7 +83,7 @@ public class TenantAmbientSpec
     [Fact]
     public void Tenant_carries_across_an_unrelated_entitycontext_scope()
     {
-        // Changing another axis (partition) must NOT drop the tenant — inherit-unless-overridden (ARCH-0097).
+        // Data pushes only its own Core context value; it must not drop Tenancy's separate value.
         using (Tenant.Use("a1b2c3"))
         using (EntityContext.With(partition: "archive"))
         {
