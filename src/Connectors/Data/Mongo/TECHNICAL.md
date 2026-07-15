@@ -26,10 +26,21 @@ source: src/Koan.Data.Connector.Mongo/
 
 ## Configuration
 
-- Connection URI, database/collection naming per conventions.
+- A concrete Mongo connection string is authoritative.
+- `auto` delegates to the shared health-checked discovery coordinator.
+- The Mongo package declares a `mongo` → `mongodb` Zen Garden offering binding, but that metadata is
+  inert unless the `Koan.ZenGarden` engine is referenced and activated.
+- When active, Zen Garden contributes one automatic candidate. It does not short-circuit discovery;
+  Mongo applies database/authentication parameters, validates reachability, and falls through when the
+  candidate is unhealthy.
+- Automatic precedence is Aspire, activated contributors, then runtime topology. All remain below
+  concrete explicit configuration.
+- The selected discovery method is emitted as a credential-redacted runtime fact; raw endpoints are not
+  included in that fact.
 
 ## References
 
 - [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
 - [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
+- [ARCH-0114 layered capability activation](../../../../docs/decisions/ARCH-0114-layered-capability-activation.md)
 

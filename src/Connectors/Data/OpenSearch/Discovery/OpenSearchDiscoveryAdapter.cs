@@ -80,7 +80,7 @@ internal sealed class OpenSearchDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return openSearchUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                             .Select(url => new DiscoveryCandidate(url.Trim(), "environment-opensearch-urls", 0));
+                             .Select(url => new DiscoveryCandidate(url.Trim(), "environment-opensearch-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>OpenSearch-specific connection string parameter application</summary>

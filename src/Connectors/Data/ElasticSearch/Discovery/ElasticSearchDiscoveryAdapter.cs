@@ -80,7 +80,7 @@ internal sealed class ElasticSearchDiscoveryAdapter : ServiceDiscoveryAdapterBas
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return elasticUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                         .Select(url => new DiscoveryCandidate(url.Trim(), "environment-elasticsearch-urls", 0));
+                         .Select(url => new DiscoveryCandidate(url.Trim(), "environment-elasticsearch-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>ElasticSearch-specific connection string parameter application</summary>

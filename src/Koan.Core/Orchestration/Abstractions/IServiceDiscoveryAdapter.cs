@@ -4,7 +4,10 @@ namespace Koan.Core.Orchestration.Abstractions;
 
 /// <summary>
 /// Contract for autonomous service discovery adapters.
-/// Each service adapter implements this to handle its own discovery process.
+/// Koan service adapters derive from <see cref="ServiceDiscoveryAdapterBase"/> so every adapter participates
+/// in the same precedence, activated-contributor, normalization, health, fallback, and reporting lifecycle.
+/// Implement this interface directly only for synthetic/test adapters or when a specific architectural
+/// decision defines a different concern boundary.
 /// </summary>
 public interface IServiceDiscoveryAdapter
 {

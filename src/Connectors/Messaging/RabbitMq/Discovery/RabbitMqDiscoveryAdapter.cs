@@ -58,13 +58,13 @@ public sealed class RabbitMqDiscoveryAdapter : ServiceDiscoveryAdapterBase
         var envUrl = Environment.GetEnvironmentVariable("RABBITMQ_URL");
         if (!string.IsNullOrWhiteSpace(envUrl))
         {
-            candidates.Add(new DiscoveryCandidate(envUrl, "environment-rabbitmq-url", 0));
+            candidates.Add(new DiscoveryCandidate(envUrl, "environment-rabbitmq-url", DiscoveryCandidatePriority.Environment));
         }
 
         var koanEnvUrl = Environment.GetEnvironmentVariable("Koan_RABBITMQ_URL");
         if (!string.IsNullOrWhiteSpace(koanEnvUrl))
         {
-            candidates.Add(new DiscoveryCandidate(koanEnvUrl, "environment-koan-rabbitmq-url", 0));
+            candidates.Add(new DiscoveryCandidate(koanEnvUrl, "environment-koan-rabbitmq-url", DiscoveryCandidatePriority.Environment));
         }
 
         return candidates;

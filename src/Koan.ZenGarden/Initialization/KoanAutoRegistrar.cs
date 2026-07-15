@@ -24,6 +24,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
+        module.AddNote("Layered discovery contributor: active; offering bindings become health-checked automatic candidates");
 
         var defaults = new ZenGardenOptions();
         var endpoint = Configuration.ReadWithSource(cfg, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.Endpoint), defaults.Endpoint);

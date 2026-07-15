@@ -28,7 +28,16 @@ source: src/Koan.Data.Vector.Connector.Weaviate/
 - Metrics: request latency, error rates
 - Logs: redact embeddings and sensitive metadata
 
+## Layered discovery
+
+- The adapter declares its Zen Garden offering binding without activating Zen Garden.
+- Referencing and activating `Koan.ZenGarden` adds a health-checked automatic candidate through the
+  shared discovery coordinator; without that engine, Weaviate keeps its normal local/orchestrated path.
+- Concrete configuration remains authoritative over Aspire, activated contributors, and topology guesses.
+- Weaviate owns endpoint normalization and health; Zen Garden contributes but never elects.
+
 ## References
 
 - Data access patterns: `/docs/guides/data/all-query-streaming-and-pager.md`
+- [ARCH-0114 layered capability activation](../../../../docs/decisions/ARCH-0114-layered-capability-activation.md)
 

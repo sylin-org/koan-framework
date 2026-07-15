@@ -170,6 +170,8 @@
       href: ARCH-0112-bounded-relationship-negotiation.md
     - name: ARCH-0113 Entity capability lifting and the Communication boundary
       href: ARCH-0113-entity-capability-communication.md
+    - name: ARCH-0114 Layered capability activation
+      href: ARCH-0114-layered-capability-activation.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

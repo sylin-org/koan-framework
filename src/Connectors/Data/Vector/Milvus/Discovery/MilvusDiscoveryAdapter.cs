@@ -90,7 +90,7 @@ internal sealed class MilvusDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return milvusUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                         .Select(url => new DiscoveryCandidate(url.Trim(), "environment-milvus-urls", 0));
+                         .Select(url => new DiscoveryCandidate(url.Trim(), "environment-milvus-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>Milvus-specific connection string parameter application</summary>

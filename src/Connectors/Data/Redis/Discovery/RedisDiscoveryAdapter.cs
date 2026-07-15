@@ -67,7 +67,7 @@ public sealed class RedisDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return redisUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                       .Select(url => new DiscoveryCandidate(url.Trim(), "environment-redis-urls", 0));
+                       .Select(url => new DiscoveryCandidate(url.Trim(), "environment-redis-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>Redis-specific connection string parameter application</summary>

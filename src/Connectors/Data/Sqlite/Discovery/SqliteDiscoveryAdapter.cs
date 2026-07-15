@@ -75,7 +75,7 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return sqliteFiles.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                         .Select(path => new DiscoveryCandidate($"Data Source={path.Trim()}", "environment-sqlite-files", 0));
+                         .Select(path => new DiscoveryCandidate($"Data Source={path.Trim()}", "environment-sqlite-files", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>SQLite-specific connection string normalization</summary>

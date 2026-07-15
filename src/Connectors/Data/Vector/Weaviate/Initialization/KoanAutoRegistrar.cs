@@ -52,6 +52,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         module.Describe(ModuleVersion);
         module.AddNote("Weaviate discovery handled by autonomous WeaviateDiscoveryAdapter");
+        module.AddNote("Layered discovery: Zen Garden compatibility declared; activation is owned by Koan.ZenGarden");
 
         // Configure default options for reporting with provenance metadata
         var defaultOptions = new WeaviateOptions();

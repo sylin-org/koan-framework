@@ -68,7 +68,7 @@ internal sealed class SqlServerDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return sqlServerUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                           .Select(url => new DiscoveryCandidate(url.Trim(), "environment-sqlserver-urls", 0));
+                           .Select(url => new DiscoveryCandidate(url.Trim(), "environment-sqlserver-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>SQL Server-specific connection string parameter application</summary>

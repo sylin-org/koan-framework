@@ -70,7 +70,7 @@ internal sealed class CockroachDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return cockroachUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                          .Select(url => new DiscoveryCandidate(url.Trim(), "environment-cockroach-urls", 0));
+                          .Select(url => new DiscoveryCandidate(url.Trim(), "environment-cockroach-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>CockroachDB-specific connection string construction</summary>

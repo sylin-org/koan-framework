@@ -65,7 +65,7 @@ internal sealed class MongoDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return mongoUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                       .Select(url => new DiscoveryCandidate(url.Trim(), "environment-mongo-urls", 0));
+                       .Select(url => new DiscoveryCandidate(url.Trim(), "environment-mongo-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>MongoDB-specific connection string parameter application — delegates to the shared

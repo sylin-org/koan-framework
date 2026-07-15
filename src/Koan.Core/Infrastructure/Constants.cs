@@ -16,6 +16,7 @@ public static class Constants
             public const string LockfileMatched = "koan.composition.lockfile.matched";
             public const string LockfileDrifted = "koan.composition.lockfile.drifted";
             public const string LockfileMissing = "koan.composition.lockfile.missing";
+            public const string ServiceDiscovery = "koan.discovery.service";
         }
 
         public static class Reasons
@@ -26,6 +27,9 @@ public static class Constants
             public const string LockfileMatched = "lockfile-matched";
             public const string LockfileDrifted = "lockfile-drifted";
             public const string LockfileMissing = "lockfile-missing";
+            public const string DiscoverySelected = "discovery-selected";
+            public const string DiscoveryFailed = "discovery-failed";
+            public const string DiscoveryAdapterMissing = "discovery-adapter-missing";
         }
     }
 

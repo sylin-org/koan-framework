@@ -72,6 +72,7 @@ public sealed class MongoModule : KoanModule
         // Autonomous discovery adapter handles all connection string resolution; the boot report shows
         // the discovery result via the fleet-shared AdapterBootReporting.ResolveConnectionString.
         module.AddNote("MongoDB discovery handled by autonomous MongoDiscoveryAdapter");
+        module.AddNote("Layered discovery: Zen Garden compatibility declared; activation is owned by Koan.ZenGarden");
         module.AddNote("AODB isolation: RowScoped + ContainerScoped + DatabaseScoped (conformance: AodbConformanceSpecsBase)");
 
         var defaultOptions = new MongoOptions();

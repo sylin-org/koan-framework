@@ -68,7 +68,7 @@ internal sealed class PostgresDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return postgresUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                          .Select(url => new DiscoveryCandidate(url.Trim(), "environment-postgres-urls", 0));
+                          .Select(url => new DiscoveryCandidate(url.Trim(), "environment-postgres-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>PostgreSQL-specific connection string construction</summary>

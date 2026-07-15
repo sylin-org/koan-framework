@@ -101,7 +101,7 @@ internal sealed class WeaviateDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return weaviateUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                          .Select(url => new DiscoveryCandidate(url.Trim(), "environment-weaviate-urls", 0));
+                          .Select(url => new DiscoveryCandidate(url.Trim(), "environment-weaviate-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>Weaviate adapter handles Aspire service discovery for Weaviate</summary>

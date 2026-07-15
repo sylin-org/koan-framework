@@ -16,9 +16,6 @@ namespace Koan.ZenGarden.Discovery;
 /// </summary>
 internal sealed class ZenGardenDiscoveryCandidateContributor : IDiscoveryCandidateContributor
 {
-    // Tried ahead of the compose/host/local guesses (priority 2/3/4) but behind explicit env (0) / config (1).
-    private const int ZenGardenCandidatePriority = 2;
-
     private readonly IZenGardenInitializationProvider _provider;
     private readonly ILogger<ZenGardenDiscoveryCandidateContributor> _logger;
 
@@ -53,7 +50,10 @@ internal sealed class ZenGardenDiscoveryCandidateContributor : IDiscoveryCandida
             _logger.LogDebug(
                 "ZenGarden contributed a discovery candidate for {Service} (offering {Offering}): {Url}",
                 serviceName, offering, url);
-            return [new DiscoveryCandidate(url!, "zengarden-offering", ZenGardenCandidatePriority)];
+            return [new DiscoveryCandidate(
+                url!,
+                "zengarden-offering",
+                DiscoveryCandidatePriority.Automatic)];
         }
         catch (Exception ex)
         {

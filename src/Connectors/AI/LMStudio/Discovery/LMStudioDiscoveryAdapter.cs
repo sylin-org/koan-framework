@@ -28,30 +28,28 @@ internal sealed class LMStudioDiscoveryAdapter : ServiceDiscoveryAdapterBase
 
     protected override Type GetFactoryType() => typeof(LMStudioServiceDescriptor);
 
-    protected override IEnumerable<DiscoveryCandidate> BuildDiscoveryCandidates(KoanServiceAttribute attribute, DiscoveryContext context)
+    protected override IEnumerable<DiscoveryCandidate> BuildRuntimeCandidates(KoanServiceAttribute attribute)
     {
         var candidates = new List<DiscoveryCandidate>();
-
-        candidates.AddRange(GetEnvironmentCandidates());
-
-        var explicitConfig = ReadExplicitConfiguration();
-        if (!string.IsNullOrWhiteSpace(explicitConfig))
-        {
-            candidates.Add(new DiscoveryCandidate(explicitConfig, "explicit-config", 1));
-        }
 
         if (KoanEnv.InContainer)
         {
             if (!string.IsNullOrWhiteSpace(attribute.LocalHost))
             {
                 var hostUrl = $"{attribute.LocalScheme}://{attribute.LocalHost}:{attribute.LocalPort}";
-                candidates.Add(new DiscoveryCandidate(hostUrl, "host-first", 2));
+                candidates.Add(new DiscoveryCandidate(
+                    hostUrl,
+                    "host-first",
+                    DiscoveryCandidatePriority.Automatic));
             }
 
             if (!string.IsNullOrWhiteSpace(attribute.Host))
             {
                 var containerUrl = $"{attribute.Scheme}://{attribute.Host}:{attribute.EndpointPort}";
-                candidates.Add(new DiscoveryCandidate(containerUrl, "container-fallback", 3));
+                candidates.Add(new DiscoveryCandidate(
+                    containerUrl,
+                    "container-fallback",
+                    DiscoveryCandidatePriority.HostGateway));
             }
         }
         else
@@ -59,22 +57,19 @@ internal sealed class LMStudioDiscoveryAdapter : ServiceDiscoveryAdapterBase
             if (!string.IsNullOrWhiteSpace(attribute.LocalHost))
             {
                 var localUrl = $"{attribute.LocalScheme}://{attribute.LocalHost}:{attribute.LocalPort}";
-                candidates.Add(new DiscoveryCandidate(localUrl, "local", 2));
-            }
-        }
-
-        if (context.OrchestrationMode == OrchestrationMode.AspireAppHost)
-        {
-            var aspireUrl = _configuration[$"services:{ServiceName}:default:0"] ??
-                            _configuration[$"services:{ServiceName}-ai:default:0"];
-            if (!string.IsNullOrWhiteSpace(aspireUrl))
-            {
-                candidates.Insert(0, new DiscoveryCandidate(aspireUrl, "aspire", 0));
+                candidates.Add(new DiscoveryCandidate(
+                    localUrl,
+                    "local",
+                    DiscoveryCandidatePriority.Automatic));
             }
         }
 
         return candidates;
     }
+
+    protected override string? ReadAspireServiceDiscovery() =>
+        _configuration[$"services:{ServiceName}:default:0"] ??
+        _configuration[$"services:{ServiceName}-ai:default:0"];
 
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
@@ -133,14 +128,20 @@ internal sealed class LMStudioDiscoveryAdapter : ServiceDiscoveryAdapterBase
         var baseUrl = Environment.GetEnvironmentVariable(Constants.Discovery.EnvBaseUrl);
         if (!string.IsNullOrWhiteSpace(baseUrl))
         {
-            candidates.Add(new DiscoveryCandidate(baseUrl, "env-base-url", 0));
+            candidates.Add(new DiscoveryCandidate(
+                baseUrl,
+                "env-base-url",
+                DiscoveryCandidatePriority.Environment));
         }
 
         var list = Environment.GetEnvironmentVariable(Constants.Discovery.EnvList);
         if (!string.IsNullOrWhiteSpace(list))
         {
             candidates.AddRange(list.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(url => new DiscoveryCandidate(url.Trim(), "env-list", 0)));
+                .Select(url => new DiscoveryCandidate(
+                    url.Trim(),
+                    "env-list",
+                    DiscoveryCandidatePriority.Environment)));
         }
 
         return candidates;
@@ -190,4 +191,3 @@ internal sealed class LMStudioDiscoveryAdapter : ServiceDiscoveryAdapterBase
         }
     }
 }
-

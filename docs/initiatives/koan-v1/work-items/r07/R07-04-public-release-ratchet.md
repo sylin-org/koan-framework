@@ -123,8 +123,29 @@ Isolated reruns show that the red result is not only whole-solution contention:
   directories are created on elected use; and disposal closes keepers and clears observed driver pool
   groups. The Jobs harness relies on the normal host binder and owns only its explicit test placement.
 - Jobs core passes 77/77. Jobs SQLite passes 79/79 on three complete sequential runs and on two
-  simultaneous complete processes. SQLite passes 35/35, Data.Core 349/349, Core Unit 105/105, JSON
+  simultaneous complete processes. SQLite passes 35/35, Data.Core 349/349, Core Unit 112/112, JSON
   20/20, Data axes integration 18/18, Web SQLite 49/49, and Tenancy 110/110.
+
+### Layered discovery and Mongo endpoint precedence — implementation passed; live aggregate pending
+
+- The remaining Mongo fact encoded the pre-health-check era: a manually registered Zen Garden provider
+  was expected to short-circuit `auto`, even though the activated engine now contributes candidates to
+  the shared coordinator. The fixture composed neither the engine nor its contributor.
+- ARCH-0114 now makes the general rule explicit: an adapter declares compatibility; the optional engine
+  activates contribution; the concern-owned coordinator elects; the adapter normalizes and validates.
+  `ServiceDiscoveryAdapterBase` owns a non-replaceable candidate template, with one narrow runtime-
+  topology hook. The former LM Studio whole-pipeline override now uses that hook.
+- Candidate precedence is named and enforced: concrete explicit configuration, legacy environment hints, then
+  Aspire / activated contributors / runtime topology, followed by host-gateway and loopback fallbacks.
+  Optional contributors and adapter topology cannot promote themselves above explicit intent.
+- Startup reports distinguish adapter-declared compatibility from an active Zen Garden contributor.
+  The coordinator records the selected method or rejection as a redacted runtime fact without the raw
+  endpoint.
+- Core Unit passes 112/112 and Mongo passes 70/70. Release solution build succeeds with the reviewed
+  19-warning baseline and 0 errors;
+  docs lint is 0 errors / 1568 historical warnings; surface lint passes 34 rows. Couchbase builds
+  0-warning and its Docker-free specs pass 9/9, but its full node did not become ready in two isolated
+  five-minute attempts. The exact ratchet owns that live 17/17 recheck; it is not called green here.
 
 ## Decisions
 
@@ -150,7 +171,7 @@ Isolated reruns show that the red result is not only whole-solution contention:
 
 ### OPEN
 
-- Mongo's recorded endpoint-precedence decision and the exact aggregate ratchet remain.
+- Couchbase's live 17/17 recheck and the exact aggregate ratchet remain.
 
 ## Red/green plan
 
@@ -165,8 +186,10 @@ Isolated reruns show that the red result is not only whole-solution contention:
    without an operator environment override.
 5. **Complete.** Reproduce the five Jobs SQLite failures from a clean isolated output, group them by
    root, and repair behavior or isolation without lowering assertions.
-6. Resolve the explicit endpoint-precedence decision in
-   [PMC-012](../../POST-CYCLE-TODO.md#current-register) and rerun Mongo 68/68.
+6. **Implementation complete; live cross-provider acceptance open.** Resolve endpoint precedence through
+   [ARCH-0114](../../../../decisions/ARCH-0114-layered-capability-activation.md), pass the shared matrix
+   and Mongo 70/70, then retain Couchbase's unavailable 17/17 recheck in
+   [PMC-012](../../POST-CYCLE-TODO.md#current-register) for the exact ratchet.
 7. Run the exact public-release ratchet from a clean checkout.
 8. Record exact counts, duration, environment-dependent skips, warnings, and the absence of publication
    or remote mutation before passing this child.

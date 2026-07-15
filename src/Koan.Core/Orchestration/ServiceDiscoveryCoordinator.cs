@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using Koan.Core.Diagnostics;
 using Koan.Core.Logging;
 using Koan.Core.Orchestration.Abstractions;
+using CoreConstants = Koan.Core.Infrastructure.Constants;
 
 namespace Koan.Core.Orchestration;
 
@@ -14,13 +16,16 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
     private readonly ConcurrentDictionary<string, IServiceDiscoveryAdapter> _adapters = new();
     private readonly IDiscoveryCandidateContributor[] _contributors;
     private readonly ILogger<ServiceDiscoveryCoordinator> _logger;
+    private readonly IKoanRuntimeFactRecorder? _facts;
 
     public ServiceDiscoveryCoordinator(
         IEnumerable<IServiceDiscoveryAdapter> adapters,
         IEnumerable<IDiscoveryCandidateContributor> contributors,
-        ILogger<ServiceDiscoveryCoordinator> logger)
+        ILogger<ServiceDiscoveryCoordinator> logger,
+        IKoanRuntimeFactRecorder? facts = null)
     {
         _logger = logger;
+        _facts = facts;
         _contributors = contributors?.ToArray() ?? [];
         RegisterAdapters(adapters);
     }
@@ -33,6 +38,13 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
         if (!_adapters.TryGetValue(serviceName.ToLowerInvariant(), out var adapter))
         {
             KoanLog.ConfigWarning(_logger, LogActions.Lookup, "no-adapter", ("service", serviceName));
+            RecordDiscovery(
+                serviceName,
+                KoanFactState.Rejected,
+                "No discovery adapter is active for the requested service.",
+                CoreConstants.Diagnostics.Reasons.DiscoveryAdapterMissing,
+                "Reference and enable an adapter that handles this service.",
+                "none");
             return AdapterDiscoveryResult.NoAdapter(serviceName);
         }
 
@@ -56,6 +68,17 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
             KoanLog.ConfigInfo(_logger, LogActions.Result, outcome,
                 ("service", serviceName),
                 ("url", Redaction.DeIdentify(result.ServiceUrl)));
+            RecordDiscovery(
+                serviceName,
+                result.IsSuccessful ? KoanFactState.Selected : KoanFactState.Rejected,
+                result.IsSuccessful
+                    ? $"Selected service discovery through '{result.DiscoveryMethod}'."
+                    : "Service discovery exhausted its eligible candidates.",
+                result.IsSuccessful
+                    ? CoreConstants.Diagnostics.Reasons.DiscoverySelected
+                    : CoreConstants.Diagnostics.Reasons.DiscoveryFailed,
+                result.IsSuccessful ? null : "Correct the configured endpoint or activate a reachable provider.",
+                result.IsSuccessful ? result.DiscoveryMethod : adapter.GetType().Name);
 
             return result;
         }
@@ -65,6 +88,13 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
                 ("service", serviceName),
                 ("adapter", adapter.GetType().Name),
                 ("error", Redaction.DeIdentify(ex.Message)));
+            RecordDiscovery(
+                serviceName,
+                KoanFactState.Rejected,
+                "The selected discovery adapter failed before it could elect an endpoint.",
+                CoreConstants.Diagnostics.Reasons.DiscoveryFailed,
+                "Inspect the adapter health and configuration facts.",
+                adapter.GetType().Name);
             return AdapterDiscoveryResult.Failed(serviceName, $"Adapter exception: {ex.Message}");
         }
     }
@@ -133,6 +163,26 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
                 ("adapter", adapter.GetType().Name),
                 ("priority", adapter.Priority));
         }
+    }
+
+    private void RecordDiscovery(
+        string serviceName,
+        KoanFactState state,
+        string summary,
+        string reason,
+        string? correction,
+        string correlation)
+    {
+        _facts?.Record(new KoanFactDescriptor(
+            CoreConstants.Diagnostics.Codes.ServiceDiscovery,
+            KoanFactKind.Discovery,
+            state,
+            $"service:{serviceName.ToLowerInvariant()}",
+            summary,
+            reason,
+            correction,
+            "Koan.Core.Orchestration",
+            correlation));
     }
 
     private static class LogActions

@@ -105,7 +105,7 @@ internal sealed class CouchbaseDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return couchbaseUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                           .Select(url => new DiscoveryCandidate(url.Trim(), "environment-couchbase-urls", 0));
+                           .Select(url => new DiscoveryCandidate(url.Trim(), "environment-couchbase-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>Couchbase-specific connection string normalization</summary>

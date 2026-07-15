@@ -83,7 +83,7 @@ internal sealed class QdrantDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return qdrantUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                         .Select(url => new DiscoveryCandidate(url.Trim(), "environment-qdrant-urls", 0));
+                         .Select(url => new DiscoveryCandidate(url.Trim(), "environment-qdrant-urls", DiscoveryCandidatePriority.Environment));
     }
 
     protected override string ApplyConnectionParameters(string baseUrl, IDictionary<string, object> parameters)

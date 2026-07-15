@@ -57,6 +57,7 @@ Storage, variant routing, transform pipeline, and the recipe-based rendering sur
 | ARCH-0105 | [Koan product constitution and proposal decision test](ARCH-0105-product-constitution.md) | Accepted | Durable product principles, meaningful-step definition, evidence boundary, and proposal decision test |
 | ARCH-0106 | [Entity language admission, facets, and responsibility boundaries](ARCH-0106-entity-semantics-contract.md) | Accepted | Entity admission test, C# 14 module facets, context/lifecycle boundaries, and migration rules |
 | ARCH-0113 | [Entity capability lifting and the Communication boundary](ARCH-0113-entity-capability-communication.md) | Accepted | Lifecycle/Events/Transport separation, scalar/set/stream law, Core context ownership, and greenfield rebuild map |
+| ARCH-0114 | [Layered capability activation](ARCH-0114-layered-capability-activation.md) | Accepted | Inert declaration, Reference = Intent activation, concern-owned election, adapter interpretation, and inspectable outcomes |
 
 ## Authoring Principles
 

@@ -40,8 +40,12 @@ Replace this file at every handoff. It is a restart point, not a diary.
   passes 114/114; and Canon passes unit 35/35 plus integration 6/6. The five Jobs SQLite failures were
   one ownership root: generic source placement, host selection, and SQLite connection lifetime had
   been blurred together. The shared repair passes Jobs core 77/77, Jobs SQLite 79/79 repeatedly and in
-  simultaneous complete processes, SQLite 35/35, Data.Core 349/349, and Core Unit 105/105. Mongo's
-  recorded endpoint-precedence case and the exact aggregate ratchet remain before Lifecycle.
+  simultaneous complete processes, SQLite 35/35, and Data.Core 349/349. Mongo's stale direct
+  Zen Garden preference has now been replaced by the shared layered-capability contract in
+  [ARCH-0114](../../decisions/ARCH-0114-layered-capability-activation.md): Core Unit passes 112/112 and
+  Mongo passes 70/70. Couchbase builds clean and its Docker-free surface passes 9/9, but two isolated
+  full-suite attempts did not reach test execution because the Testcontainers node remained unready at
+  five minutes. That live 17/17 recheck and the exact aggregate ratchet remain before Lifecycle.
 - Lifecycle remains the next semantic clean 0.18 public break. Retain the no-alias greenfield decision
   and keep Communication/Pipeline work out of the release-foundation slice.
 - Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
@@ -191,14 +195,15 @@ Only the next slice has a detailed child card. Do not open broker breadth before
   provider-scoped overrides remain explicit. Repository and Direct use—not mere discovery—record
   adapter participation for readiness. One host-owned lifecycle supplies per-operation connections,
   source-isolated memory databases, lazy directory creation, and deterministic disposal. SQLite passes
-  35/35; Data.Core 349/349; Core Unit 105/105; JSON 20/20; Data axes integration 18/18; Web SQLite 49/49;
+  35/35; Data.Core 349/349; Core Unit 112/112; JSON 20/20; Data axes integration 18/18; Web SQLite 49/49;
   Tenancy 110/110; Jobs core 77/77; and Jobs SQLite 79/79 on repeated and simultaneous complete runs.
 
 ## Next safe action
 
-Continue [R07-04](work-items/r07/R07-04-public-release-ratchet.md): resolve the recorded Mongo
-endpoint-precedence case in PMC-012, rerun Mongo's complete suite, then run the exact public-release
-ratchet. Do not weaken assertions or exclude a runnable suite.
+Continue [R07-04](work-items/r07/R07-04-public-release-ratchet.md): commit the accepted layered-capability
+contract, then run the exact public-release ratchet from a clean checkout. The ratchet owns Couchbase's
+live 17/17 recheck; record a deterministic fixture failure rather than weakening assertions or excluding
+a runnable suite.
 
 Do not start Lifecycle, Communication Events, Transport, a router, a unit-of-work coordinator, or
 Messaging compatibility work while the release floor is red.

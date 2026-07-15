@@ -316,5 +316,5 @@ InMemory (sidecar; the Docker-free convergence oracle) → Json (JSON injector; 
   missing physical placement for the same adapter. It never authorizes one adapter to consume a generic
   connection explicitly owned by another adapter.
 - **Current gates:** resolver routing 19/19; Data.Core 349/349; SQLite 35/35; Jobs SQLite 79/79 on
-  repeated and simultaneous complete runs; Jobs core 77/77; Core Unit 105/105; JSON 20/20; Data axes
+  repeated and simultaneous complete runs; Jobs core 77/77; Core Unit 112/112; JSON 20/20; Data axes
   integration 18/18; Web SQLite 49/49; Tenancy 110/110.

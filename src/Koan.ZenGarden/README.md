@@ -341,7 +341,9 @@ Resolution order:
 
 1. Explicit native connection string -> pass-through.
 2. `zen-garden://...` -> resolve via Zen Garden first, then connector autonomous discovery fallback.
-3. `auto` or empty with `Koan.ZenGarden` referenced -> Zen Garden first, then connector autonomous discovery fallback.
+3. `auto` or empty without the `Koan.ZenGarden` engine -> the connector's normal discovery path.
+4. `auto` or empty with the engine activated -> Zen Garden contributes an automatic, health-checked
+   candidate to the concern-owned coordinator; the connector still elects and may fall through.
 
 Selector note:
 
