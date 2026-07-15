@@ -23,11 +23,12 @@ dotnet add package Sylin.Koan.Data.Core
 - Prefer first-class model statics for top-level data access in your app models:
   - `Item.All(ct)`
   - `Item.Query(predicate, ct)`
-  - `Item.FirstPage(pageSize, ct)` and `Item.Page(cursor, ct)`
+  - `Item.FirstPage(size, ct)` and `Item.Page(pageNumber, pageSize, ct)`
   - `Item.QueryStream(predicate, ct)`
-- For large sets today, use explicit pages or `Pager`. `AllStream`/`QueryStream` expose async iteration
-  but currently materialize the complete result before the first yield and do not honor `batchSize`;
-  genuine bounded provider streaming is the next R07 Data-semantic repair.
+- For large sets today, iterate explicit numbered pages. `AllStream`/`QueryStream` expose async
+  iteration but currently materialize the complete result before the first yield and do not honor
+  `batchSize`. Koan does not yet expose a provider-agnostic cursor or guaranteed-bounded stream;
+  genuine bounded provider iteration is the next R07 Data-semantic repair.
 - If a first-class static isn’t available, you can fall back to the generic facade (second-class): `Data<TEntity, TKey>.Query(...)`.
 
 Child relationships are strict by default. Native and in-memory providers execute directly; a

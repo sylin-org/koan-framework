@@ -105,21 +105,23 @@ source: src/Koan.Data.Core/
   operations; use the typed host-context failure to diagnose lifecycle versus composition errors
 - For large sets, prefer paging/streaming; avoid unbounded `All()`
 
-## Pager and EntityCursor
+## Explicit numbered paging
 
-- Stable iteration order is by `Id ASC` across adapters.
-- `EntityCursor` captures position and optional includeTotal; treat it as an opaque resume token.
-- `Pager` consumes a cursor and yields pages with `Items`, `HasMore/End`, and a continuation `Cursor`.
-- Typical flow: `FirstPage(size)` → render/process → `Page(cursor)` until `HasMore=false`.
-- For long-running jobs and resumability, use `EntityCursor` directly with `Pager`.
+- `FirstPage(size)` and `Page(pageNumber, pageSize)` return one materialized page.
+- Iterate page numbers until a returned page contains fewer than `pageSize` items.
+- Supply an explicit stable sort when repeated or concurrent writes could otherwise change page
+  membership. No provider-agnostic cursor/resume-token API exists today.
+- Numbered paging limits the result returned to the caller. Some adapters may still perform
+  in-memory fallback work; Koan does not yet promise universally bounded provider execution.
 
 ## Streaming semantics
 
 - `AllStream/QueryStream` currently materialize `QueryWithCount` before the first yield. The
   `batchSize` parameter is accepted but not yet applied, so these methods do not provide bounded
   memory or provider backpressure today.
-- Cancellation reaches the materialized query. For genuinely bounded work, use explicit pages or
-  `EntityCursor` + `Pager` until the R07 Data-semantic streaming slice replaces this implementation.
+- Cancellation reaches the materialized query. Prefer explicit numbered pages to limit each returned
+  result, but do not infer a provider-enforced memory bound until the R07 Data-semantic streaming slice
+  replaces this implementation.
 
 ## Edge cases and limits
 
@@ -162,8 +164,8 @@ source: src/Koan.Data.Core/
 
 ## Performance guidance
 
-- Prefer explicit paging or `EntityCursor` + `Pager` for large sets; current stream-shaped methods are
-  materialized compatibility surfaces
+- Prefer explicit numbered paging for large sets; current stream-shaped methods are materialized
+  compatibility surfaces, and a universal provider-enforced bound is not yet available
 - Batch operations according to adapter guarantees
 
 ## Compatibility and migrations
