@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R05 passed; T6 capability-ring assessment is next
+  scope: R05 passed; R06-01 conformance host isolation active
 ---
 
 # Koan V1 reorganization current handoff
@@ -41,8 +41,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - The fourth and final fresh-repeat slice is repaired: ordinary Entity schema fallback is quiet,
   custom mutations advertise the `dry_run` control they already honor, and the HTTP guide is now a
   compact Streamable-first contract rather than a deprecated-transport tutorial.
-- T6 capability-ring graduation is next. T7/V1 release readiness is not yet achieved because T6 is
-  unevaluated and the coherent package closure has not been published and observed.
+- The initial T6 assessment is recorded in R06. Entity/data/composition are strong, but Koan.Testing
+  still requires consumer assemblies to disable parallelization because ambient host ownership leaks
+  through the static Entity path. R06-01 is the first bounded repair.
+- T7/V1 release readiness is not yet achieved because T6 is ungraduated and the coherent package
+  closure has not been published and observed.
 - No public package was published and no branch was pushed by this work.
 
 ## What now exists
@@ -180,10 +183,11 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
 
 ## Next safe action
 
-Assess T6 ring 1—Entity/data/composition/testing—against `CAPABILITIES.md` and `ACCEPTANCE.md`. Create
-one bounded work item only for the smallest missing lower-ring foundation that blocks honest
-graduation. Keep public package maturity at `specified` until an actual `dev` publication is observed,
-and keep unrelated polish or compatibility choices in `POST-CYCLE-TODO.md`.
+Execute [`R06-01`](work-items/r06/R06-01-conformance-host-isolation.md): map the existing host-context
+seam, add a red concurrent-spec proof, and make Koan.Testing own its host scope without changing the
+Entity language. Do not remove unrelated test serialization attributes. Reassess the exact foundation
+support boundary after this slice; keep public package maturity at `specified` until a real `dev`
+publication is observed.
 
 ## Do not infer
 

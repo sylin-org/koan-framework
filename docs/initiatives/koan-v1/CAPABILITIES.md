@@ -70,7 +70,7 @@ it here.
 | AI, vector, and semantic capabilities | assessed | `experimental` | [record](#ai-vector-and-semantic-capabilities) | Strong unit/in-memory evidence, with a current host-lifecycle integration failure. |
 | MCP and agent-facing surfaces | assessed | `verified` | [record](#mcp-and-agent-facing-surfaces) | Core contract passes conformance; transports and operational authorization need broader proof. |
 | Authentication and authorization | assessed | `verified` | [record](#authentication-and-authorization) | Core identity passes; real external identity providers were not exercised. |
-| Testing and local infrastructure | assessed | `demonstrated` | [record](#testing-and-local-infrastructure) | Bounded bootstrap and FirstUse lanes are coherent; inherited batteries still contain explicit skips. |
+| Testing and local infrastructure | assessed | `demonstrated` | [record](#testing-and-local-infrastructure) | Bounded lanes are coherent; the consumer conformance kit still exports assembly-wide host serialization. |
 | Packaging, installation, and upgrades | assessed | `specified` | [record](#packaging-installation-and-upgrades) | Local release artifacts pass the real FirstUse clean room; public 0.17.0 remains incoherent. |
 | Operations, health, and diagnostics | assessed | `demonstrated` | [record](#operations-health-and-diagnostics) | Schema-1 runtime facts are verified for module/default-data decisions; fleet completeness remains open. |
 
@@ -325,13 +325,18 @@ boundaries remain pre-V1 work.
   includes serialized isolated source-checkout FirstUse and GoldenJourney process proofs.
 - **Inspection and failure:** capability-gated conformance can explain why some batteries do not apply;
   bounded runners report the lane, phase, command, deadline, and captured diagnostics on failure.
+- **Current T6 assessment:** `EntityConformanceSpecs<T>` owns a real host and isolated storage, but its
+  public contract still requires consumers to disable xUnit parallelization for the entire assembly
+  because static Entity operations resolve through a process-default host. R06-01 must move that
+  ownership inside the framework before this surface can graduate.
 - **Unsupported / compatibility:** inherited testing does not presently guarantee every entity/module
   combination, external infrastructure lifecycle, deterministic full-suite execution, or stable public
   test-kit APIs.
 - **Maturity / safe claim:** `demonstrated`. Koan provides useful reusable conformance tests; applications
   do not yet inherit a fully verified, package-installable test contract.
-- **Open risks:** make every skipped capability reason explicit and consolidate the remaining
-  provider-specific runners without accidentally starting infrastructure from routine solution tests.
+- **Open risks:** prove concurrent framework-owned conformance hosts; keep every skipped capability
+  reason explicit; consolidate provider-specific runners without accidentally starting infrastructure
+  from routine solution tests.
 
 ### Packaging, installation, and upgrades
 
