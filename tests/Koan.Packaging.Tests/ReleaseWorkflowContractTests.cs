@@ -1,10 +1,36 @@
 using System.Runtime.CompilerServices;
+using System.Xml.Linq;
 using Xunit;
 
 namespace Koan.Packaging.Tests;
 
 public sealed class ReleaseWorkflowContractTests
 {
+    [Fact]
+    public void SharedTestKitsAreExplicitlyNonRunnable()
+    {
+        var root = FindKoanRoot();
+        var projects = Directory
+            .EnumerateFiles(Path.Combine(root, "tests"), "*.TestKit.csproj", SearchOption.AllDirectories)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        Assert.NotEmpty(projects);
+        foreach (var project in projects)
+        {
+            var declarations = XDocument.Load(project)
+                .Descendants("IsTestProject")
+                .Select(element => element.Value.Trim())
+                .ToArray();
+            var relative = Path.GetRelativePath(root, project);
+
+            Assert.True(
+                declarations.Length == 1 &&
+                string.Equals(declarations[0], "false", StringComparison.OrdinalIgnoreCase),
+                $"Shared test kit '{relative}' must declare exactly one <IsTestProject>false</IsTestProject> boundary.");
+        }
+    }
+
     [Fact]
     public void DurableLineagePrecedesEveryVersionSensitiveReleaseStep()
     {

@@ -37,7 +37,9 @@ Replace this file at every handoff. It is a restart point, not a diary.
   complete breaking reverse closure.
 - [R07-04](work-items/r07/R07-04-public-release-ratchet.md) is active. The automatic publisher now runs
   the complete public-release ratchet and correctly stays red because several existing solution suites
-  fail independently. Restore test truth before the Lifecycle break; do not narrow the release gate.
+  fail independently. Its first slice explicitly fences all five shared TestKits from solution test
+  execution; shared Identity/Canon host ownership is next. Restore test truth before the Lifecycle
+  break; do not narrow the release gate.
 - Lifecycle remains the next semantic clean 0.18 public break. Retain the no-alias greenfield decision
   and keep Communication/Pipeline work out of the release-foundation slice.
 - Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
@@ -171,12 +173,17 @@ Only the next slice has a detailed child card. Do not open broker breadth before
 - The exact public-release ratchet passes tools, build, lockfile, docs, changed examples, skills, and
   blueprint legs. Its solution-test leg is red and fails closed. Isolated evidence is recorded in
   R07-04; no publication or remote mutation occurred.
+- All five shared TestKit projects now evaluate `IsTestProject=false`; the previously aborting Jobs
+  helper exits without a test host, and the release-workflow contract passes 2/2. A complete 53-test
+  packaging rerun exceeded its outer 240-second timeout without a result, so aggregate green is not
+  claimed.
 
 ## Next safe action
 
-Execute [R07-04](work-items/r07/R07-04-public-release-ratchet.md): classify runnable test projects,
-repair the shared host-ownership root exposed by Identity/Canon, restore Jobs SQLite behavior, resolve
-the recorded Mongo endpoint-precedence case, and pass the exact public-release ratchet.
+Continue [R07-04](work-items/r07/R07-04-public-release-ratchet.md): compare Identity and Canon with the
+closest passing host-owned Entity suites, then repair their smallest shared ownership seam. After both
+projects pass completely, restore Jobs SQLite behavior, resolve the recorded Mongo endpoint-precedence
+case, and pass the exact public-release ratchet.
 
 Do not start Lifecycle, Communication Events, Transport, a router, a unit-of-work coordinator, or
 Messaging compatibility work while the release floor is red.

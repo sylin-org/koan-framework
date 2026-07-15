@@ -54,6 +54,22 @@ Isolated reruns show that the red result is not only whole-solution contention:
 - The concurrent solution run also reports provider-specific Jobs failures. Reproduce those after the
   deterministic local failures are removed; do not infer their root cause from the aggregate log.
 
+## Progress
+
+### Shared TestKit classification — passed
+
+- Evaluated solution state identified one actual misclassification: `Koan.Jobs.TestKit` inherited
+  `IsTestProject=true` from xUnit v2 even though it contains only shared abstract specs and fixtures.
+  Data and Vector TestKits were non-runnable only because the property happened to remain unset.
+- All five `*.TestKit.csproj` libraries now explicitly declare `IsTestProject=false`. The six concrete
+  Jobs consumers and the Data, Vector, Web, and MCP consumer matrices continue to own execution.
+- A release-workflow contract requires every TestKit under `tests/` to retain exactly that explicit
+  boundary. The contract class passes 2/2, all five projects evaluate false, and the previously
+  aborting direct Jobs TestKit invocation exits successfully without launching a test host.
+- A subsequent complete 53-test packaging invocation produced no result before its outer 240-second
+  timeout; the child process tree was cleaned. This is not recorded as green. R07-03's prior 52/52
+  evidence remains valid, while R07-04 still requires a successful aggregate rerun.
+
 ## Decisions
 
 ### DECIDED
@@ -83,10 +99,11 @@ Isolated reruns show that the red result is not only whole-solution contention:
 
 ## Red/green plan
 
-1. Inventory every solution project that `dotnet test Koan.sln` treats as runnable; classify real
-   suites, shared test libraries, and explicit infrastructure runners from evaluated project state.
-2. Correct shared-library classification using the existing `IsTestProject=false` pattern and add a
-   structural regression so another test kit cannot silently enter the release run.
+1. **Complete.** Inventory every solution project that `dotnet test Koan.sln` treats as runnable;
+   classify real suites, shared test libraries, and explicit infrastructure runners from evaluated
+   project state.
+2. **Complete.** Correct shared-library classification using the existing `IsTestProject=false`
+   pattern and add a structural regression so another test kit cannot silently enter the release run.
 3. Compare Identity/Canon setup with the closest passing host-owned Entity suites. Repair the smallest
    shared ownership seam and rerun both complete projects.
 4. Reproduce the five Jobs SQLite failures from a clean isolated output, group them by root, and repair

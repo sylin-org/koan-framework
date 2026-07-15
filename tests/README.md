@@ -18,6 +18,9 @@ under **xUnit v3** with **Testcontainers 4.x** module fixtures (ARCH-0091), boot
     not add general harness primitives back to the conformance package.
 - **Seed packs** in `SeedPacks/` deliver deterministic data and are content-copied into every test
   project via `tests/Directory.Build.props`.
+- **Shared suite libraries** use the `.TestKit` project suffix and explicitly declare
+  `<IsTestProject>false</IsTestProject>`. Their abstract specs and fixtures execute only through
+  concrete consumer suites; `dotnet test Koan.sln` never launches a TestKit assembly itself.
 
 ## xUnit v3 conventions
 
