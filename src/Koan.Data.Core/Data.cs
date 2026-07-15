@@ -299,15 +299,6 @@ public static class Data<TEntity, TKey>
         CancellationToken ct = default)
     {
         var repo = Repo;
-        if (repo is Koan.Data.Abstractions.Instructions.IInstructionExecutor<TEntity> exec)
-        {
-            try
-            {
-                return await exec.ExecuteAsync<TEntity?>(new Koan.Data.Abstractions.Instructions.Instruction(Koan.Data.Abstractions.Instructions.DataInstructions.Patch, request), ct);
-            }
-            catch (NotSupportedException) { /* fall back */ }
-        }
-
         var current = await repo.Get(request.Id, ct);
         if (current is null) return null;
         var m = mergeNulls ?? MergePatchNullPolicy.SetDefault;
@@ -322,16 +313,6 @@ public static class Data<TEntity, TKey>
         CancellationToken ct = default)
     {
         var repo = Repo;
-        if (repo is Koan.Data.Abstractions.Instructions.IInstructionExecutor<TEntity> exec)
-        {
-            try
-            {
-                var result = await exec.ExecuteAsync<TEntity?>(new Koan.Data.Abstractions.Instructions.Instruction(Koan.Data.Abstractions.Instructions.DataInstructions.Patch, payload), ct);
-                if (result is not null) return result;
-            }
-            catch (NotSupportedException) { /* fallback */ }
-        }
-
         var current = await repo.Get(payload.Id, ct);
         if (current is null) return null;
         Koan.Data.Core.Patch.PatchOpsExecutor.Apply<TEntity, TKey>(current, payload);

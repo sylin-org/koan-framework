@@ -63,6 +63,7 @@ public static class AppBootstrapper
 
     public static void InitializeModules(IServiceCollection services)
     {
+        using var composition = Composition.KoanCompositionScope.Enter(services);
         KoanStartupTimeline.Mark(KoanStartupStage.BootstrapStart);
         _bootFailures = new List<ModuleFailure>();
         _bootFacts = new List<KoanFact>();

@@ -187,7 +187,7 @@ cardinality and copy semantics. Neither is a compatibility base for Events or Tr
 | 2 | [Provider-bounded streaming](r07/R07-02-provider-bounded-streaming.md) | **Passed.** Data.Core 42/42 focused and 325/325 full, six qualified and three fail-closed adapter cells, SQLite 1/1, and Backup 5/5 acceptance plus 7/7 full establish the bounded contract | materializing stream implementation and unused batch hint |
 | 3 | [Automatic breaking package lineage](r07/R07-03-automatic-package-lineage.md) | **Passed.** One version intent automatically mints and proves the complete reverse-dependent wave without an operator package list | manual closure tracking and source-SHA/package-SHA conflation |
 | 4 | [Public-release ratchet rehabilitation](r07/R07-04-public-release-ratchet.md) | **Passed.** The exact automatic release floor passes with bounded project fan-out, every runnable suite retained, and no leaked host state | misclassified helper projects, unbounded certification concurrency, and a red solution-test baseline |
-| 5 | Canonical Lifecycle | Lifecycle becomes host-owned, unavoidable, and honestly named in one clean 0.18 wave | lifecycle `Events` name, process-static registry, and bypassable hooks |
+| 5 | [Canonical Lifecycle](r07/R07-05-canonical-lifecycle.md) | **Passed.** Lifecycle is host-owned, unavoidable, inspectable, and honestly named across Entity/Data/REST/MCP | lifecycle `Events` name, process-static registry, parallel repository construction, and bypassable hooks |
 | 6 | Typed capability substrate | A minimal Data.Core cardinality adapter and pillar-owned execution replace generic public flow machinery | `PipelineBuilder` and pillar pipeline extensions |
 | 7 | In-process Transport flagship | a foundation + `AddKoan()` app gets local scalar/set/stream snapshots, stable typed receivers, source/ingress filters, isolated copies, bounded acceptance, operation-scoped settlement wait, and tenant-safe retry identity | old Messaging Core, proxy/buffer, broad `Send`, separate InMemory connector |
 | 8 | Events policy | payload-less occurrences fan out over the proved kernel | event/messaging conflation and service-collection handlers |
@@ -216,8 +216,9 @@ backlogs until their prerequisites pass.
 8. Restore the exact public-release ratchet before changing Lifecycle's shipped surface. **Complete.**
    R07-04 passes all eight legs from clean commit `50002c262` in 24 minutes 33 seconds without
    publication or remote mutation.
-9. Open canonical Lifecycle as the next clean 0.18 child. **Next.** Do not mix Communication or
-   Pipeline work into that boundary.
+9. Complete canonical Lifecycle as the clean 0.18 child. **Complete.** Host composition, one outer
+   Data boundary, migrations, cross-surface proofs, affected regression, automatic lineage, docs, and
+   privacy closure pass. Do not reopen this boundary during typed capability work.
 10. Open each later implementation slice only after its lower boundary passes.
 11. Prove in-process semantics before any broker migration or public maturity change.
 

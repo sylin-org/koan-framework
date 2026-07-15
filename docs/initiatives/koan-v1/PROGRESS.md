@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: in-progress
-  scope: R07-01 through R07-04 passed; canonical Lifecycle is next
+  scope: R07-01 through R07-05 passed; typed capability substrate is next
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T6 — capability-ring graduation`
 - Active work item: R07 — rebuild the semantic capability ring
-- Active child: none; canonical Lifecycle is the next bounded R07 child
+- Active child: none; typed capability substrate is the next bounded R07 child
 - V1 readiness: `not ready`; T7 remains gated by T6 and an observed public package publication
 
 ## Work items
@@ -36,7 +36,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 | R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
-| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | ARCH-0113 ratifies the Entity communication target; ARCH-0114 makes optional engine layering uniform. R07-01 through [R07-04](work-items/r07/R07-04-public-release-ratchet.md) pass. The exact public-release ratchet is green with bounded concurrency; canonical Lifecycle is next. |
+| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | R07-01 through [R07-05](work-items/r07/R07-05-canonical-lifecycle.md) pass. Persistence Lifecycle is host-owned and unavoidable across Entity/Data/REST/MCP; typed capability substrate is next. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -52,12 +52,13 @@ item should normally be `in-progress`.
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 | R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
-| R07 | in progress | ARCH-0113 and the canonical Entity contract define the target. R07-01 through R07-04 passed their complete closures. Canonical Lifecycle is the next bounded child. |
+| R07 | in progress | R07-01 through R07-05 passed their complete closures. Typed capability substrate is the next bounded child. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-15 | R07-05 | Persistence lifecycle behavior lived in a process-static registry above Data, so direct Data, cache short-circuits, Patch, generated REST/MCP, repeated hosts, and batch/transaction timing could disagree. The same `Events` noun also obscured the future domain-occurrence intent. | Replace it without an alias by host-owned `Entity.Lifecycle` declarations in `AddKoan(...)`; make one outer RepositoryFacade the unavoidable boundary; place decorators inside; delete Setup/faux batch state; lower Patch and soft-delete batch truthfully; report plans in shared facts. Full affected regression, Packaging 54/54, Release build, docs, diff, and privacy gates pass. |
 | 2026-07-15 | R07-04 | The exact public-release ratchet passed all eight legs from clean commit `50002c262` in 24 minutes 33 seconds. The three prior aggregate-only Jobs failures did not recur, Couchbase completed without the earlier node-readiness failure, and no hang timeout fired. The console emits per-project VSTest summaries but retains no machine-readable aggregate count. | Mark R07-04 passed. No package, release, tag, push, or remote mutation occurred. Keep the successful runner unchanged; defer persisted aggregate certification evidence to PMC-020 and open canonical Lifecycle next. |
 | 2026-07-15 | R07-04 | The clean exact ratchet completed in 14 minutes 35 seconds but unrestricted solution-project fan-out ran many heavyweight providers together. Its only failures were three Jobs timing/concurrency facts on SQLite, PostgreSQL, and SQL Server; each passes alone 1/1 in 5, 2, and 2 seconds respectively. The runner also omitted the five-minute VSTest hang policy already recorded in R04. | Keep Jobs behavior and assertions unchanged. Bound certification to two concurrent test projects, terminate an inactive test host after five minutes without dump bloat, and pin both policies in `ReleaseWorkflowContractTests`. Script parsing, the policy contract, and an exact-argument test-host smoke pass; reserve the next complete ratchet for the R07-04 certification boundary. |
 | 2026-07-15 | R07-04 | Mongo's 67/68 red encoded a removed direct Zen Garden shortcut, while Aspire and explicit configuration shared one priority and the sole custom discovery adapter could replace the complete candidate pipeline. This exposed the broader rule: compatibility may be declared by an adapter, but an optional capability layer exists only when its engine activates it. | Accept ARCH-0114. Make the shared discovery pipeline non-replaceable; retain narrow topology/normalization/health hooks; normalize explicit, environment, automatic, host, and loopback priorities; treat `auto` as delegation rather than an endpoint; let Zen Garden contribute only when active; and emit declared/active/selected explanations. Core Unit passes 112/112 and Mongo 70/70. Couchbase builds clean plus Docker-free 9/9; its full Testcontainers node failed to become ready in two five-minute attempts, so 17/17 remains an explicit aggregate recheck rather than a false pass. |

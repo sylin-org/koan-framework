@@ -75,6 +75,27 @@ public sealed class KoanCompositionBuilder
         if (ordered.Length > 0) _capabilities[owner] = ordered;
     }
 
+    /// <summary>Record an inspectable host-composition observation that is not a provider election.</summary>
+    public void AddObservation(
+        string code,
+        string subject,
+        string summary,
+        string reasonCode,
+        string? source = null)
+    {
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(subject)) return;
+        AddFact(KoanFact.Create(
+            code,
+            KoanFactKind.Discovery,
+            KoanFactState.Observed,
+            subject,
+            summary,
+            reasonCode,
+            null,
+            source ?? "composition",
+            subject));
+    }
+
     /// <summary>Record a Koan-namespaced configuration KEY consumed. Never pass a value.</summary>
     public void AddConfigKey(string key)
     {

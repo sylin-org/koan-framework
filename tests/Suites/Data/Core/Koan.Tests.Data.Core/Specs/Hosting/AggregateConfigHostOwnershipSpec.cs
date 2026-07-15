@@ -23,7 +23,8 @@ public sealed class AggregateConfigHostOwnershipSpec
             firstRepository = firstConfig.Repository;
 
             firstFactory.CreateCalls.Should().Be(1);
-            firstFactory.LastServices.Should().BeSameAs(first.Services);
+            firstFactory.LastServices!.GetRequiredService<IDataService>()
+                .Should().BeSameAs(first.Services.GetRequiredService<IDataService>());
         }
 
         var secondFactory = new RecordingAdapterFactory();
@@ -35,7 +36,8 @@ public sealed class AggregateConfigHostOwnershipSpec
         secondConfig.Should().NotBeSameAs(firstConfig);
         secondRepository.Should().NotBeSameAs(firstRepository);
         secondFactory.CreateCalls.Should().Be(1);
-        secondFactory.LastServices.Should().BeSameAs(second.Services);
+        secondFactory.LastServices!.GetRequiredService<IDataService>()
+            .Should().BeSameAs(second.Services.GetRequiredService<IDataService>());
     }
 
     [Fact]
@@ -63,8 +65,10 @@ public sealed class AggregateConfigHostOwnershipSpec
         resolutions[0].Repository.Should().NotBeSameAs(resolutions[1].Repository);
         firstFactory.CreateCalls.Should().Be(1);
         secondFactory.CreateCalls.Should().Be(1);
-        firstFactory.LastServices.Should().BeSameAs(first.Services);
-        secondFactory.LastServices.Should().BeSameAs(second.Services);
+        firstFactory.LastServices!.GetRequiredService<IDataService>()
+            .Should().BeSameAs(first.Services.GetRequiredService<IDataService>());
+        secondFactory.LastServices!.GetRequiredService<IDataService>()
+            .Should().BeSameAs(second.Services.GetRequiredService<IDataService>());
     }
 
     [Fact]

@@ -5,6 +5,12 @@
 > their module-owned facade/value provider; Data does not own cross-pillar slices or durable carriage.
 > References below to ARCH-0097 typed slices describe the historical implementation that
 > [ARCH-0113](ARCH-0113-entity-capability-communication.md) replaced.
+>
+> **R07-05 boundary amendment:** `RepositoryFacade` is now the outer application-facing Data
+> boundary; provider/module decorators, including cache, sit inside it. Managed cache-key partitioning
+> remains required for keyed lookup isolation, but an early-returning decorator can no longer bypass
+> Lifecycle, transforms, guards, or Data isolation. Historical wrap-order statements below describe
+> the pre-R07-05 architecture.
 
 **Status**: Proposed (2026-06-22) — *revised twice after adversarial review; this version adopts the **descriptor-not-callback** model, **consumes ARCH-0096** for the Name stage, **drops the Key stage** (cache-key composition is a cache-pillar concern), and folds in the second-review corrections.*
 > ⚠ **Realigned by [ARCH-0099](ARCH-0099-tenancy-realignment.md) (2026-06-22):** §1's *"schema-per-tenant (4a) is NOT a name particle — it is a schema qualifier; name-particles reserved for partition suffixes"* is **superseded**. Tenant storage isolation is the **per-adapter native container** (DATA-0094's model): a **leading container particle by tenant id** on name-encoding stores (relational table / Mongo collection / Redis key / Json dir), or the adapter's native scope/database/schema where it has one. The empirical objection (the `.` flattens; the composer was append-only) is resolved — the composer now has positions (ARCH-0096/`a46c11fc`); per-adapter rendering handles the flatten. The "tenant never enters the table-name **spine**" rule still holds (leading namespace ≠ spine).

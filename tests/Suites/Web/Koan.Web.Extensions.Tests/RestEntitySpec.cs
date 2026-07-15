@@ -70,6 +70,17 @@ public sealed class RestEntitySpec
         (await Client.GetAsync("/api/cog")).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    [Fact]
+    public async Task Generated_REST_CRUD_cannot_bypass_the_Data_lifecycle()
+    {
+        var create = await Client.PostAsJsonAsync("/api/lifecycle-widget", new { id = "lw-1", name = "koan" });
+        create.IsSuccessStatusCode.Should().BeTrue(await create.Content.ReadAsStringAsync());
+
+        var byId = await Client.GetFromJsonAsync<JsonElement>("/api/lifecycle-widget/lw-1");
+        byId.GetProperty("name").GetString().Should().Be("KOAN!",
+            "the generated endpoint crosses the same before-upsert and after-load boundary as Entity/Data calls");
+    }
+
     private static string? IdOf(JsonElement e)
         => e.TryGetProperty("id", out var i) ? i.GetString() : null;
 

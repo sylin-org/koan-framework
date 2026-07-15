@@ -1,6 +1,5 @@
 ﻿using Koan.Data.Abstractions;
 using Koan.Data.Core;
-using Koan.Data.Core.Events;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Relationships;
 using System;
@@ -24,11 +23,6 @@ public enum SensorCapabilities
 // using Entity<Sensor, string> means the serial IS the ID - no separate lookup needed!
 public class Sensor : Entity<Sensor, string>
 {
-    static Sensor()  // runs once when the type loads - neat place for setup
-    {
-        ConfigureLifecycle();
-    }
-
     // Serial returns Id - keeps API contract simple (frontend expects 'serial' field)
     public string Serial => Id;
 
@@ -68,9 +62,9 @@ public class Sensor : Entity<Sensor, string>
         return await sensor.Save(ct);  // Save() works on both Entity<T> and Entity<T,K>
     }
 
-    private static void ConfigureLifecycle()
+    internal static void ConfigureLifecycle()
     {
-        Sensor.Events.AfterUpsert(async ctx =>
+        Sensor.Lifecycle.AfterUpsert(async ctx =>
         {
             var current = ctx.Current;
             var ct = ctx.CancellationToken;

@@ -31,6 +31,20 @@ dotnet add package Sylin.Koan.Data.Core
   not opaque driver buffers. No public cursor or resume-token API exists.
 - If a first-class static isn’t available, you can fall back to the generic facade (second-class): `Data<TEntity, TKey>.Query(...)`.
 
+Host-owned persistence policy composes beside the normal zero-configuration bootstrap:
+
+```csharp
+services.AddKoan(() =>
+    Item.Lifecycle.BeforeUpsert(context =>
+        context.Current.Price < 0
+            ? context.Cancel("Price cannot be negative.", "item.price")
+            : context.Proceed()));
+```
+
+The same Lifecycle boundary governs Entity/Data calls and generated REST/MCP entity operations. See
+`/docs/reference/data/entity-lifecycle.md` for phases, bulk/transaction semantics, and deliberate
+bypasses.
+
 Child relationships are strict by default. Native and in-memory providers execute directly; a
 scan-backed provider fails with a corrective `RelationshipQueryRejectedException` unless the call
 chooses a finite budget:

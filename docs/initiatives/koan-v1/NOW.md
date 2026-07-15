@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 through R07-04 passed; canonical Lifecycle is next
+  scope: R07-01 through R07-05 passed; typed capability substrate is next
 ---
 
 # Koan V1 reorganization current handoff
@@ -48,8 +48,10 @@ Replace this file at every handoff. It is a restart point, not a diary.
   pins both bounds. The final exact ratchet passed all eight legs from clean commit `50002c262` in 24
   minutes 33 seconds. The three prior aggregate-only Jobs failures did not recur, Couchbase completed
   without its earlier node-readiness failure, and no hang timeout fired.
-- Lifecycle remains the next semantic clean 0.18 public break. Retain the no-alias greenfield decision
-  and keep Communication/Pipeline work out of the release-foundation slice.
+- [R07-05](work-items/r07/R07-05-canonical-lifecycle.md) passed. Host-owned `Entity.Lifecycle`, one
+  outer Data boundary, consumer migrations, runtime facts, generated REST/MCP parity, affected
+  regression, automatic lineage, docs, and privacy gates are green. The old persistence `Events`
+  implementation has no alias.
 - Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -133,7 +135,8 @@ await order.Transport.Send(ct);
 Keep Core facts/capabilities, C# 14 Entity facets, Jobs' ledger/context-safe coalescing, bounded
 relationship negotiation, and the carrier's fail-closed behavior.
 
-Move ambient typed state/carriers from Data to Core. Rename persistence `Events` to `Lifecycle`.
+Ambient typed state/carriers have moved from Data to Core. Persistence `Events` has been replaced by
+host-owned `Lifecycle`.
 Rebuild Messaging as Communication, Data streaming, lifecycle invocation, InMemory, and RabbitMQ.
 Absorb only cardinality normalization from Pipeline into Data.Core, plus Jobs wake and Cache coherence
 transport into their correct internal seams. Delete broad arbitrary-class
@@ -147,7 +150,7 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
 2. R07-02: genuine provider-bounded streaming beneath the existing Entity surface. **Passed.**
 3. Automate the breaking package closure. **Passed as R07-03.**
 4. Restore the exact public-release ratchet without exclusions. **Passed as R07-04.**
-5. Rebuild canonical host-owned Lifecycle as a clean 0.18 wave. **Next.**
+5. Rebuild canonical host-owned Lifecycle as a clean 0.18 wave. **Passed as R07-05.**
 6. Minimal Data.Core Entity-cardinality adapter, pillar-owned execution, and deletion of the two real
    public Pipeline uses.
 7. Faithful local Transport under `AddKoan()`.
@@ -208,13 +211,17 @@ Only the next slice has a detailed child card. Do not open broker breadth before
   source-isolated memory databases, lazy directory creation, and deterministic disposal. SQLite passes
   35/35; Data.Core 349/349; Core Unit 112/112; JSON 20/20; Data axes integration 18/18; Web SQLite 49/49;
   Tenancy 110/110; Jobs core 77/77; and Jobs SQLite 79/79 on repeated and simultaneous complete runs.
+- R07-05 passes its complete closure: Data.Core 347/347; Data.AI 84/84; Web 111/111; MCP 75/75;
+  Identity 114/114; OpenGraph 38/38; SoftDelete 9/9; Backup 7/7; Cache 14/14; Entity language
+  11/11; Core Unit 112/112; Canon 35/35 + 6/6; Packaging 54/54. Release build has 0 errors,
+  docs lint has 0 errors, and examples/skills/blueprint/surface/diff/privacy gates pass.
 
 ## Next safe action
 
-Open the bounded canonical Lifecycle child. Inventory the current Data lifecycle `Events` surface,
-host ownership, bypasses, reverse dependents, and the migration/deletion boundary before production
-changes. Keep Communication Events, Transport, routers, Pipeline work, and Messaging compatibility out
-of this slice; they follow only after the Data-owned lifecycle contract is coherent and green.
+Open the bounded typed capability substrate child with fresh exploration. Inventory the two live
+public Pipeline consumers and the smallest scalar/set/stream cardinality normalization Data.Core must
+own; each pillar must retain its own execution and outcomes. Do not mix Transport, Events, brokers, or
+Messaging compatibility into that substrate slice.
 
 ## Repository boundary
 

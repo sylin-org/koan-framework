@@ -1,6 +1,6 @@
 ﻿using Koan.Data.Abstractions;
 using Koan.Data.Core;
-using Koan.Data.Core.Events;
+using Koan.Data.Core.Lifecycle;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Relationships;
 using System.ComponentModel.DataAnnotations;
@@ -10,11 +10,6 @@ namespace g1c1.GardenCoop.Models;
 
 public class Reading : Entity<Reading>  // inheriting from Entity<Reading> gives me auto GUID v7 for Id
 {
-    static Reading()  // runs once when the type loads
-    {
-        ConfigureLifecycle();
-    }
-
     // the Pi can send "sensorSerial" instead of looking up the GUID - we'll resolve it
     public string? SensorSerial { get; set; }
 
@@ -41,18 +36,15 @@ public class Reading : Entity<Reading>  // inheriting from Entity<Reading> gives
             .ToArray();
     }
 
-    private static void ConfigureLifecycle()
+    internal static void ConfigureLifecycle()
     {
-        Reading.Events
-            .Setup(ctx =>
+        Reading.Lifecycle
+            .BeforeUpsert(async ctx =>
             {
                 // let's prevent changes to most things, but allow setting the IDs we resolve
                 ctx.ProtectAll();
                 ctx.AllowMutation(nameof(Reading.SensorId));  // we set this from the serial
                 ctx.AllowMutation(nameof(Reading.PlotId));    // we copy this from the sensor
-            })
-            .BeforeUpsert(async ctx =>
-            {
                 var reading = ctx.Current;
                 var ct = ctx.CancellationToken;
 
@@ -76,7 +68,7 @@ public class Reading : Entity<Reading>  // inheriting from Entity<Reading> gives
                     reading.PlotId = sensor.PlotId;  // might be null if sensor not bound to a plot yet
                 }
 
-                return EntityEventResult.Proceed();  // BeforeUpsert needs to return a result
+                return EntityLifecycleResult.Proceed();
             });
     }
 }

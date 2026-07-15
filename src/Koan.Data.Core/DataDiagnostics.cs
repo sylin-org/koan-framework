@@ -1,6 +1,6 @@
 namespace Koan.Data.Core;
 
-internal sealed class DataDiagnostics : IDataDiagnostics
+internal sealed class DataDiagnostics(IEnumerable<Lifecycle.IEntityLifecyclePlan> lifecyclePlans) : IDataDiagnostics
 {
     private readonly System.Collections.Concurrent.ConcurrentDictionary<
         (string EntityType, string KeyType),
@@ -19,6 +19,18 @@ internal sealed class DataDiagnostics : IDataDiagnostics
         _participations.Values
             .OrderBy(info => info.Provider, StringComparer.OrdinalIgnoreCase)
             .ThenBy(info => info.Source, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    public IReadOnlyList<Lifecycle.EntityLifecycleInfo> GetLifecyclePlansSnapshot() =>
+        lifecyclePlans
+            .Select(plan =>
+            {
+                plan.Freeze();
+                return new Lifecycle.EntityLifecycleInfo(
+                    plan.EntityType.FullName ?? plan.EntityType.Name,
+                    plan.HandlerCounts);
+            })
+            .OrderBy(info => info.EntityType, StringComparer.Ordinal)
             .ToArray();
 
     internal void Observe(EntityConfigInfo config) =>

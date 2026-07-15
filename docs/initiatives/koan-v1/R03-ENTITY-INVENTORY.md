@@ -25,7 +25,7 @@ descriptive, not an endorsement. The assessed snapshot is
 - an identity-bearing base type (`Id`);
 - an Active Record-style static data facade;
 - an instance persistence and relationship facade;
-- a global lifecycle-registration point (`Entity.Events`);
+- a host-owned lifecycle-composition point (`Entity.Lifecycle`);
 - a type-level cache facade, even when the full cache module is absent;
 - a host/service-locator bridge through `AppHost.Current` and cached static metadata.
 
@@ -42,7 +42,7 @@ semantic role.
 | Persistence | `todo.Save()`, `Upsert`, `Remove`, bulk operations, patch | Entity plus `AggregateExtensions` | intrinsic persistence facet, with duplicate aliases and unsafe broad overloads |
 | Data movement | `Todo.Copy/Move/Mirror`, `todo.MoveToPartition` | Entity and data-core extension | operational/provider facet; not ordinary entity behavior |
 | Relationships | `GetParent`, `GetChildren`, `GetRelatives`, collection `Relatives` | Entity and relationship extensions | entity-centered, but current execution can hide full scans |
-| Lifecycle | `Todo.Events.BeforeUpsert/AfterRemove/...` | static per-generic registry | entity-centered hook vocabulary; registration/lifetime is host-global |
+| Lifecycle | `Todo.Lifecycle.BeforeUpsert/AfterRemove/...` | host-owned composition plan | entity-centered persistence hooks; registration and execution are owned by the exact host |
 | Context | `EntityContext.Source/Adapter/Partition/Transaction`, cache behavior, typed slices | static AsyncLocal carrier | operation scope and infrastructure control plane mixed together |
 | Cache | `[Cacheable]`, `todo.Uncache()`, `Todo.Cache.Flush()` | cache module plus a Data.Core partial | entity-centered policy/instance invalidation; type facade leaks without module |
 | AI/vector | `[Embedding]`, `todo.FindSimilar()`, `SemanticSearch<Todo>()` | Data.AI extensions | `FindSimilar` is entity-centered; type search lacks a coherent Entity facet |
@@ -57,7 +57,7 @@ semantic role.
 
 The base type currently exposes these families directly:
 
-- lifecycle: `Events`;
+- lifecycle: `Lifecycle` during host composition;
 - reads: `Get`, `All`, `Query`, `QueryRaw`, `AllStream`, `QueryStream`;
 - windows/counts: `FirstPage`, `Page`, `Count.Exact/Fast/Optimized/Where/Query/Partition`;
 - writes: `Upsert`, `UpsertIfChanged`, `UpsertMany`, `Remove`, `RemoveByQuery`, `RemoveAll`,
@@ -117,11 +117,11 @@ are expert escape hatches and should not define the default business vocabulary.
 AsyncLocal API also needs explicit capture/suppress/restore and host-isolation rules for jobs, agents,
 parallel tests, and background dispatch.
 
-[`EntityEventContext<TEntity>`](../../../src/Koan.Data.Core/Events/EntityEventContext.cs) provides current
-value, lazy prior value, operation state, cancellation, protection, and cancel/proceed results. The
-hook grammar is useful, but the registry is static per closed generic type. Registration ownership,
-ordering, idempotence, removal, host disposal, and the distinction among validation hooks, domain
-events, integration events, and cache/index projections are not yet one explicit contract.
+At inventory time, the former `EntityEventContext<TEntity>` provided current value, lazy prior value,
+operation state, cancellation, protection, and cancel/proceed results, but its registry was static per
+closed generic type. R07-05 replaced that implementation with the host-owned
+[`EntityLifecycleContext<TEntity>`](../../../src/Koan.Data.Core/Lifecycle/EntityLifecycleContext.cs)
+and separated persistence Lifecycle from future domain Events/Transport intent.
 
 ## Concrete semantic hazards
 

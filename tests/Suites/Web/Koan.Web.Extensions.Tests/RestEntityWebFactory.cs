@@ -55,7 +55,13 @@ public sealed class RestEntityWebFactory : IAsyncLifetime
                 web.ConfigureServices(services =>
                 {
                     AppHost.Current = null;
-                    services.AddKoan();
+                    services.AddKoan(() => LifecycleWidget.Lifecycle
+                        .BeforeUpsert(ctx =>
+                        {
+                            ctx.Current.Name = ctx.Current.Name.ToUpperInvariant();
+                            return ctx.Proceed();
+                        })
+                        .AfterLoad(ctx => ctx.Current.Name += "!"));
                     services.AddKoanControllersFrom<CogController>();
                     // SEC-0004 Slice B/C: register the realizations (belt-and-suspenders vs discovery in the test assembly).
                     services.AddScoped<EntityAccess<Memo>, MemoAccess>();

@@ -30,6 +30,28 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Adds Koan and declares host-owned capability behavior in the same composition.
+    /// </summary>
+    /// <remarks>
+    /// The parameterless overload remains the complete zero-configuration bootstrap. Use this
+    /// overload only when the application has business-specific declarations such as
+    /// <c>Order.Lifecycle.BeforeUpsert(...)</c>.
+    /// </remarks>
+    public static IServiceCollection AddKoan(this IServiceCollection services, Action configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        services.AddKoan();
+        using (Composition.KoanCompositionScope.Enter(services))
+        {
+            configure();
+        }
+
+        return services;
+    }
+
     public static IServiceCollection AddKoanCore(this IServiceCollection services)
     {
         CorePillarManifest.EnsureRegistered();

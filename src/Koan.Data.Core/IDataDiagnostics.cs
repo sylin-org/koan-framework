@@ -8,4 +8,7 @@ public interface IDataDiagnostics
     // Returns the adapters and logical sources actually requested through this ServiceProvider.
     // The default preserves compatibility for third-party diagnostic implementations.
     IReadOnlyList<DataAdapterParticipationInfo> GetAdapterParticipationsSnapshot() => [];
+
+    /// <summary>Returns lifecycle behavior declared by this host composition.</summary>
+    IReadOnlyList<Lifecycle.EntityLifecycleInfo> GetLifecyclePlansSnapshot() => [];
 }

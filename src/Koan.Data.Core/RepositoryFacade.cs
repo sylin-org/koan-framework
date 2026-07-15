@@ -8,6 +8,7 @@ using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Axes;
 using Koan.Data.Core.Metadata;
 using Koan.Data.Core.Pipeline;
+using Koan.Data.Core.Lifecycle;
 
 namespace Koan.Data.Core;
 
@@ -15,6 +16,7 @@ namespace Koan.Data.Core;
 /// Adds cross-cutting behaviors on top of an underlying repository:
 /// - Ensures identifiers for all upserts (single, many, batch)
 /// - Auto-updates [Timestamp] fields on save operations
+/// - Owns host-composed Entity Lifecycle around materialization, upsert, and removal
 /// - Advertises query/write capabilities
 /// - Bridges the structured query (<see cref="IQueryRepository{TEntity,TKey}"/>) and raw query
 ///   (<see cref="IRawQueryRepository{TEntity,TKey}"/>) surfaces of the inner adapter
@@ -24,6 +26,8 @@ namespace Koan.Data.Core;
 ///   stamps the managed value on writes (the inner adapter persists + verifies it), AND-folds a managed predicate
 ///   into reads, lowers key-ops to managed-scoped queries (IDOR), scopes RemoveAll/DeleteAll, and fails closed on
 ///   the paths the managed predicate cannot cover (raw / conditional-replace / a non-isolating adapter).
+/// Provider/module decorators sit inside this facade. This is the one application-facing Data boundary,
+/// so an inner cache hit or specialized provider path cannot bypass these semantics.
 /// </summary>
 internal sealed class RepositoryFacade<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
@@ -49,8 +53,13 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     private readonly FilterSupport _filterCaps;
     private readonly bool _skipReadPushabilityCheck;
     private readonly OperationOverrideDescriptor? _deleteOverride;
+    private readonly EntityLifecyclePlan<TEntity, TKey>? _lifecycle;
 
-    public RepositoryFacade(IDataRepository<TEntity, TKey> inner, IStorageGuard[]? guards = null, IReadFilterContributor[]? readContributors = null)
+    public RepositoryFacade(
+        IDataRepository<TEntity, TKey> inner,
+        IStorageGuard[]? guards = null,
+        IReadFilterContributor[]? readContributors = null,
+        EntityLifecyclePlan<TEntity, TKey>? lifecycle = null)
     {
         _inner = inner;
         _guards = guards ?? Array.Empty<IStorageGuard>();
@@ -77,6 +86,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         // The delete operation-override (soft-delete) is a per-(type) constant — registered boot-time, AppliesTo is a
         // static predicate — so resolve it ONCE here (mirrors _managed), not per delete (no per-op registry lock).
         _deleteOverride = OperationOverrideRegistry.ForDelete(typeof(TEntity));
+        _lifecycle = lifecycle;
     }
 
     private bool HasNonDefaultReadContributor()
@@ -319,26 +329,55 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         await _inner.EnsureReady(ct);
     }
 
+    // Raw facade reads used by lifecycle Prior/remove preparation. They retain every Data-owned
+    // guard, isolation, and field-transform decision already established by the caller, but do not
+    // recursively emit a Load lifecycle while another lifecycle operation is in progress.
+    private async Task<TEntity?> ReadOne(TKey id, CancellationToken ct)
+    {
+        var managed = ReadScopeFilter();
+        if (managed is null) return Reverse(await _inner.Get(id, ct));
+        var result = await RequireQuery().Query(ScopedById(id, managed), ct);
+        return Reverse(result.Items.Count > 0 ? result.Items[0] : null);
+    }
+
+    private async Task<IReadOnlyList<TEntity?>> ReadMany(IReadOnlyList<TKey> ids, CancellationToken ct)
+    {
+        var managed = ReadScopeFilter();
+        if (managed is null) return Reverse(await _inner.GetMany(ids, ct));
+        var result = await RequireQuery().Query(ScopedByIds(ids, managed), ct);
+        var byId = new Dictionary<TKey, TEntity>();
+        foreach (var entity in result.Items) byId[entity.Id] = entity;
+        return Reverse(ids.Select(id => byId.TryGetValue(id, out var entity) ? entity : null).ToList());
+    }
+
+    private async Task ApplyLoadLifecycle(IReadOnlyList<TEntity> entities, CancellationToken ct)
+    {
+        if (_lifecycle is not { HasLoad: true }) return;
+        foreach (var entity in entities)
+        {
+            ct.ThrowIfCancellationRequested();
+            await _lifecycle.ApplyLoad(entity, ct);
+        }
+    }
+
     public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
         await Guard(ct);
-        var managed = ReadScopeFilter();
-        if (managed is null) return Reverse(await _inner.Get(id, ct));
-        // IDOR defence: a key read is lowered to a managed-scoped query; a wrong-scope row returns null = not-found.
-        var res = await RequireQuery().Query(ScopedById(id, managed), ct);
-        return Reverse(res.Items.Count > 0 ? res.Items[0] : null);
+        var entity = await ReadOne(id, ct);
+        if (entity is not null && _lifecycle is { HasLoad: true })
+            await _lifecycle.ApplyLoad(entity, ct);
+        return entity;
     }
 
     public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         await Guard(ct);
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
-        var managed = ReadScopeFilter();
-        if (managed is null) return Reverse(await _inner.GetMany(idList, ct));
-        var res = await RequireQuery().Query(ScopedByIds(idList, managed), ct);
-        var byId = new Dictionary<TKey, TEntity>();
-        foreach (var e in res.Items) byId[e.Id] = e;          // owned subset
-        return Reverse(idList.Select(id => byId.TryGetValue(id, out var e) ? e : (TEntity?)null).ToList());
+        var entities = await ReadMany(idList, ct);
+        if (_lifecycle is { HasLoad: true })
+            foreach (var entity in entities)
+                if (entity is not null) await _lifecycle.ApplyLoad(entity, ct);
+        return entities;
     }
 
     // --- structured query ---
@@ -347,7 +386,9 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         var managed = ReadScopeFilter();
-        return Reverse(await RequireQuery().Query(managed is null ? query : ApplyManaged(query, managed), ct));
+        var result = Reverse(await RequireQuery().Query(managed is null ? query : ApplyManaged(query, managed), ct));
+        await ApplyLoadLifecycle(result.Items, ct);
+        return result;
     }
 
     public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
@@ -376,6 +417,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             foreach (var entity in result.Items)
                 _fieldTransform.ApplyOnRead(entity);
         }
+        await ApplyLoadLifecycle(result.Items, ct);
         return result;
     }
 
@@ -392,9 +434,11 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         GuardRawAgainstActiveScope();
-        return _inner is IRawQueryRepository<TEntity, TKey> raw
-            ? Reverse(await raw.QueryRaw(query, parameters, shaping, ct))   // raw values come back protected; restore plaintext
-            : throw new NotSupportedException($"The adapter backing {typeof(TEntity).Name} does not support raw queries.");
+        if (_inner is not IRawQueryRepository<TEntity, TKey> raw)
+            throw new NotSupportedException($"The adapter backing {typeof(TEntity).Name} does not support raw queries.");
+        var result = Reverse(await raw.QueryRaw(query, parameters, shaping, ct));
+        await ApplyLoadLifecycle(result.Items, ct);
+        return result;
     }
 
     public async Task<CountResult> CountRaw(string query, object? parameters, CancellationToken ct = default)
@@ -421,23 +465,54 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     // --- writes ---
 
+    private ValueTask<TEntity?> ReadPrior(TEntity entity, CancellationToken ct)
+        => EqualityComparer<TKey>.Default.Equals(entity.Id, default!)
+            ? new ValueTask<TEntity?>((TEntity?)null)
+            : new ValueTask<TEntity?>(ReadOne(entity.Id, ct));
+
+    private async Task<TEntity> PersistPreparedUpsert(TEntity model, CancellationToken ct)
+    {
+        _writePlan.ApplyAll(model);
+        if (!_fieldTransform.HasTransforms) return await PersistUpsert(model, ct);
+        await PersistUpsert(WritePayload(model), ct);
+        return model;
+    }
+
     public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
         await Guard(ct);
-        _writePlan.ApplyAll(model);
-        // Stamp-AND-verify (managed scope): the inner adapter injects the managed values into the record AND adds a
-        // conflict guard so an id-keyed update of a row owned by another scope is rejected (no takeover).
-        if (!_fieldTransform.HasTransforms) return await PersistUpsert(model, ct);
-        // Field transform (ARCH-0098 §0): persist an encrypted CLONE; return the plaintext original (with its
-        // assigned id + timestamp) so the caller's instance is never ciphertext-corrupted.
-        await PersistUpsert(WritePayload(model), ct);
-        return model;
+        if (_lifecycle is not { HasUpsert: true })
+            return await PersistPreparedUpsert(model, ct);
+
+        var context = await _lifecycle.BeginUpsert(model, token => ReadPrior(model, token), ct);
+        var persisted = await PersistPreparedUpsert(context.Current, ct);
+        await _lifecycle.CompleteUpsert(context, persisted);
+        return context.Current;
     }
 
     public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         await Guard(ct);
         var list = models as IList<TEntity> ?? models.ToList();
+        if (_lifecycle is { HasUpsert: true })
+        {
+            // Prepare the complete set before the first write so a domain rejection never creates a
+            // framework-induced partial batch. Provider failures retain their normal non-transactional semantics.
+            var contexts = new List<EntityLifecycleContext<TEntity>>(list.Count);
+            foreach (var model in list)
+            {
+                ct.ThrowIfCancellationRequested();
+                contexts.Add(await _lifecycle.BeginUpsert(model, token => ReadPrior(model, token), ct));
+            }
+
+            var persisted = new List<TEntity>(contexts.Count);
+            foreach (var context in contexts)
+                persisted.Add(await PersistPreparedUpsert(context.Current, ct));
+            for (var i = 0; i < contexts.Count; i++)
+                await _lifecycle.CompleteUpsert(contexts[i], persisted[i]);
+            return persisted.Count;
+        }
+
         foreach (var m in list)
         {
             ct.ThrowIfCancellationRequested();
@@ -455,6 +530,19 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     public async Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
         await Guard(ct);
+        if (_lifecycle is not { HasRemove: true })
+            return await DeleteWithoutLifecycle(id, ct);
+
+        var entity = await ReadOne(id, ct);
+        if (entity is null) return false;
+        var context = await _lifecycle.BeginRemove(entity, ct);
+        var removed = await DeleteWithoutLifecycle(context.Current.Id, ct);
+        if (removed) await _lifecycle.CompleteRemove(context);
+        return removed;
+    }
+
+    private async Task<bool> DeleteWithoutLifecycle(TKey id, CancellationToken ct)
+    {
         var managed = ReadScopeFilter();
         var ov = DeleteOverrideFor(id);   // null when this exact entity is being hard-deleted (target-scoped bypass)
         if (ov is not null)
@@ -478,6 +566,31 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
+        if (_lifecycle is { HasRemove: true })
+            return await DeleteManyWithLifecycle(idList, ct);
+        return await DeleteManyWithoutLifecycle(idList, ct);
+    }
+
+    private async Task<int> DeleteManyWithLifecycle(IReadOnlyList<TKey> ids, CancellationToken ct)
+    {
+        var existing = await ReadMany(ids, ct);
+        var contexts = new List<EntityLifecycleContext<TEntity>>(existing.Count);
+        foreach (var entity in existing)
+        {
+            if (entity is null) continue;
+            contexts.Add(await _lifecycle!.BeginRemove(entity, ct));
+        }
+
+        var completed = new List<EntityLifecycleContext<TEntity>>(contexts.Count);
+        foreach (var context in contexts)
+            if (await DeleteWithoutLifecycle(context.Current.Id, ct)) completed.Add(context);
+        foreach (var context in completed)
+            await _lifecycle!.CompleteRemove(context);
+        return completed.Count;
+    }
+
+    private async Task<int> DeleteManyWithoutLifecycle(IReadOnlyList<TKey> idList, CancellationToken ct)
+    {
         var managed = ReadScopeFilter();
         var ov = _deleteOverride;   // mass delete: no batch hard-delete exists, so the override always applies
         if (ov is not null)
@@ -499,6 +612,12 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         var managed = ReadScopeFilter();
+        if (_lifecycle is { HasRemove: true })
+        {
+            var query = managed is null ? QueryDefinition.All : QueryDefinition.All.Where(managed);
+            var visible = await RequireQuery().Query(query, ct);
+            return await DeleteManyWithLifecycle(visible.Items.Select(entity => entity.Id).ToList(), ct);
+        }
         var ov = _deleteOverride;   // mass delete: no batch hard-delete exists, so the override always applies
         if (ov is not null)
         {
@@ -528,6 +647,12 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         var managed = ReadScopeFilter();
+        if (_lifecycle is { HasRemove: true } && strategy != RemoveStrategy.Fast)
+        {
+            var query = managed is null ? QueryDefinition.All : QueryDefinition.All.Where(managed);
+            var visible = await RequireQuery().Query(query, ct);
+            return await DeleteManyWithLifecycle(visible.Items.Select(entity => entity.Id).ToList(), ct);
+        }
         var ov = _deleteOverride;   // mass delete: no batch hard-delete exists, so the override always applies
         if (ov is not null)
         {
@@ -555,11 +680,21 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             throw new NotSupportedException(
                 $"ConditionalReplaceAsync is not supported for scoped entity '{typeof(TEntity).Name}' under an " +
                 "active scope — the compare-and-set guard cannot carry the isolation predicate. Use Upsert (conflict-aware).");
-        if (_inner is IConditionalWriteRepository<TEntity, TKey> cas)
-            // Field transform (ARCH-0098 Blocker 2): persist an encrypted clone so a CAS write never stores plaintext.
-            // A classified property must NOT appear in the guard (it compares stored ciphertext to caller plaintext).
-            return await cas.ConditionalReplaceAsync(WritePayload(model), guard, ct);
-        throw new NotSupportedException($"The adapter backing {typeof(TEntity).Name} does not support conditional replace.");
+        if (_inner is not IConditionalWriteRepository<TEntity, TKey> cas)
+            throw new NotSupportedException($"The adapter backing {typeof(TEntity).Name} does not support conditional replace.");
+
+        EntityLifecycleContext<TEntity>? context = null;
+        if (_lifecycle is { HasUpsert: true })
+            context = await _lifecycle.BeginUpsert(model, token => ReadPrior(model, token), ct);
+
+        var current = context?.Current ?? model;
+        _writePlan.ApplyAll(current);
+        // Field transform (ARCH-0098 Blocker 2): persist an encrypted clone so a CAS write never stores plaintext.
+        // A classified property must NOT appear in the guard (it compares stored ciphertext to caller plaintext).
+        var replaced = await cas.ConditionalReplaceAsync(WritePayload(current), guard, ct);
+        if (replaced && context is not null)
+            await _lifecycle!.CompleteUpsert(context, current);
+        return replaced;
     }
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new BatchFacade(this);
@@ -591,37 +726,111 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
             await _outer.Guard(ct);
-            // Batch path applies the batch-eligible write-stamps (identity; NOT [Timestamp] — the shipped invariant).
-            foreach (var e in _adds) { ct.ThrowIfCancellationRequested(); _outer._writePlan.ApplyBatch(e); }
-            foreach (var e in _updates) { ct.ThrowIfCancellationRequested(); _outer._writePlan.ApplyBatch(e); }
             if (_mutations.Count != 0)
             {
                 foreach (var (id, mutate) in _mutations)
                 {
                     ct.ThrowIfCancellationRequested();
                     // Managed-scoped load (IDOR): a mutate-by-id never loads (and so never re-stamps) another scope's row.
-                    var current = await _outer.Get(id, ct);
+                    var current = await _outer.ReadOne(id, ct);
                     if (current is not null)
                     {
                         mutate(current);
-                        _outer._writePlan.ApplyBatch(current);
                         _updates.Add(current);
                     }
                 }
             }
 
+            var addContexts = new List<EntityLifecycleContext<TEntity>>(_adds.Count);
+            var updateContexts = new List<EntityLifecycleContext<TEntity>>(_updates.Count);
+            if (_outer._lifecycle is { HasUpsert: true })
+            {
+                foreach (var entity in _adds)
+                    addContexts.Add(await _outer._lifecycle.BeginUpsert(entity, token => _outer.ReadPrior(entity, token), ct));
+                foreach (var entity in _updates)
+                    updateContexts.Add(await _outer._lifecycle.BeginUpsert(entity, token => _outer.ReadPrior(entity, token), ct));
+            }
+
+            var removeContexts = new List<EntityLifecycleContext<TEntity>>(_deletes.Count);
+            if (_outer._lifecycle is { HasRemove: true })
+            {
+                foreach (var id in _deletes)
+                {
+                    var entity = await _outer.ReadOne(id, ct);
+                    if (entity is not null)
+                        removeContexts.Add(await _outer._lifecycle.BeginRemove(entity, ct));
+                }
+            }
+
+            var adds = addContexts.Count == 0 ? _adds : addContexts.Select(context => context.Current).ToList();
+            var updates = updateContexts.Count == 0 ? _updates : updateContexts.Select(context => context.Current).ToList();
+            var deletes = removeContexts.Count == 0 ? _deletes : removeContexts.Select(context => context.Current.Id).ToList();
+
+            // Batch path applies the batch-eligible write-stamps (identity; NOT [Timestamp] — the shipped invariant).
+            foreach (var entity in adds) { ct.ThrowIfCancellationRequested(); _outer._writePlan.ApplyBatch(entity); }
+            foreach (var entity in updates) { ct.ThrowIfCancellationRequested(); _outer._writePlan.ApplyBatch(entity); }
+
             var native = _outer._inner.CreateBatch();
             // Field transform (ARCH-0098 Blocker 1): the native batch persists encrypted CLONES, so a batch write —
             // unlike a [Timestamp] stamp — never lands plaintext at rest. The caller's add/update instances stay plaintext.
-            foreach (var e in _adds) native.Add(_outer.WritePayload(e));
-            foreach (var e in _updates) native.Update(_outer.WritePayload(e));
-            foreach (var id in _deletes) native.Delete(id);
+            foreach (var entity in adds) native.Add(_outer.WritePayload(entity));
+            foreach (var entity in updates) native.Update(_outer.WritePayload(entity));
+
+            // A soft remove is an update, not a native delete. Lower it through the canonical remove path so
+            // operation overrides, managed scope and Lifecycle retain exactly the same meaning as Entity.Remove().
+            // This necessarily spans multiple writes; fail closed when the caller explicitly requires atomicity.
+            var lowerSoftDeletes = _outer._deleteOverride is not null && deletes.Count != 0;
+            if (lowerSoftDeletes && options?.RequireAtomic == true)
+                throw new NotSupportedException(
+                    $"Atomic batch removal is not available for soft-deleted entity '{typeof(TEntity).Name}'. " +
+                    "Use a non-atomic batch or an adapter transaction that explicitly composes the updates.");
+            if (!lowerSoftDeletes)
+                foreach (var id in deletes) native.Delete(id);
 
             var values = _outer.CurrentManagedValues();
-            if (values is null) return await native.Save(options, ct);
-            // Stamp-AND-verify the whole batch under one scope (all rows share the ambient managed value).
-            using (ManagedFieldWriteScope.Enter(values))
-                return await native.Save(options, ct);
+            BatchResult result;
+            if (values is null) result = await native.Save(options, ct);
+            else
+            {
+                // Stamp-AND-verify the whole batch under one scope (all rows share the ambient managed value).
+                using (ManagedFieldWriteScope.Enter(values))
+                    result = await native.Save(options, ct);
+            }
+
+            var completedRemoves = removeContexts;
+            if (lowerSoftDeletes)
+            {
+                completedRemoves = new List<EntityLifecycleContext<TEntity>>(removeContexts.Count);
+                if (removeContexts.Count != 0)
+                {
+                    foreach (var context in removeContexts)
+                        if (await _outer.DeleteWithoutLifecycle(context.Current.Id, ct))
+                            completedRemoves.Add(context);
+                }
+                else
+                {
+                    var deleted = 0;
+                    foreach (var id in deletes)
+                        if (await _outer.DeleteWithoutLifecycle(id, ct))
+                            deleted++;
+                    result = new BatchResult(result.Added, result.Updated, deleted);
+                }
+
+                if (removeContexts.Count != 0)
+                    result = new BatchResult(result.Added, result.Updated, completedRemoves.Count);
+            }
+
+            if (_outer._lifecycle is { } lifecycle)
+            {
+                for (var i = 0; i < addContexts.Count; i++)
+                    await lifecycle.CompleteUpsert(addContexts[i], adds[i]);
+                for (var i = 0; i < updateContexts.Count; i++)
+                    await lifecycle.CompleteUpsert(updateContexts[i], updates[i]);
+                foreach (var context in completedRemoves)
+                    await lifecycle.CompleteRemove(context);
+            }
+
+            return result;
         }
     }
 }

@@ -46,13 +46,18 @@ validation:
 
 ## Entity lifecycle ownership
 
-- `TEntity.Events` declares process-stable, host-independent behavior for an Entity type.
-- Registering an equal delegate repeatedly is idempotent. Distinct handlers retain FIFO order.
-- Handlers must not capture a host service provider, scoped service, configuration snapshot, or other
-  disposable runtime state. Runtime dependencies resolve through the active operation's ambient host.
-- Repeated `AddKoan()` composition may rediscover the same static module hook without multiplying it.
-- Distinct closure instances remain distinct handlers; idempotence is not a substitute for correct
-  host-independent handler design.
+- `TEntity.Lifecycle` declares persistence behavior inside `AddKoan(() => ...)` or Koan module
+  registration. The builder is static syntax; every plan and handler list belongs to one host.
+- The outer `RepositoryFacade` is the single execution boundary. Provider/module decorators sit
+  inside it, so cache hits and generated REST/MCP operations cannot bypass Lifecycle, isolation,
+  transforms, or storage guards.
+- Registering an equal delegate instance repeatedly is idempotent. Distinct handlers retain FIFO
+  order. A plan freezes on first inspection or execution and rejects late mutation correctively.
+- `UpsertMany` preflights before-handlers before the first write. With Lifecycle configured it lowers
+  to truthful point writes; without handlers the adapter's native bulk path remains available.
+- Remove Lifecycle is preserved by `Safe` and `Optimized`; explicit `Fast` is a deliberate bypass.
+- `IDataDiagnostics.GetLifecyclePlansSnapshot()` and `koan.data.lifecycle.selected` facts expose the
+  composed handler inventory without retaining runtime entities or service scopes.
 
 ## Aggregate configuration ownership
 

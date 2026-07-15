@@ -15,13 +15,6 @@ public static class SocialCards
 {
     private static readonly KoanLog.KoanLogScope Log = KoanLog.For("Koan.Web.OpenGraph");
 
-    private static readonly object WireGate = new();
-
-    // Types whose lifecycle hooks are already wired. Deliberately NOT cleared by Reset(): a handler
-    // cannot be removed from EntityEventRegistry, so we wire each type once per process and let the
-    // handler no-op (via SocialCardRegistry.TryGet) whenever the type is currently unregistered.
-    private static readonly HashSet<Type> Wired = new();
-
     /// <summary>
     /// Declare the card for <typeparamref name="T"/>. The route template's single non-catch-all token
     /// is matched against the request path (trailing slug segments are discarded); the resolver maps
@@ -51,22 +44,14 @@ public static class SocialCards
         return builder;
     }
 
-    /// <summary>Clears all registrations. For test isolation; mirrors <c>EntityEventRegistry.Reset</c>.</summary>
+    /// <summary>Clears card declarations. Host-owned lifecycle plans need no process reset.</summary>
     public static void Reset() => SocialCardRegistry.Reset();
 
     private static void WireLifecycle<T>() where T : Entity<T>
     {
-        lock (WireGate)
-        {
-            if (!Wired.Add(typeof(T)))
-            {
-                return;
-            }
-        }
-
         // Warm on upsert: the entity is already in hand, so this costs one write and no read. The
         // handler looks up the current registration at fire time so it survives Reset + re-register.
-        Entity<T, string>.Events.AfterUpsert(ctx =>
+        Entity<T, string>.Lifecycle.AfterUpsert(ctx =>
         {
             if (!SocialCardRegistry.TryGet(typeof(T), out var registration))
             {
@@ -77,7 +62,7 @@ public static class SocialCards
         });
 
         // Evict on remove.
-        Entity<T, string>.Events.AfterRemove(ctx =>
+        Entity<T, string>.Lifecycle.AfterRemove(ctx =>
         {
             if (!SocialCardRegistry.TryGet(typeof(T), out var registration))
             {

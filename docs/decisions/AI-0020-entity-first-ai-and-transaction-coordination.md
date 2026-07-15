@@ -9,6 +9,11 @@ implemented: 2025-11-13
 
 # ADR: Entity-First AI Integration and Transaction Coordination
 
+> **R07-05 implementation amendment (2026-07-15).** Embedding-on-save now declares host-owned
+> `Entity<T>.Lifecycle` behavior during module composition. The former process-static `Entity.Events`
+> registry and executor types referenced below were removed; transaction-deferred after-handler
+> semantics and the entity-first capability remain.
+
 > **Partially superseded (C11, 2026-06-15).** The fluent **pipeline-class surface** introduced
 > here — `Ai.FromText()` / `TextPipeline` / `ImagePipeline` / `PipelineContext` / `IAiPipelineStage`
 > / `StorageResult` (`src/Koan.AI/Pipelines/**`) — shipped inert (internal ctors, no entry point,

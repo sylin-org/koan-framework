@@ -59,8 +59,8 @@ internal sealed class CachedRepository<TEntity, TKey> :
         _keyAccessor = static entity => ((IEntity<TKey>)entity).Id;
         _entityName = CacheKey.EntityTypeName(typeof(TEntity));
         // ARCH-0098 §6: an entity whose stored value is transformed on read (e.g. a [Classified] field encrypted at
-        // rest) must NOT be cached — the cache decorates OUTSIDE the facade, so the cached value would be the
-        // post-reverse PLAINTEXT and would leak into L2. Such types are excluded from caching entirely (read + write).
+        // rest) must NOT be cached. The Data facade owns reversal and remains outside decorators; retaining the
+        // exclusion also prevents transformed provider payloads from becoming a second cache representation.
         // Generic: the cache never names classification; it asks the field-transform registry. Off ⇒ false ⇒ no change.
         //
         // DATA-0106 §5: an entity read-scoped by a NON-equality axis (a viewer-context row-visibility predicate, e.g.
@@ -411,9 +411,10 @@ internal sealed class CachedRepository<TEntity, TKey> :
             return false;
         }
 
-        // DATA-0105 §3.2 — the cache decorator wraps OUTSIDE the RepositoryFacade, so a cache hit never reaches the
-        // managed read-filter; the managed equality scope (tenant/classification) MUST partition the cache key or a
-        // [Cacheable] managed entity serves one scope's row to another. The scope-fold is delegated to the one
+        // DATA-0105 §3.2 — the cache decorator sits inside the Data facade, but a keyed cache lookup still cannot carry
+        // the facade's managed read predicate into its physical lookup. The managed equality scope
+        // (tenant/classification) MUST therefore partition the cache key or a [Cacheable] managed entity can serve one
+        // scope's row to another. The scope-fold is delegated to the one
         // canonical builder (gap B) so the read path and the out-of-band evict sites compose the SAME key. Off / no
         // managed field for this type ⇒ no suffix ⇒ byte-identical key.
         key = new CacheKey(ScopedEntityCacheKey.AppendScope(formatted, typeof(TEntity)));

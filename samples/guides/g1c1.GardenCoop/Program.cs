@@ -1,4 +1,5 @@
 ﻿using g1c1.GardenCoop.Hosting;
+using g1c1.GardenCoop.Automation;
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Web.Extensions;
@@ -17,7 +18,7 @@ builder.ConfigureSampleLogging();
 
 // one line does everything - auto-registration magic!
 // finds all entities, controllers, and services automatically
-builder.Services.AddKoan();
+builder.Services.AddKoan(GardenAutomation.Configure);
 
 var initializers = Koan.Core.Hosting.Registry.KoanRegistry.GetInitializerTypes();
 Console.WriteLine($"Initializers registered: {initializers.Length}");

@@ -93,6 +93,19 @@ await approval.Remove();
 await foreach (var item in Approval.AllStream(batchSize: 1000)) { /* consume */ }
 ```
 
+Business persistence rules stay equally direct and apply to Entity, Data, generated REST, and MCP
+paths. Applications without custom rules keep the parameterless `AddKoan()` above:
+
+```csharp
+builder.Services.AddKoan(() =>
+    Approval.Lifecycle.BeforeUpsert(context =>
+        string.IsNullOrWhiteSpace(context.Current.Subject)
+            ? context.Cancel("An approval needs a subject.", "approval.subject")
+            : context.Proceed()));
+```
+
+The plan is host-owned and appears in Koan's startup/runtime facts; it is not process-static state.
+
 ### 2 · Reference an intent → gain a capability
 
 Adding a package **is** the configuration. Each line below is one package reference and (at

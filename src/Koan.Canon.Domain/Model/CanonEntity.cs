@@ -9,7 +9,7 @@ using Koan.Data.Core.Model;
 namespace Koan.Canon.Domain.Model;
 
 /// <summary>
-/// Base type for canonical aggregates. Extends the Koan entity base while tracking canon metadata and lifecycle.
+/// Base type for canonical aggregates. Extends the Koan entity base while tracking canon metadata and state.
 /// </summary>
 /// <typeparam name="TModel">Concrete canonical entity type.</typeparam>
 public abstract class CanonEntity<TModel> : Entity<TModel>
@@ -44,11 +44,6 @@ public abstract class CanonEntity<TModel> : Entity<TModel>
             _metadata.Touch();
         }
     }
-
-    /// <summary>
-    /// Convenience accessor for the lifecycle component of <see cref="State"/>.
-    /// </summary>
-    public CanonLifecycle Lifecycle => State.Lifecycle;
 
     /// <summary>
     /// Sets the canon state. Prefer helper methods such as <see cref="ApplyState"/> for incremental updates.

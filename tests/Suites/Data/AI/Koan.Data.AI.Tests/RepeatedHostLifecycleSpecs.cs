@@ -3,7 +3,6 @@ using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Data.AI;
 using Koan.Data.Core;
-using Koan.Data.Core.Events;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -93,40 +92,36 @@ public sealed class RepeatedHostLifecycleSpecs
     [Fact]
     public async Task Sequential_hosts_register_one_embedding_lifecycle_handler()
     {
-        EntityEventTestHooks.Reset<RepeatedHostEmbeddingEntity, string>();
         EmbeddingRegistry.RegisterTypes([typeof(RepeatedHostEmbeddingEntity)]);
 
+        var first = await StartHost("memory://lifecycle-handler-host-a");
         try
         {
-            var first = await StartHost("memory://lifecycle-handler-host-a");
-            try
-            {
-                EntityEventTestHooks.GetAfterUpsertHandlerCount<RepeatedHostEmbeddingEntity, string>()
-                    .Should().Be(1);
-            }
-            finally
-            {
-                await first.DisposeAsync();
-            }
-
-            var second = await StartHost("memory://lifecycle-handler-host-b");
-            try
-            {
-                EntityEventTestHooks.GetAfterUpsertHandlerCount<RepeatedHostEmbeddingEntity, string>()
-                    .Should().Be(1, "the same process-stable AI hook must not be appended per host");
-            }
-            finally
-            {
-                await second.DisposeAsync();
-            }
+            LifecycleInfo(first).HandlerCounts["after-upsert"].Should().Be(1);
         }
         finally
         {
-            EntityEventTestHooks.Reset<RepeatedHostEmbeddingEntity, string>();
+            await first.DisposeAsync();
+        }
+
+        var second = await StartHost("memory://lifecycle-handler-host-b");
+        try
+        {
+            LifecycleInfo(second).HandlerCounts["after-upsert"].Should().Be(1,
+                "each host owns one AI lifecycle contribution without process accumulation");
+        }
+        finally
+        {
+            await second.DisposeAsync();
         }
 
         AppHost.Current.Should().BeNull();
     }
+
+    private static Koan.Data.Core.Lifecycle.EntityLifecycleInfo LifecycleInfo(IntegrationHost host)
+        => host.Services.GetRequiredService<IDataDiagnostics>()
+            .GetLifecyclePlansSnapshot()
+            .Single(info => info.EntityType.EndsWith(nameof(RepeatedHostEmbeddingEntity), StringComparison.Ordinal));
 
     private static Task<IntegrationHost> StartHost(string connectionString)
         => KoanIntegrationHost.Configure()

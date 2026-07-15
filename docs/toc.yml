@@ -76,8 +76,8 @@
     - name: Data
       href: reference/data/index.md
       items:
-        - name: Entity Lifecycle Events
-          href: reference/data/entity-lifecycle-events.md
+        - name: Entity Lifecycle
+          href: reference/data/entity-lifecycle.md
         - name: Cache
           href: reference/data/cache.md
     - name: Web

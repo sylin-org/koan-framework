@@ -26,6 +26,14 @@ public sealed class Trinket : Entity<Trinket>
     public string Name { get; set; } = "";
 }
 
+/// <summary>Lifecycle parity probe for the generated REST path.</summary>
+[RestEntity]
+[StorageName("rest_lifecycle_widgets")]
+public sealed class LifecycleWidget : Entity<LifecycleWidget>
+{
+    public string Name { get; set; } = "";
+}
+
 /// <summary>Terse with an explicit route override — CRUD at <c>api/gizmos</c>, not <c>api/gizmo</c>.</summary>
 [RestEntity("api/gizmos")]
 [StorageName("rest_gizmos")]

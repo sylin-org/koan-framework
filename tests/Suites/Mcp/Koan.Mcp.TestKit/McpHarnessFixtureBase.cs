@@ -53,6 +53,9 @@ public abstract class McpHarnessFixtureBase : IAsyncLifetime
     /// <summary>Register entities/controllers/hooks and any extra services under test.</summary>
     protected virtual void ConfigureServices(IServiceCollection services) { }
 
+    /// <summary>Declare host-owned Koan behavior that must be composed inside <c>AddKoan(...)</c>.</summary>
+    protected virtual void ConfigureKoan() { }
+
     /// <summary>Tune the MCP server options (allow/deny lists, exposure overrides, audit, …).</summary>
     protected virtual void ConfigureMcp(McpServerOptions options) { }
 
@@ -67,7 +70,7 @@ public abstract class McpHarnessFixtureBase : IAsyncLifetime
                 web.ConfigureServices(services =>
                 {
                     AppHost.Current = null;
-                    services.AddKoan().AsProxiedApi();
+                    services.AddKoan(ConfigureKoan).AsProxiedApi();
                     services.AddKoanMcp();
                     services.AddKoanWeb();
 

@@ -1,366 +1,170 @@
-using Koan.Data.Core.Events;
+using Koan.Data.Core.Lifecycle;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Transactions;
 using Koan.Tests.Data.Core.Support;
+using Koan.Core.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using DataConstants = Koan.Data.Core.Infrastructure.Constants;
 
 namespace Koan.Tests.Data.Core.Specs.Entity;
 
 public sealed class EntityLifecycleSpec
 {
-    private readonly ITestOutputHelper _output;
-
-    public EntityLifecycleSpec(ITestOutputHelper output)
-    {
-        _output = output ?? throw new ArgumentNullException(nameof(output));
-    }
-
     private static string NewPartition() => $"data-core-lifecycle-{Guid.CreateVersion7():n}";
-
-    private static void ResetHooks(DataCoreRuntimeFixture runtime)
-    {
-        runtime.ResetEntityCaches();
-        EntityEventTestHooks.Reset<LifecycleEntity, string>();
-        TestHooks.ResetDataConfigs();
-    }
 
     [Fact]
     public async Task Before_upsert_cancel_prevents_persistence()
     {
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(configureServices: _ =>
+            LifecycleEntity.Lifecycle.BeforeUpsert(ctx =>
+                ctx.Current.Title.Contains("blocked", StringComparison.OrdinalIgnoreCase)
+                    ? ctx.Cancel("blocked", "title.blocked")
+                    : ctx.Proceed()));
 
-        ResetHooks(runtime);
+        using var partition = runtime.UsePartition(NewPartition());
+        var action = () => LifecycleEntity.Upsert(new LifecycleEntity { Title = "Blocked Draft" });
 
-        LifecycleEntity.Events
-            .BeforeUpsert(c =>
-            {
-                if (c.Current.Title.Contains("blocked", StringComparison.OrdinalIgnoreCase))
-                {
-                    return new ValueTask<EntityEventResult>(c.Cancel("blocked"));
-                }
-
-                return new ValueTask<EntityEventResult>(c.Proceed());
-            });
-
-        var partitionName = NewPartition();
-        using var lease = runtime.UsePartition(partitionName);
-        var blocked = new LifecycleEntity { Title = "Blocked Draft" };
-
-        await Assert.ThrowsAsync<EntityEventCancelledException>(() => LifecycleEntity.Upsert(blocked));
-
-        var all = await LifecycleEntity.All(lease.Partition);
-        all.Should().BeEmpty();
+        var error = await action.Should().ThrowAsync<EntityLifecycleCancelledException>();
+        error.Which.ReasonCode.Should().Be("title.blocked");
+        (await LifecycleEntity.All(partition.Partition)).Should().BeEmpty();
     }
 
     [Fact]
-    public async Task Protect_all_blocks_mutations()
+    public async Task Direct_Data_and_Entity_reads_share_the_same_lifecycle()
     {
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+        var loads = 0;
+        var upserts = 0;
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(configureServices: _ =>
+            LifecycleEntity.Lifecycle
+                .AfterLoad(ctx => { loads++; ctx.Current.Revision++; })
+                .AfterUpsert(_ => upserts++));
 
-        ResetHooks(runtime);
+        using var partition = runtime.UsePartition(NewPartition());
+        var saved = await Data<LifecycleEntity, string>.Upsert(new LifecycleEntity { Title = "canonical" });
+        upserts.Should().Be(1);
 
-        LifecycleEntity.Events
-            .Setup(c =>
+        (await LifecycleEntity.Get(saved.Id))!.Revision.Should().Be(1);
+        (await Data<LifecycleEntity, string>.Query(entity => entity.Id == saved.Id)).Single().Revision.Should().Be(1);
+        loads.Should().Be(2, "key and query materialization use the same Data-owned lifecycle");
+    }
+
+    [Fact]
+    public async Task Prior_and_protection_are_operation_scoped()
+    {
+        string? observedPrior = null;
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(configureServices: _ =>
+            LifecycleEntity.Lifecycle.BeforeUpsert(async ctx =>
             {
-                c.ProtectAll();
-                return ValueTask.CompletedTask;
-            })
-            .AfterUpsert(c =>
+                observedPrior = (await ctx.Prior.Get())?.Title;
+                ctx.Protect(nameof(LifecycleEntity.Title));
+                ctx.Current.Revision++;
+                return ctx.Proceed();
+            }));
+
+        using var partition = runtime.UsePartition(NewPartition());
+        var first = await LifecycleEntity.Upsert(new LifecycleEntity { Title = "v1" });
+        observedPrior.Should().BeNull();
+
+        await LifecycleEntity.Upsert(new LifecycleEntity { Id = first.Id, Title = "v2" });
+        observedPrior.Should().Be("v1");
+    }
+
+    [Fact]
+    public async Task Protected_mutation_fails_before_the_write()
+    {
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(configureServices: _ =>
+            LifecycleEntity.Lifecycle.BeforeUpsert(ctx =>
             {
-                c.Current.Revision++;
-                return ValueTask.CompletedTask;
-            });
+                ctx.ProtectAll();
+                ctx.Current.Title = "changed";
+                return ctx.Proceed();
+            }));
 
-        var entity = new LifecycleEntity { Title = "Immutable" };
-
-        var act = async () => await LifecycleEntity.Upsert(entity);
-        await act.Should().ThrowAsync<InvalidOperationException>()
+        using var partition = runtime.UsePartition(NewPartition());
+        var action = () => LifecycleEntity.Upsert(new LifecycleEntity { Title = "original" });
+        await action.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*protected and cannot be mutated*");
+        (await LifecycleEntity.All()).Should().BeEmpty();
     }
 
     [Fact]
-    public async Task Allow_mutation_permits_whitelisted_changes()
+    public async Task Bulk_rejection_is_preflighted_before_the_first_write()
     {
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(configureServices: _ =>
+            LifecycleEntity.Lifecycle.BeforeUpsert(ctx =>
+                ctx.Current.Title == "blocked" ? ctx.Cancel("blocked") : ctx.Proceed()));
 
-        ResetHooks(runtime);
-        var partitionName = NewPartition();
+        using var partition = runtime.UsePartition(NewPartition());
+        var action = () => Data<LifecycleEntity, string>.UpsertMany([
+            new LifecycleEntity { Title = "allowed" },
+            new LifecycleEntity { Title = "blocked" },
+        ]);
 
-        using (var arrangeLease = runtime.UsePartition(partitionName))
+        await action.Should().ThrowAsync<EntityLifecycleCancelledException>();
+        (await LifecycleEntity.All()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task After_upsert_waits_for_transaction_commit()
+    {
+        var after = 0;
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(configureServices: _ =>
+            LifecycleEntity.Lifecycle.AfterUpsert(_ => after++));
+
+        using var partition = runtime.UsePartition(NewPartition());
+        using (EntityContext.Transaction("lifecycle-commit"))
         {
-            LifecycleEntity.Events
-                .Setup(c =>
-                {
-                    c.Protect(nameof(LifecycleEntity.Title));
-                    c.AllowMutation(nameof(LifecycleEntity.Id));
-                    c.AllowMutation(nameof(LifecycleEntity.Title));
-                    return ValueTask.CompletedTask;
-                })
-                .BeforeUpsert(c =>
-                {
-                    c.Current.Title = "mutated";
-                    return new ValueTask<EntityEventResult>(c.Proceed());
-                });
+            await LifecycleEntity.Upsert(new LifecycleEntity { Title = "deferred" });
+            after.Should().Be(0);
+            await EntityContext.Commit();
+            after.Should().Be(1);
+        }
+    }
+
+    [Fact]
+    public async Task Sequential_hosts_do_not_share_lifecycle_declarations()
+    {
+        var first = 0;
+        await using (var host = await DataCoreRuntimeFixture.CreateAsync(configureServices: _ =>
+                         LifecycleEntity.Lifecycle.AfterUpsert(_ => first++)))
+        {
+            using var partition = host.UsePartition(NewPartition());
+            await LifecycleEntity.Upsert(new LifecycleEntity { Title = "first" });
+            first.Should().Be(1);
         }
 
-        using var lease = runtime.UsePartition(partitionName);
-
-        var entity = new LifecycleEntity { Title = "original" };
-        var saved = await LifecycleEntity.Upsert(entity);
-
-        saved.Title.Should().Be("mutated");
-
-        var persisted = await LifecycleEntity.Get(saved.Id, lease.Partition);
-        persisted?.Title.Should().Be("mutated");
-    }
-
-    [Fact]
-    public async Task Prior_snapshot_exposes_previous_version()
-    {
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
-
-        ResetHooks(runtime);
-
-        var partitionName = NewPartition();
-        using var lease = runtime.UsePartition(partitionName);
-
-        var priorTitles = new List<string?>();
-
-        LifecycleEntity.Events
-            .BeforeUpsert(async c =>
-            {
-                var prior = await c.Prior.Get();
-                priorTitles.Add(prior?.Title);
-                return c.Proceed();
-            });
-
-        var entity = new LifecycleEntity { Title = "v1" };
-        var saved = await LifecycleEntity.Upsert(entity);
-
-        var updated = new LifecycleEntity
+        var second = 0;
+        await using (var host = await DataCoreRuntimeFixture.CreateAsync(configureServices: _ =>
+                         LifecycleEntity.Lifecycle.AfterUpsert(_ => second++)))
         {
-            Id = saved.Id,
-            Title = "v2",
-            Revision = saved.Revision,
-            IsPublished = saved.IsPublished
-        };
-
-        await LifecycleEntity.Upsert(updated);
-
-        priorTitles.Should().BeEquivalentTo(new[] { null, "v1" }, options => options.WithStrictOrdering());
+            using var partition = host.UsePartition(NewPartition());
+            await LifecycleEntity.Upsert(new LifecycleEntity { Title = "second" });
+            second.Should().Be(1);
+            first.Should().Be(1, "the first host's plan is not process state");
+        }
     }
 
     [Fact]
-    public async Task Atomic_batch_cancellation_prevents_partial_removes()
+    public async Task Composed_lifecycle_is_visible_in_the_shared_runtime_facts()
     {
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(configureServices: _ =>
+            LifecycleEntity.Lifecycle
+                .BeforeUpsert(ctx => ctx.Proceed())
+                .AfterUpsert(_ => { }));
 
-        ResetHooks(runtime);
+        var fact = runtime.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts
+            .Single(item => item.Code == DataConstants.Diagnostics.Codes.LifecycleSelected);
 
-        LifecycleEntity.Events
-            .BeforeRemove(c =>
-            {
-                if (c.Current.Title == "Block")
-                {
-                    c.Operation.RequireAtomic();
-                    return new ValueTask<EntityEventResult>(c.Cancel("blocked"));
-                }
-
-                return new ValueTask<EntityEventResult>(c.Proceed());
-            });
-
-        var partitionName = NewPartition();
-        using var lease = runtime.UsePartition(partitionName);
-
-        var keep = await LifecycleEntity.Upsert(new LifecycleEntity { Title = "Keep" });
-        var block = await LifecycleEntity.Upsert(new LifecycleEntity { Title = "Block" });
-
-        var act = async () => await LifecycleEntity.Remove(new[] { keep.Id, block.Id });
-        await act.Should().ThrowAsync<EntityEventBatchCancelledException>();
-
-        var keepPersisted = await LifecycleEntity.Get(keep.Id, lease.Partition);
-        keepPersisted.Should().NotBeNull();
-        keepPersisted!.Title.Should().Be("Keep");
-
-        var blockPersisted = await LifecycleEntity.Get(block.Id, lease.Partition);
-        blockPersisted.Should().NotBeNull();
-        blockPersisted!.Title.Should().Be("Block");
+        fact.Subject.Should().Be("data:lifecycle:lifecycleentity");
+        fact.Summary.Should().Contain("2 persistence lifecycle handler(s)");
     }
 
     [Fact]
-    public async Task Load_pipeline_can_enrich_entities()
+    public void Declaration_outside_composition_fails_correctively()
     {
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
-
-        ResetHooks(runtime);
-
-        var partitionName = NewPartition();
-        using var lease = runtime.UsePartition(partitionName);
-
-        LifecycleEntity.Events
-            .AfterLoad(c =>
-            {
-                c.Current.Revision += 10;
-                return ValueTask.CompletedTask;
-            });
-
-        var saved = await LifecycleEntity.Upsert(new LifecycleEntity { Title = "Load" });
-
-        var originalRevision = saved.Revision;
-        var loaded = await LifecycleEntity.Get(saved.Id, lease.Partition);
-        loaded.Should().NotBeNull();
-        loaded!.Revision.Should().Be(originalRevision + 10);
-    }
-
-    [Fact]
-    public async Task UpsertIfChanged_identical_write_skips_persist_and_events()
-    {
-        var afterUpsertCount = 0;
-
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
-
-        ResetHooks(runtime);
-
-        LifecycleEntity.Events
-            .AfterUpsert(c =>
-            {
-                afterUpsertCount++;
-                return ValueTask.CompletedTask;
-            });
-
-        var partitionName = NewPartition();
-        using var lease = runtime.UsePartition(partitionName);
-
-        var entity = new LifecycleEntity { Title = "Initial" };
-        var saved = await LifecycleEntity.Upsert(entity);
-        afterUpsertCount.Should().Be(1);
-
-        var sameData = new LifecycleEntity
-        {
-            Id = saved.Id,
-            Title = saved.Title,
-            Revision = saved.Revision,
-            IsPublished = saved.IsPublished
-        };
-
-        var written = await LifecycleEntity.UpsertIfChanged(sameData);
-        written.Should().BeFalse("identical data should not be persisted");
-        afterUpsertCount.Should().Be(1, "AfterUpsert must not fire when write is suppressed");
-    }
-
-    [Fact]
-    public async Task UpsertIfChanged_changed_write_persists_and_fires_events()
-    {
-        var afterUpsertCount = 0;
-
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
-
-        ResetHooks(runtime);
-
-        LifecycleEntity.Events
-            .AfterUpsert(c =>
-            {
-                afterUpsertCount++;
-                return ValueTask.CompletedTask;
-            });
-
-        var partitionName = NewPartition();
-        using var lease = runtime.UsePartition(partitionName);
-
-        var entity = new LifecycleEntity { Title = "v1" };
-        var saved = await LifecycleEntity.Upsert(entity);
-        afterUpsertCount.Should().Be(1);
-
-        var updated = new LifecycleEntity
-        {
-            Id = saved.Id,
-            Title = "v2",
-            Revision = saved.Revision,
-            IsPublished = saved.IsPublished
-        };
-
-        var written = await LifecycleEntity.UpsertIfChanged(updated);
-        written.Should().BeTrue("changed data should be persisted");
-        afterUpsertCount.Should().Be(2, "AfterUpsert must fire for a real change");
-
-        var persisted = await LifecycleEntity.Get(saved.Id, lease.Partition);
-        persisted?.Title.Should().Be("v2");
-    }
-
-    [Fact]
-    public async Task UpsertIfChanged_new_entity_always_writes()
-    {
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
-
-        ResetHooks(runtime);
-
-        var partitionName = NewPartition();
-        using var lease = runtime.UsePartition(partitionName);
-
-        var entity = new LifecycleEntity { Title = "Brand New" };
-        var written = await LifecycleEntity.UpsertIfChanged(entity);
-        written.Should().BeTrue("a new entity with no prior always writes");
-
-        var all = await LifecycleEntity.All(lease.Partition);
-        all.Should().ContainSingle(e => e.Title == "Brand New");
-    }
-
-    [Fact]
-    public async Task Upsert_is_unconditional_regardless_of_content()
-    {
-        var afterUpsertCount = 0;
-
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
-
-        ResetHooks(runtime);
-
-        LifecycleEntity.Events
-            .AfterUpsert(c =>
-            {
-                afterUpsertCount++;
-                return ValueTask.CompletedTask;
-            });
-
-        var partitionName = NewPartition();
-        using var lease = runtime.UsePartition(partitionName);
-
-        var entity = new LifecycleEntity { Title = "Stable" };
-        var saved = await LifecycleEntity.Upsert(entity);
-
-        var sameData = new LifecycleEntity
-        {
-            Id = saved.Id,
-            Title = saved.Title,
-            Revision = saved.Revision,
-            IsPublished = saved.IsPublished
-        };
-
-        await LifecycleEntity.Upsert(sameData);
-        afterUpsertCount.Should().Be(2, "plain Upsert always persists and fires events");
-    }
-
-    [Fact]
-    public async Task Registering_the_same_handler_twice_executes_it_once()
-    {
-        var afterUpsertCount = 0;
-
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
-
-        ResetHooks(runtime);
-
-        Func<EntityEventContext<LifecycleEntity>, ValueTask> handler = _ =>
-        {
-            afterUpsertCount++;
-            return ValueTask.CompletedTask;
-        };
-
-        LifecycleEntity.Events
-            .AfterUpsert(handler)
-            .AfterUpsert(handler);
-
-        using var lease = runtime.UsePartition(NewPartition());
-        await LifecycleEntity.Upsert(new LifecycleEntity { Title = "Idempotent" });
-
-        afterUpsertCount.Should().Be(1,
-            "repeatable composition must not multiply the same lifecycle behavior");
+        var action = () => LifecycleEntity.Lifecycle.AfterUpsert(_ => { });
+        action.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Lifecycle*AddKoan*");
     }
 
     private sealed class LifecycleEntity : Entity<LifecycleEntity, string>
@@ -369,7 +173,5 @@ public sealed class EntityLifecycleSpec
         public override string Id { get; set; } = default!;
         public string Title { get; set; } = "";
         public int Revision { get; set; }
-        public bool IsPublished { get; set; }
-        public new static EntityEventsBuilder<LifecycleEntity, string> Events => Entity<LifecycleEntity, string>.Events;
     }
 }

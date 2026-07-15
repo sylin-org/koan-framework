@@ -15,7 +15,7 @@ internal sealed class CardRegistration
     /// <summary>Lazy path: resolve the token to an entity, then project. Null when the entity is not found.</summary>
     public required Func<string, Task<SocialCard?>> ResolveAndProject { get; init; }
 
-    /// <summary>Warm path: project an already-loaded entity (handed to us by the lifecycle event).</summary>
+    /// <summary>Warm path: project an already-loaded entity (handed to us by Lifecycle).</summary>
     public required Func<object, SocialCard> ProjectFromEntity { get; init; }
 
     public string KeyFor(string token) => $"{TypeDiscriminator}:{token}";

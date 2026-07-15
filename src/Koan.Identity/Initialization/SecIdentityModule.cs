@@ -58,6 +58,7 @@ public sealed class SecIdentityModule : KoanModule
         services.TryAddSingleton<Impersonation.ImpersonationService>();
         services.TryAddSingleton<Management.JitGrantService>();
         services.TryAddSingleton<Audit.AuditChain>();
+        Audit.IdentityAuditHooks.Register();
 
         // Replace the in-memory stubs (registered by AddKoanWebAuth) with durable Entity<>-backed stores.
         // Ordered after the auth registrar (see [After]) so Replace finds and supersedes the defaults.
@@ -72,9 +73,6 @@ public sealed class SecIdentityModule : KoanModule
         // Module startup can run alongside another host in tests or embedded compositions. Entity statics must
         // resolve through the provider this invocation was handed without replacing the process-default owner.
         using var hostScope = AppHost.PushScope(services);
-
-        // Layer 1 — audit-by-construction: hook the lifecycle seam once per process so identity mutations self-audit.
-        Audit.IdentityAuditHooks.EnsureRegistered();
 
         var env = services.GetRequiredService<IHostEnvironment>();
         var cfg = services.GetRequiredService<IConfiguration>();

@@ -1,4 +1,5 @@
 using Koan.Data.Core;
+using Koan.Core.Hosting.App;
 using Koan.Media.Web.Routing;
 using Microsoft.Extensions.Logging;
 using S6.SnapVault.Models;
@@ -32,10 +33,12 @@ namespace S6.SnapVault.Initialization;
 /// </summary>
 internal static class PhotoAssetCleanup
 {
-    public static void Register(ILogger logger)
+    public static void Register()
     {
-        PhotoAsset.Events.AfterRemove(async ctx =>
+        PhotoAsset.Lifecycle.AfterRemove(async ctx =>
         {
+            var logger = AppHost.GetRequiredService<ILoggerFactory>("SnapVault photo cleanup")
+                .CreateLogger("SnapVault.PhotoAssetCleanup");
             var photoId = ctx.Current.Id;
             var ct = ctx.CancellationToken;
 

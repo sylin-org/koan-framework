@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using g1c1.GardenCoop.Models;
-using Koan.Data.Core.Events;
 
 namespace g1c1.GardenCoop.Automation;
 
@@ -11,17 +9,17 @@ public static class GardenAutomation
     private const int WindowSize = 8;        // look at last 8 readings
     private const double DryThreshold = 20.0; // below 20% = time to water
 
-    [ModuleInitializer]  // this runs automatically at startup - no wiring needed!
-    public static void Initialize()
+    public static void Configure()
     {
+        Reading.ConfigureLifecycle();
+        Sensor.ConfigureLifecycle();
         ConfigureReadingLifecycle();
         ConfigureReminderLifecycle();
     }
 
     private static void ConfigureReadingLifecycle()
     {
-        Reading.Events
-            .Setup(ctx => ctx.ProtectAll())  // let's prevent changes to things we don't need to change
+        Reading.Lifecycle
             .AfterUpsert(async ctx =>  // every time a reading gets saved, run this
             {
                 var reading = ctx.Current;
@@ -78,13 +76,7 @@ public static class GardenAutomation
 
     private static void ConfigureReminderLifecycle()
     {
-        Reminder.Events
-            .Setup(ctx =>
-            {
-                ctx.ProtectAll();  // lock it down first
-                ctx.AllowMutation(nameof(Reminder.Status));  // except these two fields
-                ctx.AllowMutation(nameof(Reminder.Notes));
-            })
+        Reminder.Lifecycle
             .AfterUpsert(async ctx =>
             {
                 // check if status changed to Active - that's when we'd send notifications

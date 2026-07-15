@@ -60,15 +60,14 @@ public sealed class SnapVaultModule : KoanModule
         // operator-via-carrier / dev-trust anonymous operator), and the ingest/AI jobs run Subject.System() — so a
         // path that reaches an [AccessScoped] read without establishing a subject sees NOTHING rather than everything.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanWebPipelineContributor, SnapVaultSubjectContributor>());
+
+        // §9.7 structural delete-cleanup belongs to the host composition, not mutable process state.
+        PhotoAssetCleanup.Register();
     }
 
     public override async Task Start(IServiceProvider services, CancellationToken ct)
     {
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("SnapVault");
-
-        // §9.7 structural delete-cleanup: register the PhotoAsset AfterRemove hook ONCE so every delete path
-        // (bulk delete, future deprovisioning) evicts cached recipe renders + prunes collection membership.
-        PhotoAssetCleanup.Register(logger);
 
         // ZenGarden model advisor (zero-config model selection). Reads AppHost.Current, which Program.cs sets
         // synchronously before await app.RunAsync() — so it is available by the time Start runs in host startup.

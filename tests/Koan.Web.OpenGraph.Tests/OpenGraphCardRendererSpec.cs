@@ -37,7 +37,7 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
             .WithSetting("Koan:Web:OpenGraph:ShellPath", _shellPath)
             .WithSetting("Koan:Web:OpenGraph:SiteName", "Test Site")
             .WithSetting("Koan:Web:OpenGraph:DefaultImage", "/img/default.png")
-            .ConfigureServices(s => s.AddKoan())
+            .ConfigureServices(s => s.AddKoan(RegisterWorkCard))
             .StartAsync();
 
         _previousAppHost = AppHost.Current;
@@ -78,7 +78,6 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
     [Fact]
     public async Task Matched_route_emits_full_card_for_the_entity()
     {
-        RegisterWorkCard();
         var work = new TestWork { Name = "Parukita Preset", Summary = "A warm cinematic preset.", CoverMediaId = "cover123" };
         await work.Save();
 
@@ -101,7 +100,6 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
     [Fact]
     public async Task Injected_values_are_html_encoded()
     {
-        RegisterWorkCard();
         var work = new TestWork { Name = "<script>alert('xss')</script>", Summary = "safe", CoverMediaId = "c1" };
         await work.Save();
 
@@ -115,7 +113,6 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
     [Fact]
     public async Task Description_truncates_at_the_configured_maximum()
     {
-        RegisterWorkCard();
         var work = new TestWork { Name = "ok", Summary = new string('d', 300), CoverMediaId = "c1" };
         await work.Save();
 
@@ -130,8 +127,6 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
     [Fact]
     public async Task Unknown_id_falls_to_the_default_card_without_error()
     {
-        RegisterWorkCard();
-
         var html = await Renderer.RenderShellAsync(Navigation("/work/does-not-exist"));
 
         html.Should().NotBeNull();
@@ -142,8 +137,6 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
     [Fact]
     public async Task Unmatched_route_falls_to_the_default_card()
     {
-        RegisterWorkCard();
-
         var html = await Renderer.RenderShellAsync(Navigation("/about/contact"));
 
         html.Should().NotBeNull();
@@ -153,7 +146,6 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
     [Fact]
     public async Task Snapshot_is_warmed_on_upsert_and_removed_on_delete()
     {
-        RegisterWorkCard();
         var work = new TestWork { Name = "First", Summary = "s", CoverMediaId = "c1" };
         await work.Save();
 
@@ -172,12 +164,12 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
     [Fact]
     public async Task Cold_snapshot_is_lazily_filled_on_first_request()
     {
-        // Save before registering so the warm hook does not capture it: this exercises lazy fill.
+        // Remove the eager snapshot to exercise the request-time lazy fill path.
         var work = new TestWork { Name = "Cold Start", Summary = "s", CoverMediaId = "c1" };
         await work.Save();
 
-        RegisterWorkCard();
         var key = "TestWork:" + work.Id;
+        await SocialCardSnapshot.Remove(key);
         (await SocialCardSnapshot.Get(key)).Should().BeNull("not warmed");
 
         var html = await Renderer.RenderShellAsync(Navigation($"/work/{work.Id}"));
@@ -191,6 +183,7 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
     public async Task Toggles_off_suppress_their_tags()
     {
         // A fresh host with the head toggles disabled; operate entirely against its own store.
+        SocialCards.Reset();
         await using var host = await KoanIntegrationHost.Configure()
             .WithSetting("Koan:Environment", "Test")
             .WithSetting("Koan:Data:Sources:Default:Adapter", "inmemory")
@@ -199,14 +192,13 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
             .WithSetting("Koan:Web:OpenGraph:EmitTitleElement", "false")
             .WithSetting("Koan:Web:OpenGraph:EmitCanonical", "false")
             .WithSetting("Koan:Web:OpenGraph:EmitTwitterTags", "false")
-            .ConfigureServices(s => s.AddKoan())
+            .ConfigureServices(s => s.AddKoan(RegisterWorkCard))
             .StartAsync();
 
         var previous = AppHost.Current;
         AppHost.Current = host.Services;
         try
         {
-            RegisterWorkCard();
             var work = new TestWork { Name = "Toggle", Summary = "s", CoverMediaId = "c1" };
             await work.Save();
 

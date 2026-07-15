@@ -110,11 +110,11 @@ public class Collection : Entity<Collection> {
 
 ### 5. Entity Lifecycle Pattern
 
-**Decision**: Confirm BeforeRemove pattern as canonical
+**Decision**: Confirm host-composed BeforeRemove pattern as canonical
 
 **Pattern**:
 ```csharp
-PhotoAsset.Events.BeforeRemove(async ctx => {
+builder.Services.AddKoan(() => PhotoAsset.Lifecycle.BeforeRemove(async ctx => {
     // Delete storage files for thumbnails
     await thumbnail.Delete(ct);  // Storage cleanup
     await thumbnail.Remove(ct);  // Entity deletion
@@ -122,14 +122,14 @@ PhotoAsset.Events.BeforeRemove(async ctx => {
     // Delete main photo storage
     await photo.Delete(ct);
 
-    // Entity removal proceeds after event
-    return EntityEventResult.Proceed();
-});
+    // Entity removal proceeds after Lifecycle policy
+    return ctx.Proceed();
+}));
 ```
 
 **Critical Distinction**:
 - `Delete()`: Storage file deletion (StorageEntity method)
-- `Remove()`: Entity deletion + lifecycle events (Entity method)
+- `Remove()`: Entity deletion + Lifecycle policy (Entity method)
 - Main photo uses `Delete()` for storage in event, then `Remove()` completes entity deletion
 
 ---

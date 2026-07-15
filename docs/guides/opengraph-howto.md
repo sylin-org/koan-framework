@@ -141,7 +141,7 @@ that middleware, or accept that the bare root serves the default shell.
 Each card is materialized as a `SocialCardSnapshot` entity marked `[Cacheable]`, so it
 reuses the cache pillar (L1/L2 plus coherence) when a cache adapter is referenced, and
 falls back to a plain persisted read otherwise. The snapshot is kept fresh by entity
-lifecycle events: it is rebuilt when the source entity is saved and removed when the
+entity Lifecycle: it is rebuilt when the source entity is saved and removed when the
 source entity is deleted. The request path reads the snapshot and lazily fills it on a
 miss, so the common case is a cache read plus a string replace.
 

@@ -137,8 +137,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     }
 
     /// <summary>
-    /// Registers AfterUpsert hook for the specified entity type.
-    /// Uses reflection to call Entity&lt;T&gt;.Events.AfterUpsert().
+    /// Registers the typed host-owned lifecycle contribution for a discovered entity type.
     /// </summary>
     [RequiresUnreferencedCode("Embedding hooks use reflection against entity lifecyle APIs.")]
     [RequiresDynamicCode("Embedding hooks create closed generic delegates at runtime.")]
@@ -164,54 +163,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 $"Remove [Embedding] attribute or change to string-based keys.");
         }
 
-        // Get the static Events property
-        // FlattenHierarchy: the static Events property is declared on Entity<T, TKey> (2-arg). When an
-        // entity derives from the 1-arg Entity<T> (the common shape), FindEntityBaseType returns that
-        // 1-arg base, and inherited STATIC members are only visible to reflection with FlattenHierarchy —
-        // without it, every Entity<T>-derived [Embedding]/[MediaAnalysis] entity (e.g. S5.Recs Media)
-        // throws "does not have a static Events property" at boot.
-        var eventsProperty = entityBaseType.GetProperty("Events", BindingFlags.Static | BindingFlags.Public | BindingFlags.FlattenHierarchy);
-        if (eventsProperty == null)
-        {
-            throw new InvalidOperationException(
-                $"Type {entityType.Name} does not have a static Events property. " +
-                $"This should never happen for Entity<T> types.");
-        }
-
-        var eventsBuilder = eventsProperty.GetValue(null);
-        if (eventsBuilder == null)
-        {
-            throw new InvalidOperationException(
-                $"Events property for {entityType.Name} returned null.");
-        }
-
-        // Get the AfterUpsert method
-        var afterUpsertMethod = eventsBuilder.GetType().GetMethod("AfterUpsert", new[] { typeof(Func<,>).MakeGenericType(
-            typeof(Koan.Data.Core.Events.EntityEventContext<>).MakeGenericType(entityType),
-            typeof(ValueTask)) });
-
-        if (afterUpsertMethod == null)
-        {
-            throw new InvalidOperationException(
-                $"AfterUpsert method not found on Events for {entityType.Name}.");
-        }
-
-        // Create the embedding hook handler
-        var handlerType = typeof(Func<,>).MakeGenericType(
-            typeof(Koan.Data.Core.Events.EntityEventContext<>).MakeGenericType(entityType),
-            typeof(ValueTask));
-
-        var hookMethod = typeof(KoanAutoRegistrar).GetMethod(nameof(EmbeddingHookAsync), BindingFlags.Static | BindingFlags.NonPublic);
-        if (hookMethod == null)
-        {
-            throw new InvalidOperationException("EmbeddingHookAsync method not found.");
-        }
-
-        var genericHookMethod = hookMethod.MakeGenericMethod(entityType);
-        var handler = Delegate.CreateDelegate(handlerType, genericHookMethod);
-
-        // Register the hook: Entity<T>.Events.AfterUpsert(EmbeddingHookAsync)
-        afterUpsertMethod.Invoke(eventsBuilder, new[] { handler });
+        CloseRegistration(nameof(RegisterEmbeddingHook), entityType);
     }
 
     /// <summary>
@@ -238,56 +190,29 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 $"Media analysis currently only supports string keys.");
         }
 
-        // FlattenHierarchy: the static Events property is declared on Entity<T, TKey> (2-arg). When an
-        // entity derives from the 1-arg Entity<T> (the common shape), FindEntityBaseType returns that
-        // 1-arg base, and inherited STATIC members are only visible to reflection with FlattenHierarchy —
-        // without it, every Entity<T>-derived [Embedding]/[MediaAnalysis] entity (e.g. S5.Recs Media)
-        // throws "does not have a static Events property" at boot.
-        var eventsProperty = entityBaseType.GetProperty("Events", BindingFlags.Static | BindingFlags.Public | BindingFlags.FlattenHierarchy);
-        if (eventsProperty == null)
-        {
-            throw new InvalidOperationException(
-                $"Type {entityType.Name} does not have a static Events property.");
-        }
-
-        var eventsBuilder = eventsProperty.GetValue(null);
-        if (eventsBuilder == null)
-        {
-            throw new InvalidOperationException(
-                $"Events property for {entityType.Name} returned null.");
-        }
-
-        var afterUpsertMethod = eventsBuilder.GetType().GetMethod("AfterUpsert", new[] { typeof(Func<,>).MakeGenericType(
-            typeof(Koan.Data.Core.Events.EntityEventContext<>).MakeGenericType(entityType),
-            typeof(ValueTask)) });
-
-        if (afterUpsertMethod == null)
-        {
-            throw new InvalidOperationException(
-                $"AfterUpsert method not found on Events for {entityType.Name}.");
-        }
-
-        var handlerType = typeof(Func<,>).MakeGenericType(
-            typeof(Koan.Data.Core.Events.EntityEventContext<>).MakeGenericType(entityType),
-            typeof(ValueTask));
-
-        var hookMethod = typeof(KoanAutoRegistrar).GetMethod(nameof(MediaAnalysisHookAsync), BindingFlags.Static | BindingFlags.NonPublic);
-        if (hookMethod == null)
-        {
-            throw new InvalidOperationException("MediaAnalysisHookAsync method not found.");
-        }
-
-        var genericHookMethod = hookMethod.MakeGenericMethod(entityType);
-        var handler = Delegate.CreateDelegate(handlerType, genericHookMethod);
-
-        afterUpsertMethod.Invoke(eventsBuilder, new[] { handler });
+        CloseRegistration(nameof(RegisterMediaAnalysisHook), entityType);
     }
+
+    private static void CloseRegistration(string methodName, Type entityType)
+    {
+        var method = typeof(KoanAutoRegistrar).GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"Lifecycle registration method '{methodName}' was not found.");
+        method.MakeGenericMethod(entityType).Invoke(null, null);
+    }
+
+    private static void RegisterEmbeddingHook<TEntity>()
+        where TEntity : class, Koan.Data.Abstractions.IEntity<string>
+        => Koan.Data.Core.Model.Entity<TEntity, string>.Lifecycle.AfterUpsert(EmbeddingHookAsync<TEntity>);
+
+    private static void RegisterMediaAnalysisHook<TEntity>()
+        where TEntity : class, Koan.Data.Abstractions.IEntity<string>
+        => Koan.Data.Core.Model.Entity<TEntity, string>.Lifecycle.AfterUpsert(MediaAnalysisHookAsync<TEntity>);
 
     /// <summary>
     /// Entity lifecycle hook that triggers media analysis after upsert.
     /// Detects byte[] content changes, checks version, and queues or executes analysis.
     /// </summary>
-    private static async ValueTask MediaAnalysisHookAsync<TEntity>(Koan.Data.Core.Events.EntityEventContext<TEntity> ctx)
+    private static async ValueTask MediaAnalysisHookAsync<TEntity>(Koan.Data.Core.Lifecycle.EntityLifecycleContext<TEntity> ctx)
         where TEntity : class, Koan.Data.Abstractions.IEntity<string>
     {
         var entity = ctx.Current;
@@ -352,7 +277,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     /// <summary>
     /// Entity lifecycle hook that generates and stores embeddings after upsert.
     /// </summary>
-    private static async ValueTask EmbeddingHookAsync<TEntity>(Koan.Data.Core.Events.EntityEventContext<TEntity> ctx)
+    private static async ValueTask EmbeddingHookAsync<TEntity>(Koan.Data.Core.Lifecycle.EntityLifecycleContext<TEntity> ctx)
         where TEntity : class, Koan.Data.Abstractions.IEntity<string>
     {
         var entity = ctx.Current;

@@ -63,15 +63,15 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
             .WithSettings(settings)
             .ConfigureServices(s =>
             {
-                s.AddKoan();
+                s.AddKoan(() => configureServices?.Invoke(s));
                 s.AddKoanTransactions();
                 // The deliberately non-isolating fake (inert unless a source names "fake-noniso") — the fail-closed
                 // safety-net counter-example now that every real KV adapter announces isolation (ARCH-0103).
                 s.AddSingleton<IDataAdapterFactory, NonIsolatingFakeAdapterFactory>();
                 // FakeVectorService registered AFTER AddKoan() so it wins.
                 s.AddSingleton<IVectorService>(vectorService);
-                // Spec hook: register fake contributors (e.g. an IReadFilterContributor, DATA-0106) into the real boot.
-                configureServices?.Invoke(s);
+                // Spec hooks run inside AddKoan's host composition so they can declare both DI contributors and
+                // Entity lifecycle behavior without process-static test resets.
             })
             .StartAsync()
             .ConfigureAwait(false);

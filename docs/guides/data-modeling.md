@@ -40,7 +40,7 @@ related_guides:
 ## How to Use This Playbook
 
 - 📌 Reference hub: [Data Pillar Reference](../reference/data/index.md)
-- 🔁 Lifecycle matrix: [Entity Lifecycle Events](../reference/data/entity-lifecycle-events.md)
+- 🔁 Lifecycle matrix: [Entity Lifecycle](../reference/data/entity-lifecycle.md)
 - 🌊 Orchestration partner: [Flow Pillar Reference](../reference/flow/index.md)
 - 📮 Delivery surface: [API Delivery Playbook](./building-apis.md)
 
@@ -143,28 +143,20 @@ public class Product : Entity<Product>
 
 ## 5. Apply Lifecycle Policies
 
-- Register hooks at startup against the entity's static `Events` facade.
-- Use a `Setup` handler to `ProtectAll()` and opt-in only the properties you intend to mutate via `AllowMutation(...)`.
-- Use `BeforeUpsert`/`BeforeRemove` for guardrails (return `ctx.Proceed()` or `ctx.Cancel(...)`), `AfterLoad` for hydration.
+- Compose persistence policy inside `AddKoan(() => ...)`; the plan belongs to that host.
+- Use `BeforeUpsert`/`BeforeRemove` for guardrails and return `ctx.Proceed()` or `ctx.Cancel(...)`.
+- Call `Protect(...)` or `ProtectAll()` in the relevant before-handler when later handlers must not
+  mutate those values. Use `AfterLoad` only for small, deterministic hydration.
 
 ```csharp
-public static class ProductLifecycle
-{
-    public static void Configure()
+builder.Services.AddKoan(() =>
+    Product.Lifecycle.BeforeUpsert(ctx =>
     {
-        Product.Events.Setup(ctx =>
-        {
-            ctx.ProtectAll();
-            ctx.AllowMutation(nameof(Product.Price));
-            ctx.AllowMutation(nameof(Product.Description));
-        });
-
-        Product.Events.BeforeUpsert(ctx =>
-            ctx.Current.Price < 0
-                ? ctx.Cancel("Price cannot be negative.", "product.negative_price")
-                : ctx.Proceed());
-    }
-}
+        ctx.Protect(nameof(Product.Id));
+        return ctx.Current.Price < 0
+            ? ctx.Cancel("Price cannot be negative.", "product.negative_price")
+            : ctx.Proceed();
+    }));
 ```
 
 ---

@@ -469,7 +469,7 @@ Koan also gives you **lifecycle hooks**—think of them as middleware for your e
 
 **Recipe**
 
-Dependencies already covered. Lifecycle API lives in `Koan.Data.Core.Events` (included automatically).
+Dependencies already covered. Lifecycle is part of `Koan.Data.Core`.
 
 **Sample**
 
@@ -499,51 +499,32 @@ await Todo.Batch()
     .SaveAsync(ct);
 ```
 
-**Lifecycle hooks:**
+**Lifecycle policy:**
 
 ```csharp
-public static class TodoLifecycle
-{
-    // Call this once at startup (e.g. from your KoanAutoRegistrar or Program.cs)
-    public static void Register()
+builder.Services.AddKoan(() =>
+    Todo.Lifecycle
+        .BeforeUpsert(ctx =>
     {
-        // Setup runs first; declare property protection here
-        Todo.Events.Setup(ctx =>
+        ctx.Protect(nameof(Todo.Id));
+        if (string.IsNullOrWhiteSpace(ctx.Current.Title))
+            return ctx.Cancel("Todo must have a title");
+        if (ctx.Current.Title.Length > 200)
+            return ctx.Cancel("Title too long (max 200 chars)");
+        return ctx.Proceed();
+    })
+        .AfterLoad(ctx =>
         {
-            ctx.ProtectAll();                  // Protect all properties by default
-            ctx.AllowMutation(nameof(Todo.Title));     // Allow specific properties to change
-            ctx.AllowMutation(nameof(Todo.Completed));
-            ctx.AllowMutation(nameof(Todo.DueDate));
-        });
-
-        // Validation before save — return ctx.Cancel(...) to reject, ctx.Proceed() to continue
-        Todo.Events.BeforeUpsert(ctx =>
-        {
-            if (string.IsNullOrWhiteSpace(ctx.Current.Title))
-                return ctx.Cancel("Todo must have a title");
-
-            if (ctx.Current.Title.Length > 200)
-                return ctx.Cancel("Title too long (max 200 chars)");
-
-            return ctx.Proceed();
-        });
-
-        // Auto-format after load
-        Todo.Events.AfterLoad(ctx =>
-        {
-            // Trim whitespace
             if (ctx.Current.Title != null)
                 ctx.Current.Title = ctx.Current.Title.Trim();
-        });
-    }
-}
+        }));
 ```
 
 **How hooks work:**
-1. `ctx.ProtectAll()` (inside `Setup`) prevents accidental property mutations
-2. `ctx.AllowMutation(name)` whitelists safe-to-change properties
-3. `BeforeUpsert` runs validation before save (return `ctx.Cancel(reason)` to reject)
-4. `AfterLoad` formats data after fetching from database
+1. `AddKoan(...)` owns the plan for this host; no static reset or registrar is required.
+2. `ctx.Protect(name)` prevents later handlers from mutating the captured value.
+3. `BeforeUpsert` validates before save; `ctx.Cancel(reason)` rejects before persistence.
+4. `AfterLoad` formats the materialized application instance without persisting it.
 
 **Usage Scenarios**
 
@@ -565,9 +546,10 @@ Eventually, you'll need to delete a lot of data—test cleanup, archival, tenant
 
 - **Safe:** Always fires lifecycle hooks (audit trails, cleanup logic)
 - **Fast:** Bypasses hooks for 10-250x performance (TRUNCATE, DROP, etc.)
-- **Optimized:** Framework chooses Fast when safe, Safe when hooks matter
+- **Optimized:** Preserves configured remove Lifecycle; otherwise delegates optimization to the provider
 
-Here's the key insight: **Optimized uses Fast on most providers** (Postgres, SQL Server, MongoDB, SQLite, Redis). If you need audit trails, explicitly choose Safe.
+Here's the key insight: configured remove Lifecycle makes `Optimized` use the safe per-entity path.
+Explicit `Fast` is the only intentional lifecycle bypass.
 
 **Quick decision:**
 - Need audit trail or cleanup logic? → **Safe**
@@ -583,7 +565,7 @@ Same packages as always. Providers with `DataCaps.Write.FastRemove` (Postgres, S
 **Basic removal:**
 
 ```csharp
-// Default: Optimized (usually Fast on capable providers)
+// Default: Optimized (preserves configured remove Lifecycle)
 var count = await Todo.RemoveAll(ct);
 
 // Explicit Safe (always fires hooks)
@@ -647,25 +629,26 @@ public async Task PurgeArchivedLogs(CancellationToken ct)
 }
 ```
 
-**⚠️ Important:** Optimized uses Fast on most providers, **bypassing hooks**. If you have audit logging or cleanup logic in lifecycle hooks, use explicit Safe:
+**Important:** `Fast` explicitly bypasses remove Lifecycle. `Optimized` and `Safe` preserve it when
+handlers are configured:
 
 ```csharp
-public static class OrderLifecycle
-{
-    public static void Register() =>
-        Order.Events.BeforeRemove(async ctx =>
+builder.Services.AddKoan(() =>
+    Order.Lifecycle.BeforeRemove(async ctx =>
         {
             // Log deletion for compliance
             await AuditLog.RecordDeletion(ctx.Current.Id, ctx.Current.CustomerId);
             return ctx.Proceed();
-        });
-}
+        }));
 
-// ❌ Optimized bypasses BeforeRemove hook on Postgres!
+// ✅ Optimized detects the configured remove Lifecycle and preserves it
 await Order.RemoveAll(ct);
 
-// ✅ Safe guarantees hook fires
+// ✅ Safe also guarantees per-entity Lifecycle
 await Order.RemoveAll(RemoveStrategy.Safe, ct);
+
+// ⚠️ Fast is an explicit lifecycle bypass
+await Order.RemoveAll(RemoveStrategy.Fast, ct);
 ```
 
 **Usage Scenarios**
@@ -1218,12 +1201,16 @@ an unbounded fallback.
 
 ## Write-If-Changed Upserts
 
-**Concept:** By default, `Upsert` always writes to the store and fires `AfterUpsert`, even when the incoming data is byte-identical to what is already stored. This is correct for most scenarios. When you have event-driven consumers downstream, though, an unchanged re-crawl can trigger a full fan-out for every record. `UpsertIfChanged` is an opt-in alternative that suppresses the persist and `AfterUpsert` when the entity is byte-identical to the stored prior.
+**Concept:** By default, `Upsert` always writes to the store and runs `AfterUpsert`, even when the
+incoming data is byte-identical to what is already stored. This is correct for most scenarios. When
+Lifecycle consumers perform expensive follow-up work, an unchanged re-crawl can create needless
+work. `UpsertIfChanged` compares first and enters the normal Upsert/Lifecycle path only when the model
+differs from its stored value.
 
 **Semantics:**
-- `BeforeUpsert` always fires -- validation and normalization hooks still run.
-- If `BeforeUpsert` cancels, the operation throws `EntityEventCancelledException` (same as `Upsert`).
-- After `BeforeUpsert`, the current entity is serialized and compared against the loaded prior. If they are byte-identical, persist and `AfterUpsert` are skipped; the method returns `false`.
+- The current stored application value and caller's model are compared before Lifecycle.
+- If they are byte-identical, persistence and all Upsert Lifecycle phases are skipped; the method returns `false`.
+- If they differ, the normal canonical `Upsert` runs, including cancellation and all configured handlers.
 - If the entity is new (no prior exists), or if the serialization fails for any reason, the write always proceeds (safe fallback).
 - The method returns `true` when written, `false` when skipped.
 
@@ -1250,7 +1237,8 @@ var written = await Article.UpsertIfChanged(article, tenantPartition);
 - When `AfterUpsert` must always fire regardless of content (e.g., heartbeat updates, explicit re-triggers).
 - When the entity has fields the serializer cannot capture faithfully (custom converters, computed properties set externally). In that case, `Upsert` is the safe default.
 
-**Cost:** `UpsertIfChanged` always loads the prior from the store before running the pipeline. This is one extra read per call. On hot paths that almost always write, this overhead outweighs the savings -- prefer `Upsert` there.
+**Cost:** `UpsertIfChanged` always loads the prior before deciding whether to enter Lifecycle and write.
+This is one extra read per call. On hot paths that almost always write, prefer `Upsert`.
 
 ---
 

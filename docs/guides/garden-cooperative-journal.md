@@ -68,7 +68,7 @@ using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddKoan();
+builder.Services.AddKoan(GardenAutomation.Configure);
 
 var app = builder.Build();
 app.Run();
@@ -196,19 +196,16 @@ Need to swap hardware between beds? The sample ships with an **Admin** tab that 
 
 _Afternoon: Bed 3 dips; Bed 1 wobbles. Mara squints. “Feelings aren’t data.” Riley nods. “So we decide when the reading arrives.”_
 
-We do the “is it dry?” decision **right after** each upsert—using entity statics only. Register the automation once so every process shares the same story.
+We do the “is it dry?” decision **right after** each upsert—using entity statics only. Compose the
+automation with this host so tests and neighboring hosts never share handlers.
 
 ```csharp
-using System.Runtime.CompilerServices;
-using Koan.Data.Core.Events;
-
 public static class GardenAutomation
 {
     private const int WindowSize = 8;
     private const double DryThreshold = 20.0;
 
-    [ModuleInitializer]
-    public static void Initialize()
+    public static void Configure()
     {
         ConfigureReadingLifecycle();
         ConfigureReminderLifecycle();
@@ -216,8 +213,7 @@ public static class GardenAutomation
 
     private static void ConfigureReadingLifecycle()
     {
-        Reading.Events
-            .Setup(ctx => ctx.ProtectAll())
+        Reading.Lifecycle
             .AfterUpsert(async ctx =>
             {
                 var reading = ctx.Current;
@@ -273,16 +269,10 @@ public static class GardenAutomation
 
     private static void ConfigureReminderLifecycle()
     {
-        Reminder.Events
-            .Setup(ctx =>
-            {
-                ctx.ProtectAll();
-                ctx.AllowMutation(nameof(Reminder.Status));
-                ctx.AllowMutation(nameof(Reminder.Notes));
-            })
+        Reminder.Lifecycle
             .AfterUpsert(async ctx =>
             {
-                var prior = await ctx.Prior.GetAsync(ctx.CancellationToken);
+                var prior = await ctx.Prior.Get(ctx.CancellationToken);
                 var was = prior?.Status ?? ReminderStatus.Idle;
                 var now = ctx.Current.Status;
 

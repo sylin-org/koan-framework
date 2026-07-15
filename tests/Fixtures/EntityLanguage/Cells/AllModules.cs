@@ -17,4 +17,5 @@ public static class AllModuleConsumer
     public static IDisposable WithDeleted() => AllModuleTodo.WithDeleted();
     public static JobOps<AllModuleTodo> Job(AllModuleTodo todo) => todo.Job;
     public static Task<bool> HardDelete(AllModuleTodo todo) => todo.HardDelete();
+    public static void ConfigureLifecycle() => AllModuleTodo.Lifecycle.AfterUpsert(_ => { });
 }

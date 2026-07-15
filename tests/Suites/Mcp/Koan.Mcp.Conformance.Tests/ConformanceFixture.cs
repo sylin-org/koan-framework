@@ -8,6 +8,15 @@ namespace Koan.Mcp.Conformance.Tests;
 /// for the wire-shape (AN1) and annotation (AN4) conformance specs.</summary>
 public sealed class ConformanceFixture : McpHarnessFixtureBase
 {
+    protected override void ConfigureKoan()
+    {
+        Gadget.Lifecycle.BeforeUpsert(context =>
+        {
+            context.Current.Name = context.Current.Name.Trim().ToUpperInvariant();
+            return context.Proceed();
+        });
+    }
+
     protected override void ConfigureServices(IServiceCollection services)
     {
         services.AddKoanControllersFrom<GadgetsController>();

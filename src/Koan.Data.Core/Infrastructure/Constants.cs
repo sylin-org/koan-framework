@@ -10,6 +10,7 @@ public static class Constants
             public const string AdapterRejected = "koan.data.adapter.rejected";
             public const string RelationshipExecution = "koan.data.relationship.execution";
             public const string StreamExecution = "koan.data.stream.execution";
+            public const string LifecycleSelected = "koan.data.lifecycle.selected";
         }
 
         public static class Reasons

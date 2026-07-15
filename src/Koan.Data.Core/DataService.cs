@@ -43,14 +43,18 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         // Create repository with source context
         var repo = factory.Create<TEntity, TKey>(sp, source);
 
-        // Wrap with facade for the write-stamp pipeline (identity + [Timestamp]) and the generic pre-op guards.
+        // Provider/module decorators sit inside the Data-owned facade. They may cache or specialize
+        // physical access, but cannot bypass guards, isolation, transforms, or Lifecycle by returning
+        // early. The facade is therefore the one unavoidable application-facing repository boundary.
+        var decorated = ApplyDecorators(typeof(TEntity), typeof(TKey), repo, sp);
+
+        // Wrap once with the Data-owned semantic boundary: guards, isolation, transforms, write stamps and Lifecycle.
         // Schema readiness is the adapter's responsibility now (IDataRepository.EnsureReady);
         // the facade calls it before every operation — no separate EntitySchemaGuard layer.
         var guards = sp.GetServices<Pipeline.IStorageGuard>().ToArray();
         var readContributors = sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
-        var facade = new RepositoryFacade<TEntity, TKey>(repo, guards, readContributors);
-
-        var decorated = ApplyDecorators(typeof(TEntity), typeof(TKey), facade, sp);
+        var lifecycle = sp.GetService<Lifecycle.EntityLifecyclePlan<TEntity, TKey>>();
+        var facade = new RepositoryFacade<TEntity, TKey>(decorated, guards, readContributors, lifecycle);
 
         // Repository construction is the activation boundary: inspection and route description remain pure, while
         // any runtime path that actually asks for a repository makes that provider/source visible to readiness.
@@ -62,8 +66,8 @@ public sealed class DataService(IServiceProvider sp) : IDataService
             AggregateMetadata.GetIdSpec(typeof(TEntity))?.Prop.Name));
         diagnostics?.ObserveParticipation(factory.Provider, source);
 
-        _cache[key] = decorated;
-        return decorated;
+        _cache[key] = facade;
+        return facade;
     }
 
     /// <inheritdoc />
@@ -82,7 +86,8 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         var repo = factory.Create<TEntity, TKey>(sp, source);
         var guards = sp.GetServices<Pipeline.IStorageGuard>().ToArray();
         var readContributors = sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
-        return new RepositoryFacade<TEntity, TKey>(repo, guards, readContributors);
+        var lifecycle = sp.GetService<Lifecycle.EntityLifecyclePlan<TEntity, TKey>>();
+        return new RepositoryFacade<TEntity, TKey>(repo, guards, readContributors, lifecycle);
     }
 
     /// <inheritdoc />

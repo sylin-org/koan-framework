@@ -117,4 +117,34 @@ public sealed class SoftDeleteSpec(SqliteFixture fixture, ITestOutputHelper outp
         (await Doc.All()).Should().BeEmpty();
         using (Doc.WithDeleted()) (await Doc.All()).Should().HaveCount(3);
     }
+
+    [Fact(DisplayName = "Batch delete preserves soft-delete semantics")]
+    public async Task Batch_delete_soft_removes_instead_of_physically_deleting()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        using var _ = Lease(NewPartition());
+
+        var doc = await new Doc { Title = "batched" }.Save();
+        var result = await Doc.Batch().Delete(doc.Id).Save();
+
+        result.Deleted.Should().Be(1);
+        (await Doc.Get(doc.Id)).Should().BeNull();
+        using (Doc.WithDeleted()) (await Doc.Get(doc.Id)).Should().NotBeNull();
+    }
+
+    [Fact(DisplayName = "Atomic batch delete fails closed when soft-delete requires multiple writes")]
+    public async Task Atomic_batch_delete_does_not_claim_false_atomicity()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        using var _ = Lease(NewPartition());
+
+        var doc = await new Doc { Title = "atomic" }.Save();
+        var action = () => Doc.Batch().Delete(doc.Id).Save(new BatchOptions(RequireAtomic: true));
+
+        await action.Should().ThrowAsync<NotSupportedException>()
+            .WithMessage("*Atomic batch removal*soft-deleted entity*");
+        (await Doc.Get(doc.Id)).Should().NotBeNull("the contract is rejected before the first write");
+    }
 }

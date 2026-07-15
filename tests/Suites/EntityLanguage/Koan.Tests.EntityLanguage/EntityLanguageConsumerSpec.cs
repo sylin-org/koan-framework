@@ -53,6 +53,21 @@ public sealed class EntityLanguageConsumerSpec
     }
 
     [Fact]
+    public void Data_core_exposes_Lifecycle_directly_on_the_entity_type()
+    {
+        var result = Compile("LifecycleAccess", includeCache: false);
+        result.Succeeded.Should().BeTrue(result.Output);
+    }
+
+    [Fact]
+    public void Persistence_Events_is_not_retained_as_a_second_canonical_name()
+    {
+        var result = Compile("LegacyEventsAccess", includeCache: false);
+        result.Succeeded.Should().BeFalse();
+        result.Output.Should().Contain("Events");
+    }
+
+    [Fact]
     public void Removing_cache_makes_the_same_consumer_source_fail_at_the_facet()
     {
         var present = Compile("CacheAccess", includeCache: true);

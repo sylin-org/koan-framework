@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Koan.Web.OpenGraph;
 
 /// <summary>
-/// Static, type-keyed card registry. Clones the <c>EntityEventRegistry</c> mechanic: written once at
+/// Static, type-keyed card registry. Application declarations are written during
 /// boot, read at request time, with a <c>Reset()</c> for test isolation. Registration is boot-time and
 /// consumption is request-time, so there is no deferred-attach problem to solve.
 /// </summary>

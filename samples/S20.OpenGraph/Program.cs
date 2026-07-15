@@ -11,24 +11,25 @@ using Koan.Web.OpenGraph;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddKoan();
+builder.Services.AddKoan(() =>
+{
+    // Declare one card. The route template's single token resolves to a Note; the selectors
+    // project the card fields. A trailing slug segment (e.g. /notes/welcome/hello-world) is
+    // matched and discarded.
+    SocialCards
+        .For<Note>("/notes/{id}", id => Note.Get(id))
+            .Title(n => n.Title)
+            .Description(n => n.Body)
+            .Image(n => CardImage.Recipe("share-card", n.CoverMediaId))
+            .Url(n => $"/notes/{n.Id}")
+            .Type("article");
+});
 
 // Point the pillar at the static shell and supply brand defaults.
 builder.Configuration["Koan:Web:OpenGraph:ShellPath"] = "wwwroot/index.html";
 builder.Configuration["Koan:Web:OpenGraph:SiteName"] = "Koan OpenGraph Sample";
 builder.Configuration["Koan:Web:OpenGraph:DefaultImage"] = "/img/default-card.png";
 builder.Configuration["Koan:Web:OpenGraph:DefaultDescription"] = "A tiny Koan app with per-route social cards.";
-
-// Declare one card. The route template's single token resolves to a Note; the selectors
-// project the card fields. A trailing slug segment (e.g. /notes/welcome/hello-world) is
-// matched and discarded.
-SocialCards
-    .For<Note>("/notes/{id}", id => Note.Get(id))
-        .Title(n => n.Title)
-        .Description(n => n.Body)
-        .Image(n => CardImage.Recipe("share-card", n.CoverMediaId))
-        .Url(n => $"/notes/{n.Id}")
-        .Type("article");
 
 var app = builder.Build();
 
