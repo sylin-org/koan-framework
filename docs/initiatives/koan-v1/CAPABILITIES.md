@@ -348,7 +348,10 @@ initiative progress ledger; they do not silently promote the original maturity l
 - **Current R05 change:** the fresh package proof embeds one source commit across independently
   selected App, SQLite, Jobs, and MCP versions and writes separate evidence for both applications.
   This proves local artifact coherence; it is not a public package-path claim because the release set
-  was not published.
+  was not published. A later lockfile-focused rehearsal at `a2780672` verified another 84-package
+  closure: Core carried its composition target through `buildTransitive`, and external FirstUse plus
+  GoldenJourney both emitted and validated checked-in lockfiles while passing their complete 8-step
+  and 11-step contracts with zero build warnings/errors.
 - **Inspection and failure:** the restore fails loudly, which is safer than an ABI mismatch, but the
   public docs previously described packages only as lagging and offered a broken copy/paste path.
 - **Unsupported / compatibility:** the staged package set is coherent, but public package-first install,

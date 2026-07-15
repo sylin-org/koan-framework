@@ -101,3 +101,13 @@ operational toolsets. `koan://self` now exposes structured custom workflows and 
 `koan://entities` stays Entity-specific. Verification passes MCP conformance 73/73, the real
 Streamable HTTP GoldenJourney source contract 1/1, and strict docs. A fresh agent repeat and human
 record remain required after the bounded queue.
+
+Repair 3 is complete in local commit `a2780672`. Core's existing deterministic emitter now ships as
+a `buildTransitive` asset, so the App bundle carries Reference = Intent through its package graph;
+the two supported source contracts import that same target centrally because ProjectReference cannot
+carry NuGet build assets. Both checked-in lockfiles are now executable evidence, both application
+probes validate identity and required modules, and the release compiler rejects a Core artifact that
+lacks the target. Packaging passes 16/16, Core lockfile tests 4/4, strict docs and the 113-owner
+inventory pass. A fresh 84-package clean room restored and built both external applications with zero
+warnings/errors: FirstUse passed 8/8 in 4.755s and GoldenJourney passed 11/11 in 8.754s, each recording
+`compositionLockfileObserved=true`. Evidence is under ignored `artifacts/r05-lockfile-release/`.
