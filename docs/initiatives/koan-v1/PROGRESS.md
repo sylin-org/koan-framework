@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: in-progress
-  scope: R07-01 and R07-02 passed; reverse-dependent package closure is next
+  scope: R07-01 and R07-02 passed; R07-03 automatic package lineage is active
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T6 — capability-ring graduation`
 - Active work item: R07 — rebuild the semantic capability ring
-- Active child: none; reverse-dependent package closure is the next child to open
+- Active child: R07-03 — automate breaking package lineage
 - V1 readiness: `not ready`; T7 remains gated by T6 and an observed public package publication
 
 ## Work items
@@ -36,7 +36,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 | R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
-| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | ARCH-0113 ratifies pointwise capability lifting, Lifecycle/Events/Transport separation, Core context ownership, one Communication pillar, and the greenfield deletion map. R07-01 and R07-02 pass. R07-02 closes with Data.Core 42/42 focused and 325/325 full, six qualified and three fail-closed adapter cells, SQLite 1/1, Backup 5/5 acceptance and 7/7 full, and final repository gates green. Reverse-dependent package closure is next. |
+| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | ARCH-0113 ratifies pointwise capability lifting, Lifecycle/Events/Transport separation, Core context ownership, one Communication pillar, and the greenfield deletion map. R07-01 and R07-02 pass. [R07-03](work-items/r07/R07-03-automatic-package-lineage.md) is active: it promotes PMC-011 into the automatic Git-native reverse-dependent closure required before the clean Lifecycle 0.18 break. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -52,7 +52,7 @@ item should normally be `in-progress`.
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 | R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
-| R07 | in progress | ARCH-0113 and the canonical Entity contract define the target. R07-01 and R07-02 passed their complete closures. The next gate is automatic reverse-dependent package closure before the clean Lifecycle 0.18 break. |
+| R07 | in progress | ARCH-0113 and the canonical Entity contract define the target. R07-01 and R07-02 passed their complete closures. R07-03 is implementing automatic reverse-dependent package lineage before the clean Lifecycle 0.18 break. |
 
 ## Divergence and risk log
 
