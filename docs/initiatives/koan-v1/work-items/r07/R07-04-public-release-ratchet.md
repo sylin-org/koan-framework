@@ -126,7 +126,7 @@ Isolated reruns show that the red result is not only whole-solution contention:
   simultaneous complete processes. SQLite passes 35/35, Data.Core 349/349, Core Unit 112/112, JSON
   20/20, Data axes integration 18/18, Web SQLite 49/49, and Tenancy 110/110.
 
-### Layered discovery and Mongo endpoint precedence — implementation passed; live aggregate pending
+### Layered discovery and Mongo endpoint precedence — implementation passed; certification pending
 
 - The remaining Mongo fact encoded the pre-health-check era: a manually registered Zen Garden provider
   was expected to short-circuit `auto`, even though the activated engine now contributes candidates to
@@ -147,6 +147,20 @@ Isolated reruns show that the red result is not only whole-solution contention:
   0-warning and its Docker-free specs pass 9/9, but its full node did not become ready in two isolated
   five-minute attempts. The exact ratchet owns that live 17/17 recheck; it is not called green here.
 
+### Bounded certification topology — implementation passed; final certification pending
+
+- The first clean exact rerun completed in 14 minutes 35 seconds. Every non-test leg passed. The
+  solution-test leg reported only three failures: SQLite's high-volume FIFO claim bound, PostgreSQL's
+  parallel-safe same-entity behavior, and SQL Server's different-entity concurrency behavior.
+- Those exact facts pass individually 1/1 in 5, 2, and 2 seconds. No Jobs behavior, threshold, or
+  assertion changed. The aggregate red was certification resource contention, not three product roots.
+- `green-ratchet.ps1` now gives solution testing a two-project concurrency budget and applies VSTest's
+  five-minute per-host inactivity bound with dump collection disabled. A stalled provider therefore
+  fails with sequence diagnostics instead of occupying the release queue indefinitely or producing a
+  large local dump.
+- `ReleaseWorkflowContractTests` pins both bounds. PowerShell parsing, the focused contract, and a real
+  test-host invocation with the exact argument combination pass.
+
 ## Decisions
 
 ### DECIDED
@@ -161,6 +175,8 @@ Isolated reruns show that the red result is not only whole-solution contention:
   test-flow selection; Canon owns one complete replaceable persistence boundary.
 - Treat Jobs behavior failures and Mongo endpoint election as their own behavioral roots, with focused
   evidence before the aggregate rerun.
+- Certification is allowed controlled project concurrency; unrestricted solution fan-out is not a
+  stronger proof when it creates provider contention. Keep every runnable suite and bound inactive hosts.
 - Lifecycle production changes remain stopped until this base is green. Stable release truth is a
   prerequisite, not post-cycle polish.
 
@@ -171,7 +187,7 @@ Isolated reruns show that the red result is not only whole-solution contention:
 
 ### OPEN
 
-- Couchbase's live 17/17 recheck and the exact aggregate ratchet remain.
+- One exact bounded certification run remains at the R07-04 closure boundary.
 
 ## Red/green plan
 
@@ -186,12 +202,14 @@ Isolated reruns show that the red result is not only whole-solution contention:
    without an operator environment override.
 5. **Complete.** Reproduce the five Jobs SQLite failures from a clean isolated output, group them by
    root, and repair behavior or isolation without lowering assertions.
-6. **Implementation complete; live cross-provider acceptance open.** Resolve endpoint precedence through
+6. **Complete.** Resolve endpoint precedence through
    [ARCH-0114](../../../../decisions/ARCH-0114-layered-capability-activation.md), pass the shared matrix
-   and Mongo 70/70, then retain Couchbase's unavailable 17/17 recheck in
-   [PMC-012](../../POST-CYCLE-TODO.md#current-register) for the exact ratchet.
-7. Run the exact public-release ratchet from a clean checkout.
-8. Record exact counts, duration, environment-dependent skips, warnings, and the absence of publication
+   and Mongo 70/70, and retain Couchbase's live recheck in the exact ratchet.
+7. **Complete through focused evidence.** Run the exact public-release ratchet once, isolate its three
+   aggregate-only Jobs failures, prove each fact alone, and bound the solution-test topology without
+   changing behavior or assertions.
+8. Run one exact bounded public-release ratchet from a clean checkout. Record exact counts, duration,
+   environment-dependent skips, warnings, and the absence of publication
    or remote mutation before passing this child.
 
 ## Acceptance

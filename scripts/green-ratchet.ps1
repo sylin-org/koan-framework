@@ -9,8 +9,9 @@
     0.  Tools       dotnet tool restore      — pinned repository tools used by executable proofs.
     A.  Build       dotnet build Koan.sln   — framework + every dogfood sample
                     (the samples live in Koan.sln, so one build covers both).
-    A'. Test        dotnet test  Koan.sln    — container-gated integration specs skip
-                    cleanly when infra is absent. Skip with -SkipTests.
+    A'. Test        dotnet test  Koan.sln    — runs every runnable suite with bounded project fan-out
+                    and per-host hang detection. Container-gated integration specs skip cleanly when
+                    infra is absent. Skip with -SkipTests.
     B.  Docs lint   scripts/docs-lint.ps1    — links / front-matter / anchors / terms.
                     Errors are fatal; warnings are not.
     C.  Doc code    scripts/validate-code-examples.ps1 — compiles the C# blocks in the
@@ -52,6 +53,10 @@ param(
 
 $ErrorActionPreference = 'Continue'
 $root = (Resolve-Path "$PSScriptRoot/..").ProviderPath
+# Certification policy: provider suites remain comprehensive, but heavyweight test projects do not all
+# compete for one host at once and an inactive test host cannot retain the release queue indefinitely.
+$testProjectConcurrency = 2
+$testHostHangTimeout = '5m'
 Push-Location $root
 
 $results = [ordered]@{}
@@ -71,6 +76,7 @@ try {
         $Base = if ($LASTEXITCODE -eq 0) { 'origin/main' } else { 'main' }
     }
     Write-Host "[ratchet] config=$Configuration  docs-base=$Base  skipTests=$SkipTests  fullDocs=$FullDocs  publicRelease=$PublicRelease"
+    Write-Host "[ratchet] test-project-concurrency=$testProjectConcurrency  test-host-hang-timeout=$testHostHangTimeout"
 
     Invoke-Leg '0. tools' { & dotnet tool restore }
 
@@ -92,7 +98,18 @@ try {
     Invoke-Leg 'E. lockfile' { & "$root/scripts/compare-koan-lock.ps1" }
 
     if (-not $SkipTests) {
-        Invoke-Leg "A'. test" { & dotnet test "$root/Koan.sln" -c $Configuration --no-build --nologo }
+        Invoke-Leg "A'. test" {
+            $arguments = @(
+                'test', "$root/Koan.sln",
+                '-c', $Configuration,
+                '--no-build',
+                '--nologo',
+                "-m:$testProjectConcurrency",
+                '--blame-hang-timeout', $testHostHangTimeout,
+                '--blame-hang-dump-type', 'none'
+            )
+            & dotnet @arguments
+        }
     }
 
     Invoke-Leg 'B. docs-lint' { & "$root/scripts/docs-lint.ps1" -Output table }

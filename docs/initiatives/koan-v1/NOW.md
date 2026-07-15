@@ -47,6 +47,9 @@ Replace this file at every handoff. It is a restart point, not a diary.
   full-suite attempts did not reach test execution because the Testcontainers node remained unready at
   five minutes. The clean exact aggregate later completed in 14 minutes 35 seconds and remained red only
   in its solution-test leg: one Jobs timing/concurrency fact each on SQLite, PostgreSQL, and SQL Server.
+  Each named fact passes alone (1/1). The certification runner now limits solution testing to two
+  concurrent projects and terminates an inactive test host after five minutes without producing a dump;
+  a packaging contract pins both bounds.
 - Lifecycle remains the next semantic clean 0.18 public break. Retain the no-alias greenfield decision
   and keep Communication/Pipeline work out of the release-foundation slice.
 - Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
@@ -210,10 +213,10 @@ Only the next slice has a detailed child card. Do not open broker breadth before
 
 ## Next safe action
 
-Continue [R07-04](work-items/r07/R07-04-public-release-ratchet.md) through the change ring: reproduce the
-three named Jobs facts individually, then decide whether the remaining owner is behavior or aggregate
-test topology. Do not rerun the exact ratchet until that owner materially changes. Do not weaken
-assertions or exclude a runnable suite.
+Continue [R07-04](work-items/r07/R07-04-public-release-ratchet.md) at its certification boundary: commit
+the bounded test-topology repair, then run the exact public-release ratchet once from a clean checkout.
+Do not weaken assertions, exclude a runnable suite, or rerun the complete gate without another material
+owner or topology change.
 
 Do not start Lifecycle, Communication Events, Transport, a router, a unit-of-work coordinator, or
 Messaging compatibility work while the release floor is red.

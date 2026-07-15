@@ -7,6 +7,21 @@ namespace Koan.Packaging.Tests;
 public sealed class ReleaseWorkflowContractTests
 {
     [Fact]
+    public void ReleaseRatchetBoundsSolutionTestTopology()
+    {
+        var ratchet = File.ReadAllText(Path.Combine(
+            FindKoanRoot(),
+            "scripts",
+            "green-ratchet.ps1"));
+
+        Assert.Contains("$testProjectConcurrency = 2", ratchet, StringComparison.Ordinal);
+        Assert.Contains("$testHostHangTimeout = '5m'", ratchet, StringComparison.Ordinal);
+        Assert.Contains("\"-m:$testProjectConcurrency\"", ratchet, StringComparison.Ordinal);
+        Assert.Contains("'--blame-hang-timeout', $testHostHangTimeout", ratchet, StringComparison.Ordinal);
+        Assert.Contains("'--blame-hang-dump-type', 'none'", ratchet, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SharedTestKitsAreExplicitlyNonRunnable()
     {
         var root = FindKoanRoot();
