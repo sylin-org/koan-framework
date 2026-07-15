@@ -93,6 +93,12 @@ public sealed class ReleaseLineageGitTests
             first.VersionCommit,
             CancellationToken.None);
         Assert.Equal(first.VersionCommit, replay.VersionCommit);
+        var replayManifest = await new ReleasePlanner(
+                repository,
+                new NuGetRegistry(new HttpClient(new AlwaysPublishedHandler())))
+            .CreateAsync(replay, offline: false, CancellationToken.None);
+        Assert.Equal(first.ClosurePackages, replayManifest.Packages.Select(package => package.PackageId));
+        Assert.All(replayManifest.Packages, package => Assert.True(package.AlreadyPublished));
 
         await fixture.SwitchAsync("dev");
         fixture.Touch(LineageRepository.UnrelatedId, "ordinary leaf patch");
@@ -192,27 +198,26 @@ public sealed class ReleaseLineageGitTests
     }
 
     [Fact]
-    public async Task BootstrapAnchorsWithoutRecalculatingHistoricalIdentities()
+    public async Task BootstrapRejectsNonCanonicalCurrentVersionIntent()
     {
-        await using var fixture = await LineageRepository.CreateAsync(malformedCoreVersion: true);
+        await using var fixture = await LineageRepository.CreateAsync();
         var process = new ProcessRunner();
         var compiler = new ReleaseLineageCompiler(
             fixture.Root,
             process,
             new RepositoryInspector(fixture.Root, process));
-        fixture.WriteVersion(LineageRepository.CoreId, "0.18");
-        var source = await fixture.CommitAsync("repair malformed package version");
+        fixture.WriteVersion(LineageRepository.CoreId, "0.17.1");
+        var source = await fixture.CommitAsync("use non-canonical package intent");
 
-        var lineage = await compiler.CompileAsync(
-            source,
-            fixture.BaseCommit,
-            "automation/package-lineage-dev",
-            previousLineageRevision: null,
-            CancellationToken.None);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            compiler.CompileAsync(
+                source,
+                fixture.BaseCommit,
+                "automation/package-lineage-dev",
+                previousLineageRevision: null,
+                CancellationToken.None));
 
-        Assert.True(lineage.IsBootstrap);
-        Assert.Equal(lineage.Packages.Count, lineage.ClosurePackages.Count);
-        Assert.All(lineage.Packages, package => Assert.False(string.IsNullOrWhiteSpace(package.Version)));
+        Assert.Contains("exactly unsigned major.minor", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -253,6 +258,14 @@ public sealed class ReleaseLineageGitTests
             package => package.Version,
             StringComparer.OrdinalIgnoreCase);
 
+    private sealed class AlwaysPublishedHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK));
+    }
+
     private sealed class LineageRepository : IAsyncDisposable
     {
         public const string CoreId = "Sylin.Koan.Test.Core";
@@ -273,7 +286,7 @@ public sealed class ReleaseLineageGitTests
         public string Root { get; }
         public string BaseCommit { get; }
 
-        public static async Task<LineageRepository> CreateAsync(bool malformedCoreVersion = false)
+        public static async Task<LineageRepository> CreateAsync()
         {
             var repositoryRoot = FindKoanRoot();
             var root = Path.Combine(repositoryRoot, "tmp", "package-lineage-tests", Guid.NewGuid().ToString("N"));
@@ -290,12 +303,6 @@ public sealed class ReleaseLineageGitTests
                 [UnrelatedId] = CreateProject(root, "Unrelated", UnrelatedId)
             };
             var fixture = new LineageRepository(root, directories, string.Empty);
-            if (malformedCoreVersion)
-            {
-                File.WriteAllText(
-                    Path.Combine(directories[CoreId], "version.json"),
-                    "{ \"version\": \"not-a-version\", \"pathFilters\": [\".\"] }" + Environment.NewLine);
-            }
             await fixture.GitAsync("init", "--initial-branch=dev");
             await fixture.GitAsync("config", "user.name", "Koan Packaging Tests");
             await fixture.GitAsync("config", "user.email", "packaging-tests@koan.invalid");

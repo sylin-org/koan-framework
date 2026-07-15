@@ -49,6 +49,18 @@ public sealed class PackageGraphTests
     }
 
     [Fact]
+    public void SuppressedPackageDependenciesStillParticipateInSourceClosure()
+    {
+        var core = Project("Sylin.Koan.Core");
+        var tool = Project("Sylin.Koan.Tool", suppressDependenciesWhenPacking: true, Reference(core));
+        var graph = new PackageGraph([tool, core]);
+
+        Assert.Equal([core.PackageId, tool.PackageId], graph.ReverseDependentClosure([core.PackageId]));
+        Assert.Equal([core.PackageId], graph.DependenciesOf(tool.PackageId));
+        Assert.Empty(graph.PackageDependenciesOf(tool.PackageId));
+    }
+
+    [Fact]
     public void ReverseClosureUnionsMultipleRootsDeterministically()
     {
         var left = Project("Sylin.Koan.Left");
@@ -87,7 +99,13 @@ public sealed class PackageGraphTests
     private static string Reference(PackageProject project) =>
         Path.Combine(project.ProjectDirectory, Path.GetFileName(project.ProjectPath));
 
-    private static PackageProject Project(string id, params string[] references)
+    private static PackageProject Project(string id, params string[] references) =>
+        Project(id, suppressDependenciesWhenPacking: false, references);
+
+    private static PackageProject Project(
+        string id,
+        bool suppressDependenciesWhenPacking,
+        params string[] references)
     {
         var name = id.Replace('.', '-');
         var directory = Path.Combine(Path.GetTempPath(), "koan-package-graph-tests", name);
@@ -96,6 +114,7 @@ public sealed class PackageGraphTests
             directory,
             id,
             "Package",
+            suppressDependenciesWhenPacking,
             true,
             "README.md",
             "Description",

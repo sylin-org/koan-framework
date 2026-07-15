@@ -129,6 +129,30 @@ public sealed class ReleaseLineageCompilerTests
     }
 
     [Fact]
+    public void ExistingClosureMemberRequiresDurablePriorIdentity()
+    {
+        var core = Project("Sylin.Koan.Core");
+        var data = Project("Sylin.Koan.Data", Reference(core));
+        var app = Project("Sylin.Koan.App", Reference(data));
+        var graph = new PackageGraph([app, data, core]);
+        var previous = new Dictionary<string, string?>(Versions(core, data, app), StringComparer.OrdinalIgnoreCase)
+        {
+            [core.PackageId] = null
+        };
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            ReleaseLineageCompiler.Plan(
+                graph,
+                [core.PackageId],
+                new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
+                isBootstrap: false,
+                previous,
+                Versions(core, data, app)));
+
+        Assert.Contains("durable version identity", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void PreviousPackageDeletionFailsLoudly()
     {
         var core = Project("Sylin.Koan.Core");
@@ -213,6 +237,7 @@ public sealed class ReleaseLineageCompilerTests
             directory,
             id,
             "Package",
+            false,
             true,
             "README.md",
             "Description",

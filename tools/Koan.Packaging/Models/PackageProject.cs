@@ -5,6 +5,7 @@ internal sealed record PackageProject(
     string ProjectDirectory,
     string PackageId,
     string Kind,
+    bool SuppressDependenciesWhenPacking,
     bool IncludeSymbols,
     string? Readme,
     string Description,

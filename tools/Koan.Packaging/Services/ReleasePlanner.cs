@@ -99,7 +99,7 @@ internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegist
                 var published = !offline && await registry.ExistsAsync(project.PackageId, current, ct);
                 if (!changed && published) return;
 
-                var dependencies = graph.DependenciesOf(project.PackageId).ToList();
+                var dependencies = graph.PackageDependenciesOf(project.PackageId).ToList();
                 triggerByPackage.TryGetValue(project.PackageId, out var trigger);
                 var reason = trigger is not null
                     ? roots.Contains(project.PackageId)

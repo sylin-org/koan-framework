@@ -10,7 +10,7 @@ permissions: {}
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
     permissions:
       actions: read
@@ -18,14 +18,14 @@ jobs:
       id-token: write
     steps:
       - name: Checkout source event with full history
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
-          dotnet-version: 10.x
+          global-json-file: global.json
 
       - name: Restore repository tools
         run: dotnet tool restore
@@ -50,7 +50,7 @@ jobs:
             if (-not $current) { throw "Current workflow run $currentId was not returned by GitHub." }
             $earlier = @($runs | Where-Object {
               [long]$_.id -lt $currentId -and
-              $_.status -in @('queued', 'in_progress', 'waiting', 'pending')
+              $_.status -in @('requested', 'queued', 'in_progress', 'waiting', 'pending')
             })
             if ($earlier.Count -eq 0) { exit 0 }
             Write-Host "Waiting for $($earlier.Count) earlier release event(s)."
@@ -132,21 +132,19 @@ jobs:
             throw 'Unable to persist package version lineage. A concurrent or non-forward update must be reconciled before publication.'
           }
 
-      - name: Build exact version commit
+      - name: Validate exact version commit
         shell: pwsh
         run: |
           $head = (git rev-parse HEAD).Trim()
           if ($head -ne '${{ steps.lineage.outputs.version-commit }}') {
             throw "Checkout $head does not match compiled version commit ${{ steps.lineage.outputs.version-commit }}."
           }
-          dotnet build Koan.sln -c Release --nologo -p:PublicRelease=true -p:NuGetAuditMode=all -p:NuGetAuditLevel=high -p:WarningsAsErrors=NU1903%3BNU1904
-          if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
-
-      - name: Test exact version commit
-        shell: pwsh
-        run: |
-          dotnet test Koan.sln -c Release --no-build --nologo --blame-hang --blame-hang-timeout 5m
-          if ($LASTEXITCODE -ne 0) { throw 'Release tests failed.' }
+          ./scripts/green-ratchet.ps1 -Configuration Release -Base '${{ steps.revisions.outputs.previous-source }}' -PublicRelease
+          if ($LASTEXITCODE -ne 0) { throw 'Exact release ratchet failed.' }
+          $drift = @(git status --porcelain --untracked-files=no)
+          if ($drift.Count -gt 0) {
+            throw "The exact version checkout drifted during verification:`n$($drift -join "`n")"
+          }
 
       - name: Compile exact release plan
         id: plan
@@ -174,9 +172,9 @@ jobs:
 
       - name: Preserve exact verified release set
         if: steps.plan.outputs.has-packages == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: koan-release-${{ github.sha }}
+          name: koan-release-${{ steps.lineage.outputs.version-commit }}
           path: artifacts/release
           if-no-files-found: error
           retention-days: 30
@@ -195,7 +193,7 @@ jobs:
       - name: Exchange GitHub identity for a short-lived NuGet credential
         if: steps.plan.outputs.has-packages == 'true'
         id: nuget-login
-        uses: NuGet/login@v1
+        uses: NuGet/login@ebc737b6fc418a6ca0073cf116ec8dc156d8b81e # v1
         with:
           user: ${{ vars.NUGET_USER }}
 
@@ -233,17 +231,41 @@ jobs:
             'artifacts/release/release-set.json',
             'artifacts/release/release-state.json'
           )
+          $tagRef = "refs/tags/$tag"
+          function Resolve-RemoteTagTarget {
+            $refs = @(git ls-remote --tags origin $tagRef "$tagRef^{}")
+            if ($LASTEXITCODE -ne 0) { throw "Unable to inspect release tag $tag." }
+            if ($refs.Count -eq 0) { return $null }
+            $peeled = $refs | Where-Object { $_ -like "*$tagRef^{}" } | Select-Object -First 1
+            $selected = if ($peeled) { $peeled } else { $refs | Select-Object -First 1 }
+            return ($selected -split '\s+')[0]
+          }
+          $tagTarget = Resolve-RemoteTagTarget
+          if ($tagTarget) {
+            if ($tagTarget -ne $manifest.versionCommit) {
+              throw "Release tag $tag targets $tagTarget, not exact version commit $($manifest.versionCommit)."
+            }
+          }
+          else {
+            git push origin "$($manifest.versionCommit):$tagRef"
+            if ($LASTEXITCODE -ne 0) {
+              $tagTarget = Resolve-RemoteTagTarget
+              if ($tagTarget -ne $manifest.versionCommit) {
+                throw "Unable to create exact release tag $tag at $($manifest.versionCommit)."
+              }
+            }
+          }
           for ($attempt = 1; $attempt -le 5; $attempt++) {
             gh release view $tag *> $null
             if ($LASTEXITCODE -eq 0) {
               gh release upload $tag @evidence --clobber
               if ($LASTEXITCODE -eq 0) {
-                gh release edit $tag --target $manifest.versionCommit --title "Koan package release $sourceShort / $versionShort" --notes $notes
+                gh release edit $tag --title "Koan package release $sourceShort / $versionShort" --notes $notes
               }
             }
             else {
               gh release create $tag @evidence `
-                --target $manifest.versionCommit `
+                --verify-tag `
                 --title "Koan package release $sourceShort / $versionShort" `
                 --notes $notes
             }

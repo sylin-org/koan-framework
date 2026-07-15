@@ -153,7 +153,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             "dotnet",
             [
                 "msbuild", project, "-nologo",
-                "-getProperty:IsPackable,PackageId,KoanPackageKind,IncludeSymbols,PackageReadmeFile,Description,PackageTags",
+                "-getProperty:IsPackable,PackageId,KoanPackageKind,SuppressDependenciesWhenPacking,IncludeSymbols,PackageReadmeFile,Description,PackageTags",
                 "-getItem:ProjectReference,None", "-p:PublicRelease=true"
             ],
             repositoryRoot,
@@ -209,6 +209,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             projectDirectory,
             packageId,
             ReadString(properties, "KoanPackageKind") ?? "Package",
+            ReadBoolean(properties, "SuppressDependenciesWhenPacking", defaultValue: false),
             ReadBoolean(properties, "IncludeSymbols", defaultValue: true),
             ReadString(properties, "PackageReadmeFile"),
             ReadString(properties, "Description") ?? string.Empty,

@@ -75,11 +75,17 @@ internal sealed class ReleaseLineageCompiler(
             package => package.Version,
             StringComparer.OrdinalIgnoreCase);
 
-        var breakingRoots = await FindBreakingRootsAsync(
+        var currentVersionIntents = await ReadCurrentVersionIntentsAsync(
             graph,
-            previousSourceCommit,
             sourceCommit,
             cancellationToken);
+        var breakingRoots = isBootstrap
+            ? []
+            : await FindBreakingRootsAsync(
+                graph,
+                previousSourceCommit,
+                currentVersionIntents,
+                cancellationToken);
         var sharedInputsByPackage = await FindChangedSharedInputsAsync(
             graph,
             previousSourceCommit,
@@ -385,7 +391,7 @@ internal sealed class ReleaseLineageCompiler(
     private async Task<IReadOnlyList<string>> FindBreakingRootsAsync(
         PackageGraph graph,
         string previousSourceCommit,
-        string sourceCommit,
+        IReadOnlyDictionary<string, string> currentVersionIntents,
         CancellationToken cancellationToken)
     {
         var roots = new List<string>();
@@ -394,11 +400,27 @@ internal sealed class ReleaseLineageCompiler(
             var versionPath = Normalize(Path.Combine(Path.GetDirectoryName(project.ProjectPath) ?? string.Empty, "version.json"));
             var previous = await TryReadVersionIntentAsync(previousSourceCommit, versionPath, cancellationToken);
             if (previous is null) continue;
-            var current = await TryReadVersionIntentAsync(sourceCommit, versionPath, cancellationToken)
-                ?? throw new InvalidOperationException($"Package {project.PackageId} has no version intent at {sourceCommit}.");
+            var current = currentVersionIntents[project.PackageId];
             if (IsBreakingTierAdvance(previous, current)) roots.Add(project.PackageId);
         }
         return roots;
+    }
+
+    private async Task<IReadOnlyDictionary<string, string>> ReadCurrentVersionIntentsAsync(
+        PackageGraph graph,
+        string sourceCommit,
+        CancellationToken cancellationToken)
+    {
+        var intents = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var project in graph.Projects.OrderBy(project => project.PackageId, StringComparer.OrdinalIgnoreCase))
+        {
+            var versionPath = Normalize(Path.Combine(Path.GetDirectoryName(project.ProjectPath) ?? string.Empty, "version.json"));
+            var current = await TryReadVersionIntentAsync(sourceCommit, versionPath, cancellationToken)
+                ?? throw new InvalidOperationException($"Package {project.PackageId} has no version intent at {sourceCommit}.");
+            _ = ParseVersionIntent(current);
+            intents[project.PackageId] = current;
+        }
+        return intents;
     }
 
     private static void VerifyFreshClosureVersions(

@@ -34,6 +34,9 @@
 .PARAMETER Base
   Git ref to diff instructional docs against for Leg C. Default: origin/main if present, else main.
 
+.PARAMETER PublicRelease
+  Build the exact public package identity and enable the release audit floor. Used by the dev release compiler.
+
 .EXAMPLE
   pwsh scripts/green-ratchet.ps1                 # full gate, diff-scoped doc-code vs main
   pwsh scripts/green-ratchet.ps1 -SkipTests      # build + lints only (fast)
@@ -43,7 +46,8 @@ param(
     [string]$Configuration = "Debug",
     [string]$Base = "",
     [switch]$SkipTests,
-    [switch]$FullDocs
+    [switch]$FullDocs,
+    [switch]$PublicRelease
 )
 
 $ErrorActionPreference = 'Continue'
@@ -66,11 +70,22 @@ try {
         & git rev-parse --verify --quiet origin/main *> $null
         $Base = if ($LASTEXITCODE -eq 0) { 'origin/main' } else { 'main' }
     }
-    Write-Host "[ratchet] config=$Configuration  docs-base=$Base  skipTests=$SkipTests  fullDocs=$FullDocs"
+    Write-Host "[ratchet] config=$Configuration  docs-base=$Base  skipTests=$SkipTests  fullDocs=$FullDocs  publicRelease=$PublicRelease"
 
     Invoke-Leg '0. tools' { & dotnet tool restore }
 
-    Invoke-Leg 'A. build' { & dotnet build "$root/Koan.sln" -c $Configuration --nologo }
+    Invoke-Leg 'A. build' {
+        $arguments = @('build', "$root/Koan.sln", '-c', $Configuration, '--nologo')
+        if ($PublicRelease) {
+            $arguments += @(
+                '-p:PublicRelease=true',
+                '-p:NuGetAuditMode=all',
+                '-p:NuGetAuditLevel=high',
+                '-p:WarningsAsErrors=NU1903%3BNU1904'
+            )
+        }
+        & dotnet @arguments
+    }
 
     # E. Lockfile drift (P1.1) — the build regenerates each app's koan.lock.json; fail if one drifted
     # without being committed (composition changed but not recorded). Clean skip when none are tracked.

@@ -63,6 +63,12 @@ internal sealed class PackageGraph
         return dependencies[packageId];
     }
 
+    public IReadOnlyList<string> PackageDependenciesOf(string packageId)
+    {
+        var project = Project(packageId);
+        return project.SuppressDependenciesWhenPacking ? [] : dependencies[packageId];
+    }
+
     public IReadOnlyList<string> ReverseDependentClosure(IEnumerable<string> roots)
     {
         var selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
