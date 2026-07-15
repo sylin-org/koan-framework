@@ -3,7 +3,6 @@ using System.Linq;
 using System.Security.Claims;
 using Koan.Core;
 using Koan.Mcp.CustomTools;
-using Koan.Mcp.Execution;
 using Koan.Mcp.Hosting;
 using Koan.Mcp.Options;
 using Koan.Web.Authorization;
@@ -77,9 +76,8 @@ public sealed class McpSurfaceProjector
         }
 
         var customTools = new JArray();
-        foreach (var tool in _customTools.Tools)
+        foreach (var tool in CustomToolProjection.Visible(_customTools, _serverOptions.Value, user))
         {
-            if (!CustomToolVisible(tool, user)) continue;
             customTools.Add(ToolJson(McpRpcHandler.ToolDescriptor.FromCustom(tool)));
         }
 
@@ -111,11 +109,6 @@ public sealed class McpSurfaceProjector
             ["customTools"] = customTools,
         };
     }
-
-    // Custom [McpTool] verbs ride a scope policy, not the entity [Access] gate. Show one only when the caller
-    // satisfies its required scopes (scope-free verbs are visible to anyone — including anonymous, which is honest).
-    private static bool CustomToolVisible(McpCustomTool tool, ClaimsPrincipal? user)
-        => user is null || tool.RequiredScopes.Count == 0 || McpToolAccessPolicy.UserHasScopes(user, tool.RequiredScopes);
 
     // DeepClone the schema/annotation JObjects: the registry shares one instance per tool, and a JToken may not
     // be parented twice — cloning keeps the registry's structure intact while we compose the document.

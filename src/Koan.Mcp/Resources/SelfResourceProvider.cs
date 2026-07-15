@@ -5,7 +5,10 @@ using System.Security.Claims;
 using System.Text;
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Mcp.CustomTools;
+using Koan.Mcp.Options;
 using Koan.Web.Authorization;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -15,7 +18,7 @@ namespace Koan.Mcp.Resources;
 /// AN8 (docs/assessment/09 §11.1) — the <c>koan://self</c> self-introduction: the projector's per-grant
 /// output rendered in TWO faces in one resource. A first-person <c>prose</c> greeting (the menu, written
 /// from the app identity + the verbs visible to THIS caller) AND the <c>structured</c> contract beneath it
-/// (exact entities/verbs). Prose is the greeting; structured is the contract — prose is NEVER the only
+/// (exact entities/verbs and custom workflow tools). Prose is the greeting; structured is the contract — prose is NEVER the only
 /// form (it is lossy; exact verb names/schemas don't survive a friendly sentence). The menu reshapes per
 /// grant and is authored by nobody — rename the app → it updates; a walled entity → it vanishes.
 ///
@@ -28,12 +31,20 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
     public const string ResourceUri = "koan://self";
 
     private readonly McpEntityRegistry _registry;
+    private readonly McpCustomToolRegistry _customTools;
     private readonly IAccessGateCache _gateCache;
+    private readonly IOptions<McpServerOptions> _options;
 
-    public SelfResourceProvider(McpEntityRegistry registry, IAccessGateCache gateCache)
+    public SelfResourceProvider(
+        McpEntityRegistry registry,
+        McpCustomToolRegistry customTools,
+        IAccessGateCache gateCache,
+        IOptions<McpServerOptions> options)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        _customTools = customTools ?? throw new ArgumentNullException(nameof(customTools));
         _gateCache = gateCache ?? throw new ArgumentNullException(nameof(gateCache));
+        _options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
     public IEnumerable<McpResourceDescriptor> List(ClaimsPrincipal? user)
@@ -54,6 +65,7 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
 
         var app = KoanEnv.CurrentSnapshot.Application;
         var visible = EntityProjection.Visible(_registry, _gateCache, user);
+        var visibleCustomTools = CustomToolProjection.Visible(_customTools, _options.Value, user);
 
         var entities = new JArray(visible.Select(v => new JObject
         {
@@ -67,9 +79,16 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
             }))
         }));
 
+        var customTools = new JArray(visibleCustomTools.Select(tool => new JObject
+        {
+            ["name"] = tool.Name,
+            ["description"] = tool.Description,
+            ["isMutation"] = tool.IsMutation
+        }));
+
         var document = new JObject
         {
-            ["prose"] = BuildProse(app, visible),
+            ["prose"] = BuildProse(app, visible, visibleCustomTools),
             ["identity"] = new JObject
             {
                 ["name"] = app.Name,
@@ -79,7 +98,8 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
                 ["supportUrl"] = app.SupportUrl,
                 ["tags"] = new JArray(app.Tags)
             },
-            ["entities"] = entities
+            ["entities"] = entities,
+            ["customTools"] = customTools
         };
 
         return new McpResourceContents(ResourceUri, "application/json", document.ToString(Formatting.None));
@@ -87,7 +107,8 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
 
     private static string BuildProse(
         ApplicationIdentitySnapshot app,
-        IReadOnlyList<(McpEntityRegistration Registration, IReadOnlyList<McpToolDefinition> Verbs, IReadOnlyList<EntityProjection.Door> Doors)> visible)
+        IReadOnlyList<(McpEntityRegistration Registration, IReadOnlyList<McpToolDefinition> Verbs, IReadOnlyList<EntityProjection.Door> Doors)> visible,
+        IReadOnlyList<McpCustomTool> customTools)
     {
         var sb = new StringBuilder();
         sb.Append("I'm ").Append(app.Name).Append('.');
@@ -96,15 +117,18 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
             sb.Append(' ').Append(app.Description.TrimEnd('.')).Append('.');
         }
 
-        if (visible.Count == 0)
+        if (visible.Count == 0 && customTools.Count == 0)
         {
             sb.Append(" There's nothing here you can use yet.");
             return sb.ToString();
         }
 
-        sb.Append(" You can work with: ")
-          .Append(string.Join(", ", visible.Select(v => v.Registration.DisplayName)))
-          .Append('.');
+        if (visible.Count > 0)
+        {
+            sb.Append(" You can work with: ")
+              .Append(string.Join(", ", visible.Select(v => v.Registration.DisplayName)))
+              .Append('.');
+        }
 
         foreach (var (registration, verbs, _) in visible)
         {
@@ -112,6 +136,13 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
             sb.Append(" For ").Append(registration.DisplayName).Append(" you can ")
               .Append(canModify ? "read and modify" : "read")
               .Append(" records.");
+        }
+
+        if (customTools.Count > 0)
+        {
+            sb.Append(" You can use application tools: ")
+              .Append(string.Join(", ", customTools.Select(tool => tool.Name)))
+              .Append('.');
         }
 
         return sb.ToString();

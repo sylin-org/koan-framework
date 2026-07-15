@@ -41,9 +41,14 @@ Consumers must:
 
 - Resource providers register through `IMcpResourceProvider` and are projected by the shared MCP RPC
   handler.
-- `koan://self` introduces the application and caller-visible Entity surface.
+- `koan://self` introduces the application and its caller-visible Entity plus custom-workflow surface.
 - `koan://entities` describes caller-visible entities and verbs.
 - `koan://facts` explains host composition decisions and degraded states.
+
+Custom-tool visibility is calculated once by `CustomToolProjection` and reused by protocol listing,
+remote dispatch, Explorer projection, and `koan://self`. A null principal preserves the established
+trusted local-STDIO surface; a concrete remote principal applies server authentication, required
+scopes, and operational-toolset enablement. Disabled or unauthorized tools leave no trace.
 
 ## References
 

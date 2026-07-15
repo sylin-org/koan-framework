@@ -13,6 +13,11 @@ MCP clients can read `koan://facts` for the same versioned, redacted runtime-fac
 startup, health, and the Web well-known surface. Check `complete` before treating the snapshot as a
 verdict, and use stable fact codes rather than parsing summaries.
 
+Read `koan://self` for a caller-specific introduction to the application. Its structured contract
+contains the Entity surface and custom `[McpTool]` workflows visible to that caller; its prose face is
+derived from the same projection. `koan://entities` remains intentionally entity-specific and may be
+empty in an application that exposes only custom workflow tools.
+
 ## Quick start
 
 To expose a Koan entity over the Model Context Protocol (MCP), simply annotate your entity class with the `[McpEntity]` attribute. The framework's Zero-DX scanner will automatically discover the entity, map its relational/data endpoints to MCP tools, and host them.

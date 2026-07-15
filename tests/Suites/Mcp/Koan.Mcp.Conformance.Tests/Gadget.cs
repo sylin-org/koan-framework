@@ -33,4 +33,10 @@ public static class ConformanceTools
     [McpTool(Name = "gadget_purge", Description = "Permanently purges gadgets.")]
     [McpDestructive]
     public static string GadgetPurge(string confirm) => $"purged:{confirm}";
+
+    [McpTool(
+        Name = "gadget_admin",
+        Description = "Performs a scope-protected gadget operation.",
+        RequiredScopes = ["gadget:admin"])]
+    public static string GadgetAdmin() => "admin";
 }

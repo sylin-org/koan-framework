@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Koan.Core;
 using Koan.Mcp;
+using Koan.Mcp.CustomTools;
 using Koan.Mcp.Options;
 using Koan.Mcp.Resources;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +51,12 @@ public sealed class SelfIntroductionSpec : IClassFixture<ConformanceFixture>
         var entities = (JArray)doc["entities"]!;
         entities.OfType<JObject>().Select(e => e["name"]?.Value<string>())
             .Should().Contain("gadget", "the visible entities appear in the structured contract");
+
+        var customTools = (JArray)doc["customTools"]!;
+        customTools.OfType<JObject>().Select(tool => tool["name"]?.Value<string>())
+            .Should().Contain(["gadget_ping", "gadget_purge"],
+                "caller-visible business tools are part of the structured self-description");
+        prose.Should().Contain("gadget_ping", "the prose face acknowledges usable custom workflows");
     }
 
     [Fact]
@@ -59,12 +66,25 @@ public sealed class SelfIntroductionSpec : IClassFixture<ConformanceFixture>
         // (walled-means-silent) — a tier you can't reach is invisible, not redacted.
         var provider = new SelfResourceProvider(
             _fx.Services.GetRequiredService<McpEntityRegistry>(),
-            _fx.Services.GetRequiredService<Koan.Web.Authorization.IAccessGateCache>());
+            _fx.Services.GetRequiredService<McpCustomToolRegistry>(),
+            _fx.Services.GetRequiredService<Koan.Web.Authorization.IAccessGateCache>(),
+            _fx.Services.GetRequiredService<IOptions<McpServerOptions>>());
 
         var doc = JObject.Parse(provider.Read(SelfResourceProvider.ResourceUri, new ClaimsPrincipal(new ClaimsIdentity()))!.Text);
         var names = ((JArray)doc["entities"]!).OfType<JObject>().Select(e => e["name"]?.Value<string>()).ToList();
+        var toolNames = ((JArray)doc["customTools"]!).OfType<JObject>()
+            .Select(tool => tool["name"]?.Value<string>()).ToList();
 
         names.Should().Contain("gadget", "a public entity is part of the anonymous self-projection");
         names.Should().NotContain("vault", "a scoped entity is absent from the self-projection for an unscoped caller");
+        toolNames.Should().Contain("gadget_ping", "a scope-free custom tool is visible anonymously");
+        toolNames.Should().NotContain("gadget_admin", "a scoped custom tool remains silent without its grant");
+
+        var granted = JObject.Parse(provider.Read(
+            SelfResourceProvider.ResourceUri,
+            Koan.Mcp.TestKit.McpHarnessFixtureBase.Principal("gadget:admin"))!.Text);
+        ((JArray)granted["customTools"]!).OfType<JObject>()
+            .Select(tool => tool["name"]?.Value<string>())
+            .Should().Contain("gadget_admin", "the self-description reshapes for the caller's scope");
     }
 }

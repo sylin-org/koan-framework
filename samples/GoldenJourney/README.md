@@ -52,9 +52,9 @@ one preserves the previous result and adds one business-aligned capability.
 `GoldenJourneyContractTests` builds and runs this exact directory. It verifies SQLite persistence,
 the business priority rule, completed job progress, selected Jobs ledger and transport, identical
 operator/agent facts, MCP tool discovery, rejection before assessment, honest custom-tool dry-run,
-an agent recommendation observed through REST, and unavailable-adapter explanation followed by a
-clean restart. Package-only clean-room proof is tracked separately and must pass before that lane is
-claimed as supported.
+caller-specific `koan://self` acknowledgement of both custom workflows, an agent recommendation
+observed through REST, and unavailable-adapter explanation followed by a clean restart. Package-only
+clean-room proof is tracked separately and must pass before that lane is claimed as supported.
 
 This is not a production security template. HTTP MCP is enabled for local Development, the agent
 recommendation is deliberately non-final, and authentication/authorization must be designed for the

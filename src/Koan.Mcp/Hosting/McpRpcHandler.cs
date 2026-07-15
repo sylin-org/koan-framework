@@ -11,6 +11,7 @@ using Koan.Mcp.CodeExecution;
 using Koan.Mcp.CodeMode.Sdk;
 using Koan.Mcp.Execution;
 using Koan.Mcp.Options;
+using Koan.Mcp.Resources;
 using Koan.Web.Endpoints;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -118,9 +119,8 @@ public sealed class McpRpcHandler
             {
                 // P3.2: a verb on a config-disabled operational toolset is absent from the surface (global gate —
                 // applies on STDIO + remote, unlike the per-caller visibility filter). The grant is enforced separately.
-                var options = _serverOptions.Value;
-                toolsList.AddRange(_customTools.Tools
-                    .Where(t => t.OperationalToolsetKey is not { Length: > 0 } key || options.IsOperationalToolsetEnabled(key))
+                toolsList.AddRange(CustomToolProjection
+                    .Visible(_customTools, _serverOptions.Value, user: null)
                     .Select(ToolDescriptor.FromCustom));
             }
         }

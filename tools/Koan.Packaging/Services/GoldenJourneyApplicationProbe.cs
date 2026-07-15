@@ -77,6 +77,26 @@ internal sealed class GoldenJourneyApplicationProbe
                     || !names.Contains(PackagingConstants.GoldenJourney.RecommendTool))
                     throw new InvalidOperationException("MCP did not advertise the bounded review workflow tools.");
 
+                var self = await mcp.CallAsync("resources/read", new
+                {
+                    uri = PackagingConstants.ApplicationProbe.SelfUri
+                }, cancellationToken);
+                var selfText = self.GetProperty("result").GetProperty("contents")[0].GetProperty("text").GetString()
+                    ?? throw new InvalidOperationException("MCP self-description returned no content.");
+                using (var selfDocument = JsonDocument.Parse(selfText))
+                {
+                    var selfRoot = selfDocument.RootElement;
+                    var selfTools = selfRoot.GetProperty(PackagingConstants.ApplicationProbe.CustomToolsProperty)
+                        .EnumerateArray()
+                        .Select(tool => tool.GetProperty("name").GetString())
+                        .ToArray();
+                    var prose = selfRoot.GetProperty("prose").GetString() ?? string.Empty;
+                    if (!selfTools.Contains(PackagingConstants.GoldenJourney.PendingTool)
+                        || !selfTools.Contains(PackagingConstants.GoldenJourney.RecommendTool)
+                        || prose.Contains(PackagingConstants.ApplicationProbe.EmptySelfMessage, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("MCP self-description did not acknowledge its live review workflow tools.");
+                }
+
                 var facts = await mcp.CallAsync("resources/read", new
                 {
                     uri = PackagingConstants.ApplicationProbe.RuntimeFactsUri

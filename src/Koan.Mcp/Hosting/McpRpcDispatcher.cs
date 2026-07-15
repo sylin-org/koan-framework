@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Mcp.Execution;
 using Koan.Mcp.Options;
+using Koan.Mcp.Resources;
 using Koan.Web.Authorization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -190,7 +191,7 @@ public sealed class McpRpcDispatcher
     }
 
     private bool HasAccessCustom(Koan.Mcp.CustomTools.McpCustomTool tool, ClaimsPrincipal principal)
-        => McpToolAccessPolicy.IsCustomToolPermitted(principal, tool, _options.CurrentValue);
+        => CustomToolProjection.IsVisible(tool, _options.CurrentValue, principal);
 
     private JObject Wrap(JToken? id, JToken? result)
         => result is null
