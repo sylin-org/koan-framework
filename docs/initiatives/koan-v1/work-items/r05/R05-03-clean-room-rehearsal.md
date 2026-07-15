@@ -111,3 +111,11 @@ lacks the target. Packaging passes 16/16, Core lockfile tests 4/4, strict docs a
 inventory pass. A fresh 84-package clean room restored and built both external applications with zero
 warnings/errors: FirstUse passed 8/8 in 4.755s and GoldenJourney passed 11/11 in 8.754s, each recording
 `compositionLockfileObserved=true`. Evidence is under ignored `artifacts/r05-lockfile-release/`.
+
+Repair 4 is complete in local commit `775d5716`. GoldenJourney now publishes one exact command that
+executes the complete 11-step contract and a manual PowerShell sequence that forces
+`Koan:Data:Sources:Default:Adapter=not-referenced`, reads the stable rejection fact and correction,
+clears the intent, and observes SQLite recovery. The public explanation pins the routing boundary:
+ambient and Entity-specific routes precede the application Default, so `ReviewRequest`'s explicit
+`[DataAdapter("sqlite")]` remains scoped while the bad default stays visible. The documented command
+passes 1/1 and strict docs passes.

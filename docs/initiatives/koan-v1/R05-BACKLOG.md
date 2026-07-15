@@ -42,7 +42,7 @@ R05-01 business spine
 |---|---|---|---|---|
 | [R05-01](work-items/r05/R05-01-business-spine.md) | passed | The cumulative app reads as a review workflow and persists/reaches one business result. | R04 | GoldenJourney domain/controller; pure rule and running REST assertions |
 | [R05-02](work-items/r05/R05-02-reactive-agentic.md) | passed | Durable assessment and bounded agent recommendation remain inspectable and honest. | R05-01 | Jobs facts/progress suites; 11-step source process proof |
-| [R05-03](work-items/r05/R05-03-clean-room-rehearsal.md) | in-progress | A package-only checkout and independent readers reproduce the supported journey. | R05-02 | fresh 84-package clean room passed; agent round confirmed the core and entered bounded repair-and-repeat; repairs 1/5 through 3/5 complete |
+| [R05-03](work-items/r05/R05-03-clean-room-rehearsal.md) | in-progress | A package-only checkout and independent readers reproduce the supported journey. | R05-02 | fresh 84-package clean room passed; agent round confirmed the core and entered bounded repair-and-repeat; repairs 1/5 through 4/5 complete |
 
 ## Program rules
 
