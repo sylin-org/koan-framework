@@ -186,7 +186,7 @@ cardinality and copy semantics. Neither is a compatibility base for Events or Tr
 | 1 | [R07-01 Core context foundation](r07/R07-01-core-context-foundation.md) | **Passed.** Tenant and other module context survive durable work through a Core-owned, fail-closed contract | Data-owned generic slice/carrier APIs |
 | 2 | [Provider-bounded streaming](r07/R07-02-provider-bounded-streaming.md) | **Passed.** Data.Core 42/42 focused and 325/325 full, six qualified and three fail-closed adapter cells, SQLite 1/1, and Backup 5/5 acceptance plus 7/7 full establish the bounded contract | materializing stream implementation and unused batch hint |
 | 3 | [Automatic breaking package lineage](r07/R07-03-automatic-package-lineage.md) | **Passed.** One version intent automatically mints and proves the complete reverse-dependent wave without an operator package list | manual closure tracking and source-SHA/package-SHA conflation |
-| 4 | [Public-release ratchet rehabilitation](r07/R07-04-public-release-ratchet.md) | The exact automatic release floor passes without excluding real suites or relying on leaked host state | misclassified helper projects and a red solution-test baseline |
+| 4 | [Public-release ratchet rehabilitation](r07/R07-04-public-release-ratchet.md) | **Passed.** The exact automatic release floor passes with bounded project fan-out, every runnable suite retained, and no leaked host state | misclassified helper projects, unbounded certification concurrency, and a red solution-test baseline |
 | 5 | Canonical Lifecycle | Lifecycle becomes host-owned, unavoidable, and honestly named in one clean 0.18 wave | lifecycle `Events` name, process-static registry, and bypassable hooks |
 | 6 | Typed capability substrate | A minimal Data.Core cardinality adapter and pillar-owned execution replace generic public flow machinery | `PipelineBuilder` and pillar pipeline extensions |
 | 7 | In-process Transport flagship | a foundation + `AddKoan()` app gets local scalar/set/stream snapshots, stable typed receivers, source/ingress filters, isolated copies, bounded acceptance, operation-scoped settlement wait, and tenant-safe retry identity | old Messaging Core, proxy/buffer, broad `Send`, separate InMemory connector |
@@ -213,10 +213,11 @@ backlogs until their prerequisites pass.
 7. Automate reverse-dependent package closure before changing Lifecycle's shipped public surface.
    **Complete.** R07-03 proves two synthetic waves and the complete 81-package Data.Core break in a
    registry-reconciled 100-artifact clean room.
-8. Restore the exact public-release ratchet before changing Lifecycle's shipped surface. **Active as
-   R07-04.** Do not turn real test failures into exclusions.
-9. Open canonical Lifecycle as the next clean 0.18 child; do not mix Communication or Pipeline work
-   into that boundary.
+8. Restore the exact public-release ratchet before changing Lifecycle's shipped surface. **Complete.**
+   R07-04 passes all eight legs from clean commit `50002c262` in 24 minutes 33 seconds without
+   publication or remote mutation.
+9. Open canonical Lifecycle as the next clean 0.18 child. **Next.** Do not mix Communication or
+   Pipeline work into that boundary.
 10. Open each later implementation slice only after its lower boundary passes.
 11. Prove in-process semantics before any broker migration or public maturity change.
 
@@ -239,8 +240,9 @@ identity automatically.
 - The real Backup consumer passes 5/5 acceptance and 7/7 full: SQLite pages `2/2/1`, cancellation
   publishes nothing after the bounded stop, and InMemory/JSON reject before query or archive
   publication.
-- Connector regressions pass 236/237; Mongo's sole known ZenGarden endpoint-preference failure remains
-  isolated in PMC-012, while Couchbase is 17/17 and mixed-case convergence is repaired centrally.
+- The former Mongo ZenGarden endpoint-preference failure is resolved by ARCH-0114's uniform layered-
+  capability activation. Core Unit passes 112/112 and Mongo 70/70; Couchbase's earlier 17/17 proof is
+  corroborated by the final aggregate completing without its prior node-readiness failure.
 - The Release solution build passes with 0 errors and 19 reviewed pre-existing warnings. Strict docs,
   skill lint, changed examples, structural claims, compatibility, diff, and privacy gates pass. R07-02
   is closed without a maturity promotion.
@@ -251,6 +253,10 @@ identity automatically.
   produces 100 exact artifacts, and package-only FirstUse plus GoldenJourney pass in 4.095s and
   10.591s. The implementation changes no runtime API and performs no publication or remote Git
   mutation.
+- R07-04's exact public-release ratchet passes all eight legs from clean commit `50002c262` in 24
+  minutes 33 seconds. The bounded two-project solution topology retains every runnable suite; the
+  three prior aggregate-only Jobs failures do not recur, no hang timeout fires, and no package,
+  release, tag, push, or remote mutation occurs.
 
 ## Acceptance additions
 

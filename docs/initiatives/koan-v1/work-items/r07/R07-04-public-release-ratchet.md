@@ -8,14 +8,14 @@ last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
-  status: in-progress
-  scope: whole-repository test truth required before the first automatic public release
+  status: passed
+  scope: exact public-release ratchet from clean commit 50002c262
 ---
 
 # R07-04 — Restore a trustworthy public-release ratchet
 
 - Tranche: `T6 — semantic capability ring`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R07-03
 - Unlocks: canonical Lifecycle; advances the first trusted automatic `dev` publication, which remains
   gated by [PMC-016 and PMC-017](../../POST-CYCLE-TODO.md#current-register)
@@ -126,7 +126,7 @@ Isolated reruns show that the red result is not only whole-solution contention:
   simultaneous complete processes. SQLite passes 35/35, Data.Core 349/349, Core Unit 112/112, JSON
   20/20, Data axes integration 18/18, Web SQLite 49/49, and Tenancy 110/110.
 
-### Layered discovery and Mongo endpoint precedence — implementation passed; certification pending
+### Layered discovery and Mongo endpoint precedence — passed
 
 - The remaining Mongo fact encoded the pre-health-check era: a manually registered Zen Garden provider
   was expected to short-circuit `auto`, even though the activated engine now contributes candidates to
@@ -144,10 +144,11 @@ Isolated reruns show that the red result is not only whole-solution contention:
 - Core Unit passes 112/112 and Mongo passes 70/70. Release solution build succeeds with the reviewed
   19-warning baseline and 0 errors;
   docs lint is 0 errors / 1568 historical warnings; surface lint passes 34 rows. Couchbase builds
-  0-warning and its Docker-free specs pass 9/9, but its full node did not become ready in two isolated
-  five-minute attempts. The exact ratchet owns that live 17/17 recheck; it is not called green here.
+  0-warning and its Docker-free specs pass 9/9. The final clean aggregate completed without the earlier
+  node-readiness failure, closing the cross-provider certification rather than relabeling an unavailable
+  lane as green.
 
-### Bounded certification topology — implementation passed; final certification pending
+### Bounded certification topology — passed
 
 - The first clean exact rerun completed in 14 minutes 35 seconds. Every non-test leg passed. The
   solution-test leg reported only three failures: SQLite's high-volume FIFO claim bound, PostgreSQL's
@@ -160,6 +161,10 @@ Isolated reruns show that the red result is not only whole-solution contention:
   large local dump.
 - `ReleaseWorkflowContractTests` pins both bounds. PowerShell parsing, the focused contract, and a real
   test-host invocation with the exact argument combination pass.
+- The exact public-release ratchet then passed all eight legs from clean commit `50002c262` in 24
+  minutes 33 seconds. The three aggregate-only Jobs failures did not recur and no hang timeout fired.
+  Docs lint reported 0 errors / 1567 historical warnings; changed examples passed 25/25, skills 20/20,
+  and blueprint lint 1/1. No package, tag, release, push, or remote mutation occurred.
 
 ## Decisions
 
@@ -187,7 +192,9 @@ Isolated reruns show that the red result is not only whole-solution contention:
 
 ### OPEN
 
-- One exact bounded certification run remains at the R07-04 closure boundary.
+- None within R07-04. The ratchet emits per-project VSTest summaries but does not persist one
+  machine-readable aggregate count; [PMC-020](../../POST-CYCLE-TODO.md#current-register) owns that
+  observability improvement without reopening this passed certification.
 
 ## Red/green plan
 
@@ -208,9 +215,11 @@ Isolated reruns show that the red result is not only whole-solution contention:
 7. **Complete through focused evidence.** Run the exact public-release ratchet once, isolate its three
    aggregate-only Jobs failures, prove each fact alone, and bound the solution-test topology without
    changing behavior or assertions.
-8. Run one exact bounded public-release ratchet from a clean checkout. Record exact counts, duration,
-   environment-dependent skips, warnings, and the absence of publication
-   or remote mutation before passing this child.
+8. **Complete.** Run one exact bounded public-release ratchet from clean commit `50002c262`. All eight
+   legs passed in 24 minutes 33 seconds; docs reported 0 errors / 1567 historical warnings, changed
+   examples 25/25, skills 20/20, and blueprint lint 1/1. No package, tag, release, push, or remote
+   mutation occurred. Per-project VSTest counts were emitted to the console but are not retained as one
+   aggregate artifact; that operator-evidence improvement is deferred to PMC-020.
 
 ## Acceptance
 

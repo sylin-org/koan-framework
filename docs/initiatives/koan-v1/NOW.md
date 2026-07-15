@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 through R07-03 passed; R07-04 packaging, host, persistence, and SQLite ownership roots repaired
+  scope: R07-01 through R07-04 passed; canonical Lifecycle is next
 ---
 
 # Koan V1 reorganization current handoff
@@ -35,7 +35,7 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - [R07-03](work-items/r07/R07-03-automatic-package-lineage.md) passed. Its two production concepts—an
   evaluated `PackageGraph` and Git-native `ReleaseLineageCompiler`—automatically mint and prove the
   complete breaking reverse closure.
-- [R07-04](work-items/r07/R07-04-public-release-ratchet.md) is active. All five shared TestKits are
+- [R07-04](work-items/r07/R07-04-public-release-ratchet.md) passed. All five shared TestKits are
   fenced from solution test execution; packaging subprocesses terminate deterministically; Identity
   passes 114/114; and Canon passes unit 35/35 plus integration 6/6. The five Jobs SQLite failures were
   one ownership root: generic source placement, host selection, and SQLite connection lifetime had
@@ -43,13 +43,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
   simultaneous complete processes, SQLite 35/35, and Data.Core 349/349. Mongo's stale direct
   Zen Garden preference has now been replaced by the shared layered-capability contract in
   [ARCH-0114](../../decisions/ARCH-0114-layered-capability-activation.md): Core Unit passes 112/112 and
-  Mongo passes 70/70. Couchbase builds clean and its Docker-free surface passes 9/9, but two isolated
-  full-suite attempts did not reach test execution because the Testcontainers node remained unready at
-  five minutes. The clean exact aggregate later completed in 14 minutes 35 seconds and remained red only
-  in its solution-test leg: one Jobs timing/concurrency fact each on SQLite, PostgreSQL, and SQL Server.
-  Each named fact passes alone (1/1). The certification runner now limits solution testing to two
-  concurrent projects and terminates an inactive test host after five minutes without producing a dump;
-  a packaging contract pins both bounds.
+  Mongo passes 70/70. The certification runner limits solution testing to two concurrent projects and
+  terminates an inactive test host after five minutes without producing a dump; a packaging contract
+  pins both bounds. The final exact ratchet passed all eight legs from clean commit `50002c262` in 24
+  minutes 33 seconds. The three prior aggregate-only Jobs failures did not recur, Couchbase completed
+  without its earlier node-readiness failure, and no hang timeout fired.
 - Lifecycle remains the next semantic clean 0.18 public break. Retain the no-alias greenfield decision
   and keep Communication/Pipeline work out of the release-foundation slice.
 - Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
@@ -148,8 +146,8 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
    **Passed.**
 2. R07-02: genuine provider-bounded streaming beneath the existing Entity surface. **Passed.**
 3. Automate the breaking package closure. **Passed as R07-03.**
-4. Restore the exact public-release ratchet without exclusions. **Active as R07-04.**
-5. Rebuild canonical host-owned Lifecycle as a clean 0.18 wave.
+4. Restore the exact public-release ratchet without exclusions. **Passed as R07-04.**
+5. Rebuild canonical host-owned Lifecycle as a clean 0.18 wave. **Next.**
 6. Minimal Data.Core Entity-cardinality adapter, pillar-owned execution, and deletion of the two real
    public Pipeline uses.
 7. Faithful local Transport under `AddKoan()`.
@@ -189,9 +187,9 @@ Only the next slice has a detailed child card. Do not open broker breadth before
   No package or remote Git object changed.
 - The Release solution build passes with 0 errors and 19 reviewed pre-existing warnings; strict docs,
   skill lint, changed examples, structural claims, compatibility, diff, and privacy gates pass.
-- The exact public-release ratchet passes tools, build, lockfile, docs, changed examples, skills, and
-  blueprint legs. Its solution-test leg is red and fails closed. Isolated evidence is recorded in
-  R07-04; no publication or remote mutation occurred.
+- The exact public-release ratchet passes all eight legs from clean commit `50002c262` in 24 minutes
+  33 seconds. Docs lint reports 0 errors / 1567 historical warnings; changed examples pass 25/25,
+  skills 20/20, and blueprint lint 1/1. No publication or remote mutation occurred.
 - All five shared TestKit projects now evaluate `IsTestProject=false`; the previously aborting Jobs
   helper exits without a test host. The packaging runner now disables reusable MSBuild worker nodes
   for its redirected subprocesses, closing the pipe-lifetime hang across source probes and release
@@ -213,13 +211,10 @@ Only the next slice has a detailed child card. Do not open broker breadth before
 
 ## Next safe action
 
-Continue [R07-04](work-items/r07/R07-04-public-release-ratchet.md) at its certification boundary: commit
-the bounded test-topology repair, then run the exact public-release ratchet once from a clean checkout.
-Do not weaken assertions, exclude a runnable suite, or rerun the complete gate without another material
-owner or topology change.
-
-Do not start Lifecycle, Communication Events, Transport, a router, a unit-of-work coordinator, or
-Messaging compatibility work while the release floor is red.
+Open the bounded canonical Lifecycle child. Inventory the current Data lifecycle `Events` surface,
+host ownership, bypasses, reverse dependents, and the migration/deletion boundary before production
+changes. Keep Communication Events, Transport, routers, Pipeline work, and Messaging compatibility out
+of this slice; they follow only after the Data-owned lifecycle contract is coherent and green.
 
 ## Repository boundary
 
