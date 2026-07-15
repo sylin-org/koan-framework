@@ -11,7 +11,7 @@ The safe read-only diagnostic is:
 dotnet run --project tools/Koan.Packaging -- inventory
 ```
 
-The workflow's compiler sequence is:
+The packaging-tool invocations are:
 
 ```powershell
 dotnet run --project tools/Koan.Packaging -- lineage `
@@ -33,19 +33,24 @@ dotnet run --project tools/Koan.Packaging -- pack `
 `lineage` intentionally switches a clean checkout to its dedicated local lineage branch and creates
 one commit. Run that command only in the protected workflow or a disposable rehearsal checkout. Omit
 `--previous-lineage` only when initializing a new lineage. That first projection is an explicit
-bootstrap wave: every package owner receives a fresh identity so no prior source-commit artifact can
-be rebuilt under the same package version with different repository metadata.
+bootstrap wave: every package owner receives a fresh identity, preventing an existing package identity
+from being rebuilt with different bits or repository metadata.
+
+The protected workflow persists that lineage commit, runs the complete public-release green ratchet,
+and proves the checkout stayed clean before it invokes `plan` and `pack`.
 
 `SourceCommit` identifies the developer's `dev` event. `VersionCommit` identifies the exact linear
 projection that NBGV versions, packing, SourceLink metadata, resumable state, and release evidence use.
 The committed lineage state must match the external lineage artifact before planning can begin.
+It records every package owner's exact minted identity, so later events compare durable facts instead
+of recalculating historical versions with a newer SDK or NBGV tool.
 Repository-wide build policy, ancestor `Directory.*` policy, and external packed files are evaluated
 as shared package inputs. Changing one automatically selects only its evaluated package consumers.
 
 For a long reconciliation rehearsal, add `--resume` to `pack`. Existing artifacts are reused only
 after their identity, metadata, symbols policy, and embedded version commit match the manifest.
-Selected identities are packed even when their nupkg is already public so an interrupted symbol/state
-reconciliation can replay safely.
+During a same-source replay, selected identities are packed even when their nupkg is already public so
+an interrupted symbol/state reconciliation can reuse the exact version wave safely.
 
 `publish` is protected-workflow machinery. It consumes the verified manifest and exact artifact
 directory, obtains its credential from the named environment variable, and records resumable

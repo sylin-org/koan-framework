@@ -55,7 +55,9 @@ validation:
 - Give every packable project a local `version.json`; NBGV owns patch and assembly/package stamping.
 - Ensure `<Description>`, `<PackageTags>`, and `<GenerateDocumentationFile>true</GenerateDocumentationFile>` are set.
 - Write or update per-project `README.md` with controller/entity examples.
-- Run `dotnet run --project tools/Koan.Packaging -- inventory` and the relevant local package plan.
+- Run `dotnet run --project tools/Koan.Packaging -- inventory` and the relevant packaging tests. The
+  protected `dev` workflow alone compiles and persists the canonical release plan; use a disposable
+  clone for controlled release rehearsals.
 - Dotnet tools set `<PackAsTool>true</PackAsTool>` and document install commands; analyzers ship assets under `analyzers/dotnet/cs`.
 
 See the [NuGet packaging policy](packaging.md) for detailed expectations and follow-ups.

@@ -76,10 +76,10 @@ it here.
 
 R02 may split or merge rows only when the resulting boundaries better match user-visible contracts.
 
-No row is labeled `supported-*`. That is deliberate: current package installation is not coherent,
-compatibility boundaries are not yet consolidated into a release contract, and several provider or
-failure paths remain untested. `Verified` means the scope stated in that record is automated—not that
-the entire capability fleet is production-certified.
+No row is labeled `supported-*`. That is deliberate: current public package installation is not
+coherent, the locally proved compatibility/release contract has not yet been observed through a real
+publication, and several provider or failure paths remain untested. `Verified` means the scope stated
+in that record is automated—not that the entire capability fleet is production-certified.
 
 ## Capability records
 
@@ -191,9 +191,9 @@ boundaries remain pre-V1 work.
   query path scans/materializes the complete source before slicing.
 - **Maturity / safe claim:** `demonstrated`. Koan has a real capability-negotiation model and reports
   major elections; only specifically tested provider combinations may claim parity.
-- **Open risks:** automate reverse-dependent package closure before the next breaking tier; expand the
-  stream sort floor only with new cross-provider proof; verify index sufficiency and performance; design
-  parent batching and recursive graph/depth budgets without turning facts into request history.
+- **Open risks:** expand the stream sort floor only with new cross-provider proof; verify index
+  sufficiency and performance; design parent batching and recursive graph/depth budgets without turning
+  facts into request history.
 
 ### Web/API conventions
 
@@ -404,6 +404,15 @@ boundaries remain pre-V1 work.
   and 11-step contracts with zero build warnings/errors. Independent readers then reproduced the
   supported path, generated two bounded repair queues, and verified the affected contracts. The
   maintainer accepted the resulting evidence without promoting unpublished packages.
+- **Current R07 result:** automatic lineage now distinguishes developer `SourceCommit` from the exact
+  package `VersionCommit`, detects breaking version intent, and mints the evaluated transitive reverse
+  closure without an operator list. The all-owner bootstrap, stored exact identity inventory, and
+  evaluated shared-input fan-out pass in the 51/51 packaging suite. In a disposable
+  complete-repository rehearsal, a Data.Core 0.18 intent selected all 81 affected packages and
+  generated 78 markers; registry reconciliation added 19 existing publication gaps. The resulting
+  100 exact artifacts passed inspection and package-only FirstUse (4.095s) plus GoldenJourney
+  (10.591s). No package was published, so this strengthens internal release evidence without
+  promoting public maturity.
 - **Inspection and failure:** the restore fails loudly, which is safer than an ABI mismatch, but the
   public docs previously described packages only as lagging and offered a broken copy/paste path.
 - **Unsupported / compatibility:** the staged package set is coherent, but public package-first install,
@@ -412,8 +421,9 @@ boundaries remain pre-V1 work.
 - **Maturity / safe claim:** `specified`. The package model and compatibility-range intent are written;
   the current public package set is not a supported installation path. Source checkout is the only
   demonstrated path.
-- **Open risks:** observe the first trusted `dev` publication, retain advisory review, and add explicit
-  pre-1.0 upgrade/rollback policy before promoting the package path.
+- **Open risks:** observe the first trusted `dev` publication and a cross-event partial-publication
+  recovery drill; retain advisory review; establish explicit pre-1.0 upgrade/rollback policy before
+  promoting the package path.
 
 ### Operations, health, and diagnostics
 

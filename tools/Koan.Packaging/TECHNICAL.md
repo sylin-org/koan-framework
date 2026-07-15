@@ -19,8 +19,10 @@ commits. This creates a linear projection rather than a merge graph, so NBGV pat
 package-independent.
 
 The first lineage is a deliberate all-owner bootstrap. Later waves include the breaking reverse
-closure plus packages whose evaluated shared inputs changed. NBGV identities are calculated from a
-detached checkout of each exact commit, never from the current working tree with a revision hint.
+closure plus packages whose evaluated shared inputs changed. Every committed lineage state records
+the exact public NBGV identity of every package owner. Later waves use those durable identities as
+their previous truth and calculate only the checked-out provisional/final commit; they never
+reinterpret an old release with today's SDK, tool version, or working tree.
 
 For every breaking root, the graph computes its complete transitive reverse closure. After a
 provisional projection commit exposes the actual NBGV identities, only closure members that still
@@ -32,8 +34,9 @@ state/markers, a tree byte-identical to `SourceCommit`. Manual branch commits an
 drift are rejected before the next projection.
 
 `.koan-package-lineage.json` is committed on `automation/package-lineage-dev`. The external
-`release-lineage.json` adds the resulting `VersionCommit`; planning rejects it unless every field
-matches the committed state.
+`release-lineage.json` adds the resulting `VersionCommit`; both include the complete package/version
+inventory, and planning rejects the artifact unless every field matches committed state and current
+NBGV calculation.
 
 ## Artifact contract
 
@@ -44,9 +47,10 @@ repository metadata against that commit, enables transitive NuGet audit, and rej
 advisories. The packed Koan dependency set must equal the evaluated `ProjectReference` graph, and a
 selected dependency's range floor must equal the selected dependency identity.
 
-Every selected identity is packed, including an already-public identity selected during replay. This
-lets publication reconcile its symbol artifact and state without minting replacement bits. Publication
-consumes the exact manifest/artifact directory and keys `release-state.json` to `VersionCommit`.
+During a same-source replay, every selected identity is packed, including an already-public identity.
+This lets publication reconcile its symbol artifact and state without minting replacement bits.
+Publication consumes the exact manifest/artifact directory and keys `release-state.json` to
+`VersionCommit`.
 
 ## Clean room
 

@@ -77,3 +77,7 @@ the safety bound. Roll back the release workflow before publication if any closu
 The maintainer explicitly accepted automated publication from every advancement of `dev` on
 2026-07-14. No package was published during this local proof. The public front door must continue to
 state that the old 0.17.0 set is incoherent until a real `dev` workflow run provides registry evidence.
+
+This card records the terminology of its accepting proof. R07-03 supersedes package identity's
+historical “source commit” shorthand: `SourceCommit` is developer provenance, while the exact
+`VersionCommit` now owns package metadata, artifact identity, resumable state, and release evidence.

@@ -110,6 +110,12 @@ These ship with this ADR:
 - **`docs/workbooks/versioning.md`** — operating the ARCH-0082 versioning system day-to-day
 - **`docs/workbooks/nuget-publishing.md`** — operating the release-on-main publish flow
 
+The documentation-category decision remains current. The initial `docs/workbooks/` surfaces were
+later consolidated into [versioning](../engineering/versioning.md) and
+[NuGet publishing](../engineering/nuget-publishing.md) under `docs/engineering/`. The named
+`release-on-main` flow is historical; [ARCH-0110](ARCH-0110-dev-release-compiler.md) supersedes its
+operating procedure with the serialized automatic `dev` release compiler.
+
 The existing `docs/guides/versioning-workbook.md` becomes a redirect stub pointing at the new location.
 
 ## Notes for reviewers

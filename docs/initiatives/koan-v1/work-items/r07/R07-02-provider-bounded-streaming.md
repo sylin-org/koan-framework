@@ -46,10 +46,10 @@ Provider streaming and Lifecycle expose different risk:
 - the accepted `Events` to `Lifecycle` rebuild removes shipped public 0.17 APIs and requires a complete
   0.18 reverse-dependent publication wave.
 
-The release mechanism does not yet mint that breaking reverse-dependent closure automatically. This
-slice therefore fixes the independent lower boundary now and leaves Lifecycle source changes stopped
-until the packaging gate can carry them safely. It does not add a compatibility alias or weaken the
-accepted greenfield Lifecycle target.
+At this slice's opening, the release mechanism did not mint that breaking reverse-dependent closure
+automatically. R07-02 therefore fixed the independent lower boundary while Lifecycle source changes
+remained stopped. R07-03 subsequently passed the packaging gate; this historical sequencing did not
+add a compatibility alias or weaken the accepted greenfield Lifecycle target.
 
 ## Defect this slice repairs
 

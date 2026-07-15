@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: in-progress
-  scope: R07-01 and R07-02 passed; R07-03 automatic package lineage is active
+  scope: R07-01 through R07-03 passed; canonical Lifecycle is next
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T6 — capability-ring graduation`
 - Active work item: R07 — rebuild the semantic capability ring
-- Active child: R07-03 — automate breaking package lineage
+- Active child: none; open canonical Lifecycle as the next bounded child
 - V1 readiness: `not ready`; T7 remains gated by T6 and an observed public package publication
 
 ## Work items
@@ -36,7 +36,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 | R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
-| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | ARCH-0113 ratifies pointwise capability lifting, Lifecycle/Events/Transport separation, Core context ownership, one Communication pillar, and the greenfield deletion map. R07-01 and R07-02 pass. [R07-03](work-items/r07/R07-03-automatic-package-lineage.md) is active: it promotes PMC-011 into the automatic Git-native reverse-dependent closure required before the clean Lifecycle 0.18 break. |
+| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | ARCH-0113 ratifies pointwise capability lifting, Lifecycle/Events/Transport separation, Core context ownership, one Communication pillar, and the greenfield deletion map. R07-01 through [R07-03](work-items/r07/R07-03-automatic-package-lineage.md) pass. Automatic lineage now carries the complete breaking closure; canonical Lifecycle is the next clean 0.18 child. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -52,12 +52,15 @@ item should normally be `in-progress`.
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 | R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
-| R07 | in progress | ARCH-0113 and the canonical Entity contract define the target. R07-01 and R07-02 passed their complete closures. R07-03 is implementing automatic reverse-dependent package lineage before the clean Lifecycle 0.18 break. |
+| R07 | in progress | ARCH-0113 and the canonical Entity contract define the target. R07-01 through R07-03 passed their complete closures. The release-safety stop is removed; open and execute canonical Lifecycle next. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-15 | R07-03 | Final hardening passes packaging 51/51: all-owner bootstrap, durable exact identities, evaluated shared-input fan-out, suppressed pack-dependency parity, two breaking waves, same-source replay, and all three source-application contracts. The workflow uses an exact SDK, pinned actions, the public-release green ratchet, and an exact non-forced `VersionCommit` tag. Cross-event recovery after a later lineage advances past partial symbol publication remains unproved. | Keep R07-03 passed for its bounded automatic-lineage contract; record the unclaimed recovery edge as high-priority PMC-016 before the first trusted public publication. |
+| 2026-07-15 | R07-03 | A synthetic Git proof showed that merging each source commit into the package lineage advances NBGV height for unrelated paths and recreates lockstep identities. | Keep the package branch as a linear exact-tree-delta projection. Record `SourceCommit` as provenance and bind package identity, metadata, state, and releases to `VersionCommit`. |
+| 2026-07-15 | R07-03 | The real Data.Core 0.18 rehearsal derived all 81 breaking-wave packages and packed them, then an offline clean room rejected one unchanged dependency absent from both the plan and nuget.org. Normal registry reconciliation added 19 publication gaps; resume reused the 81 artifacts and the 100-artifact set passed both package-only applications. | Mark R07-03 passed. Keep offline planning as graph diagnosis, not a claim that it can hydrate missing registry identities; the protected workflow always reconciles before packing. PMC-011 is resolved. |
 | 2026-07-15 | R07-02 | The final stream contract admits caller ordering only on top-level non-nullable `bool`, `byte`, `sbyte`, `short`, `ushort`, and `int`; explicit Entity-id ordering rejects before provider I/O. Only the normal string Entity id may be appended as an opaque provider-stable page tie-breaker; every custom key shape rejects. | Keep the two initial floors deliberately small and separate. The shared boundary corpus passes on all six qualified adapters; later caller-sort or identifier expansion requires new cross-provider evidence. |
 | 2026-07-15 | R07-02 | Exact-case-first canonical field paths repaired mixed-case convergence centrally. Couchbase passes 17/17; Mongo passes 67/68 with only its pre-existing ZenGarden endpoint-preference case remaining. | Close the streaming slice and keep the unrelated Mongo election issue isolated in PMC-012. |
 | 2026-07-15 | R07-02 | Final closure passes Data.Core 42/42 focused and 325/325 full, Backup 5/5 acceptance and 7/7 full, connector regressions 236/237 with the recorded Mongo exception, filtering 92/92 and convergence 19/19, Release solution 0 errors / 19 pre-existing warnings, strict docs, skills, changed examples, structural claims, compatibility, diff, and privacy. | Mark R07-02 passed without promoting maturity. Open reverse-dependent release closure as the next prerequisite. |

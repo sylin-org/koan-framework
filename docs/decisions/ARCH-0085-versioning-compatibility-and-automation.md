@@ -33,7 +33,9 @@ The two do not trade off. Truthful, independent, bump-on-change numbers (Axis 1)
 
 ### 1. Uniform independent versioning (two-tier retired)
 
-**Every package versions independently** — there is no kernel lockstep. A package with no commits in its folder is **not** republished. This is the anti-spam guarantee.
+**Every package versions independently** — there is no kernel lockstep. A package with no
+package-affecting commit, evaluated shared-input change, or generated compatibility marker is **not**
+republished. This is the anti-spam guarantee.
 
 This *supersedes* ARCH-0082's two-tier (kernel-lockstep) model. The reason two-tier existed was to keep the abstraction contract surface coherent and avoid a compatibility matrix among independently-versioned packages — but **§3's compatibility ranges now provide that guarantee directly and more precisely** (an incompatible pair fails to resolve regardless of version numbers). With ranges in place, lockstep added only cost: in nbgv it would require all 14 abstraction packages to carry identical `pathFilters` lists and be bumped together, a fragile, manual operation. So the kernel/periphery split no longer drives versioning. `build/kernel-manifest.txt` and `$(KoanPackageKind)` survive only as informational metadata (what is "contract surface"), not as a version lever.
 
@@ -44,7 +46,9 @@ Trade-off accepted: there is no longer a single "kernel version" number to cite;
 Adopt **Nerdbank.GitVersioning (nbgv)**. Each package declares its `major.minor` in a `version.json`; the **patch is the git commit height** of that package's path since its `major.minor` last changed. Consequences:
 
 - **Major/minor are a human decision** (the only judgment a tool can't make: "is this breaking / a feature?"). Bumped by editing `version.json`.
-- **Patch is automatic and deterministic** — same commit → same version, reproducible from a clean checkout. A folder with no commits keeps its height → same version → not republished (anti-spam, by construction).
+- **Patch is automatic and deterministic** — same version-lineage commit → same version, reproducible
+  from a clean checkout. A package path with no source change keeps its height unless §4 deliberately
+  adds a reverse-closure marker because that package's compatibility contract changed.
 - **Per-package independence** via one nested `version.json` per packable project with `pathFilters: ["."]`, so height counts only commits touching that package's folder. A repo-root `version.json` is the fallback for unpublished projects (tests, samples).
 - nbgv also stabilizes `AssemblyVersion` at `major.minor.0.0` (reduces binding churn) while `FileVersion`/`PackageVersion` move freely, and stamps the git SHA into the informational version.
 - **Non-release branches get prerelease versions** (`0.17.3-g1a2b3c`) by default; clean release versions are produced on `main`/release branches (nbgv `publicReleaseRefSpec`) or with `-p:PublicRelease=true`. §3's range target only bands clean release versions (it skips prerelease deps, which are never published).
@@ -68,6 +72,15 @@ Effect: an incompatible pair fails at **restore** (NU1107/NU1608 — loud, at bu
 ### 4. Coordinated closure republish on a breaking bump, enforced by CI
 
 When any package makes a breaking (pre-1.0 minor) bump, **every package that depends on it must be rebuilt + republished** — its IL recompiles against the new surface and its band floor moves past the broken version. This is **not spam**: the dependent's *compatibility contract* changed even when its own code didn't. The closure is computed from the dependency graph (not a kernel manifest). A release-gate check fails the release if the published set does not include the full dependent closure of every breaking bump. This is the check that would have caught the missed Cache.
+
+Implemented by the serialized release-lineage compiler. Evaluated ProjectReferences form the graph.
+After the current `dev` tree delta is projected onto the prior linear version commit, NBGV determines
+which closure members already gained an identity. Only the remaining members receive deterministic
+package-local markers. The compiler then proves every member differs from the previous version commit;
+the planner independently re-derives the closure and rejects lineage/manifest drift. Each committed
+lineage state stores every package owner's exact identity, so later waves compare against minted facts
+rather than recalculating an old commit with today's SDK or NBGV. Evaluated shared build/pack inputs
+fan out through the same mechanism to the package owners that consume them.
 
 ### 5. Change discipline: deprecate-then-remove in the kernel
 
@@ -94,13 +107,12 @@ The skew was *fatal* only because DATA-0096 **hard-deleted** a type. Pre-1.0, ke
    `Directory.Build.targets`. The one-time mass-generation script is retired so it cannot overwrite
    package-specific baselines or bundle composition filters.
 3. ✅ **Release-pipeline rework.** ARCH-0110 replaces the legacy workflows and scripts with the
-   `dev` release compiler: full history, NBGV endpoint comparison, independently selected packages,
+   `dev` release compiler: full history, serialized linear version lineage, independently selected packages,
    exact manifests, SDK bundle projects, advisory/metadata/closure checks, clean-room application
    proof, trusted publishing, and resumable dependency-ordered publication.
-4. ⏳ **Breaking dependent-closure invariant (§4).** Bounded ranges remain active and fail loudly.
-   The automated release compiler does not yet infer or mint the reverse-dependent version wave for
-   a deliberate compatibility-band change; keep this follow-up explicit rather than overstating the
-   new release gate.
+4. ✅ **Breaking dependent-closure invariant (§4).** The compiler detects deliberate breaking tiers,
+   derives the complete reverse-dependent graph closure, mints identities only where source did not,
+   and fails before packing if any required member remains stale or is absent from the exact plan.
 
 ## Non-goals
 - `kernel-manifest.txt` / `$(KoanPackageKind)` are retained only as informational "contract surface" metadata; they no longer drive versioning (see §1).

@@ -19,11 +19,12 @@ validation:
 - **Release intent**: a push or merge that advances `dev`.
 - **Version lineage**: one serialized linear projection per `dev` event, preserved on
   `automation/package-lineage-dev`.
-- **Selection**: NBGV difference between `PreviousVersionCommit` and `VersionCommit`, automatic
-  reverse-dependent closure for breaking roots, plus reconciliation of a current identity absent
-  from nuget.org.
+- **Selection**: exact identities stored by the prior/current lineage commits, automatic
+  reverse-dependent closure for breaking roots, evaluated shared-input consumers, plus
+  reconciliation of a current identity absent from nuget.org. The initial lineage is a one-time
+  all-owner bootstrap.
 - **Output**: an exact, dependency-ordered manifest and its hashed nupkg/snupkg artifacts.
-- **Proof**: exact-version build/tests, advisory enforcement, package inspection, internal dependency
+- **Proof**: the canonical public-release green ratchet, advisory enforcement, package inspection, internal dependency
   closure, and package-only FirstUse and GoldenJourney execution outside the checkout.
 - **Publication**: trusted GitHub OIDC identity, ordered push, registry visibility waits, resumable
   state, then a release tag.

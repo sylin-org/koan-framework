@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 and R07-02 passed; R07-03 automatic package lineage is active
+  scope: R07-01 through R07-03 passed; canonical Lifecycle is next
 ---
 
 # Koan V1 reorganization current handoff
@@ -32,11 +32,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
   Data.Core passes 42/42 focused and 325/325 full; all six qualified and three fail-closed adapter
   cells pass; SQLite passes 1/1; and the real Backup consumer passes 5/5 acceptance plus 7/7 full.
   Unsupported adapters reject rather than falling back to full-result materialization.
-- [R07-03](work-items/r07/R07-03-automatic-package-lineage.md) is active. It reduces the release-safety
-  prerequisite to two production concepts: an evaluated `PackageGraph` and a Git-native
-  `ReleaseLineageCompiler`.
-- Lifecycle is a separate clean 0.18 public break. It remains stopped until package automation can mint
-  the complete reverse-dependent closure; no alias or partial source break is being introduced.
+- [R07-03](work-items/r07/R07-03-automatic-package-lineage.md) passed. Its two production concepts—an
+  evaluated `PackageGraph` and Git-native `ReleaseLineageCompiler`—automatically mint and prove the
+  complete breaking reverse closure.
+- Lifecycle is the next separate clean 0.18 public break. The release-safety stop is removed; retain
+  the no-alias greenfield decision and keep Communication/Pipeline work out of this slice.
 - Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -123,14 +123,14 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
 1. R07-01: Core-owned typed ambient context and durable carrier, preserving current Jobs/Tenant proofs.
    **Passed.**
 2. R07-02: genuine provider-bounded streaming beneath the existing Entity surface. **Passed.**
-3. Automate the breaking package closure. **In progress as R07-03.** Then rebuild canonical host-owned Lifecycle as a
-   clean 0.18 wave.
-4. Minimal Data.Core Entity-cardinality adapter, pillar-owned execution, and deletion of the two real
+3. Automate the breaking package closure. **Passed as R07-03.**
+4. Rebuild canonical host-owned Lifecycle as a clean 0.18 wave.
+5. Minimal Data.Core Entity-cardinality adapter, pillar-owned execution, and deletion of the two real
    public Pipeline uses.
-5. Faithful local Transport under `AddKoan()`.
-6. Events occurrence policy on the same kernel.
-7. Multi-connector mesh, RabbitMQ parity, Jobs wake, and Cache coherence migration.
-8. Secondary pointwise lifts: Relationships, constrained Jobs streams, AI Embed/Index, Cache eviction,
+6. Faithful local Transport under `AddKoan()`.
+7. Events occurrence policy on the same kernel.
+8. Multi-connector mesh, RabbitMQ parity, Jobs wake, and Cache coherence migration.
+9. Secondary pointwise lifts: Relationships, constrained Jobs streams, AI Embed/Index, Cache eviction,
    then Media if a real derivative operation earns it.
 
 Only the next slice has a detailed child card. Do not open broker breadth before local semantics pass.
@@ -156,18 +156,22 @@ Only the next slice has a detailed child card. Do not open broker breadth before
   archive; cancellation during page 2 prevents its completion and archive publication; InMemory and
   JSON reject before query or archive publication.
 - R07-02's current artifacts contain no private downstream identity, path, persona, or workflow.
+- R07-03 packaging passes 51/51, including all-owner bootstrap, durable exact identities,
+  shared-input fan-out, two breaking waves, and same-source replay. A disposable Data.Core 0.18
+  rehearsal derives the full 81-package breaking closure and 78 markers. Registry reconciliation
+  yields 100 verified artifacts; package-only FirstUse passes in 4.095s and GoldenJourney in 10.591s.
+  No package or remote Git object changed.
 - The Release solution build passes with 0 errors and 19 reviewed pre-existing warnings; strict docs,
   skill lint, changed examples, structural claims, compatibility, diff, and privacy gates pass.
 
 ## Next safe action
 
-Execute [R07-03](work-items/r07/R07-03-automatic-package-lineage.md): derive the complete closure from
-evaluated projects, mint fresh immutable identities through one durable Git lineage, separate source
-and version commit evidence, and prove the behavior in a temporary synthetic repository.
+Open the canonical Lifecycle child: inventory the current static registry, registration/invocation
+bypasses, public `Events` spellings, handler ordering, host ownership, and every affected consumer.
+Define the smallest clean 0.18 replacement and its deletion map before production edits.
 
-Do not change Lifecycle production APIs until automatic reverse-dependent package closure can carry the
-0.18 break. Do not add Events, Transport, a router, a unit-of-work coordinator, or Messaging
-compatibility aliases before that release-safety prerequisite passes.
+Do not add Communication Events, Transport, a router, a unit-of-work coordinator, or Messaging
+compatibility aliases during Lifecycle. The next slice is Data-owned persistence behavior only.
 
 ## Repository boundary
 

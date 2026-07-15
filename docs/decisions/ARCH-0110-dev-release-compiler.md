@@ -28,19 +28,35 @@ checkbox list, version calculator, skip marker, or routine credential handling.
 ### 1. Every advancement of `dev` is a release event
 
 `.github/workflows/release-on-dev.yml` runs for every push to `dev`. Each event is retained; GitHub
-concurrency cancellation is not used. Publication waits for earlier active release events so two
-pushes cannot publish out of order.
+concurrency cancellation is not used. The complete version-lineage/build/plan/pack/publish operation
+waits for every earlier `requested`, queued, waiting, pending, or running release event, so two pushes
+cannot mint or publish out of order.
 
 ### 2. A release plan is compiled, not curated
 
 `tools/Koan.Packaging` evaluates packability, package IDs, metadata, and project references through
-MSBuild. Every packable project must own a project-local `version.json`. For the event's `before` and
-`after` commits, the compiler asks NBGV for each public package version and selects identities whose
-version changed.
+MSBuild. Every packable project must own a project-local `version.json`.
+
+`SourceCommit` records the `dev` event. The compiler applies the exact source-tree delta onto the
+previous `automation/package-lineage-dev` tip and commits one linear `VersionCommit`. Linear
+projection is load-bearing: importing source merge topology would advance unrelated NBGV heights.
+The first lineage is an explicit all-owner bootstrap. Each lineage commit then stores every package
+owner's exact minted identity. Later events compare that durable inventory with the checked-out
+`VersionCommit`; they do not recalculate an old release with a newer SDK or NBGV tool.
+
+A deliberate pre-1.0 minor or post-1.0 major advance is a breaking root. The evaluated package graph
+derives its complete transitive reverse-dependent closure. After a provisional commit exposes actual
+NBGV identities, only closure members still equal to their previous identity receive a deterministic
+marker; the final commit is rechecked member by member.
+
+Evaluated repository/ancestor build policy and packed files outside an owner directory are shared
+package inputs. A change fans out to the package owners that consume that input and uses the same
+marker/identity proof; it cannot silently alter package bits beneath an unchanged identity.
 
 The online plan also reconciles a current identity missing from nuget.org. This makes a retry or an
 initial migration converge without asking an operator to reconstruct the failed subset. The manifest
-records commits, reason, dependency order, artifact names, and SHA-256 hashes.
+records source/version commits, breaking causes, dependency order, artifact names, and SHA-256 hashes.
+Planning rejects any external lineage artifact that differs from state committed at the version SHA.
 
 ### 3. Bundles are ordinary independently versioned projects
 
@@ -51,22 +67,23 @@ forcing one package version onto unrelated dependencies. Hand-tokenized `.nuspec
 
 ### 4. Verification precedes publication
 
-The workflow builds and tests the release commit, then packs the exact planned set fail-fast with
-public versions and NuGet auditing enabled. High and critical advisories fail the release. Every nupkg
+The workflow runs the repository's complete green ratchet against the exact public-release commit,
+proves the tracked tree stayed clean, then packs the planned set fail-fast with NuGet auditing enabled.
+High and critical advisories fail the release. Every nupkg
 is inspected for identity, version, description, license, README, repository metadata, symbol policy,
 internal dependency closure, and recorded hash.
 
-A copied application outside the repository then restores only PackageReferences from the staged
-feed, builds, starts, reports health, and performs SQLite-backed Entity create/read/delete through an
-`EntityController<T>`. This is the minimum meaningful consumer proof; project references and
-repository build props cannot make it pass accidentally.
+FirstUse and GoldenJourney are copied outside the repository and restore only PackageReferences from
+the staged feed. They prove the shortest meaningful result and the cumulative persistence/jobs/agent/
+operator journey without project references or repository build props making it pass accidentally.
 
 ### 5. Publication is exact, ordered, and resumable
 
-Only artifacts uploaded by the verification job are publishable. Packages are pushed in project
-dependency order. Existing identities are reconciled, transient pushes retry, registry visibility is
-confirmed before dependents continue, and `release-state.json` records progress. Re-running the same
-workflow converges instead of minting or selecting a different set.
+Only exact artifacts that passed verification are publishable. Packages are pushed in project
+dependency order. Existing nupkgs are reconciled while their symbol artifact is replayed, transient
+pushes retry, registry visibility is confirmed before dependents continue, and version-keyed
+`release-state.json` records progress. Re-running the same source resolves the same durable version
+commit and converges instead of minting a replacement set.
 
 nuget.org trusted publishing exchanges the workflow's GitHub OIDC identity for a short-lived
 credential. A missing trusted-publishing owner is a hard failure. No long-lived API key is stored and
@@ -74,20 +91,23 @@ no release is reported successful when publication was skipped.
 
 ### 6. Evidence follows success
 
-The workflow creates `release/dev/<commit>` and a GitHub release only after the entire release set is
-available. The verified manifest and final state are attached. Tags are audit evidence; they never
-drive package versions or publication.
+The workflow creates `release/dev/<source-commit>` and a GitHub release only after the entire release
+set is available. It creates or verifies the tag ref itself at `VersionCommit` without force, then
+uses that existing exact tag; lineage, manifest, and final state are attached.
+Tags are audit evidence; they never drive package versions or publication.
 
 ## Consequences
 
 ### Positive
 
 - Git contains all routine release intent; advancing `dev` needs no operator ceremony.
-- Unchanged packages are neither rebuilt nor republished during steady-state operation.
+- Unchanged packages are neither rebuilt nor republished during steady-state operation; a generated
+  marker means the dependency compatibility contract changed even though application source did not.
 - The artifact a consumer restores is the artifact that passed metadata, closure, advisory, and
   clean-room behavior checks.
 - Agents and reviewers can inspect one deterministic manifest instead of reverse-engineering logs.
-- Interrupted publication has an explicit, idempotent recovery path.
+- Interrupted same-source publication has an explicit, idempotent recovery path. Cross-event artifact
+  recovery after a later lineage advancement remains uncertified and is tracked as PMC-016.
 
 ### Trade-offs and boundaries
 
@@ -98,9 +118,13 @@ drive package versions or publication.
   rollback.
 - A deliberate major/minor compatibility decision still belongs in `version.json`; automation does
   not infer semantic breaking intent.
-- ARCH-0085's dependent-closure rule for a breaking compatibility-band change remains a separate
-  version-graph invariant. This release compiler does not weaken bounded ranges or claim that a
-  registry supports transactional rollback.
+- Package deletion/rename, reserved lineage paths on `dev`, non-forward source history, and manual
+  lineage divergence are initially unsupported and fail before packing.
+- The dedicated version branch is an automation projection, not an application-development branch.
+  Source ancestry is recorded explicitly rather than merged into its topology.
+- Same-source rerun replays selected symbols/state from the same version commit. If a later lineage
+  event has already advanced after a partial symbol publication, automatic cross-event artifact
+  recovery is not yet certified; the workflow fails red rather than claiming that edge is complete.
 
 ## Operational contract
 
