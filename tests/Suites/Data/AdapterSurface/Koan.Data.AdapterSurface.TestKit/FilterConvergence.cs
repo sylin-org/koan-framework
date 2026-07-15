@@ -53,6 +53,8 @@ public static class FilterConvergence
         ("size-on-collection",        "{ \"Tags\": { \"$size\": 1 } }"),
         ("bare-value-on-collection",  "{ \"Tags\": \"wow\" }"),
         ("scalar-eq",                 "{ \"Name\": \"Bravo\" }"),
+        ("scalar-eq-lowercase-field", "{ \"name\": \"Bravo\" }"),
+        ("scalar-eq-mixed-case-field","{ \"lEvEl\": 20 }"),
         ("scalar-ne",                 "{ \"Name\": { \"$ne\": \"Bravo\" } }"),
         ("scalar-in",                 "{ \"Level\": { \"$in\": [10, 30] } }"),
         ("scalar-nin-matches-null",   "{ \"Score\": { \"$nin\": [100, 300] } }"),

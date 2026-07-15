@@ -8,6 +8,7 @@ internal sealed record FirstUseEvidence(
     double TotalSeconds,
     bool CompositionLockfileObserved,
     string SelectedAdapter,
+    bool RestFilterObserved,
     bool StartupReported,
     bool FactsConverged,
     bool DryRunPreservedState,

@@ -16,7 +16,8 @@ public sealed record ResolvedField(
     bool TargetsCollection,
     Type? ElementType,
     bool IsManaged = false,
-    string? StorageName = null)
+    string? StorageName = null,
+    FieldPath? CanonicalPath = null)
 {
     /// <summary>Reads the leaf value from an entity instance, walking the member chain. Null-safe.</summary>
     public object? GetValue(object? entity)

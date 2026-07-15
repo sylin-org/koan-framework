@@ -56,7 +56,8 @@ public static class FieldPathResolver
             {
                 var managedComparable = Nullable.GetUnderlyingType(managed.ClrType) ?? managed.ClrType;
                 return new ResolvedField(rootType, Array.Empty<MemberInfo>(), managed.ClrType, managedComparable,
-                    TargetsCollection: false, ElementType: null, IsManaged: true, StorageName: managed.StorageName);
+                    TargetsCollection: false, ElementType: null, IsManaged: true, StorageName: managed.StorageName,
+                    CanonicalPath: FieldPath.Of(managed.StorageName));
             }
         }
 
@@ -91,7 +92,8 @@ public static class FieldPathResolver
             ? element!
             : Nullable.GetUnderlyingType(leafType) ?? leafType;
 
-        return new ResolvedField(rootType, members, leafType, comparable, targetsCollection, element);
+        return new ResolvedField(rootType, members, leafType, comparable, targetsCollection, element,
+            CanonicalPath: FieldPath.Of(members.Select(member => member.Name).ToArray()));
     }
 
     /// <summary>Element type when <paramref name="t"/> is a generic enumerable (excluding string), else null.</summary>

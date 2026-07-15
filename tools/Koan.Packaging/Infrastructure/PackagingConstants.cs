@@ -62,6 +62,7 @@ internal static class PackagingConstants
         public const string EntityCatalogUri = "koan://entities";
         public const string RuntimeFactsUri = ApplicationProbe.RuntimeFactsUri;
         public const string ApprovalEntity = "approval";
+        public const string ApprovalSubject = "Approve supplier invoice";
         public const string AdapterSelectedCode = "koan.data.adapter.selected";
         public const string DefaultDataSubject = "data:default";
         public const int StartupAttempts = ApplicationProbe.StartupAttempts;

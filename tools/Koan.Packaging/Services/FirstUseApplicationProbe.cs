@@ -34,6 +34,7 @@ internal sealed class FirstUseApplicationProbe
         var mcp = new McpProbeClient(http);
 
         string selectedAdapter = "unknown";
+        var restFilterObserved = false;
         var factsConverged = false;
         var dryRunPreservedState = false;
         var agentMutationObserved = false;
@@ -69,13 +70,25 @@ internal sealed class FirstUseApplicationProbe
             {
                 using var create = await http.PostAsJsonAsync(
                     PackagingConstants.FirstUse.ApprovalsPath,
-                    new { subject = "Approve supplier invoice" },
+                    new { subject = PackagingConstants.FirstUse.ApprovalSubject },
                     JsonOptions,
                     cancellationToken);
                 create.EnsureSuccessStatusCode();
                 var list = await ReadApprovalsAsync(http, cancellationToken);
-                if (!ContainsSubject(list, "Approve supplier invoice"))
+                if (!ContainsSubject(list, PackagingConstants.FirstUse.ApprovalSubject))
                     throw new InvalidOperationException("REST did not return the approval it created.");
+
+                var filterJson = JsonSerializer.Serialize(
+                    new { subject = PackagingConstants.FirstUse.ApprovalSubject },
+                    JsonOptions);
+                var filtered = await ReadApprovalsAsync(
+                    http,
+                    cancellationToken,
+                    $"{PackagingConstants.FirstUse.ApprovalsPath}?filter={Uri.EscapeDataString(filterJson)}");
+                restFilterObserved = filtered.Length == 1
+                    && ContainsSubject(filtered, PackagingConstants.FirstUse.ApprovalSubject);
+                if (!restFilterObserved)
+                    throw new InvalidOperationException("The documented camelCase REST filter did not return the approval it created.");
             });
 
             await StepAsync("agent-initialize", steps, () =>
@@ -179,6 +192,7 @@ internal sealed class FirstUseApplicationProbe
             Math.Round(total.Elapsed.TotalSeconds, 3),
             compositionLockfileObserved,
             selectedAdapter,
+            restFilterObserved,
             startupReported,
             factsConverged,
             dryRunPreservedState,
@@ -187,9 +201,14 @@ internal sealed class FirstUseApplicationProbe
             steps);
     }
 
-    private static async Task<string[]> ReadApprovalsAsync(HttpClient http, CancellationToken cancellationToken)
+    private static async Task<string[]> ReadApprovalsAsync(
+        HttpClient http,
+        CancellationToken cancellationToken,
+        string? relativePath = null)
     {
-        using var response = await http.GetAsync(PackagingConstants.FirstUse.ApprovalsPath, cancellationToken);
+        using var response = await http.GetAsync(
+            relativePath ?? PackagingConstants.FirstUse.ApprovalsPath,
+            cancellationToken);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         using var document = JsonDocument.Parse(json);

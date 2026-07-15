@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R05 independent rehearsal repairs 1 through 5 complete
+  scope: R05 fresh-agent repeat and filtered-query repair complete
 ---
 
 # Koan V1 reorganization current handoff
@@ -23,6 +23,12 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - R05-01 business spine and R05-02 reactive/agentic collaboration pass.
 - R05-03's fresh package clean room passes. Two independent agent rehearsals confirmed the central
   journey; the deeper run returned `repair-and-repeat`, and all five bounded repairs now pass.
+- A genuinely fresh repeat over candidate `47ce8915` again confirmed the complete FirstUse and
+  GoldenJourney business paths, modern HTTP MCP, persistence, facts convergence, agent mutation, and
+  V5 rejection/recovery. It returned `repair-and-repeat` on a smaller second-round truth queue.
+- The first promoted finding is repaired: case-insensitive field binding now hands relational
+  adapters the canonical resolved path, and the exact documented camelCase FirstUse filter is part
+  of the executable source/package evidence.
 - No public package was published and no branch was pushed by this work.
 
 ## What now exists
@@ -98,6 +104,11 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
   REST filter. FirstUse passes 1/1, GoldenJourney's exact public command passes 1/1, the focused
   filter contract passes 1/1, and strict docs pass. Adjacent design debts are preserved in
   [`POST-CYCLE-TODO.md`](POST-CYCLE-TODO.md).
+- Fresh-repeat filtered-query repair: `ResolvedField` now retains the canonical member path and the
+  shared relational translator uses it for case-sensitive JSON extraction. SQLite convergence passes
+  lowercase and mixed-case field probes; the FirstUse contract now asserts the exact documented
+  camelCase filter and passes 1/1 after a warning-as-error Release build; the filtering suite remains
+  green at 92/92.
 
 ## Important discoveries
 
@@ -124,13 +135,20 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
 - The independent run's five material findings are repaired in `977f33b9`, `c9977361`, `a2780672`,
   `775d5716`, and `ffc1ed27`. Broader small issues are explicitly deferred in
   [`POST-CYCLE-TODO.md`](POST-CYCLE-TODO.md), not silently discarded.
+- The fresh repeat exposed why the earlier focused REST-filter test was insufficient: it used the CLR
+  spelling `Name`, while the public API correctly used web-style `subject`. Resolution was
+  case-insensitive, but SQLite extracted the caller spelling from case-sensitive stored JSON and
+  silently returned an empty result. The shared canonical-path handoff fixes the relational family
+  rather than special-casing FirstUse or rewriting the public command.
 
 ## Next safe action
 
-Run a genuinely fresh agent against the repaired public path, without implementation context, and
-record its independent verdict. Then obtain the remaining human rehearsal before closing R05-03.
-Do not begin the post-cycle todo register until this acceptance loop is complete unless new evidence
-promotes an entry into a correctness, security, or release blocker.
+Repair the fresh repeat's composition truth mismatch next: runtime module discovery currently counts
+the application assembly as a module while the build lockfile correctly records it only as `app`, so
+both supported samples report false `+Koan.*` drift. Prove a no-drift live sample contract, then move
+to the bounded readiness/operator and MCP discoverability findings. Obtain the remaining human
+rehearsal only after this second repair queue is quiet. Do not begin the post-cycle todo register
+unless new evidence promotes an entry into a correctness, security, or release blocker.
 
 ## Do not infer
 
@@ -143,7 +161,7 @@ promotes an entry into a correctness, security, or release blocker.
 
 ## Repository state
 
-The coherent R04/R05 candidate is `d1dbbe35`; independent-rehearsal repairs are local commits
-`977f33b9`, `c9977361`, `a2780672`, `775d5716`, and `ffc1ed27`. Only evaluator reports remain
-untracked under `tmp/`. Do not stage those reports, or publish, push, tag, or release the candidate
-without a separate operator request.
+The coherent R04/R05 candidate is `d1dbbe35`; the first independent-rehearsal repair sequence ends at
+`ffc1ed27`, and its closure record is `47ce8915`. This commit contains the fresh-repeat filtered-query
+repair. Only evaluator reports remain untracked under `tmp/`. Do not stage those reports, or publish,
+push, tag, or release the candidate without a separate operator request.
