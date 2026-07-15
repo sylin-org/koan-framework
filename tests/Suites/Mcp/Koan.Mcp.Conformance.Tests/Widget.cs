@@ -42,7 +42,10 @@ public sealed class WidgetsController : EntityController<Widget>
 /// the AN11 / A10 case. A dry-run must NOT silently execute it; it returns an honest partial rehearsal.</summary>
 public static class WidgetTools
 {
-    [McpTool(Name = "widget_recompute", Description = "Recomputes derived widget state (external effects).")]
+    [McpTool(
+        Name = "widget_recompute",
+        Description = "Recomputes derived widget state (external effects).",
+        IsMutation = true)]
     [McpDestructive]
     public static string Recompute(string id) => $"recomputed:{id}";
 }

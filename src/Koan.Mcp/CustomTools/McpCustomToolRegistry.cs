@@ -150,6 +150,15 @@ public sealed class McpCustomToolRegistry
             }
         }
 
+        if (attribute.IsMutation)
+        {
+            properties[Koan.Mcp.Execution.McpDryRun.ArgumentName] = new JObject
+            {
+                ["type"] = "boolean",
+                ["description"] = Koan.Mcp.Execution.McpDryRun.SchemaDescription
+            };
+        }
+
         var schema = new JObject
         {
             ["type"] = "object",

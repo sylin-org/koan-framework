@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R05 fresh-agent repeat repairs 1 through 3 complete
+  scope: R05 fresh-agent repeat repair queue complete; human rehearsal remains
 ---
 
 # Koan V1 reorganization current handoff
@@ -35,6 +35,9 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - The third promoted finding is repaired: current guidance names the real liveness/readiness routes,
   rejected backend intent is proven to return readiness 503, and Jobs records one Error per failure
   episode while pacing retries at its existing poll interval.
+- The fourth and final fresh-repeat slice is repaired: ordinary Entity schema fallback is quiet,
+  custom mutations advertise the `dry_run` control they already honor, and the HTTP guide is now a
+  compact Streamable-first contract rather than a deprecated-transport tutorial.
 - No public package was published and no branch was pushed by this work.
 
 ## What now exists
@@ -123,6 +126,11 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
   GoldenJourney asserts readiness 503 plus `unhealthy`, observes the process for a bounded interval,
   and rejects repeated Jobs iteration errors. Jobs and packaging warning-as-error builds pass; the
   live GoldenJourney contract passes 2/2.
+- Fresh-repeat MCP discoverability repair: Koan.Mcp builds warning-as-error clean; conformance passes
+  74/74; Streamable HTTP passes 18/18; FirstUse and GoldenJourney pass all three focused contract
+  tests with quiet schema startup and discoverable custom-mutation `dry_run`; strict docs pass. The
+  HTTP guide is reduced from 1,752 lines to a 250-line current contract and no longer publishes
+  invented options, inline endpoint scaffolding, or unsupported performance claims.
 
 ## Important discoveries
 
@@ -161,15 +169,17 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
 - `/api/health` is an intentionally shallow compatibility up-check, not aggregate readiness. Public
   docs had incorrectly extrapolated nonexistent `/api/health/live` and `/api/health/ready` routes
   from it; the controller-owned canonical probes are `/health/live` and `/health/ready`.
+- Property-name fallback is normal in an opinionated schema generator. Optional description
+  attributes improve agent guidance, but warning about every conventional property made a working
+  first use look incomplete. Operational warnings now remain reserved for actionable failures.
 
 ## Next safe action
 
-Take the bounded MCP discoverability slice next: remove supported-path schema warning noise, make
-accepted generic mutation controls such as `dry_run` discoverable on custom-tool input schemas, and
-reshape the public HTTP guidance around the canonical Streamable HTTP path without changing
-compatibility-sensitive result casing or legacy configuration names. Then obtain the remaining human
-rehearsal. Do not begin the post-cycle todo register unless new evidence promotes an entry into a
-correctness, security, or release blocker.
+Obtain the remaining independent human rehearsal from a clean checkout using only the public front
+door and the record format in R05-03. If it passes, rerun only any contract affected by a material
+correction, close R05-03, and evaluate R05/V1 acceptance without upgrading public-package maturity.
+If it returns `repair-and-repeat`, promote only correctness, security, release, or central-experience
+findings; preserve small design choices in `POST-CYCLE-TODO.md`.
 
 ## Do not infer
 
@@ -183,8 +193,8 @@ correctness, security, or release blocker.
 ## Repository state
 
 The coherent R04/R05 candidate is `d1dbbe35`; the first independent-rehearsal repair sequence ends at
-`ffc1ed27`, and its closure record is `47ce8915`. Commits `f66bc8f5` and `88e3be69` repair the
-fresh-repeat filter and composition truth; this change repairs readiness/operator behavior. Only
-evaluator reports remain untracked under `tmp/`.
+`ffc1ed27`, and its closure record is `47ce8915`. Commits `f66bc8f5`, `88e3be69`, and `46c523d8`
+repair the fresh-repeat filter, composition truth, and readiness/operator behavior; this change
+closes MCP discoverability. Only evaluator reports remain untracked under `tmp/`.
 Do not stage those reports, or publish, push, tag, or release the candidate without a separate
 operator request.

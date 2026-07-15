@@ -48,6 +48,7 @@ internal static class PackagingConstants
         public const string CustomToolsProperty = "customTools";
         public const string EmptySelfMessage = "nothing here you can use yet";
         public const string MissingWebRootWarning = "The WebRootPath was not found";
+        public const string MissingMcpMetadataWarning = "Missing metadata for";
         public const int StartupAttempts = 40;
         public const int StartupPollMilliseconds = 500;
         public const int HttpTimeoutSeconds = 5;

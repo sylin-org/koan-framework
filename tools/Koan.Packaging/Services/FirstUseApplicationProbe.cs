@@ -184,6 +184,11 @@ internal sealed class FirstUseApplicationProbe
                 $"FirstUse {lane} ran successfully but did not emit a recognizable Koan startup report.{Environment.NewLine}{logs.StandardOutput}{logs.StandardError}");
         if (logs.StandardOutput.Contains(PackagingConstants.ApplicationProbe.MissingWebRootWarning, StringComparison.Ordinal))
             throw new InvalidOperationException("FirstUse emitted a missing-web-root warning even though it is an API-only application.");
+        var mcpSchemaWarningsAbsent = !logs.StandardOutput.Contains(
+            PackagingConstants.ApplicationProbe.MissingMcpMetadataWarning,
+            StringComparison.Ordinal);
+        if (!mcpSchemaWarningsAbsent)
+            throw new InvalidOperationException("FirstUse treated convention-based MCP schema descriptions as warning-worthy.");
 
         total.Stop();
         return new FirstUseEvidence(
@@ -197,6 +202,7 @@ internal sealed class FirstUseApplicationProbe
             selectedAdapter,
             restFilterObserved,
             startupReported,
+            mcpSchemaWarningsAbsent,
             factsConverged,
             dryRunPreservedState,
             agentMutationObserved,

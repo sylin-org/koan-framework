@@ -29,6 +29,7 @@ public sealed class FirstUseContractTests
         Assert.True(evidence.CompositionLockfileMatched);
         Assert.True(evidence.RestFilterObserved);
         Assert.True(evidence.StartupReported);
+        Assert.True(evidence.McpSchemaWarningsAbsent);
         Assert.True(evidence.FactsConverged);
         Assert.True(evidence.DryRunPreservedState);
         Assert.True(evidence.AgentMutationObserved);

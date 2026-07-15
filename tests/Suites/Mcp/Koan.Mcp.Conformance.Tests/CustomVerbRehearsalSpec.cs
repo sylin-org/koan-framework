@@ -29,6 +29,16 @@ public sealed class CustomVerbRehearsalSpec : IClassFixture<DryRunFixture>
     }
 
     [Fact]
+    public async Task A_mutating_custom_verb_advertises_the_reserved_dry_run_control()
+    {
+        var tool = await _fx.GetWireToolAsync("widget_recompute");
+        var dryRun = tool?["inputSchema"]?["properties"]?["dry_run"];
+
+        dryRun?["type"]?.Value<string>().Should().Be("boolean");
+        dryRun?["description"]?.Value<string>().Should().Contain("non-executing rehearsal");
+    }
+
+    [Fact]
     public async Task The_same_verb_without_dry_run_executes_normally()
     {
         var call = await _fx.CallToolAsync("widget_recompute", new JObject { ["id"] = "w-2" });

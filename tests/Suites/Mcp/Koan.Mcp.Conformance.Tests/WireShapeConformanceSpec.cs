@@ -35,6 +35,8 @@ public sealed class WireShapeConformanceSpec : IClassFixture<ConformanceFixture>
 
         tool.Should().NotBeNull("the custom [McpTool] verb is listed");
         AssertSpecShape(tool!);
+        tool!["inputSchema"]!["properties"]!["dry_run"].Should().BeNull(
+            "a custom tool not declared as a mutation must not advertise mutation rehearsal");
     }
 
     [Fact]

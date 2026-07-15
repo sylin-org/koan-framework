@@ -11,4 +11,8 @@ internal static class McpDryRun
 {
     /// <summary>The reserved argument name a caller sets to rehearse a mutation.</summary>
     public const string ArgumentName = "dry_run";
+
+    /// <summary>Discovery text shared by generated Entity mutations and custom mutation verbs.</summary>
+    public const string SchemaDescription =
+        "Request a non-executing rehearsal. Entity mutations return a prospective state delta; custom mutations report their inspectability boundary.";
 }

@@ -50,6 +50,12 @@ remote dispatch, Explorer projection, and `koan://self`. A null principal preser
 trusted local-STDIO surface; a concrete remote principal applies server authentication, required
 scopes, and operational-toolset enablement. Disabled or unauthorized tools leave no trace.
 
+`McpCustomToolRegistry` owns custom input schemas. A tool declared with `IsMutation=true` advertises
+the shared `McpDryRun.ArgumentName` control; the handler already accepts that control and returns an
+honest non-executing partial rehearsal. Entity schema synthesis treats the CLR/wire property name as
+the normal description fallback. Optional prose metadata improves agent guidance but its absence is
+not an operational warning.
+
 ## Transports
 
 STDIO is enabled by default. When `EnableHttpSseTransport` is true, Koan hosts modern Streamable

@@ -41,6 +41,7 @@ public sealed class GoldenJourneyContractTests
         Assert.True(evidence.ReactiveWorkObserved);
         Assert.True(evidence.JobsCompositionObserved);
         Assert.True(evidence.FactsConverged);
+        Assert.True(evidence.CustomMutationSchemaTruthful);
         Assert.True(evidence.AgentBoundaryObserved);
         Assert.True(evidence.AgentMutationObserved);
         Assert.True(evidence.AdapterRejectionExplained);

@@ -88,6 +88,12 @@ Development may be open so the first-use path remains observable.
 Tool advertisement and enforcement share the same caller-aware projection. A denied or disabled
 tool is not offered and cannot be reached by calling its name directly.
 
+Set `IsMutation = true` on a mutating `[McpTool]`. Its input schema advertises `dry_run`; because
+arbitrary imperative effects are not inspectable, `dry_run: true` returns a non-executing partial
+rehearsal that names that boundary. Generated Entity mutations return framework-owned prospective
+deltas. Convention-based Entity property names are valid fallback schema descriptions and do not
+produce startup warnings; add `[McpDescription]` only when richer agent guidance adds value.
+
 ## Runtime inspection
 
 - `koan://self` introduces the caller-visible Entity and custom-workflow surface.

@@ -11,6 +11,7 @@ internal sealed record GoldenJourneyEvidence(
     bool ReactiveWorkObserved,
     bool JobsCompositionObserved,
     bool FactsConverged,
+    bool CustomMutationSchemaTruthful,
     bool AgentBoundaryObserved,
     bool AgentMutationObserved,
     bool AdapterRejectionExplained,

@@ -32,6 +32,7 @@ internal sealed class GoldenJourneyApplicationProbe
         var reactiveWorkObserved = false;
         var jobsCompositionObserved = false;
         var factsConverged = false;
+        var customMutationSchemaTruthful = false;
         var agentBoundaryObserved = false;
         var agentMutationObserved = false;
         var adapterRejectionExplained = false;
@@ -82,12 +83,22 @@ internal sealed class GoldenJourneyApplicationProbe
             await StepAsync("agent-discovery", steps, async () =>
             {
                 var tools = await mcp.CallAsync("tools/list", null, cancellationToken);
-                var names = tools.GetProperty("result").GetProperty("tools").EnumerateArray()
+                var advertisedTools = tools.GetProperty("result").GetProperty("tools").EnumerateArray().ToArray();
+                var names = advertisedTools
                     .Select(tool => tool.GetProperty("name").GetString())
                     .ToArray();
                 if (!names.Contains(PackagingConstants.GoldenJourney.PendingTool)
                     || !names.Contains(PackagingConstants.GoldenJourney.RecommendTool))
                     throw new InvalidOperationException("MCP did not advertise the bounded review workflow tools.");
+
+                var recommend = advertisedTools.First(tool =>
+                    tool.GetProperty("name").GetString() == PackagingConstants.GoldenJourney.RecommendTool);
+                customMutationSchemaTruthful = recommend.GetProperty("inputSchema")
+                    .GetProperty("properties")
+                    .TryGetProperty("dry_run", out var dryRun)
+                    && dryRun.GetProperty("type").GetString() == "boolean";
+                if (!customMutationSchemaTruthful)
+                    throw new InvalidOperationException("The custom mutation accepted dry_run without advertising it in its input schema.");
 
                 var self = await mcp.CallAsync("resources/read", new
                 {
@@ -297,6 +308,7 @@ internal sealed class GoldenJourneyApplicationProbe
             reactiveWorkObserved,
             jobsCompositionObserved,
             factsConverged,
+            customMutationSchemaTruthful,
             agentBoundaryObserved,
             agentMutationObserved,
             adapterRejectionExplained,

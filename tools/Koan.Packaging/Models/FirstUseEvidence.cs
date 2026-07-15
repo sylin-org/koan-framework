@@ -11,6 +11,7 @@ internal sealed record FirstUseEvidence(
     string SelectedAdapter,
     bool RestFilterObserved,
     bool StartupReported,
+    bool McpSchemaWarningsAbsent,
     bool FactsConverged,
     bool DryRunPreservedState,
     bool AgentMutationObserved,

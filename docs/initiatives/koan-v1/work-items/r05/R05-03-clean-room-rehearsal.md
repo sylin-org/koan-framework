@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: five-item repair queue complete; fresh repeat and human rehearsal remain
+  scope: both agent rounds and repair queues complete; human rehearsal remains
 ---
 
 # R05-03 — Prove the clean room and independent rehearsal
@@ -49,8 +49,9 @@ built with zero warnings and zero errors. The retained ignored evidence lives un
 
 ## Remaining acceptance gate
 
-- Have a new human and a new coding-agent context independently follow the public path; record
-  confusion, corrections, and whether business behavior can be reviewed without framework internals.
+- Have a new human independently follow the public path; record confusion, corrections, and whether
+  business behavior can be reviewed without framework internals. Both coding-agent rounds and their
+  material repair queues are complete.
 - Update capability maturity and package-install wording only if the resulting public release state
   supports those claims.
 
@@ -71,6 +72,26 @@ intended route or provide this session's implementation context. For each reader
 
 R05-03 passes only after both records exist and any material repair has rerun its affected automated
 source/package contract.
+
+### Fresh independent agent repeat
+
+A new context over `47ce8915` again reproduced FirstUse, GoldenJourney, persistence, modern HTTP MCP,
+facts convergence, agent mutation, and forced adapter recovery, then returned `repair-and-repeat` on
+a smaller truth queue. Four bounded shared repairs now close it:
+
+1. canonical field paths make the documented camelCase REST filter return the persisted FirstUse
+   result across the shared relational translation boundary (`f66bc8f5`);
+2. runtime composition uses executable assembly identity for `app`, excludes it from `modules`, and
+   both journeys require the matched lockfile fact (`88e3be69`);
+3. current docs name `/health/live` and `/health/ready`, rejected adapter intent returns readiness
+   503, and Jobs paces persistent ledger failures without repeated Error noise (`46c523d8`); and
+4. convention-based MCP schemas are quiet, mutating custom tools advertise `dry_run`, and the HTTP
+   guide is rebuilt around the canonical Streamable path.
+
+Verification for the final slice passes Koan.Mcp warning-as-error, MCP conformance 74/74,
+Streamable HTTP 18/18, both executable journey classes 3/3, and strict docs. Compatibility-sensitive
+MCP casing and legacy option names remain explicit post-cycle decisions, not hidden changes. The
+coding-agent record is complete; automation cannot substitute for the remaining human record.
 
 ### First independent agent round
 

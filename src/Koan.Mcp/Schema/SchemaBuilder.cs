@@ -26,7 +26,6 @@ public sealed class SchemaBuilder
 
     private readonly IServiceProvider _services;
     private readonly ILogger<SchemaBuilder> _logger;
-    private readonly HashSet<string> _warnedEntities = new();
 
     public SchemaBuilder(IServiceProvider services, ILogger<SchemaBuilder> logger)
     {
@@ -221,7 +220,7 @@ public sealed class SchemaBuilder
     // AN11 (A1, invariant #14) — every state-mutating verb advertises the reserved dry_run posture so an
     // agent can discover that the mutation is rehearsable without trying it.
     private static JsonObject DryRunProperty()
-        => CreateBooleanProperty("Rehearse only: run validation and return the prospective state delta in meta.diagnostics.delta; commit nothing.");
+        => CreateBooleanProperty(Koan.Mcp.Execution.McpDryRun.SchemaDescription);
 
     private JsonObject BuildDeleteSchema(Type keyType, EntityEndpointOperationDescriptor operation)
     {
@@ -324,7 +323,6 @@ public sealed class SchemaBuilder
         var schema = CreateObjectSchema().WithDescription(description);
         var props = new JsonObject();
         var required = new JsonArray();
-        var missingDescriptions = new List<string>();
 
         foreach (var property in entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
@@ -332,7 +330,7 @@ public sealed class SchemaBuilder
             // [McpIgnore] (input-excluded) drops the property from the upsert/patch input schema and the
             // Code Mode entity interface (which is derived from this schema).
             if (McpFieldPolicy.IsExcludedFromInput(property)) continue;
-            var propSchema = CreateSchemaForProperty(property, operation, missingDescriptions);
+            var propSchema = CreateSchemaForProperty(property, operation);
             if (propSchema is null) continue;
             // Honor a Newtonsoft [JsonProperty] rename so the advertised name matches the actual wire name.
             var wireName = McpFieldPolicy.ResolveWireName(property);
@@ -341,14 +339,6 @@ public sealed class SchemaBuilder
             {
                 required.Add(wireName);
             }
-        }
-
-        if (missingDescriptions.Count > 0 && _warnedEntities.Add(entityType.FullName ?? entityType.Name))
-        {
-            _logger.LogWarning("{Entity}: Missing metadata for {Count} properties: [{Properties}]. Using fallback.",
-                entityType.Name,
-                missingDescriptions.Count,
-                string.Join(", ", missingDescriptions));
         }
 
         schema["properties"] = props;
@@ -366,9 +356,9 @@ public sealed class SchemaBuilder
         return requiredAttribute is not null && !requiredAttribute.AllowEmptyStrings;
     }
 
-    private JsonObject? CreateSchemaForProperty(PropertyInfo property, EntityEndpointOperationKind? operation, List<string>? missingDescriptions = null)
+    private JsonObject? CreateSchemaForProperty(PropertyInfo property, EntityEndpointOperationKind? operation)
     {
-        var schema = CreateSimpleTypeSchema(property.PropertyType, GetPropertyDescription(property, operation, missingDescriptions));
+        var schema = CreateSimpleTypeSchema(property.PropertyType, GetPropertyDescription(property, operation));
         if (schema is null)
         {
             _logger.LogDebug("Skipping property {Property} on {Entity} because it cannot be translated to JSON schema.", property.Name, property.DeclaringType?.FullName);
@@ -376,7 +366,7 @@ public sealed class SchemaBuilder
         return schema;
     }
 
-    private string? GetPropertyDescription(PropertyInfo property, EntityEndpointOperationKind? operation, List<string>? missingDescriptions = null)
+    private static string GetPropertyDescription(PropertyInfo property, EntityEndpointOperationKind? operation)
     {
         foreach (var attribute in property.GetCustomAttributes<McpDescriptionAttribute>())
         {
@@ -403,7 +393,6 @@ public sealed class SchemaBuilder
             return description.Description;
         }
 
-        missingDescriptions?.Add(property.Name);
         return property.Name;
     }
 
