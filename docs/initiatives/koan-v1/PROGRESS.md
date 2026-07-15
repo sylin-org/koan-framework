@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: in-progress
-  scope: R07-01 passed; R07 Data semantic truth is next
+  scope: R07-01 passed; R07-02 provider-bounded streaming is active
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T6 — capability-ring graduation`
 - Active work item: R07 — rebuild the semantic capability ring
-- Next decision: bound the Data-semantic-truth child around canonical Lifecycle and genuine streaming
+- Active child: R07-02 — make the existing Entity stream surface genuinely bounded
 - V1 readiness: `not ready`; T7 remains gated by T6 and an observed public package publication
 
 ## Work items
@@ -36,7 +36,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 | R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
-| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | ARCH-0113 ratifies pointwise capability lifting, Lifecycle/Events/Transport separation, Core context ownership, one Communication pillar, and the greenfield deletion map. R07-01 passes with one Core context/registry and the affected consumer matrix green; Data semantic truth is next. |
+| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | ARCH-0113 ratifies pointwise capability lifting, Lifecycle/Events/Transport separation, Core context ownership, one Communication pillar, and the greenfield deletion map. R07-01 passes; [R07-02](work-items/r07/R07-02-provider-bounded-streaming.md) now makes the existing Entity stream surface genuinely bounded before capability lifting. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -52,12 +52,14 @@ item should normally be `in-progress`.
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 | R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
-| R07 | in progress | ARCH-0113 and the canonical Entity contract define the target. R07-01 passed its Core/Data/Tenancy/Access/Jobs/Data.AI, solution-build, documentation, diff, compatibility, and privacy gates. Data semantic truth is the next child. |
+| R07 | in progress | ARCH-0113 and the canonical Entity contract define the target. R07-01 passed its Core/Data/Tenancy/Access/Jobs/Data.AI, solution-build, documentation, diff, compatibility, and privacy gates. R07-02 is active with provider-bounded streams as its one execution primitive. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-15 | R07-02 | Data streaming and Lifecycle are separate release units. Streaming can correct an existing implementation additively, but the shipped lifecycle `Events` surface requires a clean 0.18 break and roughly eighty reverse dependents; current release automation cannot yet mint that closure. | Execute provider-bounded streaming first beneath the unchanged `IAsyncEnumerable<TEntity>` grammar. Stop Lifecycle production changes until reverse-dependent closure is automatic, then take the accepted no-alias greenfield break with an explicit policy amendment and migration note. |
+| 2026-07-15 | R07-02 | Current adapters all return materialized query lists, while only some enforce page size in the provider before materialization. A public cursor or adapter-specific stream interface would add grammar without improving the first honest guarantee. | Add one capability-reported provider-bounded-page primitive and compose it internally. Adapters earn the claim through shared conformance; no capability means corrective rejection, never a full-result fallback. |
 | 2026-07-15 | R07-01 | A global Data.AI embedding queue keyed only by Entity type/id allowed equal ids in different carried contexts to overwrite or suppress each other's work. Context-scoped identity also made the old entity-id-only admin retry ambiguous. | Keep the legacy unscoped id, derive scoped ids from a value-opaque Core fingerprint, prove two distinct durable rows end to end, make entity-id retry current-context-specific, and add an exact durable-job-id operator path. |
 | 2026-07-15 | R07-01 | Logical-flow context and durable carriage were Data-owned, forcing non-Data modules and future Communication through persistence abstractions; the Data-axis DSL also coupled Data realization to cross-hop carriage. | Move exact-type logical-flow state, carrier registration, ingress trust, safe failures, and fingerprints to `Koan.Core.Context`; retain `EntityContext` only for Data routing/transaction state; register Tenancy and Access carriers independently. The affected matrix, solution build, strict docs, compatibility, diff, and privacy gates pass. |
 | 2026-07-15 | R07 | At R07 opening, persistence Lifecycle, arbitrary-object Messaging, mutable-bag Pipelines, Data-owned ambient carriage, and provider-specific message cardinality competed with the Entity language. InMemory shared mutable references while RabbitMQ created type-wide competing consumers; neither implemented tenant-safe Entity Event/Transport semantics. | Accept ARCH-0113: expose Lifecycle, Events, and Transport as three intents over one hidden Communication mechanism; rebuild rather than compatibility-wrap the current generation. |

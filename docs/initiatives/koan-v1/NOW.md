@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 passed; Data semantic truth is next
+  scope: R07-01 passed; R07-02 provider-bounded streaming is active
 ---
 
 # Koan V1 reorganization current handoff
@@ -27,6 +27,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
   Core-owned typed logical-flow context and durable carrier registry; Data, Tenancy, Access, Jobs, and
   Data.AI have moved to it. The old Data-owned generic slice/carrier APIs and Data-axis carriage hook
   are removed, and the affected regression/docs/privacy gates are green.
+- [R07-02](work-items/r07/R07-02-provider-bounded-streaming.md) is active. It keeps
+  `IAsyncEnumerable<TEntity>` and introduces one honest provider-bounded-page capability beneath it;
+  unsupported adapters reject rather than falling back to full-result materialization.
+- Lifecycle is a separate clean 0.18 public break. It remains stopped until package automation can mint
+  the complete reverse-dependent closure; no alias or partial source break is being introduced.
 - Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -108,13 +113,15 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
 
 1. R07-01: Core-owned typed ambient context and durable carrier, preserving current Jobs/Tenant proofs.
    **Passed.**
-2. Data truth: canonical host-owned Lifecycle plus genuine bounded streaming.
-3. Minimal Data.Core Entity-cardinality adapter, pillar-owned execution, and deletion of the two real
+2. R07-02: genuine provider-bounded streaming beneath the existing Entity surface. **Active.**
+3. Automate the breaking package closure, then rebuild canonical host-owned Lifecycle as a clean 0.18
+   wave.
+4. Minimal Data.Core Entity-cardinality adapter, pillar-owned execution, and deletion of the two real
    public Pipeline uses.
-4. Faithful local Transport under `AddKoan()`.
-5. Events occurrence policy on the same kernel.
-6. Multi-connector mesh, RabbitMQ parity, Jobs wake, and Cache coherence migration.
-7. Secondary pointwise lifts: Relationships, constrained Jobs streams, AI Embed/Index, Cache eviction,
+5. Faithful local Transport under `AddKoan()`.
+6. Events occurrence policy on the same kernel.
+7. Multi-connector mesh, RabbitMQ parity, Jobs wake, and Cache coherence migration.
+8. Secondary pointwise lifts: Relationships, constrained Jobs streams, AI Embed/Index, Cache eviction,
    then Media if a real derivative operation earns it.
 
 Only the next slice has a detailed child card. Do not open broker breadth before local semantics pass.
@@ -134,13 +141,13 @@ Only the next slice has a detailed child card. Do not open broker breadth before
 
 ## Next safe action
 
-Open and bound the Data-semantic-truth child. Start from executable red proofs for two claims only:
-Lifecycle is canonical and host-owned, and provider iteration is genuinely bounded rather than a
-materialized async-enumerable shape. Decide whether those outcomes need separate commits before
-changing production code; delete or rename old surfaces only as their replacement passes.
+Execute R07-02 from red proofs: add one provider-bounded-page capability, compose it lazily beneath the
+existing Entity stream surface, qualify adapters independently, and rewrite public claims from
+conformance evidence. Do not add a public Pager/cursor/Flow abstraction or a materializing fallback.
 
-Do not add Events, Transport, a router, a unit-of-work coordinator, or Messaging compatibility aliases
-until Data's lower boundary is true.
+Do not change Lifecycle production APIs until automatic reverse-dependent package closure can carry the
+0.18 break. Do not add Events, Transport, a router, a unit-of-work coordinator, or Messaging
+compatibility aliases until Data's lower boundary is true.
 
 ## Repository boundary
 

@@ -178,12 +178,13 @@ semantics. Neither is a compatibility base for Events or Transport.
 | Order | Slice | Meaningful result | Principal deletion/supersession |
 |---|---|---|---|
 | 1 | [R07-01 Core context foundation](r07/R07-01-core-context-foundation.md) | **Passed.** Tenant and other module context survive durable work through a Core-owned, fail-closed contract | Data-owned generic slice/carrier APIs |
-| 2 | Data semantic truth | Lifecycle is canonical/host-owned and Data streams are genuinely incremental | lifecycle `Events` name, bypassable hooks, materializing stream implementation |
-| 3 | Typed capability substrate | A minimal Data.Core cardinality adapter and pillar-owned execution replace generic public flow machinery | `PipelineBuilder` and pillar pipeline extensions |
-| 4 | In-process Transport flagship | a foundation + `AddKoan()` app gets local scalar/set/stream snapshots, stable typed receivers, source/ingress filters, isolated copies, bounded acceptance, operation-scoped settlement wait, and tenant-safe retry identity | old Messaging Core, proxy/buffer, broad `Send`, separate InMemory connector |
-| 5 | Events policy | payload-less occurrences fan out over the proved kernel | event/messaging conflation and service-collection handlers |
-| 6 | Mesh, broker, and internal parity | a build manifest turns connector references into zero-routing-code channel election; RabbitMQ, Jobs wake, and Cache coherence obey the same groups/context/facts | current RabbitMQ implementation and two Messaging bridge packages |
-| 7 | Secondary capability lifts | Relationships, Jobs, AI, Cache, then Media adopt only proven pointwise verbs | fragmented or misleading per-pillar surfaces |
+| 2 | [Provider-bounded streaming](r07/R07-02-provider-bounded-streaming.md) | Existing Entity streams become genuinely lazy and bounded on adapters that prove provider-side paging | materializing stream implementation and unused batch hint |
+| 3 | Release-safe canonical Lifecycle | Package automation first carries the complete 0.18 closure; then Lifecycle becomes host-owned and unavoidable | lifecycle `Events` name, process-static registry, and bypassable hooks |
+| 4 | Typed capability substrate | A minimal Data.Core cardinality adapter and pillar-owned execution replace generic public flow machinery | `PipelineBuilder` and pillar pipeline extensions |
+| 5 | In-process Transport flagship | a foundation + `AddKoan()` app gets local scalar/set/stream snapshots, stable typed receivers, source/ingress filters, isolated copies, bounded acceptance, operation-scoped settlement wait, and tenant-safe retry identity | old Messaging Core, proxy/buffer, broad `Send`, separate InMemory connector |
+| 6 | Events policy | payload-less occurrences fan out over the proved kernel | event/messaging conflation and service-collection handlers |
+| 7 | Mesh, broker, and internal parity | a build manifest turns connector references into zero-routing-code channel election; RabbitMQ, Jobs wake, and Cache coherence obey the same groups/context/facts | current RabbitMQ implementation and two Messaging bridge packages |
+| 8 | Secondary capability lifts | Relationships, Jobs, AI, Cache, then Media adopt only proven pointwise verbs | fragmented or misleading per-pillar surfaces |
 
 Only the next slice receives a child card. Later rows remain outcomes rather than speculative API
 backlogs until their prerequisites pass.
@@ -201,6 +202,11 @@ backlogs until their prerequisites pass.
    migrated, and the affected regression, compatibility, documentation, diff, and privacy gates pass.
 6. Open each later implementation slice only after its lower boundary passes.
 7. Prove in-process semantics before any broker migration or public maturity change.
+
+R07-02 is intentionally additive and precedes the Lifecycle source break. Public 0.17 already shipped
+the `Events` lifecycle surface, while the packaging mechanism does not yet automatically mint the full
+reverse-dependent 0.18 closure required by a clean greenfield rename. That release stop condition must
+be removed before Lifecycle production changes begin; it does not weaken the accepted target.
 
 ## Verification
 
