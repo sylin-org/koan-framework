@@ -189,8 +189,9 @@ boundaries remain pre-V1 work.
 
 ### Events and messaging
 
-- **Outcome and shortest path:** reference a messaging provider and call entity/message-centered
-  extension methods such as `Send()`; provider registration is automatic.
+- **Outcome and shortest path:** the current experimental surface references a Messaging provider and
+  calls broad arbitrary-class `Send()`; provider registration is automatic. Entity `Events` and
+  `Transport` are accepted R07 target semantics, not current APIs.
 - **Entry point and owner:** `Koan.Messaging` plus the
   [in-memory](../../../src/Connectors/Messaging/InMemory/Koan.Messaging.Connector.InMemory.csproj) or
   [RabbitMQ](../../../src/Connectors/Messaging/RabbitMq/Koan.Messaging.Connector.RabbitMq.csproj)
@@ -205,8 +206,9 @@ boundaries remain pre-V1 work.
   evidence for shipped behavior.
 - **Maturity / safe claim:** `demonstrated`. Koan can send through real in-memory/RabbitMQ paths; delivery
   and compatibility guarantees are not yet consolidated.
-- **Open risks:** establish a provider-neutral messaging conformance suite and make delivery semantics
-  inspectable before promotion.
+- **Open risks:** ARCH-0113 deliberately rebuilds rather than promotes this generation. The complete
+  local ring, connector mesh, logical channels/filters, and shared conformance suite must pass before
+  any Communication maturity claim.
 
 ### Jobs and scheduling
 

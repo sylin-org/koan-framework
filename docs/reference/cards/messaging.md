@@ -1,64 +1,53 @@
 ---
 type: REF
 domain: messaging
-title: "Messaging — pillar map"
+title: "Messaging — legacy implementation map"
 audience: [developers, ai-agents]
-status: current
-last_updated: 2026-06-18
+status: deprecated
+last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-06-18
-  status: verified
-  scope: docs/reference/cards/messaging.md
+  date_last_tested: 2026-07-15
+  status: reviewed
+  scope: current implementation truth and replacement direction
 ---
 
-# Messaging — pillar map
+# Messaging — legacy implementation map
 
-> One-screen map of the Messaging pillar — fire-and-forget `.Send()` with zero ceremony, buffered until the transport is live. Full detail: [messaging/index.md](../messaging/index.md).
+> Messaging is a demonstrated experimental surface, not a stable Koan contract. See the
+> [current limitations](../messaging/index.md) and the accepted
+> [Communication rebuild](../../decisions/ARCH-0113-entity-capability-communication.md).
 
-**What it does** — Any object becomes a message: `await myMessage.Send()` routes it through an `IMessageProxy` that **buffers during startup and goes live once a transport connects** (`AdaptiveMessageProxy`), so `Send()` works from the first line of code without a wired bus. Handlers register with `services.On<T>(handler)`; consumers are created when the lifecycle goes live. Transport is **Reference = Intent** — referencing `Koan.Messaging.Connector.RabbitMq` self-registers an `IMessagingProvider` (priority 100) that the lifecycle auto-selects over the in-memory fallback by probing `CanConnect`. Connection discovery is orchestration-aware; no bus wiring in `Program.cs` beyond `AddKoan()`.
-
-## The one canonical pattern
-
-Any class is a message. `.Send()` it; register a handler with `services.On<T>()`. The proxy buffers until a provider is live, then flushes.
+## Current v0.17 shape
 
 ```csharp
-public sealed class UserRegistered { public string UserId { get; init; } = ""; public string Email { get; init; } = ""; }
-
-// Register a handler (during startup / ConfigureServices)
-services.On<UserRegistered>(async msg =>
-{
-    Console.WriteLine($"Welcome {msg.UserId} ({msg.Email})");
-});
-
-// Send from anywhere — buffered pre-live, routed to the transport once connected
-await new UserRegistered { UserId = "u-1", Email = "u1@example.com" }.Send();
+services.On<UserRegistered>(Handle);
+await new UserRegistered("u-1").Send(ct);
 ```
 
-`Send<T>` dispatches on the payload's concrete runtime type (after any registered interceptor), so derived/substituted types route correctly.
-
-## ≤5 surfaces you'll use
-
-| Surface | What it does |
+| Surface | Current behavior |
 |---|---|
-| `myMessage.Send(ct)` (`MessagingExtensions.Send`) | Fire-and-forget send; auto-buffers pre-live, then routes to the live `IMessageBus`. |
-| `services.On<T>(Func<T,Task>)` (`MessagingExtensions.On`) | Registers a handler into the `HandlerRegistry`; a consumer is created when messaging goes live. |
-| `IMessageProxy` (`IsLive`, `BufferedMessageCount`) | The buffer→live seam; resolved from `AppHost.Current`, so `Send()` needs no injection. |
-| `IMessagingProvider` (`Name`, `Priority`, `CanConnect`, `CreateBus`) | Transport contract; self-registers via `IKoanAutoRegistrar`, auto-selected by descending priority. |
-| `MessagingInterceptors.RegisterForType<T>` / `RegisterForInterface<T>` | Substitutes the outbound payload at send time (e.g. wrap in a transport envelope) by type or interface. |
+| `Send<T>(this T) where T : class` | Intercepts the object, resolves the current host proxy, then buffers or forwards it. |
+| `services.On<T>(...)` | Retains at most one handler per CLR type. |
+| `IMessageProxy` | Buffers during startup and forwards through one elected provider. It is not durable storage. |
+| InMemory provider | Fans out the same mutable object reference inside one process. |
+| RabbitMQ provider | Serializes JSON into one CLR-type-derived queue whose consumers compete. |
 
-## The escape hatch
+Those providers do not share copy, cardinality, context, idempotency, durability, or topology
+guarantees. Older attribute, batch, routing, inbox/outbox, and dead-letter examples are not shipped
+APIs.
 
-Inside the semantic pipeline DSL, `Notify(...)` sends a per-entity message as a pipeline stage (faults are recorded on the envelope, not thrown):
+## Target replacement
+
+R07 deletes this broad arbitrary-object grammar and introduces:
 
 ```csharp
-await someEntities
-    .Pipeline()
-    .Notify(e => new UserRegistered { UserId = e.Id });   // PipelineMessagingExtensions.Notify
+await order.Events.Raise<OrderApproved>(ct);
+await order.Transport.Send(ct);
 ```
 
-Lower level: `AddKoanMessaging()` registers the core proxy/buffer/lifecycle by hand (normally done for you by the auto-registrar). The RabbitMQ transport reads `Koan:Messaging:RabbitMQ:ConnectionString` (fallback `Koan:Messaging:ConnectionString`), but discovery resolves the broker automatically when omitted.
-
-## The sample that shows it
-
-[`samples/S3.Mq.Sample`](../../../samples/S3.Mq.Sample/README.md) — a minimal end-to-end Koan Messaging app over RabbitMQ: `AddKoan()` self-wires the connector, then `new Hello { Name = "Koan" }.Send()` and `new UserRegistered { ... }.Send()` fire over the live bus.
+The foundation plus `AddKoan()` supplies a complete local ring. A build manifest later turns direct
+connector references into deterministic, per-channel, boot-reported election without application
+routing code. Awaits return bounded publication acceptance; later receiver settlement remains
+correlated and inspectable. This target remains specified—not implemented—until its conformance slices
+pass.

@@ -3,16 +3,21 @@ type: ARCHITECTURE
 domain: data
 title: "R04 Entity Facet Candidate Slate"
 audience: [architects, maintainers, developers, ai-agents]
-status: draft
-last_updated: 2026-07-13
+status: superseded
+last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-15
   status: reviewed
-  scope: pillar-owned candidates for R04-07 consumer proof; no public API implemented
+  scope: historical R04-07 candidate slate; superseded for Lifecycle, Events, Transport, and lifting by ARCH-0113
 ---
 
 # R04 Entity facet candidate slate
+
+> **Superseded in part:** This file records the slate used to complete R04-07. Its Cache pilot and
+> general Entity admission discipline remain historical evidence. ARCH-0113 now governs capability
+> lifting and supersedes the decisions to combine lifecycle with Events, reject Entity Transport, and
+> preserve compatibility anchors.
 
 This slate elects the Entity-language candidates that R04-07 should prove. It is a design input, not
 a claim that the sketched members exist today. The historical

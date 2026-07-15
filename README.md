@@ -88,7 +88,8 @@ var approval = await Approval.Get(id);                    // null if missing
 var pending = await Approval.Query(a => a.State == ApprovalState.Pending);
 await new Approval { Subject = "Approve invoice" }.Save();
 await approval.Remove();
-await foreach (var item in Approval.AllStream(batchSize: 1000)) { /* streaming */ }
+// Async enumeration today; providers may materialize before yielding until R07 repairs streaming.
+await foreach (var item in Approval.AllStream(batchSize: 1000)) { /* consume */ }
 ```
 
 ### 2 · Reference an intent → gain a capability
@@ -102,7 +103,8 @@ most) one attribute:
 [Cacheable(300)]
 public sealed class Todo : Entity<Todo> { /* … */ }
 
-// dotnet add package Sylin.Koan.Messaging.Connector.RabbitMq → cross-process events:
+// Legacy experimental message movement; delivery semantics are provider-specific:
+// dotnet add package Sylin.Koan.Messaging.Connector.RabbitMq
 await new TodoCompleted { TodoId = todo.Id }.Send();
 
 // dotnet add package Sylin.Koan.Jobs → durable background work, jobs are entities too:
@@ -125,6 +127,9 @@ var related = await SemanticSearch<Todo>("groceries and meal planning");
 [McpEntity]
 public sealed class Todo : Entity<Todo> { /* agents can now query and mutate Todos */ }
 ```
+
+The current Messaging path is [experimental and provider-specific](docs/reference/messaging/index.md);
+R07 defines its future Entity `Events`/`Transport` replacement but does not advertise it as shipped.
 
 Backends differ, and Koan refuses to pretend otherwise: every adapter declares its capabilities,
 the framework negotiates them, and an unsupported operation **fails loudly** instead of silently

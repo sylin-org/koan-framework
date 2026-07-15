@@ -9,6 +9,11 @@ title: Entity language admission, facets, and responsibility boundaries
 
 # ARCH-0106: Entity language admission, facets, and responsibility boundaries
 
+> **2026-07-15 amendment:** [ARCH-0113](ARCH-0113-entity-capability-communication.md) retains this
+> decision's Entity admission and module-facet rules but supersedes its lifecycle/event/messaging and
+> compatibility posture. Persistence hooks are `Lifecycle`; `Events` and `Transport` are distinct
+> Entity intents over one Communication pillar; greenfield replacement does not presume aliases.
+
 ## Context
 
 ARCH-0105 ratified `Entity<T>` as Koan's semantic spine and IntelliSense as its primary discovery

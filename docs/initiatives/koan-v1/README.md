@@ -43,7 +43,8 @@ capability baseline; [`R03-ENTITY-INVENTORY.md`](R03-ENTITY-INVENTORY.md) and
 the dependency-ordered [`R04-BACKLOG.md`](R04-BACKLOG.md); each child card under
 [`work-items/r04/`](work-items/r04/) must land an independently meaningful result. The
 [`R04-ENTITY-FACET-CANDIDATES.md`](R04-ENTITY-FACET-CANDIDATES.md) slate elects the pillar-owned Entity
-language that R04-07 should prove without authorizing a mass API migration.
+language that R04-07 proved; it is historical where ARCH-0113 now defines Lifecycle, Events,
+Transport, and capability lifting.
 R05 execution follows the three-card [`R05-BACKLOG.md`](R05-BACKLOG.md); it preserves FirstUse and
 proves meaningful growth in the cumulative [`GoldenJourney`](../../../samples/GoldenJourney/README.md).
 Small design and polish debts deliberately kept out of the active acceptance path live in the
@@ -61,7 +62,7 @@ Small design and polish debts deliberately kept out of the active acceptance pat
 | What foundation repair executes next? | `R04-BACKLOG.md` and its linked child card |
 | What golden-journey work executes next? | `R05-BACKLOG.md` and its linked child card |
 | Which small issues wait until the main cycle closes? | `POST-CYCLE-TODO.md` |
-| Which module capabilities should grow Entity language? | `R04-ENTITY-FACET-CANDIDATES.md`, subject to the Entity Semantics Contract |
+| Which module capabilities should grow Entity language? | the Entity Semantics Contract and `ARCH-0113`; the R04 slate is historical input |
 | What makes work acceptable? | `ACCEPTANCE.md` |
 | How mature is a public capability? | `CAPABILITIES.md` |
 | What belongs in the Entity language? | `docs/architecture/entity-semantics-contract.md` |

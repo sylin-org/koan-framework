@@ -1,67 +1,33 @@
 # Sylin.Koan.Messaging.Core
 
-Core messaging abstractions and helpers for Koan: bus configuration, auto-registration, and options binding.
+> **Legacy experimental implementation.** Do not treat this package as a stable messaging contract or
+> add new application APIs to it. [ARCH-0113](../../docs/decisions/ARCH-0113-entity-capability-communication.md)
+> replaces arbitrary-object Messaging with Entity `Events` and `Transport` over a rebuilt Communication
+> pillar.
 
-- Target framework: net10.0
+The current v0.17 package supplies the proxy, startup buffer, handler catalog, lifecycle, and provider
+seams behind this demonstrated shape:
+
+```csharp
+builder.Services.On<UserRegistered>(Handle);
+await new UserRegistered("u-1").Send(ct);
+```
+
+Current boundaries:
+
+- `Send<T>` applies to any reference type and needs an active Koan host.
+- `On<T>` retains at most one handler for each CLR type.
+- the startup buffer is memory-only, not durable storage;
+- provider selection is one priority/connectivity election;
+- InMemory and RabbitMQ do not share copy or consumer-cardinality semantics; and
+- there is no provider-neutral context, idempotency, retry, ordering, inbox/outbox, or dead-letter
+  guarantee.
+
+Attributes, aliases, `SendTo`, batch APIs, headers, partitions, and envelope-oriented handler examples
+from older documents are not shipped by this implementation.
+
+See the [truthful current boundary](../../docs/reference/messaging/index.md) and the active R07 work item
+before maintaining or migrating this package.
+
+- Target framework: .NET 10
 - License: Apache-2.0
-
-## Install
-
-```powershell
-dotnet add package Sylin.Koan.Messaging.Core
-```
-
-## Links
-- Messaging reference: https://github.com/sylin-org/Koan-framework/tree/dev/docs/reference
-
-## Usage
-
-Declare messages with attributes, then send via extension methods.
-
-```csharp
-using Koan.Messaging;
-
-[Message(Alias = "User.Registered", Version = 1)]
-public sealed record UserRegistered(
-	string UserId,
-	[Header("x-tenant")] string Tenant,
-	[IdempotencyKey] string EventId,
-	[PartitionKey] string Partition,
-	[DelaySeconds] int DelaySeconds = 0);
-
-// Single send (DefaultBus)
-await new UserRegistered("u-123", "acme", "evt-1", "acme:u-123").Send();
-
-// Send to a specific bus
-await new UserRegistered("u-456", "acme", "evt-2", "acme:u-456").SendTo("rabbit");
-
-// Batch send
-var batch = new object[]
-{
-	new UserRegistered("u-789", "acme", "evt-3", "acme:u-789"),
-	new UserRegistered("u-790", "acme", "evt-4", "acme:u-790")
-};
-await batch.Send();           // default bus
-await batch.SendTo("rabbit"); // specific bus
-```
-
-Register handlers tersely
-
-```csharp
-// Most concise (no envelope):
-builder.Services.On<UserRegistered>(msg => Console.WriteLine($"New user: {msg.UserId}"));
-
-// Async with CancellationToken
-builder.Services.On<UserRegistered>((msg, ct) => HandleAsync(msg, ct));
-
-// Keep envelope when needed
-builder.Services.OnMessage<UserRegistered>((env, msg, ct) => HandleWithEnvelope(env, msg, ct));
-
-// Intent-signaling aliases
-builder.Services.OnEvent<UserRegistered>(msg => IndexUser(msg.UserId));
-builder.Services.OnCommand<ReindexAll>(ct => ReindexAsync(ct));
-```
-
-Notes
-- `Send`/`SendTo` are defined on `MessagingExtensions` and operate per-message when batching.
-- Headers/correlation/idempotency are promoted from attributes; partitions add a `.p{n}` suffix to routing keys.

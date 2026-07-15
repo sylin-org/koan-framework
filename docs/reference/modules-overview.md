@@ -210,13 +210,18 @@ Use this reference when you plan a Koan solution and need to understand which mo
 
 ### Koan.Messaging.Core
 
-- **Purpose**: base for event bus (publish/subscribe) – already covered.
+- **Current status**: legacy experimental arbitrary-object messaging. Its InMemory and RabbitMQ paths
+  are demonstrated but do not share copy, cardinality, context, idempotency, or durability semantics.
+- **New work**: do not extend this generation. See the truthful
+  [Messaging boundary](messaging/index.md) and the accepted ARCH-0113 Communication rebuild.
 
 ### Messaging Connectors (RabbitMQ, etc.)
 
-- **Purpose**: implementation of message transport.
-- **How to use**: reference connector, configure broker endpoints.
-- **When to use**: event-driven architectures requiring reliable transport.
+- **Current purpose**: provider-specific transport for the legacy demonstration surface.
+- **Boundary**: a connector reference is not evidence of reliable delivery. Test the exact topology
+  and do not infer outbox, inbox, retry, ordering, or tenant-isolation guarantees.
+- **Target**: R07 rebuilds connectors as capability-declaring channels behind Entity `Events` and
+  `Transport`, with a complete local `AddKoan()` ring and boot-reported election.
 
 ## 9. Secrets & Storage
 

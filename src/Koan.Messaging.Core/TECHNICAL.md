@@ -1,53 +1,46 @@
 ---
 uid: reference.modules.Koan.messaging.core
-title: Koan.Messaging.Core - Technical Reference
-description: Messaging runtime, dispatcher, provisioning and aliasing.
+title: Koan.Messaging.Core - Legacy Technical Boundary
+description: Truthful boundary for the v0.17 experimental Messaging implementation.
 since: 0.2.x
 packages: [Sylin.Koan.Messaging.Core]
 source: src/Koan.Messaging.Core/
 ---
 
-## Contract
+## Status
 
-- Dispatcher and router: alias-based topic/queue routing; provider plug-ins resolve aliases to transport-specific resources.
-- Batching: configurable batch size/time for producers and prefetch for consumers.
-- Delivery: at-least-once baseline with idempotency keys; per-partition ordering when the transport supports it.
-- Headers: correlationId, causationId, messageId, idempotencyKey, partitionKey, contentType, timestamp.
-- Inbox/Outbox: transactional outbox for producer reliability; inbox dedupe with bounded windows (see MESS decisions).
+This is a legacy experimental implementation scheduled for replacement by
+[ARCH-0113](../../docs/decisions/ARCH-0113-entity-capability-communication.md). It is code evidence, not
+a stable delivery contract.
 
-## Error modes
+## Current mechanism
 
-- Transient transport errors (timeouts, throttling): retried with backoff.
-- Non-retryable errors (schema invalid, auth): fail fast → DLQ.
-- Poison-after-retries: routed to DLQ with failure metadata and last exception class/message captured in headers.
+1. `Send<T>(this T) where T : class` applies a process-static interceptor, resolves the current host's
+   `IMessageProxy`, and submits the resulting object.
+2. `AdaptiveMessageProxy` buffers raw objects in memory before one provider becomes live, then forwards
+   them to that provider's `IMessageBus`.
+3. `services.On<T>(...)` writes one handler per CLR type into the current `HandlerRegistry`.
+4. Provider election orders `IMessagingProvider` instances by priority and chooses a connectable one.
+5. The InMemory provider uses process-local channels and object references. RabbitMQ serializes JSON
+   into a queue derived from the CLR type.
 
-## Retries and DLQ
+## Unsupported claims
 
-- Retries: exponential backoff with jitter; caps for maxAttempts and maxBackoff; respect transport-specific retry headers where applicable.
-- DLQ: dead-letter destination per alias; include headers: retryCount, lastErrorType, lastErrorMessage, failedAt, originalAlias.
+The current package does not establish provider-neutral:
 
-## Ordering and partitioning
+- publish/subscribe versus competing receiver-group cardinality;
+- immutable-copy behavior;
+- durable acceptance or delivery;
+- retry idempotence, inbox/outbox, or exactly-once effects;
+- ordering, replay, dead-letter, partition, batch, or schema-evolution policy;
+- tenant/context carriage or authenticated provenance; or
+- complete startup, settlement, health, and metric facts.
 
-- Ordering is guaranteed only within a partition/shard; cross-partition ordering is not guaranteed.
-- Partition keys should be stable hashes of the business key to co-locate related messages.
+Do not infer those guarantees from connector names, historical MESS decisions, or older examples.
 
-## Idempotency and exactly-once
+## Replacement boundary
 
-- At-least-once delivery requires consumer idempotency keyed by messageId or idempotencyKey.
-- Exactly-once is only achievable when both transport and storage support idempotent writes with dedupe windows; otherwise treat as at-least-once.
-
-## Outbox and inbox
-
-- Outbox: enqueue records within the producer’s DB transaction; a background dispatcher publishes to the broker.
-- Inbox: persist processed message IDs with TTL; drop duplicates during the window.
-
-## Operations
-
-- Health: transport connectivity, alias provisioning, backlog depth, consumer lag.
-- Metrics: delivery latency (p50/p95/p99), throughput, retry counts, DLQ rates, handler duration, batch sizes, prefetch effectiveness.
-- Logs: include correlation/causation IDs; never log payload secrets; include alias and partition identifiers.
-
-## References
-
-- Decisions MESS-0021..0027: `/docs/decisions/`
-- Engineering: `/docs/engineering/index.md`
+R07 moves ambient context beneath Data, makes Data Lifecycle/streaming truthful, and then proves Entity
+`Transport` and `Events` first through a faithful built-in in-process adapter. External connectors are
+rebuilt only against the same conformance kit. See the
+[current Messaging reference](../../docs/reference/messaging/index.md).

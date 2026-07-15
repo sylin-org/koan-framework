@@ -4,12 +4,12 @@ domain: data
 title: "Entity Semantics Contract"
 audience: [architects, developers, framework-authors, ai-agents]
 status: current
-last_updated: 2026-07-13
+last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-15
   status: reviewed
-  scope: normative Entity language, module extension, context, event, and inspectability rules
+  scope: normative Entity language, capability lifting, context, Lifecycle, Events, Transport, and inspectability rules
 ---
 
 # Entity Semantics Contract
@@ -21,7 +21,8 @@ can do.
 
 The contract is normative for new APIs and changes to existing APIs. It does not claim the v0.17
 surface already conforms. The [R03 inventory](../initiatives/koan-v1/R03-ENTITY-INVENTORY.md) identifies
-current deltas, and R04 owns migration in dependency order.
+the original deltas. [ARCH-0113](../decisions/ARCH-0113-entity-capability-communication.md) supersedes
+the earlier lifecycle/event/messaging split and records the greenfield rebuild order.
 
 ## Product outcome
 
@@ -105,12 +106,17 @@ unreadable. A module therefore contributes one or a very small number of noun fa
 // Illustrative contract shape; individual APIs graduate through their own work items.
 var related = await Article.Semantic.Search("food security", ct);
 await Article.Cache.Flush(ct);
+Article.Lifecycle.BeforeUpsert(...);
 var facts = Article.Explain.Capabilities;
 ```
 
 Facets make scope visible: `Article.Cache.Flush()` is about Article's cache, while a cache-cluster purge
 belongs to the cache control plane. Facet names are short domain/capability nouns, not `Manager`,
 `Helper`, or `Service` wrappers.
+
+Static facet syntax never licenses a process-global mutable registry. Communication receiver behavior
+uses stable business-named typed handlers discovered by the host. A future Entity-shaped composition
+facade is admitted only if it is genuinely host-bound and replaces rather than duplicates that path.
 
 ### 3. Modules extend the language; Data.Core does not predict them
 
@@ -129,9 +135,9 @@ Consequences:
 - module control-plane APIs remain in the module's own namespace;
 - two modules may not claim the same facet/member without an explicit composition decision.
 
-A disposable .NET 10 probe compiled both a static `Todo.Semantic` extension and an instance extension
-on a constrained Entity subtype. R04 must turn that proof into checked-in consumer compilation tests
-before migrating public APIs.
+R04's checked-in .NET 10 consumer suite proves static and instance extension members on constrained
+Entity subtypes, module absence/presence/removal, invalid receivers, and collision behavior. Every new
+facet must extend those cells for its own scalar, type, set, and stream forms.
 
 ### 4. Attributes declare policy, not hidden workflows
 
@@ -155,79 +161,168 @@ inflate every Entity base type. Prefer typed opt-in facets whose guarantees are 
 
 ## Context contract
 
-`EntityContext` is the scoped carrier for one logical Entity operation flow. It is not a global service
-locator.
+Core owns the immutable typed ambient carrier for one logical Koan flow. The working API name is
+`KoanContext`; applications normally use module vocabulary such as `Tenant.Use(...)` rather than raw
+context access. The ambient state is deliberately logical-flow scoped; an explicit outer scope may
+span calls into more than one host. `EntityContext` remains the Entity/Data-facing facade for source,
+adapter, partition, and transaction intent because that is its semantic role, not for compatibility.
+It is not the owner of every cross-cutting concern, exposes no generic module-slice bag, and is never a
+global service locator.
 
 ### Context classes
 
 - **Business/request scope:** typed module-owned values such as tenant, actor, classification, or
-  correlation. Applications use named module vocabulary such as `Tenant.Use(...)`, not raw dictionary
-  keys.
+  correlation.
 - **Logical data scope:** a named partition/source only when it has application meaning and stable
   semantics.
 - **Unit of work:** a named transaction boundary with declared provider coverage and commit behavior.
-- **Execution override:** adapter selection, cache bypass, and provider diagnostics. These are expert
-  controls and are presented as overrides, not ordinary business scope.
+- **Execution override:** adapter selection, cache bypass, and provider diagnostics. These remain
+  expert controls rather than ordinary business scope.
 
-Context is immutable and inherit-unless-overridden. Every push returns a disposable/async-disposable
-scope, and invalid combinations fail immediately. Cross-thread dispatch has explicit
-capture/restore/suppress behavior. Secrets and connection values never enter the context description.
+Context is immutable and inherit-unless-overridden. Every push returns a disposable or
+async-disposable scope, and invalid combinations fail immediately. Secrets and connection values never
+enter the portable context or its description.
+
+Each module owns capture, validation, versioning, restore, and suppression of its durable slice. The
+Core registry transports opaque values and never names tenant or another axis. An absent registered
+axis means explicit suppression and is valid; an unknown axis, malformed encoding, or unsupported
+version fails before application code. Opaque syntax validation does not prove integrity. A
+security-sensitive axis crossing a process boundary requires authenticated adapter provenance or the
+route/ingress fails closed. Each carrier declares its generic ingress-trust requirement, allowing the
+router to compare it with adapter capabilities without learning the axis meaning. Restore spans the
+complete handler and disposal runs in reverse order.
 
 ### Host ownership
 
-Entity operations resolve through the current host scope. Registries, lifecycle handlers, provider
-elections, and cached services are host-owned and disposed with that host. A missing or disposed host
-produces one Koan error naming the attempted Entity operation and corrective action; no stale static
-service provider may remain reachable.
+Entity operations resolve through the current host scope. Registries, lifecycle handlers,
+subscriptions, receiver groups, provider elections, and cached services are host-owned and disposed
+with that host. A missing or disposed host produces one Koan error naming the attempted Entity
+operation and corrective action; no stale static service provider may remain reachable.
+
+Host isolation does not redefine ambient context as host-local. A host cannot mutate or dispose another
+host's registrations, services, or drain state, and host disposal cannot clear a caller-owned outer
+context scope. Durable capture carries module values into the receiving host's target flow; it never
+carries host services.
+
+An Entity operation may resolve implicitly only when one live host is eligible. ASP.NET requests,
+Jobs, and Communication handlers establish an ambient host scope automatically. Multiple-host tests or
+applications establish it deliberately; Koan never chooses a process-static winner.
 
 Static generic metadata may be process-wide only when it is immutable and independent of services,
 configuration, environment, or host lifecycle.
 
-### Transaction boundary
+### Transaction and operation boundaries
 
 One Entity write is atomic to the degree declared by the selected provider. Multi-operation atomicity
-uses an explicit `EntityContext.Transaction(...)` or a documented host boundary (HTTP request, agent
-tool, job attempt, or message handler) that reports its unit-of-work behavior.
+uses an explicit Data transaction or documented host boundary and never implies cross-provider
+atomicity.
 
-Koan never implies cross-provider atomicity. It negotiates it, rejects it, or names a saga/outbox/
-compensation contract. Disposal, commit, rollback, and exception behavior are automated tests, not
-incidental implementation.
+Events and Transport do not inspect a Data transaction coordinator. The base contract treats their
+acceptance independently from persistence. A later Save-plus-signal guarantee must use one neutral
+Core operation-completion seam in which Data and Communication enlist independently. Process
+after-commit, durable outbox, inbox, saga, and compensation guarantees are named and negotiated rather
+than inferred from a concise API.
 
-## Lifecycle and event contract
+## Lifecycle, Events, and Transport contract
 
-Four mechanisms remain distinct:
+Five mechanisms remain distinct:
 
-| Mechanism | Purpose | Timing/ownership |
+| Mechanism | Purpose | Owner |
 |---|---|---|
-| Entity invariant/domain method | keep one entity/aggregate valid | synchronous business code on the model |
-| Persistence lifecycle hook | validate, normalize, protect, or observe a load/save/remove | ordered host-owned pipeline around one operation |
-| Domain event | state a business fact for in-process domain/application reactions | raised by Entity, deferred to the declared unit-of-work boundary |
-| Integration message | communicate outside the process/bounded context | serializable contract with declared immediate/outbox delivery semantics |
+| Entity invariant/domain method | keep one Entity or aggregate valid | synchronous business code on the model |
+| Persistence Lifecycle | validate, normalize, protect, or observe load/upsert/remove | Data |
+| Event | state a typed business occurrence associated with an Entity | Communication Events lane |
+| Entity Transport | distribute an immutable copy of Entity state | Communication Transport lane |
+| Integration contract | cross a DDD bounded context with an explicit versioned schema | application/integration boundary |
 
-Framework projections—cache invalidation, search indexing, embeddings, audit facts—are separately
-identified framework reactions. They appear in composition/operation explanation and do not pretend to
-be application-authored domain rules.
+Framework reactions—cache invalidation, indexing, embeddings, audit facts, and job wakeups—are
+separately identified. They appear in composition and operation explanation and do not pretend to be
+application-authored domain facts.
 
-Lifecycle registration is deterministic, idempotent per owner, removable, and host-scoped. Ordering is
-inspectable. Before-hooks may reject with a stable code and corrective message; after-hooks state
-whether they run before commit, after commit, or on rollback. A hook must not recursively save the same
-entity unless an explicit guarded contract permits it.
-
-Domain events carry business data, not providers or services. Integration messages require a message
-contract; a broad `.Send()` on every class is outside this contract.
-
-Event grammar follows the Entity receiver:
+The public grammar communicates intent:
 
 ```csharp
-Todo.Events.BeforeUpsert(...);              // type lifecycle composition
-todo.Events.Raise(new TodoCompleted(...));  // domain fact raised by this entity
+Todo.Lifecycle.BeforeUpsert(...);
+
+public sealed class RecordCompletion : IHandleEntityEvent<Todo, TodoCompleted> { /* business code */ }
+await todo.Events.Raise<TodoCompleted>(ct);
+
+public sealed class ImportTodo : IReceiveEntity<Todo> { /* business code */ }
+await todo.Transport.Send(ct);
 ```
 
-`Events` is an intrinsic Entity facet. The static form describes the ordered lifecycle of the Entity
-type; the instance form records a typed business fact from one Entity. Sharing the noun makes both
-capabilities discoverable without merging their promises: `Raise` joins the declared unit-of-work and
-never means immediate broker publication. Any integration delivery is a separately named, explained,
-and negotiated reaction.
+Lifecycle registration is deterministic, idempotent per owner, removable, host-scoped, and invoked by
+the canonical Data operation path. Before-hooks may reject with a stable code and correction.
+After-hook names state whether the provider write or a real commit has occurred; enlistment alone is
+not `AfterUpsert` or `AfterCommit`.
+
+Every explicit `Raise<E>()` is a new occurrence. Retries retain its occurrence identity, and every
+logical subscription becomes a delivery target under the elected channel's reported delivery class.
+The source Entity already supplies identity and snapshot, so a zero-payload fact is the common path;
+an overload accepts explicit details when the fact carries additional business information.
+`Raise<E>()` treats `E` as an event-kind token and does not instantiate it. A contract declared as
+details-required rejects the zero-details overload before dispatch. An Event with no subscriptions is
+a valid zero-target occurrence and is reported as such.
+
+Every explicit `Send()` is a new logical send of the immutable accepted snapshot. The route creates one
+logical copy target per receiver group; the elected channel reports whether arrival is best-effort,
+acknowledged, or durably accepted. Retries retain delivery identity and deduplicate within the declared
+receiver scope. This is retry idempotence, not silent content-hash coalescing or exactly-once handler
+side effects. Local delivery serializes/deserializes so it cannot expose a shared mutable reference.
+Standard Transport with no receiver group fails correctively instead of succeeding as a silent no-op.
+
+`Raise` and `Send` lift pointwise across one Entity, a finite sequence, and a genuine lazy async stream.
+They preserve source ordinal/multiplicity, capture context once, use bounded backpressure, and report an
+accepted prefix without claiming collection atomicity or handler execution order. A normal await ends
+at channel publication acceptance. The returned receipt is a bounded operation summary; per-item
+identity and receiver dedupe/completion/failure/retry/dead-letter transitions are incremental correlated
+settlement facts, never an unbounded receipt collection. A capability-gated operation-scoped settlement
+wait makes local tests deterministic; a separate host drain serves shutdown. Source, route, adapter,
+and cancellation failures throw typed lane exceptions carrying the bounded partial receipt, with
+cancellation still catchable as `OperationCanceledException`.
+
+The sole V1 receiver path is a typed, auto-discovered business handler with stable application identity,
+usable unchanged in-process or through a connector. A type-derived default group identity is
+refactor-sensitive and reported; long-lived distributed groups declare an explicit business alias and
+version. Lambdas are deferred except for an explicitly local test convenience. The full laws, adapter
+rules, and greenfield deletion map are in
+[ARCH-0113](../decisions/ARCH-0113-entity-capability-communication.md).
+
+Events or Transport may be physically local, networked, or broker-backed. Adapters cannot change
+occurrence/snapshot identity, fan-out/receiver-group cardinality, copy, context, receipt, or failure
+semantics. Crossing a process does not itself cross a bounded context; crossing a bounded context
+requires the explicit integration contract rather than silently publishing a persisted Entity schema.
+
+The foundation provides the complete ring through one faithful in-process adapter. Referencing no
+external connector still permits local `Raise`/`Send` with auto-discovered typed handlers and zero
+routing configuration. A build-generated application communication manifest distinguishes direct
+PackageReference/ProjectReference connector intent from transitive availability. One eligible outbound
+adapter is elected per logical channel; every local group binds once to the same channel. Publishers
+publish once and never infer remote receiver acceptance. InProcess implements that same contract when
+no external connector exists.
+
+Best-effort, durable, ordered, acknowledged, and other postures remain distinct facts; fan-out/groups,
+copy, context/provenance, and contract safety cannot be weakened. An unavailable selected external
+channel never silently falls back to process-local reach, and connector health participates in
+readiness. Endpoint, credentials, and trust remain deployment configuration or orchestration discovery,
+not values Koan invents.
+
+V1 uses an inferred default channel, an optional business-named channel at the terminal, and one
+host/deployment binding. Sender selection uses standard LINQ or a truthful Data query. A named typed
+receiver may apply `Where` at ingress after authenticated deserialization; `false` is a terminal
+filtered settlement, never retry/dead-letter, and never a confidentiality boundary. V1 performs no
+adapter predicate pushdown, provider lowering, automatic `When` routing, mirroring, or failover.
+
+Mesh identity derives from stable application identity plus environment. V1 is limited to replicas
+sharing one application communication manifest and trust boundary; heterogeneous/cross-application
+communication requires a future explicit integration manifest. Wire identity is mesh/application,
+channel, versioned contract, operation/item, correlation, and sealed context—not a deployment plan
+hash. The plan hash remains diagnostic so compatible rolling configuration can coexist.
+
+Boot emits one concise Communication summary and warnings for rejected/degraded plans. The complete
+contract/channel/outbound-adapter/local-group/inbound-binding matrix is structured runtime truth through
+expanded startup reporting, operator inspection, and authorized agent projections. Every surface
+reuses the same reason codes and safe corrections.
 
 ## Relationships and execution cost
 
@@ -242,6 +337,9 @@ work.
   runtime guess.
 - Expansion through REST/MCP follows the same visibility, authorization, limit, and cost facts as
   in-process code.
+- A method named `Stream` performs bounded incremental enumeration. Materializing a complete result
+  and yielding it afterward is not a streaming implementation, even when the return type is
+  `IAsyncEnumerable<T>`.
 
 ## Backend negotiation and operation explanation
 
@@ -250,10 +348,12 @@ Every Entity operation can be described by a stable fact envelope containing, as
 - entity type, operation, and correlation identifier;
 - logical scope without secret values;
 - selected source/adapter and the reason it won;
+- application communication manifest, logical channel, outbound election, local inbound group binding,
+  receiver-filter posture, and considered connector candidates;
 - required and available capabilities;
 - execution mode: native/pushdown, streamed, hybrid, in-memory, deferred, or rejected;
 - transaction/event/projection participation;
-- boundedness, limits, retries, and idempotency facts;
+- boundedness, limits, retries, receipt state, idempotency scope, ordering, and carried context axes;
 - degraded/defaulted decisions and corrective actions.
 
 Application code need not request this envelope on every call. The same underlying facts project to
@@ -296,7 +396,7 @@ projection:
 
 - which Entity facets exist because of referenced modules;
 - which operations are read-only, mutating, destructive, idempotent, or deferred;
-- input/output schemas, limits, authorization, and dry-run support;
+- input/output schemas, limits, authorization, acceptance/delivery meaning, and dry-run support;
 - selected backend/capabilities and why an operation is unavailable;
 - stable error codes and a safe corrective action.
 
@@ -328,21 +428,39 @@ Every module contributing Entity language must add compilation and runtime evide
 6. module removed: compilation/configuration/lockfile drift is understandable;
 7. repeated hosts: no registration or service-provider residue crosses host boundaries;
 8. provider capability absent: fail-closed or explicitly opted-in fallback behavior is asserted;
-9. XML documentation and agent schema describe the same effects and limits.
+9. scalar, finite sequence, sync-yield, and async-yield forms preserve one semantic contract where the
+   capability claims to lift;
+10. partial source/adapter failure, cancellation, backpressure, context capture, acceptance receipts,
+    and later settlement observation are asserted for lifted side effects; and
+11. XML documentation and agent schema describe the same effects and limits.
 
-## Compatibility and migration
+## Greenfield evolution and removal
 
-This contract does not authorize abrupt removal of pre-1.0 APIs. R04 will classify each inventory row:
+Koan is pre-1.0. A current API, package, sample, or document is evidence to assess, not a compatibility
+anchor. When it conflicts with the coherent contract, the owning work item classifies it as:
 
 - keep and harden in place;
-- move behind a facet with a compatibility forwarding period;
-- move to workflow/control plane;
-- strongly type and deprecate a broad receiver;
-- remove immediately only when behavior is false-success, unsafe, or explicitly unshipped.
+- move behind the correct facet or layer;
+- absorb into a smaller shared mechanism;
+- rebuild under the canonical intent; or
+- delete.
 
-Migration order begins with false-success and host-lifetime hazards, then broad receivers and missing
-capability checks, then facet/naming cleanup. The golden V0-to-V1 proof becomes the release gate for
-the resulting language.
+Compatibility aliases are not automatic. A forwarding period is justified only by demonstrated public
+adoption and only when it does not leave two plausible common paths. False-success, unsafe, invented,
+or semantically misleading surfaces are removed in the same coherent change that introduces their
+replacement.
+
+The current rebuild specifically permits:
+
+- `Entity.Events` persistence lifecycle to become `Entity.Lifecycle` with no alias;
+- arbitrary-object Messaging to be replaced by Entity `Events` and `Transport`;
+- only Pipeline's Entity-cardinality normalization to move into Data.Core while each typed capability
+  owns its execution/results, then delete the public generic DSL; and
+- adapters and bridge packages to be deleted when they cannot satisfy the shared semantics.
+
+Migration proceeds as meaningful vertical slices: establish the lower context/Data boundary, prove one
+faithful in-process capability, then add network breadth. Each slice leaves a useful application state
+and removes or supersedes the mechanism it replaces.
 
 ## Proposal checklist
 
@@ -353,6 +471,9 @@ Before approving a new Entity capability, record:
 - module/package and namespace;
 - direct member, instance extension, static facet, attribute, or interface choice;
 - provider/cost/transaction/event contract;
+- scalar/set/stream lifting decision and partial-receipt behavior;
+- context capture, isolation, idempotency, ordering, and adapter guarantees where communication is
+  involved;
 - startup and per-operation explanation;
 - agent/API projection boundary;
 - compile/runtime evidence and unsupported scenarios;
