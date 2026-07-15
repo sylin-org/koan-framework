@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 passed; R07-02 provider-bounded streaming is active
+  scope: R07-01 and R07-02 passed; reverse-dependent package closure is next
 ---
 
 # Koan V1 reorganization current handoff
@@ -27,9 +27,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
   Core-owned typed logical-flow context and durable carrier registry; Data, Tenancy, Access, Jobs, and
   Data.AI have moved to it. The old Data-owned generic slice/carrier APIs and Data-axis carriage hook
   are removed, and the affected regression/docs/privacy gates are green.
-- [R07-02](work-items/r07/R07-02-provider-bounded-streaming.md) is active. It keeps
-  `IAsyncEnumerable<TEntity>` and introduces one honest provider-bounded-page capability beneath it;
-  unsupported adapters reject rather than falling back to full-result materialization.
+- [R07-02](work-items/r07/R07-02-provider-bounded-streaming.md) passed. It keeps
+  `IAsyncEnumerable<TEntity>` and composes one honest provider-bounded-page capability beneath it.
+  Data.Core passes 42/42 focused and 325/325 full; all six qualified and three fail-closed adapter
+  cells pass; SQLite passes 1/1; and the real Backup consumer passes 5/5 acceptance plus 7/7 full.
+  Unsupported adapters reject rather than falling back to full-result materialization.
 - Lifecycle is a separate clean 0.18 public break. It remains stopped until package automation can mint
   the complete reverse-dependent closure; no alias or partial source break is being introduced.
 - Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
@@ -75,15 +77,19 @@ await order.Transport.Send(ct);
 
 ## Zero-configuration delight contract
 
-- The foundation package plus `AddKoan()` ultimately provides the complete process-local ring: local
+- Communication must ship, and the foundation package plus `AddKoan()` must activate, the complete
+  minimum-priority process-local ring: local
   `Raise` reaches local Event subscriptions and local `Send` targets local Transport receiver groups.
+  Communication owns this in-process provider floor; it is not a separately referenced connector.
 - A build-generated communication manifest records direct PackageReference/ProjectReference connector
   intent; transitive references cannot hijack selection.
 - Connector references add no application routing code or Koan registration; endpoint, credentials,
   trust material, and production availability remain deployment configuration/discovery.
-- Election is per logical channel: explicit binding, hard semantic eligibility, direct-reference
-  intent, fixed delivery-assurance rank, then stable connector identity. Publishers submit once; every
-  local stable group binds once to the same channel.
+- Election is per lane and logical channel: explicit binding; directly referenced claim or, only when
+  none exists, the built-in floor; hard semantic eligibility; fixed delivery-assurance rank; provider
+  priority; then stable connector identity. A directly intended but unavailable provider never
+  silently falls back to process-local reach. Publishers submit once; every local stable group binds
+  once to the same channel.
 - UDP may honestly weaken durability or liveness, never fan-out/groups, copy, context, provenance, or
   contract safety. Raw datagrams are ineligible for standard Entity Transport unless those invariants
   are proved. RabbitMQ earns only the guarantees its conformance tests prove.
@@ -113,9 +119,9 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
 
 1. R07-01: Core-owned typed ambient context and durable carrier, preserving current Jobs/Tenant proofs.
    **Passed.**
-2. R07-02: genuine provider-bounded streaming beneath the existing Entity surface. **Active.**
-3. Automate the breaking package closure, then rebuild canonical host-owned Lifecycle as a clean 0.18
-   wave.
+2. R07-02: genuine provider-bounded streaming beneath the existing Entity surface. **Passed.**
+3. Automate the breaking package closure. **Next.** Then rebuild canonical host-owned Lifecycle as a
+   clean 0.18 wave.
 4. Minimal Data.Core Entity-cardinality adapter, pillar-owned execution, and deletion of the two real
    public Pipeline uses.
 5. Faithful local Transport under `AddKoan()`.
@@ -128,26 +134,37 @@ Only the next slice has a detailed child card. Do not open broker breadth before
 
 ## Verified
 
-- `pwsh -NoProfile -File scripts/build-docs.ps1 -Strict` passes after the architecture and public-truth
-  changes.
-- `git diff --check` passes.
-- `dotnet build Koan.sln --no-restore --verbosity minimal` succeeds with 0 errors.
-- Core 257/257; Data context/transactions 35/35; Tenancy 110/110; Access 22/22; Jobs core 77/77
-  and durable tenancy 11/11; Data.AI 84/84; Data axes 56/56 plus integration 18/18 pass.
-- The changed architecture artifacts contain no private downstream identity, path, persona, or
-  workflow.
-- R07 code evidence was independently inventoried across Data Lifecycle/streams, ambient carriers,
-  Jobs, Cache coherence, Pipelines, Messaging Core, InMemory, and RabbitMQ.
+- R07-01's recorded closure remains green: strict docs, diff check, its recorded successful solution build, Core
+  257/257, Data context/transactions 35/35, Tenancy 110/110, Access 22/22, Jobs core 77/77 plus durable
+  tenancy 11/11, Data.AI 84/84, and Data axes 56/56 plus integration 18/18.
+- R07-02 Data.Core streaming passes 42/42 focused and 325/325 full, including exact pages,
+  first-yield laziness, no count,
+  cancellation/disposal, residual continuation, total-order/overclaim rejection, stable routed
+  source/partition/registered carrier context, natural cancellation overloads, and selected/rejected
+  runtime facts.
+- The focused SQLite provider proof passes 1/1.
+- The shared provider-bounded cell passes once each for SQLite, PostgreSQL, CockroachDB, SQL Server,
+  MongoDB, and Couchbase, including boundary ordering for every admitted caller-sort type: top-level
+  non-nullable `bool`, `byte`, `sbyte`, `short`, `ushort`, and `int`. Only the usual string Entity id
+  is admitted as an opaque provider-stable tie-breaker. The matching fail-closed cell passes once each for InMemory,
+  JSON, and Redis; none yields or silently enters a complete-source stream fallback.
+- The real Backup consumer passes 5/5 acceptance and 7/7 full: SQLite requests pages `2/2/1` and
+  publishes the complete
+  archive; cancellation during page 2 prevents its completion and archive publication; InMemory and
+  JSON reject before query or archive publication.
+- R07-02's current artifacts contain no private downstream identity, path, persona, or workflow.
+- The Release solution build passes with 0 errors and 19 reviewed pre-existing warnings; strict docs,
+  skill lint, changed examples, structural claims, compatibility, diff, and privacy gates pass.
 
 ## Next safe action
 
-Execute R07-02 from red proofs: add one provider-bounded-page capability, compose it lazily beneath the
-existing Entity stream surface, qualify adapters independently, and rewrite public claims from
-conformance evidence. Do not add a public Pager/cursor/Flow abstraction or a materializing fallback.
+Open and execute the bounded reverse-dependent package-closure child promoted from `PMC-011`. It must
+derive the complete closure, mint fresh immutable identities for closure-selected packages, fail before
+publication when a member is missing, and prove the behavior with a synthetic dependency graph.
 
 Do not change Lifecycle production APIs until automatic reverse-dependent package closure can carry the
 0.18 break. Do not add Events, Transport, a router, a unit-of-work coordinator, or Messaging
-compatibility aliases until Data's lower boundary is true.
+compatibility aliases before that release-safety prerequisite passes.
 
 ## Repository boundary
 

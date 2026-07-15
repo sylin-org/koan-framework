@@ -30,7 +30,8 @@ related_guides:
 
 - **Multiple adapters** – set defaults via configuration and scope specialty stores with `[DataAdapter]`.
 - **Lifecycle gatekeeping** – treat cancellations as first-class outcomes and convert them into domain-specific errors.
-- **Background workloads** – always pass `CancellationToken` through `AllStream`/`QueryStream` calls.
+- **Background workloads** – use `AllStream`/`QueryStream` only with
+  `DataCaps.Query.ProviderBoundedPaging`, and always pass a `CancellationToken`.
 - **Vector migrations** – align embedding dimensions with the configured provider before backfilling historical data.
 - **Bulk writes** – verify adapter capabilities before assuming transactional or batched semantics.
 
@@ -170,8 +171,8 @@ public static class ProductLifecycle
 
 ## 6. Design for Scale from Day One
 
-- Prefer `FirstPage`/`Page` or streaming helpers for high-volume reads.
-- Document batch sizes for Flow pipelines and background jobs.
+- Prefer explicit `FirstPage`/`Page`; use streaming helpers only on a qualified adapter.
+- Document provider page sizes separately from pipeline concurrency and job windows.
 - Declare vector annotations early if semantic search or AI is on the roadmap.
 
 ---
@@ -191,7 +192,7 @@ Use this checklist before exposing the model:
 - [ ] Static helpers cover expected CRUD and query shapes.
 - [ ] Lifecycle hooks guard critical invariants and emit meaningful error codes.
 - [ ] Relationships expose navigation helpers or dedicated query methods.
-- [ ] Paging/streaming helpers support high-volume reads.
+- [ ] Paging is explicit, and any stream is backed by `ProviderBoundedPaging`.
 - [ ] Downstream pillars (Flow, Messaging, AI) know which helpers to call.
 
 ---

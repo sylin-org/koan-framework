@@ -9,7 +9,9 @@ source: src/Koan.Data.Connector.SqlServer/
 
 ## Contract
 
-- Adapter implementing paging/streaming; uses Koan.Data.Relational helpers.
+- The adapter declares `DataCaps.Query.ProviderBoundedPaging` and applies numbered pages in SQL Server
+  before candidate rows are materialized into application memory.
+- Relational translation and schema helpers remain in Koan.Data.Relational.
 
 ## Configuration
 
@@ -27,13 +29,28 @@ source: src/Koan.Data.Connector.SqlServer/
 ## LINQ and pushdowns
 
 - Supported expressions follow `Koan.Data.Relational` translator. See: `xref:reference.modules.Koan.data.relational#supported-linq-subset`.
-- Paging is translated to OFFSET/FETCH; stable order is by `Id ASC`.
+- Paging uses `OFFSET`/`FETCH`. Every caller-requested provider-bounded stream sort component must be a
+  top-level, non-nullable `bool`, `byte`, `sbyte`, `short`, `ushort`, or `int` member. Every other
+  caller sort, including an explicit Entity identifier sort, rejects before provider I/O. Data.Core
+  appends the usual string Entity identifier only as an opaque provider-stable tie-breaker; that is not
+  a CLR or cross-provider collation promise.
+
+## Provider-bounded streaming
+
+- `AllStream` and `QueryStream` are coordinated as lazy numbered pages by Data.Core.
+- `batchSize` is the maximum Koan-visible candidate page, not a promise about opaque SQL client
+  buffers.
+- Deep or collection ordering rejects correctively before provider I/O rather than falling back to a
+  complete-result sort.
+- Offset paging is not snapshot isolation and does not provide mutation-safe traversal, resume tokens,
+  or a public cursor.
 
 ## Error modes
 
 - Provider errors (SqlException) surfaced; transient errors retried per options.
 - Timeouts honor `CommandTimeoutSeconds`.
-- NotSupportedException thrown for unsupported predicates; callers should adjust filters or fallback to streaming + in-memory filtering for small windows.
+- Unsupported predicates surface explicitly; simplify the predicate or materialize a known-small page.
+  Provider-bounded streams may apply supported pointwise residuals but never hide a full-source fallback.
 
 ## Operations
 
@@ -44,5 +61,6 @@ source: src/Koan.Data.Connector.SqlServer/
 ## References
 
 - DATA-0044 paging guardrails: `/docs/decisions/DATA-0044-paging-guardrails-and-tracing-must.md`
-- DATA-0061 paging/streaming: `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
+- [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
 

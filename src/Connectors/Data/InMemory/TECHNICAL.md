@@ -26,9 +26,21 @@ The repository declares:
 - bulk delete; and
 - atomic batch within the process-local store.
 
+It does not declare `DataCaps.Query.ProviderBoundedPaging`. Its query path starts from the resident
+full-source dictionary, so slicing a numbered page is not evidence of provider-bounded traversal.
+
 The common key-value family supplies managed-field guards, isolation modes, instructions, and the
 provider-neutral Entity repository contract. This connector does not infer remote durability,
 distributed atomicity, or production recovery from those shared semantics.
+
+## Streaming boundary
+
+- `AllStream` and `QueryStream` fail correctively with `QueryStreamRejectedException` before yielding;
+  there is no complete-result materializing fallback.
+- Use `All`/`Query` only for known-small test sets. Use `FirstPage`/`Page` to limit the result returned to
+  test code, without inferring an unbounded-data performance guarantee.
+- A later resident-incremental implementation must earn a separate capability claim through shared
+  conformance before these Entity streams become available.
 
 ## Concurrency and isolation
 
@@ -44,7 +56,7 @@ every inherited Entity battery.
 
 `Koan.Data.Connector.InMemory.Tests` covers CRUD, filtering/capabilities, sorting, batch behavior,
 instructions, isolation modes, partitions, host ownership, and managed-field no-leak behavior. The
-current suite passes 55/55.
+current suite passes 56/56.
 
 ## Unsupported
 
@@ -53,3 +65,8 @@ current suite passes 55/55.
 - production backup/recovery;
 - unbounded-data performance claims; and
 - parity with a provider capability the connector does not declare.
+
+## References
+
+- [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)

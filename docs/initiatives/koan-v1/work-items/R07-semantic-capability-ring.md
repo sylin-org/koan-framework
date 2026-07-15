@@ -70,14 +70,16 @@ subordinate to arriving at one sustainable architecture.
   adapter; each pillar owns execution and results. The public Pipeline surface is deleted, not moved
   into Communication.
 - A foundation application with only `AddKoan()` receives a complete process-local Events/Transport
-  ring. No external adapter or configuration is required.
+  ring. Communication owns the minimum-priority in-process provider; no external adapter, separate
+  InMemory reference, or configuration is required.
 - A build-generated application communication manifest records direct PackageReference/ProjectReference
   connector intent. The host elects one eligible outbound adapter per logical channel; every local
   stable group binds once to that channel, and transitive references cannot hijack defaults.
-- A model-owned logical channel and one host/deployment binding are the V1 application policy. Hard
-  semantic capabilities filter adapters; a fixed delivery-assurance rank and stable identity complete
-  deterministic election. Effective outbound/inbound/filter decisions and diagnostic plan hashes are
-  boot-reported.
+- A model-owned logical channel and one host/deployment binding are the V1 application policy. Election
+  is per lane/channel: explicit binding; direct connector claim or built-in floor; hard semantic
+  capabilities; fixed delivery-assurance rank; Core-owned provider priority; then stable identity.
+  Direct intent never silently falls back to local reach when unhealthy. Effective
+  outbound/inbound/filter decisions and diagnostic plan hashes are boot-reported.
 - Sender selection, optional business-named channel choice, and named receiver filters remain typed and
   composable without reviving a general Pipeline DSL. Automatic sender `When` routing is deferred.
 - Event and Transport awaits return only lane-named acceptance facts. Receiver dedupe, handler outcome,
@@ -167,18 +169,22 @@ matrix, adjacent-pillar admission, and dependency-ordered rebuild. The canonical
 The assessment found two lower-layer defects that must precede visible Communication syntax:
 
 - the correct cross-hop ambient carrier is owned by Data rather than Core; and
-- provider `AllStream`/`QueryStream` currently materialize complete results rather than providing the
-  bounded lazy source required by the public grammar.
+- provider `AllStream`/`QueryStream` materialized complete results at assessment time rather than
+  providing the bounded lazy source required by the public grammar.
 
-It also found that the current InMemory and RabbitMQ adapters implement different cardinality and copy
-semantics. Neither is a compatibility base for Events or Transport.
+R07-01 repaired the first defect. R07-02 passes the second: qualified adapters page beneath the
+existing `IAsyncEnumerable<TEntity>` surface, complete-scan resident adapters reject correctively,
+and public/operator/agent guidance states the same tested boundary.
+
+The assessment also found that the current InMemory and RabbitMQ adapters implement different
+cardinality and copy semantics. Neither is a compatibility base for Events or Transport.
 
 ## Implementation slices
 
 | Order | Slice | Meaningful result | Principal deletion/supersession |
 |---|---|---|---|
 | 1 | [R07-01 Core context foundation](r07/R07-01-core-context-foundation.md) | **Passed.** Tenant and other module context survive durable work through a Core-owned, fail-closed contract | Data-owned generic slice/carrier APIs |
-| 2 | [Provider-bounded streaming](r07/R07-02-provider-bounded-streaming.md) | Existing Entity streams become genuinely lazy and bounded on adapters that prove provider-side paging | materializing stream implementation and unused batch hint |
+| 2 | [Provider-bounded streaming](r07/R07-02-provider-bounded-streaming.md) | **Passed.** Data.Core 42/42 focused and 325/325 full, six qualified and three fail-closed adapter cells, SQLite 1/1, and Backup 5/5 acceptance plus 7/7 full establish the bounded contract | materializing stream implementation and unused batch hint |
 | 3 | Release-safe canonical Lifecycle | Package automation first carries the complete 0.18 closure; then Lifecycle becomes host-owned and unavoidable | lifecycle `Events` name, process-static registry, and bypassable hooks |
 | 4 | Typed capability substrate | A minimal Data.Core cardinality adapter and pillar-owned execution replace generic public flow machinery | `PipelineBuilder` and pillar pipeline extensions |
 | 5 | In-process Transport flagship | a foundation + `AddKoan()` app gets local scalar/set/stream snapshots, stable typed receivers, source/ingress filters, isolated copies, bounded acceptance, operation-scoped settlement wait, and tenant-safe retry identity | old Messaging Core, proxy/buffer, broad `Send`, separate InMemory connector |
@@ -200,8 +206,11 @@ backlogs until their prerequisites pass.
 5. Execute R07-01 without changing current durable context behavior. **Complete.** Core owns the typed
    logical-flow state and durable carrier registry; Data, Tenancy, Access, Jobs, and Data.AI are
    migrated, and the affected regression, compatibility, documentation, diff, and privacy gates pass.
-6. Open each later implementation slice only after its lower boundary passes.
-7. Prove in-process semantics before any broker migration or public maturity change.
+6. Complete R07-02's public-document reconciliation and final regression/build/docs/compatibility/
+   privacy gates. **Complete.**
+7. Automate reverse-dependent package closure before changing Lifecycle's shipped public surface.
+8. Open each later implementation slice only after its lower boundary passes.
+9. Prove in-process semantics before any broker migration or public maturity change.
 
 R07-02 is intentionally additive and precedes the Lifecycle source break. Public 0.17 already shipped
 the `Events` lifecycle surface, while the packaging mechanism does not yet automatically mint the full
@@ -210,13 +219,23 @@ be removed before Lifecycle production changes begin; it does not weaken the acc
 
 ## Verification
 
-- Focused tests: the completed architecture assessment is documentation-only; implementation children
-  define executable gates.
-- Broader regression tests: none until a production slice changes.
-- Documentation / sample checks: strict full-site docs build and initiative link validation.
-- Manual or observable proof: current code citations for every disposition and a reviewable target
-  dependency map.
-- Privacy check: no private downstream identity, path, persona, or workflow enters tracked artifacts.
+- R07-01 passed its focused, broader-regression, solution-build, strict-docs, compatibility, diff, and
+  privacy gates.
+- R07-02's Data.Core stream coordinator passes 42/42 focused and 325/325 full, including routed
+  source, partition, registered carrier stability, exact caller-order admission, explicit Entity-id
+  rejection, and selected/rejected runtime facts.
+- R07-02's SQLite provider proof passes 1/1. The shared conformance cell passes for all six qualified
+  adapters—SQLite, PostgreSQL, CockroachDB, SQL Server, MongoDB, and Couchbase—including boundary
+  ordering for all six admitted scalar types, and fails closed as designed for InMemory, JSON, and
+  Redis.
+- The real Backup consumer passes 5/5 acceptance and 7/7 full: SQLite pages `2/2/1`, cancellation
+  publishes nothing after the bounded stop, and InMemory/JSON reject before query or archive
+  publication.
+- Connector regressions pass 236/237; Mongo's sole known ZenGarden endpoint-preference failure remains
+  isolated in PMC-012, while Couchbase is 17/17 and mixed-case convergence is repaired centrally.
+- The Release solution build passes with 0 errors and 19 reviewed pre-existing warnings. Strict docs,
+  skill lint, changed examples, structural claims, compatibility, diff, and privacy gates pass. R07-02
+  is closed without a maturity promotion.
 
 ## Acceptance additions
 

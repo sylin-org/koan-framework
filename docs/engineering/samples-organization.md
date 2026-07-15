@@ -49,8 +49,9 @@ Required Conventions (DX)
 
 Streaming and Data Access in Samples
 
-- In code samples and snippets, prefer entity statics: `MyModel.All(ct)`, `MyModel.Query(...)`, `MyModel.AllStream(...)`, `MyModel.FirstPage(...)`, etc. See DATA-0061.
-- For larger sets, demonstrate `AllStream`/`QueryStream` or explicit paging. Avoid `All()` for large data paths.
+- In code samples and snippets, prefer entity statics: `MyModel.All(ct)`, `MyModel.Query(...)`, `MyModel.AllStream(...)`, `MyModel.FirstPage(...)`, etc. See DATA-0107.
+- For larger sets, demonstrate `AllStream`/`QueryStream` only with the adapter capability boundary, or
+  use explicit paging. Avoid `All()` for large data paths.
 
 Migration Guidance
 
@@ -101,5 +102,5 @@ References
 
 - Engineering: `/docs/engineering/index.md`
 - Architecture: `/docs/architecture/principles.md`
-- Data Access: `/docs/guides/data/all-query-streaming-and-pager.md`, `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
+- Data Access: `/docs/guides/data/entity-access-and-streaming.md`, `/docs/decisions/DATA-0107-provider-bounded-entity-streams.md`
 - Web API: `/docs/api/web-http-api.md`, `/docs/decisions/WEB-0035-entitycontroller-transformers.md`

@@ -17,17 +17,19 @@ This is a greenfield framework. Break and change as necessary, concerns for back
 - Use first-class static model methods for prominent data access in samples, documentation, and code suggestions:
   - Examples: `MyModel.All(ct)`, `MyModel.Query(...)`, `MyModel.AllStream(...)`, `MyModel.QueryStream(...)`, `MyModel.FirstPage(...)`, `MyModel.Page(...)`
 - Use generic facades like `Data<TEntity, TKey>` only when a first-class static is unavailable.
-- For large result sets, prefer streaming (`AllStream`, `QueryStream`) or explicit paging (`FirstPage`, `Page`); avoid non-paged `All`/`Query` over large data.
+- For large result sets, prefer `AllStream`/`QueryStream` only on an adapter that advertises
+  `ProviderBoundedPaging` (SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB, Couchbase).
+  InMemory, JSON, and Redis reject streams; use explicit paging/materialization or another adapter.
 
 **References:**
 
-- `/docs/guides/data/all-query-streaming-and-pager.md`
-- `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
+- `/docs/guides/data/entity-access-and-streaming.md`
+- `/docs/decisions/DATA-0107-provider-bounded-entity-streams.md`
 
 ### 0. Prime Directives
 
 - Prioritize separation of concerns, DRY (Don't Repeat Yourself), and ease of use.
-- Prefer concise method names (e.g., `Save()`, `Get()`, `Find()`). Avoid unnecessary repetition.
+- Prefer concise method names (e.g., `Save()`, `Get()`, `Query()`). Avoid unnecessary repetition.
 
 ### 1. Controllers, Not Inline Endpoints
 
@@ -87,7 +89,7 @@ This is a greenfield framework. Break and change as necessary, concerns for back
   - For modules/projects: follow `ARCH-0042`. Create `README.md` (information, setup, safe snippets) and `TECHNICAL.md` (reference, architecture) at project root.
   - For architectural policies: add ADRs to `docs/decisions` and update `toc.yml`.
   - For engineering guidance: edit/extend under `docs/engineering/`.
-  - For reference, how-to, API docs: update/add under `docs/reference/` (e.g., `reference/data-access.md`).
+  - For reference, how-to, API docs: update/add under `docs/reference/` (e.g., `docs/reference/data/index.md`).
   - For web conventions: use `docs/api/web-http-api.md`, etc.
   - For adapters: update `docs/reference/_data/adapters.yml`. Allow the build process to update generated docs; do not edit generated artifacts manually.
   - For guides: create under `docs/guides/<area>/` and update local TOCs.
@@ -128,7 +130,7 @@ After each documentation or code change, validate that updates are correctly lin
   - Architecture principles: `/docs/architecture/principles.md` (curated ADR digest)
   - Documentation root: `/docs` and `/docs/toc.yml`
 
-- Data Access: `/docs/guides/data/all-query-streaming-and-pager.md`, `/docs/guides/data/working-with-entity-data.md`, `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
+- Data Access: `/docs/guides/data/entity-access-and-streaming.md`, `/docs/reference/data/index.md`, `/docs/decisions/DATA-0107-provider-bounded-entity-streams.md`
 - Web API: `/docs/api/web-http-api.md`, `/docs/api/openapi-generation.md`, `/docs/decisions/WEB-0035-entitycontroller-transformers.md`
-- Messaging: `docs/reference/messaging.md`, decisions in `docs/decisions/MESS-*.md`
-- Adapter Matrix: `docs/reference/_data/adapters.yml` → `docs/reference/adapter-matrix.md` (generated)
+- Messaging: `docs/reference/messaging/index.md`, decisions in `docs/decisions/MESS-*.md`
+- Adapter Matrix: `docs/reference/_data/adapters.yml` → `docs/reference/_generated/adapter-matrix.md` (generated)

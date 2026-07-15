@@ -61,8 +61,8 @@ it here.
 | Surface | Assessment state | Maturity | Evidence record | Principal question |
 |---|---|---|---|---|
 | Bootstrap, discovery, and startup reporting | assessed | `demonstrated` | [record](#bootstrap-discovery-and-startup-reporting) | Bounded lanes pass; a shared fact model now proves one vertical slice, not exhaustive runtime narration. |
-| `Entity<T>` data semantics and context | assessed | `verified` | [record](#entityt-data-semantics-and-context) | Foundation boundary is explicit: SQLite durable local, InMemory conformance, JSON fallback; broader parity remains separate. |
-| Backend discovery and negotiation | assessed | `demonstrated` | [record](#backend-discovery-and-negotiation) | Child-edge cost is explicit and bounded for three proven providers; fleet-wide parity is not certified. |
+| `Entity<T>` data semantics and context | assessed | `verified` | [record](#entityt-data-semantics-and-context) | Entity streams are provider-bounded on six qualified adapters and fail closed on complete-scan resident adapters. |
+| Backend discovery and negotiation | assessed | `demonstrated` | [record](#backend-discovery-and-negotiation) | Streaming selection/rejection is capability-driven and runtime-explained; fleet-wide behavioral parity is not certified. |
 | Web/API conventions | assessed | `verified` | [record](#webapi-conventions) | In-memory API behavior is well tested; package installation is blocked. |
 | Events and messaging | assessed | `demonstrated` | [record](#events-and-messaging) | A real sample and providers exist; no current broker conformance result was obtained. |
 | Jobs and scheduling | assessed | `verified` | [record](#jobs-and-scheduling) | Core/in-process behavior is strong; distributed tiers remain separate. |
@@ -128,27 +128,41 @@ boundaries remain pre-V1 work.
   generic logical-flow state and durable carriage now live in
   [`Koan.Core.Context`](../../../src/Koan.Core/Context/) through `KoanContext`,
   `IKoanContextCarrier`, and the host-owned `KoanContextCarrierRegistry`.
-- **Executable evidence:** Data.Core passes 301/301, including current health-participation and
+- **Executable evidence:** Data.Core passes 325/325, including current health-participation and
   observed-Entity diagnostics. [`S0.ConsoleJsonRepo`](../../../samples/S0.ConsoleJsonRepo/Program.cs) and
   [`S1.Web`](../../../samples/S1.Web/Todo.cs) demonstrate console and web paths.
 - **Inspection and failure:** repositories and capabilities are resolvable through the static data
   facade; missing/unsupported operations use explicit exceptions rather than silent client-side
   emulation where the capability contract applies.
 - **Unsupported / compatibility:** the result does not certify semantic parity for every external
-  database, transaction shape, query expression, tenancy mode, or migration path. The surface is
-  pre-1.0.
+  database, transaction shape, query expression, tenancy mode, or migration path. Provider-bounded
+  streams do not imply snapshot consistency, mutation-safe iteration, resumability, or constant memory
+  inside opaque drivers. The surface is pre-1.0.
 - **Maturity / safe claim:** `verified`. Core `Entity<T>` persistence semantics are automated and are
   Koan's strongest first-class application language; provider-specific claims require their suites.
-- **Current T6 boundary:** SQLite is the durable Level-1 application provider (15/15 plus both
-  executable journeys); InMemory is the ephemeral conformance oracle (55/55); JSON is the bundled
-  zero-infrastructure fallback (14/14), not a durable application claim. The canonical
+- **Current T6 boundary:** SQLite is the durable Level-1 application provider (17/17 plus both
+  executable journeys); InMemory is the ephemeral conformance oracle (56/56); JSON is the bundled
+  zero-infrastructure fallback (20/20), not a durable application claim. The canonical
   [Data foundation reference](../../reference/data/index.md) publishes selection, inspection, and
   unsupported scenarios without promoting public package maturity.
-- **Current R07 evidence:** R07-01 passes after migrating Data, Tenancy, Access, Jobs, and Data.AI to
+- **Current R07-01 evidence:** R07-01 passes after migrating Data, Tenancy, Access, Jobs, and Data.AI to
   the Core-owned context seam and removing Data's generic slice/carrier APIs. The affected matrix
   proves fail-closed durable restoration and context-isolated embedding queue identity. Safe carrier
   descriptors are code-inspectable; startup/runtime-fact projection remains deferred. This is an
   ownership repair, not a maturity promotion or a Communication claim.
+- **Current R07-02 evidence:** the focused Data.Core streaming surface passes 42/42 and Data.Core full
+  passes 325/325, including bounded
+  page requests, first-yield laziness, no count, cancellation/disposal, residual continuation,
+  total-order/overclaim rejection, natural cancellation overloads, selected/rejected runtime facts,
+  and stable routed source, partition, and registered carrier context for one enumeration. SQLite's
+  focused provider proof passes 1/1. The shared realization cell passes once each for SQLite,
+  PostgreSQL, CockroachDB, SQL Server, MongoDB, and Couchbase; its fail-closed branch passes once each
+  for InMemory, JSON, and Redis. Every qualified cell proves the initial caller-sort floor—top-level
+  non-nullable `bool`, `byte`, `sbyte`, `short`, `ushort`, and `int`—while only the usual string Entity
+  id is admitted as an opaque provider-stable tie-breaker. The real Backup consumer passes 5/5 acceptance and 7/7
+  full over SQLite pages `2/2/1`, caller cancellation, and InMemory/JSON rejection before query or
+  archive publication. This is an adapter-bounded streaming claim, not a universal provider,
+  cross-provider collation, or total-memory claim; R07-02 passes without promoting this row.
 - **Open risks:** graduate the defined Entity semantic locations ring by ring; provider parity,
   concurrency, schema evolution, and compatibility remain separate claims.
 
@@ -160,19 +174,26 @@ boundaries remain pre-V1 work.
   [`DataAdapterAttribute`](../../../src/Koan.Data.Abstractions/DataAdapterAttribute.cs),
   [`DataCaps`](../../../src/Koan.Data.Abstractions/Capabilities/DataCaps.cs), and core
   [`CapabilitySet`](../../../src/Koan.Core/Capabilities/CapabilitySet.cs).
-- **Executable evidence:** Data.Core passes 301/301. Relationship cells execute InMemory, JSON, and
+- **Executable evidence:** Data.Core passes 325/325. Relationship cells execute InMemory, JSON, and
   SQLite selection/rejection/bounds; Web relationship passes 7/7; MCP relationship passes 2/2 and MCP
-  conformance 74/74. [`S10.DevPortal`](../../../samples/S10.DevPortal/README.md) demonstrates provider switching.
+  conformance 74/74. R07-02 adds a 42/42 focused stream coordinator proof, one focused SQLite provider
+  proof, six shared provider-bounded realization cells, three shared fail-closed cells, and a 5/5
+  acceptance plus 7/7 full real Backup consumer proof. [`S10.DevPortal`](../../../samples/S10.DevPortal/README.md) demonstrates provider switching.
 - **Inspection and failure:** [`AdapterResolutionDecision`](../../../src/Koan.Data.Core/Routing/AdapterResolutionDecision.cs)
   is the single calculation for configured/default data selection used by runtime behavior, lockfile,
   and schema-1 facts. [ARCH-0112](../../decisions/ARCH-0112-bounded-relationship-negotiation.md) adds
-  physical filter profiles, corrective relationship rejections, and the latest safe execution fact.
+  physical filter profiles and corrective relationship rejections. R07-02 adds the
+  `query.paging.providerBounded` capability, a corrective `QueryStreamRejectedException`, and safe
+  selected/rejected per-Entity runtime facts without claiming a lazy repository election at boot.
 - **Unsupported / compatibility:** R02 did not run every relational, document, cache, vector, or
   messaging connector, nor prove fallback/election behavior for every ambiguous multi-provider graph.
+  InMemory, JSON, and Redis deliberately reject provider-bounded Entity streams because their current
+  query path scans/materializes the complete source before slicing.
 - **Maturity / safe claim:** `demonstrated`. Koan has a real capability-negotiation model and reports
   major elections; only specifically tested provider combinations may claim parity.
-- **Open risks:** execute the remaining provider cells; verify index sufficiency and performance;
-  design parent batching and recursive graph/depth budgets without turning facts into request history.
+- **Open risks:** automate reverse-dependent package closure before the next breaking tier; expand the
+  stream sort floor only with new cross-provider proof; verify index sufficiency and performance; design
+  parent batching and recursive graph/depth budgets without turning facts into request history.
 
 ### Web/API conventions
 
@@ -403,7 +424,7 @@ boundaries remain pre-V1 work.
   and core health under [`Koan.Core/Observability`](../../../src/Koan.Core/Observability), plus
   [`Sylin.Koan.Observability`](../../../src/Koan.Observability/Koan.Observability.csproj) and module
   contributors.
-- **Executable evidence:** focused facts pass 7/7; Core 211/211, Data.Core 301/301, Web WellKnown 3/3,
+- **Executable evidence:** focused facts pass 7/7; Core 211/211, Data.Core 325/325, Web WellKnown 3/3,
   Web relationship 7/7, MCP relationship 2/2, and MCP conformance 74/74. These prove ordering, schema round-trip, redaction, host isolation,
   unknown/degraded health, and identical Web/MCP serialization for the vertical slice. FirstUse proves
   the operator and agent projections against the same running SQLite-backed business application.

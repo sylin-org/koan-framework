@@ -85,8 +85,9 @@ var loaded = await Todo.Get(todo.Id); // Works with any provider
 ```csharp
 // ✅ CORRECT: Provider-agnostic entity usage
 var todos = await Todo.All(); // Works across all providers
-var capabilities = Data<Todo, string>.QueryCaps; // Check provider capabilities
-await foreach (var todo in Todo.AllStream(1000)) { } // Memory-efficient streaming
+var capabilities = Data<Todo, string>.Capabilities; // Check provider capabilities
+// Provider-bounded only when ProviderBoundedPaging is advertised; unsupported adapters reject.
+await foreach (var todo in Todo.AllStream(1000)) { }
 
 // ❌ ANTI-PATTERN: Provider-specific code that breaks transparency
 var dbContext = serviceProvider.GetService<MyDbContext>(); // Couples to specific provider

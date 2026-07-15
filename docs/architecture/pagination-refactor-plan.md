@@ -1,5 +1,10 @@
 # Pagination & Data Stack Refactoring Plan
 
+> **Historical plan.** This document records an earlier pagination refactor and is not the current
+> Entity streaming contract. Provider-bounded `AllStream`/`QueryStream` execution is defined by
+> [DATA-0107](../decisions/DATA-0107-provider-bounded-entity-streams.md); its supported-adapter and
+> fail-closed boundaries supersede statements below that streaming was removed.
+
 ## Purpose
 
 Align pagination behavior across EntityController endpoints, data helpers, and repository adapters while reducing duplicated logic and simplifying the mental model for developers building against the Koan data stack.

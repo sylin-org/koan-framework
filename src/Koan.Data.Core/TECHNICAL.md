@@ -5,6 +5,12 @@ description: Contracts, options, design and operations for the Koan data core.
 since: 0.2.x
 packages: [Sylin.Koan.Data.Core]
 source: src/Koan.Data.Core/
+last_updated: 2026-07-15
+framework_version: v0.17.0
+validation:
+  date_last_tested: 2026-07-15
+  status: reviewed
+  scope: public Data.Core source inventory and current capability contracts; adapter behavior remains suite-owned
 ---
 
 ## Contract
@@ -20,7 +26,7 @@ source: src/Koan.Data.Core/
   - Common host-backed Entity/Data operations use `KoanHostContextException` when no host is active,
     the selected provider is disposed, or a required Data service is absent
 - Success criteria
-  - Consistent paging/streaming semantics across adapters; predictable options binding
+  - Predictable materialized paging plus explicit capability negotiation for provider-bounded streams
 
 ## Key types and surfaces
 
@@ -80,7 +86,7 @@ source: src/Koan.Data.Core/
 
 - Prefer typed Options for tunables; avoid magic values
 - Centralize constants per project (see ARCH-0040)
-- Paging and streaming follow DATA-0061
+- Structured query planning follows DATA-0096; bounded Entity streaming follows DATA-0107
 
 ## Non-hosted startup ownership
 
@@ -103,7 +109,7 @@ source: src/Koan.Data.Core/
 - Reserve `Data<TEntity, TKey>` for cases where no first-class static exists
 - Establish the runtime with a Koan generic host or `StartKoan()` before calling static Entity/Data
   operations; use the typed host-context failure to diagnose lifecycle versus composition errors
-- For large sets, prefer paging/streaming; avoid unbounded `All()`
+- For large sets, prefer explicit pages or a capability-qualified stream; avoid unbounded `All()`
 
 ## Explicit numbered paging
 
@@ -116,16 +122,31 @@ source: src/Koan.Data.Core/
 
 ## Streaming semantics
 
-- `AllStream/QueryStream` currently materialize `QueryWithCount` before the first yield. The
-  `batchSize` parameter is accepted but not yet applied, so these methods do not provide bounded
-  memory or provider backpressure today.
-- Cancellation reaches the materialized query. Prefer explicit numbered pages to limit each returned
-  result, but do not infer a provider-enforced memory bound until the R07 Data-semantic streaming slice
-  replaces this implementation.
+- `AllStream/QueryStream` use one Data.Core coordinator to request numbered candidate pages lazily.
+  They never invoke `QueryWithCount`; totals are not requested.
+- A repository must advertise `DataCaps.Query.ProviderBoundedPaging`, enforce the requested page and
+  complete total order, and report both honestly. Otherwise enumeration throws a corrective
+  `QueryStreamRejectedException` before yielding instead of materializing the complete source.
+- Qualified adapters are SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB, and Couchbase.
+  InMemory, JSON, and Redis currently reject.
+- `batchSize` bounds the Koan-visible candidate page, not opaque driver buffers. Consumer pace controls
+  later page requests; cancellation and early disposal stop later work.
+- Every user stream sort component must be a single-member, top-level, non-nullable `bool`, `byte`,
+  `sbyte`, `short`, `ushort`, or `int`. Nullable, enum, string/char, wide numeric, floating/decimal,
+  temporal, `Guid`, binary, nested, complex, collection, and explicit Entity-identifier sorts reject
+  before provider I/O.
+- After validating caller ordering, Koan appends the actual Entity identifier. The usual string key is
+  an opaque provider-stable tie-break, not a CLR/cross-provider collation promise. A
+  different business member named `id` does not suppress it, but models declaring both `Id` and `id`
+  are not portable persistence models and are outside the qualified-adapter contract.
+- The current `Int32` provider-offset contract rejects a page before I/O when
+  `(pageNumber - 1) * pageSize` exceeds `Int32.MaxValue`. Numbered paging is not snapshot-consistent,
+  mutation-safe, resumable, or cursor-based.
 
 ## Edge cases and limits
 
-- Large result sets → require paging/streaming
+- Large result sets require explicit paging or a stream on a provider that earns
+  `DataCaps.Query.ProviderBoundedPaging`
 - Concurrency and batches → follow transactional batch semantics (see DATA-0007)
 - Adapter capabilities vary. `DataCaps.Query.Filter` describes operator semantics;
   `DataCaps.Query.FilterExecution` carries `FilterExecutionProfile` (`Native`, `InMemory`, `Scan`, or
@@ -164,18 +185,21 @@ source: src/Koan.Data.Core/
 
 ## Performance guidance
 
-- Prefer explicit numbered paging for large sets; current stream-shaped methods are materialized
-  compatibility surfaces, and a universal provider-enforced bound is not yet available
+- Prefer Entity streams for consumer-paced large-set work on a qualified adapter; use explicit
+  materialization or numbered pages when the selected adapter does not provide bounded streaming
 - Batch operations according to adapter guarantees
 
 ## Compatibility and migrations
 
 - Target frameworks: net10.0
-- Works with: Koan.Data.Connector.Sqlite, SqlServer, Postgres, Redis, Mongo, Vector providers
+- Adapter compatibility is capability-specific. Use the adapter matrix and runtime facts instead of
+  treating package presence as proof of every Data.Core feature.
 
 ## References
 
 - ADR ARCH-0040 - config and constants naming: `/docs/decisions/ARCH-0040-config-and-constants-naming.md`
-- ADR DATA-0061 - paging/streaming semantics: `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
+- ADR DATA-0096 - unified filter pipeline: `/docs/decisions/DATA-0096-unified-filter-pipeline.md`
+- ADR DATA-0107 - provider-bounded Entity streams: `/docs/decisions/DATA-0107-provider-bounded-entity-streams.md`
+- ADR ARCH-0084 - unified capability model: `/docs/decisions/ARCH-0084-unified-capability-model.md`
 - Engineering guardrails: `/docs/engineering/index.md`
 

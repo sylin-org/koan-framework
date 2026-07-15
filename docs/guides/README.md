@@ -113,7 +113,7 @@ _For contributors_: How application initialization actually works
 
 ### [AI & Vector Search](ai-vector-howto.md)
 
-- Streaming data processing with AI enrichments (`AllStream` → `Tokenize` → `SaveWithVectors`)
+- Provider-qualified Entity processing with AI enrichments (`AllStream` → `Tokenize` → `SaveWithVectors`)
 - Batch-processing pipeline patterns and branching
 - Observability guidance for long-running enrichment jobs
 

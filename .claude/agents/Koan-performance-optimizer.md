@@ -11,14 +11,14 @@ You optimize Koan Framework applications for speed, efficiency, and scalability.
 - **Query Optimization**: Provider capability detection, pushdown vs fallback
 - **Batch Operations**: Minimize round trips with bulk operations
 - **Caching Strategies**: Multi-tier caching with invalidation patterns
-- **Memory Management**: Streaming large datasets, GC pressure reduction
+- **Memory Management**: Capability-qualified provider paging, bounded stages, GC pressure reduction
 - **Async Patterns**: Proper concurrency control and task composition
 
 ## Optimization Principles
 - **Measure First**: Profile before optimizing, data-driven decisions
 - **Provider Capabilities**: Leverage database-specific optimizations
 - **Graceful Degradation**: Performance degrades predictably under load
-- **Streaming**: Process large datasets without memory exhaustion
+- **Streaming**: Bound Koan-visible source pages on qualified adapters; measure driver and downstream buffers separately
 - **Cache Strategically**: Cache frequently accessed, rarely changed data
 
 ## Key Responsibilities

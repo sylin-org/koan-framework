@@ -28,7 +28,8 @@ validation:
 - **Inline endpoints**: Adding `Koan.Web` but bypassing controller-first patterns will break engineering guardrails and fail docs/tests.
 - **Secrets (now agyo-tools)**: Pulling in `Sylin.Agyo.Secrets.*` without a backing provider keeps references unresolved; configure a provider (e.g. Vault) or local configuration. _(These packages live in the `agyo-tools` sibling repo as of 2026-06.)_
 - **Orchestration without engine**: `Koan.Orchestration.Cli` detects Docker/Podman; ensure at least one engine is available or run in export-only mode.
-- **Large result sets**: Always couple data providers with paging or streaming helpers (`Entity.Page`, `Entity.AllStream`) to avoid memory pressure.
+- **Large result sets**: Use `Entity.AllStream` only when the selected adapter advertises
+  `ProviderBoundedPaging`; otherwise choose explicit `Entity.Page`/materialization or another adapter.
 
 ---
 

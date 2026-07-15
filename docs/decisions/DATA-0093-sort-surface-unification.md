@@ -8,6 +8,12 @@ date: 2026-05-17
 
 # ADR 0093: Sort surface unification across Page, Stream, Transfer, and body-query
 
+> **Implementation update (2026-07-15):** section 2's materializing sorted-stream fallback is
+> superseded by [DATA-0107](DATA-0107-provider-bounded-entity-streams.md). Its first proved user-sort
+> floor is non-nullable `bool`, `byte`, `sbyte`, `short`, `ushort`, and `int`; only the usual string
+> Entity identifier is admitted as a separate provider-stable tie-break. Nullable, enum, string/char, wide numeric, temporal, `Guid`,
+> binary, nested, complex, collection, and provider-unhandled sorts reject before provider I/O.
+
 ## Context
 
 DATA-0092 introduces structured sort and adapter pushdown for the `Data<T,K>.QueryWithCount` path and the `GET /` collection endpoint. But sort is missing or silently dropped on every other entry point in the framework:
@@ -50,17 +56,16 @@ Todo.FirstPage(10, sort: "-CreatedAt")
 Todo.Query(x => x.Done, sort: q => q.OrderBy(x => x.Title))
 Todo.Query(x => x.Done, sort: "-CreatedAt")
 
-Todo.AllStream(sort: q => q.OrderBy(x => x.Id))
-Todo.QueryStream("filter", sort: "-CreatedAt")
+Todo.AllStream(sort: q => q.OrderBy(x => x.Priority))
+Todo.QueryStream("filter", sort: "-Priority")
 ```
 
-### 2. Streaming + sort: explicit buffer
+### 2. Streaming + sort: provider-bounded or corrective rejection
 
-`AllStream(sort: ...)` and `QueryStream(filter, sort: ...)` **materialize the full result set** before yielding the first item. This contradicts the "streaming" name but is the only way to honour sort semantics. The trade-off is documented in XML doc on each method:
-
-> When `sort` is specified, all matching items are fetched and ordered before enumeration begins. For true incremental streaming, do not pass `sort`.
-
-The orchestrator emits a debug-level log when streaming materializes for sort, so operators can detect the pattern in tracing.
+[DATA-0107](DATA-0107-provider-bounded-entity-streams.md) supersedes the former materializing fallback.
+An admitted caller sort remains consumer-paced only when the selected adapter proves provider-bounded
+paging and the complete total order. Unsupported sort or execution rejects before yielding; Koan does
+not silently materialize the full result.
 
 ### 3. Transfer builders
 

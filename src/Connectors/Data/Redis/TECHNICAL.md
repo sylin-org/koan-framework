@@ -9,7 +9,18 @@ source: src/Koan.Data.Connector.Redis/
 
 ## Contract
 
-- Key-value/document patterns; limited query semantics; paging where meaningful.
+- Key-value/document patterns with limited query semantics and caller-visible numbered paging.
+- The adapter does not declare `DataCaps.Query.ProviderBoundedPaging`; its current scan path cannot
+  prove that a requested page is applied before the keyspace is traversed.
+
+## Streaming boundary
+
+- `AllStream` and `QueryStream` fail correctively with `QueryStreamRejectedException` before yielding;
+  there is no complete-result materializing fallback.
+- Use `All`/`Query` only for known-small sets. Use `FirstPage`/`Page` to limit the result returned to
+  application code, without inferring a provider-side scan bound.
+- A later incremental Redis implementation must earn a separate capability claim through shared
+  conformance before these Entity streams become available.
 
 ## Configuration
 
@@ -38,5 +49,6 @@ source: src/Koan.Data.Connector.Redis/
 
 ## References
 
-- DATA-0061 paging/streaming: `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
+- [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
 

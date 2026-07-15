@@ -88,7 +88,7 @@ var approval = await Approval.Get(id);                    // null if missing
 var pending = await Approval.Query(a => a.State == ApprovalState.Pending);
 await new Approval { Subject = "Approve invoice" }.Save();
 await approval.Remove();
-// Async enumeration today; providers may materialize before yielding until R07 repairs streaming.
+// Qualified adapters fetch one consumer-paced, provider-bounded candidate page at a time.
 await foreach (var item in Approval.AllStream(batchSize: 1000)) { /* consume */ }
 ```
 

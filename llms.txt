@@ -63,7 +63,8 @@ var open  = await Todo.Query(t => !t.IsCompleted);   // pushed down when the ada
 var page  = await Todo.FirstPage(20);
 await new Todo { Title = "Ship it" }.Save();
 await todo.Remove();
-await foreach (var t in Todo.AllStream(batchSize: 1000)) { /* streaming, constant memory */ }
+// Provider-bounded on SQLite/Postgres/SQL Server/Cockroach/Mongo/Couchbase; others reject.
+await foreach (var t in Todo.AllStream(batchSize: 1000)) { /* consumer-paced pages */ }
 ```
 
 ### 2 · Reference an intent → gain a capability

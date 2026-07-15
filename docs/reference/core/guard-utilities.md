@@ -637,20 +637,25 @@ public class TodosController : EntityController<Todo>
 }
 ```
 
-### Flow Pipeline Validation
+### Semantic Pipeline Validation
 
 ```csharp
-await Flow.Pipeline("process-orders")
-          .ForEach(await Order.AllStream())
-          .Do(async (order, ct) =>
-          {
-              // Validate during pipeline processing
-              order.Amount = order.Amount.Must().Be.Positive();
-              order.Status = order.Status.Must().Be.Defined<OrderStatus>();
-              await order.Save();
-          })
-          .RunAsync(ct);
+using Koan.Core.Pipelines;
+
+await Order.AllStream(ct)
+    .Pipeline()
+    .Do(async (envelope, token) =>
+    {
+        var order = envelope.Entity;
+        order.Amount = order.Amount.Must().Be.Positive();
+        order.Status = order.Status.Must().Be.Defined<OrderStatus>();
+        await order.Save(token);
+    })
+    .ExecuteAsync(ct);
 ```
+
+The Entity source requires `DataCaps.Query.ProviderBoundedPaging`; downstream pipeline buffers and
+concurrency remain separate limits.
 
 ---
 

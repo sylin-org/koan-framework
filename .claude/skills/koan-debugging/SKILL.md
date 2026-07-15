@@ -89,7 +89,7 @@ docker logs koan-app --tail 40 | grep "Koan:"        # or KoanEnv.DumpSnapshot(l
 | `data→json (expected: mongodb)` | connection failed → fallback, or provider package missing | check connection string + service health; pin with `[DataAdapter("mongodb")]` |
 | `Entity ID is required but not set` | using `Entity<T,TKey>` (custom key) without assigning `Id` | use `Entity<T>` for auto GUID v7, or set the custom key yourself |
 | N+1 query flood | `Todo.Get(id)` inside a loop | one call: `await Todo.Get(ids)` |
-| `OutOfMemoryException` on `.All()` | materializing a huge set | `await foreach (var t in Todo.AllStream(batchSize: 1000))` |
+| `OutOfMemoryException` on `.All()` | materializing a huge set | On a `ProviderBoundedPaging` adapter use `AllStream`; InMemory/JSON/Redis reject, so page/materialize explicitly or choose a qualified adapter. |
 
 ## Discoverability: the registrar contract
 

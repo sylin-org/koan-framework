@@ -12,8 +12,9 @@ validation:
 
 ## Contract
 
-- Stream entity enumeration during backup and restore through Koan entity/repository surfaces. The
-  current ZIP archive is still assembled in memory before upload.
+- Stream entity enumeration during backup through capability-qualified, provider-bounded Entity
+  pages. The current ZIP archive is still assembled in memory before upload; restore reads archive
+  entries incrementally but has a separate certification boundary.
 - Auto-register backup, restore, discovery, and optional maintenance services when the package is referenced.
 - Persist manifests, verification data, and entity payloads through Koan storage providers while exposing progress, viability checks, and catalog discovery.
 - Support selective restore paths with optimization hooks (`IRestoreOptimizedRepository`) so adapters can disable constraints, batch, or bulk-load data safely.
@@ -38,6 +39,8 @@ validation:
    - Creates a manifest and progress record (stored in `_activeBackups`).
    - Builds a ZIP archive in memory via `BackupStorageService.CreateBackupArchive`.
    - Streams each entity using `Data<TEntity, TKey>.AllStream(batchSize)` (single-entity) or reflection-based enumeration for global backups.
+   - Requires `DataCaps.Query.ProviderBoundedPaging`. SQLite, PostgreSQL, SQL Server, CockroachDB,
+     MongoDB, and Couchbase are qualified; InMemory, JSON, and Redis reject before query/yield.
    - Serializes records as JSON Lines and collects schema metadata, sizes, checksums, and timing metrics per entity.
    - After all entities are processed, writes manifest & verification files (`manifest.json`, `verification/*`) and uploads the archive using `IStorageService` under the configured storage profile.
 4. **Progress & cancellation** – `GetBackupProgress` returns process-local aggregate metrics, while
@@ -58,7 +61,7 @@ validation:
 
 - **Archive layout**: `entities/{EntityType}[#set].jsonl`, `manifest.json`, `verification/checksums.json`, `verification/schema-snapshots.json`.
 - **Content format**: JSON Lines per entity with deterministic SHA-256 content hashes. Overall checksum is derived from ordered entity hashes to detect tampering.
-- **Upload target**: `IStorageService.PutAsync` writes to the `backups` container using the requested `storageProfile`. The returned `ContentHash` replaces the manifest-level checksum for end-to-end verification.
+- **Upload target**: `IStorageService.Put` writes to the `backups` container using the requested `storageProfile`. The returned `ContentHash` replaces the manifest-level checksum for end-to-end verification.
 
 ## Configuration
 
@@ -104,18 +107,26 @@ Per-operation options (`BackupOptions`, `GlobalBackupOptions`, `RestoreOptions`,
   established.
 - Encryption: `EntityBackupAttribute.Encrypt` is recorded as policy/manifest metadata; the archive
   writer currently performs no payload encryption.
-- Partial availability: if a provider lacks backup capability, discovery still records the entity, but backup attempts will surface adapter exceptions—filter via `GlobalBackupOptions.IncludeProviders` when needed.
+- Partial availability: discovery still records entities on adapters without provider-bounded paging.
+  A single-entity backup propagates corrective `QueryStreamRejectedException` before provider query
+  or archive publication; a global backup records the per-entity failure in its manifest. Filter via
+  `GlobalBackupOptions.IncludeProviders` when a mixed topology intentionally excludes those entities.
 - Schema drift: manifests store schema snapshots; use them during validation or restore planning to detect incompatible changes.
 - Restore to missing types: viability testing attempts to resolve entity types by name; consider providing custom mapping or reconciling renamed entities ahead of time.
 - Cancellation: marking a backup/restore as cancelled stops progress reporting but does not abort the running stream; integrate with caller-provided `CancellationToken` for hard aborts.
 
 ## Validation notes
 
-- Safety proof: `Koan.Data.Backup.Tests` pins fail-loud deletion behavior and its non-success message.
+- Export proof: `Koan.Data.Backup.Tests` runs a real `AddKoan()` host with SQLite and local storage,
+  observes candidate pages `2/2/1` without count work, reopens the archive, and verifies stable IDs.
+  It also proves caller cancellation stops before page 2 completes and publishes nothing.
+- Capability-boundary proof: the same acceptance surface proves InMemory and JSON reject before
+  repository query or archive publication. Shared Data conformance separately proves Redis rejection.
+- Safety proof: the suite also pins fail-loud deletion behavior and its non-success message.
 - Host-ownership proof: registered-type fallback discovery resolves provider metadata against an
   explicitly supplied host through the supported Data Core inspection surface.
 - Source review: `StreamingBackupService`, `OptimizedRestoreService`, `BackupStorageService`,
   `BackupMaintenanceService`, `Initialization/KoanAutoRegistrar`, and related models as of 2026-07-14.
-- Maturity boundary: no end-to-end storage-plus-data-adapter backup/restore conformance suite currently
-  supports production recovery claims.
+- Maturity boundary: the SQLite/local export lane is not a restore drill or a certification of the
+  wider data-adapter/storage matrix, schema evolution, or production recovery.
 - DocFX strict build executed via `pwsh -File scripts/build-docs.ps1 -ConfigPath docs/api/docfx.json -LogLevel Warning -Strict`.

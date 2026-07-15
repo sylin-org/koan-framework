@@ -25,10 +25,10 @@ dotnet add package Sylin.Koan.Data.Core
   - `Item.Query(predicate, ct)`
   - `Item.FirstPage(size, ct)` and `Item.Page(pageNumber, pageSize, ct)`
   - `Item.QueryStream(predicate, ct)`
-- For large sets today, iterate explicit numbered pages. `AllStream`/`QueryStream` expose async
-  iteration but currently materialize the complete result before the first yield and do not honor
-  `batchSize`. Koan does not yet expose a provider-agnostic cursor or guaranteed-bounded stream;
-  genuine bounded provider iteration is the next R07 Data-semantic repair.
+- `AllStream`/`QueryStream` lazily compose provider-bounded numbered pages on SQLite, PostgreSQL,
+  SQL Server, CockroachDB, MongoDB, and Couchbase. InMemory, JSON, and Redis reject correctively
+  before query/yield; there is no materializing fallback. `batchSize` bounds Koan-visible candidates,
+  not opaque driver buffers. No public cursor or resume-token API exists.
 - If a first-class static isn’t available, you can fall back to the generic facade (second-class): `Data<TEntity, TKey>.Query(...)`.
 
 Child relationships are strict by default. Native and in-memory providers execute directly; a
@@ -64,7 +64,7 @@ See TECHNICAL.md for contracts, options, and extension points.
 
 ## References
 
-- Data access patterns: `/docs/guides/data/all-query-streaming-and-pager.md`
-- Decision: `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
+- Data access patterns: `/docs/guides/data/entity-access-and-streaming.md`
+- Decision: `/docs/decisions/DATA-0107-provider-bounded-entity-streams.md`
 - Engineering guardrails: `/docs/engineering/index.md`
 - Repo: https://github.com/sylin-org/Koan-framework

@@ -4,12 +4,11 @@ domain: data
 title: "Entity Capabilities How-To"
 audience: [developers, architects]
 status: current
-last_updated: 2025-11-09
-framework_version: v0.6.3
+last_updated: 2026-07-15
+framework_version: v0.17.0
 validation:
-  date_last_tested: 2025-11-09
-  status: verified
-  scope: All code examples tested against v0.6.3
+  status: not-yet-tested
+  scope: docs/guides/entity-capabilities-howto.md
 related_guides:
   - ai-vector-howto.md
   - canon-capabilities-howto.md
@@ -343,24 +342,28 @@ Console.WriteLine($"Showing {result.Items.Count} of {result.TotalCount} todos");
 
 **Streaming large datasets:**
 
-For datasets too large to fit in memory, use streaming:
+When a result is too large to materialize as one Entity list, use provider-bounded streaming on a
+qualified adapter:
 
 ```csharp
-// Process millions of log entries without loading all into RAM
+// Consumer-paced provider pages on a qualified adapter
 await foreach (var reading in SensorReading.QueryStream(
-    "timestamp > '2024-01-01'",
-    batchSize: 500,  // Fetch 500 at a time
-    ct))
+    reading => reading.Timestamp > cutoff,
+    batchSize: 500,  // At most 500 Koan-visible candidates per provider page
+    ct: ct))
 {
     await ProcessReading(reading, ct);
-    // Each batch is processed then garbage collected
 }
 ```
+
+This requires `ProviderBoundedPaging` (SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB, or
+Couchbase). InMemory, JSON, and Redis reject before query/yield. The batch bounds Koan-visible
+candidates; it does not promise snapshot consistency, mutation safety, or opaque-driver memory.
 
 **Usage Scenarios**
 
 - **Web APIs:** Paginate results for list endpoints (`GET /api/todos?page=2&size=20`)
-- **Reports:** Stream large datasets for CSV exports without memory exhaustion
+- **Reports:** On a qualified adapter, process large datasets without materializing the complete Entity source
 - **Dashboards:** Query with counts for "Showing X of Y" UI controls
 - **Admin tools:** Use string queries for user-built dynamic filters
 
@@ -372,18 +375,19 @@ await foreach (var reading in SensorReading.QueryStream(
 
 **Concepts**
 
-How many todos do you have? Sounds simple, but at scale (millions of rows), full table scans can take 20+ seconds. Koan gives you three counting strategies:
+How many todos do you have? Koan gives you three counting strategies so you can state the accuracy
+you need:
 
-- **Exact:** Full accuracy, may be slower (scans entire table)
-- **Fast:** Lightning-fast estimates using database metadata (5000x speedup on large tables)
-- **Optimized:** Framework chooses the best approach (usually Fast if available)
+- **Exact:** Request an exact result
+- **Fast:** Request an adapter-specific fast path; the result may be an estimate
+- **Optimized:** Let the adapter choose its optimized count path
 
 Think of it like this: counting jelly beans in a jar—you can count each one (Exact) or estimate from the jar's size (Fast).
 
 **When to use each:**
-- Dashboard summaries? **Fast** is perfect (who cares if it's 1,000,042 vs 1,000,000?)
+- Dashboard summaries? **Fast** can fit when an estimate is acceptable and the selected adapter supports it
 - Business-critical inventory check? **Exact** is essential
-- General use? **Optimized** (the default) makes smart choices for you
+- General use? **Optimized** is the default; verify the selected adapter's behavior for your workload
 
 **Recipe**
 
@@ -394,38 +398,31 @@ No new packages. Count strategies are built into Entity<T>.
 **Simple counts:**
 
 ```csharp
-// Default: framework chooses best strategy
-var total = await Todo.Count;  // Usually uses Fast if available
+// Default: pass CountStrategy.Optimized to the selected adapter
+var total = await Todo.Count;
 
 // Explicit exact count (guaranteed accuracy)
 var exact = await Todo.Count.Exact(ct);
 
-// Explicit fast count (metadata estimate)
+// Explicit adapter-specific fast path; the result may be an estimate
 var fast = await Todo.Count.Fast(ct);
 
 // Filtered count
-var completed = await Todo.Count.Where(t => t.Completed, ct);
+var completed = await Todo.Count.Where(t => t.Completed, ct: ct);
 
 // Filtered with explicit strategy
 var urgent = await Todo.Count.Where(
     t => t.Priority > 3,
     CountStrategy.Fast,
-    ct
+    ct: ct
 );
 
 // Count a specific partition
-var archivedCount = await Todo.Count.Partition("archive", ct);
+var archivedCount = await Todo.Count.Partition("archive", ct: ct);
 ```
 
-**Performance comparison (10 million rows):**
-
-| Provider   | Exact Count | Fast Count  | Strategy Used                    |
-|------------|-------------|-------------|----------------------------------|
-| PostgreSQL | ~25 seconds | ~5ms        | `pg_stat_user_tables.n_live_tup` |
-| SQL Server | ~20 seconds | ~1ms        | `sys.dm_db_partition_stats`      |
-| MongoDB    | ~15 seconds | ~10ms       | `estimatedDocumentCount()`       |
-| SQLite     | Full scan   | Same        | No metadata (always exact)       |
-| JSON       | In-memory   | Same        | Dictionary.Count (instant)       |
+Count cost, accuracy, and optimization are adapter-specific. Benchmark the elected adapter and
+dataset rather than relying on cross-provider timings.
 
 **When to use each strategy:**
 
@@ -437,15 +434,15 @@ var totalPages = (await Todo.Count.Fast(ct) + pageSize - 1) / pageSize;
 var stats = new
 {
     Total = await Todo.Count.Fast(ct),
-    Completed = await Todo.Count.Where(t => t.Completed, CountStrategy.Fast, ct),
-    Pending = await Todo.Count.Where(t => !t.Completed, CountStrategy.Fast, ct)
+    Completed = await Todo.Count.Where(t => t.Completed, CountStrategy.Fast, ct: ct),
+    Pending = await Todo.Count.Where(t => !t.Completed, CountStrategy.Fast, ct: ct)
 };
 
 // ✅ Business logic (exact required!)
 var exactInventory = await Product.Count.Where(
     p => p.InStock && p.WarehouseId == warehouseId,
     CountStrategy.Exact,
-    ct
+    ct: ct
 );
 if (exactInventory < reorderThreshold)
     await TriggerRestock(ct);
@@ -767,7 +764,7 @@ using (EntityContext.Source("Analytics"))
     var stats = new
     {
         Total = await Todo.Count.Fast(ct),
-        Completed = await Todo.Count.Where(t => t.Completed, ct)
+        Completed = await Todo.Count.Where(t => t.Completed, ct: ct)
     };
 }
 
@@ -949,14 +946,15 @@ if (EntityContext.InTransaction)
 
 Moving data between partitions, sources, or adapters is common: archiving old records, hydrating analytics databases, migrating tenants. Hand-written loops are error-prone and verbose.
 
-Koan's transfer DSL provides declarative, resumable operations:
+Koan's transfer DSL provides declarative copy, move, and mirror operations:
 - **Copy:** Duplicate entities to another context
 - **Move:** Copy then delete from origin (strategies: AfterCopy, Batched, Synced)
-- **Mirror:** Synchronize data (one-way or bidirectional); `[Timestamp]` resolves conflicts
+- **Mirror:** Propagate records one-way or reconcile both sides; `[Timestamp]` resolves bidirectional conflicts
 
 **Recipe**
 
-Latest `Koan.Data.Core` (transfer builders in `Koan.Data.Core.Transfers`). Use `System.ComponentModel.DataAnnotations` for `[Timestamp]` conflict resolution.
+Latest `Koan.Data.Core` (transfer builders in `Koan.Data.Core.Transfers`). Use
+`Koan.Data.Abstractions.Annotations` for `[Timestamp]` conflict resolution.
 
 **Sample**
 
@@ -989,8 +987,8 @@ await Todo.Mirror(mode: MirrorMode.Bidirectional)
     .To(source: "Analytics")
     .Run(ct);
 
-// One-way sync (production → analytics)
-await Todo.Mirror(mode: MirrorMode.OneWay)
+// Push production records to analytics
+await Todo.Mirror(mode: MirrorMode.Push)
     .To(source: "Analytics")
     .Run(ct);
 ```
@@ -1025,10 +1023,9 @@ if (result.HasConflicts)
     foreach (var conflict in result.Conflicts)
     {
         logger.LogWarning(
-            "Conflict on {Id}: Source modified {Source}, Dest modified {Dest}",
+            "Conflict on {Id}: {Reason}",
             conflict.Id,
-            conflict.SourceModified,
-            conflict.DestinationModified
+            conflict.Reason
         );
     }
 }
@@ -1041,7 +1038,13 @@ if (result.HasConflicts)
 - **Analytics:** Mirror transactional data to reporting databases
 - **Migrations:** Transfer data between adapters during provider changes
 
-**Pro tip:** Use `.Audit()` to track progress on large transfers. Each batch emits metrics—hook them into your logging or APM.
+Current transfer builders materialize the selected source before writing the destination in batches.
+`BatchSize(...)` and `.Audit(...)` describe destination write batches; they do not bound source
+materialization or provide checkpoints. If the selection can be large, use a qualified Entity stream
+and an application-owned idempotency/checkpoint design instead.
+
+**Pro tip:** `.Audit()` reports destination write batches and a final summary. It is observability,
+not a checkpoint or resume token.
 
 ---
 
@@ -1049,60 +1052,75 @@ if (result.HasConflicts)
 
 **Concepts**
 
-For massive datasets or long-running operations, combine Entity streaming with Koan Flow (pipelines) or Jobs (scheduled/resumable work).
+For large datasets or long-running operations, combine a qualified Entity stream with Koan's semantic
+pipeline or Jobs (durable/retryable work).
 
 **When to use:**
-- **Flow:** Transform millions of records (generate embeddings, update fields)
+- **Pipeline:** Transform records with consumer-paced stages (generate embeddings, update fields)
 - **Jobs:** Scheduled nightly transfers, archival, or DR sync
 
 **Recipe**
 
-Add pipeline support:
-```xml
-<PackageReference Include="Koan.Flow" Version="0.6.3" />
-<PackageReference Include="Koan.Jobs.Core" Version="0.6.3" />
+Pipelines are part of the Koan core surface. Add only the feature packages whose stages or durable
+execution you need:
+
+```bash
+dotnet add package Sylin.Koan.AI
+dotnet add package Sylin.Koan.Jobs
 ```
 
 **Sample**
 
-**Flow pipeline (embedding backfill):**
+**Semantic pipeline (embedding backfill):**
 
 ```csharp
-// Process millions of recommendations without loading all into memory
-await Flow.Pipeline("generate-embeddings")
-    .ForEach(await Recommendation.AllStream(batchSize: 200, ct))
-    .Do(async (rec, ct) =>
+using Koan.Core.Pipelines;
+
+// Process recommendations without materializing the complete Entity source in Koan
+await Recommendation.AllStream(batchSize: 200, ct: ct)
+    .Pipeline()
+    .Do(async (envelope, token) =>
     {
-        // Generate embedding
-        rec.Embedding = await Koan.AI.Client.Embed(rec.Content, ct);
-        await rec.Save(ct);
+        var recommendation = envelope.Entity;
+        recommendation.Embedding = await Koan.AI.Client.Embed(recommendation.Content, token);
+        await recommendation.Save(token);
     })
-    .RunAsync(ct);
+    .ExecuteAsync(ct);
 ```
 
 **Job for nightly archive:**
 
 ```csharp
-public class ArchiveOldTodosJob : IJob
+public sealed class ArchiveOldTodosJob
+    : Entity<ArchiveOldTodosJob>, IKoanJob<ArchiveOldTodosJob>
 {
-    public async Task ExecuteAsync(JobContext ctx)
-    {
-        var cutoffDate = DateTimeOffset.UtcNow.AddDays(-90);
+    public DateTimeOffset Cutoff { get; init; }
 
-        await Todo.Move()
-            .Where(t => t.Completed && t.CompletedDate < cutoffDate)
+    public static async Task Execute(
+        ArchiveOldTodosJob job,
+        JobContext context,
+        CancellationToken ct)
+    {
+        await Todo.Move(todo => todo.Completed && todo.CompletedDate < job.Cutoff)
             .From(partition: "active")
             .To(partition: "archive")
-            .Run(ctx.CancellationToken);
+            .Run(ct);
+
+        await context.Progress(1, "Archive complete");
     }
 }
+
+await new ArchiveOldTodosJob
+{
+    Cutoff = DateTimeOffset.UtcNow.AddDays(-90)
+}.Job.Submit(ct: ct);
 ```
 
 **Usage Scenarios**
 
 - **AI pipelines:** Generate embeddings for millions of documents
 - **Nightly transfers:** Archive old data, sync replicas
-- **Resumable operations:** Long-running migrations with checkpointing
+- **Scheduled workflows:** Run transfers from Jobs; checkpoint and resume policy remains application-owned
 
 ---
 
@@ -1110,7 +1128,8 @@ public class ArchiveOldTodosJob : IJob
 
 **Concepts**
 
-Store embeddings directly on entities and integrate with vector providers (Weaviate, Pinecone, Qdrant). Same Entity<T> patterns you know.
+Store embeddings directly on entities and integrate with shipped vector providers such as Weaviate
+and Qdrant. The same `Entity<T>` patterns apply.
 
 **Recipe**
 
@@ -1153,8 +1172,11 @@ var similar = await MediaItem.Query("vectorDistance < 0.15", ct);
 ### Symptom: Out of memory during large queries
 
 **Cause:** Loading millions of records with `.All()` or `.Query()`
-**Solution:** Use streaming: `AllStream(batchSize: 500, ct)` or `QueryStream()`
-**Prevention:** Ask: "Could this dataset grow unbounded?" → Use streaming
+**Solution:** On a qualified adapter, use provider-bounded streaming: `AllStream(batchSize: 500, ct)` or `QueryStream()`
+**Prevention:** Ask: "Could this dataset grow unbounded?" Then verify the adapter advertises
+`DataCaps.Query.ProviderBoundedPaging` (runtime id `query.paging.providerBounded`); InMemory, JSON, and
+Redis reject streaming rather than materialize
+an unbounded fallback.
 
 ### Symptom: Slow pagination on large tables
 
@@ -1234,12 +1256,13 @@ var written = await Article.UpsertIfChanged(article, tenantPartition);
 
 ## Next Steps
 
-You've learned the fundamentals—from simple saves to production-scale streaming and transactions. Here's where to go next:
+You've learned the fundamentals—from simple saves to capability-qualified streaming and transactions.
+Here's where to go next:
 
 **Immediate next actions:**
 1. Try batch retrieval in your next API endpoint (replace loops with `Entity.Get(ids)`)
 2. Add Fast counts to your dashboard (see the 1000x speedup)
-3. Use streaming for your next large dataset export
+3. On a qualified adapter, stream the Entity source for your next large export
 
 **Explore related capabilities:**
 - **Semantic search?** → [AI & Vector How-To](ai-vector-howto.md) (embeddings, hybrid search)
@@ -1262,6 +1285,6 @@ Happy building! 🚀
 
 ---
 
-**Last Validation:** 2025-11-09
-**Framework Version:** v0.6.3
-**Tested Against:** SQLite, PostgreSQL, MongoDB, Redis, InMemory adapters
+**Validation status:** Not yet tested end-to-end
+**Streaming validation:** SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB, and Couchbase qualify;
+InMemory, JSON, and Redis fail closed before query or yield.

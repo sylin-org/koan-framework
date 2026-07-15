@@ -26,7 +26,7 @@ validation:
 - Idempotency: Handlers must tolerate retries.
 - Backpressure: Limit concurrency/batch sizes for long pipelines.
 - Cancellation: Always pass CancellationToken to streaming operations.
-- Ordering: Prefer `AllStream`/`QueryStream` with stable ordering on large sets.
+- Ordering: Qualified Entity streams use a provider-handled total order, but numbered pages are not a snapshot or mutation-safe traversal.
 - Capabilities: Gate AI/vector usage with provider capability checks.
 
 ---
@@ -55,7 +55,7 @@ Product.Events
 ```csharp
 await foreach (var item in Product.AllStream(ct))
 {
-    // Enrich and persist in batches to avoid OOM
+    // One item at a time from a qualified, provider-bounded Entity source
 }
 ```
 
@@ -84,11 +84,16 @@ public sealed class EnrichmentWorker : BackgroundService
 
 End-to-end enrichment pipelines that stream entities, apply transforms (AI or business rules), and persist results without custom orchestration.
 
+The Entity source is provider-bounded only on SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB,
+and Couchbase. InMemory, JSON, and Redis reject before query/yield. See
+[Entity access and streaming](../../guides/data/entity-access-and-streaming.md) before describing a
+pipeline as bounded; downstream pipeline stages have their own queue/concurrency limits.
+
 ## Pipeline quick start
 
 1. Start from an entity stream (`AllStream`/`QueryStream`).
 2. Compose operations with the pipeline DSL (transform, branch, save, notify).
-3. Execute with a cancellation token and backpressure-aware batch sizes.
+3. Execute with a cancellation token; tune provider page size separately from downstream concurrency.
 
 ## Flow entities & stages
 

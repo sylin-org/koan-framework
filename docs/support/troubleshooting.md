@@ -277,7 +277,9 @@ public sealed class DatabaseHealthCheck : IHealthContributor
   doc.ContentEmbedding = vector;
   await doc.Save();
   ```
-- For heavy workloads stream the source with `Entity.AllStream(...)` and a `.Pipeline()` so embedding work is processed in batches and rate limits stay manageable.
+- For heavy workloads on a `ProviderBoundedPaging` adapter, stream the source with
+  `Entity.AllStream(...)` and a `.Pipeline()`. InMemory, JSON, and Redis reject Entity streams;
+  pipeline batching/rate limits remain separate from the data-source page bound.
 
 ### Cost & Rate Limits
 

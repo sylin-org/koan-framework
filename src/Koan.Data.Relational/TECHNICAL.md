@@ -34,7 +34,9 @@ Not supported (throw NotSupportedException):
 
 Fallbacks:
 
-- Callers should catch `NotSupportedException` and either change the predicate or apply filtering in-memory on a streamed/paged set when feasible (see DATA-0061). For HTTP, prefer emitting tighter server-side filters.
+- Callers should change an unsupported predicate or explicitly materialize a known-small page before
+  applying client-side logic. Provider-bounded Entity streams may apply supported pointwise residuals,
+  but they reject unsupported ordering and never hide a complete-source fallback (see DATA-0107).
 
 ## Pushdown coverage
 

@@ -72,6 +72,10 @@ public sealed class TodoService
 }
 ```
 
+`AllStream`/`QueryStream` are provider-bounded on SQLite, PostgreSQL, SQL Server, CockroachDB,
+MongoDB, and Couchbase. InMemory, JSON, and Redis reject before query/yield; do not describe Entity
+streaming as universal provider parity.
+
 ## Reference = Intent activation
 
 | Add this | Effect |

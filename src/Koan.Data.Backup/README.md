@@ -5,9 +5,10 @@ entities, writes JSON Lines payloads and a manifest into a ZIP archive, stores i
 `IStorageService`, and can restore records through the entity repository surface.
 
 > **Maturity: experimental.** Registration, policy discovery, archive construction, and restore
-> implementations exist. Current tests cover discovery ownership and fail-loud deletion only; there
-> is no end-to-end backup/restore conformance lane proving supported storage and data-adapter pairs.
-> Do not treat this module as a production recovery guarantee yet.
+> implementations exist. A real SQLite-to-local-storage lane now proves multi-page export,
+> cancellation, archive publication, and fail-closed resident adapters, but restore and the wider
+> adapter/storage matrix remain uncertified. Do not treat this module as a production recovery
+> guarantee yet.
 
 ## Reference and declare intent
 
@@ -55,6 +56,10 @@ select the storage profile, partition, batch size, compression, verification, an
 
 - Archives are assembled in a `MemoryStream` before upload. Entity enumeration is streaming, but the
   complete compressed archive is currently held in memory; large-backup memory safety is unproven.
+- Entity enumeration requires `ProviderBoundedPaging`. SQLite, PostgreSQL, SQL Server, CockroachDB,
+  MongoDB, and Couchbase are qualified. InMemory, JSON, and Redis reject before export rather than
+  hiding a complete-source scan. `BatchSize` bounds Koan-visible candidates, not the archive or opaque
+  provider buffers.
 - `EntityBackupAttribute.Encrypt` is policy metadata today. The archive writer does not encrypt entity
   payloads, so the flag must not be presented as data-at-rest protection.
 - Retention settings identify and log cleanup candidates; managed deletion is not implemented.

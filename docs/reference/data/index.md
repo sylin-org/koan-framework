@@ -115,7 +115,8 @@ describe whether filtering is native, bounded residual work, or in-memory. Provi
 earn provider-specific claims.
 
 - Use `Get`, `Query`, `FirstPage`/`Page`, `AllStream`, `Save`, and `Remove` as the common vocabulary.
-- Prefer paging or streaming when the result can grow.
+- Prefer explicit paging when the result can grow; use Entity streams only when the selected adapter
+  advertises `DataCaps.Query.ProviderBoundedPaging`.
 - Inspect `Data<TEntity, string>.Capabilities` before relying on optional bulk, transaction, filter,
   or isolation behavior.
 - Unsupported guarantees reject explicitly; Koan does not silently claim backend parity.

@@ -1,33 +1,34 @@
 ---
 name: koan-performance
-description: Streaming, pagination, count strategies, bulk operations for Entity<T> at scale — AllStream, FirstPage/Page/QueryWithCount, Count.Fast/Exact/Optimized, RemoveAll(RemoveStrategy.Fast), batch Save
+description: Capability-qualified Entity<T> streaming, explicit paging/count strategies, and batch-shaped reads/writes without overclaiming provider commands or guarantees
 pillar: data
 card: docs/reference/cards/data.md
 status: current
-last_validated: 2026-06-18
+last_validated: 2026-07-15
 ---
 
 # Koan Performance
 
 ## Trigger this skill when you see
 
-- Large-dataset reads — `Todo.All()` materializing millions of rows, OOM, "load everything"
-- `Todo.AllStream(...)` / `Todo.QueryStream(...)` streaming facades
-- Pagination — `Todo.FirstPage(...)`, `Todo.Page(...)`, `Todo.QueryWithCount(...)`, `QueryDefinition.WithPagination(...)`, `X-Total-Count` headers
-- Counts — `Todo.Count`, `Todo.Count.Fast(ct)`, `Todo.Count.Exact(ct)`, `CountStrategy`
-- Bulk writes / deletes — `list.Save(ct)`, `Todo.UpsertMany(...)`, `Todo.RemoveAll(RemoveStrategy.Fast)`
-- Batch reads — `Todo.Get(ids, ct)` vs an N+1 `foreach (var id in ids) await Todo.Get(id)`
-- "performance tuning", "large dataset", "N+1", "streaming", "bulk", "fast count", "TRUNCATE"
+- `All()` or a client-side loop over a result that can grow without a known bound
+- `AllStream` / `QueryStream`, paging, totals, or count accuracy questions
+- N+1 key reads or one-at-a-time save/delete loops
+- `Count.Fast`, `Count.Exact`, `Count.Optimized`, or `RemoveStrategy`
+- performance claims such as "one round-trip", "constant time", or "works on every adapter"
 
 ## Core principle
 
-**Pick the verb that matches the scale.** The facade gives a verb for each access shape — stream instead of materialize, paginate with one round-trip via `QueryWithCount`, count with an explicit strategy, and bulk-write/delete in a single operation. Every helper returns `IReadOnlyList<T>` (not `List<T>`); sort is a typed `ISortBuilder<T>` or a `QueryDefinition`, never the removed `DataQueryOptions` ([DATA-0096](../../../docs/decisions/DATA-0096-unified-filter-pipeline.md)).
+Pick the Entity verb that matches the result shape, then qualify physical guarantees through the
+elected adapter's capabilities. A single facade call is not necessarily one provider command.
+Materialized collection facades return `IReadOnlyList<T>`; query composition uses predicates, the JSON
+filter DSL, typed sort builders, or `QueryDefinition`—not the removed `DataQueryOptions` and not an
+`IQueryable` model chain ([DATA-0096](../../../docs/decisions/DATA-0096-unified-filter-pipeline.md)).
 
 <!-- validate -->
 ```csharp
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.Abstractions;
@@ -38,87 +39,108 @@ public sealed class Todo : Entity<Todo>
 {
     public string Title { get; set; } = "";
     public bool Done { get; set; }
-    public DateTimeOffset Created { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 }
 
 public sealed class TodoReports
 {
-    // Stream large sets — never materialize the whole table.
+    // Valid only when the elected adapter earns ProviderBoundedPaging.
     public async Task ExportOpen(CancellationToken ct = default)
     {
-        await foreach (var t in Todo.AllStream(batchSize: 1000, ct)) { _ = t.Title; }
+        await foreach (var todo in Todo.QueryStream(t => !t.Done, batchSize: 1000, ct: ct))
+        {
+            _ = todo.Title;
+        }
     }
 
-    // One round-trip page + total, sorted via the typed builder (no DataQueryOptions).
-    public async Task<(IReadOnlyList<Todo> Items, long Total)> Page(
-        int page, int size, CancellationToken ct = default)
+    // One coordinated result; the adapter may execute separate data and count commands.
+    public async Task<(IReadOnlyList<Todo> Items, long Total, bool IsEstimate)> Page(
+        int page,
+        int size,
+        CancellationToken ct = default)
     {
-        var q = QueryDefinition.All.WithPagination(page, size);   // DATA-0096 (sort via the typed Page/FirstPage overloads below)
-        var result = await Todo.QueryWithCount(t => !t.Done, q, ct);
-        return (result.Items, result.TotalCount);
+        var query = QueryDefinition.All.WithPagination(page, size);
+        var result = await Todo.QueryWithCount(t => !t.Done, query, ct);
+        return (result.Items, result.TotalCount, result.IsEstimate);
     }
 
-    // First page only, when you don't need a total.
     public Task<IReadOnlyList<Todo>> Latest(int size, CancellationToken ct = default)
-        => Todo.FirstPage(size, b => b.OrderByDescending(t => t.Created), ct);
+        => Todo.FirstPage(size, sort => sort.OrderByDescending(t => t.CreatedAt), ct);
 
-    // Count strategies are explicit, not magic.
     public async Task<(long Fast, long Exact, long Optimized)> Counts(CancellationToken ct = default)
-        => (await Todo.Count.Fast(ct),         // metadata estimate, ~constant time
-            await Todo.Count.Exact(ct),        // guaranteed-accurate scan
-            await Todo.Count.Optimized(ct));   // adapter's best exact strategy (its OWN path)
+        => (await Todo.Count.Fast(ct),       // estimate is permitted; adapter may fall back
+            await Todo.Count.Exact(ct),      // exact result requested
+            await Todo.Count.Optimized(ct)); // adapter-preferred path; may be estimated
 
-    // Bulk write + bulk delete in single operations.
     public async Task Reseed(IReadOnlyList<Todo> todos, CancellationToken ct = default)
     {
-        await Todo.RemoveAll(RemoveStrategy.Fast, ct);   // TRUNCATE/DROP where supported
-        await todos.Save(ct);                            // one bulk upsert (IEnumerable extension)
+        await Todo.RemoveAll(RemoveStrategy.Fast, ct); // provider-defined fast path; count may be -1
+        await todos.Save(ct);                          // one bulk-shaped facade call
     }
 
-    // Batch read — one query, order-preserving — instead of N round-trips.
     public Task<IReadOnlyList<Todo?>> Load(IEnumerable<string> ids, CancellationToken ct = default)
         => Todo.Get(ids, ct);
 }
 ```
 
-## Reference = Intent: what scales the access path
+## Reference = Intent
 
-| Add / use this | Effect |
+| Surface | Current contract |
 |---|---|
-| `Todo.AllStream(batchSize, ct)` / `Todo.QueryStream(predicate, ct)` | `IAsyncEnumerable<Todo>` — paged off the adapter, never the whole set in memory. |
-| `Todo.QueryWithCount(predicate, query, ct)` | `QueryResult<Todo>` with `.Items` + `.TotalCount` — page and total in one round-trip. |
-| `Todo.FirstPage(size, sort, ct)` / `Todo.Page(page, size, sort, ct)` | Materialized page; `sort` is `Action<ISortBuilder<Todo>>` or a sort string. |
-| `Todo.Count.Fast(ct)` | `CountStrategy.Fast` — approximate, from table stats (`query.fastCount` capability). |
-| `Todo.Count.Exact(ct)` / `await Todo.Count` | Exact / default-Optimized. `Optimized` is its **own** strategy, not an alias of Fast. |
-| `list.Save(ct)` / `Todo.UpsertMany(items, ct)` | Single bulk upsert instead of a write per row. |
-| `Todo.RemoveAll(RemoveStrategy.Fast, ct)` | `write.fastRemove` path (TRUNCATE/DROP); falls back to safe DELETE where unsupported. |
-| `Todo.Get(ids, ct)` | One order-preserving query for a set of keys (kills the N+1). |
+| `AllStream` / `QueryStream` | Consumer-paced `IAsyncEnumerable<T>` on a qualified provider; unsupported providers reject before query/yield. |
+| `FirstPage` / `Page` | One materialized numbered page; no cursor/resume token. |
+| `QueryWithCount` | One `QueryResult<T>` carrying items, total, and `IsEstimate`; provider command count is adapter-owned. |
+| `Count.Fast` | Requests a fast path where estimates are allowed; an adapter may use an exact fallback. |
+| `Count.Exact` | Requests an exact result; it does not prescribe scan versus native count mechanics. |
+| `Count.Optimized` / `await Entity.Count` | Lets the adapter choose its preferred path and can return an estimate internally. Use `Exact` when correctness depends on the value. |
+| `items.Save` / `UpsertMany` | One batch-shaped framework call; native bulk, round-trips, and atomicity are capability/provider-specific. |
+| `RemoveAll(strategy)` | Provider-defined bulk removal; `Fast` can bypass lifecycle behavior and may return `-1` when count is unknown. |
+| `Get(ids)` | Batch-shaped key read with input-position results; physical request count remains adapter-owned. |
+
+## Provider-bounded stream boundary
+
+Qualified today: SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB, and Couchbase. InMemory, JSON,
+and Redis reject.
+
+Koan requests one numbered candidate page lazily, requests no total, and verifies provider paging and
+complete ordering before yielding. Each caller-requested sort component must be a top-level,
+non-nullable `bool`, `byte`, `sbyte`, `short`, `ushort`, or `int` member. Every other caller sort,
+including an explicit Entity identifier sort, rejects before provider I/O. Koan appends the usual
+string Entity identifier only as an opaque provider-stable tie-breaker, not a CLR or cross-provider
+collation promise. Streams are not
+snapshot-consistent, mutation-safe, resumable, or cursor-based ([DATA-0107](../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)).
 
 ## Anti-patterns to flag
 
 | If you see | Suggest |
 |---|---|
-| `var all = await Todo.All();` then a loop over millions | `await foreach (var t in Todo.AllStream(batchSize: …, ct))` — bounded memory. |
-| Two calls (`Query` then a separate `Count`) for one page | `Todo.QueryWithCount(predicate, query, ct)` → `.Items` + `.TotalCount` in one trip. |
-| `new DataQueryOptions { OrderBy = …, Descending = true }` | `QueryDefinition.All.WithSort(b => b.OrderByDescending(...)).WithPagination(page, size)` (DATA-0096 removed `DataQueryOptions`). |
-| `Todo.Query(...).Where(...).OrderBy(...).Take(...).ToArrayAsync()` (LINQ chain) | There is no `IQueryable` chain — use `Todo.Query(predicate, sort, ct)` / `FirstPage(size, sort)` / `All(QueryDefinition.WithPagination(...))`, each returning `IReadOnlyList<Todo>`. |
-| "Optimized just uses Fast" | `Optimized` is a distinct exact strategy (the adapter's best exact path); `Fast` is the approximate one. |
-| `List<Todo>` as the declared return of a page/query helper | `IReadOnlyList<Todo>` — facade results are read-only. |
-| `foreach (var id in ids) await Todo.Get(id)` (N round-trips) | `await Todo.Get(ids, ct)` — single, order-preserving. |
-| A DELETE loop / `foreach (... ) await t.Remove()` to clear a table | `Todo.RemoveAll(RemoveStrategy.Fast, ct)` — set-based truncate where the adapter supports it. |
-| `foreach (var t in items) await t.Save();` to seed | `await items.Save(ct)` / `Todo.UpsertMany(items, ct)` — one bulk write. |
+| `await Todo.All()` over an unbounded source | A qualified stream, or explicit `FirstPage`/`Page` on an unsupported adapter. |
+| `Query` plus a separate `Count` for one response | `QueryWithCount` for a coordinated result; do not promise one provider command. |
+| `QueryDefinition.All.WithSort(b => ...)` | Use a typed facade overload such as `Todo.Page(page, size, b => b.OrderByDescending(...), ct)`. |
+| `Todo.Query().Where(...).Take(...)` | `Todo.Query(predicate, ...)`, `FirstPage`, `Page`, or `QueryDefinition`; there is no model `IQueryable` chain. |
+| "Optimized is exact" | Use `Count.Exact` when exactness is required; current optimized adapter paths may estimate. |
+| N key reads in a loop | `Todo.Get(ids, ct)`; retain no claim about physical round-trips. |
+| One save per item | `items.Save(ct)` or `Todo.UpsertMany(items, ct)`; verify atomicity separately. |
+| `RemoveAll(Fast)` in business logic without review | Probe `DataCaps.Write.FastRemove` and account for bypassed lifecycle/count semantics. |
 
 ## Escape hatches
 
-- **Count a subset**: `Todo.Count.Where(t => !t.Done, ct)` and `Todo.Count.Query(queryDefinition, ct)` count with the same strategy machinery as the bare accessor.
-- **Sorted stream**: `Todo.AllStream(b => b.OrderBy(t => t.Created), ct)` and `Todo.QueryStream(predicate, sort, ct)` — note a sorted stream materializes the full result before yielding the first item ([ADR-0093]).
-- **Capability probe before a fast path**: `Data<Todo, string>.Capabilities.Has(DataCaps.Query.FastCount)` / `.Has(DataCaps.Write.FastRemove)` — branch on the unified `CapabilitySet` (ARCH-0084) when you need to know whether the optimization is real on the elected adapter.
-- **Provider-native query**: `Todo.QueryRaw(providerQuery, parameters, ct)` for store-specific tuning; `IDataService.Direct(...)` for raw SQL without leaving Koan (parameterized, registered by default — ARCH-0090 §1).
+- **Count a subset:** `Todo.Count.Where(t => !t.Done, CountStrategy.Exact, ct)` or
+  `Todo.Count.Query(queryDefinition, ct)`.
+- **Sorted stream:** `Todo.AllStream(sort => sort.OrderBy(t => t.Priority), ct: ct)` or the
+  corresponding `QueryStream` overload, subject to DATA-0107's portable ordering floor.
+- **Probe the elected adapter:** `Data<Todo, string>.Capabilities.Has(...)` with `DataCaps` tokens.
+- **Provider-native query:** `Todo.QueryRaw(providerQuery, parameters, ct)` when portability is
+  intentionally traded for provider behavior.
+- **Direct provider session:** resolve `IDataService` and use `Direct(source, adapter)` for an
+  advanced provider-specific path; keep it at an infrastructure boundary.
 
 ## See also
 
-- [Reference card: data.md](../../../docs/reference/cards/data.md) — one-screen pillar map
-- [Performance guide](../../../docs/guides/performance.md) — streaming, counts, bulk benchmarks
-- [Entity capabilities how-to](../../../docs/guides/entity-capabilities-howto.md) — queries, paging, streaming, counts in depth
-- [`samples/S14.AdapterBench`](../../../samples/S14.AdapterBench/README.md) — cross-adapter performance benchmarks
-- [DATA-0096 — unified filter pipeline (`QueryDefinition`)](../../../docs/decisions/DATA-0096-unified-filter-pipeline.md) · [ARCH-0084 — unified capability model](../../../docs/decisions/ARCH-0084-unified-capability-model.md)
+- [Reference card: data](../../../docs/reference/cards/data.md)
+- [Performance guide](../../../docs/guides/performance.md)
+- [Entity capabilities how-to](../../../docs/guides/entity-capabilities-howto.md)
+- [Adapter matrix](../../../docs/reference/_generated/adapter-matrix.md)
+- [DATA-0096 — unified filter pipeline](../../../docs/decisions/DATA-0096-unified-filter-pipeline.md)
+- [DATA-0107 — provider-bounded Entity streams](../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [ARCH-0084 — unified capability model](../../../docs/decisions/ARCH-0084-unified-capability-model.md)

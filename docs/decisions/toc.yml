@@ -276,6 +276,8 @@
       href: DATA-0088-adapter-auto-configuration-resolver-pipeline.md
     - name: DATA-0089 Zen Garden connection intent minimum URI shape
       href: DATA-0089-zengarden-connection-intent-minimum-uri-shape.md
+    - name: DATA-0107 Provider-bounded Entity streams
+      href: DATA-0107-provider-bounded-entity-streams.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

@@ -10,6 +10,7 @@ Redis provider for Koan data - key-value storage with options binding, health ch
 - Connection multiplexer management via options
 - Basic scan/query over keys for simple filters
 - Health checks and minimal metrics hooks
+- Explicitly does not advertise `DataCaps.Query.ProviderBoundedPaging`
 
 ## Install
 
@@ -28,20 +29,27 @@ dotnet add package Sylin.Koan.Data.Connector.Redis
 
 ```csharp
 // Save and get entity
-await Session.Save(new Cart { Id = id, Items = [] }, ct);
-var cart = await Session.Get(id, ct);
+await new Cart { Id = id, Items = [] }.Save(ct);
+var cart = await Cart.Get(id, ct);
 
-// Stream keys if the set is large
-await foreach (var c in Session.AllStream(batchSize: 1000, ct))
-{
-	// process
-}
+// Materialize deliberately small sets, or request a caller-visible numbered page
+var knownSmall = await Cart.All(ct);
+var secondPage = await Cart.Page(2, 100, ct);
 ```
+
+## Streaming boundary
+
+`AllStream` and `QueryStream` reject correctively with `QueryStreamRejectedException` before yielding
+because the current Redis query path can scan the keyspace before slicing. Koan does not hide that scan
+behind a streaming-shaped API.
+
+Use `All`/`Query` only for deliberately small sets, or `FirstPage`/`Page` when a bounded result returned
+to application code is sufficient. Numbered pages do not make Redis keyspace scanning provider-bounded.
 
 See TECHNICAL.md for options and operational considerations.
 
 ## References
 
-- Redis adapter notes: `~/20-redis-adapter.md`
-- Data access reference: `~/reference/data-access.md`
+- [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
 

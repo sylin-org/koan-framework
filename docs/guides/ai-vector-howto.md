@@ -4,12 +4,11 @@ domain: ai
 title: "AI & Vector Search How-To"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-11-09
+last_updated: 2026-07-15
 framework_version: v0.6.3
 validation:
-  date_last_tested: 2025-11-09
-  status: verified
-  scope: all-examples-tested
+  status: not-yet-tested
+  scope: docs/guides/ai-vector-howto.md
 related_guides:
   - entity-capabilities-howto.md
   - patch-capabilities-howto.md
@@ -137,7 +136,8 @@ var embedding = await Koan.AI.Client.Embed(
 
 - `Vector<T>.Save()` stores embeddings with entity IDs and optional metadata
 - Metadata enables hybrid search and filtering (titles, tags, categories)
-- Provider-transparent - works with Weaviate, Pinecone, Qdrant, ElasticSearch
+- Provider-transparent across the shipped Weaviate, Qdrant, Milvus, SQLite-vec, Elasticsearch,
+  OpenSearch, and InMemory connectors, subject to each connector's advertised capabilities
 - Supports bulk operations for efficient batch indexing
 
 **Recipe**
@@ -178,9 +178,10 @@ await Vector<Media>.Save(
 
 **Usage scenarios & benefits**
 
-- *S5.Recs* indexes 50,000+ media items with embeddings for instant semantic search
+- *S5.Recs* demonstrates media indexing for semantic search
 - Metadata enables hybrid keyword+semantic search (see section 4)
-- Provider transparency allows migrating from Weaviate to Pinecone without code changes
+- The same Vector API can target another shipped connector; verify capability and migration support
+  before changing providers
 
 **Batch indexing**
 
@@ -474,8 +475,8 @@ public async Task UpdateUserPreferences(string userId, string mediaId, int ratin
 
 **Concepts**
 
-- Cache embeddings by content hash to avoid redundant AI calls
-- Dramatically reduces embedding costs and latency (70-90% cache hit rate)
+- An application-owned cache can avoid repeated AI calls when the normalized content and model match
+- Its latency and cost benefit depends on how often the workload repeats identical inputs
 - Content-addressable storage - same text always produces same hash
 - Model-aware caching - different models have separate cache spaces
 
@@ -522,9 +523,9 @@ public class EmbeddingService
 
 **Usage scenarios & benefits**
 
-- *S5.Recs* caches 50k+ embeddings, achieving 85% cache hit rate on re-indexing
 - Swapping embedding models invalidates only that model's cache (model-aware keys)
-- Reduces AI provider costs by 70-90% during development and re-indexing
+- Measure hit rate, latency, storage, and provider cost before deciding whether this app-owned pattern
+  is worth operating
 
 **Batch caching pattern**
 
@@ -561,110 +562,91 @@ _logger.LogInformation(
 
 ---
 
-## 7. Flow Integration – Batch Processing
+## 7. Semantic Pipeline Integration – Batch Processing
 
 **Concepts**
 
-- Use Koan Flow for large-scale embedding generation pipelines
-- Stream entities in batches to avoid memory exhaustion
-- Built-in error handling and retry logic
-- Pipeline branching for success/failure paths
+- Use Koan's semantic pipeline to express embedding and persistence as one readable operation
+- Bound Koan-visible Entity source pages on qualified adapters
+- Pipeline stages capture failures for explicit success/failure branches
+- The pipeline does not retry failed AI calls automatically
 
 **Recipe**
 
-- `Koan.Flow` package for pipeline DSL
+- Koan's core semantic pipeline
 - Entity streaming (`AllStream`, `QueryStream`)
 - AI and Vector packages from previous sections
+
+The Entity source is provider-bounded only on SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB,
+and Couchbase. InMemory, JSON, and Redis reject before query/yield. `batchSize` bounds Koan-visible
+candidates, not AI-stage concurrency or the complete pipeline's memory.
 
 **Sample – Embedding backfill pipeline**
 
 ```csharp
-using Koan.Flow;
-using Koan.AI.Flow;  // Extension methods for AI in pipelines
+using Koan.AI;
+using Koan.Core.Pipelines;
+using Koan.Data.Vector;
 
-await Media.AllStream(batchSize: 100)
-    .ToAsyncEnumerable()
-    .Tokenize(m => BuildEmbeddingText(m))  // Generate embeddings
+await Media.AllStream(batchSize: 100, ct: ct)
+    .Pipeline()
+    .Tokenize(m => BuildEmbeddingText(m))
     .Branch(branch => branch
         .OnSuccess(success => success
             .Mutate(envelope =>
             {
-                // Prepare metadata from entity
-                envelope.Features["vector:metadata"] = new
+                envelope.Features["vector:metadata"] = new Dictionary<string, object>
                 {
-                    title = envelope.Entity.Title,
-                    searchText = BuildSearchText(envelope.Entity),
-                    genres = envelope.Entity.Genres
+                    ["title"] = envelope.Entity.Title,
+                    ["searchText"] = BuildSearchText(envelope.Entity),
+                    ["genres"] = envelope.Entity.Genres
                 };
             })
-            .Do(async (envelope, ct) =>
-            {
-                // Extract embedding from pipeline
-                if (envelope.Features.TryGetValue("Embedding", out var embObj) &&
-                    embObj is float[] embedding)
-                {
-                    var metadata = envelope.Features["vector:metadata"]
-                        as IReadOnlyDictionary<string, object>;
-
-                    // Store in vector database
-                    await Vector<Media>.Save(
-                        id: envelope.Entity.Id,
-                        embedding: embedding,
-                        metadata: metadata
-                    );
-
-                    // Cache the embedding
-                    var embeddingText = BuildEmbeddingText(envelope.Entity);
-                    var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
-                    await _cache.SetAsync(contentHash, modelId, embedding, "Media", ct);
-                }
-            })
-        )
+            .SaveWithVectors())
         .OnFailure(failure => failure
-            .Do(async (envelope, ct) =>
-            {
-                _logger.LogWarning(
-                    "Failed to embed {MediaId}: {Error}",
-                    envelope.Entity.Id,
-                    envelope.Error?.Message
-                );
-            })
-        )
-    );
+            .Tap(envelope => _logger.LogWarning(
+                "Failed to embed {MediaId}: {Error}",
+                envelope.Entity.Id,
+                envelope.Error?.Message))))
+    .ExecuteAsync(ct);
 ```
+
+`Tokenize` records a provider exception on the pipeline envelope, and `OnFailure` receives that
+envelope. This is failure routing, not a retry policy. Add an explicit application retry or durable
+job when the workload requires another attempt.
 
 **Usage scenarios & benefits**
 
-- *S5.Recs* processes 50k+ media embeddings in ~2 hours with full caching
-- Pipeline automatically retries transient AI failures
-- Memory-efficient streaming avoids loading entire dataset
+- `SaveWithVectors()` persists the entity and the embedding staged by `Tokenize()` on the success path
+- A qualified data adapter avoids loading the complete Entity source into Koan at once; downstream
+  stage state and provider-driver memory remain separate limits
+- Failure branches make provider errors visible without implying that failed items were retried
 
 **Advanced - Progress tracking**
 
 ```csharp
 var total = await Media.Count();
-var processed = 0;
+var seen = 0;
 
-await Media.AllStream(batchSize: 100)
-    .ToAsyncEnumerable()
+await Media.AllStream(batchSize: 100, ct: ct)
+    .Pipeline()
+    .Tap(_ =>
+    {
+        var current = Interlocked.Increment(ref seen);
+        if (current % 100 == 0)
+        {
+            _logger.LogInformation(
+                "Source progress: {Seen}/{Total}",
+                current,
+                total);
+        }
+    })
     .Tokenize(m => BuildEmbeddingText(m))
     .Branch(branch => branch
-        .OnSuccess(success => success
-            .Do(async (envelope, ct) =>
-            {
-                // ... embedding logic ...
-
-                Interlocked.Increment(ref processed);
-                if (processed % 100 == 0)
-                {
-                    _logger.LogInformation(
-                        "Progress: {Processed}/{Total} ({Percent:P0})",
-                        processed, total, (double)processed / total
-                    );
-                }
-            })
-        )
-    );
+        .OnSuccess(success => success.SaveWithVectors())
+        .OnFailure(failure => failure.Tap(envelope =>
+            _logger.LogWarning(envelope.Error, "Embedding failed for {Id}", envelope.Entity.Id))))
+    .ExecuteAsync(ct);
 ```
 
 ---
@@ -914,8 +896,8 @@ await foreach (var batch in vectorRepo.ExportAll(batchSize: 100, ct))
 
 1. Start simple - embed a few entities and try semantic search (sections 1-3)
 2. Add hybrid search for exact matching (section 4)
-3. Implement embedding caching to reduce costs (section 6)
-4. Scale with Flow pipelines for batch processing (section 7)
+3. Add an app-owned embedding cache when measured input repetition justifies it (section 6)
+4. Use semantic pipelines for observable batch processing (section 7)
 5. Add personalization for returning users (section 5)
 
 Explore the S5.Recs sample to see production patterns in action. The combination of semantic search, hybrid matching, and personalization creates powerful recommendation experiences that understand both explicit queries and implicit user preferences.

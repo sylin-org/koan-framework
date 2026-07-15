@@ -49,9 +49,21 @@ selects InMemory explicitly.
 - atomic batch behavior within the in-memory store; and
 - shared/container/database isolation modes through the common key-value family.
 
+The connector does not advertise `DataCaps.Query.ProviderBoundedPaging`. `AllStream` and
+`QueryStream` reject correctively with `QueryStreamRejectedException` before yielding because paging
+an already resident full-source dictionary is not a provider-bounded stream.
+
+Use `All`/`Query` for deliberately small test sets, or `FirstPage`/`Page` when a bounded result returned
+to test code is sufficient. Numbered pages do not create an unbounded-data performance guarantee.
+
 These are connector-specific claims, not a promise that remote providers behave identically. The
-current connector suite passes 55/55.
+current connector suite passes 56/56.
 
 For application conformance, prefer `Sylin.Koan.Testing`; it owns host isolation, partitions, and the
 capability-aware battery. See [`TECHNICAL.md`](TECHNICAL.md) for the exact storage and negotiation
 contract.
+
+## References
+
+- [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)

@@ -3,19 +3,19 @@ type: SPEC
 domain: framework
 title: "R07-02 - Make Entity Streams Genuinely Bounded"
 audience: [architects, maintainers, developers, ai-agents]
-status: draft
+status: current
 last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
-  status: in-progress
+  status: reviewed
   scope: provider-bounded query paging beneath the existing Entity stream surface
 ---
 
 # R07-02 — Make Entity streams genuinely bounded
 
 - Tranche: `T6 — semantic capability ring`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R07-01 and ARCH-0113
 - Unlocks: truthful lazy Entity selections and the later scalar/set/stream capability substrate
 - Owner: Data.Core query coordination with adapter-owned execution claims
@@ -51,15 +51,21 @@ slice therefore fixes the independent lower boundary now and leaves Lifecycle so
 until the packaging gate can carry them safely. It does not add a compatibility alias or weaken the
 accepted greenfield Lifecycle target.
 
-## Current defect
+## Defect this slice repairs
 
-- `AllStream` and `QueryStream` call the materializing query-and-count path and then enumerate a list.
-- `batchSize` is accepted but ignored.
-- documentation and agent guidance have consequently alternated between overstating constant-memory
-  behavior and understating the intended Entity grammar.
-- ordinary `Page` requests also pay for count work they do not require.
-- natural calls such as `AllStream(ct)` do not compile because the optional batch argument precedes the
-  cancellation token.
+Before this slice:
+
+- `AllStream` and `QueryStream` called the materializing query-and-count path and then enumerated a list;
+- `batchSize` was accepted but ignored;
+- documentation and agent guidance consequently alternated between overstating constant-memory
+  behavior and understating the intended Entity grammar;
+- ordinary `Page` requests also paid for count work they did not require; and
+- natural calls such as `AllStream(ct)` did not compile because the optional batch argument preceded
+  the cancellation token.
+
+The implementation, executable consumer proofs, and public contract below repair these defects in the
+working tree. The final regression, build, documentation, compatibility, diff, and privacy evidence is
+recorded in this card's closure.
 
 ## Decisions
 
@@ -67,20 +73,30 @@ accepted greenfield Lifecycle target.
 
 - Keep `IAsyncEnumerable<TEntity>` as the only public streaming substrate.
 - Do not add a public Pager, cursor, continuation, Flow, or provider-specific stream type.
-- Add one precise adapter capability: provider-bounded paging. It means that, when the adapter reports
-  the complete filter and total ordering as handled, `PageSize = N` is enforced by the provider before
-  candidates are materialized into application memory.
+- Add one precise adapter capability: provider-bounded paging. It means the adapter faithfully
+  executes the coordinator-supplied pushable candidate filter, enforces `PageSize = N` before
+  candidates are materialized into application memory, and reports provider-handled pagination plus
+  the complete total order.
 - Compose that proven primitive into a lazy async sequence in one internal Data.Core coordinator.
 - `batchSize` is a positive maximum candidate-page size. The existing unbounded-loop page size is the
   default until configuration evidence earns another value.
 - Enumeration performs no repository I/O until its first move, never calls the query-and-count path,
   and requests no later page after early disposal.
-- Unsupported adapters, incomplete filter/sort pushdown, invalid bounds, and dishonest execution
-  metadata reject correctively before yielding. There is no materializing fallback.
-- Residual predicates may be evaluated pointwise after a bounded candidate page. Empty output from one
-  candidate page does not end the stream.
+- Unsupported adapters, incomplete provider handling of pagination or the total order, invalid bounds,
+  and dishonest execution metadata reject correctively before yielding. There is no materializing
+  fallback.
+- Filter fragments that a provider cannot push may remain residual only after the provider has enforced
+  the candidate-page bound and complete total order. Koan evaluates those residual predicates
+  pointwise; empty output from one candidate page does not end the stream.
 - A stable total order is mandatory. The adapter must handle the complete order; Koan does not sort an
   unbounded source in memory.
+- Caller-requested stream sorting has one exact initial semantic floor: a top-level, non-nullable
+  `bool`, `byte`, `sbyte`, `short`, `ushort`, or `int` member. Every other caller sort, including an
+  explicit Entity-identifier sort, rejects before provider I/O.
+- After caller-order validation, Koan appends only the usual string Entity identifier as an opaque
+  provider-stable page tie-breaker. Custom identifier shapes reject before provider I/O. The key is
+  not a CLR or
+  cross-provider collation promise.
 - Provider/source/partition and logical context are fixed for one enumeration.
 - Add natural cancellation overloads without removing the existing signatures.
 - Adapter claims are earned through shared conformance. A paging flag alone is not evidence because a
@@ -117,8 +133,9 @@ Entity<T>.QueryStream / AllStream
 ```
 
 - Data.Core owns orchestration and semantic guarantees; adapters own physical execution claims.
-- A capability token is necessary but not sufficient: each returned page must also report that
-  pagination and the requested filter/order were handled.
+- A capability token is necessary but not sufficient: the adapter must faithfully execute the
+  coordinator-supplied pushable candidate filter, and each returned page must report that pagination
+  and the complete requested order were handled.
 - The coordinator buffers no more than the current candidate page and yields no item from a page whose
   execution metadata violates the plan.
 - `batchSize` bounds Koan-visible candidates; it does not make unproved claims about opaque driver
@@ -130,19 +147,43 @@ Entity<T>.QueryStream / AllStream
 
 ## Red/green plan
 
-1. Add core fake-repository proofs for lazy first yield, exact page requests, no count, early disposal,
-   cancellation, invalid bounds, empty residual pages, stable ordering, and rejection before I/O.
-2. Add the provider-bounded-page capability and one typed corrective rejection following the existing
+1. **Complete.** Core fake-repository proofs cover lazy first yield, exact page requests, no count, early
+   disposal, cancellation, invalid bounds, empty residual pages, stable ordering, rejection before I/O,
+   and enumeration-stable source, partition, and registered logical context.
+2. **Complete.** `ProviderBoundedPaging` and one typed corrective rejection follow the existing
    relationship-query execution pattern.
-3. Add the internal stream coordinator and route `Data`, `Entity`, repository facade, and cache
-   decorator calls through it without introducing a second application path.
-4. Make count strategy explicit so stream/page requests do not compute totals accidentally.
-5. Add natural cancellation overload consumer probes.
-6. Qualify SQLite, then each remote adapter independently; do not advertise InMemory, JSON, or Redis
-   until a bounded implementation exists.
-7. Exercise the real Backup consumer over multiple pages, cancellation, and early failure.
-8. Rewrite public, connector, sample, and agent guidance from executable evidence only.
-9. Run focused, adapter, build, docs, diff, compatibility, and privacy gates.
+3. **Complete.** One internal coordinator serves `Data` and `Entity`; the existing repository facade
+   and cache decorator forward the same query/capability contract without creating another application
+   path.
+4. **Complete.** Count strategy is explicit, and stream/page requests do not compute totals
+   accidentally.
+5. **Complete.** Natural cancellation overloads compile and execute through the same path.
+6. **Complete.** SQLite, PostgreSQL, CockroachDB, SQL Server, MongoDB, and Couchbase pass the shared
+   qualification cell. InMemory, JSON, and Redis do not advertise the capability and pass the shared
+   fail-closed cell.
+7. **Complete.** The real Backup consumer crosses SQLite pages of `2/2/1`, stops on caller
+   cancellation, and rejects InMemory/JSON before query or archive publication.
+8. **Complete.** Public, connector, sample, and agent guidance now states only the executable boundary.
+9. **Complete.** Affected regression, warning-reviewed solution build, strict docs, structural claim
+   sweep, compatibility, diff, and privacy gates are recorded below.
+
+## Current implementation evidence
+
+| Boundary | Result | What it proves |
+|---|---|---|
+| Data.Core stream coordinator | 42/42 focused; 325/325 full | first-yield laziness, exact bounded pages, no count, consumer-paced advancement, cancellation/disposal, residual continuation, exact sort-floor, explicit-Id rejection, custom-key rejection before provider I/O, total-order and overclaim rejection, natural cancellation overloads, stable routed source/partition/registered carrier context, and selected/rejected runtime facts |
+| SQLite focused provider proof | 1/1 | capability declaration, bounded ordered output, count-free default, explicit exact count, and refusal to claim pagination for an unhandled nested sort |
+| Qualified adapter shared cells | 6/6 cells, one each | SQLite, PostgreSQL, CockroachDB, SQL Server, MongoDB, and Couchbase each realize deterministic provider-bounded paging through a real `AddKoan()` host; the shared corpus exercises boundary ordering for all six admitted caller-sort types plus the opaque string-Id tie-break |
+| Unqualified adapter shared cells | 3/3 cells, one each | InMemory, JSON, and Redis reject before yielding rather than beginning their complete-source scan path |
+| Real Backup consumer | 5/5 acceptance; 7/7 full | SQLite crosses candidate pages `2/2/1` and publishes the complete archive; cancellation during page 2 prevents its completion and archive publication; InMemory and JSON reject before query/archive publication |
+| Connector regression | 236/237 | all current connector suites pass except Mongo's existing ZenGarden URI-preference case; Mongo is 67/68 and Couchbase 17/17. Mixed-case filter convergence is repaired centrally; the remaining issue is isolated in PMC-012 |
+| Filtering regression | 92/92 foundation; 19/19 convergence | exact-case-first canonical field paths retain unambiguous case-insensitive public binding across provider translators |
+| Documentation and agent guidance | 22 strict-doc items; 20/20 skills; 5/5 examples | DocFX and skills report zero warnings/errors; all changed instructional examples compile |
+| Final repository gates | solution 0 errors / 19 existing warnings | the warning-reviewed Release solution build, structural claim sweep, compatibility review, diff check, and privacy scan pass; all warning-bearing files are unchanged from `HEAD` |
+
+The implementation, conformance, consumer, and public-truth portions are green. Maturity labels remain
+unchanged: this proves a bounded adapter execution contract, not snapshot iteration, provider-fleet
+production certification, or public package support.
 
 ## Verification
 
@@ -150,7 +191,8 @@ Entity<T>.QueryStream / AllStream
   break; zero-output residual page; cancellation before and during work; unsupported and overclaim
   rejection before output; context/source stability.
 - Adapter conformance: every static row exactly once in deterministic order; candidate output never
-  exceeds the requested bound; filter/order are provider-handled; cancellation reaches provider work;
+  exceeds the requested bound; pagination and the complete total order are provider-handled; any
+  residual filter is evaluated pointwise from bounded candidates; cancellation reaches provider work;
   generated command or SDK behavior proves limit/offset before materialization.
 - Negative conformance: adapters using the current complete key scan do not advertise the capability
   and reject without starting that scan.
@@ -162,16 +204,19 @@ Entity<T>.QueryStream / AllStream
 
 ## Acceptance additions
 
-- A supported stream yields before its tail has been queried.
-- The maximum Koan-owned candidate buffer never exceeds the effective batch size.
-- A paused consumer causes no unbounded provider advancement.
-- Cancellation and disposal prevent later page requests.
-- No supported stream invokes `QueryWithCount` or performs a hidden complete-source sort.
-- Unsupported execution fails with Entity, adapter, missing capability/reason, and corrective action.
-- Boot/composition facts state only capabilities known at composition; runtime facts state the selected
-  or rejected per-Entity execution without pretending lazy repositories were elected at startup.
-- Current limitations explicitly exclude snapshot consistency, mutation-safe iteration, resumability,
-  and constant-memory claims about opaque provider internals.
+- **Proven:** a supported stream yields before its tail has been queried.
+- **Proven:** every qualified page accepted for yielding contains no more than the effective batch
+  size; an overfull provider result rejects before yielding any candidate from that page.
+- **Proven:** a paused consumer causes no unbounded provider advancement.
+- **Proven:** cancellation and disposal prevent later page requests.
+- **Proven:** no supported stream invokes `QueryWithCount` or performs a hidden complete-source sort.
+- **Proven:** unsupported execution fails with Entity, adapter, missing capability/reason, and corrective
+  action.
+- **Proven:** boot/composition facts state only capabilities known at composition; runtime facts state
+  the selected or rejected per-Entity execution without pretending lazy repositories were elected at
+  startup.
+- **Documented limitation:** current guarantees explicitly exclude snapshot consistency, mutation-safe
+  iteration, resumability, and constant-memory claims about opaque provider internals.
 
 ## Stop conditions
 

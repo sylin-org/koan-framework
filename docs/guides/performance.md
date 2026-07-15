@@ -4,12 +4,11 @@ domain: performance
 title: "Performance Optimization with Koan"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-11-09
-framework_version: v0.6.3
+last_updated: 2026-07-15
+framework_version: v0.17.0
 validation:
-  date_last_tested: 2025-11-09
-  status: verified
-  scope: all-examples-tested
+  status: not-yet-tested
+  scope: docs/guides/performance.md
 related_guides:
   - entity-capabilities-howto.md
   - data-modeling.md
@@ -21,8 +20,8 @@ related_guides:
 
 **Document Type**: GUIDE
 **Target Audience**: Developers, Architects
-**Last Updated**: 2025-01-17
-**Framework Version**: v0.2.18+
+**Last Updated**: 2026-07-15
+**Framework Version**: v0.17.0
 
 ---
 
@@ -51,9 +50,16 @@ var allUsers = await User.All(); // If you have millions of users
 
 ### Streaming for Large Datasets
 
+Entity streams are provider-bounded only when the selected adapter advertises and realizes
+`ProviderBoundedPaging` (SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB, Couchbase). InMemory,
+JSON, and Redis reject before query/yield. `batchSize` bounds Koan's candidate page, not opaque driver
+buffers, snapshots, or mutation-safe traversal. See [Entity access and streaming](data/entity-access-and-streaming.md).
+
 ```csharp
-// Process large datasets efficiently
-await foreach (var batch in Product.AllStream(batchSize: 500).ToBatches(500))
+using Koan.Data.Core;
+
+// Keep the provider page and the application-owned work batch explicit
+await foreach (var batch in Product.AllStream(batchSize: 500).Batch(500))
 {
     await ProcessBulkProducts(batch);
 }
@@ -66,10 +72,11 @@ await foreach (var order in Order.QueryStream(
     await ProcessOrder(order);
 }
 
-// Parallel processing
-await Todo.AllStream(batchSize: 100)
-    .ForEachAsync(async todo => await ProcessTodo(todo),
-                  degreeOfParallelism: Environment.ProcessorCount);
+// Parallel processing with an explicit concurrency bound
+await Parallel.ForEachAsync(
+    Todo.AllStream(batchSize: 100),
+    new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+    async (todo, _) => await ProcessTodo(todo));
 ```
 
 ### Query Pushdown Optimization
@@ -121,7 +128,7 @@ public class Order : Entity<Order>
 {
     public string UserId { get; set; } = "";
     public decimal Total { get; set; }
-    // Id: automatically generated GUID v7, 56% storage reduction
+    // Id: automatically generated GUID v7; physical storage is connector-specific
 }
 
 // ✅ Explicit strings - when you need human-readable IDs
@@ -134,43 +141,43 @@ public class Category : Entity<Category, string>
 
 ### Storage Efficiency
 
-**Database storage comparison:**
-- PostgreSQL: TEXT (36+ bytes) → UUID (16 bytes) = **56% reduction**
-- SQL Server: NVARCHAR(256) (512+ bytes) → UNIQUEIDENTIFIER (16 bytes) = **97% reduction**
-- MongoDB: String (36+ bytes) → BinData UUID (16 bytes) = **56% reduction**
+Native GUID columns can be narrower than textual GUID representations, but the actual representation,
+index width, and benefit depend on the connector, schema, and database configuration. Inspect the
+generated schema and measure the workload you deploy.
 
 ### Performance Impact
 
-```csharp
-// Query performance improvements from GUID optimization:
-// - PostgreSQL: 290% faster single lookups
-// - SQL Server: 314% faster single lookups
-// - MongoDB: 51% faster single lookups
-// - Index size reduction: 65-73% smaller indexes
-
-// Throughput improvements:
-// - Single entity lookup: 3x improvement (800 → 2,400 req/sec)
-// - Bulk operations: 2.3x improvement
-```
+Koan does not publish a current, controlled cross-provider benchmark for identifier mapping. Treat
+smaller keys as a potential storage and locality benefit, not a throughput promise. Benchmark the
+selected connector with your schema, indexes, data distribution, and concurrency.
 
 ## Memory Management
 
 ### Efficient Batch Processing
 
 ```csharp
-// ✅ Process large datasets without memory issues
-public async Task ProcessLargeDataset<T>() where T : IEntity
+using Koan.Data.Core;
+
+// Bound the application-owned work batch and concurrent processing.
+// The caller supplies the stream because static Entity APIs cannot be called on generic T.
+public async Task ProcessLargeDataset<T>(
+    IAsyncEnumerable<T> source,
+    CancellationToken ct = default)
 {
-    await foreach (var batch in T.AllStream().ToBatches(1000))
+    await foreach (var batch in source.Batch(1000, ct))
     {
-        await Parallel.ForEachAsync(batch, async (item, ct) =>
-        {
-            await ProcessItem(item);
-        });
+        await Parallel.ForEachAsync(
+            batch,
+            new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Environment.ProcessorCount,
+                CancellationToken = ct
+            },
+            async (item, _) => await ProcessItem(item));
     }
 }
 
-// ✅ Memory-efficient aggregations
+// Avoid materializing the complete Entity source in Koan on a qualified provider
 public async Task<decimal> CalculateTotalRevenue()
 {
     decimal total = 0;
@@ -210,25 +217,12 @@ public class OrderService
 
 ```csharp
 // ✅ Async enumeration for large datasets
-public static async IAsyncEnumerable<T> GetEntitiesAsync<T>(
+public static async IAsyncEnumerable<Order> GetOrdersAsync(
     [EnumeratorCancellation] CancellationToken ct = default)
-    where T : IEntity
 {
-    const int batchSize = 1000;
-    int offset = 0;
-
-    while (!ct.IsCancellationRequested)
+    await foreach (var order in Order.AllStream(batchSize: 1000, ct: ct))
     {
-        var batch = await T.All(
-            new QueryDefinition().WithPagination(offset / batchSize + 1, batchSize),
-            ct);
-
-        if (batch.Count == 0) yield break;
-
-        foreach (var entity in batch)
-            yield return entity;
-
-        offset += batchSize;
+        yield return order;
     }
 }
 
@@ -388,65 +382,47 @@ public async Task<Product[]> SearchProducts(string query)
 ### Efficient Message Processing
 
 ```csharp
-public class OrderProcessor : BackgroundService
+using Koan.Messaging;
+
+// Register one business-readable handler during composition
+builder.Services.On<OrderCreated>(async message =>
 {
-    protected override async Task ExecuteAsync(CancellationToken ct)
+    var order = new Order
     {
-        // ✅ Process orders in batches
-        await this.On<OrderCreated>(async orders =>
-        {
-            var batches = orders.Chunk(100);
+        UserId = message.UserId,
+        Total = message.Total
+    };
 
-            await Parallel.ForEachAsync(batches,
-                new ParallelOptions { MaxDegreeOfParallelism = 4 },
-                async (batch, ct) =>
-                {
-                    await ProcessOrderBatch(batch.ToArray(), ct);
-                });
-        });
-    }
-
-    private async Task ProcessOrderBatch(OrderCreated[] orders, CancellationToken ct)
-    {
-        // Batch database operations
-        var orderEntities = orders.Select(o => new Order
-        {
-            UserId = o.UserId,
-            Total = o.Total
-        }).ToArray();
-
-        await Order.SaveBatch(orderEntities, ct);
-    }
-}
+    await order.Save();
+});
 ```
+
+`On<T>` handles one message at a time. If the application deliberately buffers messages, persist a
+completed buffer with `Order.UpsertMany(batch, ct)`; buffer size and flush policy remain
+application-owned.
 
 ## Performance Monitoring
 
-### Built-in Metrics
+### Measure Application Work and Inspect Capabilities
 
 ```csharp
-// ✅ Monitor framework performance
-public class PerformanceService
-{
-    public async Task<PerformanceReport> GetPerformanceMetrics()
-    {
-        var report = new PerformanceReport();
+using System.Diagnostics;
+using Koan.Data.Core;
 
-        // Check query capabilities per provider
-        report.DataCapabilities = Data<Product, string>.Capabilities;
+var started = Stopwatch.GetTimestamp();
+var products = await Product.FirstPage(size: 100, ct: ct);
+var elapsed = Stopwatch.GetElapsedTime(started);
 
-        // Monitor entity optimization status
-        var optimizedTypes = StorageOptimization.GetOptimizedEntityTypes();
-        report.OptimizedEntities = optimizedTypes.Count;
-
-        // Check provider health
-        var healthReports = await _healthService.CheckAllProvidersAsync();
-        report.ProviderHealth = healthReports;
-
-        return report;
-    }
-}
+logger.LogInformation(
+    "Loaded {Count} products in {Elapsed}; data capabilities: {Capabilities}",
+    products.Count,
+    elapsed,
+    Data<Product, string>.Capabilities);
 ```
+
+Koan exposes the selected data provider's capability set. Latency, throughput, alert thresholds, and
+health endpoints are application and deployment concerns; measure them with your normal .NET
+observability stack.
 
 ### Performance Alerts
 
@@ -519,7 +495,7 @@ var result = await SomeAsyncMethod();
 // Wrong: Not handling cancellation
 public async Task ProcessData()
 {
-    await foreach (var item in Data.AllStream())
+    await foreach (var item in Order.AllStream())
     {
         // No cancellation check
         await ProcessItem(item);
@@ -529,7 +505,7 @@ public async Task ProcessData()
 // Right: Respect cancellation
 public async Task ProcessData(CancellationToken ct = default)
 {
-    await foreach (var item in Data.AllStream(ct: ct))
+    await foreach (var item in Order.AllStream(ct: ct))
     {
         ct.ThrowIfCancellationRequested();
         await ProcessItem(item, ct);
@@ -571,5 +547,4 @@ public async Task ProcessData(CancellationToken ct = default)
 
 ---
 
-**Last Validation**: 2025-01-17 by Framework Specialist
-**Framework Version Tested**: v0.2.18+
+**Validation status**: Not yet tested end-to-end

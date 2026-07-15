@@ -3,282 +3,138 @@ type: REF
 domain: web
 title: "Web Pillar Reference"
 audience: [developers, architects, ai-agents]
-last_updated: 2025-09-28
-framework_version: v0.6.3
 status: current
+last_updated: 2026-07-15
+framework_version: v0.17.0
 validation:
-  date_last_tested: 2025-09-28
-  status: verified
-  scope: docs/reference/web/index.md
+  date_last_tested: 2026-07-15
+  status: reviewed
+  scope: public controller, endpoint, hook, transformer, relationship, health, and facts source inventory
 ---
 
 # Web Pillar Reference
 
 ## Contract
 
-- **Inputs**: ASP.NET Core application with `services.AddKoan()`, Koan data models, and familiarity with controller conventions.
-- **Outputs**: Production-ready HTTP surfaces built on `EntityController<T>`, custom controllers, payload transformers, and consistent auth/pagination policies.
-- **Error Modes**: Missing capability flags (soft-delete, moderation) for entities, unhandled hook cancellations, streaming endpoints without pagination, or authentication providers not registered.
-- **Success Criteria**: REST endpoints stand up with minimal code, custom routes reuse shared pipeline services, payloads remain consistent across surfaces, and auth/pagination behavior is predictable.
+- **Input:** an ASP.NET Core application composed with `AddKoan()`, an Entity model, and an
+  attribute-routed MVC controller.
+- **Output:** conventional Entity CRUD/query endpoints backed by the shared
+  `IEntityEndpointService<TEntity, TKey>` policy and execution seam.
+- **Errors:** invalid filters/sorts/paging, authorization denial, adapter limitations, safety bounds,
+  transformer failures, and relationship negotiation failures become explicit HTTP results.
+- **Success:** the application declares business models and routes while Koan owns routine parsing,
+  persistence orchestration, pagination metadata, hooks, shaping, and inspectability.
 
-### Edge Cases
-
-- **Entity caps** – honor feature flags from the Data pillar before surfacing moderation or soft-delete endpoints.
-- **Transformer order** – payload transformers run post-hook; avoid mutating entities directly.
-- **Streaming endpoints** – always accept `CancellationToken` in custom actions to avoid thread starvation.
-- **Auth bootstrapping** – provider metadata must be configured before `AddKoan()` runs in hosted scenarios.
-- **Cache headers** – set explicit caching when serving static projections; defaults are conservative.
-
----
-
-## Pillar Overview
-
-Koan.Web layers opinionated controller patterns on top of ASP.NET Core:
-
-- Automatic CRUD endpoints through `EntityController<T>`
-- Shared orchestration via `IEntityEndpointService`
-- Attribute routing with MVC controllers only (no inline `MapGet`/`MapPost`)
-- Payload transformers for response shaping
-- Out-of-the-box authentication discovery endpoints and health probes
-
-Install `Koan.Web` alongside the Data pillar for end-to-end CRUD in minutes.
-
----
-
-## Quick Start: Two-File API
+## Shortest supported shape
 
 ```csharp
-// Models/Product.cs
-public class Product : Entity<Product>
+public sealed class Todo : Entity<Todo>
 {
-    public string Name { get; set; } = "";
-    public decimal Price { get; set; }
-    public string Category { get; set; } = "";
+    public string Title { get; set; } = "";
+    public bool Done { get; set; }
 }
 
-// Controllers/ProductsController.cs
-[Route("api/[controller]")]
-public class ProductsController : EntityController<Product> { }
-```
-
-This delivers:
-
-- `GET /api/products` – list
-- `GET /api/products/{id}` – details
-- `POST /api/products` – create
-- `PUT /api/products/{id}` – update
-- `DELETE /api/products/{id}` – delete
-
-Health endpoints are `/health/live` for process liveness and `/health/ready` for dependency-aware
-readiness. `/api/health` remains a lightweight compatibility up-check; it does not aggregate dependencies.
-
----
-
-## Entity Controllers in Depth
-
-Extend `EntityController<T>` to add intent-specific routes while keeping the built-in CRUD surface.
-
-```csharp
-[Route("api/[controller]")]
-public class ProductsController : EntityController<Product>
+[Route("api/todos")]
+public sealed class TodosController : EntityController<Todo>
 {
-    [HttpGet("featured")]
-    public Task<Product[]> GetFeatured() => Product.Featured();
-
-    [HttpPost("{id}/activate")]
-    public async Task<IActionResult> Activate(string id)
-    {
-  var product = await Product.Get(id);
-        if (product is null) return NotFound();
-
-        product.IsActive = true;
-        await product.Save();
-        return Ok();
-    }
 }
-```
 
-### Pagination & Streaming
-
-- Prefer `FirstPage`/`Page` when exposing list endpoints to clients.
-- For background jobs, stream data with `QueryStream` and wrap the controller action in `IAsyncEnumerable`.
-- Reference: [Pagination attribute](./pagination-attribute.md) for reusable policy annotations.
-
----
-
-## Custom Controllers & Composition
-
-When you need custom orchestration or cross-entity projections, inherit from `ControllerBase` and call entity statics.
-
-```csharp
-[Route("api/[controller]")]
-public class OrdersController : ControllerBase
-{
-    [HttpGet("analytics/revenue")]
-    public async Task<IActionResult> GetRevenue([FromQuery] int days = 30)
-    {
-        var orders = await Order.Query()
-            .Where(o => o.Created > DateTimeOffset.UtcNow.AddDays(-days))
-            .ToArrayAsync();
-
-        var revenue = orders.Sum(o => o.Total);
-        return Ok(new { revenue, orderCount = orders.Length });
-    }
-}
-```
-
-Controllers, hosted services, GraphQL resolvers, and MCP endpoints all share behavior via `IEntityEndpointService`. Reuse it to process domain requests consistently outside MVC.
-
----
-
-## Payload Transformers
-
-Transformers shape responses without mutating the entity. They run after lifecycle hooks and before serialization.
-
-```csharp
-public class ProductTransformer : IPayloadTransformer<Product>
-{
-    public Task<object> TransformResponse(Product product, TransformContext context)
-        => Task.FromResult<object>(new
-        {
-            product.Id,
-            product.Name,
-            product.Price,
-            Url = $"/products/{product.Id}",
-            InStock = product.Quantity > 0
-        });
-}
-```
-
-Attach transformers via configuration or attribute decoration depending on the surface. See [EntityController Transformers](../../decisions/WEB-0035-entitycontroller-transformers.md).
-
----
-
-## Authentication & Authorization
-
-### Provider Setup
-
-```bash
-dotnet add package Koan.Web.Auth.Connector.Google
-
-// Program.cs
+var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
+
+var app = builder.Build();
+await app.RunAsync();
 ```
 
-Endpoints provided out of the box:
+The package reference expresses intent; `AddKoan()` discovers referenced Koan modules. Application
+code still owns its model, route, authorization declarations, and any business-specific actions.
+Koan.Web maps controllers by default through its startup filter (`AutoMapControllers = true`); an
+application only owns explicit pipeline mapping when it disables that default.
 
-- `GET /.well-known/auth/providers`
-- `POST /auth/challenge/{provider}`
-- `POST /auth/callback`
-- `POST /auth/logout`
+## EntityController behavior
 
-### Policy Enforcement
+`EntityController<TEntity, TKey>` provides collection, query, get-new, get-by-id, single/bulk upsert,
+single/bulk/query/all delete, and patch actions. `EntityController<TEntity>` is its string-key alias.
+See the HTTP API reference for the exact verbs, bodies, headers, and status codes.
+
+The controller parses request syntax and translates HTTP. `IEntityEndpointService` owns the shared
+authorization, hooks, data access, relationship, and emission pipeline so other Entity surfaces do
+not need to duplicate those decisions.
+
+## Pagination and queries
 
 ```csharp
-[Authorize]
-public class OrdersController : EntityController<Order>
+[Route("api/todos")]
+[Pagination(
+    Mode = PaginationMode.On,
+    DefaultSize = 50,
+    MaxSize = 200,
+    IncludeCount = true,
+    DefaultSort = "-createdAt")]
+public sealed class TodosController : EntityController<Todo>
 {
-    [HttpPost]
-    [Authorize(Policy = "CanCreateOrders")]
-    public override Task<IActionResult> Post([FromBody] Order entity) => base.Post(entity);
 }
 ```
 
-Register custom claims transformations and fallback policies through Koan’s auth capability modules. Reference ADR [WEB-0047](../../decisions/WEB-0047-capability-authorization-fallback-and-defaults.md).
+- Collection requests accept `page`, `pageSize` (or legacy `size`), sort, filter, shape, set, and
+  relationship options subject to endpoint policy.
+- When count metadata is enabled, collection responses include `X-Total-Count`; paged responses can
+  also include RFC-style `Link` navigation headers.
+- `POST /query` accepts the provider-agnostic JSON filter shape. It is not an `IQueryable` endpoint.
+- `FirstPage`/`Page` are materialized Data APIs. `EntityController` does not promise an
+  `IAsyncEnumerable` HTTP response merely because the selected adapter can stream internally.
 
----
+For custom business actions, use first-class model APIs such as `Todo.Query(...)` and
+`Todo.FirstPage(...)`. Use `Todo.AllStream(...)` or `Todo.QueryStream(...)` for background
+consumer-paced work only when the elected adapter advertises `ProviderBoundedPaging`. SQLite,
+PostgreSQL, SQL Server, CockroachDB, MongoDB, and Couchbase qualify today; InMemory, JSON, and Redis
+reject before query/yield.
 
-## Error Handling & Observability
+## Extension seams
 
-- Use ASP.NET Core middleware for global error shaping.
-- Combine with Koan’s tracing so downstream adapters capture request context.
+- `IModelHook<TEntity>` — before/after fetch, save, delete, and patch.
+- `ICollectionHook<TEntity>` — before/after collection fetch.
+- `IRequestOptionsHook<TEntity>` — adjust parsed query options.
+- `IEmitHook<TEntity>` — replace or transform emitted model/collection payloads.
+- `IEntityEnricher<TEntity>` — ordered same-shape output enrichment.
+- `IEntityTransformer<TEntity, TShape>` — content-negotiated terminal input/output transformation.
 
-```csharp
-public class GlobalExceptionMiddleware
-{
-    public async Task InvokeAsync(HttpContext context, RequestDelegate next)
-    {
-        try
-        {
-            await next(context);
-        }
-        catch (ValidationException ex)
-        {
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await context.Response.WriteAsJsonAsync(new
-            {
-                error = "validation_failed",
-                details = ex.Errors
-            });
-        }
-    }
-}
-```
+Hooks are ordered application policy. Keep storage rules in the Data/domain layer and transport-only
+translation in Web.
 
-Add structured logging via `ILogger` and correlate request IDs; Koan bundles default enrichers.
+## Authorization and relationships
 
----
+- Base Entity operations use the shared authorization seam; declare standard
+  `[Authorize]`/`[AllowAnonymous]` and Koan scope requirements on the entity or applicable surface.
+  Do not add REST-only `CanRead`/`CanWrite` overrides.
+- `?access=true` opts a REST collection into the per-row capability sidecar when configured.
+- `?with=...` expands declared direct relationships through the governed relationship executor.
+  Native or resident execution is accepted by default; bounded fallback requires an explicit finite
+  policy. Unsupported scans fail closed (422), and exceeded safety limits return 413.
+- This contract covers direct edges. It does not promise arbitrary recursive graph traversal.
 
-## Configuration & Environment
+## Operator-facing behavior
 
-```json
-{
-  "Koan": {
-    "Web": {
-      "CorsOrigins": ["http://localhost:3000"],
-      "Auth": {
-        "Providers": {
-          "google": {
-            "ClientId": "{GOOGLE_CLIENT_ID}",
-            "ClientSecret": "{GOOGLE_CLIENT_SECRET}"
-          }
-        }
-      }
-    }
-  }
-}
-```
+- `GET /health/live` reports process liveness without dependency checks.
+- `GET /health/ready` reports aggregated dependency readiness and returns 503 when a critical
+  component is unhealthy.
+- `GET /.well-known/Koan/facts` returns the host's current runtime explanation envelope.
+- Startup reporting and runtime facts explain discovered modules and important selections; package
+  presence alone is not proof that an optional adapter capability was elected.
 
-Environment overrides:
+## Maturity boundary
 
-```bash
-export Koan__Web__Auth__Providers__google__ClientId=your-client-id
-export Koan__Web__Auth__Providers__google__ClientSecret=your-secret
-```
+Koan is pre-1.0. The sources above support a concise MVC/Entity path, shared endpoint policies,
+hooks, transforms, health, and facts. They do not provide blanket production certification, automatic
+security-provider configuration, universal streaming, or unlimited relationship expansion. Validate
+the adapters, authentication setup, safety limits, and topology used by each application.
 
----
+## References
 
-## Related Reading
-
-- [Pagination attribute reference](./pagination-attribute.md)
-- [Entity Endpoint Service](./entity-endpoint-service.md)
-- [AI Pillar Reference](../ai/index.md) for chat/embedding endpoints
-- [Data Pillar Reference](../data/index.md) for entity patterns shared with controllers
-
-## GraphQL
-
-Auto-generated schema from entities:
-
-```bash
-dotnet add package Koan.Web.GraphQL
-```
-
-Schema automatically includes all `EntityController<T>` types.
-
-Query example:
-
-```graphql
-query {
-  products(where: { category: "Electronics" }) {
-    id
-    name
-    price
-  }
-}
-```
-
----
-
-**Last Validation**: 2025-01-17 by Framework Specialist
-**Framework Version Tested**: v0.2.18+
-
+- [HTTP API](../../api/web-http-api.md)
+- [Detailed Web HTTP reference](http-api.md)
+- [WEB-0035 — EntityController transformers](../../decisions/WEB-0035-entitycontroller-transformers.md)
+- [ARCH-0092 — Entity exposure surfaces](../../decisions/ARCH-0092-entity-exposure-surfaces.md)
+- [ARCH-0112 — bounded relationship negotiation](../../decisions/ARCH-0112-bounded-relationship-negotiation.md)
+- [DATA-0107 — provider-bounded Entity streams](../../decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [Koan.Web source](../../../src/Koan.Web/)

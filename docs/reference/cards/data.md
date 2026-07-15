@@ -33,9 +33,13 @@ var todo = new Todo { Title = "Buy milk" };
 await todo.Save();                            // create or update
 var one  = await Todo.Get(todo.Id);           // by id
 var open = await Todo.Query(t => !t.Done);    // predicate query (pushed down when the adapter can)
-await foreach (var t in Todo.AllStream()) { } // stream large sets without materializing
+await foreach (var t in Todo.AllStream()) { } // bounded pages on a qualified adapter
 await todo.Remove();                          // delete
 ```
+
+`AllStream` and `QueryStream` require provider-bounded paging. SQLite, PostgreSQL, SQL Server,
+CockroachDB, MongoDB, and Couchbase are qualified; InMemory, JSON, and Redis reject correctively
+before query/yield. See the [streaming guide](../../guides/data/entity-access-and-streaming.md).
 
 Use `Entity<T, TKey>` when the key isn't a string. Batch writes: `Todo.UpsertMany(items)`.
 

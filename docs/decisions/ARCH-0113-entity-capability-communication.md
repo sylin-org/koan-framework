@@ -8,10 +8,16 @@
 
 ---
 
+> **Implementation update (2026-07-15):** [DATA-0107](DATA-0107-provider-bounded-entity-streams.md)
+> now satisfies the provider-query streaming prerequisite for SQLite, PostgreSQL, SQL Server,
+> CockroachDB, MongoDB, and Couchbase. InMemory, JSON, and Redis reject before query/yield. The
+> Communication implementation remains pending; this note unlocks its qualified query-stream cell
+> without claiming universal adapter parity.
+
 ## Context
 
 Koan's Entity-first language has the right center but the wrong boundaries around communication.
-Today:
+At decision time:
 
 - `Entity.Events` means persistence lifecycle only;
 - Messaging adds `Send<T>(this T) where T : class` to every reference type;
@@ -22,8 +28,9 @@ Today:
 - `PipelineBuilder<T>` adds another composition model with mutable string-keyed feature bags and no
   aggregate receipt;
 - cross-hop ambient capture has sound behavior but lives in Data.Core; and
-- `AllStream` and `QueryStream` currently materialize the complete query before yielding while their
-  `batchSize` parameter does not create a real streaming boundary.
+- `AllStream` and `QueryStream` materialized the complete query before yielding while their
+  `batchSize` parameter did not create a real streaming boundary (resolved for qualified adapters by
+  DATA-0107; see the implementation update above).
 
 These pieces cannot support one stable business meaning across a local process, a tenant-isolated
 host, and a broker. Preserving their names or package boundaries would preserve the architectural
@@ -308,6 +315,12 @@ One package initially owns the Entity facets, semantic coordinators, router, rec
 in-process adapter. No separate Events, Transport, Abstractions, or InMemory package is created until a
 demonstrated dependency or distribution need earns it. Connector packages depend on this pillar.
 
+Generic provider precedence belongs below every pillar, not in Data. The existing
+`ProviderPriorityAttribute` moves from Data.Abstractions to Core during the canonical 0.18 break.
+Core owns only stable provider identity and priority metadata; Communication still owns lane/channel
+eligibility, assurance, reach, health, and the election itself. Koan does not introduce a universal
+provider resolver whose lowest-common-denominator rules would erase concern semantics.
+
 The internal runtime has six chokepoints:
 
 1. Entity-cardinality normalization supplied by Data.Core;
@@ -342,8 +355,9 @@ after-commit phase requires a real completion boundary.
 Data also rebuilds provider streaming before provider queries are advertised as lazy sources. The
 current materializing `AllStream`/`QueryStream` implementation is not retained under a streaming claim.
 Scalar, finite collection, and a genuine caller-provided async stream can prove Communication first;
-the `QueryStream(...).Transport/Events` cell remains gated until Data proves bounded incremental
-enumeration and backpressure.
+the `QueryStream(...).Transport/Events` cell is now unlocked on DATA-0107-qualified adapters, whose
+consumer-paced numbered pages and cancellation/disposal behavior passed conformance. Unsupported
+resident/key-value adapters remain corrective rejections rather than hidden materialization.
 
 `Order.Where(...)` may later become a shorter Koan-owned selection spelling. This decision does not
 extend Communication terminals to arbitrary `IQueryable<T>` implementations.
@@ -367,6 +381,11 @@ The local adapter dispatches Events to every local logical subscription and Tran
 every local logical receiver group. It uses bounded channels, serialized copies, the same context
 ingress, identities, dedupe, and receipts required of a network adapter. Its facts honestly state
 process-only reach, memory-only acceptance, and no restart durability.
+
+The in-process adapter is the Communication concern's built-in provider floor, registered by the
+pillar itself at the reserved minimum priority. It is not a connector the application must reference.
+This follows the existing concern-owned Memory/Jobs precedent while retaining Data's explicit-binding
+and deterministic-priority rules.
 
 This is the V0 floor, not a toy alternate API. An application can fully exercise composition,
 filtering, failure behavior, tests, facts, and agent inspection before choosing infrastructure.
@@ -406,22 +425,27 @@ Transport delivers one snapshot to every receiver group; replicas within a group
 acceptance reports publication to the channel, never inferred remote-group acceptance. Receiver-group
 delivery is settlement truth.
 
-The router elects each channel with this executable order:
+The router elects each lane/channel with this executable order:
 
 1. apply the host/deployment binding for the logical channel, when present;
-2. reject candidates that cannot preserve contract identity, copy isolation, context/provenance,
+2. collect direct build-manifest intents that claim that lane/channel; when none claim it, use only the
+   built-in in-process floor for automatic election;
+3. reject candidates that cannot preserve contract identity, copy isolation, context/provenance,
    retry identity, and the lane's fan-out or receiver-group topology;
-3. consider only direct intents from the build manifest for an automatic default;
 4. prefer the highest documented `DeliveryAssurance` rank—durably acknowledged, acknowledged, then
    best-effort—among otherwise eligible candidates;
-5. use stable connector identity as the deterministic tie-breaker.
+5. prefer the highest Core-owned provider priority; and
+6. use stable connector identity as the deterministic tie-breaker.
 
 Capability requirements are hard filters. Durability may vary; contract safety, isolation, and
-cardinality may not. The fixed assurance/identity vector always elects among eligible default
-candidates without operator input. If no candidate satisfies a declared requirement, startup fails
-with the candidates, missing capabilities, and one safe correction. Mirroring, automatic failover, and
-multi-path delivery are deferred until a real use case proves semantics that do not expand this
-foundation.
+cardinality may not. A direct connector claim removes the built-in floor from that lane/channel's
+automatic candidate set; temporary unavailability cannot silently shrink external reach back to the
+process. The fixed assurance/priority/identity vector always elects among eligible default candidates
+without operator input. If no intended candidate satisfies a declared requirement, startup fails with
+the candidates, missing capabilities, and one safe correction. A connector that supports Transport
+but does not claim Events can transparently supersede only Transport while Events remain local.
+Mirroring, automatic failover, and multi-path delivery are deferred until a real use case proves
+semantics that do not expand this foundation.
 
 Capabilities are facts, not marketing tiers. A UDP connector may honestly declare best-effort liveness
 and limited ordering, but that does not excuse incorrect event fan-out, receiver groups, copy, context,
@@ -594,7 +618,8 @@ attributes, routing APIs, inbox/outbox, batch, retry, and topology claims are no
 
 - Existing Messaging, Pipeline, Lifecycle naming, bridge packages, adapters, samples, and tests require
   intentional replacement or deletion.
-- Real Data streaming is a prerequisite for the provider-query syntax to meet its advertised meaning.
+- Provider-query syntax depends on DATA-0107 qualification; unsupported adapters reject rather than
+  weakening the Communication terminal's meaning.
 - The first in-process implementation proves process-local ephemeral acceptance, not production
   broker durability.
 - Exactly-once effects, automatic Data transaction coupling, outbox/inbox atomicity, global ordering,

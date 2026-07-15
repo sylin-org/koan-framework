@@ -330,7 +330,7 @@ var recent = await Todo.RecentAsync(14);
 | **Auto GUID v7 Generation** | ✅ Built-in | ❌ Manual implementation |
 | **Provider Transparency** | ✅ Works with any adapter | ❌ Tied to specific provider |
 | **Batch Operations** | ✅ `.Save()`, `.Batch()` | ❌ Must implement separately |
-| **Streaming** | ✅ `.AllStream()`, `.QueryStream()` | ❌ Must implement separately |
+| **Streaming** | ✅ capability-qualified `.AllStream()` / `.QueryStream()`; unsupported adapters reject | ❌ Must implement separately |
 | **Count Strategies** | ✅ Fast/Exact/Optimized | ❌ Manual queries only |
 | **Context Routing** | ✅ Partition/Source/Adapter | ❌ Not available |
 | **Capability Detection** | ✅ Auto-fallback | ❌ Manual checks needed |

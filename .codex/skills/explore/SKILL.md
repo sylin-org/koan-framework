@@ -15,7 +15,8 @@ Do not write production code until all steps are done.
 - No magic literals: stable identifiers go in `Infrastructure/Constants`; tunables are typed `*Options`.
 - Docs posture: instruction-first (no tutorials); update ADRs and TOCs when behavior/policy changes.
 - Per-project docs: `README.md` + `TECHNICAL.md` at project roots for reusable modules.
-- Large data paths: use streaming or paging (`AllStream`, `QueryStream`, `FirstPage`, `Page`).
+- Large data paths: use capability-qualified streaming or explicit paging. InMemory, JSON, and Redis
+  reject `AllStream`/`QueryStream`; see DATA-0107.
 
 ## Step 1: Understand the task
 
@@ -37,7 +38,7 @@ Start with:
 
 If the task touches specific areas, add the relevant ADR or guide, for example:
 
-- docs/decisions/DATA-0061-data-access-pagination-and-streaming.md
+- docs/decisions/DATA-0107-provider-bounded-entity-streams.md
 - docs/decisions/WEB-0035-entitycontroller-transformers.md
 - docs/guides/data/entity-access-and-streaming.md
 - docs/reference/web/http-api.md
@@ -124,7 +125,7 @@ Before proceeding, confirm:
 - [ ] No empty placeholder classes or commented-out scaffolds
 - [ ] No magic literals; constants are centralized and typed options are used
 - [ ] First-class model statics are used for data access when available
-- [ ] Large data access uses streaming or paging (`AllStream`, `QueryStream`, `FirstPage`, `Page`)
+- [ ] Large data access uses a capability-qualified stream (`AllStream`, `QueryStream`) or explicit paging; InMemory/JSON/Redis do not currently stream
 - [ ] Docs/ADRs/TOCs will be updated when behavior or policy changes
 
 ## Step 8: Present the plan
