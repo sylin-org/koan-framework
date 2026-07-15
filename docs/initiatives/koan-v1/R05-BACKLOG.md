@@ -4,10 +4,10 @@ domain: framework
 title: "R05 Golden V0-to-V1 Backlog"
 audience: [architects, maintainers, ai-agents]
 status: current
-last_updated: 2026-07-14
+last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-14
+  date_last_tested: 2026-07-15
   status: reviewed
   scope: dependency-ordered R05 implementation cards
 ---
@@ -42,7 +42,7 @@ R05-01 business spine
 |---|---|---|---|---|
 | [R05-01](work-items/r05/R05-01-business-spine.md) | passed | The cumulative app reads as a review workflow and persists/reaches one business result. | R04 | GoldenJourney domain/controller; pure rule and running REST assertions |
 | [R05-02](work-items/r05/R05-02-reactive-agentic.md) | passed | Durable assessment and bounded agent recommendation remain inspectable and honest. | R05-01 | Jobs facts/progress suites; 11-step source process proof |
-| [R05-03](work-items/r05/R05-03-clean-room-rehearsal.md) | in-progress | A package-only checkout and independent readers reproduce the supported journey. | R05-02 | fresh 84-package clean room passed; agent round confirmed the core and entered bounded repair-and-repeat; repairs 1/5 through 4/5 complete |
+| [R05-03](work-items/r05/R05-03-clean-room-rehearsal.md) | in-progress | A package-only checkout and independent readers reproduce the supported journey. | R05-02 | fresh 84-package clean room passed; agent round confirmed the core; all five bounded repairs pass; fresh-agent repeat and human record remain |
 
 ## Program rules
 

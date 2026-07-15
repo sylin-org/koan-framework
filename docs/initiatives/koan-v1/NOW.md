@@ -4,12 +4,12 @@ domain: framework
 title: "Koan V1 Reorganization Current Handoff"
 audience: [maintainers, ai-agents]
 status: current
-last_updated: 2026-07-14
+last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-14
+  date_last_tested: 2026-07-15
   status: reviewed
-  scope: R05 independent rehearsal repairs 1 through 4 complete
+  scope: R05 independent rehearsal repairs 1 through 5 complete
 ---
 
 # Koan V1 reorganization current handoff
@@ -22,7 +22,7 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - R05 is `in-progress` under [`R05-BACKLOG.md`](R05-BACKLOG.md).
 - R05-01 business spine and R05-02 reactive/agentic collaboration pass.
 - R05-03's fresh package clean room passes. Two independent agent rehearsals confirmed the central
-  journey; the deeper run returned `repair-and-repeat`, so a bounded truthfulness repair loop is active.
+  journey; the deeper run returned `repair-and-repeat`, and all five bounded repairs now pass.
 - No public package was published and no branch was pushed by this work.
 
 ## What now exists
@@ -92,6 +92,12 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
   manual PowerShell rejection/recovery sequence, names the stable fact/reason/correction surface, and
   explains why an Entity-level SQLite route outranks the rejected application default. The command
   passes 1/1 and strict docs passes.
+- Quiet/current first-use repair commit `ffc1ed27`: eight traversed compiler warnings are corrected,
+  both supported source contracts build warning-as-error clean, MCP's front door now teaches
+  Reference = Intent and `POST /mcp`, and the public path includes a SQLite-verified encoded-JSON
+  REST filter. FirstUse passes 1/1, GoldenJourney's exact public command passes 1/1, the focused
+  filter contract passes 1/1, and strict docs pass. Adjacent design debts are preserved in
+  [`POST-CYCLE-TODO.md`](POST-CYCLE-TODO.md).
 
 ## Important discoveries
 
@@ -115,18 +121,16 @@ readiness, failure logs, and cleanup primitives. Their business probes and evide
   `977f33b9`, its missing default directory made a SQLite-selected application return readiness 503.
   Health now gates only default-elected, configured, or observed providers; availability alone is
   inspectable but inert.
-- The independent run's MCP self-description, source/package lockfile, and missing V5 reproduction
-  findings are repaired in `c9977361`, `a2780672`, and `775d5716`. Genuine warning noise plus minor
-  MCP/REST transport guidance remain.
+- The independent run's five material findings are repaired in `977f33b9`, `c9977361`, `a2780672`,
+  `775d5716`, and `ffc1ed27`. Broader small issues are explicitly deferred in
+  [`POST-CYCLE-TODO.md`](POST-CYCLE-TODO.md), not silently discarded.
 
 ## Next safe action
 
-Continue the bounded repair-and-repeat queue in this order:
-
-1. remove genuine warning noise and clarify Streamable HTTP `POST /mcp` plus one REST query example.
-
-After each material repair, rerun the affected source contracts. Then obtain a genuinely fresh agent
-repeat and the remaining human rehearsal before closing R05-03.
+Run a genuinely fresh agent against the repaired public path, without implementation context, and
+record its independent verdict. Then obtain the remaining human rehearsal before closing R05-03.
+Do not begin the post-cycle todo register until this acceptance loop is complete unless new evidence
+promotes an entry into a correctness, security, or release blocker.
 
 ## Do not infer
 
@@ -140,6 +144,6 @@ repeat and the remaining human rehearsal before closing R05-03.
 ## Repository state
 
 The coherent R04/R05 candidate is `d1dbbe35`; independent-rehearsal repairs are local commits
-`977f33b9`, `c9977361`, `a2780672`, and `775d5716`. Only evaluator reports remain untracked under
-`tmp/`. Do not stage those reports, or publish, push, tag, or release the candidate without a
-separate operator request.
+`977f33b9`, `c9977361`, `a2780672`, `775d5716`, and `ffc1ed27`. Only evaluator reports remain
+untracked under `tmp/`. Do not stage those reports, or publish, push, tag, or release the candidate
+without a separate operator request.

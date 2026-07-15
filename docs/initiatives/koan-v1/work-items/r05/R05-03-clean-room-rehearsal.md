@@ -4,12 +4,12 @@ domain: framework
 title: "R05-03 - Prove the Clean Room and Independent Rehearsal"
 audience: [maintainers, developers, operators, ai-agents]
 status: current
-last_updated: 2026-07-14
+last_updated: 2026-07-15
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-14
+  date_last_tested: 2026-07-15
   status: reviewed
-  scope: independent agent review entered bounded repair-and-repeat
+  scope: five-item repair queue complete; fresh repeat and human rehearsal remain
 ---
 
 # R05-03 — Prove the clean room and independent rehearsal
@@ -119,3 +119,14 @@ clears the intent, and observes SQLite recovery. The public explanation pins the
 ambient and Entity-specific routes precede the application Default, so `ReviewRequest`'s explicit
 `[DataAdapter("sqlite")]` remains scoped while the bad default stays visible. The documented command
 passes 1/1 and strict docs passes.
+
+Repair 5 is complete in local commit `ffc1ed27`. The eight compiler warnings traversed by the public
+source path are corrected without suppressions, and both supported application contracts now build
+with warnings treated as errors. The MCP package front door teaches Reference = Intent and modern
+Streamable HTTP: JSON-RPC and initialization use `POST /mcp`; `GET /mcp` is optional established-
+session server push; the legacy `/sse` plus `/rpc` shape is explicit opt-in. Root, quickstart, and
+FirstUse docs include one SQLite-verified URL-encoded JSON `filter` request. FirstUse passes 1/1,
+GoldenJourney's exact public command passes 1/1, the focused SQLite filter contract passes 1/1, and
+strict docs pass. Broader small design debts, including the intentional `JobMetric.Count` collision,
+are retained with required decisions and evidence in
+[`POST-CYCLE-TODO.md`](../../POST-CYCLE-TODO.md) rather than widening R05.
