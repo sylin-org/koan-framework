@@ -8,7 +8,8 @@ namespace Koan.Data.Abstractions.Filtering;
 
 /// <summary>
 /// Resolves a <see cref="FieldPath"/> into a <see cref="ResolvedField"/> against an entity
-/// type: case-insensitive member binding, nested dot-paths, and leaf collection detection.
+/// type: exact-case member binding with an unambiguous case-insensitive fallback, nested dot-paths,
+/// and leaf collection detection.
 /// Strict — an unresolvable segment throws <see cref="InvalidFilterFieldException"/>.
 ///
 /// Harvested from the sort path's <c>MemberPathResolver</c>; the two converge onto this in a
@@ -16,7 +17,7 @@ namespace Koan.Data.Abstractions.Filtering;
 /// </summary>
 public static class FieldPathResolver
 {
-    private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase;
+    private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public;
 
     // Resolution is a pure function of (rootType, path) and reflection-bound, so it is memoized: every
     // pushed filter AND sort spec resolves its field on the (hot) per-query translation path, and the
@@ -72,10 +73,10 @@ public static class FieldPathResolver
             var elementType = TryGetElementType(currentType);
             if (elementType is not null && i > 0) currentType = elementType;
 
-            var prop = currentType.GetProperty(segment, Flags);
+            var prop = FindProperty(currentType, segment, path, rootType);
             if (prop is null && elementType is not null)
             {
-                prop = elementType.GetProperty(segment, Flags);
+                prop = FindProperty(elementType, segment, path, rootType);
                 if (prop is not null) currentType = elementType;
             }
             if (prop is null)
@@ -94,6 +95,25 @@ public static class FieldPathResolver
 
         return new ResolvedField(rootType, members, leafType, comparable, targetsCollection, element,
             CanonicalPath: FieldPath.Of(members.Select(member => member.Name).ToArray()));
+    }
+
+    private static PropertyInfo? FindProperty(Type type, string segment, FieldPath path, Type rootType)
+    {
+        var properties = type.GetProperties(Flags);
+        var exact = properties.Where(property =>
+            string.Equals(property.Name, segment, StringComparison.Ordinal)).ToArray();
+        if (exact.Length == 1) return exact[0];
+        if (exact.Length > 1)
+            throw new InvalidFilterFieldException(path.ToString(), rootType, segment,
+                "The exact member name is ambiguous on the CLR type.");
+
+        var insensitive = properties.Where(property =>
+            string.Equals(property.Name, segment, StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (insensitive.Length == 1) return insensitive[0];
+        if (insensitive.Length > 1)
+            throw new InvalidFilterFieldException(path.ToString(), rootType, segment,
+                "Use the member's exact casing because this type declares multiple case-insensitive matches.");
+        return null;
     }
 
     /// <summary>Element type when <paramref name="t"/> is a generic enumerable (excluding string), else null.</summary>

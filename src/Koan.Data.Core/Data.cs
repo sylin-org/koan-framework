@@ -6,6 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core;
 using Koan.Core.Capabilities;
+using Koan.Core.Context;
+using Koan.Core.Diagnostics;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
@@ -72,8 +74,9 @@ public static class Data<TEntity, TKey>
     private static Filter Lower(Expression<Func<TEntity, bool>> predicate) => LinqFilterCompiler.Compile(predicate);
 
     // ------------------------------------------------------------------
-    // The ONE execution path: plan (split vs caps) → adapter → finalize
-    // (residual + sort-fallback + paginate-after), centrally.
+    // The one materialized-result execution path: plan (split vs caps) → adapter → finalize
+    // (residual + sort-fallback + paginate-after), centrally. Provider-bounded async streams use
+    // QueryStreamCoordinator because their candidate-page semantics are intentionally different.
     // ------------------------------------------------------------------
     public static async Task<QueryResult<TEntity>> QueryWithCount(
         QueryDefinition query,
@@ -220,8 +223,16 @@ public static class Data<TEntity, TKey>
     public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, int? batchSize = null, CancellationToken ct = default)
         => QueryStreamCore(JsonFilterParser.Parse<TEntity>(filterJson), sortSpecs: null, batchSize, ct);
 
+    [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+    public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, CancellationToken ct)
+        => QueryStreamCore(JsonFilterParser.Parse<TEntity>(filterJson), sortSpecs: null, batchSize: null, ct);
+
     public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, string sort, int? batchSize = null, CancellationToken ct = default)
         => QueryStreamCore(JsonFilterParser.Parse<TEntity>(filterJson), SortSpecParser.ParseStrict<TEntity>(sort), batchSize, ct);
+
+    [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+    public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, string sort, CancellationToken ct)
+        => QueryStreamCore(JsonFilterParser.Parse<TEntity>(filterJson), SortSpecParser.ParseStrict<TEntity>(sort), batchSize: null, ct);
 
     // ------------------------------------------------------------------
     // Raw provider query escape hatch
@@ -343,36 +354,109 @@ public static class Data<TEntity, TKey>
     public static IBatchSet<TEntity, TKey> Batch() => Repo.CreateBatch();
 
     // ------------------------------------------------------------------
-    // Streaming (IAsyncEnumerable). Sort materializes before first yield.
+    // Streaming (IAsyncEnumerable). Supported adapters enforce one bounded candidate page before
+    // materialization; unsupported execution rejects rather than falling back to a complete result.
     // ------------------------------------------------------------------
     public static IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, CancellationToken ct = default)
         => AllStreamCore(sortSpecs: null, batchSize, ct);
 
+    [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+    public static IAsyncEnumerable<TEntity> AllStream(CancellationToken ct)
+        => AllStreamCore(sortSpecs: null, batchSize: null, ct);
+
     public static IAsyncEnumerable<TEntity> AllStream(string sort, int? batchSize = null, CancellationToken ct = default)
         => AllStreamCore(SortSpecParser.ParseStrict<TEntity>(sort), batchSize, ct);
+
+    [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+    public static IAsyncEnumerable<TEntity> AllStream(string sort, CancellationToken ct)
+        => AllStreamCore(SortSpecParser.ParseStrict<TEntity>(sort), batchSize: null, ct);
 
     public static IAsyncEnumerable<TEntity> AllStream(Action<ISortBuilder<TEntity>> sort, int? batchSize = null, CancellationToken ct = default)
         => AllStreamCore(SortBuilder<TEntity>.Build(sort), batchSize, ct);
 
-    private static async IAsyncEnumerable<TEntity> AllStreamCore(IReadOnlyList<SortSpec>? sortSpecs, int? batchSize, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+    public static IAsyncEnumerable<TEntity> AllStream(Action<ISortBuilder<TEntity>> sort, CancellationToken ct)
+        => AllStreamCore(SortBuilder<TEntity>.Build(sort), batchSize: null, ct);
+
+    private static IAsyncEnumerable<TEntity> AllStreamCore(IReadOnlyList<SortSpec>? sortSpecs, int? batchSize, CancellationToken ct)
     {
         var query = sortSpecs is { Count: > 0 } ? QueryDefinition.All.WithSort(sortSpecs) : QueryDefinition.All;
-        var result = await QueryWithCount(query, ct);
-        foreach (var item in result.Items) yield return item;
+        return StreamCore(query, batchSize, ct);
     }
 
     public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, int? batchSize = null, CancellationToken ct = default)
         => QueryStreamCore(Lower(predicate), sortSpecs: null, batchSize, ct);
 
+    [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+    public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, CancellationToken ct)
+        => QueryStreamCore(Lower(predicate), sortSpecs: null, batchSize: null, ct);
+
     public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, string sort, int? batchSize = null, CancellationToken ct = default)
         => QueryStreamCore(Lower(predicate), SortSpecParser.ParseStrict<TEntity>(sort), batchSize, ct);
 
-    private static async IAsyncEnumerable<TEntity> QueryStreamCore(Filter filter, IReadOnlyList<SortSpec>? sortSpecs, int? batchSize, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+    public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, string sort, CancellationToken ct)
+        => QueryStreamCore(Lower(predicate), SortSpecParser.ParseStrict<TEntity>(sort), batchSize: null, ct);
+
+    private static IAsyncEnumerable<TEntity> QueryStreamCore(Filter filter, IReadOnlyList<SortSpec>? sortSpecs, int? batchSize, CancellationToken ct)
     {
         var query = QueryDefinition.All.Where(filter);
         if (sortSpecs is { Count: > 0 }) query = query.WithSort(sortSpecs);
-        var result = await QueryWithCount(query, ct);
-        foreach (var item in result.Items) yield return item;
+        return StreamCore(query, batchSize, ct);
+    }
+
+    private static async IAsyncEnumerable<TEntity> StreamCore(
+        QueryDefinition query,
+        int? batchSize,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        var dataService = Service; // Preserve the standard missing/disposed-host failure contract.
+        var services = AppHost.Current!;
+        var capturedDataContext = EntityContext.Current;
+        var carrierRegistry = services.GetService(typeof(KoanContextCarrierRegistry)) as KoanContextCarrierRegistry;
+        var capturedCarriers = carrierRegistry?.Capture();
+
+        IDataRepository<TEntity, TKey> repo;
+        string provider;
+        using (EnterCapturedContext(capturedDataContext, carrierRegistry, capturedCarriers))
+        {
+            repo = dataService.GetRepository<TEntity, TKey>();
+            var sourceRegistry = (DataSourceRegistry?)services.GetService(typeof(DataSourceRegistry))
+                ?? throw new InvalidOperationException("Data source registry is unavailable. Ensure AddKoanDataCore() ran during startup.");
+            (provider, _) = AdapterResolver.ResolveForEntity<TEntity>(services, sourceRegistry);
+        }
+        var facts = services.GetService(typeof(IKoanRuntimeFactRecorder)) as IKoanRuntimeFactRecorder;
+
+        await foreach (var item in QueryStreamCoordinator.Execute<TEntity, TKey>(
+                           repo,
+                           query,
+                           provider,
+                           batchSize,
+                           facts,
+                           () => EnterCapturedContext(capturedDataContext, carrierRegistry, capturedCarriers),
+                           ct).ConfigureAwait(false))
+            yield return item;
+    }
+
+    private static IDisposable EnterCapturedContext(
+        EntityContext.ContextState? dataContext,
+        KoanContextCarrierRegistry? carrierRegistry,
+        IReadOnlyDictionary<string, string>? carriers)
+    {
+        var carrierScope = carrierRegistry?.Restore(carriers, ContextIngressTrust.HostTrusted)
+                           ?? NoOpDisposable.Instance;
+        try
+        {
+            var dataScope = dataContext is null
+                ? KoanContext.Suppress<EntityContext.ContextState>()
+                : KoanContext.Push(dataContext);
+            return new CapturedContextScope(dataScope, carrierScope);
+        }
+        catch
+        {
+            carrierScope.Dispose();
+            throw;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -400,8 +484,13 @@ public static class Data<TEntity, TKey>
     {
         if (page <= 0) throw new System.ArgumentOutOfRangeException(nameof(page));
         if (size <= 0) throw new System.ArgumentOutOfRangeException(nameof(size));
-        var result = await QueryWithCount(query.WithPagination(page, size), ct);
-        return result.Items;
+        var requested = query.WithPagination(page, size).WithCountStrategy(null);
+        var repo = Repo;
+        var q = RequireQuery(repo);
+        var filterSupport = ResolveFilterSupport(repo);
+        var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(requested, filterSupport, typeof(TEntity));
+        var adapterResult = await q.Query(adapterQuery, ct);
+        return FilterPushdownCoordinator.Finalize(requested, residual, adapterResult).Page;
     }
 
     // ------------------------------------------------------------------
@@ -569,5 +658,17 @@ public static class Data<TEntity, TKey>
         public static readonly NoOpDisposable Instance = new();
         private NoOpDisposable() { }
         public void Dispose() { }
+    }
+
+    private sealed class CapturedContextScope(IDisposable dataScope, IDisposable carrierScope) : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            try { dataScope.Dispose(); }
+            finally { carrierScope.Dispose(); }
+        }
     }
 }

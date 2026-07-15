@@ -29,90 +29,30 @@ public static class SwaggerExtensions
                 Title = title ?? "Koan Backup & Restore API",
                 Version = version ?? "v1",
                 Description = @"
-## Comprehensive Backup & Restore API for Koan Framework
+## Experimental Koan Backup & Restore HTTP API
 
-This API provides enterprise-grade backup and restore capabilities for Koan Framework applications,
-offering both simple one-line operations and sophisticated enterprise-grade functionality.
+This surface exposes the current `Koan.Data.Backup` operations through ASP.NET Core controllers.
 
-### Key Features
-
-- **Async Operations**: All backup/restore operations run asynchronously with real-time progress tracking
-- **Real-time Progress**: WebSocket-based progress updates via SignalR
-- **Entity Discovery**: Automatic discovery and backup of all Entity<> types
-- **Streaming Architecture**: Memory-efficient processing of large datasets
-- **Smart Compression**: ZIP compression with configurable levels
-- **Verification**: Built-in backup integrity verification
-- **Adapter Optimization**: Database-specific optimizations for faster restores
-- **Multi-Provider**: Works across SQL, NoSQL, Vector, and JSON storage
-
-### Usage Patterns
-
-#### Simple Entity Backup
-```http
-POST /api/entities/User/backup
-{
-  ""name"": ""daily-users-backup"",
-  ""description"": ""Daily backup of user data""
-}
-```
-
-#### Global System Backup
-```http
-POST /api/backup/all
-{
-  ""name"": ""full-system-backup"",
-  ""description"": ""Complete system backup"",
-  ""tags"": [""production"", ""daily""]
-}
-```
-
-#### Selective Backup
-```http
-POST /api/backup/selective
-{
-  ""name"": ""mongodb-only"",
-  ""includeProviders"": [""mongo""],
-  ""excludeEntityTypes"": [""AuditLog""]
-}
-```
-
-#### Real-time Progress Tracking
-Connect to the SignalR hub at `/api/backup/progress` to receive live updates:
-```javascript
-const connection = new signalR.HubConnectionBuilder()
-    .withUrl(""/api/backup/progress"")
-    .build();
-
-await connection.start();
-await connection.invoke(""JoinOperationGroup"", operationId);
-```
-
-### Response Format
-
-All operations return standardized responses with operation tracking:
-```json
-{
-  ""operationId"": ""abc123"",
-  ""backupName"": ""my-backup"",
-  ""status"": ""Running"",
-  ""statusUrl"": ""/api/backup/operations/abc123"",
-  ""progress"": {
-    ""percentComplete"": 45.2,
-    ""currentStage"": ""Backing up entities"",
-    ""itemsPerSecond"": 1250
-  }
-}
-```
+- Start operations asynchronously and observe their process-local state by polling
+  `/api/backup/operations/{operationId}` or `/api/restore/operations/{operationId}`.
+- No SignalR hub, WebSocket transport, or server-push progress channel is registered.
+- Cancel endpoints mark tracking state only; they do not abort backup or restore I/O already running.
+- Provider-bounded Entity export is qualified on SQLite, PostgreSQL, SQL Server, CockroachDB,
+  MongoDB, and Couchbase. InMemory, JSON, and Redis reject before export.
+- The complete compressed ZIP remains in memory until upload, so archive size affects peak memory.
+- Restore and the wider adapter/storage matrix remain uncertified. This API is not a production
+  recovery guarantee.
+- `Koan.Web.Backup` currently has no dedicated automated controller or integration test suite.
 ",
                 Contact = new OpenApiContact
                 {
                     Name = "Koan Framework",
-                    Url = new Uri("https://github.com/your-org/koan-framework")
+                    Url = new Uri("https://github.com/sylin-org/koan-framework")
                 },
                 License = new OpenApiLicense
                 {
-                    Name = "MIT License",
-                    Url = new Uri("https://opensource.org/licenses/MIT")
+                    Name = "Apache License 2.0",
+                    Url = new Uri("https://www.apache.org/licenses/LICENSE-2.0.html")
                 }
             });
 

@@ -101,7 +101,8 @@ internal sealed class CouchbaseN1qlFilterTranslator
     private string VisitField(FieldFilter f)
     {
         var resolved = FieldPathResolver.Resolve(_entityType, f.Field);
-        var field = ResolveFieldExpression(f.Field, resolved);
+        // Bind caller casing once at the shared resolver; N1QL sees the canonical CLR member path.
+        var field = ResolveFieldExpression(resolved.CanonicalPath ?? f.Field, resolved);
 
         if (f.Operator == FilterOperator.Exists)
         {
@@ -292,8 +293,8 @@ internal sealed class CouchbaseN1qlFilterTranslator
     }
 
     private bool IsIdMember(string memberName)
-        => string.Equals(memberName, _optimization.IdPropertyName, StringComparison.OrdinalIgnoreCase) ||
-           string.Equals(memberName, "Id", StringComparison.OrdinalIgnoreCase);
+        => string.Equals(memberName, _optimization.IdPropertyName, StringComparison.Ordinal) ||
+           string.Equals(memberName, "Id", StringComparison.Ordinal);
 
     private static string NormalizeProperty(string property)
         => property.Length == 0 ? property : property[..1].ToLowerInvariant() + property[1..];

@@ -43,7 +43,7 @@ internal class PostgresRepository<
     where TKey : notnull
 {
     public void Describe(ICapabilities caps) => caps
-        .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
+        .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String).Add(DataCaps.Query.ProviderBoundedPaging)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
         // The AODB three-mode ledger (ARCH-0103 §6). Shared (DATA-0105 §3b): persists a framework-managed discriminator
@@ -424,19 +424,22 @@ internal class PostgresRepository<
         if (query.HasPagination && sortFullyHandled)
         {
             var size = query.EffectivePageSize();
-            var offset = (query.EffectivePage() - 1) * size;
+            var offset = query.EffectiveOffset();
             sb.Append(" LIMIT ").Append(size).Append(" OFFSET ").Append(offset);
             paginationHandled = true;
         }
 
         await using var conn = Open();
         var dyn = ToDapper(parameters);
-        var rows = await conn.QueryAsync<(string Id, string Json)>(sb.ToString(), dyn);
+        var command = new CommandDefinition(sb.ToString(), dyn, cancellationToken: ct);
+        var rows = await conn.QueryAsync<(string Id, string Json)>(command);
         var items = rows.Select(FromRow).ToList();
 
-        long? totalCount = paginationHandled
-            ? await CountCore(whereSql, parameters, ct)
-            : items.Count;
+        long? totalCount = query.CountStrategy is null
+            ? null
+            : paginationHandled
+                ? await CountCore(whereSql, parameters, ct)
+                : items.Count;
 
         return new RepositoryQueryResult<TEntity>
         {
@@ -490,7 +493,8 @@ internal class PostgresRepository<
             ? $"SELECT COUNT(1) FROM {QualifiedTable}"
             : $"SELECT COUNT(1) FROM {QualifiedTable} WHERE {whereSql}";
         var dyn = ToDapper(parameters);
-        return await conn.ExecuteScalarAsync<long>(sql, dyn);
+        var command = new CommandDefinition(sql, dyn, cancellationToken: ct);
+        return await conn.ExecuteScalarAsync<long>(command);
     }
 
     /// <summary>Translates the (fully-pushable) filter to a WHERE fragment; null filter -> no WHERE.</summary>
@@ -618,7 +622,7 @@ internal class PostgresRepository<
         {
             var whereSql = RewriteWhereForProjection(query);
             var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
-            var offset = shaping.HasPagination ? (shaping.EffectivePage() - 1) * size : 0;
+            var offset = shaping.EffectiveOffset();
             var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} {StableOrderClause} LIMIT {size} OFFSET {offset}";
             var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
             return new RepositoryQueryResult<TEntity>

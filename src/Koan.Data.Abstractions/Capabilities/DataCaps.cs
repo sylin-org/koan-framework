@@ -26,6 +26,14 @@ public static class DataCaps
         /// consumers can distinguish native backend filtering from in-memory and keyspace scans.
         /// </summary>
         public static readonly Capability FilterExecution = new("query.filter.execution");
+        /// <summary>
+        /// Provider-enforced bounded paging. The provider faithfully executes the coordinator-supplied
+        /// pushable candidate filter and applies <see cref="QueryDefinition.PageSize"/> before candidates
+        /// are materialized into application memory. Each result must report provider-handled pagination
+        /// and the complete total order. This does not imply snapshot isolation, resumability, or
+        /// mutation-safe iteration.
+        /// </summary>
+        public static readonly Capability ProviderBoundedPaging = new("query.paging.providerBounded");
     }
 
     /// <summary>Write negotiation tokens.</summary>

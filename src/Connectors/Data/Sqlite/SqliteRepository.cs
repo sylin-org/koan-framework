@@ -46,6 +46,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 {
     public void Describe(ICapabilities caps) => caps
         .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
+        .Add(DataCaps.Query.ProviderBoundedPaging)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
         .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
@@ -543,11 +544,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         if (whereSql is not null) sb.Append(" WHERE ").Append(whereSql);
         sb.Append(' ').Append(orderBy);
 
+        // LIMIT/OFFSET is only a correct candidate bound when SQLite owns the complete requested
+        // ordering. Otherwise the coordinator must materialize, finish the sort, and page afterwards.
+        var sortFullyHandled = query.Sort is null || query.Sort.Count == 0 || sortHandled.Count == query.Sort.Count;
         var paginationHandled = false;
-        if (query.HasPagination)
+        if (query.HasPagination && sortFullyHandled)
         {
             var size = query.EffectivePageSize();
-            var offset = (query.EffectivePage() - 1) * size;
+            var offset = query.EffectiveOffset();
             sb.Append(" LIMIT ").Append(size).Append(" OFFSET ").Append(offset);
             paginationHandled = true;
         }
@@ -555,10 +559,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var items = await ExecuteRows(sb.ToString(), SqlParameters.Positional(parameters), ct);
 
         long? totalCount = null;
-        if (paginationHandled)
-            totalCount = await CountCore(whereSql, parameters, ct);
-        else
-            totalCount = items.Count;
+        if (query.CountStrategy is not null)
+            totalCount = paginationHandled
+                ? await CountCore(whereSql, parameters, ct)
+                : items.Count;
 
         return new RepositoryQueryResult<TEntity>
         {
@@ -664,8 +668,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             return ("ORDER BY Id", RepositoryQueryResult<TEntity>.NoSortHandled);
 
         var parts = new List<string>(sort.Count);
+        var handled = new HashSet<SortSpec>();
         foreach (var spec in sort)
         {
+            // The SQLite JSON expression below addresses one top-level scalar. Nested and collection
+            // paths require the coordinator's full-set sorter and therefore cannot be claimed here.
+            if (spec.Path.TraversesCollection || spec.Path.Members.Count != 1) continue;
+
             var leaf = spec.Path.Members[spec.Path.Members.Count - 1].Name;
             // Resolve the leaf so ResolveColumnSql applies the comparable-encoding cast (TimeSpan ->
             // INTEGER) to the ORDER BY column too, not only to filter predicates (DATA-0100). Fall back
@@ -677,9 +686,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             catch (InvalidFilterFieldException) { /* leave null — bare expression is correct for sort */ }
             var col = ResolveColumnSql(FieldPath.Of(leaf), rf!);
             parts.Add($"{col} {(spec.Desc ? "DESC" : "ASC")}");
+            handled.Add(spec);
         }
+
+        if (parts.Count == 0)
+            return ("ORDER BY Id", RepositoryQueryResult<TEntity>.NoSortHandled);
+
         var orderBy = "ORDER BY " + string.Join(", ", parts);
-        return (orderBy, sort.ToFrozenSet());
+        return (orderBy, handled.ToFrozenSet());
     }
 
     // ==================== Conditional compare-and-set (IConditionalWriteRepository) ====================
@@ -721,7 +735,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         {
             var whereSql = RewriteWhereForProjection(query);
             var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
-            var offset = shaping.HasPagination ? (shaping.EffectivePage() - 1) * size : 0;
+            var offset = shaping.EffectiveOffset();
             var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} LIMIT {size} OFFSET {offset}";
             var items = await QueryRowsWithRetry(conn, sql, parameters);
             return new RepositoryQueryResult<TEntity>

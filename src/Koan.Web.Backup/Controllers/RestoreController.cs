@@ -160,10 +160,13 @@ public class RestoreController : ControllerBase
     }
 
     /// <summary>
-    /// Cancel a running restore operation
+    /// Mark a running restore operation as cancelled in the process-local tracker.
     /// </summary>
+    /// <remarks>
+    /// This endpoint changes tracking state only. It does not abort restore I/O already running.
+    /// </remarks>
     /// <param name="operationId">Operation ID</param>
-    /// <returns>Confirmation of cancellation</returns>
+    /// <returns>The updated process-local tracking record.</returns>
     [HttpPost("operations/{operationId}/cancel")]
     [ProducesResponseType(typeof(RestoreOperationResponse), 200)]
     [ProducesResponseType(404)]

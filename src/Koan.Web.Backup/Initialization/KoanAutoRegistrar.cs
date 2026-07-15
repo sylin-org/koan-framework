@@ -87,7 +87,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.AddSetting(
             WebBackupItems.ApiVersioning,
             PublicationMode.Auto,
-            true,
+            false,
             usedDefault: true);
         module.AddSetting(
             WebBackupItems.BackgroundCleanup,

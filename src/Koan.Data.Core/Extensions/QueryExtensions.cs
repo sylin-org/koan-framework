@@ -17,8 +17,7 @@ public static class QueryExtensions
         if (!hasPagination) return (0, int.MaxValue);
 
         var pageSize = query!.PageSize ?? defaultPageSize;
-        var page = query.Page ?? 1;
-        return ((page - 1) * pageSize, pageSize);
+        return (query.EffectiveOffset(), pageSize);
     }
 
     /// <summary>Applies paging to any provider query type via a provider-specific skip/take delegate.</summary>
@@ -40,7 +39,7 @@ public static class QueryExtensions
     public static int CalculateSkip(this QueryDefinition? query)
     {
         if (query?.Page is null or <= 0 || query.PageSize is null or <= 0) return 0;
-        return (query.Page.Value - 1) * query.PageSize.Value;
+        return query.EffectiveOffset();
     }
 
     public static int CalculateTake(this QueryDefinition? query, int defaultPageSize = 20)

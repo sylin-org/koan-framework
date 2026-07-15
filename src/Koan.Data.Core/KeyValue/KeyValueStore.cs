@@ -147,9 +147,10 @@ public abstract class KeyValueStore<TEntity, TKey> :
             ? records.Select(r => r.Entity)
             : records.Where(KvFilterEvaluator.Compile<TEntity>(query.Filter)).Select(r => r.Entity);
 
-        // Materialize once for a stable count + ordering.
+        // Materialize once for stable filtering and ordering. Expose a total only when the caller
+        // requested one; ordinary pages and streams must not acquire count semantics implicitly.
         var filtered = items as IReadOnlyList<TEntity> ?? items.ToList();
-        var totalCount = (long)filtered.Count;
+        long? totalCount = query.CountStrategy is null ? null : filtered.Count;
 
         var sortHandled = RepositoryQueryResult<TEntity>.NoSortHandled;
         IEnumerable<TEntity> ordered;
@@ -168,7 +169,7 @@ public abstract class KeyValueStore<TEntity, TKey> :
         var paginationHandled = false;
         if (query.HasPagination)
         {
-            var skip = (query.EffectivePage() - 1) * query.EffectivePageSize();
+            var skip = query.EffectiveOffset();
             ordered = ordered.Skip(skip).Take(query.EffectivePageSize());
             paginationHandled = true;
         }

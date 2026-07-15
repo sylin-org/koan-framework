@@ -41,7 +41,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     where TKey : notnull
 {
     public void Describe(ICapabilities caps) => caps
-        .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
+        .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String).Add(DataCaps.Query.ProviderBoundedPaging)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
         .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
@@ -363,19 +363,22 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         if (query.HasPagination && sortFullyHandled)
         {
             var size = query.EffectivePageSize();
-            var offset = (query.EffectivePage() - 1) * size;
+            var offset = query.EffectiveOffset();
             sb.Append(" OFFSET ").Append(offset).Append(" ROWS FETCH NEXT ").Append(size).Append(" ROWS ONLY");
             paginationHandled = true;
         }
 
         await using var conn = Open();
         var dyn = ToDapper(parameters);
-        var rows = await conn.QueryAsync<(string Id, string Json)>(sb.ToString(), dyn);
+        var command = new CommandDefinition(sb.ToString(), dyn, cancellationToken: ct);
+        var rows = await conn.QueryAsync<(string Id, string Json)>(command);
         var items = rows.Select(FromRow).ToList();
 
-        long? totalCount = paginationHandled
-            ? await CountCore(whereSql, parameters, ct)
-            : items.Count;
+        long? totalCount = query.CountStrategy is null
+            ? null
+            : paginationHandled
+                ? await CountCore(whereSql, parameters, ct)
+                : items.Count;
 
         return new RepositoryQueryResult<TEntity>
         {
@@ -431,7 +434,8 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             ? $"SELECT COUNT(1) FROM [dbo].[{TableName}]"
             : $"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE {whereSql}";
         var dyn = ToDapper(parameters);
-        return await conn.ExecuteScalarAsync<long>(sql, dyn);
+        var command = new CommandDefinition(sql, dyn, cancellationToken: ct);
+        return await conn.ExecuteScalarAsync<long>(command);
     }
 
     /// <summary>Translates the (fully-pushable) filter to a WHERE fragment; null filter -> no WHERE.</summary>
@@ -451,7 +455,8 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private string ResolveColumnSql(FieldPath field, ResolvedField resolved)
     {
         var prop = field.Leaf;
-        if (string.Equals(prop, "Id", StringComparison.Ordinal)) return "[Id]";
+        if (string.Equals(prop, "Id", StringComparison.Ordinal))
+            return ApplyPortableScalarCast("[Id]", resolved?.ComparableType);
         if (string.Equals(prop, "Json", StringComparison.Ordinal)) return "[Json]";
         var camel = CamelCase.GetPropertyName(prop, hasSpecifiedName: false);
 
@@ -465,11 +470,32 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         // same lesson. (The optimiser can still match a computed-column index defined on the same
         // JSON_VALUE expression, so the optimisation is preserved when the column does exist.)
         var expr = $"JSON_VALUE([Json], '$.{camel}')";
-        // Comparable-encoding contract (DATA-0100): TimeSpan persists as Int64 ticks -> cast so it
-        // compares by duration. DateTimeOffset / DateOnly / TimeOnly persist as monotonic fixed-width
-        // UTC/ISO TEXT and compare correctly as nvarchar (no cast).
-        var leaf = Nullable.GetUnderlyingType(resolved?.ComparableType ?? typeof(object)) ?? resolved?.ComparableType;
-        return leaf == typeof(TimeSpan) ? $"CAST({expr} AS BIGINT)" : expr;
+        return ApplyPortableScalarCast(expr, resolved?.ComparableType);
+    }
+
+    /// <summary>
+    /// Applies the exact SQL Server representation used by DATA-0107's portable streaming floor.
+    /// JSON_VALUE returns nvarchar, so integral values must be converted before ORDER BY can truthfully
+    /// report the numeric sort as handled. Types outside the portable floor remain text here and are
+    /// rejected by the stream coordinator before provider I/O.
+    /// </summary>
+    private static string ApplyPortableScalarCast(string expr, Type? comparableType)
+    {
+        if (comparableType is null) return expr;
+
+        var type = Nullable.GetUnderlyingType(comparableType) ?? comparableType;
+        if (type.IsEnum) type = Enum.GetUnderlyingType(type);
+
+        if (type == typeof(ulong))
+            return $"TRY_CONVERT(DECIMAL(20, 0), {expr})";
+
+        if (type == typeof(byte) || type == typeof(sbyte) ||
+            type == typeof(short) || type == typeof(ushort) ||
+            type == typeof(int) || type == typeof(uint) ||
+            type == typeof(long) || type == typeof(TimeSpan))
+            return $"TRY_CONVERT(BIGINT, {expr})";
+
+        return expr;
     }
 
     /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable Id order.</summary>
@@ -549,7 +575,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         {
             var whereSql = RewriteWhereForProjection(query);
             var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
-            var offset = shaping.HasPagination ? (shaping.EffectivePage() - 1) * size : 0;
+            var offset = shaping.EffectiveOffset();
             var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE {whereSql} {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {size} ROWS ONLY";
             var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
             return new RepositoryQueryResult<TEntity>

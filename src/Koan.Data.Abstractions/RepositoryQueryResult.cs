@@ -5,9 +5,10 @@ namespace Koan.Data.Abstractions;
 
 /// <summary>
 /// A repository query result enriched with per-axis metadata describing what the adapter
-/// actually pushed down. The coordinator inspects these flags to decide which residual work
-/// to do in memory: evaluate the unpushed filter, sort the unhandled specs, paginate, or
-/// project — always after the residual filter so paging is correct.
+/// actually pushed down. Materialized-result coordination uses these flags to evaluate an unpushed
+/// filter, finish sort, paginate, or project in the correctness-safe order. Provider-bounded stream
+/// coordination instead requires provider-handled candidate pagination and total ordering, then
+/// evaluates any residual pointwise before requesting the next candidate page.
 /// </summary>
 public sealed class RepositoryQueryResult<TEntity>
 {
@@ -16,7 +17,10 @@ public sealed class RepositoryQueryResult<TEntity>
     /// <summary>Items returned by the adapter, in the order it intends (sorted iff it pushed sort down).</summary>
     public required IReadOnlyList<TEntity> Items { get; init; }
 
-    /// <summary>Total cardinality of the unpaginated result; null when the adapter could not compute it cheaply.</summary>
+    /// <summary>
+    /// Total cardinality of the unpaginated result when the query requested a count and the adapter
+    /// supplied one; null when no count was requested or no total is available.
+    /// </summary>
     public long? TotalCount { get; init; }
 
     /// <summary>True when <see cref="TotalCount"/> is approximate (e.g. from table stats).</summary>

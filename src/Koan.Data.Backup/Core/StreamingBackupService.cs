@@ -70,12 +70,17 @@ public class StreamingBackupService : IBackupService
                 backupName,
                 manifest.CreatedAt,
                 ct);
+            await using var archiveLifetime = archiveStream;
 
             manifest.StorageProfile = options.StorageProfile;
             manifest.ArchiveStorageKey = descriptor.StorageKey;
             manifest.ArchiveFileName = descriptor.FileName;
 
-            using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create);
+            using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, leaveOpen: true);
+            var effectivePartition = options.Partition ?? EntityContext.Current?.Partition;
+            using var partitionScope = effectivePartition is null
+                ? null
+                : EntityContext.With(partition: effectivePartition);
 
             // Get entity stream using Data<> AllStream
             var entityStream = GetEntityStream<TEntity, TKey>(options.BatchSize);
@@ -87,7 +92,7 @@ public class StreamingBackupService : IBackupService
                 typeof(TKey).Name,
                 GetEntityProvider<TEntity, TKey>(),
                 entityStream,
-                options.Partition ?? "root",
+                PartitionLabel(effectivePartition),
                 ct);
 
             entityInfo.BackupDuration = stopwatch.Elapsed;
@@ -113,7 +118,7 @@ public class StreamingBackupService : IBackupService
             await _storageService.StoreVerification(archive, manifest, ct);
 
             // Upload to storage
-            archive.Dispose(); // Close the archive
+            archive.Dispose(); // Finalize the ZIP directory while leaving the upload stream open.
             var storageObject = await _storageService.UploadBackupArchive(
                 archiveStream,
                 descriptor,
@@ -219,12 +224,13 @@ public class StreamingBackupService : IBackupService
                 backupName,
                 manifest.CreatedAt,
                 ct);
+            await using var archiveLifetime = archiveStream;
 
             manifest.StorageProfile = options.StorageProfile;
             manifest.ArchiveStorageKey = descriptor.StorageKey;
             manifest.ArchiveFileName = descriptor.FileName;
 
-            using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create);
+            using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, leaveOpen: true);
 
             // Backup entities sequentially to avoid ZIP archive concurrency issues
             var results = new List<EntityBackupInfo?>();
@@ -276,7 +282,7 @@ public class StreamingBackupService : IBackupService
             await _storageService.StoreVerification(archive, manifest, ct);
 
             // Upload to storage
-            archive.Dispose(); // Close the archive
+            archive.Dispose(); // Finalize the ZIP directory while leaving the upload stream open.
             var storageObject = await _storageService.UploadBackupArchive(
                 archiveStream,
                 descriptor,
@@ -366,6 +372,10 @@ public class StreamingBackupService : IBackupService
         try
         {
             var stopwatch = Stopwatch.StartNew();
+            var effectivePartition = options.Partition ?? EntityContext.Current?.Partition;
+            using var partitionScope = effectivePartition is null
+                ? null
+                : EntityContext.With(partition: effectivePartition);
 
             // Get entity stream using reflection
             var entityStream = AggregateConfigsExtensions.GetAllStreamByReflection(
@@ -378,7 +388,7 @@ public class StreamingBackupService : IBackupService
                 entityInfo.KeyType.Name,
                 entityInfo.Provider,
                 entityStream,
-                "root", // TODO: support different sets
+                PartitionLabel(effectivePartition),
                 ct);
 
             backupInfo.BackupDuration = stopwatch.Elapsed;
@@ -437,6 +447,9 @@ public class StreamingBackupService : IBackupService
     {
         return AggregateConfigs.Get<TEntity, TKey>(_serviceProvider).Provider;
     }
+
+    private static string PartitionLabel(string? partition)
+        => string.IsNullOrWhiteSpace(partition) ? "root" : partition;
 
     private static bool ShouldIncludeEntity(EntityTypeInfo entity, GlobalBackupOptions options)
     {

@@ -9,6 +9,7 @@ public static class Constants
             public const string AdapterSelected = "koan.data.adapter.selected";
             public const string AdapterRejected = "koan.data.adapter.rejected";
             public const string RelationshipExecution = "koan.data.relationship.execution";
+            public const string StreamExecution = "koan.data.stream.execution";
         }
 
         public static class Reasons
@@ -29,6 +30,13 @@ public static class Constants
             public const string UnboundedScan = "unbounded-scan";
             public const string FallbackLimit = "fallback-candidate-limit";
             public const string ResultLimit = "relationship-result-limit";
+            public const string ProviderBoundedPaging = "provider-bounded-paging";
+            public const string MissingProviderBoundedPaging = "missing-provider-bounded-paging";
+            public const string InvalidStreamBatchSize = "invalid-stream-batch-size";
+            public const string UnsupportedStreamSort = "unsupported-stream-sort";
+            public const string PaginationNotHandled = "provider-pagination-not-handled";
+            public const string StreamSortNotHandled = "provider-stream-sort-not-handled";
+            public const string StreamPageLimitExceeded = "provider-stream-page-limit-exceeded";
         }
     }
 

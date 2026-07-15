@@ -51,7 +51,7 @@ public enum BackupScope
 /// // Opt-in all entities in this assembly
 /// [assembly: EntityBackupScope(Mode = BackupScope.All)]
 ///
-/// // Opt-in all with encryption by default
+/// // Opt-in all and record encryption intent by default (metadata only)
 /// [assembly: EntityBackupScope(Mode = BackupScope.All, EncryptByDefault = true)]
 ///
 /// // Require explicit decoration (strict mode)
@@ -62,7 +62,7 @@ public enum BackupScope
 /// </para>
 /// <list type="number">
 /// <item><description>Assembly scope sets the default inclusion/exclusion behavior</description></item>
-/// <item><description>Assembly-level <see cref="EncryptByDefault"/> applies to included entities</description></item>
+/// <item><description>Assembly-level <see cref="EncryptByDefault"/> supplies encryption intent metadata for included entities</description></item>
 /// <item><description>Entity-level <see cref="EntityBackupAttribute"/> overrides assembly defaults</description></item>
 /// </list>
 /// </remarks>
@@ -83,15 +83,20 @@ public sealed class EntityBackupScopeAttribute : Attribute
     public BackupScope Mode { get; set; } = BackupScope.None;
 
     /// <summary>
-    /// Gets or sets whether entities in this assembly should be encrypted by default.
+    /// Gets or sets default encryption intent metadata for entities in this assembly.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Default is <c>false</c>. When <c>true</c>, all entities included via this scope
-    /// will have <c>Encrypt = true</c> unless overridden by entity-level <see cref="EntityBackupAttribute"/>.
+    /// have resolved <c>Encrypt = true</c> policy metadata unless overridden by an entity-level
+    /// <see cref="EntityBackupAttribute"/>.
     /// </para>
     /// <para>
-    /// Use this for assemblies containing primarily sensitive data (e.g., user management, payment processing).
+    /// <b>Safety:</b> The current archive writer does not encrypt entity payloads, manifests, or
+    /// verification entries. Setting this value to <c>true</c> does not provide data-at-rest
+    /// protection and does not configure an encryption provider or key management. Protect backup
+    /// storage through independently verified application or storage controls until payload
+    /// encryption is implemented.
     /// </para>
     /// </remarks>
     public bool EncryptByDefault { get; set; } = false;

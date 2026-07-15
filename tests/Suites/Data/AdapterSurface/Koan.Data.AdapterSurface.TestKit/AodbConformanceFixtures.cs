@@ -18,6 +18,12 @@ namespace Koan.Data.AdapterSurface.TestKit;
 public sealed class ConformancePartitionDoc : Entity<ConformancePartitionDoc>
 {
     public string Title { get; set; } = "";
+    public bool Flag { get; set; }
+    public byte ByteValue { get; set; }
+    public sbyte SignedByteValue { get; set; }
+    public short ShortValue { get; set; }
+    public ushort UnsignedShortValue { get; set; }
+    public int Sequence { get; set; }
 }
 
 /// <summary>The Database-mode conformance entity: a <see cref="ConformanceShardedAttribute"/> routes each op to the

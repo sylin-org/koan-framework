@@ -114,6 +114,7 @@ internal sealed class CouchbaseDocumentStore<TEntity, TKey> :
 
     protected override void DescribeBackend(ICapabilities caps) => caps
         .Add(DataCaps.Query.String)
+        .Add(DataCaps.Query.ProviderBoundedPaging)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
         .Add(DataCaps.Write.AtomicBatch)
         .Add(DataCaps.Write.ConditionalReplace)   // native CAS (DATA-0102)
@@ -259,14 +260,15 @@ internal sealed class CouchbaseDocumentStore<TEntity, TKey> :
         if (where is not null) sb.Append(" WHERE ").Append(where);
         if (orderBy is not null) sb.Append(" ORDER BY ").Append(orderBy);
 
-        // Only push pagination when the sort was fully pushed down — a deep/collection sort is finished by the
-        // coordinator's in-memory sorter, which needs the full matching set (filter residual already strips pagination).
+        // Only push pagination when the sort was fully pushed down. Materialized-result planning strips
+        // pagination when residual work needs the full matching set; provider-bounded stream planning may
+        // add candidate pagination back after the split and therefore also requires the complete sort here.
         var sortFullyHandled = query.Sort is null || query.Sort.Count == 0 || sortHandled.Count == query.Sort.Count;
         var paginationHandled = false;
         if (query.HasPagination && sortFullyHandled)
         {
             var size = query.EffectivePageSize();
-            var offset = (query.EffectivePage() - 1) * size;
+            var offset = query.EffectiveOffset();
             sb.Append(" LIMIT ").Append(size.ToString(CultureInfo.InvariantCulture)).Append(" OFFSET ").Append(offset.ToString(CultureInfo.InvariantCulture));
             paginationHandled = true;
         }
@@ -560,7 +562,7 @@ internal sealed class CouchbaseDocumentStore<TEntity, TKey> :
             if (shaping.HasPagination)
             {
                 var size = shaping.EffectivePageSize();
-                var offset = (shaping.EffectivePage() - 1) * size;
+                var offset = shaping.EffectiveOffset();
                 sb.Append(" LIMIT ").Append(size.ToString(CultureInfo.InvariantCulture)).Append(" OFFSET ").Append(offset.ToString(CultureInfo.InvariantCulture));
                 paginationHandled = true;
             }
@@ -623,8 +625,8 @@ internal sealed class CouchbaseDocumentStore<TEntity, TKey> :
     }
 
     private bool IsIdMember(string memberName)
-        => string.Equals(memberName, _optimizationInfo.IdPropertyName, StringComparison.OrdinalIgnoreCase) ||
-           string.Equals(memberName, "Id", StringComparison.OrdinalIgnoreCase);
+        => string.Equals(memberName, _optimizationInfo.IdPropertyName, StringComparison.Ordinal) ||
+           string.Equals(memberName, "Id", StringComparison.Ordinal);
 
     private static string NormalizeProperty(string property)
         => property.Length == 0 ? property : property[..1].ToLowerInvariant() + property[1..];

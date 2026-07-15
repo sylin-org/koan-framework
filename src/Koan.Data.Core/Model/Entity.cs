@@ -107,23 +107,44 @@ namespace Koan.Data.Core.Model
         public static Task<IReadOnlyList<TEntity>> QueryRaw(string providerQuery, object? parameters = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.QueryRaw(providerQuery, parameters, null, ct);
 
-        // Streaming (IAsyncEnumerable). When sort is specified, streaming materializes the full result
-        // before yielding the first item — see ADR-0093.
+        // Streaming (IAsyncEnumerable). Supported adapters enforce bounded candidate pages; unsupported
+        // execution rejects rather than silently materializing the complete result.
         public static IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.AllStream(batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> AllStream(CancellationToken ct)
+            => Data<TEntity, TKey>.AllStream(ct);
         public static IAsyncEnumerable<TEntity> AllStream(string sort, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.AllStream(sort, batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> AllStream(string sort, CancellationToken ct)
+            => Data<TEntity, TKey>.AllStream(sort, ct);
         public static IAsyncEnumerable<TEntity> AllStream(Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.AllStream(sort, batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> AllStream(Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, CancellationToken ct)
+            => Data<TEntity, TKey>.AllStream(sort, ct);
 
         public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.QueryStream(predicate, batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, CancellationToken ct)
+            => Data<TEntity, TKey>.QueryStream(predicate, ct);
         public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, string sort, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.QueryStream(predicate, sort, batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, string sort, CancellationToken ct)
+            => Data<TEntity, TKey>.QueryStream(predicate, sort, ct);
         public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.QueryStream(filterJson, batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, CancellationToken ct)
+            => Data<TEntity, TKey>.QueryStream(filterJson, ct);
         public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, string sort, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.QueryStream(filterJson, sort, batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, string sort, CancellationToken ct)
+            => Data<TEntity, TKey>.QueryStream(filterJson, sort, ct);
 
         // Basic paging helpers (materialized). Sort overloads thread through the orchestrator (ADR-0093).
         public static Task<IReadOnlyList<TEntity>> FirstPage(int size, CancellationToken ct = default)

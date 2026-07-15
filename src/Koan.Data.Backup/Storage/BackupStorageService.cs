@@ -141,10 +141,10 @@ public class BackupStorageService
             );
 
         var checksumsEntry = archive.CreateEntry("verification/checksums.json", CompressionLevel.Optimal);
-        using var checksumsStream = checksumsEntry.Open();
         var checksumsJson = JsonConvert.SerializeObject(checksums, Formatting.Indented);
         var checksumsBytes = Encoding.UTF8.GetBytes(checksumsJson);
-        await checksumsStream.WriteAsync(checksumsBytes, ct);
+        using (var checksumsStream = checksumsEntry.Open())
+            await checksumsStream.WriteAsync(checksumsBytes, ct);
 
         // Create schema snapshots
         var schemas = manifest.Entities
@@ -155,10 +155,10 @@ public class BackupStorageService
             );
 
         var schemasEntry = archive.CreateEntry("verification/schema-snapshots.json", CompressionLevel.Optimal);
-        using var schemasStream = schemasEntry.Open();
         var schemasJson = JsonConvert.SerializeObject(schemas, Formatting.Indented);
         var schemasBytes = Encoding.UTF8.GetBytes(schemasJson);
-        await schemasStream.WriteAsync(schemasBytes, ct);
+        using (var schemasStream = schemasEntry.Open())
+            await schemasStream.WriteAsync(schemasBytes, ct);
 
         _logger.LogDebug("Stored verification data for {EntityCount} entities", manifest.Entities.Count);
     }

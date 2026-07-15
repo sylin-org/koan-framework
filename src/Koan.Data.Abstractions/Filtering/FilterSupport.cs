@@ -21,7 +21,11 @@ public sealed record FilterSupport(
     private static readonly IReadOnlySet<FilterOperator> EveryOp =
         new HashSet<FilterOperator>((FilterOperator[])Enum.GetValues(typeof(FilterOperator)));
 
-    /// <summary>Pushes nothing — any non-empty filter becomes a residual and therefore a hard error.</summary>
+    /// <summary>
+    /// Pushes nothing, so every non-empty filter becomes residual work. Entity materialized queries
+    /// may evaluate that residual in memory; provider-bounded Entity streams may evaluate it
+    /// pointwise over bounded candidate pages; consumers that cannot safely realize residuals reject.
+    /// </summary>
     public static FilterSupport None { get; } = new(NoOps, NoOps, NestedPaths: false, IgnoreCase: false);
 
     /// <summary>Pushes every operator (e.g. in-memory / oracle adapters that evaluate the AST directly).</summary>

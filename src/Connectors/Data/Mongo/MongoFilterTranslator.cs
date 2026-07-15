@@ -83,7 +83,9 @@ internal sealed class MongoFilterTranslator<TEntity>
     private FilterDefinition<TEntity> BuildField(FieldFilter f, ResolvedField field)
     {
         var b = Builders<TEntity>.Filter;
-        var name = MapPath(f.Field);
+        // Bind caller casing once at the shared resolver; storage translation always consumes the
+        // canonical CLR member path so every adapter applies the same field semantics.
+        var name = MapPath(field.CanonicalPath ?? f.Field);
         var op = f.Operator;
 
         if (op == FilterOperator.Exists)

@@ -186,10 +186,13 @@ public class BackupController : ControllerBase
     }
 
     /// <summary>
-    /// Cancel a running backup operation
+    /// Mark a running backup operation as cancelled in the process-local tracker.
     /// </summary>
+    /// <remarks>
+    /// This endpoint changes tracking state only. It does not abort backup I/O already running.
+    /// </remarks>
     /// <param name="operationId">Operation ID</param>
-    /// <returns>Confirmation of cancellation</returns>
+    /// <returns>The updated process-local tracking record.</returns>
     [HttpPost("operations/{operationId}/cancel")]
     [ProducesResponseType(typeof(BackupOperationResponse), 200)]
     [ProducesResponseType(404)]

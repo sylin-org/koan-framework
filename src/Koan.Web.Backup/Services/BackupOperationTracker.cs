@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace Koan.Web.Backup.Services;
 
 /// <summary>
-/// Tracks long-running backup and restore operations with progress reporting
+/// Tracks long-running backup and restore operations in process-local memory.
 /// </summary>
 public interface IBackupOperationTracker
 {
@@ -45,8 +45,9 @@ public interface IBackupOperationTracker
     Task FailOperation(string operationId, string errorMessage);
 
     /// <summary>
-    /// Cancel an operation
+    /// Mark an operation as cancelled in the process-local tracker.
     /// </summary>
+    /// <remarks>This changes tracking state only and does not abort running I/O.</remarks>
     Task CancelOperation(string operationId);
 
     /// <summary>
@@ -222,6 +223,7 @@ public class InMemoryBackupOperationTracker : IBackupOperationTracker
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task CancelOperation(string operationId)
     {
         // Try backup operations first

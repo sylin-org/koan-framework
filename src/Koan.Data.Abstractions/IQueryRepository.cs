@@ -13,12 +13,17 @@ namespace Koan.Data.Abstractions;
 /// <c>DataCaps.Query.Filter</c> capability token, ARCH-0084) and invokes <see cref="Query"/>
 /// with a <see cref="QueryDefinition"/> whose <c>Filter</c> contains <b>only nodes this adapter
 /// declared pushable</b>. The adapter therefore translates the WHOLE filter it receives — it never
-/// computes a residual, never splits, never falls back. The coordinator evaluates the residual,
-/// finishes unhandled sort, and paginates AFTER, centrally. When the coordinator has a residual it
-/// strips pagination before calling the adapter (paginating a partially-filtered set is wrong).
+/// computes a residual, never splits, never falls back. For a materialized result, the coordinator
+/// evaluates the residual, finishes unhandled sort, and paginates afterward; it strips provider
+/// pagination when a residual exists because paginating a partially filtered final result is wrong.
+/// For DATA-0107 provider-bounded streaming, the coordinator instead pages the pushable candidate set,
+/// evaluates the residual pointwise, and continues across empty output pages. That distinct mode
+/// requires provider-handled pagination and total ordering before it yields any candidate.
 ///
 /// The adapter reports, per axis, what it handled natively (sort/pagination/projection) plus
-/// <c>TotalCount</c> when it can compute it cheaply; the coordinator trusts those flags.
+/// <c>TotalCount</c> when the query explicitly requests a <see cref="CountStrategy"/>. A null count
+/// strategy means no total was requested; adapters must not add count work merely because a page was
+/// requested. The coordinator trusts the execution flags.
 /// </summary>
 public interface IQueryRepository<TEntity, TKey>
     where TEntity : IEntity<TKey>

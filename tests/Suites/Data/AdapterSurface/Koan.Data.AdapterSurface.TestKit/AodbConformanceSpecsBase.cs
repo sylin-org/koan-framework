@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core.Capabilities;
@@ -9,6 +10,7 @@ using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Conformance;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Querying;
 using Koan.Testing.Containers;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -66,6 +68,13 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
         (DataCaps.Isolation.DatabaseScoped, UnclaimedDisposition.Required),
     };
 
+    /// <summary>Streaming is an earned adapter capability, not a fleet mandate: announcing adapters must realize
+    /// provider-bounded paging, while unannounced adapters must reject before yielding instead of materializing.</summary>
+    private static readonly (Capability Token, UnclaimedDisposition Disposition)[] StreamModules =
+    {
+        (DataCaps.Query.ProviderBoundedPaging, UnclaimedDisposition.FailClosed),
+    };
+
     /// <summary>The adapter's announced data capabilities, read off a resolved repository (the repository facade
     /// forwards the inner adapter's set; capabilities are adapter-level, so any conformance entity's repository
     /// reports the same tokens).</summary>
@@ -84,6 +93,97 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
         await using var host = await BootAsync();
         // All three modes are Required (the fleet mandate) — the gate fails any under-claim.
         CapabilityConformanceGate.AssertRequiredDeclared(ResolveCaps(host.Services), Modules);
+    }
+
+    // ==================== Provider-bounded Entity streams ====================
+
+    [Fact(DisplayName = "Streaming: announced provider-bounded paging realizes; unannounced adapters reject before yielding")]
+    public async Task Provider_bounded_streaming_realizes_or_fails_closed()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        using var lease = Lease(NewPartition("provider-bounded-stream"));
+
+        const int batchSize = 2;
+        const string readyTitle = "stream-ready";
+        const string heldTitle = "stream-held";
+
+        await CapabilityConformanceGate.RunCell(
+            ResolveCaps(host.Services),
+            StreamModules,
+            DataCaps.Query.ProviderBoundedPaging,
+            realize: async () =>
+            {
+                var idPrefix = Guid.NewGuid().ToString("N");
+                var corpus = new[]
+                {
+                    (Title: readyTitle, Flag: false, Byte: (byte)2, SignedByte: (sbyte)2, Short: (short)2, UnsignedShort: (ushort)2, Sequence: 2, Key: "05"),
+                    (Title: heldTitle, Flag: true, Byte: (byte)10, SignedByte: (sbyte)10, Short: (short)10, UnsignedShort: (ushort)10, Sequence: 10, Key: "04"),
+                    (Title: readyTitle, Flag: false, Byte: (byte)1, SignedByte: (sbyte)1, Short: (short)1, UnsignedShort: (ushort)1, Sequence: 1, Key: "03"),
+                    (Title: heldTitle, Flag: true, Byte: byte.MinValue, SignedByte: sbyte.MinValue, Short: short.MinValue, UnsignedShort: ushort.MinValue, Sequence: -3, Key: "02"),
+                    (Title: readyTitle, Flag: false, Byte: byte.MaxValue, SignedByte: sbyte.MaxValue, Short: short.MaxValue, UnsignedShort: ushort.MaxValue, Sequence: 3, Key: "01")
+                };
+                var saved = new List<ConformancePartitionDoc>();
+                foreach (var item in corpus)
+                {
+                    saved.Add(await new ConformancePartitionDoc
+                    {
+                        Id = $"{idPrefix}-{item.Key}",
+                        Title = item.Title,
+                        Flag = item.Flag,
+                        ByteValue = item.Byte,
+                        SignedByteValue = item.SignedByte,
+                        ShortValue = item.Short,
+                        UnsignedShortValue = item.UnsignedShort,
+                        Sequence = item.Sequence
+                    }.Save());
+                }
+
+                var expected = saved.OrderBy(static doc => doc.Id, StringComparer.Ordinal).ToList();
+                var streamed = await CollectAsync(ConformancePartitionDoc.AllStream(batchSize: batchSize));
+
+                streamed.Should().HaveCount(expected.Count);
+                streamed.Select(static doc => doc.Id).Should().Equal(expected.Select(static doc => doc.Id));
+                streamed.Select(static doc => doc.Id).Should().OnlyHaveUniqueItems();
+
+                await AssertPortableStreamOrder(saved, static doc => doc.Flag, static doc => doc.Flag, batchSize);
+                await AssertPortableStreamOrder(saved, static doc => doc.ByteValue, static doc => doc.ByteValue, batchSize);
+                await AssertPortableStreamOrder(saved, static doc => doc.SignedByteValue, static doc => doc.SignedByteValue, batchSize);
+                await AssertPortableStreamOrder(saved, static doc => doc.ShortValue, static doc => doc.ShortValue, batchSize);
+                await AssertPortableStreamOrder(saved, static doc => doc.UnsignedShortValue, static doc => doc.UnsignedShortValue, batchSize);
+                await AssertPortableStreamOrder(saved, static doc => doc.Sequence, static doc => doc.Sequence, batchSize);
+
+                var expectedReady = expected.Where(static doc => doc.Title == readyTitle).ToList();
+                var filtered = await CollectAsync(ConformancePartitionDoc.QueryStream(
+                    static doc => doc.Title == readyTitle,
+                    batchSize: batchSize,
+                    ct: TestContext.Current.CancellationToken));
+                filtered.Select(static doc => doc.Id).Should().Equal(expectedReady.Select(static doc => doc.Id));
+
+                // Compile and execute the natural (predicate, CancellationToken) overload independently of the
+                // explicit batch-size overload above; both must preserve the same provider-handled order and filter.
+                var naturalCancellation = await CollectAsync(ConformancePartitionDoc.QueryStream(
+                    static doc => doc.Title == readyTitle,
+                    TestContext.Current.CancellationToken));
+                naturalCancellation.Select(static doc => doc.Id).Should().Equal(expectedReady.Select(static doc => doc.Id));
+            },
+            failClosed: async () =>
+            {
+                var returnedItem = false;
+                Func<Task> enumerate = async () =>
+                {
+                    await foreach (var _ in ConformancePartitionDoc.AllStream(batchSize: batchSize))
+                    {
+                        returnedItem = true;
+                        break;
+                    }
+                };
+
+                var rejection = (await enumerate.Should().ThrowAsync<QueryStreamRejectedException>()).Which;
+                returnedItem.Should().BeFalse("an unannounced adapter must reject before returning its first item");
+                rejection.EntityType.Should().Contain(nameof(ConformancePartitionDoc));
+                rejection.BatchSize.Should().Be(batchSize);
+            });
     }
 
     // ==================== Shared (FieldFilter → managed-record persistence) ====================
@@ -186,5 +286,32 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
             (await act.Should().ThrowAsync<InvalidOperationException>())
                 .WithMessage($"*{SourceUnconfigured}*not configured*");
         });
+    }
+
+    private static async Task<List<TEntity>> CollectAsync<TEntity>(IAsyncEnumerable<TEntity> stream)
+    {
+        var items = new List<TEntity>();
+        await foreach (var item in stream)
+            items.Add(item);
+        return items;
+    }
+
+    private static async Task AssertPortableStreamOrder<TValue>(
+        IReadOnlyList<ConformancePartitionDoc> saved,
+        Func<ConformancePartitionDoc, TValue> valueSelector,
+        Expression<Func<ConformancePartitionDoc, TValue>> sortSelector,
+        int batchSize)
+    {
+        var expected = saved
+            .OrderBy(valueSelector, Comparer<TValue>.Default)
+            .ThenBy(static doc => doc.Id, StringComparer.Ordinal)
+            .Select(static doc => doc.Id)
+            .ToList();
+        var actual = await CollectAsync(ConformancePartitionDoc.AllStream(
+            sort => sort.OrderBy(sortSelector),
+            batchSize: batchSize,
+            ct: TestContext.Current.CancellationToken));
+
+        actual.Select(static doc => doc.Id).Should().Equal(expected);
     }
 }

@@ -2,12 +2,12 @@ namespace Koan.Data.Backup.Attributes;
 
 /// <summary>
 /// Marks an entity type for participation in backup operations.
-/// Provides policy configuration for encryption, schema inclusion, and opt-out.
+/// Provides policy metadata for encryption intent, schema inclusion, and opt-out.
 /// </summary>
 /// <remarks>
 /// <para>
-/// This attribute supports explicit opt-in to backup operations, preventing silent data loss
-/// from automatic discovery of entities that may not have configured repositories.
+/// This attribute supports explicit opt-in to backup operations and makes the resulting coverage
+/// decision visible in backup inventory. It does not guarantee that a backup or restore succeeds.
 /// </para>
 /// <para>
 /// **Usage Examples:**
@@ -17,7 +17,7 @@ namespace Koan.Data.Backup.Attributes;
 /// [EntityBackup]
 /// public class Media : Entity&lt;Media&gt; { }
 ///
-/// // PII encryption
+/// // Record encryption intent (metadata only; the current archive writer does not encrypt payloads)
 /// [EntityBackup(Encrypt = true)]
 /// public class User : Entity&lt;User&gt; { }
 ///
@@ -48,19 +48,19 @@ public sealed class EntityBackupAttribute : Attribute
     public bool Enabled { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets whether backup data for this entity should be encrypted.
+    /// Gets or sets encryption intent metadata for this entity's backup policy.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Default is <c>false</c>. When <c>true</c>, backup data will be encrypted
-    /// using the configured backup encryption provider.
+    /// Default is <c>false</c>. The resolved value is reported as policy metadata in backup
+    /// inventory and manifests.
     /// </para>
     /// <para>
-    /// Use this for entities containing PII or sensitive data (e.g., User, Payment).
-    /// </para>
-    /// <para>
-    /// **Note:** Encryption key management must be configured separately.
-    /// See Koan.Security integration documentation.
+    /// <b>Safety:</b> The current archive writer does not encrypt entity payloads, manifests, or
+    /// verification entries. Setting this value to <c>true</c> does not provide data-at-rest
+    /// protection and does not configure an encryption provider or key management. Protect backup
+    /// storage through independently verified application or storage controls until payload
+    /// encryption is implemented.
     /// </para>
     /// </remarks>
     public bool Encrypt { get; set; } = false;

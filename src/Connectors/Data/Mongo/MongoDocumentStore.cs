@@ -87,6 +87,7 @@ internal sealed class MongoDocumentStore<TEntity, TKey> :
     public override bool EnableReadinessGating => _options.CurrentValue.Readiness.EnableReadinessGating;
 
     protected override void DescribeBackend(ICapabilities caps) => caps
+        .Add(DataCaps.Query.ProviderBoundedPaging)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
         .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
@@ -203,15 +204,18 @@ internal sealed class MongoDocumentStore<TEntity, TKey> :
         var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
         var filter = BuildFilter(query.Filter);
         var (sortDef, sortHandled) = BuildSort(query.Sort);
-        var totalCount = await collection.CountDocumentsAsync(filter, cancellationToken: ct).ConfigureAwait(false);
+        long? totalCount = query.CountStrategy is not null
+            ? await collection.CountDocumentsAsync(filter, cancellationToken: ct).ConfigureAwait(false)
+            : null;
 
         var cursor = collection.Find(filter);
         if (sortDef is not null) cursor = cursor.Sort(sortDef);
 
+        var sortFullyHandled = query.Sort is null || query.Sort.Count == 0 || sortHandled.Count == query.Sort.Count;
         var paginationHandled = false;
-        if (query.HasPagination)
+        if (query.HasPagination && sortFullyHandled)
         {
-            var skip = (query.EffectivePage() - 1) * query.EffectivePageSize();
+            var skip = query.EffectiveOffset();
             cursor = cursor.Skip(skip).Limit(query.EffectivePageSize());
             paginationHandled = true;
         }
@@ -397,7 +401,7 @@ internal sealed class MongoDocumentStore<TEntity, TKey> :
         if (string.IsNullOrWhiteSpace(propertyName)) return propertyName;
         if (!string.IsNullOrWhiteSpace(_optimizationInfo.IdPropertyName) && string.Equals(propertyName, _optimizationInfo.IdPropertyName, StringComparison.Ordinal))
             return "_id";
-        if (string.Equals(propertyName, "Id", StringComparison.OrdinalIgnoreCase)) return "_id";
+        if (string.Equals(propertyName, "Id", StringComparison.Ordinal)) return "_id";
         return ToCamelCase(propertyName);
     }
 

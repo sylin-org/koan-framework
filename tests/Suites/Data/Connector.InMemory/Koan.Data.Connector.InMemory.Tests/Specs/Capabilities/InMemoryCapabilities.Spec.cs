@@ -16,7 +16,7 @@ public sealed class InMemoryCapabilitiesSpec(InMemoryFixture fixture, ITestOutpu
 
         var data = host.Services.GetRequiredService<IDataService>();
         var repo = data.GetRepository<CapabilityProbe, string>();
-        repo.Should().BeAssignableTo<IQueryRepository<CapabilityProbe, string>>();
+        var queryRepo = repo.Should().BeAssignableTo<IQueryRepository<CapabilityProbe, string>>().Which;
 
         // ARCH-0084: negotiate via the unified CapabilitySet (verifies the facade forwards
         // the inner adapter's declaration through IDescribesCapabilities).
@@ -28,6 +28,15 @@ public sealed class InMemoryCapabilitiesSpec(InMemoryFixture fixture, ITestOutpu
         caps.Has(DataCaps.Write.AtomicBatch).Should().BeTrue();
 
         await CapabilityProbe.Upsert(new CapabilityProbe { Name = "cap" });
+
+        var pageOnly = await queryRepo.Query(
+            QueryDefinition.All.WithPagination(1, 1).WithCountStrategy(null));
+        pageOnly.TotalCount.Should().BeNull("numbered paging alone does not request a total");
+
+        var countedPage = await queryRepo.Query(
+            QueryDefinition.All.WithPagination(1, 1).WithCountStrategy(CountStrategy.Exact));
+        countedPage.TotalCount.Should().Be(1);
+
         var count = await CapabilityProbe.Count.Exact();
         count.Should().Be(1);
     }
