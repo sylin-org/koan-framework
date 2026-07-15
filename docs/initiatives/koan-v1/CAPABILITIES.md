@@ -406,9 +406,9 @@ boundaries remain pre-V1 work.
   maintainer accepted the resulting evidence without promoting unpublished packages.
 - **Current R07 result:** automatic lineage now distinguishes developer `SourceCommit` from the exact
   package `VersionCommit`, detects breaking version intent, and mints the evaluated transitive reverse
-  closure without an operator list. The all-owner bootstrap, stored exact identity inventory, and
-  evaluated shared-input fan-out pass in the 51/51 packaging suite. In a disposable
-  complete-repository rehearsal, a Data.Core 0.18 intent selected all 81 affected packages and
+  closure without an operator list. The 52/52 packaging suite covers all-owner bootstrap, stored exact
+  identity inventory, mapped shared-input fan-out, and canonical current version intent. In a
+  disposable complete-repository rehearsal, a Data.Core 0.18 intent selected all 81 affected packages and
   generated 78 markers; registry reconciliation added 19 existing publication gaps. The resulting
   100 exact artifacts passed inspection and package-only FirstUse (4.095s) plus GoldenJourney
   (10.591s). No package was published, so this strengthens internal release evidence without
@@ -418,12 +418,12 @@ boundaries remain pre-V1 work.
 - **Unsupported / compatibility:** the staged package set is coherent, but public package-first install,
   upgrades, rollback, migration, release cadence, and support windows are not established until the
   automated `dev` release is actually published and observed.
-- **Maturity / safe claim:** `specified`. The package model and compatibility-range intent are written;
-  the current public package set is not a supported installation path. Source checkout is the only
-  demonstrated path.
-- **Open risks:** observe the first trusted `dev` publication and a cross-event partial-publication
-  recovery drill; retain advisory review; establish explicit pre-1.0 upgrade/rollback policy before
-  promoting the package path.
+- **Maturity / safe claim:** `specified`. Staged PackageReference clean rooms are demonstrated, but
+  those packages were not published; source checkout remains the only coherent path currently
+  available to a new user.
+- **Open risks:** observe the first trusted `dev` publication, prove cross-event partial-publication
+  recovery, and retain prior maps for arbitrary external pack inputs; retain advisory review and
+  establish explicit pre-1.0 upgrade/rollback policy before promoting the package path.
 
 ### Operations, health, and diagnostics
 

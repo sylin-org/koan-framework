@@ -20,8 +20,11 @@ release tag or reports success without registry convergence.
    waiting, pending, or running release event. Serialization happens before version calculation.
 2. Fetch the prior `automation/package-lineage-dev` tip. The compiler applies the exact prior-source
    to current-source tree delta onto that linear version history.
-3. Bootstrap every owner once, or detect breaking `version.json` tiers and evaluated shared-input
+3. Bootstrap every owner once, or detect breaking `version.json` tiers and mapped shared-input
    consumers; write markers only for affected owners that would otherwise retain their prior identity.
+   The one-time bootstrap evaluates the preceding `dev` source's package inventory with the pinned
+   toolchain. If that predecessor cannot be evaluated, lineage compilation fails before packing or
+   publication; automation does not guess a historical inventory.
 4. Commit and push the exact `VersionCommit`. Its state records every package/version identity;
    `release-lineage.json` records it separately from the developer's `SourceCommit`.
 5. Run the complete green ratchet at that version commit with the repository-pinned SDK, public
@@ -67,14 +70,15 @@ durable; the later source event advances from it and registry reconciliation clo
 ### Publish stopped partway through
 
 Re-run the failed workflow before a later lineage event advances. The same source event resolves to
-the same durable version commit. Every selected artifact is reproduced and verified; public nupkgs
-are reconciled (including symbol replay), missing identities continue in dependency order, and state
-advances only after each identity is available. Never build different bits under the same ID/version.
+the same durable version commit. Every selected identity is repacked under the pinned toolchain and
+verified again; public nupkgs are reconciled (including symbol replay), missing identities continue in
+dependency order, and state advances only after each identity is available. Never build different
+source under the same ID/version; cross-run artifact-hash retention is not claimed.
 
 If a later lineage event has already advanced after a partial nupkg/symbol publication, the current
 workflow does not yet certify cross-event artifact recovery. Treat that as red operational debt; do
 not claim success from nupkg visibility alone or hand-pack a replacement. The bounded successor is
-tracked in the post-cycle register.
+tracked as [PMC-016](../initiatives/koan-v1/POST-CYCLE-TODO.md#current-register).
 
 ### A later event is waiting
 

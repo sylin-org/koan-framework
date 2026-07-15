@@ -11,7 +11,7 @@ then compares the previous and resulting package identities.
 ## Mental model
 
 ```text
-dev source delta + package-local intent + evaluated shared inputs
+dev source delta + package-local intent + mapped shared inputs
                          ↓
           durable linear VersionCommit
                          ↓
@@ -80,9 +80,13 @@ ranges (`[0.17.x,0.18.0)` before 1.0), so incompatible combinations fail during 
 The release compiler derives the complete transitive reverse-dependent closure from evaluated
 ProjectReferences. A closure member whose source already created a fresh identity is left alone; an
 otherwise unchanged member receives a deterministic Git marker. Planning fails if the complete wave
-is not present. The first lineage deliberately mints every owner once; afterward the committed
-lineage inventory supplies each prior package identity without reinterpreting history through a newer
-toolchain. Changes to evaluated shared build/pack inputs fan out to their actual package consumers.
+is not present. The first lineage deliberately mints every owner once and requires its predecessor's
+package inventory to remain evaluable by the pinned toolchain. Afterward, committed lineage supplies
+each prior package identity without reinterpreting history through a newer toolchain. A conservative
+input map combines known shared build policy with evaluated external packed files; changes fan out to
+mapped package consumers. Known paths remain as deletion tombstones. Persisting arbitrary external
+paths from a prior evaluation is the bounded [PMC-017](../initiatives/koan-v1/POST-CYCLE-TODO.md#current-register)
+edge.
 
 ### Add a package
 

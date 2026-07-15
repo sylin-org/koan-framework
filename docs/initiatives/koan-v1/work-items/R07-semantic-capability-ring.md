@@ -186,12 +186,13 @@ cardinality and copy semantics. Neither is a compatibility base for Events or Tr
 | 1 | [R07-01 Core context foundation](r07/R07-01-core-context-foundation.md) | **Passed.** Tenant and other module context survive durable work through a Core-owned, fail-closed contract | Data-owned generic slice/carrier APIs |
 | 2 | [Provider-bounded streaming](r07/R07-02-provider-bounded-streaming.md) | **Passed.** Data.Core 42/42 focused and 325/325 full, six qualified and three fail-closed adapter cells, SQLite 1/1, and Backup 5/5 acceptance plus 7/7 full establish the bounded contract | materializing stream implementation and unused batch hint |
 | 3 | [Automatic breaking package lineage](r07/R07-03-automatic-package-lineage.md) | **Passed.** One version intent automatically mints and proves the complete reverse-dependent wave without an operator package list | manual closure tracking and source-SHA/package-SHA conflation |
-| 4 | Canonical Lifecycle | Lifecycle becomes host-owned, unavoidable, and honestly named in one clean 0.18 wave | lifecycle `Events` name, process-static registry, and bypassable hooks |
-| 5 | Typed capability substrate | A minimal Data.Core cardinality adapter and pillar-owned execution replace generic public flow machinery | `PipelineBuilder` and pillar pipeline extensions |
-| 6 | In-process Transport flagship | a foundation + `AddKoan()` app gets local scalar/set/stream snapshots, stable typed receivers, source/ingress filters, isolated copies, bounded acceptance, operation-scoped settlement wait, and tenant-safe retry identity | old Messaging Core, proxy/buffer, broad `Send`, separate InMemory connector |
-| 7 | Events policy | payload-less occurrences fan out over the proved kernel | event/messaging conflation and service-collection handlers |
-| 8 | Mesh, broker, and internal parity | a build manifest turns connector references into zero-routing-code channel election; RabbitMQ, Jobs wake, and Cache coherence obey the same groups/context/facts | current RabbitMQ implementation and two Messaging bridge packages |
-| 9 | Secondary capability lifts | Relationships, Jobs, AI, Cache, then Media adopt only proven pointwise verbs | fragmented or misleading per-pillar surfaces |
+| 4 | [Public-release ratchet rehabilitation](r07/R07-04-public-release-ratchet.md) | The exact automatic release floor passes without excluding real suites or relying on leaked host state | misclassified helper projects and a red solution-test baseline |
+| 5 | Canonical Lifecycle | Lifecycle becomes host-owned, unavoidable, and honestly named in one clean 0.18 wave | lifecycle `Events` name, process-static registry, and bypassable hooks |
+| 6 | Typed capability substrate | A minimal Data.Core cardinality adapter and pillar-owned execution replace generic public flow machinery | `PipelineBuilder` and pillar pipeline extensions |
+| 7 | In-process Transport flagship | a foundation + `AddKoan()` app gets local scalar/set/stream snapshots, stable typed receivers, source/ingress filters, isolated copies, bounded acceptance, operation-scoped settlement wait, and tenant-safe retry identity | old Messaging Core, proxy/buffer, broad `Send`, separate InMemory connector |
+| 8 | Events policy | payload-less occurrences fan out over the proved kernel | event/messaging conflation and service-collection handlers |
+| 9 | Mesh, broker, and internal parity | a build manifest turns connector references into zero-routing-code channel election; RabbitMQ, Jobs wake, and Cache coherence obey the same groups/context/facts | current RabbitMQ implementation and two Messaging bridge packages |
+| 10 | Secondary capability lifts | Relationships, Jobs, AI, Cache, then Media adopt only proven pointwise verbs | fragmented or misleading per-pillar surfaces |
 
 Only the next slice receives a child card. Later rows remain outcomes rather than speculative API
 backlogs until their prerequisites pass.
@@ -212,14 +213,17 @@ backlogs until their prerequisites pass.
 7. Automate reverse-dependent package closure before changing Lifecycle's shipped public surface.
    **Complete.** R07-03 proves two synthetic waves and the complete 81-package Data.Core break in a
    registry-reconciled 100-artifact clean room.
-8. Open canonical Lifecycle as the next clean 0.18 child; do not mix Communication or Pipeline work
+8. Restore the exact public-release ratchet before changing Lifecycle's shipped surface. **Active as
+   R07-04.** Do not turn real test failures into exclusions.
+9. Open canonical Lifecycle as the next clean 0.18 child; do not mix Communication or Pipeline work
    into that boundary.
-9. Open each later implementation slice only after its lower boundary passes.
-10. Prove in-process semantics before any broker migration or public maturity change.
+10. Open each later implementation slice only after its lower boundary passes.
+11. Prove in-process semantics before any broker migration or public maturity change.
 
-R07-02 was intentionally additive and preceded the Lifecycle source break. R07-03 has now removed the
-release stop condition: public 0.17's lifecycle `Events` surface can be replaced in one explicit 0.18
-wave, with every reverse dependent receiving a fresh identity automatically.
+R07-02 was intentionally additive and preceded the Lifecycle source break. R07-03 removed the package-
+lineage stop condition: once R07-04 restores the release floor, public 0.17's lifecycle `Events`
+surface can be replaced in one explicit 0.18 wave, with every reverse dependent receiving a fresh
+identity automatically.
 
 ## Verification
 
@@ -240,9 +244,10 @@ wave, with every reverse dependent receiving a fresh identity automatically.
 - The Release solution build passes with 0 errors and 19 reviewed pre-existing warnings. Strict docs,
   skill lint, changed examples, structural claims, compatibility, diff, and privacy gates pass. R07-02
   is closed without a maturity promotion.
-- R07-03 packaging passes 51/51, including all-owner bootstrap, durable exact identities,
-  shared-input fan-out, two breaking waves, and same-source replay. A disposable real-repository
-  Data.Core 0.18 break derives 81 closure members and 78 generated markers; registry reconciliation
+- R07-03 packaging passes 52/52, including all-owner bootstrap, canonical current version intent,
+  durable exact identities, shared-input fan-out, two breaking waves, and same-source replay. A
+  disposable real-repository Data.Core 0.18 break derives 81 closure members and 78 generated markers;
+  registry reconciliation
   produces 100 exact artifacts, and package-only FirstUse plus GoldenJourney pass in 4.095s and
   10.591s. The implementation changes no runtime API and performs no publication or remote Git
   mutation.

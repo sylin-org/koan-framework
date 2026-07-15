@@ -34,7 +34,7 @@ The two do not trade off. Truthful, independent, bump-on-change numbers (Axis 1)
 ### 1. Uniform independent versioning (two-tier retired)
 
 **Every package versions independently** — there is no kernel lockstep. A package with no
-package-affecting commit, evaluated shared-input change, or generated compatibility marker is **not**
+package-affecting commit, mapped shared-input change, or generated compatibility marker is **not**
 republished. This is the anti-spam guarantee.
 
 This *supersedes* ARCH-0082's two-tier (kernel-lockstep) model. The reason two-tier existed was to keep the abstraction contract surface coherent and avoid a compatibility matrix among independently-versioned packages — but **§3's compatibility ranges now provide that guarantee directly and more precisely** (an incompatible pair fails to resolve regardless of version numbers). With ranges in place, lockstep added only cost: in nbgv it would require all 14 abstraction packages to carry identical `pathFilters` lists and be bumped together, a fragile, manual operation. So the kernel/periphery split no longer drives versioning. `build/kernel-manifest.txt` and `$(KoanPackageKind)` survive only as informational metadata (what is "contract surface"), not as a version lever.
@@ -79,8 +79,8 @@ which closure members already gained an identity. Only the remaining members rec
 package-local markers. The compiler then proves every member differs from the previous version commit;
 the planner independently re-derives the closure and rejects lineage/manifest drift. Each committed
 lineage state stores every package owner's exact identity, so later waves compare against minted facts
-rather than recalculating an old commit with today's SDK or NBGV. Evaluated shared build/pack inputs
-fan out through the same mechanism to the package owners that consume them.
+rather than recalculating an old commit with today's SDK or NBGV. A conservative map of known shared
+policy and evaluated external packed inputs fans out through the same mechanism to mapped consumers.
 
 ### 5. Change discipline: deprecate-then-remove in the kernel
 

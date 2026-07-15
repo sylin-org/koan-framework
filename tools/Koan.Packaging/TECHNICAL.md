@@ -5,8 +5,12 @@
 Git and evaluated MSBuild projects are authoritative. Every packable project under `src/`,
 `packaging/`, or the top-level template package owns a project-local `version.json`. Evaluated
 `ProjectReference`s form one `PackageGraph`; no XML parser or maintained package list participates.
-Evaluated package consumers also record shared build/pack inputs outside their owner directory, so a
-Git change to repository or ancestor build policy cannot silently reuse an unaffected path height.
+Each package also receives a conservative shared-input map: known repository/ancestor build policy
+plus evaluated packed inputs outside its owner directory. Known paths remain as tombstones when
+deleted. Arbitrary external inputs discovered only through current evaluation are not retained in the
+next lineage state, so their later deletion or rename is not certified until
+[PMC-017](../../docs/initiatives/koan-v1/POST-CYCLE-TODO.md#current-register) is resolved or the path is
+promoted into the known map.
 
 The human signal is a compatibility-tier change in `version.json`. Before 1.0, a minor advance is
 breaking; from 1.0 onward, a major advance is breaking.
@@ -18,11 +22,13 @@ version commit and applies exactly the Git tree delta between the previous and c
 commits. This creates a linear projection rather than a merge graph, so NBGV path heights remain
 package-independent.
 
-The first lineage is a deliberate all-owner bootstrap. Later waves include the breaking reverse
-closure plus packages whose evaluated shared inputs changed. Every committed lineage state records
-the exact public NBGV identity of every package owner. Later waves use those durable identities as
-their previous truth and calculate only the checked-out provisional/final commit; they never
-reinterpret an old release with today's SDK, tool version, or working tree.
+The first lineage is a deliberate all-owner bootstrap. It evaluates the predecessor's package
+inventory with the pinned toolchain, so that predecessor must remain evaluable. Later waves include
+the breaking reverse closure plus packages whose mapped shared inputs changed. Every committed
+lineage state records the exact public NBGV identity of every package owner. After bootstrap, later
+waves use those durable identities as their previous truth and calculate only the checked-out
+provisional/final commit; they never reinterpret an old release with today's SDK, tool version, or
+working tree.
 
 For every breaking root, the graph computes its complete transitive reverse closure. After a
 provisional projection commit exposes the actual NBGV identities, only closure members that still
@@ -64,5 +70,5 @@ path regression.
 Missing version ownership, duplicate IDs, dependency cycles, lineage drift, reserved-path collisions,
 unsupported package moves, non-forward source, stale closure identities, wrong-checkout packing,
 dirty package inputs, absent or mismatched internal dependency floors, metadata defects, non-canonical
-ranges, audit failures, clean-room failures, and publication timeouts are fatal and name the relevant
-commit, package, or path.
+ranges or version intent, an unevaluable bootstrap predecessor, audit failures, clean-room failures,
+and publication timeouts are fatal and name the relevant commit, package, or path.

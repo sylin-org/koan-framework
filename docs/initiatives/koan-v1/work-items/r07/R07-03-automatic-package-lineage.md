@@ -17,7 +17,7 @@ validation:
 - Tranche: `T6 — semantic capability ring`
 - Status: `passed`
 - Depends on: R07-02, ARCH-0085, and ARCH-0110
-- Unlocks: the clean Lifecycle 0.18 break and every later independent breaking package wave
+- Unlocks: R07-04 release-floor repair and, once it passes, the clean Lifecycle 0.18 break
 - Owner: Koan.Packaging and the serialized `dev` release workflow
 
 ## Meaningful outcome
@@ -50,14 +50,20 @@ set. Ordinary leaf changes remain independent.
 - A generated package marker is written only when a closure member would otherwise retain its prior
   NBGV identity. The marker names the source commit and breaking roots that required the rebuild.
 - The first lineage is a deliberate all-owner bootstrap. Every later lineage state stores the exact
-  version identity of every package owner; historical versions are never reinterpreted with today's
-  SDK or NBGV. Evaluated shared build/pack inputs fan out to their consuming package owners.
+  version identity of every package owner; after bootstrap, historical versions are never reinterpreted
+  with today's SDK or NBGV. Bootstrap requires its predecessor's package inventory to remain evaluable
+  by the pinned toolchain. A conservative map combines known shared policy with evaluated external
+  packed inputs and fans changes out to mapped package owners.
 - Manifests distinguish `SourceCommit` from `VersionCommit`; version comparison starts at
   `PreviousVersionCommit`. Package metadata, resumable state, packing, and release evidence bind to
   `VersionCommit`.
 - Existing registry reconciliation remains the recovery mechanism for identities that were compiled
   but not published by an earlier run. Same-source partial symbol/state replay is supported; automatic
-  cross-event recovery after the lineage tip advances remains a bounded post-cycle edge.
+  cross-event recovery after the lineage tip advances remains the bounded
+  [PMC-016](../../POST-CYCLE-TODO.md#current-register) edge.
+- Known shared-input paths remain mapped as deletion tombstones. Lineage state does not yet retain an
+  arbitrary external pack path found only by a prior MSBuild evaluation; its later deletion or rename
+  remains the bounded [PMC-017](../../POST-CYCLE-TODO.md#current-register) edge.
 - Package deletion/rename, reserved marker collisions, non-forward source history, graph cycles, and
   incomplete closure fail before packing or publication.
 - The initial implementation changes no application/runtime API and does not publish, push, tag, or
@@ -120,17 +126,20 @@ source-changed members       deterministic markers for unchanged members
 8. **Complete.** Run packaging tests, a real repository offline and registry-reconciled plan, exact
    package/clean-room proof, solution build, workflow structural checks, strict docs, diff, and
    privacy gates before closing the child.
-9. **Complete.** Harden the foundation with all-owner bootstrap, durable per-package identities,
-   evaluated shared-input fan-out, exact lineage-tree/parent checks, selected dependency-floor proof,
-   pinned release tooling, the full green ratchet, and exact non-forced release tags.
+9. **Complete for release machinery.** Harden the foundation with all-owner bootstrap, durable
+   per-package identities, mapped shared-input fan-out, exact lineage-tree/parent checks, selected
+   dependency-floor proof, pinned release tooling, the complete fail-closed ratchet, and exact
+   non-forced release tags. The first whole-solution test execution exposed an existing red baseline;
+   R07-04 owns that prerequisite rather than weakening this workflow.
 
 ## Verification
 
 - Commits `72db20f3`, `3158ef23`, and their focused hardening retain two production concepts:
-  evaluated `PackageGraph` and Git-native `ReleaseLineageCompiler`. Packaging passes 51/51: 48 graph,
+  evaluated `PackageGraph` and Git-native `ReleaseLineageCompiler`. Packaging passes 52/52: 49 graph,
   lineage, dependency, schema, workflow, and Git contracts plus all three supported source-application
-  proofs. The disposable Git proof includes bootstrap, two breaking waves, shared-input fan-out,
-  same-source replay, new-package admission, manual-lineage rejection, and unrelated-leaf independence.
+  proofs. The disposable Git proof includes bootstrap, canonical current version-intent rejection, two
+  breaking waves, shared-input fan-out, same-source replay, new-package admission, manual-lineage
+  rejection, and unrelated-leaf independence.
 - A disposable clone of the complete repository changed only Data.Core's intent from 0.17 to 0.18.
   The compiler derived the exact 81-package breaking closure: one root plus all 80 transitive reverse
   dependents. It generated 78 markers because three members already gained identities from the
@@ -146,6 +155,9 @@ source-changed members       deterministic markers for unchanged members
   heights. Exact source-tree delta projection preserves independent package histories.
 - Release solution build, strict docs, skills, structural workflow/YAML, diff, and privacy gates pass.
   No package was published and no remote branch, tag, or release was changed.
+- The exact public-release ratchet passes every non-test leg and rejects publication at its
+  whole-solution test leg. R07-04 records the isolated failing suites and must turn that gate green
+  before Lifecycle; R07-03 does not claim a releasable repository state.
 
 ## Acceptance
 
@@ -158,7 +170,8 @@ source-changed members       deterministic markers for unchanged members
   independent closure assertion before publish.
 - Re-running the same source event uses the same durable version lineage and registry reconciliation;
   it never reuses a published identity for different bits. Cross-event recovery after partial symbol
-  publication is explicitly not claimed until its parked acceptance proof exists.
+  publication is explicitly not claimed until
+  [PMC-016](../../POST-CYCLE-TODO.md#current-register) passes its acceptance proof.
 - Two successive breaking tiers produce two successive dependent identities; an intervening unrelated
   leaf event does not advance the prior closure.
 - The manifest and packed nuspec agree on `VersionCommit`, while `SourceCommit` remains available for

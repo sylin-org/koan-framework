@@ -34,7 +34,9 @@ dotnet run --project tools/Koan.Packaging -- pack `
 one commit. Run that command only in the protected workflow or a disposable rehearsal checkout. Omit
 `--previous-lineage` only when initializing a new lineage. That first projection is an explicit
 bootstrap wave: every package owner receives a fresh identity, preventing an existing package identity
-from being rebuilt with different bits or repository metadata.
+from being rebuilt with different bits or repository metadata. Bootstrap evaluates its predecessor's
+package inventory with the pinned toolchain; that predecessor must remain evaluable. Once bootstrapped,
+stored identities replace historical version recalculation.
 
 The protected workflow persists that lineage commit, runs the complete public-release green ratchet,
 and proves the checkout stayed clean before it invokes `plan` and `pack`.
@@ -43,9 +45,13 @@ and proves the checkout stayed clean before it invokes `plan` and `pack`.
 projection that NBGV versions, packing, SourceLink metadata, resumable state, and release evidence use.
 The committed lineage state must match the external lineage artifact before planning can begin.
 It records every package owner's exact minted identity, so later events compare durable facts instead
-of recalculating historical versions with a newer SDK or NBGV tool.
-Repository-wide build policy, ancestor `Directory.*` policy, and external packed files are evaluated
-as shared package inputs. Changing one automatically selects only its evaluated package consumers.
+of recalculating historical versions with a newer SDK or NBGV tool. A conservative per-package input
+map combines known repository/ancestor build policy with evaluated external packed files. Changing a
+mapped input selects its package consumers; harmless extra selection is preferred to silently reusing
+an identity whose package inputs changed. Known entries remain mapped as deletion tombstones. Deleting
+or renaming a new external pack path discovered only by evaluation is currently uncertified;
+[PMC-017](../../docs/initiatives/koan-v1/POST-CYCLE-TODO.md#current-register) owns the automated durable-
+map or fail-closed contract.
 
 For a long reconciliation rehearsal, add `--resume` to `pack`. Existing artifacts are reused only
 after their identity, metadata, symbols policy, and embedded version commit match the manifest.

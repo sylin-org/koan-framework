@@ -20,7 +20,7 @@ validation:
 - **Version lineage**: one serialized linear projection per `dev` event, preserved on
   `automation/package-lineage-dev`.
 - **Selection**: exact identities stored by the prior/current lineage commits, automatic
-  reverse-dependent closure for breaking roots, evaluated shared-input consumers, plus
+  reverse-dependent closure for breaking roots, conservative mapped shared-input consumers, plus
   reconciliation of a current identity absent from nuget.org. The initial lineage is a one-time
   all-owner bootstrap.
 - **Output**: an exact, dependency-ordered manifest and its hashed nupkg/snupkg artifacts.

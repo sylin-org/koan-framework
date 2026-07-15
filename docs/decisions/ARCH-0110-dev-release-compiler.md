@@ -40,8 +40,9 @@ MSBuild. Every packable project must own a project-local `version.json`.
 `SourceCommit` records the `dev` event. The compiler applies the exact source-tree delta onto the
 previous `automation/package-lineage-dev` tip and commits one linear `VersionCommit`. Linear
 projection is load-bearing: importing source merge topology would advance unrelated NBGV heights.
-The first lineage is an explicit all-owner bootstrap. Each lineage commit then stores every package
-owner's exact minted identity. Later events compare that durable inventory with the checked-out
+The first lineage is an explicit all-owner bootstrap and requires its predecessor's package inventory
+to remain evaluable by the pinned toolchain. Each lineage commit then stores every package owner's
+exact minted identity. Later events compare that durable inventory with the checked-out
 `VersionCommit`; they do not recalculate an old release with a newer SDK or NBGV tool.
 
 A deliberate pre-1.0 minor or post-1.0 major advance is a breaking root. The evaluated package graph
@@ -49,9 +50,13 @@ derives its complete transitive reverse-dependent closure. After a provisional c
 NBGV identities, only closure members still equal to their previous identity receive a deterministic
 marker; the final commit is rechecked member by member.
 
-Evaluated repository/ancestor build policy and packed files outside an owner directory are shared
-package inputs. A change fans out to the package owners that consume that input and uses the same
+Known repository/ancestor build policy and evaluated packed files outside an owner directory form a
+conservative per-package input map. A change fans out to mapped package owners and uses the same
 marker/identity proof; it cannot silently alter package bits beneath an unchanged identity.
+Known paths remain mapped as tombstones, so their deletion is visible. The lineage does not yet retain
+arbitrary external pack inputs discovered only by a prior evaluation; deleting or renaming one of
+those paths is not certified until [PMC-017](../initiatives/koan-v1/POST-CYCLE-TODO.md#current-register)
+is resolved or the path is promoted into the known map.
 
 The online plan also reconciles a current identity missing from nuget.org. This makes a retry or an
 initial migration converge without asking an operator to reconstruct the failed subset. The manifest
@@ -91,9 +96,10 @@ no release is reported successful when publication was skipped.
 
 ### 6. Evidence follows success
 
-The workflow creates `release/dev/<source-commit>` and a GitHub release only after the entire release
-set is available. It creates or verifies the tag ref itself at `VersionCommit` without force, then
-uses that existing exact tag; lineage, manifest, and final state are attached.
+For a non-empty release set, the workflow creates `release/dev/<source-commit>` and a GitHub release
+only after the entire release set is available. It creates or verifies the tag ref itself at
+`VersionCommit` without force, then uses that existing exact tag; lineage, manifest, and final state
+are attached. An empty set exits successfully without a tag or release.
 Tags are audit evidence; they never drive package versions or publication.
 
 ## Consequences
@@ -103,11 +109,13 @@ Tags are audit evidence; they never drive package versions or publication.
 - Git contains all routine release intent; advancing `dev` needs no operator ceremony.
 - Unchanged packages are neither rebuilt nor republished during steady-state operation; a generated
   marker means the dependency compatibility contract changed even though application source did not.
-- The artifact a consumer restores is the artifact that passed metadata, closure, advisory, and
-  clean-room behavior checks.
+- An artifact newly pushed by the verified run is the artifact that passed metadata, closure,
+  advisory, and clean-room behavior checks. An immutable identity already present in the registry is
+  existence-reconciled; cross-run byte-hash retention is not claimed.
 - Agents and reviewers can inspect one deterministic manifest instead of reverse-engineering logs.
-- Interrupted same-source publication has an explicit, idempotent recovery path. Cross-event artifact
-  recovery after a later lineage advancement remains uncertified and is tracked as PMC-016.
+- Interrupted same-source publication has an explicit, idempotent identity-reconciliation path.
+  Cross-event artifact recovery after a later lineage advancement remains uncertified and is tracked
+  as [PMC-016](../initiatives/koan-v1/POST-CYCLE-TODO.md#current-register).
 
 ### Trade-offs and boundaries
 
@@ -124,7 +132,9 @@ Tags are audit evidence; they never drive package versions or publication.
   Source ancestry is recorded explicitly rather than merged into its topology.
 - Same-source rerun replays selected symbols/state from the same version commit. If a later lineage
   event has already advanced after a partial symbol publication, automatic cross-event artifact
-  recovery is not yet certified; the workflow fails red rather than claiming that edge is complete.
+  recovery is not yet certified and the missing symbol may remain undetected by that later event. The
+  first trusted publication remains gated by
+  [PMC-016](../initiatives/koan-v1/POST-CYCLE-TODO.md#current-register).
 
 ## Operational contract
 
