@@ -23,6 +23,8 @@ internal static class PackagingConstants
     public const string CoreCompositionTargetPackagePath = "buildTransitive/Sylin.Koan.Core.targets";
     public const string DefaultBeforeRevision = "HEAD~1";
     public const string DefaultAfterRevision = "HEAD";
+    public const string MsBuildDisableNodeReuseEnvironmentVariable = "MSBUILDDISABLENODEREUSE";
+    public const string MsBuildDisableNodeReuseEnvironmentValue = "1";
     public const int EvaluationParallelism = 8;
     public const int PublishAttempts = 5;
     public const int RegistryAttempts = 20;

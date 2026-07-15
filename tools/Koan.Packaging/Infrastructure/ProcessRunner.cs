@@ -26,6 +26,11 @@ internal sealed class ProcessRunner
             startInfo.ArgumentList.Add(argument);
         }
 
+        // Reusable MSBuild workers can outlive their dotnet parent while retaining inherited
+        // redirected pipe handles. Packaging favors deterministic child completion over node reuse.
+        startInfo.Environment[PackagingConstants.MsBuildDisableNodeReuseEnvironmentVariable] =
+            PackagingConstants.MsBuildDisableNodeReuseEnvironmentValue;
+
         using var process = new Process { StartInfo = startInfo };
         process.Start();
         var stdoutTask = CaptureAsync(process.StandardOutput, echo ? Console.Out : null, cancellationToken);

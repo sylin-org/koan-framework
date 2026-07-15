@@ -65,6 +65,10 @@ The verifier builds FirstUse and GoldenJourney in temporary directories outside 
 their public Koan closure. Separate evidence files prevent the larger journey from hiding a shortest-
 path regression.
 
+All subprocesses launched through the packaging runner disable reusable MSBuild worker nodes. This
+keeps redirected output handles owned by the immediate child, so build, restore, evaluation, and pack
+commands reach observable completion instead of depending on build-server lifetime.
+
 ## Failure behavior
 
 Missing version ownership, duplicate IDs, dependency cycles, lineage drift, reserved-path collisions,

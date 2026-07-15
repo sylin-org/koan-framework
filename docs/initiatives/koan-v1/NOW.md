@@ -9,7 +9,7 @@ framework_version: v0.17.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 through R07-03 passed; R07-04 TestKit and host/persistence roots repaired
+  scope: R07-01 through R07-03 passed; R07-04 packaging, TestKit, host, and persistence roots repaired
 ---
 
 # Koan V1 reorganization current handoff
@@ -175,11 +175,10 @@ Only the next slice has a detailed child card. Do not open broker breadth before
   blueprint legs. Its solution-test leg is red and fails closed. Isolated evidence is recorded in
   R07-04; no publication or remote mutation occurred.
 - All five shared TestKit projects now evaluate `IsTestProject=false`; the previously aborting Jobs
-  helper exits without a test host, and focused packaging contracts pass 30/30. Complete 53-test
-  reruns exceeded 240- and 300-second outer timeouts because reusable MSBuild workers retained the
-  Golden Journey build probe's redirected pipe handles. Disabling node reuse externally proves the
-  probe 2/2 and aggregate 53/53; the repository default still requires the bounded harness repair,
-  so aggregate green is not yet claimed.
+  helper exits without a test host. The packaging runner now disables reusable MSBuild worker nodes
+  for its redirected subprocesses, closing the pipe-lifetime hang across source probes and release
+  commands. Executable contracts pass 3/3 and the complete packaging suite passes 53/53 in 1 minute
+  20 seconds without an external environment override.
 - Identity passes 114/114 after one test-local flow-scope base separated fixture lifetime from ambient
   host selection. The expected failed nested host still rejects correctly; no production fallback or
   lease behavior changed.

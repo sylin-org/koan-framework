@@ -66,12 +66,19 @@ Isolated reruns show that the red result is not only whole-solution contention:
 - A release-workflow contract requires every TestKit under `tests/` to retain exactly that explicit
   boundary. The contract class passes 2/2, all five projects evaluate false, and the previously
   aborting direct Jobs TestKit invocation exits successfully without launching a test host.
-- Complete 53-test packaging reruns produced no result before 240- and 300-second outer timeouts;
-  the known child trees were cleaned. Focused lineage, graph, and workflow contracts pass 30/30.
-  A bounded blame run located the wait in the Golden Journey probe's `dotnet build`: reusable MSBuild
-  workers retain redirected pipe handles after the parent exits. With node reuse disabled externally,
-  that probe passes 2/2 and the full suite passes 53/53 in 83 seconds. The repository default remains
-  unproved until that process-lifetime policy is encoded and rerun, so aggregate green is not claimed.
+
+### Deterministic packaging subprocess lifetime — passed
+
+- Complete 53-test packaging reruns initially produced no result before 240- and 300-second outer
+  timeouts; the known child trees were cleaned. Focused lineage, graph, and workflow contracts still
+  passed 30/30.
+- A bounded blame run located the wait in the Golden Journey probe's `dotnet build`: reusable MSBuild
+  workers retained redirected pipe handles after the parent exited. An external node-reuse override
+  first proved the diagnosis with Golden Journey 2/2 and aggregate packaging 53/53.
+- `ProcessRunner` now disables MSBuild worker-node reuse for every packaging subprocess. This one
+  child-scoped policy covers source probes and release-time restore, evaluation, build, and pack
+  commands without an operator environment setting. The executable contracts pass 3/3 and the
+  complete packaging suite passes 53/53 in 1 minute 20 seconds.
 
 ### Identity host selection and Canon persistence — passed
 
@@ -131,13 +138,15 @@ Isolated reruns show that the red result is not only whole-solution contention:
    pattern and add a structural regression so another test kit cannot silently enter the release run.
 3. **Complete.** Repair Identity's explicit test-flow selection and Canon's complete persistence
    boundary; rerun both complete projects and their focused regressions.
-4. Reproduce the five Jobs SQLite failures from a clean isolated output, group them by root, and repair
+4. **Complete.** Make packaging subprocess lifetime deterministic and pass the complete 53-test suite
+   without an operator environment override.
+5. Reproduce the five Jobs SQLite failures from a clean isolated output, group them by root, and repair
    behavior or isolation without lowering assertions.
-5. Resolve the explicit endpoint-precedence decision in
+6. Resolve the explicit endpoint-precedence decision in
    [PMC-012](../../POST-CYCLE-TODO.md#current-register) and rerun Mongo 68/68.
-6. Rerun any remaining provider Jobs failures individually, then run the exact public-release ratchet
+7. Rerun any remaining provider Jobs failures individually, then run the exact public-release ratchet
    from a clean checkout.
-7. Record exact counts, duration, environment-dependent skips, warnings, and the absence of publication
+8. Record exact counts, duration, environment-dependent skips, warnings, and the absence of publication
    or remote mutation before passing this child.
 
 ## Acceptance
