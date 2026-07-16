@@ -82,69 +82,6 @@ internal sealed class PackagePipeline(
         await RequireCleanPackageInputsAsync(cancellationToken);
     }
 
-    public async Task PublishAsync(
-        ReleaseManifest manifest,
-        string artifactDirectory,
-        string apiKey,
-        string statePath,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(apiKey)) throw new InvalidOperationException("NuGet publishing credential is empty.");
-        var state = File.Exists(statePath)
-            ? JsonSerializer.Deserialize<ReleaseState>(await File.ReadAllTextAsync(statePath, cancellationToken), JsonOptions)
-            : null;
-        if (state is not null && state.SchemaVersion != PackagingConstants.ReleaseManifestSchema)
-        {
-            throw new InvalidOperationException(
-                $"Release state uses schema {state.SchemaVersion}; expected {PackagingConstants.ReleaseManifestSchema}.");
-        }
-        state ??= new ReleaseState { VersionCommit = manifest.VersionCommit };
-        if (!string.Equals(state.VersionCommit, manifest.VersionCommit, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("Release state belongs to a different version commit.");
-        }
-
-        foreach (var package in manifest.Packages)
-        {
-            if (state.Packages.TryGetValue(package.Identity, out var disposition) &&
-                string.Equals(disposition, "available", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (package.PackageFile is null) throw new InvalidOperationException($"{package.Identity} has no package artifact in the manifest.");
-            var packagePath = Path.Combine(artifactDirectory, package.PackageFile);
-            await VerifyArtifactHashAsync(packagePath, package.PackageSha256, package.Identity, cancellationToken);
-            string? symbolsPath = null;
-            if (package.SymbolsFile is not null)
-            {
-                symbolsPath = Path.Combine(artifactDirectory, package.SymbolsFile);
-                await VerifyArtifactHashAsync(symbolsPath, package.SymbolsSha256, $"{package.Identity} symbols", cancellationToken);
-            }
-
-            var packageExists = await registry.ExistsAsync(package.PackageId, package.Version, cancellationToken);
-            if (!packageExists)
-            {
-                Console.WriteLine($"push    {package.Identity}");
-                await PushWithRetryAsync(packagePath, apiKey, cancellationToken);
-            }
-            else
-            {
-                Console.WriteLine($"resume  {package.Identity} package exists; reconciling symbols/state");
-            }
-            if (symbolsPath is not null)
-            {
-                // A package push may have succeeded before a symbol push failed. Replaying the
-                // symbol artifact with --skip-duplicate closes that partial-publication window.
-                await PushWithRetryAsync(symbolsPath, apiKey, cancellationToken);
-            }
-
-            await WaitUntilAvailableAsync(package.PackageId, package.Version, cancellationToken);
-            state.Packages[package.Identity] = "available";
-            await SaveStateAsync(state, statePath, cancellationToken);
-        }
-    }
-
     public static async Task SaveManifestAsync(ReleaseManifest manifest, string path, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
@@ -399,22 +336,6 @@ internal sealed class PackagePipeline(
         }
     }
 
-    private async Task PushWithRetryAsync(string packagePath, string apiKey, CancellationToken cancellationToken)
-    {
-        for (var attempt = 1; attempt <= PackagingConstants.PublishAttempts; attempt++)
-        {
-            var result = await processRunner.RunAsync(
-                "dotnet",
-                ["nuget", "push", packagePath, "--source", PackagingConstants.NuGetSource, "--api-key", apiKey, "--skip-duplicate", "--timeout", "300"],
-                repositoryRoot,
-                cancellationToken,
-                echo: true);
-            if (result.ExitCode == 0) return;
-            if (attempt == PackagingConstants.PublishAttempts) throw new InvalidOperationException($"Failed to publish {Path.GetFileName(packagePath)} after {attempt} attempts.");
-            await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
-        }
-    }
-
     private async Task RequireVersionCommitCheckoutAsync(string versionCommit, CancellationToken cancellationToken)
     {
         var head = await processRunner.RequireAsync(
@@ -447,16 +368,6 @@ internal sealed class PackagePipeline(
             throw new InvalidOperationException(
                 $"Package inputs differ from the exact version commit:{Environment.NewLine}{status}");
         }
-    }
-
-    private async Task WaitUntilAvailableAsync(string packageId, string version, CancellationToken cancellationToken)
-    {
-        for (var attempt = 0; attempt < PackagingConstants.RegistryAttempts; attempt++)
-        {
-            if (await registry.ExistsAsync(packageId, version, cancellationToken)) return;
-            await Task.Delay(TimeSpan.FromSeconds(Math.Min(30, 2 + attempt * 2)), cancellationToken);
-        }
-        throw new InvalidOperationException($"Published package {packageId}/{version} did not become available before the registry timeout.");
     }
 
     private static InspectedPackage InspectPackage(string path)
@@ -556,28 +467,6 @@ internal sealed class PackagePipeline(
         await using var stream = File.OpenRead(path);
         return Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken)).ToLowerInvariant();
     }
-
-    private static async Task VerifyArtifactHashAsync(
-        string path,
-        string? expectedHash,
-        string identity,
-        CancellationToken cancellationToken)
-    {
-        if (!File.Exists(path)) throw new InvalidOperationException($"Artifact for {identity} is missing: {path}");
-        if (string.IsNullOrWhiteSpace(expectedHash))
-        {
-            throw new InvalidOperationException($"Manifest has no SHA-256 for {identity}.");
-        }
-        var actualHash = await HashAsync(path, cancellationToken);
-        if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                $"Artifact hash mismatch for {identity}: expected {expectedHash}, found {actualHash}.");
-        }
-    }
-
-    private static async Task SaveStateAsync(ReleaseState state, string path, CancellationToken cancellationToken) =>
-        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(state, JsonOptions) + Environment.NewLine, cancellationToken);
 
     private static void CopyDirectory(string source, string destination)
     {

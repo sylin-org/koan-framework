@@ -44,14 +44,6 @@ internal sealed class ReleasePackage
 
 internal sealed record PackageDependency(string PackageId, string VersionRange, string? MinimumVersion);
 
-internal sealed class ReleaseState
-{
-    [JsonRequired]
-    public int SchemaVersion { get; init; } = PackagingConstants.ReleaseManifestSchema;
-    public required string VersionCommit { get; init; }
-    public Dictionary<string, string> Packages { get; init; } = new(StringComparer.OrdinalIgnoreCase);
-}
-
 internal sealed class ReleaseLineage
 {
     [JsonRequired]

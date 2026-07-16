@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Koan.Packaging.Infrastructure;
 using Koan.Packaging.Models;
 using Koan.Packaging.Services;
@@ -96,6 +97,45 @@ public sealed class ReleaseWaveBundleTests
                 await File.AppendAllTextAsync(fixture.PackagePath, "different bits");
                 break;
         }
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            ReleaseWaveBundle.PrepareAsync(fixture.Preparation(output), CancellationToken.None));
+
+        Assert.Contains(expectedMessage, error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(File.Exists(Path.Combine(output, PackagingConstants.ReleaseWave.MarkerFileName)));
+    }
+
+    [Theory]
+    [InlineData("package", "not present in the active committed lineage")]
+    [InlineData("version", "disagree on version")]
+    [InlineData("project", "disagree on project path")]
+    [InlineData("bootstrap", "disagree on bootstrap state")]
+    public async Task PreparationRejectsManifestAuthorityNotGrantedByCommittedLineage(
+        string mode,
+        string expectedMessage)
+    {
+        using var fixture = await WaveFixture.CreateAsync();
+        var output = fixture.CreateOutputDirectory($"authority-{mode}");
+        var manifest = JsonNode.Parse(await File.ReadAllTextAsync(fixture.ManifestPath))!.AsObject();
+        var package = manifest["packages"]!.AsArray()[0]!.AsObject();
+        switch (mode)
+        {
+            case "package":
+                package["packageId"] = "Sylin.Koan.Unknown";
+                break;
+            case "version":
+                package["version"] = "9.9.9";
+                break;
+            case "project":
+                package["projectPath"] = "src/Other/Other.csproj";
+                break;
+            case "bootstrap":
+                manifest["isLineageBootstrap"] = true;
+                break;
+        }
+        await File.WriteAllTextAsync(
+            fixture.ManifestPath,
+            manifest.ToJsonString(JsonOptions) + "\n");
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             ReleaseWaveBundle.PrepareAsync(fixture.Preparation(output), CancellationToken.None));

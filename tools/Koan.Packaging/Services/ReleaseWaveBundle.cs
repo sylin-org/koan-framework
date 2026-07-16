@@ -433,14 +433,53 @@ internal static class ReleaseWaveBundle
         RequireEqual(lineage.PreviousVersionCommit, manifest.PreviousVersionCommit, "previous version commit");
         RequireEqual(lineage.SourceCommit, manifest.SourceCommit, "source commit");
         RequireEqual(lineage.VersionCommit, manifest.VersionCommit, "version commit");
+        if (lineage.IsBootstrap != manifest.IsLineageBootstrap)
+        {
+            throw new InvalidOperationException(
+                $"Release lineage and manifest disagree on bootstrap state: " +
+                $"'{lineage.IsBootstrap}' versus '{manifest.IsLineageBootstrap}'.");
+        }
+
+        var activeLineage = new Dictionary<string, ReleaseLineagePackage>(StringComparer.OrdinalIgnoreCase);
+        foreach (var package in lineage.Packages)
+        {
+            RequirePackageField(package.PackageId, "lineage package ID");
+            RequirePackageField(package.ProjectPath, $"lineage project path for {package.PackageId}");
+            RequirePackageField(package.Version, $"lineage version for {package.PackageId}");
+            if (!activeLineage.TryAdd(package.PackageId, package))
+            {
+                throw new InvalidOperationException(
+                    $"Release lineage contains duplicate or case-aliased active package '{package.PackageId}'.");
+            }
+        }
 
         var identities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var package in manifest.Packages)
         {
+            RequirePackageField(package.PackageId, "manifest package ID");
+            RequirePackageField(package.ProjectPath, $"manifest project path for {package.PackageId}");
+            RequirePackageField(package.Version, $"manifest version for {package.PackageId}");
             if (!identities.Add(package.Identity))
             {
                 throw new InvalidOperationException($"Release manifest contains duplicate package identity '{package.Identity}'.");
             }
+
+            if (!activeLineage.TryGetValue(package.PackageId, out var recorded))
+            {
+                throw new InvalidOperationException(
+                    $"Release manifest package '{package.Identity}' is not present in the active committed lineage.");
+            }
+            RequireEqual(recorded.PackageId, package.PackageId, $"package ID for {package.Identity}");
+            RequireEqual(recorded.ProjectPath, package.ProjectPath, $"project path for {package.Identity}");
+            RequireEqual(recorded.Version!, package.Version, $"version for {package.PackageId}");
+        }
+    }
+
+    private static void RequirePackageField(string? value, string description)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException($"Release-wave {description} is required.");
         }
     }
 

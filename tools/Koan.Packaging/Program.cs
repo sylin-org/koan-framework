@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Koan.Packaging.Infrastructure;
+using Koan.Packaging.Models;
 using Koan.Packaging.Services;
 
 return await PackagingProgram.RunAsync(args);
@@ -84,19 +85,72 @@ internal static class PackagingProgram
                     Console.WriteLine($"verified  {manifest.Packages.Count} release artifact(s)");
                     return 0;
                 }
-                case "publish":
+                case "wave-bundle":
                 {
                     var manifestPath = Require(options, "manifest");
-                    var artifacts = options.Value("artifacts") ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(manifestPath))!, "packages");
-                    var state = options.Value("state") ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(manifestPath))!, PackagingConstants.StateFileName);
-                    var credentialVariable = options.Value("api-key-env") ?? "NUGET_API_KEY";
-                    var credential = Environment.GetEnvironmentVariable(credentialVariable)
-                        ?? throw new InvalidOperationException($"Environment variable '{credentialVariable}' is not set.");
-                    var manifest = await PackagePipeline.LoadManifestAsync(manifestPath, cancellationToken);
-                    await pipeline.PublishAsync(manifest, artifacts, credential, state, cancellationToken);
-                    Console.WriteLine(
-                        $"published  release set {manifest.VersionCommit[..Math.Min(12, manifest.VersionCommit.Length)]}; " +
-                        $"source={manifest.SourceCommit[..Math.Min(12, manifest.SourceCommit.Length)]}");
+                    var releaseDirectory = Path.GetDirectoryName(Path.GetFullPath(manifestPath))!;
+                    var marker = await ReleaseWaveBundle.PrepareAsync(
+                        new ReleaseWavePreparation(
+                            options.Value("lineage") ?? Path.Combine(releaseDirectory, PackagingConstants.LineageArtifactFileName),
+                            manifestPath,
+                            options.Value("artifacts") ?? Path.Combine(releaseDirectory, "packages"),
+                            options.Value("evidence") ?? releaseDirectory,
+                            options.Value("output") ?? releaseDirectory),
+                        cancellationToken);
+                    Console.WriteLine($"prepared  {marker.TagName}");
+                    Console.WriteLine($"bundle    {marker.Bundle.FileName} {marker.Bundle.Sha256}");
+                    return 0;
+                }
+                case "wave-inspect":
+                {
+                    var coordinator = CreateReleaseWaveCoordinator(
+                        root,
+                        options,
+                        process,
+                        registry,
+                        apiKey: null);
+                    var inspection = await coordinator.InspectAsync(
+                        Require(options, "version-commit"),
+                        cancellationToken);
+                    await WriteInspectionAsync(
+                        inspection,
+                        options.Value("output"),
+                        cancellationToken);
+                    return 0;
+                }
+                case "wave-stage":
+                {
+                    var coordinator = CreateReleaseWaveCoordinator(
+                        root,
+                        options,
+                        process,
+                        registry,
+                        apiKey: null);
+                    var inspection = await coordinator.StageAsync(
+                        Require(options, "marker"),
+                        cancellationToken);
+                    await WriteInspectionAsync(
+                        inspection,
+                        options.Value("output"),
+                        cancellationToken);
+                    return 0;
+                }
+                case "wave-promote":
+                {
+                    var apiKeyVariable = options.Value("api-key-env") ?? "NUGET_API_KEY";
+                    var coordinator = CreateReleaseWaveCoordinator(
+                        root,
+                        options,
+                        process,
+                        registry,
+                        Environment.GetEnvironmentVariable(apiKeyVariable));
+                    var inspection = await coordinator.PromoteAsync(
+                        Require(options, "version-commit"),
+                        cancellationToken);
+                    await WriteInspectionAsync(
+                        inspection,
+                        options.Value("output"),
+                        cancellationToken);
                     return 0;
                 }
                 case "help":
@@ -115,7 +169,7 @@ internal static class PackagingProgram
         }
     }
 
-    private static void PrintPlan(Koan.Packaging.Models.ReleaseManifest manifest, string output)
+    private static void PrintPlan(ReleaseManifest manifest, string output)
     {
         Console.WriteLine($"release  {manifest.PreviousVersionCommit[..12]} -> {manifest.VersionCommit[..12]}");
         Console.WriteLine($"source   {manifest.SourceCommit}");
@@ -127,7 +181,7 @@ internal static class PackagingProgram
         Console.WriteLine($"manifest {Path.GetFullPath(output)}");
     }
 
-    private static void PrintLineage(Koan.Packaging.Models.ReleaseLineage lineage, string output)
+    private static void PrintLineage(ReleaseLineage lineage, string output)
     {
         Console.WriteLine($"lineage  {lineage.PreviousVersionCommit[..12]} -> {lineage.VersionCommit[..12]}");
         Console.WriteLine($"source   {lineage.SourceCommit}");
@@ -143,8 +197,43 @@ internal static class PackagingProgram
           materialize-lineage --version-commit GIT [--output PATH]
           plan      [--lineage PATH] [--output PATH] [--offline]
           pack      --manifest PATH [--output DIR] [--clean-room] [--resume]
-          publish   --manifest PATH [--artifacts DIR] [--state PATH] [--api-key-env NAME]
+          wave-bundle --manifest PATH [--lineage PATH] [--artifacts DIR] [--evidence DIR] [--output DIR]
+          wave-inspect --version-commit GIT [--repository OWNER/REPO] [--scratch DIR] [--output PATH]
+          wave-stage --marker PATH [--repository OWNER/REPO] [--scratch DIR] [--output PATH]
+          wave-promote --version-commit GIT [--repository OWNER/REPO] [--scratch DIR] [--api-key-env NAME] [--output PATH]
         """);
+
+    private static ReleaseWaveCoordinator CreateReleaseWaveCoordinator(
+        string root,
+        CommandOptions options,
+        ProcessRunner process,
+        NuGetRegistry registry,
+        string? apiKey)
+    {
+        var repository = options.Value("repository")
+            ?? Environment.GetEnvironmentVariable("GITHUB_REPOSITORY")
+            ?? throw new InvalidOperationException(
+                "--repository OWNER/REPO is required outside GitHub Actions (GITHUB_REPOSITORY is not set).");
+        var scratch = options.Value("scratch")
+            ?? Path.Combine(root, "artifacts", "release", "wave-scratch");
+        return new ReleaseWaveCoordinator(
+            new GitHubReleaseWaveEscrow(root, repository, process),
+            new NuGetPackagePromotionTarget(root, apiKey, process, registry),
+            scratch);
+    }
+
+    private static async Task WriteInspectionAsync(
+        ReleaseWaveInspection inspection,
+        string? output,
+        CancellationToken cancellationToken)
+    {
+        var json = JsonSerializer.Serialize(
+            inspection,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+        await WriteOutputAsync(output, json, cancellationToken);
+        Console.WriteLine($"wave      {inspection.State} {inspection.TagName}");
+        if (output is not null) Console.WriteLine($"inspection {Path.GetFullPath(output)}");
+    }
 
     private static string Require(CommandOptions options, string name) =>
         options.Value(name) ?? throw new InvalidOperationException($"--{name} is required.");

@@ -3,7 +3,6 @@ namespace Koan.Packaging.Infrastructure;
 internal static class PackagingConstants
 {
     public const string ManifestFileName = "release-set.json";
-    public const string StateFileName = "release-state.json";
     public const string LineageArtifactFileName = "release-lineage.json";
     public const string LineageStateFileName = ".koan-package-lineage.json";
     public const string LineageMarkerFileName = ".koan-package-lineage-marker.json";
