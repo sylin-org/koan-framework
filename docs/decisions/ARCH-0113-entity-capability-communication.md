@@ -645,7 +645,7 @@ Pointwise semantics, not visual symmetry, decide which capabilities grow over se
 | Transport `Send` | flagship scalar/set/stream lift |
 | Relationships | intrinsic Data lift; rebuild key inference and preserve bounded-query facts |
 | Jobs submission | lift only for `IKoanJob` Entities; ledger remains the work truth |
-| AI | lift pointwise `Embed`/`Index`; keep type search and nested-result similarity distinct |
+| AI | ordinary indexing remains `[Embedding]` + Entity Lifecycle; explicit rebuilds remain migration control plane. Do not add source `Embed`/`Index` until a distinct business consumer proves the meaning |
 | Cache | lift Entity-entry eviction only; policy, topology, and flush remain type/control plane |
 | Media | consider derivative/prewarm operations on media-capable Entities after a real contract exists |
 | Canon | retain direct constrained `Canonize`; delete instance-shaped administration |
@@ -715,8 +715,9 @@ attributes, routing APIs, inbox/outbox, batch, retry, and topology claims are no
    conformance kit and do not promote it while any local/network semantic cell differs.
 7. **Internal convergence** — migrate Jobs wake and Cache coherence through their correct internal delivery
    topologies, then delete their Messaging bridge packages and the old Messaging generation.
-8. **Secondary capability lifts** — Relationships, constrained Jobs streams, AI Embed/Index, Cache
-   eviction, and later Media, each as its own business proof.
+8. **Secondary capability lifts** — Relationships and constrained Jobs streams have earned pointwise
+   grammar. The AI inventory instead converges lifecycle, worker, and migration writes without adding
+   a second indexing grammar. Cache eviction and later Media remain separate business proofs.
 9. **Golden proof and bundle admission** — add the final Communication pillar to the foundation bundle
    only after one cumulative source/package journey proves the grammar, startup explanation, tenant
    isolation, failure/recovery, and agent-readable facts.

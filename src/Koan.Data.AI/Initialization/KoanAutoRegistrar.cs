@@ -283,15 +283,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var entity = ctx.Current;
         var metadata = EmbeddingMetadata.Resolve<TEntity>();
 
-        // Compute current content signature
-        var currentSignature = metadata.ComputeSignature(entity);
+        var content = EmbeddingWriter.Describe(entity, metadata);
 
         // Load existing embedding state (if any)
         var stateId = EmbeddingState<TEntity>.MakeId(entity.Id);
         var state = await EmbeddingState<TEntity>.Get(stateId, ctx.CancellationToken);
 
         // Skip if signature unchanged (content hasn't changed)
-        if (state != null && state.ContentSignature == currentSignature)
+        if (state != null && state.ContentSignature == content.Signature)
         {
             return;
         }
@@ -299,45 +298,23 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         if (metadata.Async)
         {
             // Queue for background processing (Phase 3)
-            await QueueEmbeddingJobAsync(entity, metadata, currentSignature, ctx.CancellationToken);
+            await QueueEmbeddingJobAsync(entity, content.Signature, ctx.CancellationToken);
             return;
         }
 
-        // Synchronous embedding generation
-        await GenerateAndStoreEmbedding(entity, metadata, currentSignature, ctx.CancellationToken);
-
-        // Update or create embedding state
-        if (state == null)
-        {
-            state = new EmbeddingState<TEntity>
-            {
-                Id = stateId,
-                EntityId = entity.Id,
-                ContentSignature = currentSignature,
-                LastEmbeddedAt = DateTimeOffset.UtcNow,
-                Model = metadata.Model
-            };
-        }
-        else
-        {
-            state.ContentSignature = currentSignature;
-            state.LastEmbeddedAt = DateTimeOffset.UtcNow;
-            state.Model = metadata.Model;
-        }
-
-        await state.Save(ctx.CancellationToken);
+        await EmbeddingWriter.Write(
+            entity,
+            metadata,
+            content,
+            ct: ctx.CancellationToken).ConfigureAwait(false);
     }
 
     private static async ValueTask QueueEmbeddingJobAsync<TEntity>(
         TEntity entity,
-        EmbeddingMetadata metadata,
         string signature,
         CancellationToken ct)
         where TEntity : class, Koan.Data.Abstractions.IEntity<string>
     {
-        // Build embedding text now (to capture current state)
-        var text = metadata.BuildEmbeddingText(entity);
-
         // Snapshot the Koan context (tenant + access subject) at enqueue. This hook runs inside the caller's Save,
         // so the captured context is exactly the scope the entity lives in. The global worker has no context of its
         // own; resolving the required registry through AppHost makes an incomplete composition fail loudly here.
@@ -355,8 +332,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             if (existingJob.ContentSignature != signature)
             {
                 existingJob.ContentSignature = signature;
-                existingJob.EmbeddingText = text;
-                existingJob.Model = metadata.Model;
                 existingJob.AmbientCarrier = carrierBag;   // re-capture: the enqueuing ambient is the authoritative one
 
                 // Reset retry count if content changed
@@ -383,54 +358,13 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         {
             Id = jobId,
             EntityId = entity.Id,
-            EntityType = typeof(TEntity).Name,
             ContentSignature = signature,
-            EmbeddingText = text,
             Status = EmbedJobStatus.Pending,
             CreatedAt = DateTimeOffset.UtcNow,
-            Model = metadata.Model,
-            MaxRetries = 3, // TODO: Make configurable via EmbeddingWorkerOptions
-            Priority = 0,
             AmbientCarrier = carrierBag
         };
 
         await job.Save(ct);
-    }
-
-    /// <summary>
-    /// Generates embedding and stores it in vector database.
-    /// </summary>
-    private static async ValueTask GenerateAndStoreEmbedding<TEntity>(
-        TEntity entity,
-        EmbeddingMetadata metadata,
-        string signature,
-        CancellationToken ct)
-        where TEntity : class, Koan.Data.Abstractions.IEntity<string>
-    {
-        // Build embedding text
-        var text = metadata.BuildEmbeddingText(entity);
-
-        // Generate embedding with source routing AND the configured embed model — same reason as the async worker:
-        // without the model, a mixed vision+embedding deployment falls through to a non-embedding DefaultModel and
-        // 500s ("does not support embeddings").
-        float[] embedding;
-        using (metadata.Source != null ? Koan.AI.Client.Scope(all: metadata.Source) : null)
-        {
-            embedding = string.IsNullOrWhiteSpace(metadata.Model)
-                ? await Koan.AI.Client.Embed(text, ct)
-                : await Koan.AI.Client.Embed(text, new Koan.AI.Contracts.Options.EmbedOptions { Model = metadata.Model }, ct);
-        }
-
-        // W4 (AI-0036 P2): fail loud before writing if this model would make the index mixed-space.
-        await VectorModelGuard.GuardWrite<TEntity>(metadata.Model, ct: ct);
-
-        // Store in vector database — provenance (AI-0036 W2) + filterable facets (AI-0036 D1).
-        var provenance = VectorProvenance.Build(
-            metadata.Model, metadata.Source, metadata.Version,
-            merge: VectorFilterableMetadata.Extract(entity));
-        // Vector-only: this runs inside the entity's AfterUpsert hook, so the row is already persisted.
-        // SaveWithVector would re-Save the entity, re-firing AfterUpsert -> infinite recursion (stack overflow).
-        await Koan.Data.Vector.VectorData<TEntity>.Save(entity, embedding, provenance, ct);
     }
 
     /// <summary>

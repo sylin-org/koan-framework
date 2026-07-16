@@ -4,10 +4,10 @@ domain: ai
 title: "AI (entity-aware) — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-06-18
-framework_version: v0.17.0
+last_updated: 2026-07-16
+framework_version: v0.19.0
 validation:
-  date_last_tested: 2026-06-18
+  date_last_tested: 2026-07-16
   status: verified
   scope: docs/reference/cards/ai-data.md
 ---
@@ -28,7 +28,6 @@ public sealed class Article : Entity<Article>
 {
     public string Title { get; set; } = "";
     public string Content { get; set; } = "";
-    public float[]? Embedding { get; set; }   // auto-populated on Save
 }
 
 var article = new Article { Title = "Koan", Content = "Entity-first AI." };
@@ -39,6 +38,14 @@ var answer  = await EntityAi.Chat("Summarize this", article); // entity as conte
 ```
 
 `EntityAi` works with or without `[Embedding]` — the attribute gates the auto-embed-on-save lifecycle, not the on-demand verbs.
+The generated vector lives in the selected vector store; Koan does not mutate a `float[]` property on
+the Entity. With `Async = true`, the durable worker reloads the current Entity in its captured logical
+context and writes through the same vector-only boundary as synchronous lifecycle and migration.
+
+There is intentionally no `article.AI.Index()` or collection `Embed()` grammar today. Ordinary index
+intent is `[Embedding]` + `Save`; explicit selected-set and whole-collection rebuilds belong to
+`EmbeddingMigrator`. `EntityAi.Embed(article)` remains the scalar, on-demand transform until a real
+application proves a distinct source-level result and failure contract.
 
 ## ≤5 attributes you'll use
 

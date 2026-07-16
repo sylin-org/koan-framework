@@ -216,13 +216,15 @@ public static class Client
     /// </summary>
     public static async Task<float[]> Embed(string text, EmbedOptions options, CancellationToken ct = default)
     {
+        using var _source = options.Source is not null ? Scope(embed: options.Source) : null;
         var response = await Resolve().Embed(new AiEmbeddingsRequest
-        {
-            Input = new() { text },
-            Model = options.Model,
-            OverrideUrl = options.OverrideUrl,
-            OverrideProvider = options.OverrideProvider,
-        }, ct);
+            {
+                Input = new() { text },
+                Model = options.Model,
+                OverrideUrl = options.OverrideUrl,
+                OverrideProvider = options.OverrideProvider,
+            }, ct)
+            .ConfigureAwait(false);
         return response.Vectors.FirstOrDefault() ?? [];
     }
 

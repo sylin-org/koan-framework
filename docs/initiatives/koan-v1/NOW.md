@@ -9,7 +9,7 @@ framework_version: v0.19.0
 validation:
   date_last_tested: 2026-07-16
   status: reviewed
-  scope: R07-01 through R07-14 passed; Jobs sources share one bounded, inspectable ledger-acceptance path
+  scope: R07-01 through R07-15 passed; embedding lifecycle, worker, and migration share one vector-only write seam
 ---
 
 # Koan V1 reorganization current handoff
@@ -106,6 +106,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
   returns a fixed-size `JobSubmission`; typed failure/cancellation retain the confirmed prefix. The
   duplicate type-level list path, record materialization, and opaque count are gone. Jobs passes
   82/82, Entity Language 25/25, focused SQLite 2/2, and focused tenancy 1/1.
+- [R07-15](work-items/r07/R07-15-embedding-write-convergence.md) passed. The AI inventory adds no
+  duplicate `.Index()` or source `.Embed()` grammar: ordinary indexing remains `[Embedding]` +
+  `Save`, while explicit rebuilds remain migration control plane. Lifecycle, deferred worker, and
+  migrator now share one vector-only writer; queued business text/duplicated policy and inert
+  per-Entity worker knobs are gone. Data.AI passes 87/87 and AI Unit 158/158.
 - Public Messaging guidance is reduced to the truthful legacy v0.17 generation. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -217,8 +222,9 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
     **Passed as R07-12.**
 13. Pointwise Relationships. **Passed as R07-13.**
 14. Constrained pointwise Jobs submission. **Passed as R07-14.**
-15. Inventory AI pointwise `Embed`/`Index` next; admit only a business-proven operation that preserves
-    provider negotiation and does not revive a generic flow abstraction.
+15. Inventory AI pointwise `Embed`/`Index`. **Passed as R07-15:** no duplicate public terminal; one
+    internal writer now owns the common vector seam.
+16. Inventory Entity-entry Cache eviction next; keep policy, topology, and flush at type/control plane.
 
 Only completed/current slices have detailed child cards. Do not open broker breadth before Event
 semantics pass over the local boundary.
@@ -312,12 +318,16 @@ semantics pass over the local boundary.
   evidence passes 2/2 and the tenant-context source seal passes 1/1. Jobs builds warning-as-error; the
   source dogfood compiles against the fixed-size acceptance summary. Packaging and documentation
   closure are recorded in the child card. No release-certification suite was run.
+- R07-15 passes Data.AI 87/87 and AI Unit 158/158. Data.AI builds warning-as-error; S5.Recs compiles;
+  AI 0.18.1 and Data.AI 0.19.0 pack with public companions and exact dependency floors; inventory
+  remains 112. Docs lint has 0 errors, skills pass 20/20, and changed examples pass 2/2. No
+  release-certification suite was run.
 
 ## Next safe action
 
-Inventory AI pointwise `Embed`/`Index`. Start from real application meaning and existing provider
-negotiation; do not open a child card until one scalar/set/stream operation proves it can stay
-business-readable without reviving generic flow machinery or moving AI policy into Data.
+Inventory Entity-entry Cache eviction. Start from real scalar behavior, scope, and topology facts;
+admit a finite/stream lift only if it preserves pointwise meaning and fixed-size partial outcomes.
+Keep policy, region/topology selection, and broad flush operations at the type/control plane.
 
 ## Repository boundary
 

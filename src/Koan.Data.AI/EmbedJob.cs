@@ -31,19 +31,9 @@ public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>, IAmbientExempt
     public Dictionary<string, string>? AmbientCarrier { get; set; }
 
     /// <summary>
-    /// Entity type name (for diagnostics and filtering)
-    /// </summary>
-    public required string EntityType { get; set; }
-
-    /// <summary>
     /// Content signature (SHA256 hash) of the entity content at time of queueing
     /// </summary>
     public required string ContentSignature { get; set; }
-
-    /// <summary>
-    /// Embedding text computed at time of queueing
-    /// </summary>
-    public required string EmbeddingText { get; set; }
 
     /// <summary>
     /// Job status: Pending, Processing, Completed, Failed
@@ -54,11 +44,6 @@ public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>, IAmbientExempt
     /// Number of retry attempts (0 for first attempt)
     /// </summary>
     public int RetryCount { get; set; }
-
-    /// <summary>
-    /// Maximum retry attempts before marking as permanently failed
-    /// </summary>
-    public int MaxRetries { get; set; } = 3;
 
     /// <summary>
     /// Error message if job failed
@@ -79,16 +64,6 @@ public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>, IAmbientExempt
     /// When job completed or failed (null if not finished)
     /// </summary>
     public DateTimeOffset? CompletedAt { get; set; }
-
-    /// <summary>
-    /// Model to use for embedding generation (optional, uses default if null)
-    /// </summary>
-    public string? Model { get; set; }
-
-    /// <summary>
-    /// Priority for job processing (higher = more urgent)
-    /// </summary>
-    public int Priority { get; set; } = 0;
 
     /// <summary>
     /// Creates the durable queue identity for one Entity in one captured Koan context. The unscoped form retains the

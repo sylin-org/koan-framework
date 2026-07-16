@@ -161,6 +161,21 @@ public sealed class ClientTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task Embed_options_source_scopes_the_embed_category_for_the_provider_call()
+    {
+        string? routedSource = null;
+        var fake = new FakePipeline(onEmbed: _ => routedSource = AiCategoryScope.ResolveSource("Embed"));
+
+        using (Koan.AI.Client.With(fake))
+        {
+            await Koan.AI.Client.Embed("text", new EmbedOptions { Source = "embeddings-east" });
+        }
+
+        routedSource.Should().Be("embeddings-east");
+        AiCategoryScope.ResolveSource("Embed").Should().BeNull("the request override must not leak past the call");
+    }
+
     // ========================================================================
     // OCR (delegates through Chat)
     // ========================================================================
@@ -351,6 +366,7 @@ public sealed class ClientTests : IDisposable
         private readonly float[]? _embedVector;
         private readonly string? _embedModel;
         private readonly Action<AiChatRequest>? _onPrompt;
+        private readonly Action<AiEmbeddingsRequest>? _onEmbed;
 
         public FakePipeline(
             string text = "",
@@ -359,7 +375,8 @@ public sealed class ClientTests : IDisposable
             int? tokensOut = null,
             float[]? embedVector = null,
             string? embedModel = null,
-            Action<AiChatRequest>? onPrompt = null)
+            Action<AiChatRequest>? onPrompt = null,
+            Action<AiEmbeddingsRequest>? onEmbed = null)
         {
             _text = text;
             _model = model;
@@ -368,6 +385,7 @@ public sealed class ClientTests : IDisposable
             _embedVector = embedVector;
             _embedModel = embedModel;
             _onPrompt = onPrompt;
+            _onEmbed = onEmbed;
         }
 
         public Task<AiChatResponse> Prompt(AiChatRequest request, CancellationToken ct = default)
@@ -392,6 +410,7 @@ public sealed class ClientTests : IDisposable
 
         public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
         {
+            _onEmbed?.Invoke(request);
             var vectors = request.Input.Select(_ => _embedVector ?? new float[] { 0.1f, 0.2f }).ToList();
             return Task.FromResult(new AiEmbeddingsResponse
             {

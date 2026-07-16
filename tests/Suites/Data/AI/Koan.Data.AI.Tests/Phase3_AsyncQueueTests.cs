@@ -54,9 +54,7 @@ public class Phase3_AsyncQueueTests
         {
             Id = "test-job",
             EntityId = "doc-1",
-            EntityType = "TestDocument",
             ContentSignature = "abc123",
-            EmbeddingText = "test text",
             Status = EmbedJobStatus.Pending,
             CreatedAt = DateTimeOffset.UtcNow
         };
@@ -64,7 +62,6 @@ public class Phase3_AsyncQueueTests
         // Assert
         job.Status.Should().Be(EmbedJobStatus.Pending);
         job.RetryCount.Should().Be(0);
-        job.MaxRetries.Should().Be(3); // Default
     }
 
     [Fact]
@@ -125,7 +122,6 @@ public class Phase3_AsyncQueueTests
 
         // Assert
         metadata.Async.Should().BeTrue();
-        metadata.RateLimitPerMinute.Should().Be(30);
     }
 
 

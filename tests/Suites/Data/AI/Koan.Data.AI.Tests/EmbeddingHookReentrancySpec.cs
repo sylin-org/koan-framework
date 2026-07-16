@@ -34,17 +34,23 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
 {
     private IntegrationHost? _host;
     private readonly FakeEmbedAdapter _embedder = new();
+    private int _asyncDomainUpserts;
 
     public async ValueTask InitializeAsync()
     {
         // The [Embedding] registry is populated by a source generator that does not run on this test assembly
         // through a ProjectReference, so register the type explicitly before AddKoan() wires its hooks.
-        Koan.Data.AI.EmbeddingRegistry.RegisterTypes(new[] { typeof(ReentrancyDoc) });
+        Koan.Data.AI.EmbeddingRegistry.RegisterTypes([typeof(ReentrancyDoc), typeof(AsyncEmbeddingDoc)]);
 
         _host = await KoanIntegrationHost.Configure()
             .WithSetting("Koan:Environment", "Test")
             .WithSetting("Koan:Data:Sources:Default:Adapter", "inmemory")
-            .ConfigureServices(s => { s.AddLogging(); s.AddKoan(); })
+            .ConfigureServices(s =>
+            {
+                s.AddLogging();
+                s.AddKoan(() =>
+                    AsyncEmbeddingDoc.Lifecycle.AfterUpsert(_ => Interlocked.Increment(ref _asyncDomainUpserts)));
+            })
             .StartAsync();
 
         // Register an in-process fake embedder as a routable AI source (Provider == adapter Id) so the sync
@@ -128,12 +134,47 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
         await action.Should().ThrowAsync<ArgumentOutOfRangeException>();
         _embedder.RequestedInputs.Should().Be(before);
     }
+
+    [Fact]
+    public async Task Async_embedding_writes_the_vector_without_resaving_the_domain_entity()
+    {
+        const string id = "async-vector-only";
+
+        await new AsyncEmbeddingDoc { Id = id, Text = "deferred garden notes" }.Save();
+
+        EmbedJob<AsyncEmbeddingDoc>? job = null;
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            job = await EmbedJob<AsyncEmbeddingDoc>.Get(EmbedJob<AsyncEmbeddingDoc>.MakeId(id));
+            if (job?.Status == EmbedJobStatus.Completed)
+            {
+                break;
+            }
+
+            await Task.Delay(50);
+        }
+
+        job.Should().NotBeNull();
+        job!.Status.Should().Be(EmbedJobStatus.Completed);
+        Volatile.Read(ref _asyncDomainUpserts).Should().Be(1,
+            "the worker owns a vector write, not a second persistence operation over the domain Entity");
+
+        var hit = await Vector<AsyncEmbeddingDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, topK: 5);
+        hit.Matches.Should().ContainSingle(match => (string)(object)match.Id == id);
+    }
 }
 
 /// <summary>A 1-arg <see cref="Entity{TEntity}"/> with a synchronous <c>[Embedding]</c>, routed to the in-process vector floor.</summary>
 [Embedding(Template = "{Text}", Model = "test-embed")]
 [VectorAdapter("inmemory")]
 public sealed class ReentrancyDoc : Entity<ReentrancyDoc>
+{
+    public string Text { get; set; } = "";
+}
+
+[Embedding(Async = true, Template = "{Text}", Model = "test-embed")]
+[VectorAdapter("inmemory")]
+public sealed class AsyncEmbeddingDoc : Entity<AsyncEmbeddingDoc>
 {
     public string Text { get; set; } = "";
 }

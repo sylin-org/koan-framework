@@ -31,8 +31,6 @@ public class EmbeddingMetadata
     public string[] Properties { get; init; } = [];
     public bool Async { get; init; }
     public string? Model { get; init; }
-    public int BatchSize { get; init; }
-    public int RateLimitPerMinute { get; init; }
     public string? Source { get; init; }
     public int MaxTokens { get; init; }
     public int MaxDepth { get; init; }
@@ -105,8 +103,6 @@ public class EmbeddingMetadata
             Properties = properties,
             Async = attr.Async,
             Model = attr.Model,
-            BatchSize = attr.BatchSize,
-            RateLimitPerMinute = attr.RateLimitPerMinute,
             Source = attr.Source,
             MaxTokens = attr.MaxTokens,
             MaxDepth = attr.MaxDepth,

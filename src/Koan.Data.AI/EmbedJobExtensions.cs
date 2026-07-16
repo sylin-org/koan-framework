@@ -160,7 +160,7 @@ public static class EmbedJobExtensions
         {
             JobId = j.Id!,
             EntityId = j.EntityId,
-            EntityType = j.EntityType,
+            EntityType = typeof(TEntity).Name,
             Status = j.Status.ToString(),
             Error = j.Error ?? "Unknown error",
             RetryCount = j.RetryCount,

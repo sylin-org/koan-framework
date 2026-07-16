@@ -4,10 +4,10 @@ domain: data
 title: "Vector — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-06-18
-framework_version: v0.17.0
+last_updated: 2026-07-16
+framework_version: v0.19.0
 validation:
-  date_last_tested: 2026-06-18
+  date_last_tested: 2026-07-16
   status: verified
   scope: docs/reference/cards/vector.md
 ---
@@ -30,7 +30,7 @@ public sealed class Media : Entity<Media>
     public string Synopsis { get; set; } = "";
 }
 
-await media.Save();                                  // entity + embedding (Embedding queues vectorization)
+await media.Save();                                  // entity + embedding lifecycle; Async=true defers the vector write
 
 var hits = await Vector<Media>.Search(
     vector: queryVector,                             // float[] — the query embedding

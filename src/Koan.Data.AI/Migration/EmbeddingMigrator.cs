@@ -1,9 +1,6 @@
-using Koan.AI;
-using Koan.AI.Contracts.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Selection;
-using Koan.Data.Vector;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.AI.Migration;
@@ -290,59 +287,15 @@ public static class EmbeddingMigrator
         {
             try
             {
-                // Build embedding text
-                var text = metadata.BuildEmbeddingText(entity);
-                var signature = metadata.ComputeSignature(entity);
-
-                // Generate embedding with target model/source
-                var effectiveModel = targetModel ?? metadata.Model;
-                var effectiveSource = targetSource ?? metadata.Source;
-                float[] embedding;
-                using (effectiveSource is not null ? Client.Scope(embed: effectiveSource) : null)
-                {
-                    embedding = effectiveModel is null && effectiveSource is null
-                        ? await Client.Embed(text, ct).ConfigureAwait(false)
-                        : await Client.Embed(
-                            text,
-                            new EmbedOptions { Model = effectiveModel, Source = effectiveSource },
-                            ct).ConfigureAwait(false);
-                }
-
-                await VectorModelGuard.GuardWrite<TEntity>(effectiveModel, ct: ct).ConfigureAwait(false);
-
-                // Save to vector database — stamp the TARGET model/source so migrated vectors are
-                // distinguishable from un-migrated ones (AI-0036 W3; this is the worst drop site —
-                // the migration's whole purpose is to change the producing model) + filterable facets (D1).
-                var provenance = VectorProvenance.Build(
-                    targetModel ?? metadata.Model, targetSource ?? metadata.Source, metadata.Version, targetProvider,
-                    merge: VectorFilterableMetadata.Extract(entity));
-                // The Entity already exists. A vector-only write avoids re-firing persistence
-                // Lifecycle and recursively scheduling another embedding operation.
-                await VectorData<TEntity>.Save(entity, embedding, provenance, ct).ConfigureAwait(false);
-
-                // Update embedding state
-                var stateId = EmbeddingState<TEntity>.MakeId(entity.Id);
-                var state = await EmbeddingState<TEntity>.Get(stateId, ct);
-
-                if (state == null)
-                {
-                    state = new EmbeddingState<TEntity>
-                    {
-                        Id = stateId,
-                        EntityId = entity.Id,
-                        ContentSignature = signature,
-                        LastEmbeddedAt = DateTimeOffset.UtcNow,
-                        Model = targetModel ?? metadata.Model
-                    };
-                }
-                else
-                {
-                    state.ContentSignature = signature;
-                    state.LastEmbeddedAt = DateTimeOffset.UtcNow;
-                    state.Model = targetModel ?? metadata.Model;
-                }
-
-                await state.Save(ct);
+                var content = EmbeddingWriter.Describe(entity, metadata);
+                await EmbeddingWriter.Write(
+                    entity,
+                    metadata,
+                    content,
+                    targetModel,
+                    targetSource,
+                    targetProvider,
+                    ct).ConfigureAwait(false);
 
                 Interlocked.Increment(ref result.SuccessfulEntities);
             }

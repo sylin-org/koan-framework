@@ -27,8 +27,10 @@ an operation runs; they are not retained by the metadata cache.
 ### On-demand semantic search (no attributes required)
 
 ```csharp
+using static Koan.Data.AI.EntityEmbeddingExtensions;
+
 // Embed and search without any attribute decoration
-var results = await Entity.SemanticSearch<Article>("machine learning basics", limit: 10);
+var results = await SemanticSearch<Article>("machine learning basics", limit: 10);
 var similar  = await someArticle.FindSimilar(limit: 5);
 ```
 
@@ -72,10 +74,16 @@ await article.Save(); // persists the Entity and enqueues its embedding work
 ```
 
 The lifecycle hook is the supported enqueue path today; there is no separate public `QueueAsync` API.
-It captures Koan's registered logical-flow context and restores it before loading the entity. The
-global queue identity includes a value-opaque context fingerprint, so equal Entity ids in different
-tenants or subjects cannot overwrite one another. No embedding-specific application plumbing is
-required. Queue states are `Pending`, `Processing`, `Completed`, `Failed`, and `FailedPermanent`.
+The durable row carries identity, content signature, and an opaque logical-flow context—not business
+text or duplicate provider policy. The worker restores that context, loads the current Entity, and
+uses the same vector-only embedding writer as the synchronous lifecycle and explicit migrator. It
+never re-saves the domain Entity. The global queue identity includes a value-opaque context
+fingerprint, so equal Entity ids in different tenants or subjects cannot overwrite one another. No
+embedding-specific application plumbing is required. Queue states are `Pending`, `Processing`,
+`Completed`, `Failed`, and `FailedPermanent`.
+
+Worker batching, polling, retry, and rate limits are host policy under
+`Koan:Data:AI:EmbeddingWorker`; they are deliberately not repeated on each `[Embedding]` declaration.
 
 `RequeueJob<TEntity>(entityId)` targets the row in the caller's current Koan context. For a
 context-independent operator retry, take the durable `JobId` returned by `GetFailedJobs<TEntity>()`

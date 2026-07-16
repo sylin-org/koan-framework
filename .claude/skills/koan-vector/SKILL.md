@@ -4,7 +4,7 @@ description: Semantic / KNN search over entity embeddings — [Embedding] class 
 pillar: vector
 card: docs/reference/cards/vector.md
 status: current
-last_validated: 2026-06-18
+last_validated: 2026-07-16
 ---
 
 # Koan Vector
@@ -21,7 +21,7 @@ last_validated: 2026-06-18
 
 ## Core principle
 
-**The entity owns the embedding; the package reference chooses the store.** Mark a class with `[Embedding]` to declare *which text gets vectorized* — `Save` then queues vectorization automatically. Search takes a **precomputed query vector** (`float[]`), not a string: embed the query yourself with `Koan.AI.Client.Embed(text)`, then call `Vector<T>.Search(vector, ...)`. The same code runs on Weaviate, Qdrant, or Milvus — the adapter activates by **package reference** (Reference = Intent), so swapping stores is a reference change, not a code change. For provider migration, the raw repository's `ExportAll` / `Upsert` move vectors store-to-store with **zero AI re-embedding calls**.
+**The entity owns the embedding; the package reference chooses the store.** Mark a class with `[Embedding]` to declare *which text gets vectorized* — `Save` then indexes automatically, inline by default or through the durable worker when `Async = true`. Search takes a **precomputed query vector** (`float[]`), not a string: embed the query yourself with `Koan.AI.Client.Embed(text)`, then call `Vector<T>.Search(vector, ...)`. The same code runs on Weaviate, Qdrant, or Milvus — the adapter activates by **package reference** (Reference = Intent), so swapping stores is a reference change, not a code change. For provider migration, the raw repository's `ExportAll` / `Upsert` move vectors store-to-store with **zero AI re-embedding calls**.
 
 <!-- validate -->
 ```csharp
@@ -61,7 +61,7 @@ public sealed class SemanticSearch
         return hits.Matches;                                          // each: .Id, .Score, .Metadata
     }
 
-    // Save persists the entity AND queues its [Embedding] vectorization — no manual vector wiring.
+    // Save persists the entity AND runs its [Embedding] lifecycle — no manual vector wiring.
     public Task Index(Media media, CancellationToken ct = default) => media.Save(ct);
 
     // Provider migration: pull vectors straight from the store, re-upsert — zero AI re-embedding.

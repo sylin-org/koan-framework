@@ -358,6 +358,18 @@ work.
   and yielding it afterward is not a streaming implementation, even when the return type is
   `IAsyncEnumerable<T>`.
 
+## AI embedding and indexing
+
+AI syntax follows business meaning rather than visual symmetry with Events or Transport. Ordinary
+indexing is a consequence of saving an Entity declared with `[Embedding]`; the canonical path is
+therefore `[Embedding]` + `Save()`, owned by Lifecycle. Explicit finite-set and whole-collection
+rebuilds are migration control-plane operations with aggregate outcomes.
+
+There is no generic source `.Index()` or `.Embed()` terminal in the V1 contract. Scalar
+`EntityAi.Embed(entity)` remains an on-demand transform, not a persistence synonym. A future source
+operation must first prove a distinct application intent, bounded source behavior, provider
+negotiation, partial outcomes, and a real consumer; IntelliSense symmetry alone is insufficient.
+
 ## Backend negotiation and operation explanation
 
 Every Entity operation can be described by a stable fact envelope containing, as applicable:

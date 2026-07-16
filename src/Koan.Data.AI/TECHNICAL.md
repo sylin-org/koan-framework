@@ -31,10 +31,16 @@ source: src/Koan.Data.AI/
 - Async embedding enqueue captures the host-owned `KoanContextCarrierRegistry`; the worker restores
   the opaque bag with `ContextIngressTrust.HostTrusted` before loading the entity. The worker names no
   module axis, and absent registered axes are explicitly suppressed.
+- Synchronous lifecycle indexing, deferred worker indexing, and explicit migration converge on one
+  internal embedding writer. It owns embedding-category source/model resolution, mixed-space guard,
+  provenance, vector-only persistence, and state confirmation. Its callers retain their different
+  intents and outcomes; none may re-save the domain Entity.
 - `EmbedJob<TEntity>` is host-scoped storage infrastructure but deliberately exempt from tenant Data
   filtering so the global worker can claim it. Its scoped durable id therefore folds Entity identity
   plus the complete captured bag through `KoanContextFingerprint`; equal Entity ids in different
-  contexts cannot collide, and the id never embeds raw carrier values.
+  contexts cannot collide, and the id never embeds raw carrier values. Queue rows do not persist the
+  embedding text, provider selection, per-row retry limits, or unused priority knobs; the restored
+  current Entity and current type declaration are authoritative.
 
 The discovery registries retain strong `Type` references for the process lifetime. Collectible plugin
 unloading is therefore not a supported scenario. Host activation derived from those facts—including
@@ -51,6 +57,8 @@ the active host; the hook definition does not capture them.
 - A stopped host is not restored as an ambient fallback.
 - Logging is best-effort and cannot poison an Entity metadata type initializer after host disposal.
 - Vector model mismatches fail at the guarded write boundary; inspection remains diagnostic.
+- A vector write may succeed before its embedding-state confirmation fails; the operation then fails
+  and the durable worker retries. Collection atomicity and cross-store rollback are not claimed.
 - The registry decision covers completed write sequences. Atomic exclusion between simultaneous first
   writers requires a provider transaction or conditional-write contract and is not currently claimed.
 

@@ -17,7 +17,6 @@ namespace S5.Recs.Models;
         nameof(Synonyms), nameof(Synopsis), nameof(Genres), nameof(Tags)
     },
     Async = true,
-    RateLimitPerMinute = 60,
     MaxTokens = 8191,  // text-embedding-3-large limit
     Version = 1,
     WarnOnTruncation = true  // Warn in dev if synopsis + tags exceed limit

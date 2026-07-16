@@ -570,12 +570,18 @@ _logger.LogInformation(
 - `Async = true` defers embedding work without changing the application save operation
 - `EmbeddingMigrator.ReEmbed(...)` owns an explicit finite-set rebuild
 - `EmbeddingMigrator.ReEmbedAll<T>(...)` owns an intentional whole-collection model transition
+- Lifecycle, deferred work, and migration share one vector-only writer; none re-save the domain Entity
 
 **Recipe**
 
 - Add `[Embedding]` to the Entity and keep ordinary application code business-focused
 - Use the migrator only for operator-initiated backfills or model transitions
 - Inspect `MigrationResult`; migration is observable but not atomic and does not retry failures
+- Configure deferred throughput and retry once at the host through `EmbeddingWorkerOptions`
+
+There is intentionally no `.Index()` alias or collection `.Embed()` terminal. Ordinary indexing is
+already the Entity lifecycle meaning, while explicit rebuilds have different outcomes and belong to
+the migration control plane.
 
 **Sample – ordinary writes**
 

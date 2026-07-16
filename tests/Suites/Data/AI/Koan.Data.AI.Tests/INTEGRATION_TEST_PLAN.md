@@ -112,7 +112,7 @@ var job = new EmbedJob<TestDocument>
     Id = EmbedJob<TestDocument>.MakeId("doc-1"),
     EntityId = "doc-1",
     Status = EmbedJobStatus.Pending,
-    EmbeddingText = "test text"
+    ContentSignature = "expected-signature"
 };
 await job.Save();
 

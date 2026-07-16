@@ -207,10 +207,11 @@ decrypted values). *(Mutation test: residual filter/sort over a classified non-s
   running the reverse on a hit would force the cache decorator to depend on the classification module. This is a
   **phase-3 gate**, validated before searchable/leak phases, not deferred to phase 5.
 - **Vector / AI** — `[Phi]` is **excluded from embedding at embed-build time**, enforced **inside `BuildEmbeddingText`**
-  (the single chokepoint) so it is *caller-independent*. Two carriers make this sharp: `EmbedJob.EmbeddingText` is itself
-  a durable carrier that must never hold an un-excluded classified value; and the **sync embed hook embeds the in-memory
-  value (ciphertext post-stamp) while the async worker reloads + reverses to plaintext** — so the async path is the real
-  PHI-into-vector-store leak and the `ContentSignature` diverges between them. When `allowEmbedding` is set without a
+  (the single chokepoint) so it is *caller-independent*. R07-15 removes embedding text from the durable `EmbedJob` carrier:
+  the queue stores Entity identity, signature, and opaque context, then the worker restores that context, reloads the
+  current Entity, and rebuilds the text. The **sync embed hook still sees the in-memory value while the async worker
+  reloads + reverses to plaintext**, so caller-independent exclusion remains mandatory even though the queue no longer
+  persists business text. When `allowEmbedding` is set without a
   working scrub there is **no fail-closed backstop** on the vector *write* path (unlike tenancy's search-time
   fail-close), so **scrub-or-deny is mandatory at the chokepoint** (throw `CapabilityDeniedException`). This guard is
   embed-time exclusion, *not* the tenant isolation fail-close — classification protects values, not rows.

@@ -4,7 +4,7 @@ description: Entity-aware AI over Entity<T> — EntityAi.Embed/Chat/Ocr conventi
 pillar: ai
 card: docs/reference/cards/ai-data.md
 status: current
-last_validated: 2026-06-18
+last_validated: 2026-07-16
 ---
 
 # Koan AI
@@ -37,7 +37,6 @@ public sealed class Article : Entity<Article>
 {
     public string Title { get; set; } = "";
     public string Content { get; set; } = "";
-    public float[]? Embedding { get; set; }          // auto-populated on Save
 }
 
 public static class ArticleAi
@@ -81,6 +80,11 @@ The runtime is whichever connector you referenced; no `Type: OpenAI` config, no 
 | `[EmbeddingIgnore]` | Exclude a property from convention-based embedding content. |
 | `[MediaAnalysis(Analysis = MediaAnalysis.Describe \| MediaAnalysis.Ocr)]` | Auto-run vision / OCR / transcription on a `MediaEntity` upload; results feed `[Embedding]` text via `MediaAnalysisEmbeddingBridge`. Convention-detected sinks: `AiDescription`, `OcrText`, `Transcript`, `Category`. |
 
+`[Embedding]` stores the generated vector in the elected vector provider; it does not populate a
+`float[]` property on the Entity. `Async = true` persists only queue identity/signature/context, then
+reloads the current Entity and performs a vector-only write. Worker batch/rate/retry policy is one
+host configuration under `Koan:Data:AI:EmbeddingWorker`, not per-type attribute knobs.
+
 ## The Client facade (Koan.AI)
 
 `Client` is **static** — no DI, no injection. It resolves the configured pipeline and unwraps results:
@@ -90,7 +94,8 @@ The runtime is whichever connector you referenced; no `Type: OpenAI` config, no 
 - `Client.Embed(string, ct)` → `Task<float[]>` · `Client.EmbedBatch(string[], ct)` → `float[][]`
 - `Client.Ocr(byte[], ct)` / `Client.Describe(byte[], ct)` / `Client.Classify` / `Client.Extract<T>` / `Client.Translate` / `Client.Moderate`
 - `Client.Conversation().WithSystem(...).WithUser(...).Send(ct)` → `AiChatResponse`; `.Ask(message, ct)` appends a user turn then sends
-- `Client.Scope(chat: "fast-local", embed: "cloud")` — `IDisposable` per-category routing override
+- `Client.Scope(chat: "fast-local", embed: "cloud")` — `IDisposable` per-category routing override;
+  `Client.Embed(text, new EmbedOptions { Source = "cloud" })` is the call-scoped equivalent
 
 When you need a testable seam, inject `IAiPipeline` and call `Prompt(AiChatRequest, ct)` → `AiChatResponse`. There is **no `IAi` interface**, no `ChatAsync` / `StreamAsync` / `TokenizeAsync`, and `AiChatResponse` exposes **`.Text` only** (no `.Content` / `.Choices` / `.Usage` — the rich metadata lives on `ChatResult` via `Client.ChatResult(...)`).
 

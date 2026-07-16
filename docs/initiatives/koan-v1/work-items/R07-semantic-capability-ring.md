@@ -4,10 +4,10 @@ domain: framework
 title: "R07 - Rebuild the Semantic Capability Ring"
 audience: [architects, maintainers, developers, ai-agents]
 status: draft
-last_updated: 2026-07-15
-framework_version: v0.17.0
+last_updated: 2026-07-16
+framework_version: v0.19.0
 validation:
-  date_last_tested: 2026-07-15
+  date_last_tested: 2026-07-16
   status: in-progress
   scope: greenfield Entity capability, communication, context, and execution architecture
 ---
@@ -197,6 +197,7 @@ cardinality and copy semantics. Neither is a compatibility base for Events or Tr
 | 12 | [Cache coherence convergence](r07/R07-12-cache-coherence-convergence.md) | **Passed.** Cache owns one key invalidation meaning over a distinct every-node Communication route; Redis layered activation and local/Redis/RabbitMQ proofs replace the generic channel model | public generic coherence SPI, no-op catch-up/coalescing, Cache InMemory/Messaging packages, and legacy adapter resolver |
 | 13 | [Pointwise Relationships](r07/R07-13-pointwise-relationships.md) | **Passed.** `Relatives` is one inferred scalar/set/stream Data operation with bounded execution facts | public batch loader, explicit key arguments, and duplicate graph orchestration |
 | 14 | [Pointwise Jobs submission](r07/R07-14-pointwise-job-submission.md) | **Passed.** Scalar and finite/async sources share one context-sealed ledger-acceptance operation with fixed-size partial outcomes | duplicate type-level list submit, record materialization, opaque count, and split scalar/source preparation |
+| 15 | [Embedding write convergence](r07/R07-15-embedding-write-convergence.md) | **Passed.** Ordinary indexing stays `[Embedding]` + `Save`; lifecycle, deferred work, and migration share one vector-only writer without a speculative source API | three write implementations, recursive Entity save, queued business text/duplicate policy, and inert per-Entity worker knobs |
 
 Only the next slice receives a child card. Later rows remain outcomes rather than speculative API
 backlogs until their prerequisites pass.
@@ -244,8 +245,11 @@ backlogs until their prerequisites pass.
     speculative channels, catch-up/coalescing, and legacy bridges are deleted.
 16. Open each later implementation slice only after its lower boundary passes.
 17. Prove in-process semantics before any broker migration or public maturity change.
-18. Inventory AI pointwise `Embed`/`Index`; admit no child until one business-proven meaning and its
-    backend-negotiation boundary are elected.
+18. Inventory AI pointwise `Embed`/`Index`. **Complete as R07-15.** No new public terminal is admitted;
+    ordinary indexing remains Lifecycle, explicit rebuilds remain migration, and one writer now owns
+    the shared vector seam.
+19. Inventory Entity-entry Cache eviction next; admit only a pointwise operation that preserves Cache
+    scope, topology, and partial-outcome truth without lifting policy or flush control plane.
 
 R07-02 was intentionally additive and preceded the Lifecycle source break. R07-03 removed the package-
 lineage stop condition: once R07-04 restores the release floor, public 0.17's lifecycle `Events`
@@ -313,6 +317,10 @@ identity automatically.
   evidence passes 2/2 and focused tenancy context sealing passes 1/1. Jobs builds warning-as-error;
   its independent package, docs, stale-surface, diff, and privacy gates close without release
   certification. See the child card for exact claims and non-claims.
+- R07-15 passes Data.AI 87/87 and AI Unit 158/158. Data.AI builds warning-as-error; S5.Recs compiles;
+  AI 0.18.1 and Data.AI 0.19.0 pack with their public companions and exact dependency floors; package
+  inventory remains 112. Docs lint has 0 errors, skills pass 20/20, and changed marked examples pass
+  2/2. No release-certification suite was run.
 
 ## Acceptance additions
 
