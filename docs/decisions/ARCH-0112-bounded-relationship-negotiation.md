@@ -58,7 +58,7 @@ bound is exceeded.
 
 ### 3. Every public relationship path uses the executor
 
-`Entity.GetChildren`, `Entity.GetRelatives`, collection `Relatives`, governed Web expansion, and the
+`Entity.GetChildren`, scalar/set/stream `Entity.Relatives`, governed Web expansion, and the
 MCP entity surface converge on the executor. Existing Entity method shapes remain and use strict
 policy; overloads accept an explicit policy. Web batches all roots into one child query per edge,
 retains the related type's authorization predicates, and defaults to 200 results per edge with no

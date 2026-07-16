@@ -195,7 +195,7 @@ cardinality and copy semantics. Neither is a compatibility base for Events or Tr
 | 10 | [Provider election and RabbitMQ Transport](r07/R07-10-communication-provider-election.md) | **Passed.** Direct intent elects one semantically eligible provider per lane; rebuilt RabbitMQ carries Transport with confirmed publication, groups, authenticated context, and truthful facts | separate local/external runtimes and legacy RabbitMQ semantics for Entity Transport |
 | 11 | [Jobs wake convergence](r07/R07-11-jobs-wake-convergence.md) | **Passed.** Jobs emits one internal bounded Communication signal; local and RabbitMQ providers preserve the ledger-backed latency contract | public `IJobTransport`, the Jobs Messaging bridge, service-location, and unmanaged fire-and-forget publication |
 | 12 | [Cache coherence convergence](r07/R07-12-cache-coherence-convergence.md) | **Passed.** Cache owns one key invalidation meaning over a distinct every-node Communication route; Redis layered activation and local/Redis/RabbitMQ proofs replace the generic channel model | public generic coherence SPI, no-op catch-up/coalescing, Cache InMemory/Messaging packages, and legacy adapter resolver |
-| 13 | Secondary capability lifts | Relationships, Jobs, AI, Cache, then Media adopt only proven pointwise verbs | fragmented or misleading per-pillar surfaces |
+| 13 | [Pointwise Relationships](r07/R07-13-pointwise-relationships.md) | **Passed.** `Relatives` is one inferred scalar/set/stream Data operation with bounded execution facts | public batch loader, explicit key arguments, and duplicate graph orchestration |
 
 Only the next slice receives a child card. Later rows remain outcomes rather than speculative API
 backlogs until their prerequisites pass.
@@ -301,6 +301,11 @@ identity automatically.
   real RabbitMQ 7/7, and real Redis 5/5. Seven touched package owners pack with exact dependency
   floors; the 112-owner inventory excludes the two deleted coherence packages; automatic retirement
   passes 28/28 focused compiler/Git proofs. No release-certification suite was run.
+- R07-13 passes the Data.Core Relationships matrix 10/10 and Entity Language 22/22. Data.Core builds
+  warning-as-error; S1 compiles the inferred scalar/set/provider-stream grammar; the Data.Core 0.19
+  owner packs and the inventory remains 112. Docs, stale-source, diff, and privacy gates pass without
+  release certification. The complete Data.Core project is not re-claimed by this child: one aggregate
+  attempt exceeded its four-minute slice bound and was terminated.
 
 ## Acceptance additions
 

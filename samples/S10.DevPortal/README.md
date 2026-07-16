@@ -197,7 +197,7 @@ await foreach (var article in Article.AllStream(batchSize: 1000)) {
 }
 
 // Batch relationship loading
-var enrichedArticles = await articles.Relatives<Article, string>();
+var enrichedArticles = await articles.Relatives();
 ```
 
 ### Provider Capability Detection
@@ -296,7 +296,7 @@ if (capabilities.Capabilities.HasFlag(QueryCapabilities.LinqQueries)) {
 ```csharp
 var parent = await order.GetParent<Customer>();
 var children = await customer.GetChildren<Order>();
-var fullGraph = await order.GetRelatives(); // All relationships
+var fullGraph = await order.Relatives(); // All direct relationships
 ```
 
 ### Set-Scoped Operations

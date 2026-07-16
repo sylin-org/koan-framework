@@ -313,7 +313,7 @@ canonical read pipeline.
 ## Amendment 2026-06-19: relationship expansion (`?with=all`) is governed per related type (AN-leak)
 
 The keyed-read amendment gated the *root* row before the expansion branch ran, but the expansion
-itself was still app-authority: `EntityEndpointService` called the raw `Entity<T,K>.GetRelatives()`
+itself was still app-authority: `EntityEndpointService` called the raw `Entity<T,K>.Relatives()`
 loaders, which fetch related rows via `Data<TChild,TKey>.All()` and filter by foreign key in-memory
 with **no request predicates**. That is a second row-level visibility bypass — a caller reads a
 *visible* parent, expands with `?with=all` (REST) or `with: "all"` (MCP), and receives related rows a
@@ -335,7 +335,7 @@ entry points are fixed (GetById and the collection `EnrichRelationships`). MCP r
 duplicated in the transport.
 
 **Scope boundary (deliberate).** The domain traversal API `Entity<T,K>.GetChildren()/GetParents()/
-GetRelatives()` stays **app-authority and unchanged** — service code (no HTTP principal) still sees all
+Relatives()` stays **app-authority** — service code (no HTTP principal) still sees all
 related rows. Request predicates never leak into `Koan.Data.Core`; the clamp lives entirely at the
 `Koan.Web` endpoint layer, where the request context and each related type's hooks exist.
 

@@ -2,6 +2,10 @@
 
 This enhanced S1 sample demonstrates the new relationship system in Koan Framework, showcasing instance-based relationship navigation, batch loading, and streaming capabilities, along with a minimal AngularJS UI.
 
+The application code uses one inferred operation across cardinalities: `todo.Relatives()`,
+`todos.Relatives()`, and `Todo.AllStream().Relatives()`. Parent and child batching, backend safety
+negotiation, and source ordering remain inside Data.Core.
+
 ## Entity Relationships
 
 The sample includes a hierarchical entity structure:

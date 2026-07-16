@@ -21,7 +21,7 @@ namespace Koan.Web.Endpoints;
 /// <summary>
 /// AN-leak (docs/assessment/09 §10) — governed relationship expansion for the agent/HTTP read path.
 ///
-/// Domain <c>Entity&lt;T,K&gt;.GetRelatives()</c> traversal is app-authority: it deliberately has no HTTP
+/// Domain <c>Entity&lt;T,K&gt;.Relatives()</c> traversal is app-authority: it deliberately has no HTTP
 /// request predicates. Reusing it on the agent/HTTP path would let a caller read a visible parent and
 /// receive related rows a direct query of that type would hide (WEB-0068).
 ///

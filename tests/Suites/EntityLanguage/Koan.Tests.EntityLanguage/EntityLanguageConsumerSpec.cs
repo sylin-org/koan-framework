@@ -84,6 +84,21 @@ public sealed class EntityLanguageConsumerSpec
     }
 
     [Fact]
+    public void Data_core_exposes_inferred_scalar_set_and_stream_relationship_enrichment()
+    {
+        var result = Compile("RelationshipsAccess", includeCache: false);
+        result.Succeeded.Should().BeTrue(result.Output);
+    }
+
+    [Fact]
+    public void Relationship_enrichment_rejects_non_entity_sources_at_compile_time()
+    {
+        var result = Compile("InvalidRelationshipsReceiver", includeCache: false);
+        result.Succeeded.Should().BeFalse();
+        result.Output.Should().Contain("Relatives");
+    }
+
+    [Fact]
     public void Removing_cache_makes_the_same_consumer_source_fail_at_the_facet()
     {
         var present = Compile("CacheAccess", includeCache: true);

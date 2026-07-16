@@ -72,9 +72,10 @@ public class Todo : Entity<Todo>
 
 ## 2. Capture Relationships Early
 
-- Store foreign keys as strings for provider neutrality.
-- Offer navigation helpers on both sides so higher layers never reach for repositories.
-- Wrap common lookups inside static methods.
+- Declare foreign keys with `[Parent]`; use the Entity navigation surface rather than repositories.
+- Use `GetParent<T>()` or `GetChildren<T>()` for one explicit edge.
+- Use `Relatives()` only when the business result needs every declared direct edge. The same operation
+  accepts one Entity, a finite selection, or a provider-bounded Entity stream.
 
 ```csharp
 public class Order : Entity<Order>
@@ -85,7 +86,6 @@ public class Order : Entity<Order>
     [Timestamp]
     public DateTimeOffset Created { get; set; }
 
-    public Task<User?> GetUser(CancellationToken ct = default) => User.Get(UserId, ct);
 }
 
 public class User : Entity<User>
@@ -93,6 +93,10 @@ public class User : Entity<User>
     public Task<IReadOnlyList<Order>> GetRecentOrders(CancellationToken ct = default) =>
         Order.Query(o => o.UserId == Id && o.Created > DateTimeOffset.UtcNow.AddDays(-30), ct);
 }
+
+var user = await order.GetParent<User>(ct) ?? throw new InvalidOperationException("Order has no user.");
+var recent = await user.GetChildren<Order>(ct);
+var graphs = await recent.Relatives(ct);
 ```
 
 ---

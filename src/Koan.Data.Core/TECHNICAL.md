@@ -170,7 +170,10 @@ validation:
 
 ## Relationship negotiation
 
-- `IRelationshipQueryExecutor` is the single child-edge execution owner used by Entity, batch, Web,
+- `RelationshipGraphLoader` is the single scalar/set/stream graph-loading owner. It consumes
+  `EntityCardinality`, preserves source order and multiplicity, batches parent keys through `GetMany`,
+  and sends each child edge to `IRelationshipQueryExecutor` once per bounded source batch.
+- `IRelationshipQueryExecutor` remains the child-edge execution owner used by Entity, graph, Web,
   and MCP paths. A batch of roots becomes one `Filter.In` query per edge.
 - `RelationshipQueryPolicy.Strict` accepts native or already-resident InMemory execution and rejects
   scans or residual fallback. It is the default for existing Entity method shapes.
@@ -182,7 +185,7 @@ validation:
 - `RelationshipQueryRejectedException` carries safe relationship/provider/reason/correction fields.
   The latest selected or rejected mode is recorded as `koan.data.relationship.execution` in the
   shared runtime-fact snapshot.
-- This contract covers direct child edges. Parent batching, recursive graph planning, depth budgets,
+- This contract covers direct edges. Recursive graph planning, depth budgets, cross-key-type edges,
   index verification, and fleet-wide performance certification are not included.
 
 ## Observability and security

@@ -56,6 +56,23 @@ var children = await todo.GetChildren<TodoItem>(
 
 This policy bounds candidates before rows escape and never returns a partial relationship.
 
+Load every declared direct edge with the same `Relatives` operation for one Entity, a finite
+selection, or a provider-bounded stream. Model and key types are inferred:
+
+```csharp
+var graph = await todo.Relatives(ct);
+var graphs = await todos.Where(todo => !todo.IsCompleted).Relatives(ct);
+
+await foreach (var current in Todo.QueryStream(todo => !todo.IsCompleted).Relatives(ct))
+{
+    // current.Entity, current.Parents, current.Children
+}
+```
+
+Finite and stream forms preserve source order and multiplicity. Parent edges use batched keyed reads;
+child edges retain the same strict or explicitly bounded negotiation and runtime facts as
+`GetChildren<TChild>`.
+
 Required Entity/Data operations without a usable Koan host throw `KoanHostContextException`. Its
 `Failure`, `Operation`, and `RequiredService` properties distinguish an absent host, a disposed host,
 and a host where the Data module was not composed.

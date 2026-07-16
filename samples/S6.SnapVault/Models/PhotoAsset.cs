@@ -56,7 +56,7 @@ public class PhotoAsset : MediaEntity<PhotoAsset>
     public AiAnalysis? AiAnalysis { get; set; } // Structured AI analysis (tags, summary, facts)
 
     // Smart mode classification cache (avoids repeated classification API calls).
-    // [Parent] makes this a navigable relationship for GetRelatives. Two caveats for the step-5 relatives surface:
+    // [Parent] makes this a navigable relationship for Relatives. Two caveats for the step-5 relatives surface:
     // PhotoAsset now has TWO parents (Event + AnalysisStyle), so callers must use GetParent<AnalysisStyle>() (the
     // non-generic GetParent() throws on multiple parents); and AnalysisStyle is [HostScoped] while PhotoAsset is
     // tenant-scoped — validate cross-scope resolution + nullable (no inference yet) handling when that nav lands.

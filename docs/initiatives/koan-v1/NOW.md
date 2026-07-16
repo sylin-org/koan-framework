@@ -4,12 +4,12 @@ domain: framework
 title: "Koan V1 Reorganization Current Handoff"
 audience: [maintainers, ai-agents]
 status: current
-last_updated: 2026-07-15
+last_updated: 2026-07-16
 framework_version: v0.19.0
 validation:
-  date_last_tested: 2026-07-15
+  date_last_tested: 2026-07-16
   status: reviewed
-  scope: R07-01 through R07-12 passed; Jobs wake and Cache coherence use distinct internal Communication routes
+  scope: R07-01 through R07-13 passed; direct Relationships now lift pointwise without public loader machinery
 ---
 
 # Koan V1 reorganization current handoff
@@ -95,6 +95,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
   uses ephemeral per-node queues. The public generic coherence SPI, speculative catch-up/coalescing,
   two coherence packages, and the legacy adapter resolver are deleted. Communication passes 33/33,
   Cache topology 49/49, real RabbitMQ 7/7, and real Redis 5/5.
+- [R07-13](work-items/r07/R07-13-pointwise-relationships.md) passed. Data now exposes one inferred
+  `Relatives` operation for a scalar Entity, finite selection, or provider-bounded stream. One internal
+  graph loader batches parents through `GetMany` and child edges through the existing bounded executor;
+  the public batch loader, `GetRelatives`, explicit key arguments, and duplicate orchestration are gone.
+  Relationships pass 10/10 and Entity Language 22/22.
 - Public Messaging guidance is reduced to the truthful legacy v0.17 generation. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -290,12 +295,17 @@ semantics pass over the local boundary.
   112-owner inventory excludes both deleted coherence packages. Automatic lineage retirement passes
   28/28 focused compiler/Git proofs, including a first projection with deletions. Warning-as-error
   builds, docs, stale-source, diff, and privacy gates pass; no release-certification suite was rerun.
+- R07-13 passes Relationships 10/10 and Entity Language 22/22. Data.Core builds warning-as-error,
+  S1 compiles the scalar/set/provider-stream grammar, Data.Core 0.19 packs, inventory remains 112,
+  and docs lint has 0 errors. No release-certification suite was run; one non-gating complete Data.Core
+  attempt exceeded the four-minute slice bound and was terminated without a new full-suite claim.
 
 ## Next safe action
 
-Inventory Relationships as the first R07-13 candidate and admit only one pointwise, business-proven
-Entity lift. Prefer deletion and reuse of the existing cardinality substrate; do not add a generic
-flow container, routing grammar, or pillar-symmetry API.
+Inventory constrained Jobs submission as the first R07-14 candidate. Admit a pointwise lift only for
+`IKoanJob` Entities when scalar/set/stream submission preserves ledger truth, bounded acceptance,
+ordering/multiplicity, cancellation, and explicit partial outcomes. Do not add a Jobs facet to ordinary
+Entities or turn the cardinality substrate into a public flow container.
 
 ## Repository boundary
 

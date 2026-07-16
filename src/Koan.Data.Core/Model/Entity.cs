@@ -12,6 +12,7 @@ using Koan.Data.Core;
 using Koan.Data.Core.Transfers;
 using Koan.Data.Core.Lifecycle;
 using Koan.Data.Core.Relationships;
+using Koan.Data.Core.Selection;
 
 namespace Koan.Data.Core.Model
 {
@@ -650,38 +651,24 @@ namespace Koan.Data.Core.Model
         /// Gets the full relationship graph for this entity, including all parents and children.
         /// Returns a RelationshipGraph with selective enrichment - only this entity is enriched.
         /// </summary>
-        public async Task<RelationshipGraph<TEntity>> GetRelatives(CancellationToken ct = default)
-            => await GetRelatives(RelationshipQueryPolicy.Strict, ct);
+        public Task<RelationshipGraph<TEntity>> Relatives(CancellationToken ct = default)
+            => Relatives(RelationshipQueryPolicy.Strict, ct);
 
-        /// <summary>Gets the relationship graph using an explicit execution safety policy for child edges.</summary>
-        public async Task<RelationshipGraph<TEntity>> GetRelatives(RelationshipQueryPolicy policy, CancellationToken ct = default)
+        /// <summary>
+        /// Gets this Entity's direct relationship graph using an explicit execution safety policy for
+        /// child edges. The same operation lifts to finite and asynchronous Entity sources.
+        /// </summary>
+        public async Task<RelationshipGraph<TEntity>> Relatives(RelationshipQueryPolicy policy, CancellationToken ct = default)
         {
-            var relationshipGraph = new RelationshipGraph<TEntity>
+            ArgumentNullException.ThrowIfNull(policy);
+            var loader = Koan.Core.Hosting.App.AppHost.GetRequiredService<RelationshipGraphLoader>("relationship graph loading");
+            var source = EntityCardinality.One((TEntity)(object)this, ct);
+            await foreach (var graph in loader.Load<TEntity, TKey>(source, policy, ct).ConfigureAwait(false))
             {
-                Entity = (TEntity)(object)this
-            };
-
-            // Load all parents
-            relationshipGraph.Parents = await GetParents(ct);
-
-            // Load all children grouped by class name
-            var relationshipService = GetRelationshipService();
-            var childRelationships = relationshipService.GetChildRelationships(typeof(TEntity));
-
-            foreach (var (referenceProperty, childType) in childRelationships)
-            {
-                var children = await LoadChildEntitiesByProperty(childType, referenceProperty, policy, ct);
-
-                var childTypeName = childType.Name;
-                if (!relationshipGraph.Children.ContainsKey(childTypeName))
-                {
-                    relationshipGraph.Children[childTypeName] = new Dictionary<string, IReadOnlyList<object>>();
-                }
-
-                relationshipGraph.Children[childTypeName][referenceProperty] = children;
+                return graph;
             }
 
-            return relationshipGraph;
+            throw new InvalidOperationException($"Relationship graph loading returned no result for {typeof(TEntity).Name}.");
         }
 
         // Helper methods for relationship loading

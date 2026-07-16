@@ -174,8 +174,11 @@ boundaries remain pre-V1 work.
   [`DataAdapterAttribute`](../../../src/Koan.Data.Abstractions/DataAdapterAttribute.cs),
   [`DataCaps`](../../../src/Koan.Data.Abstractions/Capabilities/DataCaps.cs), and core
   [`CapabilitySet`](../../../src/Koan.Core/Capabilities/CapabilitySet.cs).
-- **Executable evidence:** Data.Core passes 349/349. Relationship cells execute InMemory, JSON, and
-  SQLite selection/rejection/bounds; Web relationship passes 7/7; MCP relationship passes 2/2 and MCP
+- **Executable evidence:** Data.Core's last complete baseline passes 349/349. The R07-13 Relationships
+  matrix passes 10/10 and Entity Language passes 22/22; the new cells prove inferred scalar/set/stream
+  and custom-key grammar, parent/child batching, strict/bounded facts, and corrective cross-key
+  rejection. Existing relationship cells execute InMemory, JSON, and SQLite selection/rejection/bounds;
+  Web relationship passes 7/7; MCP relationship passes 2/2 and MCP
   conformance 74/74. R07-02 adds a 42/42 focused stream coordinator proof, one focused SQLite provider
   proof, six shared provider-bounded realization cells, three shared fail-closed cells, and a 5/5
   acceptance plus 7/7 full real Backup consumer proof. [`S10.DevPortal`](../../../samples/S10.DevPortal/README.md) demonstrates provider switching.
@@ -192,7 +195,7 @@ boundaries remain pre-V1 work.
 - **Maturity / safe claim:** `demonstrated`. Koan has a real capability-negotiation model and reports
   major elections; only specifically tested provider combinations may claim parity.
 - **Open risks:** expand the stream sort floor only with new cross-provider proof; verify index
-  sufficiency and performance; design parent batching and recursive graph/depth budgets without turning
+  sufficiency and performance; design recursive graph/depth budgets without turning
   facts into request history.
 
 ### Web/API conventions

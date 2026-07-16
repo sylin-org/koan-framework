@@ -101,7 +101,7 @@ public sealed class GetByIdVisibilitySpecs : IClassFixture<InMemoryAdapterFactor
     [Fact]
     public async Task Relationship_expansion_path_is_also_gated()
     {
-        // ?with=all takes the GetRelatives branch in EntityEndpointService.GetById — the predicate
+        // ?with=all takes the relationship-expansion branch in EntityEndpointService.GetById — the predicate
         // gate must run before it so the expansion path is not a second bypass.
         var response = await GetById("5?with=all"); // hidden-row, anonymous
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);

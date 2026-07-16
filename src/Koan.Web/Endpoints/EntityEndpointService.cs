@@ -461,7 +461,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         if (!string.IsNullOrWhiteSpace(request.With) && request.With.Contains("all", StringComparison.OrdinalIgnoreCase) && model is Entity<TEntity, TKey>)
         {
             // WEB-0068 / AN-leak: relationship expansion must govern every related entity by ITS OWN
-            // type's visibility predicates — domain GetRelatives() is app-authority and would tunnel
+            // type's visibility predicates — domain Relatives() is app-authority and would tunnel
             // hidden rows out through a visible parent. Already inside the partition scope above.
             RelationshipGraph<TEntity> enriched;
             try

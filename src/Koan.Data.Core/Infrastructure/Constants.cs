@@ -43,6 +43,8 @@ public static class Constants
 
     public static class Defaults
     {
+        public const int RelationshipBatchSize = 100;
+
         // Default page size used by facade loops when materializing "All"/"QueryAll" across providers.
         // Keep conservative to balance throughput and memory. Adapters no longer clamp to their own
         // MaxPageSize (that cap was removed); request-time output-layer policy is the right boundary.

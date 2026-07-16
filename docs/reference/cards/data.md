@@ -49,7 +49,7 @@ Use `Entity<T, TKey>` when the key isn't a string. Batch writes: `Todo.UpsertMan
 |---|---|
 | `[Identifier]` | Mark the id property when it isn't the inherited `Id`. |
 | `[Index]` · `[Index(Group="ix", Order=N)]` · `[Index(Ttl=true)]` | Secondary, composite, and time-to-live indexes. |
-| `[Parent(typeof(Category))]` | Declare a relationship edge; enables `.Parent()` / `.Children()` navigation + batch loading. |
+| `[Parent(typeof(Category))]` | Declare a relationship edge; enables `GetParent<T>()`, `GetChildren<T>()`, and scalar/set/stream `Relatives()` navigation. |
 | `[Timestamp]` · `[Timestamp(OnSave=true)]` | Set-once created / every-save modified stamps. |
 | `[DataAdapter("sqlite")]` | Route this entity to a specific provider (`"json"`, `"mongo"`, `"postgres"`, …). |
 

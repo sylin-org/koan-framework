@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core;
-using Koan.Data.Core.Extensions;
 using Koan.Web.Attributes;
 using Koan.Web.Controllers;
 
@@ -128,7 +127,7 @@ public sealed class TodoController : EntityController<Todo>
             TodoItems = await todo.GetChildren<TodoItem>(ct),
 
             // Full relationship graph
-            RelationshipGraph = await todo.GetRelatives(ct)
+            RelationshipGraph = await todo.Relatives(ct)
         };
 
         return Ok(demo);
@@ -141,11 +140,11 @@ public sealed class TodoController : EntityController<Todo>
         var todos = await Todo.FirstPage(5, ct);
 
         // Demonstrate batch relationship loading
-        var enrichedTodos = await todos.Relatives<Todo, string>(ct);
+        var enrichedTodos = await todos.Relatives(ct);
 
         // Demonstrate async streaming (for larger datasets)
         var streamingResults = new List<object>();
-        await foreach (var enriched in Todo.AllStream(batchSize: 3).Relatives<Todo, string>(ct))
+        await foreach (var enriched in Todo.AllStream(batchSize: 3).Relatives(ct))
         {
             streamingResults.Add(new
             {
