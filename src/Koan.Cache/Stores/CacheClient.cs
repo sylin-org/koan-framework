@@ -127,7 +127,7 @@ internal sealed class CacheClient : ICacheClient
 
         if (normalized.ForceCoherenceBroadcast)
         {
-            await _coherence.BroadcastEvict(key, normalized.Region, ct).ConfigureAwait(false);
+            await _coherence.BroadcastEvict(key, ct).ConfigureAwait(false);
             _instrumentation.RecordInvalidation(key.Value, LayeredProviderTag, "write-broadcast");
         }
     }
@@ -137,7 +137,7 @@ internal sealed class CacheClient : ICacheClient
         var success = await _layered.Evict(key, ct).ConfigureAwait(false);
         _instrumentation.RecordRemove(key.Value, LayeredProviderTag, success);
         // Removes always broadcast — peers must drop their L1 entries even if the key wasn't present locally.
-        await _coherence.BroadcastEvict(key, region: null, ct).ConfigureAwait(false);
+        await _coherence.BroadcastEvict(key, ct).ConfigureAwait(false);
         return success;
     }
 

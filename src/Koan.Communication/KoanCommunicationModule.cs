@@ -47,6 +47,9 @@ public sealed class KoanCommunicationModule : KoanModule
         module.SetSetting(Constants.Provenance.FrameworkSignalsAdapter, builder => builder
             .Label("Framework-signal provider")
             .Value("runtime election (see Koan facts)"));
+        module.SetSetting(Constants.Provenance.FrameworkBroadcastsAdapter, builder => builder
+            .Label("Framework-broadcast provider")
+            .Value("runtime election (see Koan facts)"));
         module.SetSetting(Constants.Provenance.Capacity, builder => builder
             .Label("Bounded local queue")
             .Value(options.InProcessCapacity.ToString(CultureInfo.InvariantCulture)));

@@ -33,8 +33,10 @@ working tree.
 For every breaking root, the graph computes its complete transitive reverse closure. After a
 provisional projection commit exposes the actual NBGV identities, only closure members that still
 match their previous identity receive a deterministic package-local marker. The commit is amended,
-and every closure member is checked again for a fresh identity. Source-owned reserved state/marker
-paths, deletion/rename, non-forward source, graph cycles, and incomplete identity waves fail closed.
+and every closure member is checked again for a fresh identity. A deleted owner becomes a permanent
+lineage retirement: its final ID/path/version remain reserved and no new artifact is planned. Reuse,
+rename, source-owned reserved state/marker paths, non-forward source, graph cycles, and incomplete
+identity waves fail closed.
 Each lineage commit must have exactly the recorded single parent and, after removing generated
 state/markers, a tree byte-identical to `SourceCommit`. Manual branch commits and source-continuity
 drift are rejected before the next projection.

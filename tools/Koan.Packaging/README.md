@@ -33,10 +33,16 @@ dotnet run --project tools/Koan.Packaging -- pack `
 `lineage` intentionally switches a clean checkout to its dedicated local lineage branch and creates
 one commit. Run that command only in the protected workflow or a disposable rehearsal checkout. Omit
 `--previous-lineage` only when initializing a new lineage. That first projection is an explicit
-bootstrap wave: every package owner receives a fresh identity, preventing an existing package identity
-from being rebuilt with different bits or repository metadata. Bootstrap evaluates its predecessor's
-package inventory with the pinned toolchain; that predecessor must remain evaluable. Once bootstrapped,
-stored identities replace historical version recalculation.
+bootstrap wave: every active package owner receives a fresh identity, preventing an existing package
+identity from being rebuilt with different bits or repository metadata. Bootstrap evaluates its
+predecessor's package inventory with the pinned toolchain; that predecessor must remain evaluable.
+Owners deleted by the source range are recorded as retired at their last calculated identity and do
+not produce an artifact. Once bootstrapped, stored identities replace historical version recalculation.
+
+Deleting a package project plus its version owner is complete retirement intent. The compiler removes
+it from the active graph, permanently records its final package ID/path/version, and publishes nothing
+for that retired owner. A retired ID or path can never return with different bits. Package renames
+remain unsupported: introduce a genuinely new ID and path instead, allowing the old owner to retire.
 
 The protected workflow persists that lineage commit, runs the complete public-release green ratchet,
 and proves the checkout stayed clean before it invokes `plan` and `pack`.

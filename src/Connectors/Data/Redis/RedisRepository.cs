@@ -21,7 +21,7 @@ namespace Koan.Data.Connector.Redis;
 /// <para>The backend keeps its Redis-native enrichments: native key TTL — a single-property <c>[Index(Ttl = true)]</c>
 /// timestamp expires its key via an atomic <c>SET … PX</c> (<see cref="DataCaps.Retention"/>.TtlIndex, mirroring Mongo's
 /// <c>expireAfterSeconds = 0</c>; DATA-0101) — and non-blocking fast remove (<c>UNLINK</c>). Like the in-memory
-/// reference it scans the keyspace and evaluates the filter in memory, so it declares <see cref="FilterSupport.Full"/>
+/// reference it scans the keyspace and evaluates the filter in memory, so it declares <c>full filter support</c>
 /// as operator-correctness (not pushdown efficiency).</para>
 /// </summary>
 internal sealed class RedisRepository<TEntity, TKey> : KeyValueStore<TEntity, TKey>

@@ -66,43 +66,6 @@ public sealed class CacheRegistrationAnalyzerSpec
     }
 
     [Fact]
-    public async Task Bare_TryAddEnumerable_with_ICacheCoherenceChannel_fires_KOAN0001()
-    {
-        const string source = """
-            using System;
-            using System.Threading;
-            using System.Threading.Tasks;
-            using Koan.Cache.Abstractions.Coherence;
-            using Microsoft.Extensions.DependencyInjection;
-            using Microsoft.Extensions.DependencyInjection.Extensions;
-
-            internal sealed class BadChannel : ICacheCoherenceChannel
-            {
-                public string TransportName => "bad";
-                public CoherenceCapabilities Capabilities => default;
-                public ValueTask Publish(CacheInvalidation m, CancellationToken ct) => default;
-                public ValueTask Subscribe(Func<CacheInvalidation, CancellationToken, ValueTask> h, CancellationToken ct) => default;
-                public ValueTask<string?> CatchUp(string? c, Func<CacheInvalidation, CancellationToken, ValueTask> h, CancellationToken ct) => default;
-            }
-
-            public static class BadRegistration
-            {
-                public static void Register(IServiceCollection services)
-                {
-                    services.TryAddSingleton<BadChannel>();
-                    services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheCoherenceChannel>(sp => sp.GetRequiredService<BadChannel>()));
-                }
-            }
-            """;
-
-        var diagnostics = await RunAnalyzer(source);
-
-        diagnostics.Where(d => d.Id == CacheRegistrationAnalyzer.DiagnosticId)
-            .Should().ContainSingle()
-            .Which.GetMessage().Should().Contain("ICacheCoherenceChannel").And.Contain("AddCoherenceChannel");
-    }
-
-    [Fact]
     public async Task Two_generic_form_does_not_fire()
     {
         // The CORRECT shape — exactly what the typed helpers emit internally. Must stay silent.

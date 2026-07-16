@@ -64,8 +64,8 @@ set. Ordinary leaf changes remain independent.
 - Known shared-input paths remain mapped as deletion tombstones. Lineage state does not yet retain an
   arbitrary external pack path found only by a prior MSBuild evaluation; its later deletion or rename
   remains the bounded [PMC-017](../../POST-CYCLE-TODO.md#current-register) edge.
-- Package deletion/rename, reserved marker collisions, non-forward source history, graph cycles, and
-  incomplete closure fail before packing or publication.
+- Package renames, retired-ID/path reuse, reserved marker collisions, non-forward source history,
+  graph cycles, and incomplete closure fail before packing or publication.
 - The initial implementation changes no application/runtime API and does not publish, push, tag, or
   release from a developer checkout.
 
@@ -74,10 +74,15 @@ set. Ordinary leaf changes remain independent.
 - One serialized workflow job favors correctness and inspectability over maximum release throughput.
 - Source-event identity remains visible in summaries alongside the exact version commit.
 
-### OPEN
+### R07-12 amendment — automatic package retirement
 
-- Package deletion and rename may gain an explicit migration protocol later. They are unsupported in
-  the first automatic-lineage contract rather than inferred from incomplete after-tree evidence.
+- A package-owner deletion is now complete Git intent. Its last ID/path/version moves into the
+  cumulative lineage retirement ledger and no replacement artifact is planned or published.
+- Bootstrap calculates the predecessor inventory before applying the source range, so packages
+  deleted anywhere in the first automated wave retire without operator input.
+- Retired IDs and paths are permanently reserved. Reintroduction and rename still fail closed.
+- Focused compiler and real-Git proofs cover post-bootstrap retirement, first-wave retirement,
+  no-artifact planning, persistence into later events, and reuse rejection.
 
 ## Architecture guardrails
 

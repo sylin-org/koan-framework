@@ -30,7 +30,7 @@ public interface ICacheEntryBuilder<T>
 
     /// <summary>
     /// Toggle coherence broadcast on writes through this builder. Default is on
-    /// (writes broadcast invalidations to peer nodes when a coherence channel is registered).
+    /// (writes broadcast invalidations to peer L1 caches when an every-node provider is active).
     /// </summary>
     ICacheEntryBuilder<T> BroadcastInvalidation(bool value = true);
 

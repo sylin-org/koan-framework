@@ -20,6 +20,7 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
         var transport = router?.For(CommunicationLane.Transport);
         var events = router?.For(CommunicationLane.Events);
         var frameworkSignals = router?.For(CommunicationLane.FrameworkSignals);
+        var frameworkBroadcasts = router?.For(CommunicationLane.FrameworkBroadcasts);
 
         builder.AddElection(
             Constants.Diagnostics.Subjects.Transport,
@@ -75,6 +76,7 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
         builder.AddConfigKey(Constants.Configuration.TransportProvider);
         builder.AddConfigKey(Constants.Configuration.EventsProvider);
         builder.AddConfigKey(Constants.Configuration.FrameworkSignalsProvider);
+        builder.AddConfigKey(Constants.Configuration.FrameworkBroadcastsProvider);
 
         builder.AddElection(
             Constants.Diagnostics.Subjects.FrameworkSignals,
@@ -91,12 +93,41 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
                 Constants.Diagnostics.Capabilities.BoundedSignalEgress
             ]);
 
-        var signalBindings = services.GetServices<FrameworkSignalTargetBinding>().ToArray();
+        var frameworkBindings = services.GetServices<FrameworkMessageTargetBinding>().ToArray();
+        var signalBindings = frameworkBindings
+            .Where(static binding => binding.Lane == CommunicationLane.FrameworkSignals)
+            .ToArray();
         builder.AddObservation(
             Constants.Diagnostics.Codes.FrameworkSignalGroupsDiscovered,
             Constants.Diagnostics.Subjects.FrameworkSignalGroups,
             $"Koan registered {signalBindings.Length} internal framework-signal group(s); " +
             "signals are bounded latency hints and are not an application Messaging API.",
+            Constants.Diagnostics.Reasons.TypedDiscovery,
+            typeof(CommunicationCompositionContributor).FullName);
+
+        builder.AddElection(
+            Constants.Diagnostics.Subjects.FrameworkBroadcasts,
+            frameworkBroadcasts?.AdapterId ?? Constants.Transport.InProcessAdapter,
+            frameworkBroadcasts?.Reason ?? Constants.Diagnostics.Reasons.BuiltInFloor,
+            frameworkBroadcasts?.Priority,
+            source: typeof(CommunicationCompositionContributor).FullName,
+            factCode: Constants.Diagnostics.Codes.FrameworkBroadcastsSelected);
+        builder.AddCapability(
+            Constants.Diagnostics.Subjects.FrameworkBroadcasts,
+            [
+                Constants.Diagnostics.Capabilities.InternalFrameworkBroadcasts,
+                Constants.Diagnostics.Capabilities.EveryActiveNode,
+                Constants.Diagnostics.Capabilities.BestEffortFallback,
+                Constants.Diagnostics.Capabilities.BoundedSignalEgress
+            ]);
+        var broadcastBindings = frameworkBindings
+            .Where(static binding => binding.Lane == CommunicationLane.FrameworkBroadcasts)
+            .ToArray();
+        builder.AddObservation(
+            Constants.Diagnostics.Codes.FrameworkBroadcastNodesDiscovered,
+            Constants.Diagnostics.Subjects.FrameworkBroadcastNodes,
+            $"Koan registered {broadcastBindings.Length} node-scoped framework-broadcast binding(s); " +
+            "each active node within provider reach receives its own copy.",
             Constants.Diagnostics.Reasons.TypedDiscovery,
             typeof(CommunicationCompositionContributor).FullName);
         if (options is not null)

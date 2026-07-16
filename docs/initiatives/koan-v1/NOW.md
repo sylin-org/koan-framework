@@ -5,11 +5,11 @@ title: "Koan V1 Reorganization Current Handoff"
 audience: [maintainers, ai-agents]
 status: current
 last_updated: 2026-07-15
-framework_version: v0.18.0
+framework_version: v0.19.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 through R07-11 passed; Jobs wake now uses the Communication provider boundary
+  scope: R07-01 through R07-12 passed; Jobs wake and Cache coherence use distinct internal Communication routes
 ---
 
 # Koan V1 reorganization current handoff
@@ -89,6 +89,12 @@ Replace this file at every handoff. It is a restart point, not a diary.
   reference changes reach, and the ledger/poll remains correctness. Jobs passes 77/77, Communication
   31/31, and real RabbitMQ 6/6. Public `IJobTransport`, the in-process implementation, the Jobs
   Messaging package, its service locator, and unmanaged fire-and-forget path are deleted.
+- [R07-12](work-items/r07/R07-12-cache-coherence-convergence.md) passed. Cache now owns one
+  peer-key invalidation meaning over Communication's distinct every-node route. Local carriage is
+  automatic; Redis activates as a layered capability only when it owns L2; direct RabbitMQ intent
+  uses ephemeral per-node queues. The public generic coherence SPI, speculative catch-up/coalescing,
+  two coherence packages, and the legacy adapter resolver are deleted. Communication passes 33/33,
+  Cache topology 49/49, real RabbitMQ 7/7, and real Redis 5/5.
 - Public Messaging guidance is reduced to the truthful legacy v0.17 generation. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -118,7 +124,7 @@ await order.Transport.Send(ct);
 
 - Data owns `Lifecycle` and never knows Communication.
 - One Communication pillar owns distinct Events occurrence semantics, Transport snapshot semantics,
-  and an internal framework-signal mechanism that is not an application bus.
+  and internal competing-group/every-node carriage routes that are not an application bus.
 - Scalar, finite-set, and lazy-stream forms share one pointwise meaning; no batch atomicity is implied.
 - Data.Core owns only Entity cardinality normalization; each pillar owns its callbacks, execution, and
   outcomes.
@@ -279,15 +285,17 @@ semantics pass over the local boundary.
   signal/coalescing/submission and direct-provider broker carriage. Communication, Jobs, and RabbitMQ
   build warning-as-error; the obsolete Jobs Messaging project/package/test and public transport seam
   are gone. Focused pack/docs/lock/diff/privacy gates pass; no release-certification suite was rerun.
+- R07-12 passes Communication 33/33, Cache topology 49/49, Cache Abstractions 51/51, Analyzer 6/6,
+  real RabbitMQ 7/7, and real Redis 5/5. Seven touched owners pack with exact dependency floors; the
+  112-owner inventory excludes both deleted coherence packages. Automatic lineage retirement passes
+  28/28 focused compiler/Git proofs, including a first projection with deletions. Warning-as-error
+  builds, docs, stale-source, diff, and privacy gates pass; no release-certification suite was rerun.
 
 ## Next safe action
 
-Open one bounded Cache coherence inventory child. Preserve its distinct requirements—delivery to each
-node rather than one competing replica, layered Redis capability activation, optional catch-up,
-coalescing, required/auto-detect posture, and TTL-bounded staleness. Decide whether Communication can
-carry that contract without public routing grammar; do not force it through the Jobs worker-group
-shape or delete the Cache Messaging bridge before parity. Do not add retries, channels, or broker
-breadth speculatively.
+Inventory Relationships as the first R07-13 candidate and admit only one pointwise, business-proven
+Entity lift. Prefer deletion and reuse of the existing cardinality substrate; do not add a generic
+flow container, routing grammar, or pillar-symmetry API.
 
 ## Repository boundary
 

@@ -33,6 +33,13 @@ internal sealed class CommunicationRouter
         | CommunicationAdapterCapabilities.MessageIdentity
         | CommunicationAdapterCapabilities.BoundedAcceptance;
 
+    private static readonly CommunicationAdapterCapabilities FrameworkBroadcastRequirements =
+        CommunicationAdapterCapabilities.ContractIdentity
+        | CommunicationAdapterCapabilities.SnapshotCopy
+        | CommunicationAdapterCapabilities.NodeFanOut
+        | CommunicationAdapterCapabilities.MessageIdentity
+        | CommunicationAdapterCapabilities.BoundedAcceptance;
+
     private readonly IReadOnlyDictionary<CommunicationLane, CommunicationRouteDecision> _routes;
     private readonly IReadOnlyDictionary<string, BoundTarget> _bindings;
     private readonly CommunicationAdapterHost _host;
@@ -46,7 +53,7 @@ internal sealed class CommunicationRouter
         KoanApplicationReferenceManifest references,
         ApplicationIdentitySnapshot application,
         CommunicationHandlerCatalog handlers,
-        IEnumerable<FrameworkSignalTargetBinding> frameworkSignals,
+        IEnumerable<FrameworkMessageTargetBinding> frameworkSignals,
         CommunicationIngress ingress,
         IOptions<CommunicationOptions> options,
         ILogger<CommunicationRouter> logger)
@@ -86,6 +93,12 @@ internal sealed class CommunicationRouter
                 CommunicationLane.FrameworkSignals,
                 options.Value.FrameworkSignalsProvider,
                 FrameworkSignalRequirements,
+                candidates,
+                references),
+            [CommunicationLane.FrameworkBroadcasts] = Elect(
+                CommunicationLane.FrameworkBroadcasts,
+                options.Value.FrameworkBroadcastsProvider,
+                FrameworkBroadcastRequirements,
                 candidates,
                 references)
         };
@@ -241,8 +254,9 @@ internal sealed class CommunicationRouter
                     transportBinding.EntityType,
                     wire.Payload,
                     wire.Context),
-                FrameworkSignalTargetBinding signalBinding => new FrameworkSignalEnvelope(
+                FrameworkMessageTargetBinding signalBinding => new FrameworkSignalEnvelope(
                     wire.OperationId,
+                    wire.Lane,
                     signalBinding.SignalType,
                     wire.Payload),
                 _ => throw new InvalidDataException("The Communication binding has an unsupported target type.")
@@ -293,7 +307,9 @@ internal sealed class CommunicationRouter
             : [];
         var automatic = direct.Length > 0
             ? direct
-            : laneCandidates.Where(static candidate => candidate.Descriptor.IsBuiltIn).ToArray();
+            : laneCandidates
+                .Where(static candidate => candidate.Descriptor.IsBuiltIn || candidate.Descriptor.IsLayered)
+                .ToArray();
         var eligible = automatic
             .Where(candidate => (candidate.Descriptor.Capabilities & requirements) == requirements)
             .OrderByDescending(static candidate => candidate.Descriptor.Assurance)
@@ -313,7 +329,11 @@ internal sealed class CommunicationRouter
         return Decision(
             lane,
             selected,
-            direct.Length > 0 ? "direct-reference-intent" : "built-in-floor",
+            direct.Length > 0
+                ? "direct-reference-intent"
+                : selected.Descriptor.IsLayered
+                    ? "layered-capability"
+                    : "built-in-floor",
             directIntent: direct.Length > 0);
     }
 
@@ -372,15 +392,14 @@ internal sealed class CommunicationRouter
         {
             if (string.IsNullOrWhiteSpace(candidate.Descriptor.Id))
                 throw new InvalidOperationException("A Communication adapter declares an empty provider identity.");
-            if (candidate.Descriptor.Lanes.Count == 0)
-                throw new InvalidOperationException(
-                    $"Communication adapter '{candidate.Descriptor.Id}' declares no semantic lane.");
+            // A layered adapter may deliberately declare zero active lanes when the corresponding engine is
+            // present but not selected. Dormant candidates remain inert and are never started or elected.
         }
     }
 
     private static IReadOnlyDictionary<string, BoundTarget> BuildBindings(
         CommunicationHandlerCatalog handlers,
-        IEnumerable<FrameworkSignalTargetBinding> frameworkSignals)
+        IEnumerable<FrameworkMessageTargetBinding> frameworkSignals)
     {
         var result = new Dictionary<string, BoundTarget>(StringComparer.Ordinal);
         foreach (var target in handlers.TransportReceivers)
@@ -395,9 +414,11 @@ internal sealed class CommunicationRouter
             Add(result, target, CommunicationLane.Events, contract);
         }
 
-        foreach (var target in frameworkSignals.OrderBy(static target => target.ContractId, StringComparer.Ordinal))
+        foreach (var target in frameworkSignals
+                     .OrderBy(static target => target.Lane)
+                     .ThenBy(static target => target.ContractId, StringComparer.Ordinal))
         {
-            Add(result, target, CommunicationLane.FrameworkSignals, target.ContractId);
+            Add(result, target, target.Lane, target.ContractId, target.Scope);
         }
 
         return result;
@@ -407,7 +428,8 @@ internal sealed class CommunicationRouter
         IDictionary<string, BoundTarget> result,
         CommunicationTargetBinding target,
         CommunicationLane lane,
-        string contract)
+        string contract,
+        CommunicationBindingScope scope = CommunicationBindingScope.ConsumerGroup)
     {
         var id = $"{lane.ToString().ToLowerInvariant()}|{contract}|{target.GroupIdentity}";
         var declaration = new CommunicationAdapterBinding(
@@ -415,7 +437,8 @@ internal sealed class CommunicationRouter
             lane,
             Constants.Transport.DefaultChannel,
             contract,
-            target.GroupIdentity);
+            target.GroupIdentity,
+            scope);
         result.Add(id, new BoundTarget(declaration, target));
     }
 

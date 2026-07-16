@@ -8,6 +8,14 @@
 
 ---
 
+> **Implementation amendment (R07-12, 2026-07-15):** `Koan.Cache.Adapter.Redis` continues to consume
+> the data connector's canonical `IConnectionMultiplexer` for both L2 storage and its layered Redis
+> `FrameworkBroadcasts` adapter. Cache no longer owns a RabbitMQ or Messaging bridge; when RabbitMQ carries
+> peer invalidation, `Koan.Communication.Connector.RabbitMq` owns the broker connection and Cache sees only
+> the provider-neutral Communication route.
+
+---
+
 ## Context
 
 Phase 2 of the `feat/koan-cache-pillar` work surfaced a cross-pillar registration race: both `Koan.Data.Connector.Redis` and `Koan.Cache.Adapter.Redis` registered `IConnectionMultiplexer`. The data connector used `AddSingleton` (forced); the cache adapter used `TryAddSingleton` (skipped if present). The data connector's registration therefore won, and its connection-string resolution read from a different config key (`Koan:Data:Redis:ConnectionString`) than the cache adapter (`Cache:Redis:Configuration`). Apps that set only the cache adapter's key silently connected to the wrong Redis (the data connector's default discovery resolved to `localhost:6379`).
@@ -43,7 +51,7 @@ Each **shared transport resource** has exactly one **canonical owner package**. 
 | Resource | Owner package | Canonical config key | Consumers (current) |
 |---|---|---|---|
 | `IConnectionMultiplexer` (Redis) | `Koan.Data.Connector.Redis` | `Koan:Data:Redis:ConnectionString` | `Koan.Cache.Adapter.Redis`, `Koan.Service.Inbox.Connector.Redis`, future Cache.Coherence.Redis-Streams |
-| `IConnection` (RabbitMQ) | `Koan.Messaging.Connector.RabbitMq` | `Koan:Messaging:RabbitMq:ConnectionString` (TBD) | `Koan.Cache.Coherence.Messaging` (via `IMessageBus`, not `IConnection` directly — see notes) |
+| `IConnection` (RabbitMQ) | `Koan.Communication.Connector.RabbitMq` | `Koan:Communication:RabbitMq:ConnectionString` | Communication Transport and internal framework routes; Cache consumes only the provider-neutral broadcast route |
 | `IHttpClientFactory` | `Koan.Core` (via `Microsoft.Extensions.Http`) | n/a (no connection string) | All AI adapters, Web.Auth adapters |
 | Postgres `NpgsqlDataSource` (future) | `Koan.Data.Connector.Postgres` | `Koan:Data:Postgres:ConnectionString` | `Koan.Data.Connector.PGVector` |
 

@@ -2,26 +2,28 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Adapter.Redis.Tests.Support;
+using Koan.Communication.Signals;
+using Koan.Core.Diagnostics;
 
 namespace Koan.Cache.Adapter.Redis.Tests.Specs;
 
 /// <summary>
 /// The M4 cornerstone integration test: two Koan cache nodes share one Redis container and
 /// one pub/sub channel. Proves the asymmetric coherence model end-to-end with real wire
-/// transport — writes on node A broadcast EvictKey via Redis pub/sub, node B's L1 evicts,
+/// transport — writes on node A broadcast a peer invalidation via Redis pub/sub, node B's L1 evicts,
 /// and node B's next read returns the fresh value from L2.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>Why this test matters:</b> every unit spec in <c>Koan.Tests.Cache.*</c> uses an
-/// in-process fake coherence bus. This is the only spec that proves the Redis adapter's
-/// serialization, channel naming, and pub/sub delivery actually work against a real Redis
+/// process-local provider. This spec proves the Redis adapter's Communication wire,
+/// channel naming, and pub/sub delivery actually work against a real Redis
 /// daemon. If this passes, the multi-instance story is real.
 /// </para>
 /// <para>
 /// <b>Asymmetric model recap</b> (per ARCH-0075):
 /// <list type="bullet">
-///   <item>Writer (A) write-through to L1 + L2, then broadcasts EvictKey.</item>
+///   <item>Writer (A) write-through to L1 + L2, then broadcasts the changed key.</item>
 ///   <item>Peer (B) receives → evicts its L1 (L1 only — never L2, never re-broadcast).</item>
 ///   <item>Peer's next read goes L1 (miss) → L2 (hit, fresh) → populates L1.</item>
 /// </list>
@@ -47,10 +49,21 @@ public sealed class RedisCoherenceCornerstoneSpec(RedisFixture fixture, ITestOut
 
         var clientA = nodeA.Provider.GetRequiredService<ICacheClient>();
         var clientB = nodeB.Provider.GetRequiredService<ICacheClient>();
+        nodeA.Provider.GetRequiredService<IFrameworkSignalPublisher>().BroadcastProviderId.Should().Be("redis-cache");
+        nodeB.Provider.GetRequiredService<IFrameworkSignalPublisher>().BroadcastProviderId.Should().Be("redis-cache");
+        var facts = nodeA.Provider.GetRequiredService<IKoanRuntimeFacts>().Current.Facts;
+        facts.Should().Contain(fact =>
+            fact.Code == "koan.communication.framework-broadcasts.selected"
+            && fact.ReasonCode == "layered-capability"
+            && fact.Summary.Contains("'redis-cache'", StringComparison.Ordinal));
+        facts.Should().Contain(fact =>
+            fact.Code == "koan.cache.coherence.selected"
+            && fact.Subject == "cache:coherence"
+            && fact.Summary.Contains("'redis-cache'", StringComparison.Ordinal));
 
         var key = new CacheKey($"coherence-{token}");
 
-        // 1. A writes v1 (write-through L1+L2, broadcasts EvictKey).
+        // 1. A writes v1 (write-through L1+L2, broadcasts the changed key).
         await clientA.CreateEntry<string>(key)
             .WithAbsoluteTtl(TimeSpan.FromMinutes(5))
             .Set("v1", ct);
@@ -59,7 +72,7 @@ public sealed class RedisCoherenceCornerstoneSpec(RedisFixture fixture, ITestOut
         var read1 = await clientB.CreateEntry<string>(key).Get(ct);
         read1.Should().Be("v1");
 
-        // 3. A overwrites with v2 — broadcasts EvictKey via real Redis pub/sub.
+        // 3. A overwrites with v2 — broadcasts the changed key via real Redis pub/sub.
         await clientA.CreateEntry<string>(key)
             .WithAbsoluteTtl(TimeSpan.FromMinutes(5))
             .Set("v2", ct);
@@ -105,7 +118,7 @@ public sealed class RedisCoherenceCornerstoneSpec(RedisFixture fixture, ITestOut
         (await clientB.CreateEntry<string>(key1).Get(ct)).Should().Be("alpha");
         (await clientB.CreateEntry<string>(key2).Get(ct)).Should().Be("beta");
 
-        // A flushes the tag — broadcasts EvictByTag via Redis pub/sub.
+        // A flushes the tag — each removed key emits the same peer-invalidation contract.
         var removed = await clientA.FlushTags(new[] { tag }, ct);
         removed.Should().Be(2);
 

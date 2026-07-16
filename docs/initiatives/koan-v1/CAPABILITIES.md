@@ -224,11 +224,11 @@ boundaries remain pre-V1 work.
 - **Entry point and owner:** [`Koan.Communication`](../../../src/Koan.Communication/README.md) owns both
   semantic lanes and its minimum-priority process-local provider. A direct
   [`RabbitMQ Communication connector`](../../../src/Connectors/Communication/RabbitMq/README.md)
-  reference elects RabbitMQ for Transport and internal framework signals without changing application
-  code; Events stay local. Jobs wake uses that internal lane automatically and exposes no application bus.
-- **Executable evidence:** Communication passes 31/31 local semantic/election tests; Jobs passes
+  reference elects RabbitMQ for Transport and internal framework routes without changing application
+  code; Events stay local. Jobs wake uses competing groups; Cache peer invalidation uses every-node delivery.
+- **Executable evidence:** Communication passes 33/33 local semantic/election tests; Jobs passes
   77/77 including local signal/coalescing/submission behavior. The connector's real RabbitMQ container
-  passes 6/6 for direct-intent election, confirmed persistent publication,
+  passes 7/7 for direct-intent election, confirmed persistent publication,
   two-group isolated fan-out, authenticated tenant restoration, mandatory no-route failure, boot
   facts, elected health, and zero-configuration orchestration intent.
 - **Inspection and failure:** startup/operator/agent facts report lane provider, reason, priority,
@@ -236,12 +236,12 @@ boundaries remain pre-V1 work.
   critical to health; unavailable direct intent never falls back to local reach.
 - **Unsupported / compatibility:** RabbitMQ Events, logical channel authoring, retry, dedupe,
   inbox/outbox, dead letters, replay, schema negotiation, remote settlement, exactly-once effects, and
-  Cache coherence convergence are not supported. Legacy `Koan.Messaging` remains a separate
-  bridge-era API for surviving consumers and is not the implementation behind Entity Communication.
+  application-authored framework signals are not supported. Legacy `Koan.Messaging` is not the
+  implementation behind Entity Communication.
 - **Maturity / safe claim:** `verified` for the process-local ring and the named RabbitMQ Transport
   guarantees above. No broader production-mesh or provider-parity claim follows.
 - **Open risks:** add compatibility aliases/version negotiation before heterogeneous deployments;
-  preserve Cache's node-broadcast/layered activation semantics before moving its bridge.
+  provider-specific broadcast durability and replay require separate proof.
 
 ### Jobs and scheduling
 
@@ -270,23 +270,24 @@ boundaries remain pre-V1 work.
   attributes/extensions; Koan resolves stores, policy, tiers, and coherence.
 - **Entry point and owner:** [`CacheableAttribute`](../../../src/Koan.Cache.Abstractions/Policies/CacheableAttribute.cs),
   the module-owned [`EntityCacheFacet`](../../../src/Koan.Cache/Entity/EntityCacheFacet.cs),
-  [`EntityCacheExtensions`](../../../src/Koan.Cache/Extensions/EntityCacheExtensions.cs), and
-  [`CacheAdapterResolver`](../../../src/Koan.Cache/Adapters/CacheAdapterResolver.cs).
+  [`EntityCacheExtensions`](../../../src/Koan.Cache/Extensions/EntityCacheExtensions.cs), typed stores,
+  and the Cache-owned peer-invalidation coordinator over Communication.
 - **Executable evidence:** the
   [cross-engine suite](../../../tests/Suites/Cache/CrossEngine/Koan.Tests.Cache.CrossEngine/Koan.Tests.Cache.CrossEngine.csproj)
   passes 14/14; the
   [Entity-language consumer suite](../../../tests/Suites/EntityLanguage/Koan.Tests.EntityLanguage/Koan.Tests.EntityLanguage.csproj)
   passes 9/9 for module absence/presence/removal, receiver validity, collision safety, explanation,
-  compatibility operations, corrective failure, and repeated-host resolution. Additional topology,
-  coherence, Redis, and SQLite projects exist but were not all run.
-- **Inspection and failure:** topology and capabilities are explicit; instrumentation, trace filtering,
-  and health checks exist. An obsolete compatibility shim still produces build warnings.
-- **Unsupported / compatibility:** R02 does not certify cross-node failure recovery, Redis production
-  behavior, every invalidation race, or all consistency modes.
+  compatibility operations, corrective failure, and repeated-host resolution. Cache Abstractions pass
+  51/51, topology passes 49/49, analyzer passes 6/6, and Communication passes 33/33. Real Redis passes
+  5/5 and real RabbitMQ passes 7/7, including every-node carriage.
+- **Inspection and failure:** composition facts and health report topology, coherence mode, elected carrier,
+  assurance, L1-only receipt, origin filtering, and the L1-TTL safety bound. Invalid provider pins fail loud.
+- **Unsupported / compatibility:** no durable replay/catch-up, retry, dedupe, multi-carrier publication,
+  remote settlement, or global flush wire contract is claimed.
 - **Maturity / safe claim:** `verified`. The tested cache contract and cross-engine semantics pass;
   production coherence guarantees remain topology- and provider-specific.
-- **Open risks:** eliminate compatibility residue and make freshness, fallback, and invalidation facts
-  visible in startup/health output.
+- **Open risks:** production guarantees remain provider/topology-specific; durable replay requires a real
+  use case and provider contract before the surface grows.
 
 ### AI, vector, and semantic capabilities
 
@@ -390,7 +391,9 @@ boundaries remain pre-V1 work.
   [`Directory.Build.props`](../../../Directory.Build.props), compatibility ranges in
   [`build/compat-ranges.targets`](../../../build/compat-ranges.targets), and NBGV
   [`version.json`](../../../version.json).
-- **Executable evidence:** the release compiler inventories 113 independently versioned owners. A
+- **Executable evidence:** the release compiler inventories 112 independently versioned owners after
+  deleting the two cache-specific coherence packages. Focused package-lineage tests pass 28/28 for
+  permanent no-artifact retirement in both established and first-projection histories. A
   fresh Git-derived rehearsal selected and verified 84 packages: 45 changed versions and 39
   unpublished-current registry repairs. Its package-only clean room copied the exact public
   [`FirstUse`](../../../samples/FirstUse/FirstUse.csproj) and

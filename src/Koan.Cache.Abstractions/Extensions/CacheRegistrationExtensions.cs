@@ -1,4 +1,3 @@
-using Koan.Cache.Abstractions.Coherence;
 using Koan.Cache.Abstractions.Stores;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -41,19 +40,6 @@ public static class CacheRegistrationExtensions
         services.TryAddSingleton<TStore>();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<ICacheStore, TStore>(sp => sp.GetRequiredService<TStore>()));
-        return services;
-    }
-
-    /// <summary>
-    /// Register a concrete <see cref="ICacheCoherenceChannel"/> implementation. Mirrors
-    /// <see cref="AddCacheStore{TStore}"/> for the coherence channel collection.
-    /// </summary>
-    public static IServiceCollection AddCoherenceChannel<TChannel>(this IServiceCollection services)
-        where TChannel : class, ICacheCoherenceChannel
-    {
-        services.TryAddSingleton<TChannel>();
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ICacheCoherenceChannel, TChannel>(sp => sp.GetRequiredService<TChannel>()));
         return services;
     }
 }

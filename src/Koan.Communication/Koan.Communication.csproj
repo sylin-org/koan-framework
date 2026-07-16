@@ -22,7 +22,10 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Koan.Jobs" />
+    <InternalsVisibleTo Include="Koan.Cache" />
     <InternalsVisibleTo Include="Koan.Communication.Tests" />
     <InternalsVisibleTo Include="Koan.Communication.Connector.RabbitMq.Tests" />
+    <InternalsVisibleTo Include="Koan.Tests.Cache.Topology" />
+    <InternalsVisibleTo Include="Koan.Cache.Adapter.Redis.Tests" />
   </ItemGroup>
 </Project>

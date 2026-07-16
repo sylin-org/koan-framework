@@ -17,8 +17,8 @@ using StackExchange.Redis;
 namespace Koan.Cache.Adapter.Redis.Stores;
 
 /// <summary>
-/// Distributed L2 cache store backed by Redis. Pure storage — coherence is the responsibility
-/// of <c>RedisCoherenceChannel</c> in the <c>Koan.Cache.Adapter.Redis.Coherence</c> namespace.
+/// Distributed L2 cache store backed by Redis. Pure storage; Cache owns invalidation meaning and
+/// the layered Redis Communication capability owns physical node broadcast.
 /// </summary>
 [ProviderPriority(100)]
 public sealed class RedisCacheStore : ICacheStore

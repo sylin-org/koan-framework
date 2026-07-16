@@ -23,13 +23,18 @@ internal sealed class RabbitMqCommunicationAdapter(
 {
     private static readonly CommunicationAdapterDescriptor AdapterDescriptor = new(
         Constants.ProviderId,
-        [CommunicationLane.Transport, CommunicationLane.FrameworkSignals],
+        [
+            CommunicationLane.Transport,
+            CommunicationLane.FrameworkSignals,
+            CommunicationLane.FrameworkBroadcasts
+        ],
         CommunicationDeliveryAssurance.DurablyAcknowledged,
         CommunicationAdapterCapabilities.ContractIdentity
         | CommunicationAdapterCapabilities.SnapshotCopy
         | CommunicationAdapterCapabilities.ContextCarriage
         | CommunicationAdapterCapabilities.TypedGroups
         | CommunicationAdapterCapabilities.GroupFanOut
+        | CommunicationAdapterCapabilities.NodeFanOut
         | CommunicationAdapterCapabilities.MessageIdentity
         | CommunicationAdapterCapabilities.BoundedAcceptance,
         [Constants.ProjectReference, Constants.PackageReference]);
@@ -229,11 +234,12 @@ internal sealed class RabbitMqCommunicationAdapter(
         CancellationToken ct)
     {
         var queue = Topology.Queue(host.MeshId, binding);
+        var nodeScoped = binding.Scope == CommunicationBindingScope.Node;
         await _consumer!.QueueDeclareAsync(
                 queue,
-                durable: true,
+                durable: !nodeScoped,
                 exclusive: false,
-                autoDelete: false,
+                autoDelete: nodeScoped,
                 cancellationToken: ct)
             .ConfigureAwait(false);
         await _consumer.QueueBindAsync(

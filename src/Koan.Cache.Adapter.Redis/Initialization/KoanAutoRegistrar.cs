@@ -3,20 +3,21 @@ using Koan.Cache.Adapter.Redis.Coherence;
 using Koan.Cache.Adapter.Redis.Options;
 using Koan.Cache.Adapter.Redis.Stores;
 using Koan.Cache.Abstractions.Extensions;
+using Koan.Communication.Adapters;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace Koan.Cache.Adapter.Redis.Initialization;
 
 /// <summary>
 /// Reference = Intent: referencing <c>Koan.Cache.Adapter.Redis</c> auto-registers BOTH the
-/// Redis storage (<see cref="RedisCacheStore"/> as the L2 tier) AND the Redis pub/sub
-/// coherence channel (<see cref="RedisCoherenceChannel"/>). The coherence coordinator then
-/// activates automatically in <c>CoherenceMode.AutoDetect</c>.
+/// Redis storage (<see cref="RedisCacheStore"/> as the L2 tier) and a layered Redis
+/// every-node Communication capability (<see cref="RedisCacheCommunicationAdapter"/>).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -33,9 +34,9 @@ namespace Koan.Cache.Adapter.Redis.Initialization;
 /// <para>
 /// What this adapter still owns: cache-specific options (<see cref="RedisCacheAdapterOptions.KeyPrefix"/>,
 /// <see cref="RedisCacheAdapterOptions.TagPrefix"/>, <see cref="RedisCacheAdapterOptions.Database"/>,
-/// <see cref="RedisCacheAdapterOptions.InstanceName"/>), the coherence-channel name
-/// (<c>RedisCoherenceChannelOptions.ChannelName</c>), and the <c>ICacheStore</c> +
-/// <c>ICacheCoherenceChannel</c> registrations.
+/// <see cref="RedisCacheAdapterOptions.InstanceName"/>), the broadcast channel name
+/// (<c>RedisCacheBroadcastOptions.ChannelName</c>), and the <c>ICacheStore</c> and
+/// node-broadcast provider registrations.
 /// </para>
 /// </remarks>
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
@@ -47,25 +48,26 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         // Options
         services.AddKoanOptions<RedisCacheAdapterOptions>(CacheConstants.Configuration.Redis.Section);
-        services.AddKoanOptions<RedisCoherenceChannelOptions>(CacheConstants.Configuration.Redis.Section);
+        services.AddKoanOptions<RedisCacheBroadcastOptions>(CacheConstants.Configuration.Redis.Section);
         services.PostConfigure<RedisCacheAdapterOptions>(opts =>
         {
             if (string.IsNullOrWhiteSpace(opts.KeyPrefix)) opts.KeyPrefix = "cache:";
             if (string.IsNullOrWhiteSpace(opts.TagPrefix)) opts.TagPrefix = "cache:tag:";
         });
-        services.PostConfigure<RedisCoherenceChannelOptions>(opts =>
+        services.PostConfigure<RedisCacheBroadcastOptions>(opts =>
         {
             if (string.IsNullOrWhiteSpace(opts.ChannelName)) opts.ChannelName = "koan-cache";
         });
 
         // IConnectionMultiplexer is registered by Koan.Data.Connector.Redis (the canonical
         // owner, per ARCH-0080). This adapter does not duplicate that registration; it just
-        // injects the multiplexer into RedisCacheStore and RedisCoherenceChannel via DI.
+        // injects the multiplexer into RedisCacheStore and RedisCacheCommunicationAdapter via DI.
 
         // Typed registration helpers hide the descriptor shape so the indistinguishable-
         // descriptor bug class can't return through this adapter.
         services.AddCacheStore<RedisCacheStore>();
-        services.AddCoherenceChannel<RedisCoherenceChannel>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<ICommunicationAdapter, RedisCacheCommunicationAdapter>());
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
@@ -75,7 +77,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var prefix = Configuration.Read(cfg, CacheConstants.Configuration.Redis.KeyPrefix, "cache:");
 
         module.AddSetting("CacheStore", "redis (Remote, [ProviderPriority(100)])");
-        module.AddSetting("CoherenceChannel", "redis-pubsub ([ProviderPriority(100)])");
+        module.AddSetting("FrameworkBroadcasts", "redis-cache ([ProviderPriority(100)], active with Redis L2)");
         module.AddSetting("ChannelName", channel ?? "koan-cache");
         module.AddSetting("KeyPrefix", prefix ?? "cache:");
         module.AddNote("IConnectionMultiplexer is owned by Koan.Data.Connector.Redis (per ARCH-0080); this adapter injects it.");

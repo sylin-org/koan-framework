@@ -194,7 +194,7 @@ cardinality and copy semantics. Neither is a compatibility base for Events or Tr
 | 9 | [Direct-reference intent](r07/R07-09-direct-reference-intent.md) | **Passed.** Core records direct package/project provenance separately from the transitive module closure, ready for truthful provider eligibility | assembly-presence inference and Communication-specific build machinery |
 | 10 | [Provider election and RabbitMQ Transport](r07/R07-10-communication-provider-election.md) | **Passed.** Direct intent elects one semantically eligible provider per lane; rebuilt RabbitMQ carries Transport with confirmed publication, groups, authenticated context, and truthful facts | separate local/external runtimes and legacy RabbitMQ semantics for Entity Transport |
 | 11 | [Jobs wake convergence](r07/R07-11-jobs-wake-convergence.md) | **Passed.** Jobs emits one internal bounded Communication signal; local and RabbitMQ providers preserve the ledger-backed latency contract | public `IJobTransport`, the Jobs Messaging bridge, service-location, and unmanaged fire-and-forget publication |
-| 12 | Cache coherence convergence | Preserve node broadcast, layered activation, catch-up posture, and bounded staleness before replacing its Messaging bridge | Cache Messaging bridge only |
+| 12 | [Cache coherence convergence](r07/R07-12-cache-coherence-convergence.md) | **Passed.** Cache owns one key invalidation meaning over a distinct every-node Communication route; Redis layered activation and local/Redis/RabbitMQ proofs replace the generic channel model | public generic coherence SPI, no-op catch-up/coalescing, Cache InMemory/Messaging packages, and legacy adapter resolver |
 | 13 | Secondary capability lifts | Relationships, Jobs, AI, Cache, then Media adopt only proven pointwise verbs | fragmented or misleading per-pillar surfaces |
 
 Only the next slice receives a child card. Later rows remain outcomes rather than speculative API
@@ -238,7 +238,9 @@ backlogs until their prerequisites pass.
     latency-hint meaning; Communication owns local/network carriage, provider election, health, wire,
     lifecycle, and facts. The old Jobs Messaging package and public transport seam are deleted after
     local and real RabbitMQ parity.
-15. Inventory Cache coherence against its stronger broadcast/layered contract before changing it.
+15. Converge Cache coherence on its distinct every-node Communication route. **Complete.** Origin
+    filtering, L1-only receipt, layered Redis activation, and TTL-bounded staleness pass while
+    speculative channels, catch-up/coalescing, and legacy bridges are deleted.
 16. Open each later implementation slice only after its lower boundary passes.
 17. Prove in-process semantics before any broker migration or public maturity change.
 
@@ -293,6 +295,12 @@ identity automatically.
 - R07-10 passes Communication 31/31 and a real RabbitMQ 5/5, plus warning-clean affected builds,
   focused Core provider-priority consumers, an independently versioned connector pack, docs lint with
   0 errors, diff, and privacy gates. No release-certification suite was run.
+- R07-11 passes Jobs 77/77, Communication 31/31, and real RabbitMQ 6/6 after moving the ledger-backed
+  wake hint onto Communication and deleting the Jobs Messaging seam.
+- R07-12 passes Communication 33/33, Cache topology 49/49, Cache Abstractions 51/51, Analyzer 6/6,
+  real RabbitMQ 7/7, and real Redis 5/5. Seven touched package owners pack with exact dependency
+  floors; the 112-owner inventory excludes the two deleted coherence packages; automatic retirement
+  passes 28/28 focused compiler/Git proofs. No release-certification suite was run.
 
 ## Acceptance additions
 

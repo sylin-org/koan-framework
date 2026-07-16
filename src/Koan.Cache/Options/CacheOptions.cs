@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using Koan.Cache.Abstractions.Coherence;
 using Koan.Cache.Abstractions.Primitives;
 
@@ -9,10 +8,6 @@ namespace Koan.Cache.Options;
 public sealed class CacheOptions
 {
     private static readonly string[] Empty = [];
-
-    /// <summary>Legacy single-provider field. New deployments use LocalProvider/RemoteProvider.</summary>
-    [Required]
-    public string Provider { get; set; } = "memory";
 
     public string DefaultRegion { get; set; } = "default";
 
@@ -46,20 +41,8 @@ public sealed class CacheOptions
 
     // ── Coherence ─────────────────────────────────────────────────────────────
 
-    /// <summary>How the coherence coordinator activates. Default: AutoDetect (active iff ≥1 channel registered).</summary>
+    /// <summary>How peer L1 invalidation activates for layered topologies.</summary>
     public CoherenceMode CoherenceMode { get; set; } = CoherenceMode.AutoDetect;
-
-    /// <summary>Pin coherence transport by TransportName. Null = highest [ProviderPriority] wins.</summary>
-    public string? CoherenceTransport { get; set; }
-
-    /// <summary>Per-key debounce window for write broadcasts, in milliseconds. 0 = disabled (immediate publish).</summary>
-    public int CoherenceCoalescingMs { get; set; } = 0;
-
-    /// <summary>Hard cap on the coalescing buffer. Excess writes flush immediately.</summary>
-    public int CoherenceCoalescingMaxBuffered { get; set; } = 10_000;
-
-    /// <summary>Maximum time to wait for a channel Subscribe() at startup, in milliseconds.</summary>
-    public int CoherenceStartupTimeoutMs { get; set; } = 10_000;
 
     public IReadOnlyList<string> GetPolicyAssemblies()
         => PolicyAssemblies.Count == 0 ? Empty : new List<string>(PolicyAssemblies);

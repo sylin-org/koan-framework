@@ -8,15 +8,15 @@
   "modules": [
     {
       "id": "Koan.Cache.Abstractions",
-      "version": "0.17"
+      "version": "0.18"
     },
     {
       "id": "Koan.Communication",
-      "version": "0.18"
+      "version": "0.19"
     },
     {
       "id": "Koan.Communication.Connector.RabbitMq",
-      "version": "0.18"
+      "version": "0.19"
     },
     {
       "id": "Koan.Core",

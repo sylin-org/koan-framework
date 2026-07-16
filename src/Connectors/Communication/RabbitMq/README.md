@@ -23,7 +23,8 @@ await order.Transport.Send(ct);
 ```
 
 A direct application reference is the routing decision. `AddKoan()` discovers the connector and
-elects RabbitMQ for `Transport/default` and `FrameworkSignals/default`; Entity Events remain on Koan's
+elects RabbitMQ for `Transport/default`, `FrameworkSignals/default`, and `FrameworkBroadcasts/default`;
+Entity Events remain on Koan's
 built-in process-local provider. A transitive reference does not change network reach. No bus registration, queue names,
 handler registration, or provider-selection code is required.
 
@@ -57,7 +58,9 @@ least one receiver-group route existed. It does not mean a remote handler comple
 not observable in this generation.
 
 Each stable receiver group has its own durable queue. Replicas of that group compete on the same
-queue, while different groups each receive a serialized copy. Consumers use bounded prefetch and
+queue, while different groups each receive a serialized copy. Node broadcasts instead use one
+non-durable, auto-delete queue per active host, so every live node receives a copy without leaving
+durable queues behind after it exits. Consumers use bounded prefetch and
 manual acknowledgement. Koan carries the host's opaque context envelope and authenticates it before
 restoring tenant or other registered axes around handler execution.
 
@@ -76,7 +79,7 @@ All options live under `Koan:Communication:RabbitMq`:
 - `Prefetch` — maximum unacknowledged consumer deliveries; default `32`.
 - `PublishTimeout` — confirmed-publication timeout; default `00:00:15`.
 
-Startup facts report RabbitMQ as the elected Transport/framework-signal provider, why it won, its assurance, and the
+Startup facts report RabbitMQ as the elected Transport/internal-route provider, why it won, its assurance, and the
 fact that remote settlement is unobservable. Health `communication.rabbitmq` becomes critical only
 when RabbitMQ is elected.
 
@@ -88,8 +91,8 @@ settlement, transactional coupling to Data, schema aliases/migrations, or exactl
 The application mesh and CLR contract identities must match across participants.
 
 Framework signals are reserved for Koan modules. Applications do not receive a generic publish or
-subscribe API. Jobs wake uses this lane automatically; the signal remains a lossy latency hint and
-the Jobs ledger remains the source of truth.
+subscribe API. Jobs wake uses competing groups; Cache peer invalidation uses every-node delivery.
+Both owning modules retain their correctness fallback.
 
 This is the Entity Communication connector. The legacy `Sylin.Koan.Messaging.Connector.RabbitMq`
 package has a different arbitrary-message contract and is not used underneath `Entity.Transport`.

@@ -5,11 +5,11 @@ title: "Koan V1 Reorganization Progress"
 audience: [architects, maintainers, ai-agents]
 status: draft
 last_updated: 2026-07-15
-framework_version: v0.18.0
+framework_version: v0.19.0
 validation:
   date_last_tested: 2026-07-15
   status: in-progress
-  scope: R07-01 through R07-11 passed; Jobs wake now uses the Communication provider boundary
+  scope: R07-01 through R07-12 passed; secondary capability lifts are next
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T6 — capability-ring graduation`
 - Active work item: R07 — rebuild the semantic capability ring
-- Active child: none; Cache coherence inventory is the next bounded child
+- Active child: none; R07-13 has not been opened
 - V1 readiness: `not ready`; T7 remains gated by T6 and an observed public package publication
 
 ## Work items
@@ -36,7 +36,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 | R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
-| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | R07-01 through [R07-11](work-items/r07/R07-11-jobs-wake-convergence.md) pass. Jobs wake uses local/RabbitMQ Communication without a Jobs transport package; Cache coherence is next. |
+| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | R07-01 through [R07-12](work-items/r07/R07-12-cache-coherence-convergence.md) pass. Secondary Entity capability lifts are next and remain gated by one concrete business proof each. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -52,12 +52,15 @@ item should normally be `in-progress`.
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 | R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
-| R07 | in progress | R07-01 through R07-11 passed. Inventory Cache coherence's broadcast/layered contract before replacing its bridge. |
+| R07 | in progress | R07-01 through R07-12 passed. Open only the first bounded secondary capability lift. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-15 | R07-12 | Deleting obsolete package projects made the active inventory truthful but the automatic lineage compiler rejected the next `dev` event, including a first projection spanning the deletion. Compatibility tombstone projects would preserve dead architecture indefinitely. | Treat complete owner deletion as permanent retirement intent: retain final ID/path/version in additive lineage state, plan no artifact, forbid reuse/rename, and calculate the predecessor inventory during bootstrap. Focused compiler/real-Git retirement proofs pass 28/28; no publish, push, tag, or release occurs. |
+| 2026-07-15 | R07-12 | Cache's generic public channel SPI claimed selection, catch-up, coalescing, and multiple wire operations that no provider actually guaranteed. Jobs' competing-group signal topology could not satisfy peer L1 invalidation. | Give Communication a distinct every-node internal route and layered-candidate election; keep invalidation meaning and TTL safety in Cache; rebuild Redis and RabbitMQ carriage; delete 2 packages and the speculative SPI. Communication 33/33, topology 49/49, real RabbitMQ 7/7, real Redis 5/5, 7 focused packs, and a 112-owner inventory pass. |
+| 2026-07-15 | R07-12 | Cache invalidation must reach every active L1 owner, while Jobs wake needs only one competing worker. The public generic channel and catch-up surface had one real consumer, every provider was best-effort, the coordinator published to all channels despite winner documentation, and the coalescer could lose pending work during disposal. | Add a distinct `FrameworkBroadcasts` lane with node-scoped bindings and `NodeFanOut`; keep Cache meaning/L1-only receipt/TTL safety in Cache; activate Redis carriage only with the elected Redis L2; use ephemeral RabbitMQ node queues; delete speculative SPI, catch-up, coalescer, InMemory/Messaging packages, and legacy adapter resolver after focused parity. |
 | 2026-07-15 | R07-11 | Jobs needed only a lossy level-triggered wake, but its public `IJobTransport` plus Messaging bridge duplicated provider election, used a process-static service locator, and launched unmanaged publication. Cache coherence has stronger node-broadcast, layered activation, catch-up, and bounded-staleness semantics, so moving both together would force premature routing grammar. | Add one internal-only bounded Communication signal lane; make Jobs the first competing-group consumer; let direct RabbitMQ intent change reach; delete the Jobs provider seam and Messaging package after Jobs 77/77, Communication 31/31, and RabbitMQ 6/6. Defer Cache as its own semantic inventory. |
 | 2026-07-15 | R07-10 | Local and external communication risked becoming separate runtimes, while adapting legacy RabbitMQ would preserve type-wide competing consumers, absent context provenance, and ambiguous acceptance. A direct connector must also never disappear into a local fallback. | Put the in-process floor and a rebuilt RabbitMQ Transport connector behind one Communication-owned election/wire/ingress boundary. Elect per lane from explicit or direct intent, require hard semantic capabilities, authenticate cross-process context, and report broker acceptance without inventing remote settlement. Communication 31/31 and real RabbitMQ 5/5 pass; provider-priority consumers, builds, pack, docs, diff, and privacy gates pass without release certification. |
 | 2026-07-15 | R07-09 | The existing build target flattened resolved assemblies, so it could prove module presence but not whether an application directly chose a connector. Designing Communication-specific inference or an adapter SPI before a real connector would multiply mechanisms and encode unproved topology. | Add one generic Core direct-reference manifest from evaluation-time PackageReference/ProjectReference items, register it before pillars initialize, and expose it in composition lock schema 2. Core 265/265, Bootstrap 17/17, FirstUse 1/1, GoldenJourney 1/1, package/project clean-room 1/1, build asset 1/1, all five locks, pack/docs/example checks pass. Defer provider APIs and RabbitMQ behavior to R07-10. |

@@ -31,17 +31,4 @@ public class CacheBehaviorSpec
             CoherenceMode.Disabled
         });
     }
-
-    [Fact]
-    public void CacheInvalidationKind_DeclaresThreeKinds()
-    {
-        var values = Enum.GetValues<CacheInvalidationKind>();
-
-        values.Should().BeEquivalentTo(new[]
-        {
-            CacheInvalidationKind.EvictKey,
-            CacheInvalidationKind.EvictByTag,
-            CacheInvalidationKind.EvictAll
-        });
-    }
 }

@@ -1,4 +1,3 @@
-using Koan.Cache.Abstractions.Coherence;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Topology;
@@ -92,7 +91,7 @@ public sealed class LayeredCacheSpec
     }
 
     [Fact]
-    public async Task ApplyRemoteInvalidation_touches_L1_only_never_L2()
+    public async Task EvictLocal_touches_L1_only_never_L2()
     {
         var l1 = new FakeCacheStore("memory", CacheStorePlacement.Local);
         var l2 = new FakeCacheStore("remote", CacheStorePlacement.Remote);
@@ -100,9 +99,7 @@ public sealed class LayeredCacheSpec
 
         await layered.Write(Key, Value, WriteOpts, CancellationToken.None);
 
-        // Pretend a remote node published an evict for this key.
-        var msg = CacheInvalidation.EvictKey(Key, originNodeId: Guid.NewGuid());
-        await layered.ApplyRemoteInvalidation(msg, CancellationToken.None);
+        await layered.EvictLocal(Key, CancellationToken.None);
 
         l1.Contains(Key.Value).Should().BeFalse("L1 must be evicted on receipt of a remote invalidation");
         l2.Contains(Key.Value).Should().BeTrue(
@@ -110,15 +107,13 @@ public sealed class LayeredCacheSpec
     }
 
     [Fact]
-    public async Task ApplyRemoteInvalidation_with_no_L1_is_noop()
+    public async Task EvictLocal_with_no_L1_is_noop()
     {
         var l2 = new FakeCacheStore("remote", CacheStorePlacement.Remote);
         await l2.Set(Key, Value, WriteOpts, CancellationToken.None);
 
         var layered = BuildLayered(local: null, remote: l2);
-        var msg = CacheInvalidation.EvictKey(Key, originNodeId: Guid.NewGuid());
-
-        var act = async () => await layered.ApplyRemoteInvalidation(msg, CancellationToken.None);
+        var act = async () => await layered.EvictLocal(Key, CancellationToken.None);
 
         await act.Should().NotThrowAsync();
         l2.Contains(Key.Value).Should().BeTrue();
@@ -157,29 +152,4 @@ public sealed class LayeredCacheSpec
         result.Hit.Should().BeFalse();
     }
 
-    [Fact]
-    public async Task ApplyRemoteInvalidation_EvictByTag_clears_L1_tagged_entries()
-    {
-        var l1 = new FakeCacheStore("memory", CacheStorePlacement.Local);
-        var l2 = new FakeCacheStore("remote", CacheStorePlacement.Remote);
-        var layered = BuildLayered(l1, l2);
-
-        var keyA = new CacheKey("Todo:_:a");
-        var keyB = new CacheKey("Todo:_:b");
-        var keyC = new CacheKey("Other:_:c");
-
-        var tagged = WriteOpts with { Tags = new HashSet<string> { "Todo" } };
-        var other = WriteOpts with { Tags = new HashSet<string> { "Other" } };
-
-        await layered.Write(keyA, Value, tagged, CancellationToken.None);
-        await layered.Write(keyB, Value, tagged, CancellationToken.None);
-        await layered.Write(keyC, Value, other, CancellationToken.None);
-
-        var msg = CacheInvalidation.EvictByTag(new HashSet<string> { "Todo" }, originNodeId: Guid.NewGuid());
-        await layered.ApplyRemoteInvalidation(msg, CancellationToken.None);
-
-        l1.Contains(keyA.Value).Should().BeFalse();
-        l1.Contains(keyB.Value).Should().BeFalse();
-        l1.Contains(keyC.Value).Should().BeTrue("other-tagged entries should remain");
-    }
 }

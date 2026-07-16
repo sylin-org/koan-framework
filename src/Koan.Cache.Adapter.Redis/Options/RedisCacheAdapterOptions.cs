@@ -3,8 +3,8 @@ using System.ComponentModel.DataAnnotations;
 namespace Koan.Cache.Adapter.Redis.Options;
 
 /// <summary>
-/// Storage-side options for the Redis cache adapter. Coherence pub/sub settings live in
-/// <see cref="RedisCoherenceChannelOptions"/> and are consumed by <c>RedisCoherenceChannel</c>.
+/// Storage-side options for the Redis cache adapter. Peer-broadcast settings live in
+/// <see cref="RedisCacheBroadcastOptions"/>.
 /// </summary>
 /// <remarks>
 /// <para>

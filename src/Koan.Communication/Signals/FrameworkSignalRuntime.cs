@@ -15,7 +15,8 @@ namespace Koan.Communication.Signals;
 internal sealed class FrameworkSignalRuntime : IFrameworkSignalPublisher, IAsyncDisposable
 {
     private readonly CommunicationRouter _router;
-    private readonly CommunicationRouteDecision _route;
+    private readonly CommunicationRouteDecision _signalRoute;
+    private readonly CommunicationRouteDecision _broadcastRoute;
     private readonly CommunicationOptions _options;
     private readonly ILogger<FrameworkSignalRuntime> _logger;
     private readonly Channel<SignalPublication> _outbound;
@@ -29,7 +30,8 @@ internal sealed class FrameworkSignalRuntime : IFrameworkSignalPublisher, IAsync
         ILogger<FrameworkSignalRuntime> logger)
     {
         _router = router;
-        _route = router.For(CommunicationLane.FrameworkSignals);
+        _signalRoute = router.For(CommunicationLane.FrameworkSignals);
+        _broadcastRoute = router.For(CommunicationLane.FrameworkBroadcasts);
         _options = options.Value;
         _logger = logger;
         _outbound = Channel.CreateBounded<SignalPublication>(new BoundedChannelOptions(_options.InProcessCapacity)
@@ -41,11 +43,26 @@ internal sealed class FrameworkSignalRuntime : IFrameworkSignalPublisher, IAsync
         });
     }
 
-    public string ProviderId => _route.AdapterId;
-    public string Assurance => _route.Assurance;
+    public string ProviderId => _signalRoute.AdapterId;
+    public string Assurance => _signalRoute.Assurance;
+    public string BroadcastProviderId => _broadcastRoute.AdapterId;
+    public string BroadcastAssurance => _broadcastRoute.Assurance;
+    public bool BroadcastIsBuiltIn => _broadcastRoute.Adapter.Descriptor.IsBuiltIn;
 
     public bool TryPublish<TSignal>(TSignal signal)
         where TSignal : struct, IFrameworkSignal<TSignal>
+        => TryQueue(signal, TSignal.ContractId, CommunicationLane.FrameworkSignals, _signalRoute);
+
+    public bool TryBroadcast<TSignal>(TSignal signal)
+        where TSignal : struct, IFrameworkBroadcast<TSignal>
+        => TryQueue(signal, TSignal.ContractId, CommunicationLane.FrameworkBroadcasts, _broadcastRoute);
+
+    private bool TryQueue<TSignal>(
+        TSignal signal,
+        string contractId,
+        CommunicationLane lane,
+        CommunicationRouteDecision route)
+        where TSignal : struct
     {
         if (Volatile.Read(ref _state) != 1) return false;
 
@@ -56,24 +73,25 @@ internal sealed class FrameworkSignalRuntime : IFrameworkSignalPublisher, IAsync
             {
                 _logger.LogDebug(
                     "Koan Communication dropped oversized framework signal {Contract}; the owning subsystem fallback remains active.",
-                    TSignal.ContractId);
+                    contractId);
                 return false;
             }
 
-            var operation = new CommunicationOperation(_route);
+            var operation = new CommunicationOperation(route);
             operation.MarkEnumerated();
             var wire = new CommunicationWireEnvelope(
                 CommunicationWireCodec.SchemaVersion,
                 _router.MeshId,
-                CommunicationLane.FrameworkSignals,
-                _route.Channel,
-                CommunicationContractIdentity.FrameworkSignal<TSignal>(),
+                lane,
+                route.Channel,
+                contractId,
                 operation.OperationId,
                 Ordinal: 0,
                 payload,
                 Context: null);
             var publication = new SignalPublication(
-                TSignal.ContractId,
+                contractId,
+                route,
                 operation.OperationId.ToString("N"),
                 CommunicationWireCodec.Encode(wire),
                 operation);
@@ -84,7 +102,7 @@ internal sealed class FrameworkSignalRuntime : IFrameworkSignalPublisher, IAsync
             _logger.LogDebug(
                 "Koan Communication dropped framework signal {Contract} because its bounded egress queue is full; " +
                 "the owning subsystem fallback remains active.",
-                TSignal.ContractId);
+                contractId);
             return false;
         }
         catch (Exception error)
@@ -92,7 +110,7 @@ internal sealed class FrameworkSignalRuntime : IFrameworkSignalPublisher, IAsync
             _logger.LogDebug(
                 error,
                 "Koan Communication could not encode framework signal {Contract}; the owning subsystem fallback remains active.",
-                TSignal.ContractId);
+                contractId);
             return false;
         }
     }
@@ -145,7 +163,7 @@ internal sealed class FrameworkSignalRuntime : IFrameworkSignalPublisher, IAsync
                 try
                 {
                     var accepted = await _router.Publish(
-                            _route,
+                            publication.Route,
                             publication.ContractId,
                             publication.MessageId,
                             publication.Payload,
@@ -186,6 +204,7 @@ internal sealed class FrameworkSignalRuntime : IFrameworkSignalPublisher, IAsync
 
     private sealed record SignalPublication(
         string ContractId,
+        CommunicationRouteDecision Route,
         string MessageId,
         ReadOnlyMemory<byte> Payload,
         CommunicationOperation Operation);

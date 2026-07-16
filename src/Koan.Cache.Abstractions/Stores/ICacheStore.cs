@@ -7,8 +7,8 @@ using Koan.Cache.Abstractions.Primitives;
 namespace Koan.Cache.Abstractions.Stores;
 
 /// <summary>
-/// Pure K/V cache store contract. Distributed coherence is NOT a store concern —
-/// see <c>ICacheCoherenceChannel</c> in <c>Koan.Cache.Abstractions.Coherence</c>.
+/// Pure K/V cache store contract. Distributed invalidation is owned internally by
+/// Koan.Cache and Koan.Communication, not by storage providers.
 /// </summary>
 /// <remarks>
 /// <para>

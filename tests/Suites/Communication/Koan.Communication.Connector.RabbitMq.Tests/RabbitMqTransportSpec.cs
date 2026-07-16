@@ -104,6 +104,33 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
     }
 
     [Fact]
+    public async Task Framework_broadcast_reaches_every_active_node_in_the_mesh()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var mesh = "rabbit-broadcast-" + Guid.NewGuid().ToString("N");
+        var stateA = new RabbitState(expected: 1);
+        var stateB = new RabbitState(expected: 1);
+        await using var hostA = await Start(stateA, rabbit.ConnectionString, ct, mesh, services =>
+        {
+            services.AddSingleton<ProbeBroadcastHandler>();
+            services.AddFrameworkBroadcast<ProbeBroadcast, ProbeBroadcastHandler>();
+        });
+        await using var hostB = await Start(stateB, rabbit.ConnectionString, ct, mesh, services =>
+        {
+            services.AddSingleton<ProbeBroadcastHandler>();
+            services.AddFrameworkBroadcast<ProbeBroadcast, ProbeBroadcastHandler>();
+        });
+
+        var publisher = hostA.Services.GetRequiredService<IFrameworkSignalPublisher>();
+        publisher.BroadcastProviderId.Should().Be("rabbitmq");
+        publisher.TryBroadcast(new ProbeBroadcast("every-node")).Should().BeTrue();
+
+        await Task.WhenAll(stateA.Completed.Task, stateB.Completed.Task).WaitAsync(ct);
+        stateA.Observations.Should().Equal("every-node");
+        stateB.Observations.Should().Equal("every-node");
+    }
+
+    [Fact]
     public async Task Mandatory_confirm_reports_no_receiver_without_local_fallback()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -163,6 +190,7 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
             .WithSetting("Koan:Communication:RabbitMq:ConnectionString", rabbit.ConnectionString)
             .WithSetting("Koan:Communication:TransportProvider", "in-process")
             .WithSetting("Koan:Communication:FrameworkSignalsProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkBroadcastsProvider", "in-process")
             .ConfigureServices(services =>
             {
                 services.AddSingleton(state);
@@ -183,9 +211,22 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
         string connectionString,
         CancellationToken ct,
         Action<IServiceCollection>? configure = null)
+        => Start(
+            state,
+            connectionString,
+            ct,
+            "rabbit-spec-" + Guid.NewGuid().ToString("N"),
+            configure);
+
+    private static Task<IntegrationHost> Start(
+        RabbitState state,
+        string connectionString,
+        CancellationToken ct,
+        string mesh,
+        Action<IServiceCollection>? configure)
         => KoanIntegrationHost.Configure()
             .WithEnvironment("Test")
-            .WithSetting("Koan:Application:Code", "rabbit-spec-" + Guid.NewGuid().ToString("N"))
+            .WithSetting("Koan:Application:Code", mesh)
             .WithSetting("Koan:Communication:RabbitMq:ConnectionString", connectionString)
             .ConfigureServices(services =>
             {
@@ -243,6 +284,20 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
         public ValueTask Handle(ProbeSignal signal, CancellationToken ct)
         {
             state.Record("framework-signal");
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    internal readonly record struct ProbeBroadcast(string Value) : IFrameworkBroadcast<ProbeBroadcast>
+    {
+        public static string ContractId => "koan.tests.framework-broadcast@1";
+    }
+
+    internal sealed class ProbeBroadcastHandler(RabbitState state) : IHandleFrameworkBroadcast<ProbeBroadcast>
+    {
+        public ValueTask Handle(ProbeBroadcast signal, CancellationToken ct)
+        {
+            state.Record(signal.Value);
             return ValueTask.CompletedTask;
         }
     }

@@ -12,7 +12,12 @@ internal sealed class InProcessCommunicationRuntime : ICommunicationAdapter
 {
     private static readonly CommunicationAdapterDescriptor AdapterDescriptor = new(
         "in-process",
-        [CommunicationLane.Events, CommunicationLane.Transport, CommunicationLane.FrameworkSignals],
+        [
+            CommunicationLane.Events,
+            CommunicationLane.Transport,
+            CommunicationLane.FrameworkSignals,
+            CommunicationLane.FrameworkBroadcasts
+        ],
         CommunicationDeliveryAssurance.ProcessMemory,
         CommunicationAdapterCapabilities.ContractIdentity
         | CommunicationAdapterCapabilities.SnapshotCopy
@@ -21,7 +26,8 @@ internal sealed class InProcessCommunicationRuntime : ICommunicationAdapter
         | CommunicationAdapterCapabilities.GroupFanOut
         | CommunicationAdapterCapabilities.MessageIdentity
         | CommunicationAdapterCapabilities.BoundedAcceptance
-        | CommunicationAdapterCapabilities.ZeroTargetEvents,
+        | CommunicationAdapterCapabilities.ZeroTargetEvents
+        | CommunicationAdapterCapabilities.NodeFanOut,
         [],
         IsBuiltIn: true);
 

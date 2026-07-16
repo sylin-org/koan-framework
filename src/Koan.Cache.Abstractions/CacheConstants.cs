@@ -11,7 +11,9 @@ public static class CacheConstants
     public static class Configuration
     {
         public const string Section = "Cache";
-        public const string ProviderKey = "Cache:Provider";
+        public const string LocalProvider = "Cache:LocalProvider";
+        public const string RemoteProvider = "Cache:RemoteProvider";
+        public const string CoherenceMode = "Cache:CoherenceMode";
         public const string DefaultRegion = "default";
         public const string EnableDiagnosticsEndpoint = "Cache:EnableDiagnosticsEndpoint";
         public const string DefaultSingleflightTimeout = "Cache:DefaultSingleflightTimeout";

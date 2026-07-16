@@ -24,10 +24,8 @@ namespace Koan.Tests.Integration.Bootstrap.Infrastructure.Specs;
 /// <para>
 /// References cover the cache pillar's Tier 1 surface: <c>Koan.Cache</c> (Memory L1 +
 /// orchestration), <c>Koan.Cache.Adapter.Sqlite</c> (Local L1 priority 50, preempts Memory),
-/// <c>Koan.Cache.Adapter.Redis</c> (Remote L2 + coherence channel), and
-/// <c>Koan.Cache.Coherence.InMemory</c> (fallback channel). <c>Koan.Cache.Coherence.Messaging</c>
-/// is intentionally excluded — it requires <c>IMessageBus</c> to be wired, which is out of
-/// scope for cache-pillar boot smoke and deferred to a Tier 2 messaging smoke.
+/// <c>Koan.Cache.Adapter.Redis</c> (Remote L2 + layered every-node broadcast). Communication's
+/// process-local provider is the zero-configuration floor; Redis becomes active with the Redis L2.
 /// </para>
 /// <para>
 /// ARCH-0091: Redis comes from the shared <see cref="RedisFixture"/> as a class fixture — the
@@ -81,7 +79,7 @@ public sealed class CachePillarBootstrapSpec(RedisFixture redis, ITestOutputHelp
     }
 
     [Fact(Explicit = true)]
-    public async Task AddKoan_activates_coherence_via_redis_channel_end_to_end()
+    public async Task AddKoan_activates_peer_invalidation_via_redis_broadcast_end_to_end()
     {
         Assert.SkipWhen(!redis.IsAvailable, redis.Reason ?? "Redis unavailable");
         var ct = TestContext.Current.CancellationToken;

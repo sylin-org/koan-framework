@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Koan.Cache.Abstractions.Coherence;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Microsoft.Extensions.Logging;
@@ -12,7 +11,7 @@ namespace Koan.Cache.Topology;
 /// <summary>
 /// L1/L2 read/write orchestrator. <strong>Composition over inheritance</strong> — does NOT
 /// implement <see cref="ICacheStore"/>; exposes a focused verb set (<see cref="Read"/>,
-/// <see cref="Write"/>, <see cref="Evict"/>, <see cref="ApplyRemoteInvalidation"/>).
+/// <see cref="Write"/>, <see cref="Evict"/>, <see cref="EvictLocal"/>).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -24,7 +23,7 @@ namespace Koan.Cache.Topology;
 /// after a successful write. M3 will wire that integration; M2 leaves coherence inactive.
 /// </para>
 /// <para>
-/// <see cref="ApplyRemoteInvalidation"/> is the receiver-side entry point invoked by
+/// <see cref="EvictLocal"/> is the receiver-side entry point invoked by
 /// <c>CoherenceCoordinator</c>. It touches L1 ONLY — never L2, never republishes.
 /// </para>
 /// </remarks>
@@ -140,34 +139,10 @@ internal sealed class LayeredCache
     /// Apply a remote invalidation to L1 ONLY. Never touches L2 (shared and already evicted
     /// by the writer); never republishes (would create feedback loops).
     /// </summary>
-    public async ValueTask ApplyRemoteInvalidation(CacheInvalidation msg, CancellationToken ct)
-    {
-        if (_topology.Local is not { } l1) return;
-
-        switch (msg.Kind)
-        {
-            case CacheInvalidationKind.EvictKey when msg.Key is { } key:
-                await l1.Remove(key, ct).ConfigureAwait(false);
-                break;
-
-            case CacheInvalidationKind.EvictByTag when msg.Tags is { Count: > 0 } tags:
-                foreach (var tag in tags)
-                {
-                    await foreach (var tagged in l1.EnumerateByTag(tag, ct).ConfigureAwait(false))
-                    {
-                        await l1.Remove(tagged.Key, ct).ConfigureAwait(false);
-                    }
-                }
-                break;
-
-            case CacheInvalidationKind.EvictAll:
-                _logger.LogWarning("Koan.Cache: EvictAll received — L1 will be partially evicted via known-tag enumeration.");
-                // EvictAll without tags has no efficient implementation on stores that can't
-                // enumerate keys; left as a documented sledgehammer caveat. Per-store
-                // implementations may override.
-                break;
-        }
-    }
+    public ValueTask<bool> EvictLocal(CacheKey key, CancellationToken ct)
+        => _topology.Local is { } l1
+            ? l1.Remove(key, ct)
+            : ValueTask.FromResult(false);
 
     private static CacheWriteOptions ApplyL1Ttl(CacheWriteOptions options)
     {

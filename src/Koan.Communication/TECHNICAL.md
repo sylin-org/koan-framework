@@ -2,15 +2,16 @@
 
 ## Ownership
 
-`Koan.Communication` owns two Entity-facing intents—Event occurrence and Entity Transport—and one
-internal framework-signal lane. It owns
+`Koan.Communication` owns two Entity-facing intents—Event occurrence and Entity Transport—and two
+internal framework routes: stable competing groups and every-active-node broadcast. It owns
 typed handler discovery, copy boundaries, opaque context carriage, bounded publication, local
 dispatch, settlement, and composition facts. Data.Core contributes only `EntityCardinality`; it has
 no reference to Communication.
 
 The public lanes remain distinct. Events own occurrence/details/fan-out policy; Transport owns
 snapshot/receiver-group policy. Framework signals are typed, bounded module hints with no Entity or
-application registration surface. Shared mechanisms do not become a public generic pipeline.
+application registration surface. Cache owns invalidation meaning; Communication only carries its
+internal node broadcast. Shared mechanisms do not become a public generic pipeline.
 
 ## Composition and provider election
 
@@ -19,12 +20,12 @@ application registration surface. Shared mechanisms do not become a public gener
 `IReceiveEntity<TEntity>` receivers from the generated registry. Concrete handler classes are scoped;
 each dispatch creates a fresh DI and host/context scope.
 
-One host-owned `CommunicationRouter` elects a provider independently for Events, Transport, and
-framework signals and
+One host-owned `CommunicationRouter` elects a provider independently for Events, Transport, competing-group
+framework signals, and every-node framework broadcasts and
 owns their shared wire/dispatch contract. `InProcessCommunicationRuntime` implements the same
 `ICommunicationAdapter` seam as external connectors and remains the minimum-priority built-in floor.
-Direct application reference provenance, never transitive assembly presence, admits external
-candidates. Explicit provider options override direct intent; semantic capabilities, assurance,
+Direct application reference provenance admits external candidates. A layered candidate may also participate when
+its owning engine activates it; declaring zero lanes keeps it dormant. Explicit provider options override direct intent; semantic capabilities, assurance,
 Core-owned provider priority, and stable ID resolve eligible candidates.
 
 The local adapter owns one bounded channel and worker per declared lane. The lanes share
@@ -77,10 +78,11 @@ Entity snapshot to each receiver group.
 The public acceptance and settlement types contain aggregate counters, not per-item collections.
 Operation state lives only while queued/processing envelopes and caller-held receipts require it.
 
-Framework signals have no public receipt. `TryPublish` reports only admission to the bounded host
+Framework routes have no public receipt. `TryPublish`/`TryBroadcast` report only admission to the bounded host
 egress; provider failures are observable through provider health and facts. Jobs wake is the first
 consumer: its signal carries no work or business context, replicas compete in one stable worker group,
-and the ledger poll remains the correctness fallback.
+and the ledger poll remains the correctness fallback. Cache broadcasts use a unique node-scoped binding;
+receivers filter their own origin, evict only L1, and rely on L1 TTL as the loss bound.
 
 ## Inspection
 
@@ -99,5 +101,4 @@ the same startup, operator, and authorized-agent fact projections.
 - shared-reference semantics; or
 - non-cooperative handler shutdown.
 
-Legacy `Koan.Messaging` remains temporarily for Cache coherence and other previous-generation consumers. It is
-a separate deprecated mechanism and must not be adapted underneath Entity Communication.
+Legacy `Koan.Messaging` is a separate previous-generation mechanism and is not adapted underneath Entity Communication.

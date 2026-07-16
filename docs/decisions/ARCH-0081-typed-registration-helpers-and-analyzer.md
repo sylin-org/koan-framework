@@ -6,6 +6,12 @@
 **Scope**: Service registration in `Koan.Cache.*` (extends to other pillars over time)
 **Related**: ARCH-0079 (integration tests as canon), ARCH-0080 (shared transport ownership)
 
+> **R07-12 amendment (2026-07-15).** Cache coherence now owns meaning over Communication's
+> internal every-node broadcast route. The public `ICacheCoherenceChannel` SPI and
+> `AddCoherenceChannel<T>()` helper were deleted. `KOAN0001` now guards only `ICacheStore`
+> registrations. References below to the coherence helper and analyzer target describe the
+> architecture at the time of this decision and are superseded by ARCH-0075's R07-12 amendment.
+
 ---
 
 ## Context

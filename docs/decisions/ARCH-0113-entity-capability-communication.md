@@ -63,6 +63,14 @@
 > are deleted. Cache coherence remains separate because its node-broadcast, layered activation,
 > catch-up, and bounded-staleness contract is not the Jobs competing-group shape.
 
+> **Implementation update (R07-12, 2026-07-15):** Communication now owns a fourth internal route,
+> `FrameworkBroadcasts`, whose hard invariant is delivery to every active node within elected-provider
+> reach. Cache owns the first consumer meaning: key-scoped, origin-filtered, L1-only peer eviction with
+> L1 TTL as the loss bound. Redis pub/sub participates only when Redis is the elected Cache L2, establishing
+> the layered-capability rule; RabbitMQ maps node bindings to ephemeral auto-delete queues. The generic
+> Cache coherence SPI, catch-up placeholders, coalescer, separate InMemory package, and Messaging bridge
+> are deleted. Jobs remains on its distinct competing-group lane.
+
 ## Context
 
 Koan's Entity-first language has the right center but the wrong boundaries around communication.
@@ -643,7 +651,7 @@ Pointwise semantics, not visual symmetry, decide which capabilities grow over se
 |---|---|
 | Keep | Entity/Data foundation; C# 14 module facets; Core capabilities/facts; ambient capture/restore/suppress behavior and tests; Jobs ledger/context-aware coalescing; bounded relationship negotiation; explicit MCP projection |
 | Move | ambient typed context and durable carriers from Data.Core to Core; tenant carriage out of the Data-axis DSL |
-| Absorb | InMemory messaging into Communication; only cardinality normalization from Pipeline into a minimal Data.Core Entity source adapter; Jobs wake and Cache coherence transport into an internal framework-signal lane after conformance |
+| Absorb | InMemory messaging into Communication; only cardinality normalization from Pipeline into a minimal Data.Core Entity source adapter; Jobs wake and Cache coherence carriage into distinct internal competing-group and every-node routes after conformance |
 | Rebuild | Lifecycle ownership/invocation; Data streaming; Messaging as Communication; subscriptions/receiver groups; InMemory and RabbitMQ adapters; selection/facts/receipts |
 | Rename | persistence `Entity.Events` → `Entity.Lifecycle`; `Koan.Messaging.Core` → `Koan.Communication`; Messaging connectors → Communication connectors |
 | Delete | broad `Send<T> where class`; `services.On<T>`; `IMessageProxy` and startup buffer; static interceptors; current `HandlerRegistry`; unused mutable `TransportEnvelope<T>`; public Pipeline DSL and pillar pipeline extensions; separate InMemory connector; Messaging bridge packages after their signals migrate; false provider-selected boot claims; compatibility aliases |
@@ -697,8 +705,8 @@ attributes, routing APIs, inbox/outbox, batch, retry, and topology claims are no
    communication manifest; prove zero-routing-code one/many-connector election per channel, inbound
    group bindings, and honest weaker guarantees; rebuild RabbitMQ only against the same adapter
    conformance kit and do not promote it while any local/network semantic cell differs.
-7. **Internal convergence** — migrate Jobs wake and Cache coherence as framework signals, then delete
-   their Messaging bridge packages and the old Messaging generation.
+7. **Internal convergence** — migrate Jobs wake and Cache coherence through their correct internal delivery
+   topologies, then delete their Messaging bridge packages and the old Messaging generation.
 8. **Secondary capability lifts** — Relationships, constrained Jobs streams, AI Embed/Index, Cache
    eviction, and later Media, each as its own business proof.
 9. **Golden proof and bundle admission** — add the final Communication pillar to the foundation bundle

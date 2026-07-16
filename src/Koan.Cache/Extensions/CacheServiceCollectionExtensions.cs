@@ -1,11 +1,9 @@
 using System;
 using Koan.Cache.Abstractions;
-using Koan.Cache.Abstractions.Adapters;
 using Koan.Cache.Abstractions.Extensions;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Serialization;
 using Koan.Cache.Abstractions.Stores;
-using Koan.Cache.Adapters;
 using Koan.Cache.Adapters.Memory;
 using Koan.Cache.Coherence;
 using Koan.Cache.Decorators;
@@ -16,6 +14,8 @@ using Koan.Cache.Scope;
 using Koan.Cache.Serialization;
 using Koan.Cache.Stores;
 using Koan.Cache.Topology;
+using Koan.Communication;
+using Koan.Communication.Signals;
 using Koan.Core.Modules;
 using Koan.Core.Concurrency;
 using Koan.Data.Core.Decorators;
@@ -41,6 +41,7 @@ public static class CacheServiceCollectionExtensions
         Action<CacheOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(services);
+        services.AddKoanCommunication();
 
         // Options
         if (configuration is not null)
@@ -83,12 +84,10 @@ public static class CacheServiceCollectionExtensions
         });
         services.TryAddSingleton<LayeredCache>();
 
-        // Coherence runtime — coordinator is always registered; activates iff a channel is
-        // present (CoherenceMode.AutoDetect) or required (CoherenceMode.Required). Channels
-        // are registered by adapter packages (Redis, Messaging, InMemory).
+        // Cache owns invalidation meaning; Communication owns local/remote carriage and provider election.
         services.TryAddSingleton<NodeIdProvider>();
-        services.TryAddSingleton<CursorStore>();
         services.TryAddSingleton<CoherenceCoordinator>();
+        services.AddFrameworkBroadcast<CacheInvalidationSignal, CoherenceCoordinator>();
         services.AddHostedService(sp => sp.GetRequiredService<CoherenceCoordinator>());
 
         // Client (consumes LayeredCache; ICacheClient = ICacheReader + ICacheWriter)
@@ -113,22 +112,6 @@ public static class CacheServiceCollectionExtensions
             failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy,
             tags: new[] { "cache", "koan" });
 
-        return services;
-    }
-
-    /// <summary>
-    /// Legacy adapter registration shim. New adapters self-register their <c>ICacheStore</c>
-    /// via their own <c>KoanAutoRegistrar</c>; this method is preserved as a no-op for
-    /// back-compat with older registrars (Sqlite, Redis adapters from before M2).
-    /// </summary>
-    [Obsolete("New adapters register ICacheStore directly. This shim only records the descriptor.")]
-    public static IServiceCollection AddKoanCacheAdapter(this IServiceCollection services, string name, IConfiguration? configuration = null)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Adapter name must be provided.", nameof(name));
-
-        services.AddSingleton(new CacheAdapterDescriptor(name, typeof(CacheAdapterResolver)));
         return services;
     }
 

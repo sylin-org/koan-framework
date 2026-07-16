@@ -159,11 +159,11 @@ data-backed, hot/cold) hides behind the interface. Defined by
 
 ## Cache
 
-**Coherence** — The mechanism that keeps L1 caches consistent across nodes: when one node
-invalidates an entry, it broadcasts a `CacheInvalidation` over a coherence channel and other
-nodes apply it to their local L1. Adapters (Redis pub/sub, the messaging bus, in-memory for
-tests) implement the cache-specific channel. Defined by
-[`ICacheCoherenceChannel`](../../src/Koan.Cache.Abstractions/Coherence/ICacheCoherenceChannel.cs).
+**Coherence** — The Cache-owned guarantee that a key removed or replaced on one active node is
+evicted from peer L1 caches. Cache owns the invalidation contract and local eviction; the internal
+Communication `FrameworkBroadcasts` route owns every-node carriage and provider election. The
+built-in provider is process-local. Layered or directly intended Communication adapters extend the
+same contract across nodes without exposing a cache-specific transport SPI to applications.
 
 **Fresh-or-null** — The default cache read contract: a read past the entry's absolute TTL
 returns `null` (a cache miss), never stale data. Stale-while-revalidate is an explicit

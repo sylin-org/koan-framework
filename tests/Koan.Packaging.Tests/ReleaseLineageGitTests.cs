@@ -221,6 +221,83 @@ public sealed class ReleaseLineageGitTests
     }
 
     [Fact]
+    public async Task BootstrapRecordsSourceRangeDeletionAsRetired()
+    {
+        await using var fixture = await LineageRepository.CreateAsync();
+        fixture.RemoveProject(LineageRepository.UnrelatedId);
+        var source = await fixture.CommitAsync("retire package before first lineage projection");
+        var process = new ProcessRunner();
+        var repository = new RepositoryInspector(fixture.Root, process);
+        var compiler = new ReleaseLineageCompiler(fixture.Root, process, repository);
+
+        var lineage = await compiler.CompileAsync(
+            source,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            previousLineageRevision: null,
+            CancellationToken.None);
+
+        Assert.True(lineage.IsBootstrap);
+        var retired = Assert.Single(lineage.RetiredPackages);
+        Assert.Equal(LineageRepository.UnrelatedId, retired.PackageId);
+        Assert.False(string.IsNullOrWhiteSpace(retired.Version));
+        Assert.DoesNotContain(lineage.ClosurePackages, id => id == LineageRepository.UnrelatedId);
+
+        var manifest = await new ReleasePlanner(repository, new NuGetRegistry(new HttpClient()))
+            .CreateAsync(lineage, offline: true, CancellationToken.None);
+        Assert.DoesNotContain(manifest.Packages, package => package.PackageId == LineageRepository.UnrelatedId);
+    }
+
+    [Fact]
+    public async Task PackageDeletionRetiresIdentityWithoutPublishingAnArtifact()
+    {
+        await using var fixture = await LineageRepository.CreateAsync();
+        var process = new ProcessRunner();
+        var repository = new RepositoryInspector(fixture.Root, process);
+        var compiler = new ReleaseLineageCompiler(fixture.Root, process, repository);
+        var bootstrap = await compiler.CompileAsync(
+            fixture.BaseCommit,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            previousLineageRevision: null,
+            CancellationToken.None);
+        var finalIdentity = Versions(bootstrap)[LineageRepository.UnrelatedId];
+
+        await fixture.SwitchAsync("dev");
+        fixture.RemoveProject(LineageRepository.UnrelatedId);
+        var retirementSource = await fixture.CommitAsync("retire unrelated package");
+        var retirement = await compiler.CompileAsync(
+            retirementSource,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            bootstrap.VersionCommit,
+            CancellationToken.None);
+
+        var retired = Assert.Single(retirement.RetiredPackages);
+        Assert.Equal(LineageRepository.UnrelatedId, retired.PackageId);
+        Assert.Equal(finalIdentity, retired.Version);
+        Assert.DoesNotContain(retirement.Packages, package => package.PackageId == LineageRepository.UnrelatedId);
+        Assert.Empty(retirement.ClosurePackages);
+
+        var manifest = await new ReleasePlanner(repository, new NuGetRegistry(new HttpClient()))
+            .CreateAsync(retirement, offline: true, CancellationToken.None);
+        Assert.Empty(manifest.Packages);
+
+        await fixture.SwitchAsync("dev");
+        fixture.Touch(LineageRepository.CoreId, "ordinary source after retirement");
+        var nextSource = await fixture.CommitAsync("advance after retirement");
+        var next = await compiler.CompileAsync(
+            nextSource,
+            retirementSource,
+            "automation/package-lineage-dev",
+            retirement.VersionCommit,
+            CancellationToken.None);
+
+        var retained = Assert.Single(next.RetiredPackages);
+        Assert.Equal(retired, retained);
+    }
+
+    [Fact]
     public async Task GenuinelyNewPackageMayHaveNoPreviousIdentity()
     {
         const string newPackageId = "Sylin.Koan.Test.New";
@@ -325,6 +402,12 @@ public sealed class ReleaseLineageGitTests
 
         public void AddProject(string name, string packageId) =>
             directories[packageId] = CreateProject(Root, name, packageId);
+
+        public void RemoveProject(string packageId)
+        {
+            Directory.Delete(directories[packageId], recursive: true);
+            directories.Remove(packageId);
+        }
 
         public string MarkerPath(string packageId) =>
             Path.Combine(directories[packageId], PackagingConstants.LineageMarkerFileName);

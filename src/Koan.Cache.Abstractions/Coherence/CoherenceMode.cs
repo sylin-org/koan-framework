@@ -6,20 +6,19 @@ namespace Koan.Cache.Abstractions.Coherence;
 public enum CoherenceMode
 {
     /// <summary>
-    /// Coordinator activates iff at least one <c>ICacheCoherenceChannel</c> is registered.
-    /// Default — matches Reference = Intent: referencing a coherence-capable adapter just works.
+    /// Peer invalidation activates for a layered topology. Communication supplies a process-local floor and
+    /// automatically elects a stronger node-broadcast provider when one is active.
     /// </summary>
     AutoDetect,
 
     /// <summary>
-    /// Coordinator must activate. Boot fails fast if no channel is registered and a Remote tier
-    /// is present — prevents silently-broken distributed deployments.
+    /// A layered topology requires a non-local node-broadcast provider. Boot fails rather than silently
+    /// accepting process-local reach.
     /// </summary>
     Required,
 
     /// <summary>
-    /// Coordinator is inactive even if channels are registered. Useful for single-node deployments
-    /// that want to suppress broadcasts.
+    /// Peer invalidation is inactive even when a node-broadcast provider is available.
     /// </summary>
     Disabled
 }

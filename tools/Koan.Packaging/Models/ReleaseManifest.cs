@@ -69,6 +69,7 @@ internal sealed class ReleaseLineage
     public List<string> MarkerPackages { get; init; } = [];
     public List<ReleaseLineageTrigger> Triggers { get; init; } = [];
     public List<ReleaseLineagePackage> Packages { get; init; } = [];
+    public List<ReleaseLineagePackage> RetiredPackages { get; init; } = [];
 }
 
 internal sealed class ReleaseLineageState
@@ -87,6 +88,7 @@ internal sealed class ReleaseLineageState
     public List<string> MarkerPackages { get; init; } = [];
     public List<ReleaseLineageTrigger> Triggers { get; init; } = [];
     public List<ReleaseLineagePackage> Packages { get; init; } = [];
+    public List<ReleaseLineagePackage> RetiredPackages { get; init; } = [];
 }
 
 internal sealed record ReleaseLineagePackage(string PackageId, string ProjectPath, string? Version);

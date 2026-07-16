@@ -1,5 +1,4 @@
 using Koan.Cache.Abstractions;
-using Koan.Cache.Extensions;
 using Koan.Core;
 using Koan.Core.Modules;
 using Microsoft.Extensions.Configuration;
@@ -16,7 +15,7 @@ public sealed class MemoryAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddKoanCacheAdapter("memory");
+        // The Cache pillar owns the process-memory L1 floor. This module contributes only its report.
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

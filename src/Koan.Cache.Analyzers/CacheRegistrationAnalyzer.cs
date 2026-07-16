@@ -17,9 +17,9 @@ namespace Koan.Cache.Analyzers;
 /// The bare descriptor form's <c>ImplementationType</c> equals the service interface, which
 /// <c>TryAddEnumerable</c> rejects at runtime as "indistinguishable" — first registration
 /// throws and the host fails to boot. The framework ships typed helpers
-/// (<c>AddCacheStore&lt;T&gt;</c>, <c>AddCoherenceChannel&lt;T&gt;</c>) that bake in the
-/// correct two-generic <c>Singleton&lt;TService, TImpl&gt;(factory)</c> shape. This analyzer
-/// flags adapter code that bypasses them for <c>ICacheStore</c> / <c>ICacheCoherenceChannel</c>.
+/// (<c>AddCacheStore&lt;T&gt;</c>) that bakes in the correct two-generic
+/// <c>Singleton&lt;TService, TImpl&gt;(factory)</c> shape. This analyzer flags adapter code
+/// that bypasses it for <c>ICacheStore</c>.
 /// </remarks>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class CacheRegistrationAnalyzer : DiagnosticAnalyzer
@@ -66,7 +66,6 @@ public sealed class CacheRegistrationAnalyzer : DiagnosticAnalyzer
         new Dictionary<string, string>
         {
             ["Koan.Cache.Abstractions.Stores.ICacheStore"] = "AddCacheStore",
-            ["Koan.Cache.Abstractions.Coherence.ICacheCoherenceChannel"] = "AddCoherenceChannel",
         };
 
     public override void Initialize(AnalysisContext context)

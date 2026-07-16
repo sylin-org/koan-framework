@@ -15,8 +15,8 @@ namespace Koan.Cache.Topology;
 /// Resolves a (Local, Remote) tier pair from registered cache stores using:
 ///   1. Explicit config pin (<c>CacheOptions.LocalProvider</c> / <c>RemoteProvider</c> by <c>ICacheStore.Name</c>);
 ///   2. Highest <c>[ProviderPriority]</c> among stores with matching <c>Placement</c>;
-///   3. First registered store with matching <c>Placement</c>;
-///   4. Null (single-tier deployment).
+///   3. Stable provider name tie-break;
+///   4. Null (single-tier deployment). Invalid explicit pins fail boot rather than weakening intent.
 /// </summary>
 internal sealed class CacheTopologyResolver
 {
@@ -61,9 +61,11 @@ internal sealed class CacheTopologyResolver
 
             if (pinned is not null) return pinned;
 
-            _logger.LogWarning(
-                "Koan.Cache: pinned {Placement} provider '{Pinned}' not registered. Falling back to priority/order resolution.",
-                placement, pinnedName);
+            var choices = stores.Where(store => store.Placement == placement).Select(store => store.Name).ToArray();
+            throw new InvalidOperationException(
+                $"Koan Cache cannot select {placement} provider '{pinnedName}' because it is not registered. " +
+                $"Candidates: {(choices.Length == 0 ? "none" : string.Join(", ", choices))}. " +
+                "Correct the provider name or reference the intended adapter; Koan will not weaken an explicit pin.");
         }
 
         return stores

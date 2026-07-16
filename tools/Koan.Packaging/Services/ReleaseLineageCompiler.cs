@@ -34,17 +34,27 @@ internal sealed class ReleaseLineageCompiler(
         var isBootstrap = string.IsNullOrWhiteSpace(previousLineageRevision);
         ReleaseLineageState? previousState = null;
         IReadOnlyList<ReleaseLineagePackage> previousInventory;
+        IReadOnlyList<ReleaseLineagePackage> previousRetirements;
         if (isBootstrap)
         {
             previousSourceCommit = await repository.ResolveCommitAsync(fallbackPreviousSourceRevision, cancellationToken);
             previousVersionCommit = previousSourceCommit;
             await RequireForwardSourceAsync(previousSourceCommit, sourceCommit, cancellationToken);
-            await RejectUnsupportedPackageMovesAsync(previousSourceCommit, sourceCommit, cancellationToken);
+            await RejectPackageRenamesAsync(previousSourceCommit, sourceCommit, cancellationToken);
             await SwitchBranchAsync(branchName, previousVersionCommit, cancellationToken);
-            previousInventory = (await repository.DiscoverPackagesAsync(cancellationToken))
+            var previousProjects = await repository.DiscoverPackagesAsync(cancellationToken);
+            var bootstrapPreviousVersions = await repository.CalculateVersionsAsync(
+                previousProjects,
+                previousVersionCommit,
+                cancellationToken);
+            previousInventory = previousProjects
                 .OrderBy(project => project.PackageId, StringComparer.OrdinalIgnoreCase)
-                .Select(project => new ReleaseLineagePackage(project.PackageId, Normalize(project.ProjectPath), null))
+                .Select(project => new ReleaseLineagePackage(
+                    project.PackageId,
+                    Normalize(project.ProjectPath),
+                    bootstrapPreviousVersions[project.PackageId]))
                 .ToArray();
+            previousRetirements = [];
             await ApplySourceDeltaAsync(previousSourceCommit, sourceCommit, cancellationToken);
         }
         else
@@ -54,6 +64,7 @@ internal sealed class ReleaseLineageCompiler(
             await ValidateCommittedLineageAsync(repository, previousVersionCommit, previousState, cancellationToken);
             previousSourceCommit = previousState.SourceCommit;
             previousInventory = previousState.Packages;
+            previousRetirements = previousState.RetiredPackages;
 
             if (string.Equals(previousSourceCommit, sourceCommit, StringComparison.OrdinalIgnoreCase))
             {
@@ -62,14 +73,17 @@ internal sealed class ReleaseLineageCompiler(
             }
 
             await RequireForwardSourceAsync(previousSourceCommit, sourceCommit, cancellationToken);
-            await RejectUnsupportedPackageMovesAsync(previousSourceCommit, sourceCommit, cancellationToken);
+            await RejectPackageRenamesAsync(previousSourceCommit, sourceCommit, cancellationToken);
             await SwitchBranchAsync(branchName, previousVersionCommit, cancellationToken);
             await ApplySourceDeltaAsync(previousSourceCommit, sourceCommit, cancellationToken);
         }
 
         var projects = await repository.DiscoverPackagesAsync(cancellationToken);
         var graph = new PackageGraph(projects);
-        ValidatePackageContinuity(previousInventory, graph);
+        var retiredPackages = ReconcilePackageContinuity(
+            previousInventory,
+            previousRetirements,
+            graph);
         var previousVersions = previousInventory.ToDictionary(
             package => package.PackageId,
             package => package.Version,
@@ -121,7 +135,8 @@ internal sealed class ReleaseLineageCompiler(
                 {
                     Version = versions.TryGetValue(package.PackageId, out var version) ? version : null
                 })
-                .ToList()
+                .ToList(),
+            RetiredPackages = retiredPackages.ToList()
         };
 
         var state = BuildState([], new Dictionary<string, string?>());
@@ -247,7 +262,8 @@ internal sealed class ReleaseLineageCompiler(
             supplied.ClosurePackages.SequenceEqual(committed.ClosurePackages, StringComparer.OrdinalIgnoreCase) &&
             supplied.MarkerPackages.SequenceEqual(committed.MarkerPackages, StringComparer.OrdinalIgnoreCase) &&
             TriggersEqual(supplied.Triggers, committed.Triggers) &&
-            PackagesEqual(supplied.Packages, committed.Packages);
+            PackagesEqual(supplied.Packages, committed.Packages) &&
+            PackagesEqual(supplied.RetiredPackages, committed.RetiredPackages);
         if (matches) return;
         throw new InvalidOperationException(
             $"Release lineage artifact does not match committed state at {committed.VersionCommit}. Recreate it from that version commit.");
@@ -298,19 +314,35 @@ internal sealed class ReleaseLineageCompiler(
         return new ReleaseLineagePlan(closure, markers, triggers);
     }
 
-    internal static void ValidatePackageContinuity(
+    internal static IReadOnlyList<ReleaseLineagePackage> ReconcilePackageContinuity(
         IEnumerable<ReleaseLineagePackage> previousPackages,
-        PackageGraph current) =>
-        ValidateInventory(
-            previousPackages,
-            current.Projects.Select(project => new ReleaseLineagePackage(project.PackageId, Normalize(project.ProjectPath), null)));
-
-    internal static void ValidateInventory(
-        IEnumerable<ReleaseLineagePackage> previousPackages,
-        IEnumerable<ReleaseLineagePackage> currentPackages)
+        IEnumerable<ReleaseLineagePackage> previousRetirements,
+        PackageGraph current)
     {
+        var currentPackages = current.Projects
+            .Select(project => new ReleaseLineagePackage(project.PackageId, Normalize(project.ProjectPath), null))
+            .ToArray();
         var currentById = currentPackages.ToDictionary(project => project.PackageId, StringComparer.OrdinalIgnoreCase);
         var currentByPath = currentPackages.ToDictionary(project => Normalize(project.ProjectPath), StringComparer.OrdinalIgnoreCase);
+        var retired = previousRetirements
+            .ToDictionary(package => package.PackageId, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var prior in retired.Values)
+        {
+            if (currentById.TryGetValue(prior.PackageId, out var reusedById))
+            {
+                throw new InvalidOperationException(
+                    $"Retired package identity '{prior.PackageId}' cannot be reintroduced at '{reusedById.ProjectPath}'. " +
+                    "Package retirement is permanent so an old NuGet identity can never acquire different bits.");
+            }
+            if (currentByPath.TryGetValue(Normalize(prior.ProjectPath), out var reusedByPath))
+            {
+                throw new InvalidOperationException(
+                    $"Retired package path '{prior.ProjectPath}' cannot be reused by '{reusedByPath.PackageId}'. " +
+                    "Choose a new package-owner path so retirement remains unambiguous.");
+            }
+        }
+
         foreach (var previous in previousPackages)
         {
             if (!currentById.TryGetValue(previous.PackageId, out var project))
@@ -321,8 +353,14 @@ internal sealed class ReleaseLineageCompiler(
                         $"Package rename is not supported by automatic lineage: '{previous.ProjectPath}' changed ID " +
                         $"from '{previous.PackageId}' to '{project.PackageId}'.");
                 }
-                throw new InvalidOperationException(
-                    $"Package deletion or rename is not supported by automatic lineage: {previous.PackageId} ({previous.ProjectPath}).");
+                if (string.IsNullOrWhiteSpace(previous.Version))
+                {
+                    throw new InvalidOperationException(
+                        $"Package '{previous.PackageId}' cannot retire before automatic lineage records its durable identity. " +
+                        "Complete the lineage bootstrap before deleting the owner.");
+                }
+                retired[previous.PackageId] = previous with { ProjectPath = Normalize(previous.ProjectPath) };
+                continue;
             }
             if (!string.Equals(Normalize(previous.ProjectPath), Normalize(project.ProjectPath), StringComparison.OrdinalIgnoreCase))
             {
@@ -331,6 +369,10 @@ internal sealed class ReleaseLineageCompiler(
                     $"'{previous.ProjectPath}' to '{project.ProjectPath}'.");
             }
         }
+
+        return retired.Values
+            .OrderBy(package => package.PackageId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     internal static void ValidateReservedSourcePaths(IEnumerable<string> sourcePaths)
@@ -497,6 +539,7 @@ internal sealed class ReleaseLineageCompiler(
         }
 
         var resolvedPreviousSource = await repository.ResolveCommitAsync(state.PreviousSourceCommit, cancellationToken);
+        ValidateStateShape(state);
         if (state.IsBootstrap)
         {
             if (!Same(resolvedPreviousSource, resolvedPrevious))
@@ -515,9 +558,8 @@ internal sealed class ReleaseLineageCompiler(
                     $"Lineage source continuity is broken at {resolvedVersion}: previous state records " +
                     $"{previousState.SourceCommit}, current state records {resolvedPreviousSource}.");
             }
+            ValidateRetirementContinuity(previousState, state);
         }
-
-        ValidateStateShape(state);
         var sourceTree = await repository.ReadTreeAsync(resolvedSource, cancellationToken);
         ValidateReservedSourcePaths(sourceTree.Keys);
         var versionTree = await repository.ReadTreeAsync(resolvedVersion, cancellationToken);
@@ -591,6 +633,20 @@ internal sealed class ReleaseLineageCompiler(
                 "Committed package lineage state must record one durable version identity for every package owner.");
         }
         var packageIds = state.Packages.Select(package => package.PackageId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var retiredIds = state.RetiredPackages.Select(package => package.PackageId).ToArray();
+        var packagePaths = state.Packages.Select(package => Normalize(package.ProjectPath)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var retiredPaths = state.RetiredPackages.Select(package => Normalize(package.ProjectPath)).ToArray();
+        if (state.RetiredPackages.Any(package =>
+                string.IsNullOrWhiteSpace(package.Version) ||
+                string.IsNullOrWhiteSpace(package.ProjectPath)) ||
+            retiredIds.Distinct(StringComparer.OrdinalIgnoreCase).Count() != retiredIds.Length ||
+            retiredPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count() != retiredPaths.Length ||
+            retiredIds.Intersect(packageIds, StringComparer.OrdinalIgnoreCase).Any() ||
+            retiredPaths.Intersect(packagePaths, StringComparer.OrdinalIgnoreCase).Any())
+        {
+            throw new InvalidOperationException(
+                "Committed package lineage must retain each retired package's final identity and path without reusing it as an active owner.");
+        }
         var triggerIds = state.Triggers.Select(trigger => trigger.PackageId).ToArray();
         if (!state.ClosurePackages.SequenceEqual(triggerIds, StringComparer.OrdinalIgnoreCase) ||
             state.MarkerPackages.Except(triggerIds, StringComparer.OrdinalIgnoreCase).Any() ||
@@ -610,6 +666,38 @@ internal sealed class ReleaseLineageCompiler(
         if (!recordedInputs.SetEquals(state.SharedInputs))
         {
             throw new InvalidOperationException("Committed package lineage state has an inconsistent shared-input set.");
+        }
+    }
+
+    private static void ValidateRetirementContinuity(
+        ReleaseLineageState previous,
+        ReleaseLineageState current)
+    {
+        var currentActive = current.Packages.ToDictionary(package => package.PackageId, StringComparer.OrdinalIgnoreCase);
+        var expectedRetired = previous.RetiredPackages
+            .ToDictionary(package => package.PackageId, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var package in previous.Packages)
+        {
+            if (currentActive.TryGetValue(package.PackageId, out var active))
+            {
+                if (!Same(package.ProjectPath, active.ProjectPath))
+                    throw new InvalidOperationException(
+                        $"Package rename is not supported by automatic lineage: {package.PackageId} moved from " +
+                        $"'{package.ProjectPath}' to '{active.ProjectPath}'.");
+                continue;
+            }
+            expectedRetired[package.PackageId] = package;
+        }
+
+        var actualRetired = current.RetiredPackages
+            .ToDictionary(package => package.PackageId, StringComparer.OrdinalIgnoreCase);
+        if (!PackagesEqual(
+                expectedRetired.Values.OrderBy(package => package.PackageId, StringComparer.OrdinalIgnoreCase).ToArray(),
+                actualRetired.Values.OrderBy(package => package.PackageId, StringComparer.OrdinalIgnoreCase).ToArray()))
+        {
+            throw new InvalidOperationException(
+                "Committed package lineage does not preserve the exact cumulative package-retirement ledger.");
         }
     }
 
@@ -695,7 +783,7 @@ internal sealed class ReleaseLineageCompiler(
                 StringComparer.OrdinalIgnoreCase);
     }
 
-    private async Task RejectUnsupportedPackageMovesAsync(
+    private async Task RejectPackageRenamesAsync(
         string previousSourceCommit,
         string sourceCommit,
         CancellationToken cancellationToken)
@@ -709,11 +797,12 @@ internal sealed class ReleaseLineageCompiler(
         {
             var fields = line.Split('\t');
             var status = fields[0];
-            if (status.Length == 0 || status[0] is not ('D' or 'R')) continue;
+            if (status.Length == 0 || status[0] != 'R') continue;
             var paths = fields.Skip(1).Where(IsPackageOwnershipPath).ToArray();
             if (paths.Length == 0) continue;
             throw new InvalidOperationException(
-                $"Package deletion or rename is not supported by automatic lineage: {string.Join(" -> ", paths)}.");
+                $"Package rename is not supported by automatic lineage: {string.Join(" -> ", paths)}. " +
+                "Delete the old owner and introduce a genuinely new package identity/path if replacement is required.");
         }
     }
 
@@ -830,7 +919,8 @@ internal sealed class ReleaseLineageCompiler(
         ClosurePackages = state.ClosurePackages.ToList(),
         MarkerPackages = state.MarkerPackages.ToList(),
         Triggers = state.Triggers.ToList(),
-        Packages = state.Packages.ToList()
+        Packages = state.Packages.ToList(),
+        RetiredPackages = state.RetiredPackages.ToList()
     };
 
     private static async Task WriteJsonAsync(string path, object value, CancellationToken cancellationToken)

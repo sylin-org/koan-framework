@@ -2,10 +2,11 @@ namespace Koan.Communication.Runtime;
 
 internal sealed class FrameworkSignalEnvelope(
     Guid operationId,
+    Adapters.CommunicationLane lane,
     Type signalType,
     string payload)
     : CommunicationEnvelope(
-        Adapters.CommunicationLane.FrameworkSignals,
+        lane,
         operationId,
         ordinal: 0,
         signalType,

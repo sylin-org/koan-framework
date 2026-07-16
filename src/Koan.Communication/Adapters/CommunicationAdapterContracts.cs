@@ -11,7 +11,12 @@ public enum CommunicationLane
     /// Framework-owned, non-application signals such as a Jobs wake hint. This infrastructure lane does not
     /// add an arbitrary-object Messaging surface to Entity or application code.
     /// </summary>
-    FrameworkSignals
+    FrameworkSignals,
+    /// <summary>
+    /// Framework-owned signals delivered once to every active node within the elected provider's reach.
+    /// This differs from <see cref="FrameworkSignals"/>, whose stable receiver groups may compete across replicas.
+    /// </summary>
+    FrameworkBroadcasts
 }
 
 /// <summary>The point at which an adapter reports publication acceptance.</summary>
@@ -35,17 +40,31 @@ public enum CommunicationAdapterCapabilities
     GroupFanOut = 1 << 4,
     MessageIdentity = 1 << 5,
     BoundedAcceptance = 1 << 6,
-    ZeroTargetEvents = 1 << 7
+    ZeroTargetEvents = 1 << 7,
+    NodeFanOut = 1 << 8
 }
 
-/// <summary>An immutable, side-effect-free declaration of one Communication provider candidate.</summary>
+/// <summary>The lifetime and fan-out identity represented by one receiver binding.</summary>
+public enum CommunicationBindingScope
+{
+    /// <summary>Replicas with the same group identity compete for each publication.</summary>
+    ConsumerGroup,
+    /// <summary>Each active node owns an ephemeral binding and receives its own copy.</summary>
+    Node
+}
+
+/// <summary>
+/// An immutable, side-effect-free declaration of one Communication provider candidate. A layered candidate may
+/// replace the built-in floor when its owning engine activates it; declaring zero lanes keeps it dormant.
+/// </summary>
 public sealed record CommunicationAdapterDescriptor(
     string Id,
     IReadOnlyList<CommunicationLane> Lanes,
     CommunicationDeliveryAssurance Assurance,
     CommunicationAdapterCapabilities Capabilities,
     IReadOnlyList<string> DirectReferenceIdentities,
-    bool IsBuiltIn = false);
+    bool IsBuiltIn = false,
+    bool IsLayered = false);
 
 /// <summary>One stable local receiver/subscription group that an elected adapter must bind once.</summary>
 public sealed record CommunicationAdapterBinding(
@@ -53,7 +72,8 @@ public sealed record CommunicationAdapterBinding(
     CommunicationLane Lane,
     string Channel,
     string ContractId,
-    string GroupId);
+    string GroupId,
+    CommunicationBindingScope Scope = CommunicationBindingScope.ConsumerGroup);
 
 /// <summary>One host-encoded publication. Adapters route the bytes but never interpret Entity or context axes.</summary>
 public sealed class CommunicationAdapterPublication

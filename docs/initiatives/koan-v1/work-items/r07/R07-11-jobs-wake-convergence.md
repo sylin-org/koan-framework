@@ -56,7 +56,9 @@ correctness fallback, so loss or duplication changes latency only.
   unmanaged fire-and-forget publication from the Jobs wake path; and
 - the separate Jobs Messaging test project and solution folder.
 
-Legacy Messaging remains only for Cache coherence and other surviving previous-generation consumers.
+At the time of this slice, legacy Messaging remained for Cache coherence and other
+previous-generation consumers. R07-12 subsequently removed Cache's legacy channel packages and
+moved its key-invalidation contract onto Communication's internal every-node broadcast route.
 
 ## Delight contract
 

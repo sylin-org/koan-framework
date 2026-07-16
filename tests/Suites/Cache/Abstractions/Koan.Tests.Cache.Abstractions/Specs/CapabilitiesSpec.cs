@@ -1,4 +1,3 @@
-using Koan.Cache.Abstractions.Coherence;
 using Koan.Cache.Abstractions.Stores;
 
 namespace Koan.Tests.Cache.Abstractions.Specs;
@@ -15,16 +14,6 @@ public class CapabilitiesSpec
         caps.SupportsStaleWhileRevalidate.Should().BeFalse();
         caps.SupportsBinary.Should().BeFalse();
         caps.SupportsPersistence.Should().BeFalse();
-    }
-
-    [Fact]
-    public void CoherenceCapabilitiesBestEffort_DeclaresNoGuarantees()
-    {
-        var caps = CoherenceCapabilities.BestEffort;
-
-        caps.SupportsCatchUp.Should().BeFalse();
-        caps.GuaranteesAtLeastOnce.Should().BeFalse();
-        caps.PreservesPerKeyOrder.Should().BeFalse();
     }
 
     [Fact]

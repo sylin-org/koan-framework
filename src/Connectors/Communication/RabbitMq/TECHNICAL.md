@@ -2,10 +2,10 @@
 
 ## Provider boundary
 
-The connector implements `ICommunicationAdapter` and declares `CommunicationLane.Transport` plus
-`CommunicationLane.FrameworkSignals`. Its descriptor advertises the invariants required by both routes: stable
+The connector implements `ICommunicationAdapter` and declares `CommunicationLane.Transport`,
+`CommunicationLane.FrameworkSignals`, and `CommunicationLane.FrameworkBroadcasts`. Its descriptor advertises the invariants required by these routes: stable
 contract identity, serialized snapshot copies, opaque context carriage, typed receiver groups,
-group fan-out, message identity, and bounded acceptance. It reports
+group fan-out, node fan-out, message identity, and bounded acceptance. It reports
 `CommunicationDeliveryAssurance.DurablyAcknowledged`.
 
 `Koan.Communication` owns the wire envelope, typed handler catalog, context encoding, validation, and
@@ -14,7 +14,7 @@ tenant semantics, or business handlers. The same host-owned wire is exercised by
 provider.
 
 Provider election is lane-specific. An explicit `CommunicationOptions.TransportProvider` or
-`FrameworkSignalsProvider` binding
+`FrameworkSignalsProvider` or `FrameworkBroadcastsProvider` binding
 wins first. Otherwise a direct package/project reference makes this connector eligible. Without
 direct intent, only the minimum-priority built-in provider participates. Capability requirements,
 assurance, Core-owned `[ProviderPriority]`, and stable provider ID resolve eligible candidates.
@@ -29,10 +29,12 @@ exchange per mesh for the schema-2 default channels:
 koan.communication.{mesh}.default.v2
 ```
 
-Every discovered Entity receiver or internal signal group gets one durable, non-exclusive queue. Queue and
+Every discovered Entity receiver or competing internal signal group gets one durable, non-exclusive queue. Queue and
 routing-key suffixes are deterministic SHA-256-derived identifiers over the stable group and
 contract identities. All replicas with the same mesh, contract, and group consume from the same
-queue; distinct groups bind separate queues to the same contract route and therefore fan out.
+queue; distinct groups bind separate queues to the same contract route and therefore fan out. Every-node
+bindings use unique non-durable, auto-delete queues, so each active host gets a copy and departed nodes
+leave no durable subscription behind.
 
 The publisher uses a long-lived confirm-enabled channel, persistent messages, and mandatory
 publication. A returned message becomes `TransportException.NoReceivers`; a negative/late confirm or
@@ -76,7 +78,7 @@ errors are de-identified and never include Entity payloads or credentials.
 ## Wire compatibility and non-claims
 
 The current wire schema is version `2`; its neutral payload field carries either an Entity snapshot or
-a typed framework signal. Entity contract identity is derived from CLR full names; there is no
+a typed framework signal or broadcast. Entity contract identity is derived from CLR full names; there is no
 alias registry or rolling schema negotiation yet. Mesh, lane, channel, contract, operation identity,
 source ordinal, and Entity payload are validated at host ingress before business dispatch.
 

@@ -10,6 +10,7 @@ internal static class Constants
         public const string TransportProvider = Section + ":TransportProvider";
         public const string EventsProvider = Section + ":EventsProvider";
         public const string FrameworkSignalsProvider = Section + ":FrameworkSignalsProvider";
+        public const string FrameworkBroadcastsProvider = Section + ":FrameworkBroadcastsProvider";
     }
 
     internal static class Transport
@@ -42,6 +43,7 @@ internal static class Constants
         public const string EventAssurance = "communication.events.assurance";
         public const string EventSubscriptions = "communication.events.subscription-groups";
         public const string FrameworkSignalsAdapter = "communication.framework-signals.adapter";
+        public const string FrameworkBroadcastsAdapter = "communication.framework-broadcasts.adapter";
         public const string Capacity = "communication.in-process-capacity";
         public const string MaxPayloadBytes = "communication.max-payload-bytes";
     }
@@ -61,6 +63,8 @@ internal static class Constants
             public const string ContextCarriage = "koan.communication.context.carriage";
             public const string FrameworkSignalsSelected = "koan.communication.framework-signals.selected";
             public const string FrameworkSignalGroupsDiscovered = "koan.communication.framework-signals.groups.discovered";
+            public const string FrameworkBroadcastsSelected = "koan.communication.framework-broadcasts.selected";
+            public const string FrameworkBroadcastNodesDiscovered = "koan.communication.framework-broadcasts.nodes.discovered";
         }
 
         internal static class Subjects
@@ -76,6 +80,8 @@ internal static class Constants
             public const string Context = "communication:context";
             public const string FrameworkSignals = "communication:framework-signals:default";
             public const string FrameworkSignalGroups = "communication:framework-signals:groups";
+            public const string FrameworkBroadcasts = "communication:framework-broadcasts:default";
+            public const string FrameworkBroadcastNodes = "communication:framework-broadcasts:nodes";
         }
 
         internal static class Reasons
@@ -110,6 +116,8 @@ internal static class Constants
             public const string InternalFrameworkSignals = "framework-signals.internal";
             public const string BestEffortFallback = "framework-signals.best-effort-fallback";
             public const string BoundedSignalEgress = "framework-signals.bounded-egress";
+            public const string InternalFrameworkBroadcasts = "framework-broadcasts.internal";
+            public const string EveryActiveNode = "framework-broadcasts.every-active-node";
         }
     }
 }

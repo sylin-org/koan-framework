@@ -1,0 +1,79 @@
+using Koan.Cache.Abstractions;
+using Koan.Cache.Abstractions.Coherence;
+using Koan.Cache.Coherence;
+using Koan.Cache.Options;
+using Koan.Cache.Policies;
+using Koan.Cache.Topology;
+using Koan.Core.Composition;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+
+namespace Koan.Cache.Composition;
+
+/// <summary>Projects Cache topology, peer invalidation, and policy posture into shared runtime facts.</summary>
+internal sealed class CacheCompositionContributor : IKoanCompositionContributor
+{
+    public void Contribute(KoanCompositionBuilder builder, IServiceProvider services)
+    {
+        var topology = services.GetService<CacheTopology>();
+        var coordinator = services.GetService<CoherenceCoordinator>();
+        var options = services.GetService<IOptions<CacheOptions>>()?.Value;
+        var policies = services.GetService<CachePolicyRegistry>();
+        if (topology is null || coordinator is null || options is null) return;
+
+        var topologySelection = topology switch
+        {
+            { IsLayered: true } => "layered",
+            { IsLocalOnly: true } => "local-only",
+            { IsRemoteOnly: true } => "remote-only",
+            _ => "none"
+        };
+        builder.AddElection(
+            "cache:topology",
+            topologySelection,
+            "store-capability-resolution",
+            source: typeof(CacheCompositionContributor).FullName,
+            factCode: "koan.cache.topology.selected");
+        builder.AddObservation(
+            "koan.cache.topology.bounds",
+            "cache:topology:bounds",
+            $"Cache topology is {topologySelection}: L1={topology.Local?.Name ?? "none"}, " +
+            $"L2={topology.Remote?.Name ?? "none"}.",
+            "resolved-cache-stores",
+            typeof(CacheCompositionContributor).FullName);
+
+        builder.AddElection(
+            "cache:coherence",
+            coordinator.ProviderId,
+            coordinator.IsActive ? "layered-peer-invalidation" : "inactive-for-topology-or-policy",
+            source: typeof(CacheCompositionContributor).FullName,
+            factCode: "koan.cache.coherence.selected");
+        builder.AddCapability(
+            "cache:coherence",
+            [
+                "cache.peer-l1-only",
+                "cache.origin-filtered",
+                "cache.l1-ttl-staleness-bound",
+                "cache.communication-node-broadcast"
+            ]);
+        builder.AddObservation(
+            "koan.cache.coherence.posture",
+            "cache:coherence:posture",
+            $"Peer invalidation is {(coordinator.IsActive ? "active" : "inactive")}: " +
+            $"mode={options.CoherenceMode}, provider={coordinator.ProviderId}, assurance={coordinator.Assurance}; " +
+            "receivers evict L1 only and lost signals remain bounded by L1 TTL.",
+            options.CoherenceMode == CoherenceMode.Required ? "required" : "configured-posture",
+            typeof(CacheCompositionContributor).FullName);
+
+        builder.AddConfigKey(CacheConstants.Configuration.LocalProvider);
+        builder.AddConfigKey(CacheConstants.Configuration.RemoteProvider);
+        builder.AddConfigKey(CacheConstants.Configuration.CoherenceMode);
+        builder.AddConfigKey(CacheConstants.Configuration.DefaultRegionKey);
+        builder.AddObservation(
+            "koan.cache.policies.discovered",
+            "cache:policies",
+            $"Koan materialized {policies?.GetAllPolicies().Count ?? 0} cache policy declaration(s).",
+            "typed-policy-discovery",
+            typeof(CacheCompositionContributor).FullName);
+    }
+}

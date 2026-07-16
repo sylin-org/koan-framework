@@ -6,15 +6,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Options;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Cache.Policies;
 
 internal sealed class CachePolicyBootstrapper(
     CachePolicyRegistry registry,
-    IOptionsMonitor<CacheOptions> options,
-    ILogger<CachePolicyBootstrapper> logger) : IHostedService
+    IOptionsMonitor<CacheOptions> options) : IHostedService
 {
     private AssemblyLoadEventHandler? _handler;
 

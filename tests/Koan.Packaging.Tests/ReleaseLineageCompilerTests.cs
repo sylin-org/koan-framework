@@ -153,7 +153,7 @@ public sealed class ReleaseLineageCompilerTests
     }
 
     [Fact]
-    public void PreviousPackageDeletionFailsLoudly()
+    public void PreviousPackageDeletionBecomesPermanentRetirement()
     {
         var core = Project("Sylin.Koan.Core");
         var graph = new PackageGraph([core]);
@@ -163,11 +163,11 @@ public sealed class ReleaseLineageCompilerTests
             new ReleaseLineagePackage("Sylin.Koan.Removed", "src/removed/removed.csproj", "0.17.1")
         };
 
-        var error = Assert.Throws<InvalidOperationException>(() =>
-            ReleaseLineageCompiler.ValidatePackageContinuity(previous, graph));
+        var retired = ReleaseLineageCompiler.ReconcilePackageContinuity(previous, [], graph);
 
-        Assert.Contains("Sylin.Koan.Removed", error.Message, StringComparison.Ordinal);
-        Assert.Contains("deletion", error.Message, StringComparison.OrdinalIgnoreCase);
+        var package = Assert.Single(retired);
+        Assert.Equal("Sylin.Koan.Removed", package.PackageId);
+        Assert.Equal("0.17.1", package.Version);
     }
 
     [Fact]
@@ -181,7 +181,7 @@ public sealed class ReleaseLineageCompilerTests
         };
 
         var error = Assert.Throws<InvalidOperationException>(() =>
-            ReleaseLineageCompiler.ValidatePackageContinuity(previous, graph));
+            ReleaseLineageCompiler.ReconcilePackageContinuity(previous, [], graph));
 
         Assert.Contains("rename", error.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(current.PackageId, error.Message, StringComparison.Ordinal);
@@ -193,9 +193,28 @@ public sealed class ReleaseLineageCompilerTests
         var core = Project("Sylin.Koan.Core");
         var app = Project("Sylin.Koan.App", Reference(core));
 
-        ReleaseLineageCompiler.ValidatePackageContinuity(
+        var retired = ReleaseLineageCompiler.ReconcilePackageContinuity(
             [new ReleaseLineagePackage(core.PackageId, core.ProjectPath, "0.17.1")],
+            [],
             new PackageGraph([app, core]));
+
+        Assert.Empty(retired);
+    }
+
+    [Fact]
+    public void RetiredPackageIdentityCannotBeReintroduced()
+    {
+        var returned = Project("Sylin.Koan.Removed");
+        var retired = new[]
+        {
+            new ReleaseLineagePackage(returned.PackageId, "src/old/removed.csproj", "0.17.4")
+        };
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            ReleaseLineageCompiler.ReconcilePackageContinuity([], retired, new PackageGraph([returned])));
+
+        Assert.Contains("retired package identity", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(returned.PackageId, error.Message, StringComparison.Ordinal);
     }
 
     [Theory]

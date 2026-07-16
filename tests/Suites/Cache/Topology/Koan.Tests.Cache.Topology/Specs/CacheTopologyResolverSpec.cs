@@ -92,7 +92,7 @@ public sealed class CacheTopologyResolverSpec
     }
 
     [Fact]
-    public void Config_pin_to_missing_provider_falls_back_to_priority()
+    public void Config_pin_to_missing_provider_fails_without_weakening_intent()
     {
         var stores = new ICacheStore[]
         {
@@ -101,9 +101,9 @@ public sealed class CacheTopologyResolverSpec
         };
 
         var options = new CacheOptions { LocalProvider = "does-not-exist" };
-        var result = Resolver().Resolve(stores, options);
+        var resolve = () => Resolver().Resolve(stores, options);
 
-        // Falls back to priority ranking
-        result.Local!.Name.Should().Be("high-priority");
+        resolve.Should().Throw<InvalidOperationException>()
+            .WithMessage("*does-not-exist*Candidates: high-priority, low-priority*");
     }
 }
