@@ -24,7 +24,7 @@ related_guides:
 - **Inputs**: A Koan application with `builder.Services.AddKoan()`, at least one data adapter, and baseline knowledge of entities and dependency injection.
 - **Outputs**: An entity-first domain model with encapsulated rules, safe relationships, and streaming/vector patterns ready for downstream systems.
 - **Error Modes**: Capability mismatches, missing lifecycle opt-ins when `ProtectAll()` is active, or unbounded materialization in interactive endpoints.
-- **Success Criteria**: Entities expose clear static helpers, business invariants live with the model, and Flow/AI/Messaging integrations avoid custom repositories.
+- **Success Criteria**: Entities expose clear static helpers, business invariants live with the model, and AI/Messaging integrations avoid custom repositories.
 
 ### Edge Cases
 
@@ -41,7 +41,7 @@ related_guides:
 
 - 📌 Reference hub: [Data Pillar Reference](../reference/data/index.md)
 - 🔁 Lifecycle matrix: [Entity Lifecycle](../reference/data/entity-lifecycle.md)
-- 🌊 Orchestration partner: [Flow Pillar Reference](../reference/flow/index.md)
+- 🧠 Capability partner: [Entity Capabilities](entity-capabilities-howto.md)
 - 📮 Delivery surface: [API Delivery Playbook](./building-apis.md)
 
 Treat each section as a readiness checklist before shipping a model.

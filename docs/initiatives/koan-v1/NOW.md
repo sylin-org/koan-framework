@@ -5,11 +5,11 @@ title: "Koan V1 Reorganization Current Handoff"
 audience: [maintainers, ai-agents]
 status: current
 last_updated: 2026-07-15
-framework_version: v0.17.0
+framework_version: v0.18.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 through R07-05 passed; typed capability substrate is next
+  scope: R07-01 through R07-06 passed; faithful local Transport is next
 ---
 
 # Koan V1 reorganization current handoff
@@ -52,6 +52,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
   outer Data boundary, consumer migrations, runtime facts, generated REST/MCP parity, affected
   regression, automatic lineage, docs, and privacy gates are green. The old persistence `Events`
   implementation has no alias.
+- [R07-06](work-items/r07/R07-06-typed-capability-substrate.md) passed. Data.Core now owns only lazy
+  scalar/set/stream Entity-cardinality normalization. The generic Pipeline builder, mutable envelope,
+  feature bags, and every pillar extension are deleted without an alias. Ordinary embedding is
+  Lifecycle-owned; explicit subset and whole-collection rebuilds are Data.AI migration operations
+  with aggregate outcomes. The two real sample consumers are smaller and business-named.
 - Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -152,7 +157,7 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
 4. Restore the exact public-release ratchet without exclusions. **Passed as R07-04.**
 5. Rebuild canonical host-owned Lifecycle as a clean 0.18 wave. **Passed as R07-05.**
 6. Minimal Data.Core Entity-cardinality adapter, pillar-owned execution, and deletion of the two real
-   public Pipeline uses.
+   public Pipeline uses. **Passed as R07-06.**
 7. Faithful local Transport under `AddKoan()`.
 8. Events occurrence policy on the same kernel.
 9. Multi-connector mesh, RabbitMQ parity, Jobs wake, and Cache coherence migration.
@@ -215,13 +220,17 @@ Only the next slice has a detailed child card. Do not open broker breadth before
   Identity 114/114; OpenGraph 38/38; SoftDelete 9/9; Backup 7/7; Cache 14/14; Entity language
   11/11; Core Unit 112/112; Canon 35/35 + 6/6; Packaging 54/54. Release build has 0 errors,
   docs lint has 0 errors, and examples/skills/blueprint/surface/diff/privacy gates pass.
+- R07-06 passes its bounded closure: cardinality 6/6; Entity language 13/13; Data.AI 86/86;
+  Packaging 54/54; affected Release builds; docs lint 0 errors; generated source-application
+  lockfiles; stale-surface, diff, and privacy inventories. No release-certification suite was rerun.
 
 ## Next safe action
 
-Open the bounded typed capability substrate child with fresh exploration. Inventory the two live
-public Pipeline consumers and the smallest scalar/set/stream cardinality normalization Data.Core must
-own; each pillar must retain its own execution and outcomes. Do not mix Transport, Events, brokers, or
-Messaging compatibility into that substrate slice.
+Open faithful local Transport as the next bounded child. Start with fresh exploration of the current
+Messaging contracts, in-process adapter behavior, host discovery, serialization/copy semantics,
+logical-flow context carriage, and boot facts. Build only the process-local `AddKoan()` path first;
+do not open Events, brokers, RabbitMQ compatibility, or multi-connector election until scalar/set/
+stream Transport semantics pass locally.
 
 ## Repository boundary
 

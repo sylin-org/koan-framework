@@ -30,8 +30,6 @@
       href: guides/performance.md
     - name: Publishing with NativeAOT
       href: guides/nativeaot-howto.md
-    - name: Semantic Pipelines
-      href: guides/semantic-pipelines.md
     - name: Entity access and streaming
       href: guides/data/entity-access-and-streaming.md
     - name: MCP over HTTP + SSE
@@ -95,8 +93,6 @@
       href: reference/ai/index.md
     - name: Messaging
       href: reference/messaging/index.md
-    - name: Flow
-      href: reference/flow/index.md
     - name: Storage
       href: reference/storage/index.md
     - name: Media

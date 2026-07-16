@@ -2,13 +2,13 @@
   "schema": 1,
   "app": {
     "name": "GardenCoopEmbedded",
-    "koan": "0.17",
+    "koan": "0.18",
     "tfm": "net10.0"
   },
   "modules": [
     {
       "id": "Koan.AI",
-      "version": "0.17"
+      "version": "0.18"
     },
     {
       "id": "Koan.AI.Connector.Onnx",
@@ -28,7 +28,7 @@
     },
     {
       "id": "Koan.Core",
-      "version": "0.17"
+      "version": "0.18"
     },
     {
       "id": "Koan.Core.Adapters",
@@ -36,11 +36,11 @@
     },
     {
       "id": "Koan.Data.AI",
-      "version": "0.17"
+      "version": "0.18"
     },
     {
       "id": "Koan.Data.Abstractions",
-      "version": "0.17"
+      "version": "0.18"
     },
     {
       "id": "Koan.Data.Connector.Sqlite",
@@ -56,7 +56,7 @@
     },
     {
       "id": "Koan.Data.Vector",
-      "version": "0.17"
+      "version": "0.18"
     },
     {
       "id": "Koan.Data.Vector.Abstractions",
@@ -76,7 +76,7 @@
     },
     {
       "id": "Koan.Messaging.Core",
-      "version": "0.17"
+      "version": "0.18"
     },
     {
       "id": "Koan.Orchestration.Abstractions",

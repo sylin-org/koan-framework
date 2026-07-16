@@ -7,10 +7,9 @@ using S5.Recs.Providers;
 using Koan.AI;
 using Koan.AI.Contracts;
 using Koan.Data.Abstractions;
+using Koan.Data.AI.Migration;
 using Koan.Data.Core;
 using Koan.Data.Vector;
-using Koan.Core.Pipelines;
-using Koan.Core.Observability;
 using Koan.Core;
 using System.Linq;
 using System.Net.Http;
@@ -32,8 +31,6 @@ internal sealed class SeedService : ISeedService
     private readonly IReadOnlyDictionary<string, IMediaProvider> _providers;
     private static readonly object _importLock = new object();
     private static volatile bool _importInProgress = false;
-    private int _cacheHits = 0;
-    private int _cacheMisses = 0;
 
     public bool IsImportInProgress => _importInProgress;
 
@@ -64,39 +61,7 @@ internal sealed class SeedService : ISeedService
         {
             try
             {
-                var typeJobId = await Start(source, mediaType.Name, limit, overwrite, null, ct);
-                _logger?.LogInformation("Completed import for MediaType '{MediaType}' as part of job {JobId}",
-                    mediaType.Name, jobId);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Failed to import MediaType '{MediaType}' in job {JobId}: {Error}",
-                    mediaType.Name, jobId, ex.Message);
-            }
-        }
-
-        return jobId;
-    }
-
-    public async Task<string> Start(string source, int? limit, bool overwrite, string? embeddingModel, CancellationToken ct)
-    {
-        // Import all supported media types for comprehensive coverage
-        var mediaTypes = await MediaType.All(ct);
-        if (!mediaTypes.Any())
-        {
-            throw new InvalidOperationException("No MediaTypes found. Please seed reference data first.");
-        }
-
-        var jobId = Guid.CreateVersion7().ToString("n");
-        _logger?.LogInformation("Starting multi-type import job {JobId} for source={Source} with {TypeCount} media types and model={Model}",
-            jobId, source, mediaTypes.Count, embeddingModel ?? "default");
-
-        // Import each media type separately but track under one job
-        foreach (var mediaType in mediaTypes)
-        {
-            try
-            {
-                var typeJobId = await Start(source, mediaType.Name, limit, overwrite, embeddingModel, ct);
+                var typeJobId = await Start(source, mediaType.Name, limit, overwrite, ct);
                 _logger?.LogInformation("Completed import for MediaType '{MediaType}' as part of job {JobId}",
                     mediaType.Name, jobId);
             }
@@ -111,9 +76,6 @@ internal sealed class SeedService : ISeedService
     }
 
     public Task<string> Start(string source, string mediaTypeName, int? limit, bool overwrite, CancellationToken ct)
-        => Start(source, mediaTypeName, limit, overwrite, null, ct);
-
-    public Task<string> Start(string source, string mediaTypeName, int? limit, bool overwrite, string? embeddingModel, CancellationToken ct)
     {
         // Prevent concurrent imports to avoid service saturation
         lock (_importLock)
@@ -192,24 +154,25 @@ internal sealed class SeedService : ISeedService
                         var batchImported = await ImportData(batch, internalToken);
                         totalImported += batchImported;
 
-                        var batchEmbedded = await EmbedAndIndex(batch, embeddingModel, internalToken);
-                        totalEmbedded += batchEmbedded;
-
                         // Keep data for catalog building
                         allData.AddRange(batch);
 
                         // Update progress in real-time
                         _progress[jobId] = (totalFetched, totalFetched, totalEmbedded, totalImported, false, null);
-                        _logger?.LogInformation("Seeding job {JobId} batch: imported {BatchImported}, embedded {BatchEmbedded}. Total: {TotalImported}/{TotalFetched}",
-                            jobId, batchImported, batchEmbedded, totalImported, totalFetched);
+                        _logger?.LogInformation(
+                            "Seeding job {JobId} batch: imported {BatchImported}. " +
+                            "[Embedding] lifecycle owns deferred indexing. Total: {TotalImported}/{TotalFetched}",
+                            jobId, batchImported, totalImported, totalFetched);
                     }
 
                     _logger?.LogInformation("Seeding job {JobId}: Completed import for media type '{MediaType}'",
                         jobId, mediaType.Name);
                 }
 
-                _logger?.LogInformation("Seeding job {JobId}: streaming completed. Fetched={Fetched}, Imported={Imported}, Embedded={Embedded}",
-                    jobId, totalFetched, totalImported, totalEmbedded);
+                _logger?.LogInformation(
+                    "Seeding job {JobId}: streaming completed. Fetched={Fetched}, Imported={Imported}; " +
+                    "embedding completion is reported by the framework embedding ledger",
+                    jobId, totalFetched, totalImported);
 
                 // Build catalogs once docs are imported
                 try { await CatalogTags(allData, internalToken); } catch (Exception ex) { _logger?.LogWarning(ex, "Tag cataloging failed: {Message}", ex.Message); }
@@ -643,29 +606,6 @@ internal sealed class SeedService : ISeedService
         _logger?.LogInformation("Genre catalog updated with {Count} genres", counts.Count);
     }
 
-    private async Task<int> EmbedAndIndex(List<Media> items, string? embeddingModel, CancellationToken ct)
-    {
-        try
-        {
-            var ai = Client.TryResolve();
-            var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
-            if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
-            if (!Vector<Media>.IsAvailable)
-            {
-                //_logger?.LogWarning("Vector repository unavailable. Configure a vector adapter and ensure the service is running and reachable.");
-                return 0;
-            }
-
-            var total = await RunVectorPipeline(items, embeddingModel, ct);
-            //_logger?.LogInformation("Vector pipeline stored {Stored} embeddings for recommendation content", total);
-            return total;
-        }
-        catch
-        {
-            return 0;
-        }
-    }
-
     private async Task<int> UpsertVectors(List<Media> docs, string? embeddingModel, CancellationToken ct)
     {
         try
@@ -679,169 +619,26 @@ internal sealed class SeedService : ISeedService
                 return 0;
             }
 
-            var total = await RunVectorPipeline(docs, embeddingModel, ct);
-            //_logger?.LogInformation("Vector pipeline stored {Stored} embeddings for admin rebuild", total);
-            return total;
+            var result = await EmbeddingMigrator.ReEmbed(
+                docs,
+                targetModel: embeddingModel,
+                logger: _logger,
+                ct: ct);
+            if (!result.Success)
+            {
+                _logger?.LogWarning(
+                    "Vector-only rebuild indexed {Successful}/{Total} items; {Failed} failed",
+                    result.SuccessfulEntities,
+                    result.TotalEntities,
+                    result.FailedEntities);
+            }
+            return result.SuccessfulEntities;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger?.LogWarning(ex, "Vector-only rebuild could not start");
             return 0;
         }
     }
 
-    private async Task<int> RunVectorPipeline(IEnumerable<Media> items, string? model, CancellationToken ct)
-    {
-        var stored = 0;
-        var failures = 0;
-        var itemsList = items.ToList();
-        var modelId = model ?? "default";
-
-        _logger?.LogDebug("Vector pipeline starting: {Count} items, model={Model}", itemsList.Count, modelId);
-
-        // Build lookup: contentHash -> Media
-        var metadata = EmbeddingMetadata.Resolve<Media>();
-        var mediaByHash = new Dictionary<string, Media>();
-        foreach (var media in itemsList)
-        {
-            var signature = metadata.ComputeSignature(media);
-            mediaByHash[signature] = media;
-        }
-
-        // NOTE: With ARCH-0070, embedding cache is obsolete. Framework manages embeddings via EmbeddingState<T>.
-        // All items will be processed through AI embedding pipeline.
-
-        _logger?.LogInformation("Processing {Count} items through AI embedding pipeline", itemsList.Count);
-
-        var uncachedItems = itemsList.ToList();
-        Interlocked.Add(ref _cacheMisses, uncachedItems.Count);
-
-        // Process uncached items (slow path - requires AI calls)
-        if (uncachedItems.Count > 0)
-        {
-            await uncachedItems
-                .ToAsyncEnumerable()
-                .Tokenize(m => metadata.BuildEmbeddingText(m), model != null ? new AiTokenizeOptions { Model = model } : new AiTokenizeOptions())
-                .Branch(branch => branch
-                    .OnSuccess(success => success
-                        .Mutate(envelope =>
-                        {
-                            envelope.Features["vector:metadata"] = BuildVectorMetadata(envelope.Entity);
-                        })
-                        .Do(async (envelope, ct) =>
-                        {
-                            if (envelope.Features.TryGetValue(PipelineFeatureKeys.Embedding, out var embeddingObj)
-                                && embeddingObj is float[] embedding)
-                            {
-                                var vectorMetadata = envelope.Features.TryGetValue("vector:metadata", out var metadataObj)
-                                                   ? metadataObj as IReadOnlyDictionary<string, object>
-                                                   : null;
-
-                                try
-                                {
-                                    await VectorData<Media>.SaveWithVector(envelope.Entity, embedding, vectorMetadata, ct);
-                                    envelope.Metadata["vector:affected"] = 1;
-                                    Interlocked.Add(ref stored, 1);
-
-                                    // NOTE: With ARCH-0070, embeddings are managed by framework via EmbeddingState<T>
-                                    // No need to manually cache embeddings anymore
-                                }
-                                catch (InvalidOperationException)
-                                {
-                                    envelope.Metadata["vector:affected"] = 0;
-                                    Interlocked.Increment(ref failures);
-                                }
-                                catch (Exception)
-                                {
-                                    envelope.Metadata["vector:affected"] = 0;
-                                    Interlocked.Increment(ref failures);
-                                }
-                            }
-                            else
-                            {
-                                _logger?.LogWarning("Vector pipeline: no embeddings found for media {Id}", envelope.Entity.Id);
-                                envelope.Metadata["vector:affected"] = 0;
-                                Interlocked.Increment(ref failures);
-                            }
-                        }))
-                    .OnFailure(failure => failure
-                        .Tap(env => _logger?.LogWarning("Vector pipeline: tokenization failed for media {Id}: {Error}", env.Entity.Id, env.Error?.Message ?? "unknown"))
-                        .Tap(_ => Interlocked.Increment(ref failures))
-                        .Trace(env => $"Vector pipeline failed for media {env.Entity.Id}: {env.Error?.Message ?? "unknown"}")))
-                .Execute(ct);
-        }
-
-        if (failures > 0)
-        {
-            _logger?.LogWarning("Vector pipeline encountered {Failures} failures", failures);
-        }
-
-        _logger?.LogInformation("Vector pipeline completed: {Stored} vectors stored ({Cached} from cache, {Generated} newly generated)",
-            stored, _cacheHits, uncachedItems.Count - failures);
-
-        return stored;
-    }
-
-
-    public string BuildEmbeddingText(Media m)
-    {
-        var titles = new List<string>();
-        if (!string.IsNullOrWhiteSpace(m.Title)) titles.Add(m.Title);
-        if (!string.IsNullOrWhiteSpace(m.TitleEnglish) && m.TitleEnglish != m.Title) titles.Add(m.TitleEnglish!);
-        if (!string.IsNullOrWhiteSpace(m.TitleRomaji) && m.TitleRomaji != m.Title) titles.Add(m.TitleRomaji!);
-        if (!string.IsNullOrWhiteSpace(m.TitleNative) && m.TitleNative != m.Title) titles.Add(m.TitleNative!);
-        if (m.Synonyms is { Length: > 0 }) titles.AddRange(m.Synonyms);
-
-        var tags = new List<string>();
-        if (m.Genres is { Length: > 0 }) tags.AddRange(m.Genres);
-        if (m.Tags is { Length: > 0 }) tags.AddRange(m.Tags);
-
-        var text = $"{string.Join(" / ", titles.Distinct())}\n\n{m.Synopsis}\n\nTags: {string.Join(", ", tags.Distinct())}";
-        var trimmedText = text.Trim();
-        //_logger?.LogDebug("BuildEmbeddingText for media {Id}: {Length} chars, text preview: {Preview}", m.Id, trimmedText.Length, trimmedText.Length > 100 ? trimmedText.Substring(0, 100) + "..." : trimmedText);
-        return trimmedText;
-    }
-
-    /// <summary>
-    /// Builds search text for BM25 hybrid search - just title variants for keyword matching.
-    /// </summary>
-    public string BuildSearchText(Media m)
-    {
-        var titles = new List<string>();
-        if (!string.IsNullOrWhiteSpace(m.Title)) titles.Add(m.Title);
-        if (!string.IsNullOrWhiteSpace(m.TitleEnglish) && m.TitleEnglish != m.Title) titles.Add(m.TitleEnglish!);
-        if (!string.IsNullOrWhiteSpace(m.TitleRomaji) && m.TitleRomaji != m.Title) titles.Add(m.TitleRomaji!);
-        if (!string.IsNullOrWhiteSpace(m.TitleNative) && m.TitleNative != m.Title) titles.Add(m.TitleNative!);
-        if (m.Synonyms is { Length: > 0 }) titles.AddRange(m.Synonyms);
-
-        return string.Join(" ", titles.Distinct());
-    }
-
-    /// <summary>
-    /// Builds vector metadata with all filterable properties for filter push-down.
-    /// </summary>
-    private Dictionary<string, object> BuildVectorMetadata(Media m)
-    {
-        var metadata = new Dictionary<string, object>
-        {
-            ["searchText"] = BuildSearchText(m)  // Required for hybrid search
-        };
-
-        // Add filterable properties (all optional to handle nulls gracefully)
-        if (m.Genres is { Length: > 0 })
-            metadata["genres"] = m.Genres;
-        if (m.Tags is { Length: > 0 })
-            metadata["tags"] = m.Tags;
-        if (m.Rating.HasValue)
-            metadata["rating"] = m.Rating.Value;
-        if (m.Year.HasValue)
-            metadata["year"] = m.Year.Value;
-        if (m.Episodes.HasValue)
-            metadata["episodes"] = m.Episodes.Value;
-        if (!string.IsNullOrWhiteSpace(m.MediaTypeId))
-            metadata["mediaTypeId"] = m.MediaTypeId;
-
-        metadata["popularity"] = m.Popularity;
-
-        return metadata;
-    }
 }

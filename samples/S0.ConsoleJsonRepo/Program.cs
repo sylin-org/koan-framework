@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using S0.ConsoleJsonRepo;
 using Koan.Data.Core;
 using Koan.Data.Connector.Json;
-using Koan.Core.Pipelines;
 
 var services = new ServiceCollection();
 // If a path arg is supplied, direct JSON data there; helps tests use isolated temp dirs
@@ -32,20 +31,22 @@ Console.WriteLine($"Batch: +{result.Added} ~{result.Updated} -{result.Deleted}")
 var all = await Todo.All();
 Console.WriteLine($"Total items: {all.Count}");
 
-await Todo.AllStream()
-    .Pipeline()
-    .ForEach(t =>
+await CompleteTaskTitles(Todo.AllStream());
+
+static async Task CompleteTaskTitles(IAsyncEnumerable<Todo> todos, CancellationToken ct = default)
+{
+    await foreach (var todo in todos.WithCancellation(ct))
     {
-        if (t.Title.StartsWith("task", StringComparison.OrdinalIgnoreCase))
+        if (todo.Title.StartsWith("task", StringComparison.OrdinalIgnoreCase))
         {
-            t.Title = $"{t.Title} ✅";
+            todo.Title = $"{todo.Title} ✅";
+            await todo.Save(ct);
         }
-    })
-    .Save()
-    .Execute();
+    }
+}
 
 var after = await Todo.All();
-Console.WriteLine("After pipeline mutation:");
+Console.WriteLine("After completing task titles:");
 foreach (var todoItem in after)
 {
     Console.WriteLine($" - {todoItem.Title}");

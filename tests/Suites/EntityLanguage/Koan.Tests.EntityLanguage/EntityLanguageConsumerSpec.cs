@@ -68,6 +68,21 @@ public sealed class EntityLanguageConsumerSpec
     }
 
     [Fact]
+    public void Data_core_normalizes_each_entity_cardinality_without_a_flow_container()
+    {
+        var result = Compile("EntityCardinalityAccess", includeCache: false);
+        result.Succeeded.Should().BeTrue(result.Output);
+    }
+
+    [Fact]
+    public void Cardinality_infrastructure_rejects_non_entity_receivers_at_compile_time()
+    {
+        var result = Compile("InvalidEntityCardinalityAccess", includeCache: false);
+        result.Succeeded.Should().BeFalse();
+        result.Output.Should().Contain("IEntity");
+    }
+
+    [Fact]
     public void Removing_cache_makes_the_same_consumer_source_fail_at_the_facet()
     {
         var present = Compile("CacheAccess", includeCache: true);

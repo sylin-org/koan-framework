@@ -338,7 +338,7 @@ catch (AiProviderException ex) when (ex.IsRateLimited)
 
 ## Related Reading
 
-- [Flow Pillar Reference](../flow/index.md) – semantic pipelines, enrichment, batching
+- [Entity Capabilities](../../guides/entity-capabilities-howto.md) – entity lifecycle, streaming, and durable work
 - [Data Pillar Reference](../data/index.md) – storing embeddings & entity patterns
 - [AI Provider ADRs](../../decisions/AI-0001-ai-baseline.md) for policy and governance context
 

@@ -113,8 +113,8 @@ appropriate to the deployment, especially to the admin endpoints.
 - `Replay` reads a bounded `ConcurrentQueue` owned by the current runtime. Records do not survive a
   restart and do not constitute event sourcing or a durable replay guarantee.
 - A `CanonizationEvent` is a phase result/observation record. It is not Koan Messaging transport.
-- `Koan.Core.Pipelines.Pipeline()` is a separate in-process `IAsyncEnumerable<T>` composition API;
-  it is not a Canon pipeline descriptor or durability mechanism.
+- Canon's phase pipeline is a domain-specific runtime descriptor. It is not an Entity stream,
+  transport, or durability mechanism.
 - Canon persistence inherits the selected Data adapter's behavior. Large Entity reads may use
   `AllStream`/`QueryStream` only on adapters qualified by DATA-0107; InMemory, JSON, and Redis reject
   those streaming facades.

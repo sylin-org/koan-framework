@@ -1035,17 +1035,16 @@ not a checkpoint or resume token.
 
 **Concepts**
 
-For large datasets or long-running operations, combine a qualified Entity stream with Koan's semantic
-pipeline or Jobs (durable/retryable work).
+For large datasets or long-running operations, use a qualified Entity stream for an explicit
+business operation, or Jobs when the work needs durable execution and retry.
 
 **When to use:**
-- **Pipeline:** Transform records with consumer-paced stages (generate embeddings, update fields)
+- **Entity stream:** Apply an application-owned, business-named operation with consumer-paced reads
 - **Jobs:** Scheduled nightly transfers, archival, or DR sync
 
 **Recipe**
 
-Pipelines are part of the Koan core surface. Add only the feature packages whose stages or durable
-execution you need:
+Add only the pillar package that owns the capability you need:
 
 ```bash
 dotnet add package Sylin.Koan.AI
@@ -1054,22 +1053,37 @@ dotnet add package Sylin.Koan.Jobs
 
 **Sample**
 
-**Semantic pipeline (embedding backfill):**
+**Embedding lifecycle for ordinary writes:**
 
 ```csharp
-using Koan.Core.Pipelines;
+[Embedding(Async = true)]
+public sealed class Recommendation : Entity<Recommendation>
+{
+    public string Content { get; set; } = "";
+}
 
-// Process recommendations without materializing the complete Entity source in Koan
-await Recommendation.AllStream(batchSize: 200, ct: ct)
-    .Pipeline()
-    .Do(async (envelope, token) =>
-    {
-        var recommendation = envelope.Entity;
-        recommendation.Embedding = await Koan.AI.Client.Embed(recommendation.Content, token);
-        await recommendation.Save(token);
-    })
-    .ExecuteAsync(ct);
+await recommendation.Save(ct); // persistence schedules embedding through Entity Lifecycle
 ```
+
+**Explicit finite-set backfill:**
+
+```csharp
+var stale = await Recommendation.Query(
+    recommendation => recommendation.NeedsReindex,
+    ct);
+
+var result = await EmbeddingMigrator.ReEmbed(stale, batchSize: 200, ct: ct);
+if (!result.Success)
+{
+    logger.LogWarning(
+        "Re-indexed {Succeeded}/{Total} recommendations",
+        result.SuccessfulEntities,
+        result.TotalEntities);
+}
+```
+
+`ReEmbed` reports operation outcomes and does not imply collection atomicity or retry. Use
+`ReEmbedAll<T>` for an intentional whole-collection model transition.
 
 **Job for nightly archive:**
 
@@ -1101,7 +1115,7 @@ await new ArchiveOldTodosJob
 
 **Usage Scenarios**
 
-- **AI pipelines:** Generate embeddings for millions of documents
+- **AI lifecycle and migration:** Embed ordinary saves automatically; make explicit backfills observable
 - **Nightly transfers:** Archive old data, sync replicas
 - **Scheduled workflows:** Run transfers from Jobs; checkpoint and resume policy remains application-owned
 

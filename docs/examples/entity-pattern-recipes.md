@@ -135,8 +135,8 @@ Each extended move is implemented step-by-step inside the [Advanced Patterns](..
 
 - [ ] Data: Static helpers cover CRUD + streaming requirements.
 - [ ] Web: Controllers rely on entity statics and payload transformers.
-- [ ] Flow: Pipelines subscribe to lifecycle events without duplicating queries.
-- [ ] AI: Embedding pipelines reuse the same entity definitions.
+- [ ] Lifecycle: Cross-cutting persistence behavior uses the canonical Entity lifecycle.
+- [ ] AI: Embedding lifecycle and migrations reuse the same entity definitions.
 - [ ] Messaging: Domain events inherit from `Entity<T>` and respect provider capabilities.
 
 ---
@@ -145,7 +145,7 @@ Each extended move is implemented step-by-step inside the [Advanced Patterns](..
 
 - Validate new recipes against the stage checklists in the [Data Modeling Playbook](../guides/data-modeling.md#8-validate-the-aggregate).
 - Wire live APIs using the [API Delivery Playbook](../guides/building-apis.md).
-- Instrument semantic pipelines with the [Koan Troubleshooting Hub](../support/troubleshooting.md).
+- Diagnose capability and provider decisions with the [Koan Troubleshooting Hub](../support/troubleshooting.md).
 
 ---
 

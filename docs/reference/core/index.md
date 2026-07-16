@@ -23,7 +23,7 @@ validation:
 
 ## Overview
 
-Foundation layer providing auto-registration, health checks, configuration, and semantic streaming pipelines.
+Foundation layer providing auto-registration, health checks, configuration, and shared runtime contracts.
 
 **Package**: `Koan.Core`
 
@@ -45,12 +45,6 @@ string email = userEmail.Must().Be.ValidEmail();
 - Comprehensive validation: nulls, blanks, ranges, emails, URLs, enums, collections
 
 ➤ **[Guard Utilities Reference](guard-utilities.md)**
-
-## Semantic Streaming Pipelines
-
-Koan's semantic pipelines are now documented inside the Flow pillar, alongside intake stages and controller guidance. Use that reference as the canonical source for DSL syntax, AI integration, branching, and performance patterns.
-
-➤ **[Flow Pillar – Semantic Pipelines](../flow/index.md#semantic-pipelines)**
 
 ## Auto-Registration
 

@@ -14,6 +14,12 @@
 > Communication implementation remains pending; this note unlocks its qualified query-stream cell
 > without claiming universal adapter parity.
 
+> **Implementation update (R07-06, 2026-07-15):** Data.Core now owns only lazy scalar/set/stream
+> Entity-cardinality normalization. The generic `PipelineBuilder<T>`, mutable envelope/feature bags,
+> and AI/Data/Vector/Messaging/Observability pipeline extensions are deleted. Ordinary embedding is
+> Lifecycle-owned and explicit rebuilds are Data.AI migration operations. Communication remains the
+> next unopened child.
+
 ## Context
 
 Koan's Entity-first language has the right center but the wrong boundaries around communication.

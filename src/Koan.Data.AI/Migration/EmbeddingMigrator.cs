@@ -1,6 +1,8 @@
 using Koan.AI;
+using Koan.AI.Contracts.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
+using Koan.Data.Core.Selection;
 using Koan.Data.Vector;
 using Microsoft.Extensions.Logging;
 
@@ -42,7 +44,7 @@ public static class EmbeddingMigrator
     /// <typeparam name="TEntity">Entity type with [Embedding] attribute</typeparam>
     /// <param name="targetModel">Target embedding model (e.g., "text-embedding-3-large")</param>
     /// <param name="targetSource">Target AI source/group (e.g., "openai-prod")</param>
-    /// <param name="targetProvider">Target AI provider (e.g., "openai", "ollama")</param>
+    /// <param name="targetProvider">Optional provider provenance label. Routing is selected by <paramref name="targetSource"/>.</param>
     /// <param name="batchSize">Number of entities to process per batch</param>
     /// <param name="parallel">Whether to process batches in parallel (default: false)</param>
     /// <param name="logger">Logger for progress reporting</param>
@@ -58,6 +60,7 @@ public static class EmbeddingMigrator
         CancellationToken ct = default)
         where TEntity : class, IEntity<string>
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(batchSize, 1);
         var metadata = EmbeddingMetadata.Resolve<TEntity>();
         logger?.LogInformation(
             "Starting re-embedding migration for {EntityType}: model={Model}, source={Source}, provider={Provider}",
@@ -67,61 +70,59 @@ public static class EmbeddingMigrator
         // model registry to the target so the batch writes below don't trip the mixed-space GuardWrite.
         await VectorModelGuard.Reset<TEntity>(targetModel ?? metadata.Model, ct);
 
-        var result = new MigrationResult
-        {
-            EntityType = typeof(TEntity).Name,
-            StartedAt = DateTimeOffset.UtcNow
-        };
-
         try
         {
-            // Load all entities
             var entities = (await Data<TEntity, string>.Query(e => true, ct)).ToList();
-            result.TotalEntities = entities.Count;
-
             logger?.LogInformation("Loaded {Count} entities for re-embedding", entities.Count);
-
-            // Process in batches
-            var batches = entities.Chunk(batchSize).ToList();
-            result.TotalBatches = batches.Count;
-
-            if (parallel)
-            {
-                await Parallel.ForEachAsync(batches, ct, async (batch, token) =>
-                {
-                    await ProcessBatch(batch, metadata, targetModel, targetSource, targetProvider, result, logger, token);
-                });
-            }
-            else
-            {
-                foreach (var batch in batches)
-                {
-                    await ProcessBatch(batch, metadata, targetModel, targetSource, targetProvider, result, logger, ct);
-                    result.ProcessedBatches++;
-
-                    logger?.LogInformation(
-                        "Batch {Current}/{Total} complete ({Percent}%)",
-                        result.ProcessedBatches, result.TotalBatches,
-                        (result.ProcessedBatches * 100.0 / result.TotalBatches).ToString("F1"));
-                }
-            }
-
-            result.CompletedAt = DateTimeOffset.UtcNow;
-            result.Success = true;
-
-            logger?.LogInformation(
-                "Migration completed: {Success}/{Total} entities re-embedded in {Duration}",
-                result.SuccessfulEntities, result.TotalEntities, result.Duration);
-
-            return result;
+            return await ProcessEntities(
+                entities, metadata, targetModel, targetSource, targetProvider,
+                batchSize, parallel, logger, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             logger?.LogError(ex, "Migration failed: {Error}", ex.Message);
-            result.CompletedAt = DateTimeOffset.UtcNow;
-            result.Success = false;
-            result.ErrorMessage = ex.Message;
-            return result;
+            return Failed<TEntity>(ex);
+        }
+    }
+
+    /// <summary>
+    /// Re-embeds the supplied finite Entity set without loading or changing unrelated entities.
+    /// The returned result reports per-operation success and failure counts; no collection atomicity
+    /// is implied.
+    /// </summary>
+    public static async Task<MigrationResult> ReEmbed<TEntity>(
+        IEnumerable<TEntity> entities,
+        string? targetModel = null,
+        string? targetSource = null,
+        string? targetProvider = null,
+        int batchSize = 50,
+        bool parallel = false,
+        ILogger? logger = null,
+        CancellationToken ct = default)
+        where TEntity : class, IEntity<string>
+    {
+        ArgumentNullException.ThrowIfNull(entities);
+        ArgumentOutOfRangeException.ThrowIfLessThan(batchSize, 1);
+        var metadata = EmbeddingMetadata.Resolve<TEntity>();
+
+        try
+        {
+            var materialized = entities as IReadOnlyList<TEntity> ?? entities.ToList();
+            logger?.LogInformation(
+                "Re-embedding {Count} supplied {EntityType} entities: model={Model}, source={Source}, provider={Provider}",
+                materialized.Count, typeof(TEntity).Name,
+                targetModel ?? metadata.Model ?? "default",
+                targetSource ?? metadata.Source ?? "default",
+                targetProvider ?? "default");
+
+            return await ProcessEntities(
+                materialized, metadata, targetModel, targetSource, targetProvider,
+                batchSize, parallel, logger, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "Embedding operation failed: {Error}", ex.Message);
+            return Failed<TEntity>(ex);
         }
     }
 
@@ -219,6 +220,61 @@ public static class EmbeddingMigrator
         return removedCount;
     }
 
+    private static async Task<MigrationResult> ProcessEntities<TEntity>(
+        IReadOnlyList<TEntity> entities,
+        EmbeddingMetadata metadata,
+        string? targetModel,
+        string? targetSource,
+        string? targetProvider,
+        int batchSize,
+        bool parallel,
+        ILogger? logger,
+        CancellationToken ct)
+        where TEntity : class, IEntity<string>
+    {
+        var result = new MigrationResult
+        {
+            EntityType = typeof(TEntity).Name,
+            StartedAt = DateTimeOffset.UtcNow,
+            TotalEntities = entities.Count
+        };
+        var batches = entities.Chunk(batchSize).ToArray();
+        result.TotalBatches = batches.Length;
+
+        if (parallel)
+        {
+            await Parallel.ForEachAsync(batches, ct, async (batch, token) =>
+            {
+                await ProcessBatch(
+                    batch, metadata, targetModel, targetSource, targetProvider,
+                    result, logger, token).ConfigureAwait(false);
+                Interlocked.Increment(ref result.ProcessedBatches);
+            }).ConfigureAwait(false);
+        }
+        else
+        {
+            foreach (var batch in batches)
+            {
+                await ProcessBatch(
+                    batch, metadata, targetModel, targetSource, targetProvider,
+                    result, logger, ct).ConfigureAwait(false);
+                result.ProcessedBatches++;
+
+                logger?.LogInformation(
+                    "Embedding batch {Current}/{Total} complete ({Percent:F1}%)",
+                    result.ProcessedBatches, result.TotalBatches,
+                    result.ProcessedBatches * 100.0 / result.TotalBatches);
+            }
+        }
+
+        result.CompletedAt = DateTimeOffset.UtcNow;
+        result.Success = result.FailedEntities == 0;
+        logger?.LogInformation(
+            "Embedding operation completed: {Success}/{Total} entities indexed in {Duration}",
+            result.SuccessfulEntities, result.TotalEntities, result.Duration);
+        return result;
+    }
+
     private static async Task ProcessBatch<TEntity>(
         IEnumerable<TEntity> batch,
         EmbeddingMetadata metadata,
@@ -230,7 +286,7 @@ public static class EmbeddingMigrator
         CancellationToken ct)
         where TEntity : class, IEntity<string>
     {
-        foreach (var entity in batch)
+        await foreach (var entity in EntityCardinality.Many(batch, ct).ConfigureAwait(false))
         {
             try
             {
@@ -239,13 +295,20 @@ public static class EmbeddingMigrator
                 var signature = metadata.ComputeSignature(entity);
 
                 // Generate embedding with target model/source
+                var effectiveModel = targetModel ?? metadata.Model;
+                var effectiveSource = targetSource ?? metadata.Source;
                 float[] embedding;
-                using (targetSource != null || targetProvider != null || targetModel != null
-                    ? Client.Scope(all: targetSource)
-                    : null)
+                using (effectiveSource is not null ? Client.Scope(embed: effectiveSource) : null)
                 {
-                    embedding = await Client.Embed(text, ct);
+                    embedding = effectiveModel is null && effectiveSource is null
+                        ? await Client.Embed(text, ct).ConfigureAwait(false)
+                        : await Client.Embed(
+                            text,
+                            new EmbedOptions { Model = effectiveModel, Source = effectiveSource },
+                            ct).ConfigureAwait(false);
                 }
+
+                await VectorModelGuard.GuardWrite<TEntity>(effectiveModel, ct: ct).ConfigureAwait(false);
 
                 // Save to vector database — stamp the TARGET model/source so migrated vectors are
                 // distinguishable from un-migrated ones (AI-0036 W3; this is the worst drop site —
@@ -253,7 +316,9 @@ public static class EmbeddingMigrator
                 var provenance = VectorProvenance.Build(
                     targetModel ?? metadata.Model, targetSource ?? metadata.Source, metadata.Version, targetProvider,
                     merge: VectorFilterableMetadata.Extract(entity));
-                await VectorData<TEntity>.SaveWithVector(entity, embedding, provenance, ct);
+                // The Entity already exists. A vector-only write avoids re-firing persistence
+                // Lifecycle and recursively scheduling another embedding operation.
+                await VectorData<TEntity>.Save(entity, embedding, provenance, ct).ConfigureAwait(false);
 
                 // Update embedding state
                 var stateId = EmbeddingState<TEntity>.MakeId(entity.Id);
@@ -288,6 +353,16 @@ public static class EmbeddingMigrator
             }
         }
     }
+
+    private static MigrationResult Failed<TEntity>(Exception exception)
+        => new()
+        {
+            EntityType = typeof(TEntity).Name,
+            StartedAt = DateTimeOffset.UtcNow,
+            CompletedAt = DateTimeOffset.UtcNow,
+            Success = false,
+            ErrorMessage = exception.Message
+        };
 }
 
 /// <summary>

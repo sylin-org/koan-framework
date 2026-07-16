@@ -637,25 +637,34 @@ public class TodosController : EntityController<Todo>
 }
 ```
 
-### Semantic Pipeline Validation
+### Validating a streamed business operation
 
 ```csharp
-using Koan.Core.Pipelines;
-
-await Order.AllStream(ct)
-    .Pipeline()
-    .Do(async (envelope, token) =>
-    {
-        var order = envelope.Entity;
-        order.Amount = order.Amount.Must().Be.Positive();
-        order.Status = order.Status.Must().Be.Defined<OrderStatus>();
-        await order.Save(token);
-    })
-    .ExecuteAsync(ct);
+await foreach (var order in Order.AllStream(ct: ct).WithCancellation(ct))
+{
+    order.Amount = order.Amount.Must().Be.Positive();
+    order.Status = order.Status.Must().Be.Defined<OrderStatus>();
+    await order.Save(ct);
+}
 ```
 
-The Entity source requires `DataCaps.Query.ProviderBoundedPaging`; downstream pipeline buffers and
-concurrency remain separate limits.
+Give repeated operations a business name instead of hiding them in a generic composition DSL:
+
+```csharp
+static async Task ValidateOpenOrders(CancellationToken ct)
+{
+    await foreach (var order in Order.QueryStream(
+        order => order.Status == OrderStatus.Open,
+        ct: ct).WithCancellation(ct))
+    {
+        order.Amount = order.Amount.Must().Be.Positive();
+        await order.Save(ct);
+    }
+}
+```
+
+The Entity source requires `DataCaps.Query.ProviderBoundedPaging`. The application owns any
+additional concurrency, batching, retry, and operation-level outcome semantics.
 
 ---
 

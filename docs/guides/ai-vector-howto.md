@@ -562,91 +562,74 @@ _logger.LogInformation(
 
 ---
 
-## 7. Semantic Pipeline Integration – Batch Processing
+## 7. Embedding Lifecycle and Explicit Backfills
 
 **Concepts**
 
-- Use Koan's semantic pipeline to express embedding and persistence as one readable operation
-- Bound Koan-visible Entity source pages on qualified adapters
-- Pipeline stages capture failures for explicit success/failure branches
-- The pipeline does not retry failed AI calls automatically
+- `[Embedding]` makes ordinary Entity saves the shortest path to vector indexing
+- `Async = true` defers embedding work without changing the application save operation
+- `EmbeddingMigrator.ReEmbed(...)` owns an explicit finite-set rebuild
+- `EmbeddingMigrator.ReEmbedAll<T>(...)` owns an intentional whole-collection model transition
 
 **Recipe**
 
-- Koan's core semantic pipeline
-- Entity streaming (`AllStream`, `QueryStream`)
-- AI and Vector packages from previous sections
+- Add `[Embedding]` to the Entity and keep ordinary application code business-focused
+- Use the migrator only for operator-initiated backfills or model transitions
+- Inspect `MigrationResult`; migration is observable but not atomic and does not retry failures
 
-The Entity source is provider-bounded only on SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB,
-and Couchbase. InMemory, JSON, and Redis reject before query/yield. `batchSize` bounds Koan-visible
-candidates, not AI-stage concurrency or the complete pipeline's memory.
-
-**Sample – Embedding backfill pipeline**
+**Sample – ordinary writes**
 
 ```csharp
-using Koan.AI;
-using Koan.Core.Pipelines;
-using Koan.Data.Vector;
+[Embedding(Async = true, Template = "{Title}\n\n{Description}")]
+public sealed class Media : Entity<Media>
+{
+    public string Title { get; set; } = "";
+    public string Description { get; set; } = "";
+}
 
-await Media.AllStream(batchSize: 100, ct: ct)
-    .Pipeline()
-    .Tokenize(m => BuildEmbeddingText(m))
-    .Branch(branch => branch
-        .OnSuccess(success => success
-            .Mutate(envelope =>
-            {
-                envelope.Features["vector:metadata"] = new Dictionary<string, object>
-                {
-                    ["title"] = envelope.Entity.Title,
-                    ["searchText"] = BuildSearchText(envelope.Entity),
-                    ["genres"] = envelope.Entity.Genres
-                };
-            })
-            .SaveWithVectors())
-        .OnFailure(failure => failure
-            .Tap(envelope => _logger.LogWarning(
-                "Failed to embed {MediaId}: {Error}",
-                envelope.Entity.Id,
-                envelope.Error?.Message))))
-    .ExecuteAsync(ct);
+await media.Save(ct); // persistence succeeds; embedding is lifecycle-owned and deferred
 ```
 
-`Tokenize` records a provider exception on the pipeline envelope, and `OnFailure` receives that
-envelope. This is failure routing, not a retry policy. Add an explicit application retry or durable
-job when the workload requires another attempt.
+Use synchronous `[Embedding]` when the save must wait for indexing. With `Async = true`, inspect the
+framework embedding ledger and logs for completion; the initial save is not a claim that the vector
+write has completed.
+
+**Sample – explicit subset backfill**
+
+```csharp
+var stale = await Media.Query(media => media.NeedsReindex, ct);
+var result = await EmbeddingMigrator.ReEmbed(
+    stale,
+    targetModel: "all-minilm",
+    batchSize: 100,
+    logger: logger,
+    ct: ct);
+
+logger.LogInformation(
+    "Indexed {Succeeded}/{Total}; failed={Failed}",
+    result.SuccessfulEntities,
+    result.TotalEntities,
+    result.FailedEntities);
+```
+
+`ReEmbed` materializes only the supplied finite set, processes it in batches, and performs vector-only
+writes so it does not recursively trigger persistence lifecycle. It reports partial success; it does
+not promise collection atomicity, retry, or rollback.
 
 **Usage scenarios & benefits**
 
-- `SaveWithVectors()` persists the entity and the embedding staged by `Tokenize()` on the success path
-- A qualified data adapter avoids loading the complete Entity source into Koan at once; downstream
-  stage state and provider-driver memory remain separate limits
-- Failure branches make provider errors visible without implying that failed items were retried
+- Ordinary imports need only `Save`; the Entity declaration owns embedding intent
+- A selected subset can be re-indexed without touching unrelated entities
+- A whole-collection model change has a dedicated API that resets mixed-model protection deliberately
 
-**Advanced - Progress tracking**
+**Whole-collection model transition**
 
 ```csharp
-var total = await Media.Count();
-var seen = 0;
-
-await Media.AllStream(batchSize: 100, ct: ct)
-    .Pipeline()
-    .Tap(_ =>
-    {
-        var current = Interlocked.Increment(ref seen);
-        if (current % 100 == 0)
-        {
-            _logger.LogInformation(
-                "Source progress: {Seen}/{Total}",
-                current,
-                total);
-        }
-    })
-    .Tokenize(m => BuildEmbeddingText(m))
-    .Branch(branch => branch
-        .OnSuccess(success => success.SaveWithVectors())
-        .OnFailure(failure => failure.Tap(envelope =>
-            _logger.LogWarning(envelope.Error, "Embedding failed for {Id}", envelope.Entity.Id))))
-    .ExecuteAsync(ct);
+var result = await EmbeddingMigrator.ReEmbedAll<Media>(
+    targetModel: "text-embedding-3-large",
+    batchSize: 100,
+    logger: logger,
+    ct: ct);
 ```
 
 ---
@@ -897,7 +880,7 @@ await foreach (var batch in vectorRepo.ExportAll(batchSize: 100, ct))
 1. Start simple - embed a few entities and try semantic search (sections 1-3)
 2. Add hybrid search for exact matching (section 4)
 3. Add an app-owned embedding cache when measured input repetition justifies it (section 6)
-4. Use semantic pipelines for observable batch processing (section 7)
+4. Use Entity lifecycle for ordinary indexing and explicit migrators for backfills (section 7)
 5. Add personalization for returning users (section 5)
 
 Explore the S5.Recs sample to see production patterns in action. The combination of semantic search, hybrid matching, and personalization creates powerful recommendation experiences that understand both explicit queries and implicit user preferences.

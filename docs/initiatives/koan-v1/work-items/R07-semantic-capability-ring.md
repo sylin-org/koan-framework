@@ -38,7 +38,7 @@ subordinate to arriving at one sustainable architecture.
 ## Evidence to read first
 
 - Code: Entity lifecycle builders, `EntityContext`, Messaging Core/InMemory/RabbitMQ, ambient carrier,
-  semantic pipelines, Entity queries/streams, Jobs and Cache facets.
+  the former generic Pipeline DSL, Entity queries/streams, Jobs and Cache facets.
 - Tests: Entity language consumer cells, Data lifecycle/context tests, Messaging tests, Jobs ambient
   context and collection submission tests.
 - Documentation / decisions: Entity Semantics Contract, ARCH-0100, ARCH-0106, R03 ecosystem and Entity
@@ -188,7 +188,7 @@ cardinality and copy semantics. Neither is a compatibility base for Events or Tr
 | 3 | [Automatic breaking package lineage](r07/R07-03-automatic-package-lineage.md) | **Passed.** One version intent automatically mints and proves the complete reverse-dependent wave without an operator package list | manual closure tracking and source-SHA/package-SHA conflation |
 | 4 | [Public-release ratchet rehabilitation](r07/R07-04-public-release-ratchet.md) | **Passed.** The exact automatic release floor passes with bounded project fan-out, every runnable suite retained, and no leaked host state | misclassified helper projects, unbounded certification concurrency, and a red solution-test baseline |
 | 5 | [Canonical Lifecycle](r07/R07-05-canonical-lifecycle.md) | **Passed.** Lifecycle is host-owned, unavoidable, inspectable, and honestly named across Entity/Data/REST/MCP | lifecycle `Events` name, process-static registry, parallel repository construction, and bypassable hooks |
-| 6 | Typed capability substrate | A minimal Data.Core cardinality adapter and pillar-owned execution replace generic public flow machinery | `PipelineBuilder` and pillar pipeline extensions |
+| 6 | [Typed capability substrate](r07/R07-06-typed-capability-substrate.md) | **Passed.** A minimal lazy Data.Core cardinality adapter and pillar-owned execution replace generic public flow machinery | `PipelineBuilder`, mutable envelopes, and pillar pipeline extensions |
 | 7 | In-process Transport flagship | a foundation + `AddKoan()` app gets local scalar/set/stream snapshots, stable typed receivers, source/ingress filters, isolated copies, bounded acceptance, operation-scoped settlement wait, and tenant-safe retry identity | old Messaging Core, proxy/buffer, broad `Send`, separate InMemory connector |
 | 8 | Events policy | payload-less occurrences fan out over the proved kernel | event/messaging conflation and service-collection handlers |
 | 9 | Mesh, broker, and internal parity | a build manifest turns connector references into zero-routing-code channel election; RabbitMQ, Jobs wake, and Cache coherence obey the same groups/context/facts | current RabbitMQ implementation and two Messaging bridge packages |
@@ -218,9 +218,12 @@ backlogs until their prerequisites pass.
    publication or remote mutation.
 9. Complete canonical Lifecycle as the clean 0.18 child. **Complete.** Host composition, one outer
    Data boundary, migrations, cross-surface proofs, affected regression, automatic lineage, docs, and
-   privacy closure pass. Do not reopen this boundary during typed capability work.
-10. Open each later implementation slice only after its lower boundary passes.
-11. Prove in-process semantics before any broker migration or public maturity change.
+   privacy closure pass.
+10. Replace generic Pipeline machinery with the typed capability substrate. **Complete.** R07-06
+    leaves one lazy Entity-cardinality seam, makes embedding execution pillar-owned, migrates the two
+    real consumers, and deletes the DSL without an alias.
+11. Open each later implementation slice only after its lower boundary passes.
+12. Prove in-process semantics before any broker migration or public maturity change.
 
 R07-02 was intentionally additive and preceded the Lifecycle source break. R07-03 removed the package-
 lineage stop condition: once R07-04 restores the release floor, public 0.17's lifecycle `Events`
@@ -258,6 +261,10 @@ identity automatically.
   minutes 33 seconds. The bounded two-project solution topology retains every runnable suite; the
   three prior aggregate-only Jobs failures do not recur, no hang timeout fires, and no package,
   release, tag, push, or remote mutation occurs.
+- R07-05 passes the complete Lifecycle closure recorded by its child card.
+- R07-06 passes cardinality 6/6, Entity language 13/13, Data.AI 86/86, Packaging 54/54,
+  affected Release builds, docs lint with 0 errors, generated lockfiles, and stale-surface/diff/privacy
+  gates without rerunning release certification.
 
 ## Acceptance additions
 
@@ -270,7 +277,7 @@ identity automatically.
   mesh/contract/group identity, weaker durability, hard semantic invariants, source/ingress filters,
   bounded receipts, and settlement observation are explicit.
 - Lifecycle has a Data-owned name and no longer shares the `Events` noun.
-- The target has fewer public mechanisms than the current Entity + Messaging + Pipeline combination.
+- The target has fewer public mechanisms than the former Entity + Messaging + Pipeline combination.
 - Each implementation slice produces a meaningful application result and can delete or supersede the
   mechanism it replaces.
 

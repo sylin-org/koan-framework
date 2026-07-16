@@ -11,6 +11,7 @@ using Koan.AI.Contracts.Sources;
 using Koan.Core;
 using Koan.Core.AI;
 using Koan.Data.AI.Attributes;
+using Koan.Data.AI.Migration;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Data.Vector;
@@ -32,6 +33,7 @@ namespace Koan.Data.AI.Tests;
 public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
 {
     private IntegrationHost? _host;
+    private readonly FakeEmbedAdapter _embedder = new();
 
     public async ValueTask InitializeAsync()
     {
@@ -51,7 +53,7 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
         {
             ["Embedding"] = new AiCapabilityConfig { Model = "test-embed", AutoDownload = false },
         };
-        _host.Services.GetRequiredService<IAiAdapterRegistry>().Add(new FakeEmbedAdapter());
+        _host.Services.GetRequiredService<IAiAdapterRegistry>().Add(_embedder);
         _host.Services.GetRequiredService<IAiSourceRegistry>().RegisterSource(new AiSourceDefinition
         {
             Name = "fake",
@@ -87,6 +89,45 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
         hit.Matches.Should().ContainSingle(m => (string)(object)m.Id == "d1",
             "the AfterUpsert hook must store the embedding once via the vector-only path");
     }
+
+    [Fact]
+    public async Task ReEmbed_processes_only_the_supplied_finite_set_and_reports_its_outcome()
+    {
+        var documents = new[]
+        {
+            new ReentrancyDoc { Id = "subset-1", Text = "first selected document" },
+            new ReentrancyDoc { Id = "subset-2", Text = "second selected document" },
+        };
+
+        var before = _embedder.RequestedInputs;
+        var result = await EmbeddingMigrator.ReEmbed(documents, batchSize: 1);
+
+        result.Success.Should().BeTrue();
+        result.TotalEntities.Should().Be(2);
+        result.SuccessfulEntities.Should().Be(2);
+        result.FailedEntities.Should().Be(0);
+        result.TotalBatches.Should().Be(2);
+        result.ProcessedBatches.Should().Be(2);
+        (_embedder.RequestedInputs - before).Should().Be(2,
+            "the finite-set operation must not discover or re-embed unrelated entities");
+
+        var hit = await Vector<ReentrancyDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, topK: 10);
+        hit.Matches.Select(match => (string)(object)match.Id)
+            .Should().Contain(new[] { "subset-1", "subset-2" });
+    }
+
+    [Fact]
+    public async Task ReEmbed_rejects_an_invalid_batch_before_calling_the_provider()
+    {
+        var before = _embedder.RequestedInputs;
+
+        var action = () => EmbeddingMigrator.ReEmbed(
+            new[] { new ReentrancyDoc { Id = "invalid-batch", Text = "must not be embedded" } },
+            batchSize: 0);
+
+        await action.Should().ThrowAsync<ArgumentOutOfRangeException>();
+        _embedder.RequestedInputs.Should().Be(before);
+    }
 }
 
 /// <summary>A 1-arg <see cref="Entity{TEntity}"/> with a synchronous <c>[Embedding]</c>, routed to the in-process vector floor.</summary>
@@ -99,6 +140,9 @@ public sealed class ReentrancyDoc : Entity<ReentrancyDoc>
 
 internal sealed class FakeEmbedAdapter : IEmbedAdapter
 {
+    private int _requestedInputs;
+
+    public int RequestedInputs => Volatile.Read(ref _requestedInputs);
     public string Id => "fake";
     public string Name => "fake";
     public string Type => "fake";
@@ -112,10 +156,13 @@ internal sealed class FakeEmbedAdapter : IEmbedAdapter
         });
 
     public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
-        => Task.FromResult(new AiEmbeddingsResponse
+    {
+        Interlocked.Add(ref _requestedInputs, request.Input.Count);
+        return Task.FromResult(new AiEmbeddingsResponse
         {
             Vectors = request.Input.Select(_ => new[] { 0.1f, 0.2f, 0.3f }).ToList(),
             Dimension = 3,
             Model = "test-embed",
         });
+    }
 }

@@ -2,7 +2,7 @@
   "schema": 1,
   "app": {
     "name": "Koan.FirstUse",
-    "koan": "0.17",
+    "koan": "0.18",
     "tfm": "net10.0"
   },
   "modules": [
@@ -12,7 +12,7 @@
     },
     {
       "id": "Koan.Core",
-      "version": "0.17"
+      "version": "0.18"
     },
     {
       "id": "Koan.Core.Adapters",
@@ -20,7 +20,7 @@
     },
     {
       "id": "Koan.Data.Abstractions",
-      "version": "0.17"
+      "version": "0.18"
     },
     {
       "id": "Koan.Data.Connector.Json",

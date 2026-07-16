@@ -277,9 +277,9 @@ public sealed class DatabaseHealthCheck : IHealthContributor
   doc.ContentEmbedding = vector;
   await doc.Save();
   ```
-- For heavy workloads on a `ProviderBoundedPaging` adapter, stream the source with
-  `Entity.AllStream(...)` and a `.Pipeline()`. InMemory, JSON, and Redis reject Entity streams;
-  pipeline batching/rate limits remain separate from the data-source page bound.
+- For heavy application-owned workloads on a `ProviderBoundedPaging` adapter, stream the source with
+  `Entity.AllStream(...)`. InMemory, JSON, and Redis reject Entity streams; application batching,
+  concurrency, and rate limits remain separate from the data-source page bound.
 
 ### Cost & Rate Limits
 
@@ -301,30 +301,44 @@ Set provider budgets and retry envelopes:
 
 ---
 
-## AI Pipeline Health
+## AI Indexing Health
 
 ###### Flow Pipeline Health
-<!-- Legacy anchor preserved for inbound deep links (section renamed from the removed Flow pillar). -->
+<!-- Legacy anchor preserved for inbound deep links. -->
 
-### Semantic Pipeline Failures
+### Embedding lifecycle and migration failures
 
-Stream the source, embed with `.Tokenize(...)` (the tokenize stage calls the embedding provider and stages the vector), then persist with `.SaveWithVectors()` or branch on success/failure. Use `.Tap(...)` for diagnostics and `.Mutate(...)` to record failure state:
+For ordinary indexing, declare the intent on the Entity and save normally:
 
 ```csharp
-await Document.AllStream(batchSize: 50)
-    .Pipeline()
-    .Tap(env => logger.LogInformation("Processing {Id}", env.Entity.Id))
-    .Tokenize(doc => doc.Content, new AiTokenizeOptions { Model = "all-minilm" })
-    .Branch(branch => branch
-        .OnSuccess(success => success.SaveWithVectors())
-        .OnFailure(failure => failure
-            .Tap(env => logger.LogWarning("Failed: {Error}", env.Error?.Message))
-            .Mutate(env => env.Entity.Status = "failed")
-            .Do((env, ct) => env.Entity.Save(ct))))
-    .ExecuteAsync();
+[Embedding(Async = true)]
+public sealed class Document : Entity<Document>
+{
+    public string Content { get; set; } = "";
+}
+
+await document.Save(ct);
 ```
 
-If failures persist, log envelope errors (`env.Error`) and inspect provider capability mismatches.
+With `Async = true`, persistence completion and embedding completion are separate facts. Inspect the
+embedding ledger and `Koan.Data.AI` logs before treating the vector as available.
+
+For an explicit backfill, inspect the returned outcome:
+
+```csharp
+var result = await EmbeddingMigrator.ReEmbed(documents, logger: logger, ct: ct);
+if (!result.Success)
+{
+    logger.LogWarning(
+        "Embedding backfill failed for {Failed}/{Total} documents: {Error}",
+        result.FailedEntities,
+        result.TotalEntities,
+        result.ErrorMessage);
+}
+```
+
+The migrator reports partial failure but does not retry or roll back successful vector writes. Check
+AI provider routing, model compatibility, vector availability, and the per-entity error logs.
 
 ---
 

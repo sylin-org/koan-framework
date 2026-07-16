@@ -158,7 +158,7 @@ A quick map to similar ideas in other languages—useful for evaluators comparin
 
 | Framework                         | Ecosystem | Why people use it                                             | Where it falls short vs Koan                                           |
 | --------------------------------- | --------- | ------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| **Hibernate / JPA + Spring Data** | Java      | Mature, projections/specifications, transactions, migrations  | RDBMS-centric; polyglot = extra stacks; semantic pipelines are add-ons |
+| **Hibernate / JPA + Spring Data** | Java      | Mature, projections/specifications, transactions, migrations  | RDBMS-centric; polyglot and cross-pillar Entity capabilities require extra stacks |
 | **SQLAlchemy (Core + ORM)**       | Python    | Separation of concerns, composable queries, many SQL backends | SQL-only; doc/vector need separate tech; no ambient “set” routing      |
 | **Django ORM**                    | Python    | Great DX, admin, migrations                                   | AR-ish models; SQL-oriented; signals ≠ flow/projections                |
 | **Doctrine ORM**                  | PHP       | Proper Data Mapper, migrations                                | SQL-first; polyglot via plugins; no semantic/vector layer              |
@@ -168,7 +168,7 @@ A quick map to similar ideas in other languages—useful for evaluators comparin
 | Framework                           | Ecosystem  | Why people use it                                                   | Where it falls short vs Koan                                        |
 | ----------------------------------- | ---------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | **Prisma**                          | TypeScript | Strong DX, type-safety, migrations                                  | SQL-only; no document/vector first-class; pipelines via app code    |
-| **TypeORM / MikroORM**              | TypeScript | Flexible patterns (AR/Data Mapper), multiple RDBMS (and some Mongo) | Limited polyglot; no capability-introspection; no semantic pipeline |
+| **TypeORM / MikroORM**              | TypeScript | Flexible patterns (AR/Data Mapper), multiple RDBMS (and some Mongo) | Limited polyglot; no framework-wide capability introspection or Entity language |
 | **Objection.js / Kysely / Drizzle** | TypeScript | Composable queries, type-safe SQL                                   | SQL-only; events/AI/vector are DIY                                  |
 
 ## Go & Rust
