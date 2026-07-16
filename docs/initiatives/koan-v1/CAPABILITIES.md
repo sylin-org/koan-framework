@@ -67,6 +67,7 @@ it here.
 | Events and messaging | assessed | `demonstrated` | [record](#events-and-messaging) | A real sample and providers exist; no current broker conformance result was obtained. |
 | Jobs and scheduling | assessed | `verified` | [record](#jobs-and-scheduling) | Core/in-process behavior is strong; distributed tiers remain separate. |
 | Cache and distributed state | assessed | `verified` | [record](#cache-and-distributed-state) | Cross-engine behavior is tested; production coherence topologies are not certified. |
+| Media processing and serving | assessed | `verified` | [record](#media-processing-and-serving) | Recipe and HTTP behavior are strong; prewarm, automatic cleanup, and multi-source routing are unsupported. |
 | AI, vector, and semantic capabilities | assessed | `experimental` | [record](#ai-vector-and-semantic-capabilities) | Strong unit/in-memory evidence; external providers and the combined production lifecycle remain uncertified. |
 | MCP and agent-facing surfaces | assessed | `verified` | [record](#mcp-and-agent-facing-surfaces) | Core contract passes conformance; transports and operational authorization need broader proof. |
 | Authentication and authorization | assessed | `verified` | [record](#authentication-and-authorization) | Core identity passes; real external identity providers were not exercised. |
@@ -301,6 +302,32 @@ boundaries remain pre-V1 work.
   production coherence guarantees remain topology- and provider-specific.
 - **Open risks:** production guarantees remain provider/topology-specific; durable replay requires a real
   use case and provider contract before the surface grows.
+
+### Media processing and serving
+
+- **Outcome and shortest path:** in a Koan web app with Data and Storage providers, reference
+  `Sylin.Koan.Media.Web`, derive one `MediaEntity<TEntity>`, declare a `[MediaRecipe]`, and call
+  `AddMediaSource<TEntity>()`; Koan serves `/media/{id}/{recipe}` without an application rendering controller.
+- **Entry point and owner:** [`MediaEntity<TEntity>`](../../../src/Koan.Media.Abstractions/Model/MediaEntity.cs),
+  [`MediaRecipe`](../../../src/Koan.Media.Abstractions/Recipes/MediaRecipe.cs), the
+  [Core registry/pipeline](../../../src/Koan.Media.Core/README.md), and the
+  [Web source/controller](../../../src/Koan.Media.Web/README.md).
+- **Executable evidence:** Media Core passes 562/562 across recipe grammar, pipeline, formats,
+  negotiation, limits, derivative persistence, and failure paths. The real hosted Media Web suite passes
+  4/4 for Entity access gating, persisted derivative round-trip, code/config recipe startup facts, and
+  invalid-configuration boot failure. The maintained photo sample exercises on-demand HTTP rendering,
+  direct in-process rendering, and targeted source-deletion cleanup.
+- **Inspection and failure:** `KoanModule.Start` materializes recipes before traffic; invalid declarations
+  stop host startup. Shared runtime facts and HTTP recipe endpoints read the same registry and report recipe
+  source, version, fingerprint, steps, mutators, formats, and producible shortcuts.
+- **Unsupported / compatibility:** no upload-time prewarm, scheduled orphan cleanup, automatic multi-source
+  routing, signed/content-addressed Media route, configurable route prefix, or scalar/set/stream Entity Media
+  facet is claimed. The stream `Store` path and default derivative write buffer their complete payloads.
+- **Maturity / safe claim:** `verified`. The tested in-process recipe and Entity-backed HTTP contract is
+  automated; lifecycle automation and broader routing remain explicitly unsupported, and the packages remain
+  pre-1.0/unpublished through the current release process.
+- **Open risks:** replace public `MediaDerivation` leakage and application cleanup only when one context-aware
+  lifecycle/rendering coordinator has real consumers; do not add a facet or provider SPI for symmetry.
 
 ### AI, vector, and semantic capabilities
 

@@ -43,16 +43,10 @@ public sealed record MediaRecipe
     /// first entry is the recipe's preferred fallback when Accept offers
     /// no overlap.
     ///
-    /// <para>Adding AVIF to a recipe is appending <c>"avif"</c> to this
-    /// array; no other surface changes.</para>
+    /// <para>A declared format must have a registered encoder; recipe materialization
+    /// rejects formats the active pipeline cannot produce.</para>
     /// </summary>
     public ImmutableArray<string> AllowedOutputFormats { get; init; } = ImmutableArray<string>.Empty;
-
-    /// <summary>
-    /// When true, this recipe pre-warms at upload time via
-    /// <c>POST /api/admin/media/{id}/warm</c>. Default false (lazy).
-    /// </summary>
-    public bool Eager { get; init; }
 
     /// <summary>
     /// Origin of the recipe — used by introspection JSON to show

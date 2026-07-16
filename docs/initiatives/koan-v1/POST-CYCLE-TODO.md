@@ -4,10 +4,10 @@ domain: framework
 title: "Koan V1 Post-Main-Cycle Todo Register"
 audience: [maintainers, architects, ai-agents]
 status: current
-last_updated: 2026-07-15
+last_updated: 2026-07-16
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-15
+  date_last_tested: 2026-07-16
   status: reviewed
   scope: bounded design and polish debt deliberately deferred from active V1 slices
 ---
@@ -48,6 +48,7 @@ promote it into the active backlog instead of waiting for this list.
 | PMC-019 | Connector logging security | Several remote data/vector/messaging configurators and provider-specific discovery probes still log raw endpoints or connection strings, including information-level startup messages. The shared discovery wrapper and SQLite paths now redact credential-shaped values, but that is not fleet coverage. | A safe repair is a mechanical inventory plus provider-owned regression matrix, not a handful of ad hoc call-site edits inside the SQLite release-floor root. This must be resolved or explicitly gated before coherent public provider packages are promoted. | Define one safe structured logging helper for endpoint/connection/error fields, inventory every connector call site, and decide whether non-credential endpoint paths are retained or hashed. Never infer safety from log level. | Mutation-backed capture tests for every built-in connector family cover userinfo, quoted connection secrets, signed cloud URL tokens, and exception prose; a repository sweep rejects raw sensitive fields; startup/health facts remain useful and redacted. |
 | PMC-020 | Certification evidence | The public-release ratchet prints per-project VSTest summaries but does not persist one machine-readable aggregate test/pass/fail/skip/duration manifest. A buffered or truncated supervising console therefore cannot reconstruct exact aggregate counts after a successful run. | R07-04's exact clean certification is green and every project summary was emitted; adding an evidence subsystem inside that closure would widen a successful runner repair. | Choose a durable TRX/JUnit collection convention and a deterministic aggregator that preserves project identity, execution sequence, failed or hung owner, and local/CI parity without changing pass/fail semantics. | One retained artifact reports total/pass/fail/skip/duration by project and aggregate, names the failed or hung project and sequence, and agrees between the local ratchet and protected CI. |
 | PMC-021 | Entity Communication authoring | `[EventDetailsRequired]` makes payloadless `Raise<TEvent>()` fail before source enumeration at runtime, but no build-time diagnostic guides the author at the call site. | R07-08 deliberately keeps one Communication package and avoids introducing an analyzer assembly for a misuse that already fails safely and clearly. | Decide whether this friction occurs often enough to earn a shared Koan analyzer rule, and define generic/event-attribute resolution without coupling analyzers to runtime discovery. | A compile fixture rejects payloadless Raise only for details-required event kinds, accepts optional and explicit-details calls, supplies one corrective message, and leaves runtime enforcement unchanged. |
+| PMC-022 | Media derivative lifecycle | Public `MediaDerivation` exposes framework storage mechanics, keys persisted output by source id plus recipe fingerprint without source-contract identity, and requires applications to query framework rows for targeted cleanup or statistics. | R07-17 removes a false generic sweep safely, but a correct replacement needs one context-aware render/lifecycle owner and an explicit migration rather than another speculative storage SPI. Current on-demand and targeted application behavior remains honest. | Centralize derivative identity, storage, access, and cleanup behind a Media-owned coordinator keyed by source contract/type and logical context; decide compatibility and migration for existing rows before hiding framework storage. | Multi-source-type collision and isolation proofs, tenant/access context safety, targeted cleanup and statistics, HTTP/direct-render convergence, restart behavior, and an explicit migration fixture for existing derivatives. |
 
 ## Promoted and resolved history
 
@@ -68,7 +69,7 @@ in `PMC-016` and `PMC-017` and the connector security inventory in `PMC-019`. Th
 inventory-oriented items (`PMC-003`, `PMC-007`, `PMC-009`, `PMC-018`), because they establish
 the real size and severity of the work. Discuss
 compatibility-sensitive API choices (`PMC-001`, `PMC-002`, `PMC-004`, `PMC-008`, `PMC-014`,
-`PMC-015`) and the bounded Backup graduation decision (`PMC-013`) next. Finish with independently
+`PMC-015`, `PMC-022`) and the bounded Backup graduation decision (`PMC-013`) next. Finish with independently
 useful release-tooling polish (`PMC-005`, `PMC-006`, `PMC-020`). Fewer cards may result if one root repair
 responsibly closes several entries.
 

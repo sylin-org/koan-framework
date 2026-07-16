@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Media core for Koan: Ensure, pipelines, ancestry, and URL helpers over Koan.Storage.</Description>
+    <Description>Media recipe discovery and image pipelines with startup validation and runtime facts.</Description>
     <PackageTags>$(CommonPackageTags);media;images;video;pdf;pipeline;derivative</PackageTags>
   </PropertyGroup>
   <ItemGroup>

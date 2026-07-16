@@ -3,7 +3,6 @@ using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Web.Controllers;
 using Koan.Media.Web.Options;
 using Koan.Media.Web.Routing;
-using Koan.Media.Web.Sweep;
 using Koan.Web.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,8 +24,6 @@ namespace Koan.Media.Web.Initialization;
 ///   <item>Default <see cref="IOverlayResolver"/> backed by the registered
 ///   <see cref="IMediaSource"/> + <see cref="IMediaRecipeRegistry"/> — apps
 ///   can replace by registering their own implementation before AddKoan()</item>
-///   <item>Optional <see cref="MediaDerivationSweepService"/> when
-///   <c>Koan:Media:Web:DerivationSweep:Enabled</c> is true</item>
 /// </list>
 ///
 /// <para>Applications must still register an
@@ -60,12 +57,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // regular MediaEntity rows).
         services.TryAddSingleton<IOverlayResolver, DefaultOverlayResolver>();
 
-        // Orphan-derivation sweep — MEDIA-0007 §d. Always register the
-        // singleton so callers can resolve it for manual sweeps; the hosted
-        // background loop only runs when Enabled is true (the service idles
-        // out on its own and the gate is rechecked per cycle).
-        services.TryAddSingleton<MediaDerivationSweepService>();
-        services.AddHostedService(sp => sp.GetRequiredService<MediaDerivationSweepService>());
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

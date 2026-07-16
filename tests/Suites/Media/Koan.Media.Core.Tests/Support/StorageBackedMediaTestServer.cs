@@ -58,7 +58,7 @@ public sealed class StorageBackedMediaTestServer : IAsyncDisposable
         builder.Services.AddOptions<MediaWebOptions>()
             .BindConfiguration(MediaWebOptions.SectionPath);
         builder.Services.AddOptions<RecipesOptions>()
-            .BindConfiguration(RecipesOptions.SectionPath);
+            .BindConfiguration(RecipesOptions.RootSectionPath);
         builder.Services.TryAddSingleton<Koan.Media.Abstractions.Recipes.IMediaRecipeRegistry>(sp =>
         {
             var monitor = sp.GetService<IOptionsMonitor<RecipesOptions>>();

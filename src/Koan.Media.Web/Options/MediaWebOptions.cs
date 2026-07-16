@@ -35,9 +35,6 @@ public sealed class MediaWebOptions
     /// </summary>
     public bool AllowAdHoc { get; set; } = true;
 
-    /// <summary>Route prefix. Default <c>/media</c>.</summary>
-    public string RoutePrefix { get; set; } = "/media";
-
     /// <summary>
     /// Default cache-control header for variant responses (no
     /// content-addressable hash in the URL). Default
@@ -45,15 +42,4 @@ public sealed class MediaWebOptions
     /// </summary>
     public string DefaultCacheControl { get; set; } = "public, max-age=3600, stale-while-revalidate=86400";
 
-    /// <summary>
-    /// Cache-control header when the URL carries a content-addressable
-    /// hash (<c>/media/{id}@{shortHash}/...</c>). Default immutable.
-    /// </summary>
-    public string ImmutableCacheControl { get; set; } = "public, immutable, max-age=31536000";
-
-    /// <summary>
-    /// Configuration for the <see cref="Sweep.MediaDerivationSweepService"/>.
-    /// Disabled by default; enable to schedule orphan-derivation cleanup.
-    /// </summary>
-    public MediaDerivationSweepOptions DerivationSweep { get; set; } = new();
 }

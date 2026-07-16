@@ -27,11 +27,10 @@ namespace Koan.Media.Web.Controllers;
 /// land in follow-up phases per the ADR migration plan. This controller
 /// exposes the base grammar and override layering today.
 ///
-/// <para>Per MEDIA-0007, derivations are persisted through the registered
-/// <see cref="IMediaSource"/> directly — the same storage namespace as the
-/// originals, with lineage stamped on <c>SourceMediaId</c>/<c>DerivationKey</c>/
-/// <c>RelationshipType</c>/<c>Tags["recipe-version"]</c>. When the source does
-/// not persist derivations, every request renders from scratch.
+/// <para>Derivation persistence is an optional capability of the registered
+/// <see cref="IMediaSource"/>. The default Entity source stores lineage-stamped
+/// derivation records separately from the application's source Entity. When a
+/// source does not persist derivations, every request renders from scratch.
 /// </para>
 /// </summary>
 [ApiController]

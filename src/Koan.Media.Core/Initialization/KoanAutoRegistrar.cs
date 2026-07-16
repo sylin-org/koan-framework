@@ -1,6 +1,5 @@
 using System.Reflection;
 using Koan.Core;
-using Koan.Core.Modules;
 using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Core.Recipes;
 using Microsoft.Extensions.Configuration;
@@ -19,16 +18,15 @@ namespace Koan.Media.Core.Initialization;
 /// The pipeline itself is stateless and reached via <c>stream.AsMedia()</c>;
 /// no DI registration needed for the engine.
 /// </summary>
-public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
+public sealed class KoanAutoRegistrar : KoanModule
 {
-    public string ModuleName => "Koan.Media.Core";
-    public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
+    public override string Id => "Koan.Media.Core";
 
-    public void Initialize(IServiceCollection services)
+    public override void Register(IServiceCollection services)
     {
         // Bind appsettings recipes
         services.AddOptions<RecipesOptions>()
-            .BindConfiguration(RecipesOptions.SectionPath);
+            .BindConfiguration(RecipesOptions.RootSectionPath);
 
         // Discover application assemblies for [MediaRecipe] scanning
         services.TryAddSingleton<IMediaRecipeRegistry>(sp =>
@@ -42,9 +40,16 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         });
     }
 
-    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
+    public override Task Start(IServiceProvider services, CancellationToken ct)
     {
-        module.Describe(ModuleVersion);
+        ct.ThrowIfCancellationRequested();
+        _ = services.GetRequiredService<IMediaRecipeRegistry>().All;
+        return Task.CompletedTask;
+    }
+
+    public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
+    {
+        module.Describe(Version);
     }
 
     private static bool IsScannable(Assembly asm)

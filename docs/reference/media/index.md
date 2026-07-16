@@ -2,205 +2,121 @@
 type: REFERENCE
 domain: media
 title: "Media Pillar Reference"
-audience: [developers, architects, ai-agents]
-last_updated: 2026-05-27
-framework_version: v0.11.1
+audience: [developers, architects, support-engineers, ai-agents]
+last_updated: 2026-07-16
+framework_version: v0.18.0
 status: current
 validation:
-  status: not-yet-tested
-  scope: docs/reference/media/index.md
+  date_last_tested: 2026-07-16
+  status: verified
+  scope: recipe discovery, configuration, startup facts, pipeline, Entity source, and HTTP rendering
 ---
 
-# Media Pillar Reference
+# Media pillar reference
 
-**Document Type**: REFERENCE
-**Target Audience**: Developers, Architects
-**Last Updated**: 2026-05-27
-**Framework Version**: v0.11.1
+Koan Media turns a stored Entity original plus a named recipe into inspectable, on-demand HTTP rendering.
+The application declares media meaning; Koan owns recipe discovery, validation, execution, negotiation, and
+the controller.
 
-For the conceptual walkthrough, see the [Media Recipes How-To](../../guides/media-recipes-howto.md).
-For the design rationale, see [MEDIA-0004](../../decisions/MEDIA-0004-recipe-pipeline.md).
+## Shortest path
 
----
-
-## Installation
+For a Koan web application that already has Data and Storage providers:
 
 ```bash
-dotnet add package Koan.Media.Abstractions
-dotnet add package Koan.Media.Core
-dotnet add package Koan.Media.Web
+dotnet add package Sylin.Koan.Media.Web
 ```
 
 ```csharp
-// Program.cs
-builder.Services.AddKoan();
-builder.Services.AddControllers();
-builder.Services.AddSingleton<IMediaSource, YourMediaSource>();
-app.MapControllers();
-```
+using Koan.Core;
+using Koan.Media.Abstractions.Model;
+using Koan.Media.Abstractions.Recipes;
+using Koan.Media.Web.Routing;
+using Koan.Web.Extensions;
 
----
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan().AsWebApi();
+builder.Services.AddMediaSource<Photo>();
 
-## Pipeline Entry
+var app = builder.Build();
+await app.RunAsync();
 
-| Call | Returns | Behaviour |
-|---|---|---|
-| `stream.AsMedia()` | `IMediaPipeline` | Lifts a stream into a lazy pipeline. The pipeline disposes the stream at the first terminal call. |
-| `stream.AsMedia(logger)` | `IMediaPipeline` | Same, with an `ILogger` for destructive-verb diagnostics. |
+public sealed class Photo : MediaEntity<Photo> { }
 
----
-
-## Builder Verbs
-
-### Non-destructive (preserve format / animation / alpha / color depth)
-
-| Verb | Stage | Description |
-|---|---|---|
-| `AutoOrient(keep: false)` | Orient | EXIF-based; default-on. Pass `keep: true` to skip. |
-| `Rotate(int degrees)` | Rotate | Explicit clockwise rotation. |
-| `FlipHorizontal()` / `FlipVertical()` | Rotate | Mirror axis. |
-| `Crop(string spec)` / `Crop(CropSpec)` | Shape | Sugar over `Shape(crop: ...)`. |
-| `Shape(crop?, fit?, position?, background?)` | Shape | CSS-aligned shape step. Single slot. |
-| `Resize(width?, height?, dpr = 1.0)` | Size | Single-axis preserves aspect; dual-axis honours the shape step's `Fit`. |
-| `ResizeFit(int maxW, int maxH)` | Shape + Size | Convenience: contain within bounds. |
-| `ResizeCover(int w, int h, position?)` | Shape + Size | Convenience: cover-crop to exact dimensions. |
-| `Strip(MetadataKinds)` | Metadata | EXIF / ICC / XMP removal. |
-| `PreserveFormat(quality = Quality.Web)` | Encode | Explicit "encode in source's format" (implicit if no encode declared). |
-| `EncodeAs(string format, int quality = Quality.Web)` | Encode | Encode in named format; animation / alpha survive if target supports them. |
-
-### Destructive (explicit caller intent; logged at Information)
-
-| Verb | Stage | Description |
-|---|---|---|
-| `ExtractFrame(int index = 0)` | Frame | Animated → still. No-op on static sources. Out-of-range throws. |
-| `FlattenTo(string format, int quality = Quality.Web)` | Encode | Format change that may drop animation / alpha / color depth. |
-
-### Inspection
-
-| Verb | Returns | Description |
-|---|---|---|
-| `ProbeAsync(ct)` | `Task<MediaInfo>` | Format, dimensions, frames, alpha, color depth, EXIF orientation, ICC presence. Consumes the pipeline. |
-| `ToBytesAsync(ct)` | `Task<MediaOutput>` | Single-output materialisation. Disposes source. |
-| `MaterializeAsync(builder, ct)` | `Task<MediaBundle>` | Multi-variant materialisation: one decode, N encodes. |
-| `Apply(MediaRecipe recipe)` | `IMediaPipeline` | Apply every step from a recipe in one call. |
-
----
-
-## Canonical Pipeline Stages
-
-Steps always execute in stage order, regardless of declaration or
-URL-param order:
-
-```
-1. Decode    (implicit)
-2. Orient    (AutoOrient)
-3. Frame     (ExtractFrame)
-4. Timeline  (reserved for Koan.Media.Video)
-5. Rotate    (Rotate, FlipHorizontal/Vertical)
-6. Shape     (Crop + Fit + Position + Background)
-7. Size      (Resize)
-8. Overlay   (composition — media + text layers)
-9. Metadata  (Strip)
-10. Audio    (reserved for Koan.Media.Video)
-11. Encode   (PreserveFormat / EncodeAs / FlattenTo) — always terminal
-```
-
----
-
-## Value Types
-
-### `Quality` presets
-
-| Preset | Value | Notes |
-|---|---|---|
-| `Quality.Thumbnail` | 60 | Small thumbnails, low-stakes previews |
-| `Quality.Web` | 80 | Default for hero / content surfaces |
-| `Quality.Print` | 95 | Archival / print-ready |
-| `Quality.Lossless` | -1 | Sentinel; WebP picks lossless mode; PNG ignores; JPEG falls back to Print |
-
-### `Fit` modes (CSS `object-fit` aligned)
-
-| Mode | Behaviour |
-|---|---|
-| `Fit.Cover` | Default when `crop` set or both `w`/`h` given. Fills shape, crops overflow. |
-| `Fit.Contain` | Fits source inside shape, leaves bg-filled space. |
-| `Fit.Fill` | Stretches to fill, aspect broken. |
-| `Fit.ScaleDown` | Like Contain but never upscales. |
-| `Fit.None` | No resize; honours source dimensions. |
-
-### `Position` anchors
-
-| Form | Meaning |
-|---|---|
-| `Position.Center` (default) | Centered |
-| `Position.Top`, `Bottom`, `Left`, `Right` | Edge anchors |
-| `Position.TopLeft`, `TopRight`, `BottomLeft`, `BottomRight` | Corner anchors |
-| `Position.Percent(0.33, 0.5)` | Per-axis fraction in [0,1] |
-| `Position.Focus` | Use source media's stored focus point |
-
-### `Background` kinds
-
-| Factory | Behaviour |
-|---|---|
-| `Background.Transparent(fallback)` | Default. Preserved on alpha-capable outputs; falls back to `fallback` (default white) on JPEG. Composer is a no-op — no canvas extension. |
-| `Background.Solid(BackgroundColor)` | Named (`Black`, `White`, `Red`, `Green`, `Blue`, `Gray`, `Silver`) or hex (`new BackgroundColor(0x1a, 0x1a, 0x1a, 0xff)`) or `rgba:r,g,b,a`. |
-| `Background.Auto(fallback)` | Border-strip average on a 16×16 down-sample of the source. Computed per request (no cache today). Best for images with a deliberate frame/border. |
-| `Background.Dominant(fallback)` | 1×1 box-resample of the source — fast area-average that reads as "dominant" for photos and covers. Computed per request. |
-| `Background.Blur(radius)` | Cover-resize a clone of the source to fill the canvas, then Gaussian-blur. `radius:0` picks a sensible default (~4% of canvas short edge). |
-
-Smart backgrounds (`Auto`, `Dominant`, `Blur`) only fire when paired with `Fit.Contain` and a fully-defined target canvas (both `width` and `height` resolvable from the recipe). With `bg=transparent` (the default), the composer is skipped entirely — preserving the v0.10 behavior where `Fit.Contain` produced a proportionally-sized image without padding.
-
-### `CropSpec` parsers
-
-| String form | Constructor | Notes |
-|---|---|---|
-| `"square"` | `CropSpec.Square` | 1:1 aspect |
-| `"16:9"`, `"4:3"`, `"21:9"` | `CropSpec.Aspect(w, h)` | Aspect ratio |
-| `"400x200"` | `CropSpec.Pixels(w, h)` | Literal pixel dimensions, anchor-respecting |
-| `"400x200+100,50"` | `CropSpec.PixelsAt(w, h, x, y)` | Literal crop with explicit offset (ignores `position`) |
-
----
-
-## Recipe Registration
-
-### Code-side: `[MediaRecipe]`
-
-```csharp
-public static class MyRecipes
+public static class PhotoRecipes
 {
-    [MediaRecipe(
-        name: "poster",
-        Description = "...",
-        Version = 1,
-        Mutators = MutatorKind.Common | MutatorKind.Frame,
-        Eager = false)]
-    public static MediaRecipe Poster() => MediaRecipe.New()
-        .ExtractFrame(0)
-        .Resize(width: 800).Name("size").Primary()
-        .EncodeAs("webp", Quality.Web);
+    [MediaRecipe("card", Description = "320px JPEG card")]
+    public static MediaRecipe Card() => MediaRecipe.New()
+        .Resize(width: 320)
+        .EncodeAs("jpeg", Quality.Web)
+        .Build();
 }
 ```
 
-- Method must be `static`, parameterless, return `MediaRecipe` or `MediaRecipeBuilder`.
-- Discovered via `AppDomain.GetAssemblies()` excluding framework / test infrastructure.
-- Boot fails fast on duplicate names, reserved-name collisions, invalid step grammar.
+The resulting useful surface is `GET /media/{photoId}/card`. No application rendering controller or recipe
+registration loop is required.
 
-### Config-side: `Koan:Media:Recipes`
+## Package responsibilities
 
-```jsonc
+| Package | Owns |
+|---|---|
+| `Sylin.Koan.Media.Abstractions` | `MediaEntity<TEntity>`, recipes, steps, pipeline contracts, output values |
+| `Sylin.Koan.Media.Core` | recipe discovery/configuration, startup validation/facts, image engine |
+| `Sylin.Koan.Media.Web` | Entity source, recipe controller, request bounds, format negotiation, HTTP diagnostics |
+
+`Sylin.Koan.Media.Web` brings the other two packages transitively. Applications still reference concrete Data
+and Storage providers appropriate to their environment.
+
+## Entity-backed originals
+
+`MediaEntity<TEntity>` composes Koan Data and Storage:
+
+```csharp
+var uploaded = await Photo.Upload(stream, "original.jpg", "image/jpeg", ct: ct);
+var deduplicated = await Photo.Store(bytes, "original.jpg", "image/jpeg", ct: ct);
+await using var original = await Photo.OpenRead(uploaded.Key, ct);
+```
+
+- `Upload` preserves the caller's storage name.
+- `Store` uses a SHA-256 key and returns an existing Entity for identical content.
+- the stream overload of `Store` currently buffers the complete source to hash it.
+- tenancy, access, and storage placement come from the active Data/Storage axes, not from Media-specific
+  controller code.
+
+## Recipes
+
+A recipe method must be static, parameterless, and return `MediaRecipe` or `MediaRecipeBuilder`.
+
+```csharp
+[MediaRecipe(
+    "poster",
+    Description = "800px WebP poster",
+    Version = 2,
+    Mutators = MutatorKind.Dimensions | MutatorKind.Quality)]
+public static MediaRecipe Poster() => MediaRecipe.New()
+    .AutoOrient()
+    .Resize(width: 800).Name("size").Primary()
+    .EncodeAs("webp", Quality.Web)
+    .Build();
+```
+
+At host startup, Koan rejects duplicate names, reserved shortcut collisions, invalid step grammar, and output
+formats without an encoder. Configuration replaces code when both declare the same recipe name.
+
+### Configuration recipes
+
+```json
 {
   "Koan": {
     "Media": {
       "Recipes": {
-        "poster": {
-          "description": "...",
+        "card": {
+          "description": "Configuration-owned 320px JPEG card",
           "version": 1,
           "steps": [
-            { "op": "extractFrame", "index": 0 },
-            { "op": "resize", "width": 800, "name": "size", "primary": true },
-            { "op": "encodeAs", "format": "webp", "quality": 80 }
+            { "op": "resize", "width": 320 },
+            { "op": "encodeAs", "format": "jpeg", "quality": 80 }
           ],
-          "mutators": ["common", "frame"]
+          "mutators": ["dimensions", "quality"]
         }
       }
     }
@@ -208,181 +124,102 @@ public static class MyRecipes
 }
 ```
 
-- Schema mirrors the JSON `/media/recipes/{name}` emits.
-- Hot reload via `IOptionsMonitor<RecipesOptions>`.
-- Config **wins** over code on name collision (single Info log line at boot).
+`GET /media/recipes/{name}?as=appsettings` emits this paste-ready shape. Configuration reload is monitored;
+an invalid reload throws from the change callback rather than partially replacing the catalog.
 
-### `MutatorKind` flags
-
-| Flag | Accepts override |
-|---|---|
-| `Dimensions` | `?w=`, `?h=`, `?width=`, `?height=`, `?dpr=` |
-| `Format` | `?format=`, `?f=` |
-| `Quality` | `?q=`, `?quality=` |
-| `Frame` | `?frame=` |
-| `Position` | `?position=` (rejected without crop) |
-| `Background` | `?bg=` (named color, hex, `auto`, `dominant`, `blur`). Rejected without `crop=`/`aspect=` — there's nothing to fill without a target shape. |
-| `Crop` | `?crop=`, `?aspect=` (replaces recipe's shape slot) |
-| `Fit` | `?fit=` |
-| `Rotate` | `?rotate=`, `?flip=` |
-| `Strip` | `?strip=` |
-| `Overlay` | `?overlay={mediaId}` plus `?overlay.size=`, `?overlay.position=`, `?overlay.padding=`, `?overlay.opacity=`, `?overlay.rotate=`, `?overlay.recipe=` |
-| `Common` | Sugar for `Dimensions | Format | Quality` |
-| `All` | Every kind |
-
----
-
-## HTTP Surface
-
-### Routes
-
-| Route | Behaviour |
-|---|---|
-| `GET /media/{id}` | Original bytes, format-preserved |
-| `GET /media/{id}/{seed}` | Named recipe or format shortcut |
-| `GET /media/{id}/{seed}?param=value` | Recipe + query overrides (allowlist-checked) |
-| `GET /media/recipes` | Introspection: all recipes + global metadata |
-| `GET /media/recipes/{name}` | Single recipe + canonical JSON |
-| `GET /media/recipes/{name}?as=appsettings` | Wrapped in `Koan:Media:Recipes` for paste |
-
-### Seed resolution order
-
-1. Named recipe (case-insensitive)
-2. Format shortcut (`png`, `jpg`, `jpeg`, `webp`, `gif`, `bmp`, `tiff`, `avif`)
-3. 404
-
-Recipe names cannot collide with format shortcuts. Boot fails fast.
-
-### Parameter aliases
-
-| Short | Canonical |
-|---|---|
-| `w` | `width` |
-| `h` | `height` |
-| `q` | `quality` |
-| `f` | `format` |
-| `aspect` | `crop` |
-
-### Diagnostic response headers
-
-| Header | Meaning |
-|---|---|
-| `X-Koan-Media-Recipe` | Effective recipe name (or `ad-hoc`) |
-| `X-Koan-Media-RecipeHash` | Canonical fingerprint |
-| `X-Koan-Media-SourceFormat` | Source format |
-| `X-Koan-Media-OutputFormat` | Output format |
-| `X-Koan-Media-FrameCount` | Output frame count |
-| `X-Koan-Media-FromCache` | `hit` / `miss` / `stale-fallback` |
-| `X-Koan-Media-IgnoredParams` | Unknown params (relaxed mode) |
-| `X-Koan-Media-LimitExceeded` | Set when an output dimension exceeds policy |
-| `ETag` | `"{sourceShortHash}-{recipeFingerprint}"` |
-| `Vary` | `Accept` (emitted when format isn't pinned) |
-
-### Application-side wiring
+## Pipeline
 
 ```csharp
-public interface IMediaSource
-{
-    Task<MediaSourceHandle?> OpenAsync(string id, CancellationToken ct = default);
-}
-
-public sealed record MediaSourceHandle(
-    string Id,
-    Stream Bytes,
-    string ContentHashHex,
-    DateTimeOffset? LastModified) : IAsyncDisposable;
+await using var destination = File.Create("card.jpg");
+var output = await source.AsMedia()
+    .Apply(PhotoRecipes.Card())
+    .WriteToAsync(destination, ct);
 ```
 
-The application registers one `IMediaSource` implementation; the
-MediaController is auto-discovered by ASP.NET's controller scan.
+The pipeline is lazy until a terminal:
 
----
+| Terminal | Meaning |
+|---|---|
+| `ProbeAsync` | inspect format, dimensions, frames, alpha, and metadata posture |
+| `WriteToAsync` | write one output to a destination stream; preferred terminal |
+| `ToBytesAsync` | buffered compatibility terminal |
+| `MaterializeAsync` | decode once and produce a configured bundle |
 
-## Per-Entity Streaming: `StorageMediaController<TEntity>`
+Canonical stages are orient, frame/sample, rotate, shape, size, overlay, metadata, and encode. Stage order is
+stable regardless of declaration order. Direct Core callers own source bounds; Web applies the limits below
+before full decode where possible.
 
-For routes that serve raw stored bytes per-entity (not via the
-recipe pipeline), inherit `StorageMediaController<TEntity>`:
+## HTTP routes
 
-```csharp
-[Route("api/photos")]
-public sealed class PhotosController : StorageMediaController<Photo>
-{
-    public PhotosController(IOptions<StorageMediaOptions> options) : base(options) { }
-}
-```
+| Route | Result |
+|---|---|
+| `GET /media/{id}` | original bytes |
+| `GET /media/{id}/{seed}` | named recipe or producible format shortcut |
+| `GET /media/{id}/{seed}?w=...&q=...` | recipe plus allowlisted request overrides |
+| `GET /media/recipes` | recipes, shortcuts, aliases, and ad-hoc grammar |
+| `GET /media/recipes/{name}` | one canonical recipe |
+| `GET /media/recipes/{name}?as=appsettings` | paste-ready configuration |
 
-Provides: HEAD, GET, Range, If-None-Match, If-Modified-Since,
-Content-Disposition, Cache-Control. The recipe pipeline at
-`/media/{id}` is orthogonal — apps typically host both.
+Recipe responses carry ETag/cache headers plus `X-Koan-Media-Recipe`, recipe fingerprint, source/output format,
+frame count, ignored-parameter, and media-kind diagnostics where applicable. Negotiated responses emit
+`Vary: Accept`; an explicit format shortcut pins the output.
 
-Options under `Koan:Media:Web:Storage`:
+## Web options
 
-| Key | Default | Description |
-|---|---|---|
-| `EnableCacheControl` | `true` | Emit `Cache-Control` on raw responses |
-| `Public` | `true` | Public vs private cache visibility |
-| `MaxAge` | `1h` | Max-age for the header |
+Under `Koan:Media:Web`:
 
----
+| Option | Default | Meaning |
+|---|---:|---|
+| `MaxOutputEdge` | `4096` | largest requested output edge |
+| `MaxSourceMegapixels` | `100` | source pixel limit; `0` disables |
+| `MaxFrameCount` | `600` | source frame limit; `0` disables |
+| `StrictUnknownParams` | `false` | reject rather than report unknown query parameters |
+| `AllowAdHoc` | `true` | allow requests without a named recipe |
+| `DefaultCacheControl` | `public, max-age=3600, stale-while-revalidate=86400` | response cache policy |
 
-## Configuration
+Routes are currently fixed under `/media`.
 
-### `Koan:Media:Web` (MediaWebOptions)
+## Source and derivative behavior
 
-| Key | Default | Description |
-|---|---|---|
-| `MaxOutputEdge` | `4096` | Hard cap on output dimension (px). Excess returns 400 with `X-Koan-Media-LimitExceeded: maxOutputEdge`. |
-| `MaxSourceMegapixels` | `0` (disabled) | Pre-decode header-only check via `Image.IdentifyAsync`. Excess returns 400 with `X-Koan-Media-LimitExceeded: maxSourceMegapixels` before allocating the full decoded buffer. |
-| `MaxFrameCount` | `0` (disabled) | Pre-decode frame-count cap; same diagnostic header. Protects against animation-bomb sources. |
-| `StrictUnknownParams` | `false` | Unknown params return 400 (true) or surface in `X-Koan-Media-IgnoredParams` (false). |
-| `AllowAdHoc` | `true` | Allow URLs with no recipe seed (false → 400 on bare param requests). |
-| `RoutePrefix` | `/media` | Controller base path. |
-| `DefaultCacheControl` | `public, max-age=3600, stale-while-revalidate=86400` | Variant cache header. |
-| `ImmutableCacheControl` | `public, immutable, max-age=31536000` | Reserved for content-addressable URLs. |
+`AddMediaSource<Photo>()` selects one Entity type for the bare route. `MediaEntitySource<TEntity>` resolves the
+source through `Data<TEntity,string>.Get` before derivative lookup; warm results cannot bypass active tenant or
+access filters.
 
-### `Koan:Media:Web:Storage` (StorageMediaOptions)
+The default source persists completed derivatives as separate framework-owned `MediaDerivation` records keyed
+by source id and recipe fingerprint. Persistence is best-effort. A source implementation may decline derivative
+storage by relying on the default `IMediaSource` methods; requests then render every time.
 
-See `StorageMediaController<TEntity>` section above.
+## Startup and inspection
 
-### `Koan:Media:Recipes`
+`AddKoan()` materializes recipes before host startup completes. The shared fact envelope reports:
 
-Per-recipe declarations. Schema mirrors the
-`/media/recipes/{name}` JSON output.
+- recipe and producible-shortcut counts;
+- each recipe's code/config source, version, fingerprint, and step count; and
+- accepted mutators and output-format posture.
 
----
+The same facts are available to startup reporting, well-known/operator projections, and agent-facing inspection.
+The HTTP recipe endpoints read the same registry.
 
-## Error Modes
+## Unsupported today
 
-| Condition | HTTP | Body / Header |
-|---|---|---|
-| Unknown media id | 404 | `{ "error": "Media '...' not found." }` |
-| Unknown recipe / format shortcut seed | 404 | `{ "error": "Unknown recipe or format shortcut '...'." }` |
-| Override outside recipe's `Mutators` allowlist | 400 | `{ "error", "rejected": [...], "recipe", "allowedMutators": [...] }` |
-| Output dimension > `MaxOutputEdge` | 400 | `X-Koan-Media-LimitExceeded` header set |
-| Source bytes don't decode | 422 | `{ "error": "Source bytes did not match any registered image format." }` |
-| Boot — reserved-name collision | startup throw | `MediaRecipeBindingException` |
-| Boot — config recipe invalid grammar | startup throw | `MediaRecipeBindingException` with offending path |
+- upload-time or scheduled prewarming;
+- automatic orphan-derivative reclamation;
+- automatic routing across several media Entity types;
+- signed or content-addressed Media routes;
+- configurable route prefixes; and
+- a generic scalar/set/stream Entity Media facet.
 
----
+Source deletion makes an orphan derivative unreachable because the source gate runs first, but does not reclaim
+its storage. Applications that own deletion currently perform targeted derivative cleanup. Koan will not ship a
+context-free sweep: it cannot safely infer source absence across every tenant/access axis.
 
-## Future / Reserved
+## Evidence
 
-- `PipelineStage.Timeline` and `PipelineStage.Audio` are reserved
-  slots for the future `Koan.Media.Video` module. Image pipelines
-  ignore them; video pipelines populate them.
-- `BlurHash` / dominant-color placeholders for the SPA loading state
-  are designed in MEDIA-0004 but not yet on the API surface.
-- Per-source-hash caching of `Background.Auto` / `Background.Dominant`
-  samples is not implemented today; each render recomputes. Adequate
-  for catalogs where the response cache absorbs the cost; revisit
-  when profiling shows the sample step is hot.
+- Media Core suite: recipe grammar, pipeline, formats, negotiation, limits, derivation behavior, and errors.
+- Media Web hosted suite: Entity access gating, persisted derivative round-trip, code/config recipe startup facts,
+  and invalid-configuration boot failure.
+- Maintained photo sample: one original Entity, named on-demand recipes, HTTP serving, direct in-process rendering,
+  and explicit targeted deletion cleanup.
 
----
-
-## See Also
-
-- [Media Recipes How-To](../../guides/media-recipes-howto.md) — conceptual walkthrough
-- [Migration: Media v0.8 → v0.9](../../guides/v0.8-to-v0.9-media.md) — upgrade from `StreamTransformExtensions`
-- [MEDIA-0004 — Recipe pipeline](../../decisions/MEDIA-0004-recipe-pipeline.md) — design rationale
-- [MEDIA-0003 — Variant routing + canonical signature](../../decisions/MEDIA-0003-media-variant-routing-and-transforms.md) — addressing model
-- [MEDIA-0001 — Pillar baseline + storage integration](../../decisions/MEDIA-0001-media-pillar-baseline-and-storage-integration.md) — foundation
+See [R07-17](../../initiatives/koan-v1/work-items/r07/R07-17-media-recipe-truthfulness.md) for the current semantic
+election and lifecycle boundary.

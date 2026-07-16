@@ -23,7 +23,6 @@ public sealed class MediaRecipeBuilder
     private string? _description;
     private int _version = 1;
     private MutatorKind _mutators = MutatorKind.None;
-    private bool _eager;
     private ImmutableArray<string> _allowedFormats = ImmutableArray<string>.Empty;
 
     internal MediaRecipeBuilder() { }
@@ -49,12 +48,6 @@ public sealed class MediaRecipeBuilder
     public MediaRecipeBuilder Mutators(MutatorKind kinds)
     {
         _mutators = kinds;
-        return this;
-    }
-
-    public MediaRecipeBuilder WithEager(bool eager = true)
-    {
-        _eager = eager;
         return this;
     }
 
@@ -380,7 +373,6 @@ public sealed class MediaRecipeBuilder
             Version = _version,
             Steps = _steps.ToImmutableArray(),
             AllowedMutators = _mutators,
-            Eager = _eager,
             AllowedOutputFormats = _allowedFormats,
         };
     }

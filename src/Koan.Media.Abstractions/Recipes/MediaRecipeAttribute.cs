@@ -36,6 +36,4 @@ public sealed class MediaRecipeAttribute(string name) : Attribute
     /// <summary>Which URL/builder override classes are accepted.</summary>
     public MutatorKind Mutators { get; init; } = MutatorKind.None;
 
-    /// <summary>Pre-warm at upload time (vs lazy-on-first-request).</summary>
-    public bool Eager { get; init; }
 }

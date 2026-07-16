@@ -65,7 +65,7 @@ public sealed class MediaTestServer : IAsyncDisposable
 
         // Recipe registry: wire IOptionsMonitor + assemblies for [MediaRecipe] scan
         builder.Services.AddOptions<RecipesOptions>()
-            .BindConfiguration(RecipesOptions.SectionPath);
+            .BindConfiguration(RecipesOptions.RootSectionPath);
         builder.Services.TryAddSingleton<Koan.Media.Abstractions.Recipes.IMediaRecipeRegistry>(sp =>
         {
             var monitor = sp.GetService<IOptionsMonitor<RecipesOptions>>();

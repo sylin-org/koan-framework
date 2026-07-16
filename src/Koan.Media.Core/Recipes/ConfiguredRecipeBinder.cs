@@ -18,8 +18,6 @@ public static class ConfiguredRecipeBinder
 
         var builder = MediaRecipe.New().WithName(name).WithVersion(configured.Version);
         if (configured.Description is { Length: > 0 } d) builder.WithDescription(d);
-        if (configured.Eager) builder.WithEager();
-
         var mutators = MutatorKind.None;
         foreach (var m in configured.Mutators ?? new())
         {

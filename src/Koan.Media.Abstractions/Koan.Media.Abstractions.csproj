@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Media contracts for Koan: models, transforms, tasks, and events.</Description>
+    <Description>Entity-backed media, recipe, and pipeline contracts for Koan.</Description>
     <PackageTags>$(CommonPackageTags);media;images;video;pdf;transform;pipelines</PackageTags>
   </PropertyGroup>
   <ItemGroup>

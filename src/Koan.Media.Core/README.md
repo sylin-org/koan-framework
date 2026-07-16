@@ -1,65 +1,41 @@
-﻿# Koan.Media.Core
+# Koan.Media.Core
 
-## Contract
+Recipe discovery, startup validation, and the image-processing engine for Koan Media.
 
-- **Purpose**: Provide the runtime pipeline for Koan media operations, including variant orchestration, task scheduling, and storage integration.
-- **Primary inputs**: Media configuration options, adapter capabilities, and the shared media abstractions.
-- **Outputs**: Registered media operators, background pipelines that execute `MediaTask` workloads, and storage routes for asset lifecycle management.
-- **Failure modes**: Missing storage adapter registration, unconfigured operators, or variant handlers throwing during execution.
-- **Success criteria**: Media assets progress through configured pipelines, operators report health, and storage writes use the appropriate provider profiles.
-
-## Quick start
+## Direct processing
 
 ```csharp
-using Koan.Media.Core;
-using Koan.Media.Core.Options;
+await using var source = File.OpenRead("photo.jpg");
+await using var destination = File.Create("card.jpg");
 
-public sealed class MediaAutoRegistrar : IKoanAutoRegistrar
-{
-    public string ModuleName => "Media";
-
-    public void Initialize(IServiceCollection services)
-    {
-        services.AddMediaCore(options =>
-        {
-            options.DefaultStorageProfile = "cdn";
-            options.Pipelines.Add(new MediaPipelineDescriptor
-            {
-                PipelineId = "video-transcode",
-                Operators = { MediaOperatorDescriptor.For<VideoTranscodeOperator>() }
-            });
-        });
-    }
-
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
-        => report.AddNote("Media pipelines registered");
-}
+var output = await source.AsMedia()
+    .Resize(width: 320)
+    .EncodeAs("jpeg", Quality.Web)
+    .WriteToAsync(destination, ct);
 ```
 
-- Call `services.AddMediaCore(...)` inside your auto-registrar to register pipelines, operators, and storage defaults.
-- Operators can leverage `MediaAsset.SaveAsync()` or other entity statics to update assets after processing.
+For reusable policy, declare a `[MediaRecipe]` method and apply the resulting recipe:
+
+```csharp
+var output = await source.AsMedia()
+    .Apply(PhotoRecipes.Card())
+    .WriteToAsync(destination, ct);
+```
+
+Referencing the package plus `AddKoan()` discovers code recipes and configuration overrides. The catalog is
+materialized during host startup: invalid steps, duplicate names, reserved shortcut collisions, and unsupported
+output formats stop the host before traffic. Valid decisions enter Koan's runtime facts automatically.
 
 ## Configuration
 
-- Set `MediaOptions.DefaultStorageProfile` and per-pipeline overrides.
-- Register custom operators implementing `IMediaOperator` and describe their capabilities for observability.
-- Integrate Koan Storage adapters to route uploads and generated variants.
+Recipes may be declared under `Koan:Media:Recipes`. Configuration replaces a code recipe with the same name.
+Use `GET /media/recipes/{name}?as=appsettings` from `Koan.Media.Web` to obtain the canonical paste-ready shape.
 
-## Edge cases
+## Current limits
 
-- Large concurrent pipelines: configure `MaxConcurrentOperations` to avoid oversaturating resources.
-- Operator failures: use retry policies and mark variants with failure metadata to keep asset state consistent.
-- Storage latency: prefer streaming uploads for multi-GB media to avoid buffering in memory.
-- Multitenancy: scope pipeline IDs and storage profiles per tenant to prevent cross-tenant leaks.
+- Core is an in-process image pipeline, not a durable media job system.
+- It does not prewarm recipes or schedule background rendering.
+- Encoder availability defines which output formats are accepted at startup.
 
-## Related packages
-
-- `Koan.Media.Abstractions` – schema consumed by core pipelines.
-- `Koan.Media.Web` – HTTP interface layered atop the core runtime.
-- `Koan.Storage` – abstraction for media file persistence.
-
-## Reference
-
-- `MediaOptions` – master configuration for pipelines and storage.
-- `IMediaOperator` – contract for implementing operators.
-- `MediaPipelineDescriptor` – describes pipeline stages.
+See the [Media reference](../../docs/reference/media/index.md) and
+[technical companion](TECHNICAL.md).

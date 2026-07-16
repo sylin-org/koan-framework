@@ -8,9 +8,8 @@ namespace Koan.Media.Core.Tests.Support;
 /// derivation surface introduced by MEDIA-0007. Sources and derivations
 /// live in the same in-memory namespace, keyed by
 /// <c>{sourceId}:{recipeFingerprint}</c>, and the source itself implements
-/// the new <see cref="IMediaSource.OpenDerivationAsync"/>,
-/// <see cref="IMediaSource.TryStoreDerivationAsync"/> and
-/// <see cref="IMediaSource.SweepOrphanedDerivationsAsync"/> methods. Lets
+/// the <see cref="IMediaSource.OpenDerivationAsync"/> and
+/// <see cref="IMediaSource.TryStoreDerivationAsync"/> methods. Lets
 /// the cache-as-storage specs verify the contract end-to-end without
 /// pulling in Koan.Storage.
 /// </summary>
@@ -97,22 +96,6 @@ public sealed class StorageBackedMediaSource : IMediaSource
             CreatedAt: DateTimeOffset.UtcNow);
         Interlocked.Increment(ref DerivationWriteCount);
         return Task.CompletedTask;
-    }
-
-    public Task<MediaDerivationSweepResult> SweepOrphanedDerivationsAsync(CancellationToken ct = default)
-    {
-        var examined = 0;
-        var deleted = 0;
-        foreach (var entry in _derivations.ToArray())
-        {
-            ct.ThrowIfCancellationRequested();
-            examined++;
-            if (entry.Value.SourceMediaId is { Length: > 0 } sid && !_sources.ContainsKey(sid))
-            {
-                if (_derivations.TryRemove(entry.Key, out _)) deleted++;
-            }
-        }
-        return Task.FromResult(new MediaDerivationSweepResult(examined, deleted));
     }
 
     public static string DerivedKey(string sourceId, string fingerprint) => $"{sourceId}:{fingerprint}";

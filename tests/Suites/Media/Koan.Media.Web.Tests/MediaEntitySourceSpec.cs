@@ -149,12 +149,16 @@ public sealed class MediaWebHostFixture : IAsyncLifetime
             ["Koan:Storage:DefaultProfile"] = "test",
             ["Koan:Storage:Profiles:test:Provider"] = "local",
             ["Koan:Storage:Profiles:test:Container"] = "media",
+            ["Koan:Media:Recipes:configured-card:Description"] = "Configuration-bound recipe startup proof.",
+            ["Koan:Media:Recipes:configured-card:Steps:0:Op"] = "resize",
+            ["Koan:Media:Recipes:configured-card:Steps:0:Width"] = "640",
+            ["Koan:Media:Recipes:configured-card:Steps:1:Op"] = "encodeAs",
+            ["Koan:Media:Recipes:configured-card:Steps:1:Format"] = "jpeg",
         };
 
         Host = await KoanIntegrationHost.Configure()
             .WithSettings(settings)
-            // Referencing Koan.Media.Web requires an IMediaSource (the sweep hosted service depends on it) —
-            // register ScopedMedia's, exactly as a real app does. The specs also `new` one for direct calls.
+            // Register ScopedMedia's source exactly as a real app does. The specs also `new` one for direct calls.
             .ConfigureServices(s => { s.AddKoan(); s.AddMediaSource<ScopedMedia>(); })
             .StartAsync();
 
