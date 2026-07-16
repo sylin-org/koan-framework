@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Coherence;
 using Koan.Data.Abstractions;
+using Koan.Core;
 using Koan.Messaging;
 using Microsoft.Extensions.Logging;
 

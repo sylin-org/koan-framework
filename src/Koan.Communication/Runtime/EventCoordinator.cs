@@ -1,4 +1,5 @@
 using System.Text;
+using Koan.Communication.Adapters;
 using Koan.Core.Context;
 using Koan.Core.Json;
 using Koan.Data.Abstractions;
@@ -7,9 +8,8 @@ using Microsoft.Extensions.Options;
 namespace Koan.Communication.Runtime;
 
 internal sealed class EventCoordinator(
-    CommunicationHandlerCatalog handlers,
     KoanContextCarrierRegistry contextCarriers,
-    InProcessCommunicationRuntime runtime,
+    CommunicationRouter router,
     IOptions<CommunicationOptions> options)
 {
     public async Task<EventAcceptance> Raise<TEntity, TEvent>(
@@ -22,8 +22,9 @@ internal sealed class EventCoordinator(
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        var targets = handlers.EventsFor(typeof(TEntity), typeof(TEvent));
-        var operation = new CommunicationOperation(targets.Count);
+        var route = router.For(CommunicationLane.Events);
+        var contract = CommunicationContractIdentity.Events(typeof(TEntity), typeof(TEvent));
+        var operation = new CommunicationOperation(route);
         if (!hasDetails && Attribute.IsDefined(typeof(TEvent), typeof(EventDetailsRequiredAttribute), inherit: false))
         {
             operation.Seal(false);
@@ -43,7 +44,7 @@ internal sealed class EventCoordinator(
                 detailsPayload = details!.ToJson();
                 detailsBytes = Encoding.UTF8.GetByteCount(detailsPayload);
             }
-            catch (Exception ex)
+            catch (Exception error)
             {
                 operation.Seal(false);
                 throw new EventException(
@@ -51,22 +52,11 @@ internal sealed class EventCoordinator(
                     $"Entity Event could not serialize details for '{typeof(TEvent).Name}'. " +
                     "Use finite JSON details without reference cycles or unsupported values.",
                     new EventAcceptance(operation.Snapshot()),
-                    ex);
+                    error);
             }
         }
 
         var capturedContext = contextCarriers.Capture();
-        try
-        {
-            runtime.EnsureAvailable();
-        }
-        catch (Exception ex)
-        {
-            operation.Seal(false);
-            throw ProviderUnavailable(operation, ex);
-        }
-
-        var targetBindings = targets.Cast<CommunicationTargetBinding>().ToArray();
         var ordinal = 0L;
         try
         {
@@ -78,7 +68,7 @@ internal sealed class EventCoordinator(
                 {
                     entityPayload = entity.ToJson();
                 }
-                catch (Exception ex)
+                catch (Exception error)
                 {
                     operation.MarkRejected();
                     operation.Seal(false);
@@ -87,7 +77,7 @@ internal sealed class EventCoordinator(
                         $"Entity Event could not serialize '{typeof(TEntity).Name}' at ordinal {ordinal}. " +
                         "Use a finite JSON snapshot without reference cycles or unsupported values.",
                         new EventAcceptance(operation.Snapshot()),
-                        ex);
+                        error);
                 }
 
                 if (Encoding.UTF8.GetByteCount(entityPayload) + detailsBytes > options.Value.MaxPayloadBytes)
@@ -102,36 +92,50 @@ internal sealed class EventCoordinator(
                         new EventAcceptance(operation.Snapshot()));
                 }
 
-                var envelope = new EventEnvelope(
-                    operation,
+                var occurrenceId = Guid.CreateVersion7();
+                var wire = new CommunicationWireEnvelope(
+                    CommunicationWireCodec.SchemaVersion,
+                    router.MeshId,
+                    CommunicationLane.Events,
+                    route.Channel,
+                    contract,
+                    operation.OperationId,
                     ordinal,
-                    typeof(TEntity),
                     entityPayload,
                     capturedContext,
-                    targetBindings,
-                    typeof(TEvent),
-                    Guid.CreateVersion7(),
+                    occurrenceId,
                     DateTimeOffset.UtcNow,
                     hasDetails,
                     detailsPayload);
-                operation.ReserveAcceptance();
                 try
                 {
-                    await runtime.Accept(envelope, ct).ConfigureAwait(false);
+                    var accepted = await router.Publish(
+                            route,
+                            contract,
+                            $"{occurrenceId:N}",
+                            CommunicationWireCodec.Encode(wire),
+                            operation,
+                            ct)
+                        .ConfigureAwait(false);
+                    operation.ReserveAcceptance(accepted.TargetGroups, accepted.SettlementObservable);
                 }
-                catch (OperationCanceledException ex) when (ct.IsCancellationRequested)
+                catch (OperationCanceledException error) when (ct.IsCancellationRequested)
                 {
-                    operation.RollBackAcceptance();
                     operation.MarkRejected();
                     operation.Seal(false);
-                    throw Canceled(operation, ex, ct);
+                    throw Canceled(operation, error, ct);
                 }
-                catch (Exception ex)
+                catch (CommunicationAdapterException error)
                 {
-                    operation.RollBackAcceptance();
                     operation.MarkRejected();
                     operation.Seal(false);
-                    throw ProviderUnavailable(operation, ex);
+                    throw ProviderUnavailable(operation, route, error);
+                }
+                catch (Exception error)
+                {
+                    operation.MarkRejected();
+                    operation.Seal(false);
+                    throw ProviderUnavailable(operation, route, error);
                 }
 
                 ordinal++;
@@ -140,35 +144,32 @@ internal sealed class EventCoordinator(
             operation.Seal(true);
             return new EventAcceptance(operation.Snapshot());
         }
-        catch (EventException)
-        {
-            throw;
-        }
-        catch (EventCanceledException)
-        {
-            throw;
-        }
-        catch (OperationCanceledException ex) when (ct.IsCancellationRequested)
+        catch (EventException) { throw; }
+        catch (EventCanceledException) { throw; }
+        catch (OperationCanceledException error) when (ct.IsCancellationRequested)
         {
             operation.Seal(false);
-            throw Canceled(operation, ex, ct);
+            throw Canceled(operation, error, ct);
         }
-        catch (Exception ex)
+        catch (Exception error)
         {
             operation.Seal(false);
             throw new EventException(
                 EventException.FailureKind.SourceFailed,
                 $"Entity Event source '{typeof(TEntity).Name}' failed after {ordinal} accepted occurrence(s).",
                 new EventAcceptance(operation.Snapshot()),
-                ex);
+                error);
         }
     }
 
-    private static EventException ProviderUnavailable(CommunicationOperation operation, Exception error)
+    private static EventException ProviderUnavailable(
+        CommunicationOperation operation,
+        CommunicationRouteDecision route,
+        Exception error)
         => new(
             EventException.FailureKind.ProviderUnavailable,
-            "Entity Events could not accept the occurrence into the process-local channel. " +
-            "Ensure the Koan host is running and not stopping.",
+            $"Entity Event provider '{route.AdapterId}' could not accept the occurrence. " +
+            "Inspect Communication readiness and provider facts; Koan will not fall back to process-local reach.",
             new EventAcceptance(operation.Snapshot()),
             error);
 

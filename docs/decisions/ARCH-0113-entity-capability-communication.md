@@ -45,6 +45,14 @@
 > transitive boundary required by connector eligibility without yet introducing an adapter SPI,
 > channel grammar, broker, or provider election.
 
+> **Implementation update (R07-10, 2026-07-15):** Communication now owns one provider-neutral
+> election, wire, binding, and ingress mechanism. Its minimum-priority in-process adapter carries both
+> lanes; a direct RabbitMQ connector reference elects only Transport and leaves Events local. Real
+> RabbitMQ proofs cover confirmed mandatory persistent publication, durable group fan-out, isolated
+> copies, authenticated tenant restoration, no-route failure without local fallback, boot facts, and
+> elected health. Publisher acceptance is explicit; remote handler settlement, Events, retries,
+> inbox/outbox, dedupe, dead letters, schema negotiation, and exactly-once effects remain non-claims.
+
 ## Context
 
 Koan's Entity-first language has the right center but the wrong boundaries around communication.

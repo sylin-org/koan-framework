@@ -1,5 +1,6 @@
 using System.Reflection;
 using Koan.Cache.Decorators;
+using Koan.Core;
 using Koan.Data.Abstractions;
 
 namespace Koan.Tests.Cache.Topology.Specs;

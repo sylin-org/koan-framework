@@ -1,7 +1,7 @@
 ---
 type: REF
 domain: communication
-title: "Communication — Local Entity Events and Transport"
+title: "Communication — Entity Events and Transport"
 audience: [developers, architects, operators, ai-agents]
 status: current
 last_updated: 2026-07-15
@@ -9,10 +9,10 @@ framework_version: v0.18.0
 validation:
   date_last_tested: 2026-07-15
   status: verified
-  scope: foundation AddKoan process-local Events and Transport, scalar/set/stream grammar, typed handlers, context, acceptance, and settlement
+  scope: foundation AddKoan local Events and Transport plus directly elected RabbitMQ Transport
 ---
 
-# Communication — local Entity Events and Transport
+# Communication — Entity Events and Transport
 
 Communication gives Entity code two distinct intents without exposing a bus:
 
@@ -20,7 +20,8 @@ Communication gives Entity code two distinct intents without exposing a bus:
 - `Transport.Send()` distributes the Entity snapshot the application currently holds.
 
 The foundation includes a faithful process-local runtime. Reference `Sylin.Koan`, call `AddKoan()`,
-and write the business types; there is no handler registration or routing configuration.
+and write the business types; there is no handler registration or routing configuration. A direct
+connector reference can change physical reach without changing this application grammar.
 
 ## Shortest supported path
 
@@ -101,17 +102,18 @@ Console.WriteLine(
 ```
 
 Transport returns the parallel `TransportAcceptance` and `TransportSettlement` types. Awaiting
-`Raise` or `Send` means the bounded local lane accepted the enumerated items; it does not wait for
-handler completion. Settlement observes only that operation's local targets and is not a distributed
-transaction.
+`Raise` or `Send` means the elected provider accepted the enumerated items at its reported assurance
+boundary; it does not wait for handler completion. Receipts identify provider, channel, assurance,
+and whether settlement is observable. The local provider supports operation-scoped settlement;
+external providers may not.
 
 ## Guarantees
 
 - Every deliberate `Raise` or `Send` creates a new operation.
 - Every raised Entity gets a new occurrence identity; all Event subscription groups see that same
   identity for that occurrence.
-- Zero Event subscriptions is a valid zero-target occurrence. Zero Transport receiver groups is a
-  corrective publication failure before source enumeration.
+- Zero Event subscriptions is a valid zero-target occurrence. A known-local zero Transport receiver
+  set fails before source enumeration; an external mandatory route may report it at publication.
 - Source order and multiplicity are retained by the built-in local runtime.
 - Each handler group gets freshly deserialized Entity state. Event groups also get separate details
   copies; handlers never share the publisher's mutable objects or another group's objects.
@@ -140,12 +142,37 @@ builder.Services.Configure<CommunicationOptions>(options =>
 Invalid values fail during host startup. Oversized or unserializable values fail with a typed lane
 exception carrying the operation's partial acceptance.
 
+## Add RabbitMQ Transport
+
+Reference the connector directly from the application:
+
+```powershell
+dotnet add package Sylin.Koan.Communication.Connector.RabbitMq
+```
+
+That direct reference elects RabbitMQ for `Transport/default`; Events remain process-local. A
+transitive connector remains inert. Koan orchestration can provision the broker automatically, or an
+existing endpoint can be supplied with
+`Koan:Communication:RabbitMq:ConnectionString=amqp://user:password@host:5672`.
+
+The Entity and receiver code does not change. RabbitMQ creates a durable queue per stable receiver
+group, confirms mandatory persistent publications, restores authenticated context at ingress, and
+manually acknowledges handler outcomes. The sender knows broker acceptance, not remote handler
+settlement, so `TransportAcceptance.SettlementObservable` is false and `WaitForSettlement()` fails
+with `SettlementUnavailable`.
+
+If the directly intended provider is unavailable, startup or publication fails. Koan does not fall
+back to local Transport because doing so would silently change reach. Current RabbitMQ limits include
+no Events, retry, dedupe, inbox/outbox, dead letters, replay, schema negotiation, or exactly-once
+side-effect claim.
+
 ## Inspect composition
 
-Startup reporting and Koan facts identify both local lanes, their `process-memory` assurance, typed
-Event subscription and Transport receiver groups, bounds, and the number of context carriers moved.
-Read the same structured decisions through `/.well-known/Koan/facts` or `koan://facts` when the Web or
-MCP host surfaces are referenced.
+Startup reporting and Koan facts identify each lane's elected provider, selection reason, assurance,
+settlement observability, typed groups, applicable bounds, and the number of context carriers moved.
+Health is non-critical for an unelected candidate and critical for an elected external provider. Read
+the same structured decisions through `/.well-known/Koan/facts` or `koan://facts` when the Web or MCP
+host surfaces are referenced.
 
 ## Choose the right intent
 
@@ -154,9 +181,9 @@ associated with an Entity. Use `Transport` when another receiver should get the 
 Use Jobs when durable work, retry, or scheduling is the requirement.
 
 The built-in Communication runtime is memory-only and process-local. It does not survive restart,
-cross nodes, retry, deduplicate, dead-letter, replay, or couple to a Data transaction. Logical
-channels, connector manifests/election, RabbitMQ conformance, and internal Jobs/Cache bridge migration
-remain later R07 work.
+cross nodes, retry, deduplicate, dead-letter, replay, or couple to a Data transaction. Direct provider
+election and RabbitMQ Transport are supported; logical channel authoring, additional providers, and
+internal Jobs/Cache bridge migration remain later R07 work.
 
 Do not use the deprecated generic [Messaging](../messaging/index.md) API as an alias. It has different
 copy, cardinality, context, and failure semantics.

@@ -1,5 +1,6 @@
 using Koan.Communication.Infrastructure;
 using Koan.Communication.Runtime;
+using Koan.Communication.Adapters;
 using Koan.Core.Composition;
 using Koan.Core.Context;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,29 +15,44 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
         var handlers = services.GetService<CommunicationHandlerCatalog>();
         var carriers = services.GetService<KoanContextCarrierRegistry>();
         var options = services.GetService<IOptions<CommunicationOptions>>()?.Value;
+        var router = services.GetService<CommunicationRouter>();
+        var transport = router?.For(CommunicationLane.Transport);
+        var events = router?.For(CommunicationLane.Events);
 
         builder.AddElection(
             Constants.Diagnostics.Subjects.Transport,
-            Constants.Transport.InProcessAdapter,
-            Constants.Diagnostics.Reasons.BuiltInFloor,
+            transport?.AdapterId ?? Constants.Transport.InProcessAdapter,
+            transport?.Reason ?? Constants.Diagnostics.Reasons.BuiltInFloor,
+            transport?.Priority,
             source: typeof(CommunicationCompositionContributor).FullName,
             factCode: Constants.Diagnostics.Codes.TransportSelected);
+        var transportCapabilities = new List<string>
+        {
+            Constants.Diagnostics.Capabilities.Scalar,
+            Constants.Diagnostics.Capabilities.Set,
+            Constants.Diagnostics.Capabilities.Stream,
+            Constants.Diagnostics.Capabilities.SnapshotCopy,
+            Constants.Diagnostics.Capabilities.TypedReceivers,
+            Constants.Diagnostics.Capabilities.ContextCarriage
+        };
+        if (transport?.Adapter.Descriptor.IsBuiltIn != false)
+        {
+            transportCapabilities.Add(Constants.Diagnostics.Capabilities.LocalSettlement);
+            transportCapabilities.Add(Constants.Diagnostics.Capabilities.BoundedIngress);
+        }
+        else
+        {
+            transportCapabilities.Add(Constants.Diagnostics.Capabilities.ConfirmedPublication);
+            transportCapabilities.Add(Constants.Diagnostics.Capabilities.RemoteSettlementUnobservable);
+        }
         builder.AddCapability(
             Constants.Diagnostics.Subjects.Transport,
-            [
-                Constants.Diagnostics.Capabilities.Scalar,
-                Constants.Diagnostics.Capabilities.Set,
-                Constants.Diagnostics.Capabilities.Stream,
-                Constants.Diagnostics.Capabilities.SnapshotCopy,
-                Constants.Diagnostics.Capabilities.TypedReceivers,
-                Constants.Diagnostics.Capabilities.ContextCarriage,
-                Constants.Diagnostics.Capabilities.LocalSettlement,
-                Constants.Diagnostics.Capabilities.BoundedIngress
-            ]);
+            transportCapabilities);
         builder.AddElection(
             Constants.Diagnostics.Subjects.Events,
-            Constants.Events.InProcessAdapter,
-            Constants.Diagnostics.Reasons.BuiltInFloor,
+            events?.AdapterId ?? Constants.Events.InProcessAdapter,
+            events?.Reason ?? Constants.Diagnostics.Reasons.BuiltInFloor,
+            events?.Priority,
             source: typeof(CommunicationCompositionContributor).FullName,
             factCode: Constants.Diagnostics.Codes.EventsSelected);
         builder.AddCapability(
@@ -54,16 +70,31 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
             ]);
         builder.AddConfigKey(Constants.Configuration.InProcessCapacity);
         builder.AddConfigKey(Constants.Configuration.MaxPayloadBytes);
+        builder.AddConfigKey(Constants.Configuration.TransportProvider);
+        builder.AddConfigKey(Constants.Configuration.EventsProvider);
         if (options is not null)
         {
-            builder.AddObservation(
-                Constants.Diagnostics.Codes.TransportBounds,
-                Constants.Diagnostics.Subjects.TransportBounds,
-                $"Process-local Transport uses {Constants.Transport.ProcessMemoryAssurance} acceptance, " +
-                $"a {options.InProcessCapacity}-snapshot queue, and a " +
-                $"{options.MaxPayloadBytes}-byte publication limit.",
-                Constants.Diagnostics.Reasons.BoundedProcessMemory,
-                typeof(CommunicationCompositionContributor).FullName);
+            if (transport?.Adapter.Descriptor.IsBuiltIn != false)
+            {
+                builder.AddObservation(
+                    Constants.Diagnostics.Codes.TransportBounds,
+                    Constants.Diagnostics.Subjects.TransportBounds,
+                    $"Process-local Transport uses {Constants.Transport.ProcessMemoryAssurance} acceptance, " +
+                    $"a {options.InProcessCapacity}-snapshot queue, and a " +
+                    $"{options.MaxPayloadBytes}-byte publication limit.",
+                    Constants.Diagnostics.Reasons.BoundedProcessMemory,
+                    typeof(CommunicationCompositionContributor).FullName);
+            }
+            else
+            {
+                builder.AddObservation(
+                    Constants.Diagnostics.Codes.TransportBounds,
+                    Constants.Diagnostics.Subjects.TransportBounds,
+                    $"Transport/default uses '{transport!.AdapterId}' with {transport.Assurance} publisher acceptance; " +
+                    "remote handler settlement is not observable by the publisher.",
+                    transport.Reason,
+                    typeof(CommunicationCompositionContributor).FullName);
+            }
             builder.AddObservation(
                 Constants.Diagnostics.Codes.EventsBounds,
                 Constants.Diagnostics.Subjects.EventsBounds,

@@ -5,6 +5,7 @@ using System.Reflection;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Options;
 using Koan.Data.Abstractions;
+using Koan.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

@@ -215,28 +215,31 @@ boundaries remain pre-V1 work.
 - **Open risks:** convert the shortest path into an executable golden journey with asserted HTTP and
   startup output.
 
-### Events and messaging
+### Entity Events and Transport
 
-- **Outcome and shortest path:** the current experimental surface references a Messaging provider and
-  calls broad arbitrary-class `Send()`; provider registration is automatic. Entity `Events` and
-  `Transport` are accepted R07 target semantics, not current APIs.
-- **Entry point and owner:** `Koan.Messaging` plus the
-  [in-memory](../../../src/Connectors/Messaging/InMemory/Koan.Messaging.Connector.InMemory.csproj) or
-  [RabbitMQ](../../../src/Connectors/Messaging/RabbitMq/Koan.Messaging.Connector.RabbitMq.csproj)
-  connector.
-- **Executable evidence:** [`S3.Mq.Sample`](../../../samples/S3.Mq.Sample/README.md) is a maintained
-  end-to-end RabbitMQ sample. Messaging-dependent cache/jobs tests exist, but no broker-backed core
-  conformance result was obtained in R02; the umbrella bootstrap suite did not complete.
-- **Inspection and failure:** provider discovery exists, but there is no R02-certified unified account
-  of topology, delivery guarantees, retries, and rejected capabilities in startup output.
-- **Unsupported / compatibility:** do not claim broker parity, exactly-once delivery, durable outbox,
-  or production topology support from current evidence. The catalog's planned S3/S9 rows are not
-  evidence for shipped behavior.
-- **Maturity / safe claim:** `demonstrated`. Koan can send through real in-memory/RabbitMQ paths; delivery
-  and compatibility guarantees are not yet consolidated.
-- **Open risks:** ARCH-0113 deliberately rebuilds rather than promotes this generation. The complete
-  local ring, connector mesh, logical channels/filters, and shared conformance suite must pass before
-  any Communication maturity claim.
+- **Outcome and shortest path:** reference `Sylin.Koan`, call `AddKoan()`, declare typed business
+  handlers, then use `entity.Events.Raise<TEvent>()` or `entity.Transport.Send()`. Scalar, set, and
+  lazy-stream sources use the same pointwise meaning. No external adapter is required for the complete
+  local ring.
+- **Entry point and owner:** [`Koan.Communication`](../../../src/Koan.Communication/README.md) owns both
+  semantic lanes and its minimum-priority process-local provider. A direct
+  [`RabbitMQ Communication connector`](../../../src/Connectors/Communication/RabbitMq/README.md)
+  reference elects RabbitMQ for Transport without changing application code; Events stay local.
+- **Executable evidence:** Communication passes 31/31 local semantic/election tests. The connector's
+  real RabbitMQ container passes 5/5 for direct-intent election, confirmed persistent publication,
+  two-group isolated fan-out, authenticated tenant restoration, mandatory no-route failure, boot
+  facts, elected health, and zero-configuration orchestration intent.
+- **Inspection and failure:** startup/operator/agent facts report lane provider, reason, priority,
+  assurance, settlement observability, groups, bounds, and context carriage. An elected connector is
+  critical to health; unavailable direct intent never falls back to local reach.
+- **Unsupported / compatibility:** RabbitMQ Events, logical channel authoring, retry, dedupe,
+  inbox/outbox, dead letters, replay, schema negotiation, remote settlement, exactly-once effects, and
+  Jobs/Cache convergence are not supported. Legacy `Koan.Messaging` remains a separate bridge-era API
+  and is not the implementation behind Entity Communication.
+- **Maturity / safe claim:** `verified` for the process-local ring and the named RabbitMQ Transport
+  guarantees above. No broader production-mesh or provider-parity claim follows.
+- **Open risks:** add compatibility aliases/version negotiation before heterogeneous deployments;
+  prove the next internal consumer against the same provider boundary before adding routing grammar.
 
 ### Jobs and scheduling
 

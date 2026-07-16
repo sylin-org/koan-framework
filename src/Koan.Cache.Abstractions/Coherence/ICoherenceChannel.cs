@@ -18,7 +18,7 @@ namespace Koan.Cache.Abstractions.Coherence;
 /// is demand; the migration is a file move with no type renames.
 /// </para>
 /// <para>
-/// Implementations declare <c>[ProviderPriority(N)]</c> (from <c>Koan.Data.Abstractions</c>)
+/// Implementations declare <c>[ProviderPriority(N)]</c> (from <c>Koan.Core</c>)
 /// so coordinators can pick a winner when multiple channels are registered. Higher priority
 /// wins; ties broken by registration order; explicit config pin overrides.
 /// </para>

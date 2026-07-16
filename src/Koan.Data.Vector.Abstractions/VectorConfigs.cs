@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
+using Koan.Core;
 
 namespace Koan.Data.Vector.Abstractions;
 

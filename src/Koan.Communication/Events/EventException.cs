@@ -23,6 +23,7 @@ public class EventException : Exception
         Serialization,
         PayloadTooLarge,
         ProviderUnavailable,
-        SourceFailed
+        SourceFailed,
+        SettlementUnavailable
     }
 }

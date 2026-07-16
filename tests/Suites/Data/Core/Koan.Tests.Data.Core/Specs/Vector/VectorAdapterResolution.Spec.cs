@@ -1,6 +1,7 @@
 using Koan.Data.Core.Model;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
+using Koan.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

@@ -4,6 +4,7 @@ using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Data.Abstractions;
+using Koan.Core;
 using Koan.Data.Core.Decorators;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

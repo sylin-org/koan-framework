@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Capabilities;
+using Koan.Core;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;

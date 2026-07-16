@@ -5,6 +5,7 @@ using Koan.Cache.Abstractions.Coherence;
 using Koan.Cache.Adapter.Redis.Options;
 using Koan.Cache.Adapter.Redis.Serialization;
 using Koan.Data.Abstractions;
+using Koan.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;

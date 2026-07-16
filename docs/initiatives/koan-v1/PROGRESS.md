@@ -9,7 +9,7 @@ framework_version: v0.18.0
 validation:
   date_last_tested: 2026-07-15
   status: in-progress
-  scope: R07-01 through R07-09 passed; direct reference provenance is complete and connector election exploration is next
+  scope: R07-01 through R07-10 passed; provider-neutral Communication and RabbitMQ Transport are proven
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T6 — capability-ring graduation`
 - Active work item: R07 — rebuild the semantic capability ring
-- Active child: none; R07-10 real-connector provider/election exploration is the next bounded child
+- Active child: none; R07-11 internal Communication convergence is the next bounded child
 - V1 readiness: `not ready`; T7 remains gated by T6 and an observed public package publication
 
 ## Work items
@@ -36,7 +36,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 | R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
-| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | R07-01 through [R07-09](work-items/r07/R07-09-direct-reference-intent.md) pass. The local ring and direct-reference provenance are green; real-connector election is next. |
+| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | R07-01 through [R07-10](work-items/r07/R07-10-communication-provider-election.md) pass. The local ring and direct RabbitMQ Transport are green; internal Jobs/Cache convergence is next. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -52,12 +52,13 @@ item should normally be `in-progress`.
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 | R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
-| R07 | in progress | R07-01 through R07-09 passed. Explore the provider/election boundary against a real connector before adding broker breadth. |
+| R07 | in progress | R07-01 through R07-10 passed. Migrate one small internal Messaging consumer only after a bounded semantic inventory. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-15 | R07-10 | Local and external communication risked becoming separate runtimes, while adapting legacy RabbitMQ would preserve type-wide competing consumers, absent context provenance, and ambiguous acceptance. A direct connector must also never disappear into a local fallback. | Put the in-process floor and a rebuilt RabbitMQ Transport connector behind one Communication-owned election/wire/ingress boundary. Elect per lane from explicit or direct intent, require hard semantic capabilities, authenticate cross-process context, and report broker acceptance without inventing remote settlement. Communication 31/31 and real RabbitMQ 5/5 pass; provider-priority consumers, builds, pack, docs, diff, and privacy gates pass without release certification. |
 | 2026-07-15 | R07-09 | The existing build target flattened resolved assemblies, so it could prove module presence but not whether an application directly chose a connector. Designing Communication-specific inference or an adapter SPI before a real connector would multiply mechanisms and encode unproved topology. | Add one generic Core direct-reference manifest from evaluation-time PackageReference/ProjectReference items, register it before pillars initialize, and expose it in composition lock schema 2. Core 265/265, Bootstrap 17/17, FirstUse 1/1, GoldenJourney 1/1, package/project clean-room 1/1, build asset 1/1, all five locks, pack/docs/example checks pass. Defer provider APIs and RabbitMQ behavior to R07-10. |
 | 2026-07-15 | R07-08 | Adding Events as a separate public/runtime stack would duplicate host lifecycle, discovery, bounded ingress, context restoration, and outcome accounting; adapting Events onto Transport would erase occurrence identity, zero-subscriber validity, details policy, and subscription fan-out. | Coalesce only the mechanically identical host-owned pieces into one local Communication kernel, retain separate bounded Event/Transport queues and lane-owned contracts, and expose both facets from the normal Entity namespace. Communication 28/28, Entity language 20/20, warning-as-error build, direct/foundation packs, changed examples, docs, and skills gates pass. |
 | 2026-07-15 | R07-07 | Legacy Messaging could move arbitrary objects but shared mutable references locally, changed cardinality by provider, carried no Koan context, and exposed no bounded acceptance/settlement distinction. A compatibility wrapper would preserve those faults. | Build `Koan.Communication` independently: typed Entity receivers, serialized per-group copies, one bounded local queue, Core context ingress, fixed-size acceptance and local settlement, host drain, and shared facts. Communication 14/14, Entity language 16/16, Packaging 54/54, warning-as-error build, packs, examples, docs, locks, diff, and privacy gates pass. Legacy bridges remain isolated for later internal convergence. |

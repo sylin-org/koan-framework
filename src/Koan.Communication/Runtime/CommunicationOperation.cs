@@ -2,7 +2,7 @@ namespace Koan.Communication.Runtime;
 
 internal sealed class CommunicationOperation
 {
-    private readonly int _targetGroups;
+    private readonly CommunicationRouteDecision _route;
     private readonly TaskCompletionSource<CommunicationSettlementCounts> _settlement =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private long _enumerated;
@@ -13,13 +13,21 @@ internal sealed class CommunicationOperation
     private long _filtered;
     private long _failed;
     private long _settled;
+    private int _targetGroups;
+    private int _targetGroupsInitialized;
+    private int _targetGroupsKnown = 1;
+    private int _settlementObservable = 1;
     private int _sealed;
     private int _sourceCompleted;
 
-    public CommunicationOperation(int targetGroups)
+    public CommunicationOperation(CommunicationRouteDecision route)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(targetGroups);
-        _targetGroups = targetGroups;
+        _route = route;
+        if (!route.Adapter.Descriptor.IsBuiltIn)
+        {
+            _targetGroupsKnown = 0;
+            _settlementObservable = 0;
+        }
         OperationId = Guid.CreateVersion7();
     }
 
@@ -28,16 +36,42 @@ internal sealed class CommunicationOperation
     public void MarkEnumerated() => Interlocked.Increment(ref _enumerated);
     public void MarkRejected() => Interlocked.Increment(ref _rejected);
 
-    public void ReserveAcceptance()
+    public void ReserveAcceptance(int? targetGroups, bool settlementObservable)
     {
+        if (targetGroups is < 0) throw new ArgumentOutOfRangeException(nameof(targetGroups));
+        if (targetGroups.HasValue)
+        {
+            if (Interlocked.CompareExchange(ref _targetGroupsInitialized, 1, 0) == 0)
+            {
+                Volatile.Write(ref _targetGroups, targetGroups.Value);
+            }
+            else if (Volatile.Read(ref _targetGroups) != targetGroups.Value)
+            {
+                throw new InvalidOperationException("A Communication adapter changed its target-group count during one operation.");
+            }
+        }
+        else
+        {
+            Volatile.Write(ref _targetGroupsKnown, 0);
+        }
+
+        if (settlementObservable && targetGroups.HasValue)
+        {
+            Interlocked.Add(ref _expected, targetGroups.Value);
+        }
+        else
+        {
+            Volatile.Write(ref _settlementObservable, 0);
+        }
+
         Interlocked.Increment(ref _accepted);
-        Interlocked.Add(ref _expected, _targetGroups);
     }
 
-    public void RollBackAcceptance()
+    public void RollBackAcceptance(int? targetGroups, bool settlementObservable)
     {
         Interlocked.Decrement(ref _accepted);
-        Interlocked.Add(ref _expected, -_targetGroups);
+        if (settlementObservable && targetGroups.HasValue)
+            Interlocked.Add(ref _expected, -targetGroups.Value);
     }
 
     public void MarkDelivered()
@@ -78,7 +112,11 @@ internal sealed class CommunicationOperation
             Volatile.Read(ref _accepted),
             Volatile.Read(ref _rejected),
             Volatile.Read(ref _sourceCompleted) == 1,
-            _targetGroups,
+            Volatile.Read(ref _targetGroupsKnown) == 1 ? Volatile.Read(ref _targetGroups) : null,
+            Volatile.Read(ref _settlementObservable) == 1,
+            _route.Channel,
+            _route.AdapterId,
+            _route.Assurance,
             _settlement.Task);
 
     private void MarkSettled()
@@ -89,7 +127,8 @@ internal sealed class CommunicationOperation
 
     private void TryCompleteSettlement()
     {
-        if (Volatile.Read(ref _sealed) == 0
+        if (Volatile.Read(ref _settlementObservable) == 0
+            || Volatile.Read(ref _sealed) == 0
             || Volatile.Read(ref _settled) != Volatile.Read(ref _expected))
         {
             return;

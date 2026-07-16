@@ -6,5 +6,9 @@ internal sealed record CommunicationOperationSnapshot(
     long Accepted,
     long Rejected,
     bool SourceCompleted,
-    int TargetGroups,
+    int? TargetGroups,
+    bool SettlementObservable,
+    string Channel,
+    string Adapter,
+    string Assurance,
     Task<CommunicationSettlementCounts> Settlement);

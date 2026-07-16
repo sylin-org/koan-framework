@@ -10,27 +10,35 @@ no reference to Communication.
 The public lanes remain distinct. Events own occurrence/details/fan-out policy; Transport owns
 snapshot/receiver-group policy. Shared mechanisms do not become a public generic pipeline.
 
-## Composition
+## Composition and provider election
 
 `KoanCommunicationModule` is discovered through normal `KoanModule` registration. One immutable
 `CommunicationHandlerCatalog` discovers closed `IHandleEntityEvent<TEntity,TEvent>` subscriptions and
 `IReceiveEntity<TEntity>` receivers from the generated registry. Concrete handler classes are scoped;
 each dispatch creates a fresh DI and host/context scope.
 
-One host-owned `InProcessCommunicationRuntime` owns separate bounded Event and Transport channels and
-workers. The lanes share lifecycle and aggregate operation accounting but cannot head-of-line block
-one another. Generic dispatch is closed during catalog construction rather than reflected per item.
+One host-owned `CommunicationRouter` elects a provider independently for Events and Transport and
+owns their shared wire/dispatch contract. `InProcessCommunicationRuntime` implements the same
+`ICommunicationAdapter` seam as external connectors and remains the minimum-priority built-in floor.
+Direct application reference provenance, never transitive assembly presence, admits external
+candidates. Explicit provider options override direct intent; semantic capabilities, assurance,
+Core-owned provider priority, and stable ID resolve eligible candidates.
+
+The local adapter owns separate bounded Event and Transport channels and workers. The lanes share
+lifecycle and aggregate operation accounting but cannot head-of-line block one another. Generic
+dispatch is closed during catalog construction rather than reflected per item. A directly intended
+provider that cannot start fails the host; there is no local reach fallback.
 
 ## Publication boundary
 
 The Entity facets normalize scalar, `IEnumerable<TEntity>`, and `IAsyncEnumerable<TEntity>` sources
 to one lazy async source. Each coordinator then:
 
-1. captures its immutable typed target set and all composed context carriers once;
-2. validates lane policy before enumeration (missing Transport receivers or required Event details);
+1. resolves the lane route and captures all composed context carriers once;
+2. validates policy knowable at the selected boundary before enumeration;
 3. serializes each yielded Entity, plus Event details when present, with shared JSON settings;
 4. applies the configured combined UTF-8 payload bound;
-5. writes an immutable lane envelope into its bounded channel; and
+5. publishes an immutable host wire envelope through the elected adapter; and
 6. seals a fixed-size acceptance when enumeration completes or fails.
 
 Every accepted envelope contains JSON rather than an Entity reference. Correlation includes the
@@ -39,9 +47,11 @@ Every Event subscription for that Entity sees the same occurrence identity.
 
 ## Ingress and dispatch
 
-Each lane is multiple-writer/single-reader and uses wait backpressure. For every target group, ingress
-creates a scope, pushes it as the current `AppHost`, restores carriers with `HostTrusted` provenance,
-deserializes fresh Entity state and Event details, evaluates `Where`, and invokes the typed handler.
+The local lanes are multiple-writer/single-reader and use wait backpressure. External adapters bind
+the same stable target declarations and return host-owned wire bytes to the same ingress. For every
+target group, ingress creates a scope, pushes it as the current `AppHost`, restores carriers using the
+adapter's declared trust provenance, deserializes fresh Entity state and Event details, evaluates
+`Where`, and invokes the typed handler.
 
 Filtering, successful handling, and failure each settle one target counter. Handler exceptions are
 logged without payload contents and do not prevent later groups from receiving their copies. Graceful
@@ -54,22 +64,25 @@ An Event kind may be raised without details unless decorated with `[EventDetails
 misuse is rejected before source enumeration. Zero Event subscriptions is a valid zero-target
 occurrence. Every deliberate Raise is a new operation, and every accepted Entity is a new occurrence.
 
-Transport rejects zero receiver groups before source enumeration. Every deliberate Send is a new
-operation and distributes the accepted Entity snapshot to each receiver group.
+Transport rejects a known zero receiver-group set before source enumeration. An external mandatory
+route can learn that no group exists only when publication is returned; the typed failure then carries
+the accepted/rejected prefix. Every deliberate Send is a new operation and distributes the accepted
+Entity snapshot to each receiver group.
 
 The public acceptance and settlement types contain aggregate counters, not per-item collections.
 Operation state lives only while queued/processing envelopes and caller-held receipts require it.
 
 ## Inspection
 
-The boot module and `CommunicationCompositionContributor` report both local adapters, assurance,
-handler-group counts and identities, per-lane capacity, payload limits, and composed context-carrier
-count. Stable constants feed the same startup, operator, and authorized-agent fact projections.
+The boot module and `CommunicationCompositionContributor` report each lane's elected provider,
+reason, priority, assurance, settlement observability, handler-group counts and identities, local
+bounds where applicable, payload limits, and composed context-carrier count. Stable constants feed
+the same startup, operator, and authorized-agent fact projections.
 
 ## Unsupported scenarios
 
-- cross-process or restart-surviving delivery;
-- connector election or logical channel configuration;
+- provider-specific features outside an adapter's declared lane and assurance;
+- logical channel authoring;
 - retry, dedupe, dead-letter, replay, or outbox behavior;
 - batch atomicity or transactional coupling to persistence;
 - non-Entity payloads;

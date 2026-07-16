@@ -1,25 +1,23 @@
 namespace Koan.Communication.Runtime;
 
 internal sealed class EventEnvelope(
-    CommunicationOperation operation,
+    Guid operationId,
     long ordinal,
     Type entityType,
     string entityPayload,
     IReadOnlyDictionary<string, string>? context,
-    IReadOnlyList<CommunicationTargetBinding> targets,
     Type eventType,
     Guid occurrenceId,
     DateTimeOffset occurredAt,
     bool hasDetails,
     string? detailsPayload)
     : CommunicationEnvelope(
-        CommunicationLane.Events,
-        operation,
+        Adapters.CommunicationLane.Events,
+        operationId,
         ordinal,
         entityType,
         entityPayload,
-        context,
-        targets)
+        context)
 {
     public Type EventType { get; } = eventType;
     public Guid OccurrenceId { get; } = occurrenceId;

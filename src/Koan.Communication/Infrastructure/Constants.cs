@@ -7,6 +7,8 @@ internal static class Constants
         public const string Section = "Koan:Communication";
         public const string InProcessCapacity = Section + ":InProcessCapacity";
         public const string MaxPayloadBytes = Section + ":MaxPayloadBytes";
+        public const string TransportProvider = Section + ":TransportProvider";
+        public const string EventsProvider = Section + ":EventsProvider";
     }
 
     internal static class Transport
@@ -14,6 +16,7 @@ internal static class Constants
         public const string DefaultChannel = "default";
         public const string InProcessAdapter = "in-process";
         public const string ProcessMemoryAssurance = "process-memory";
+        public const string BuiltInProviderId = "in-process";
     }
 
     internal static class Events
@@ -96,6 +99,8 @@ internal static class Constants
             public const string EventContextCarriage = "events.context-carriage";
             public const string EventLocalSettlement = "events.local-settlement";
             public const string EventBoundedIngress = "events.bounded-ingress";
+            public const string ConfirmedPublication = "transport.confirmed-publication";
+            public const string RemoteSettlementUnobservable = "transport.remote-settlement-unobservable";
         }
     }
 }

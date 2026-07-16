@@ -1,19 +1,17 @@
 namespace Koan.Communication.Runtime;
 
 internal abstract class CommunicationEnvelope(
-    CommunicationLane lane,
-    CommunicationOperation operation,
+    Adapters.CommunicationLane lane,
+    Guid operationId,
     long ordinal,
     Type entityType,
     string entityPayload,
-    IReadOnlyDictionary<string, string>? context,
-    IReadOnlyList<CommunicationTargetBinding> targets)
+    IReadOnlyDictionary<string, string>? context)
 {
-    public CommunicationLane Lane { get; } = lane;
-    public CommunicationOperation Operation { get; } = operation;
+    public Adapters.CommunicationLane Lane { get; } = lane;
+    public Guid OperationId { get; } = operationId;
     public long Ordinal { get; } = ordinal;
     public Type EntityType { get; } = entityType;
     public string EntityPayload { get; } = entityPayload;
     public IReadOnlyDictionary<string, string>? Context { get; } = context;
-    public IReadOnlyList<CommunicationTargetBinding> Targets { get; } = targets;
 }

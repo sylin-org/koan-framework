@@ -1,5 +1,6 @@
 global using AwesomeAssertions;
 global using Koan.Communication;
+global using Koan.Communication.Adapters;
 global using Koan.Core;
 global using Koan.Core.Hosting.App;
 global using Koan.Data.Core.Model;

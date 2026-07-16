@@ -9,7 +9,7 @@ framework_version: v0.18.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 through R07-09 passed; direct reference intent is proven and connector election exploration is next
+  scope: R07-01 through R07-10 passed; provider-neutral Communication and RabbitMQ Transport are proven
 ---
 
 # Koan V1 reorganization current handoff
@@ -77,6 +77,12 @@ Replace this file at every handoff. It is a restart point, not a diary.
   Core 265/265, Bootstrap 17/17, FirstUse 1/1, GoldenJourney 1/1, a disposable package-reference build 1/1, the Core
   build-asset contract 1/1, all five tracked locks, direct pack inspection, docs, and changed examples
   pass. `Koan.Communication` is visibly present as a transitive module without becoming direct intent.
+- [R07-10](work-items/r07/R07-10-communication-provider-election.md) passed. Communication now has
+  one lane-specific provider election, wire, binding, and ingress mechanism; the in-process floor uses
+  that same boundary. A direct RabbitMQ reference elects Transport while Events stay local. Local
+  Communication passes 31/31 and a real RabbitMQ container passes 5/5 for confirmed publication,
+  isolated group fan-out, authenticated tenant restoration, mandatory no-route, truthful facts/health,
+  and zero-configuration orchestration intent. No unavailable direct route falls back locally.
 - Public Messaging guidance is reduced to the truthful legacy v0.17 generation. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -181,8 +187,9 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
 7. Faithful local Transport under `AddKoan()`. **Passed as R07-07.**
 8. Events occurrence policy on the same kernel. **Passed as R07-08.**
 9. Direct package/project reference provenance. **Passed as R07-09.**
-10. Multi-connector mesh, RabbitMQ parity, Jobs wake, and Cache coherence migration.
-11. Secondary pointwise lifts: Relationships, constrained Jobs streams, AI Embed/Index, Cache eviction,
+10. Provider-neutral election and RabbitMQ Transport. **Passed as R07-10.**
+11. Jobs wake and Cache coherence migration onto the Communication-owned internal mechanism.
+12. Secondary pointwise lifts: Relationships, constrained Jobs streams, AI Embed/Index, Cache eviction,
    then Media if a real derivative operation earns it.
 
 Only completed/current slices have detailed child cards. Do not open broker breadth before Event
@@ -256,15 +263,18 @@ semantics pass over the local boundary.
   PackageReference/ProjectReference build 1/1; the Core package build-asset contract 1/1; direct pack
   inspection; all five schema-2 lockfiles; docs lint with 0 errors; and the changed example 1/1.
   No release-certification suite was rerun.
+- R07-10 passes Communication 31/31 and its real RabbitMQ suite 5/5. The connector and Web build
+  warning-clean; Core-owned provider priority remains green through Data Vector 1/1, Cache topology
+  2/2, and Cache Messaging 1/1 focused proofs. The independently versioned connector packs with its
+  DLL, XML docs, README, and exact dependencies. No release-certification suite was rerun.
 
 ## Next safe action
 
-Explore R07-10 against a real connector rather than inventing a generic adapter in isolation. Inventory
-the current RabbitMQ wire, topology, lifecycle, context, receiver-group, and settlement behavior; then
-identify the smallest Communication-owned provider declaration/election seam that can consume R07-09
-direct intent while retaining the in-process minimum-priority floor. Prove unavailable direct intent
-fails without local fallback and every decision is reported before adding channel grammar, retries,
-durability claims, Jobs/Cache migration, or broader broker behavior.
+Open one bounded R07-11 internal-convergence child. Inventory Jobs wake and Cache coherence as
+consumers—not public Entity verbs—and identify whether the Communication provider mechanism can carry
+their internal signals without exposing arbitrary-object Messaging or adding routing grammar. Choose
+one smaller consumer first, preserve its semantics with focused proof, and delete its legacy bridge
+only after parity. Do not add retries, channels, or broker breadth speculatively.
 
 ## Repository boundary
 

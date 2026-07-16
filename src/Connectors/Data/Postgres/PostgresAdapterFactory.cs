@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
+using Koan.Core;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Orchestration;

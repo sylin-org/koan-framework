@@ -192,8 +192,9 @@ cardinality and copy semantics. Neither is a compatibility base for Events or Tr
 | 7 | [In-process Transport flagship](r07/R07-07-local-transport.md) | **Passed.** Foundation `AddKoan()` provides bounded local scalar/set/stream snapshots, typed receiver groups/filters, isolated copies, opaque context carriage, acceptance, local settlement, host drain, and facts | old Messaging semantics are superseded for new application Transport; bridge-dependent packages remain until internal convergence |
 | 8 | [Local Events policy](r07/R07-08-local-events.md) | **Passed.** Payloadless/explicit-details occurrences fan out as isolated copies over a shared host kernel with Event-owned identity and outcomes | event/messaging conflation and service-collection handlers |
 | 9 | [Direct-reference intent](r07/R07-09-direct-reference-intent.md) | **Passed.** Core records direct package/project provenance separately from the transitive module closure, ready for truthful provider eligibility | assembly-presence inference and Communication-specific build machinery |
-| 10 | Mesh, broker, and internal parity | direct intent turns connector references into zero-routing-code channel election; RabbitMQ, Jobs wake, and Cache coherence obey the same groups/context/facts | current RabbitMQ implementation and two Messaging bridge packages |
-| 11 | Secondary capability lifts | Relationships, Jobs, AI, Cache, then Media adopt only proven pointwise verbs | fragmented or misleading per-pillar surfaces |
+| 10 | [Provider election and RabbitMQ Transport](r07/R07-10-communication-provider-election.md) | **Passed.** Direct intent elects one semantically eligible provider per lane; rebuilt RabbitMQ carries Transport with confirmed publication, groups, authenticated context, and truthful facts | separate local/external runtimes and legacy RabbitMQ semantics for Entity Transport |
+| 11 | Internal Communication convergence | Jobs wake and Cache coherence adopt the shared provider mechanism only where their internal semantics fit | two Messaging bridge packages |
+| 12 | Secondary capability lifts | Relationships, Jobs, AI, Cache, then Media adopt only proven pointwise verbs | fragmented or misleading per-pillar surfaces |
 
 Only the next slice receives a child card. Later rows remain outcomes rather than speculative API
 backlogs until their prerequisites pass.
@@ -229,8 +230,11 @@ backlogs until their prerequisites pass.
 12. Complete faithful process-local Entity Events on the coalesced Communication kernel.
     **Complete.** Event occurrence/details/fan-out policy remains lane-owned while host lifecycle,
     handler discovery, context ingress, bounded accounting, and aggregate observation are shared.
-13. Open each later implementation slice only after its lower boundary passes.
-14. Prove in-process semantics before any broker migration or public maturity change.
+13. Complete provider-neutral election and real RabbitMQ Transport. **Complete.** The in-process floor
+    and RabbitMQ share one host wire/ingress contract; direct intent changes Transport reach without
+    changing Entity code, while Events remain local and unavailable intent fails without fallback.
+14. Open each later implementation slice only after its lower boundary passes.
+15. Prove in-process semantics before any broker migration or public maturity change.
 
 R07-02 was intentionally additive and preceded the Lifecycle source break. R07-03 removed the package-
 lineage stop condition: once R07-04 restores the release floor, public 0.17's lifecycle `Events`
@@ -279,6 +283,10 @@ identity automatically.
   proofs after the shared-runtime coalescence. Communication builds warning-as-error with zero
   warnings/errors; direct/foundation packs, changed examples 4/4, docs lint with 0 errors, and skills
   lint with 0 errors/warnings pass. No release-certification suite was run.
+- R07-09 passes the direct-reference provenance closure recorded by its child card.
+- R07-10 passes Communication 31/31 and a real RabbitMQ 5/5, plus warning-clean affected builds,
+  focused Core provider-priority consumers, an independently versioned connector pack, docs lint with
+  0 errors, diff, and privacy gates. No release-certification suite was run.
 
 ## Acceptance additions
 

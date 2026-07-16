@@ -1,6 +1,7 @@
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Options;
 using Koan.Cache.Topology;
+using Koan.Core;
 using Koan.Data.Abstractions;
 using Koan.Tests.Cache.Topology.Support;
 using Microsoft.Extensions.Logging.Abstractions;

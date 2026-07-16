@@ -1,8 +1,14 @@
 namespace Koan.Communication;
 
-/// <summary>Host-owned limits for the built-in process-local Communication runtime.</summary>
+/// <summary>Host-owned Communication provider bindings and publication limits.</summary>
 public sealed class CommunicationOptions
 {
+    /// <summary>Optional deployment pin for the default Transport channel.</summary>
+    public string? TransportProvider { get; set; }
+
+    /// <summary>Optional deployment pin for the default Events channel.</summary>
+    public string? EventsProvider { get; set; }
+
     /// <summary>Maximum accepted Entity communication items waiting in each local semantic lane.</summary>
     public int InProcessCapacity { get; set; } = 256;
 

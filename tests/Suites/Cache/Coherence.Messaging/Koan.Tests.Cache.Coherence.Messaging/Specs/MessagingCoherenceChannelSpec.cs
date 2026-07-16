@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Coherence;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Coherence.Messaging.Channel;
+using Koan.Core;
 using Koan.Data.Abstractions;
 using Koan.Messaging;
 using Microsoft.Extensions.Logging.Abstractions;

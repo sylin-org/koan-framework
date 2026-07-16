@@ -11,13 +11,14 @@ internal sealed class CommunicationIngress(
     public async Task<CommunicationTargetOutcome> Dispatch(
         CommunicationTargetBinding target,
         CommunicationEnvelope envelope,
+        ContextIngressTrust ingressTrust,
         CancellationToken ct)
     {
         using var serviceScope = scopeFactory.CreateScope();
         using var hostScope = AppHost.PushScope(serviceScope.ServiceProvider);
         using var contextScope = contextCarriers.Restore(
             envelope.Context,
-            ContextIngressTrust.HostTrusted);
+            ingressTrust);
         return await target.Dispatch(serviceScope.ServiceProvider, envelope, ct)
             .ConfigureAwait(false);
     }

@@ -1,4 +1,5 @@
 using Koan.Core.Observability.Health;
+using Koan.Core;
 using Koan.Data.Abstractions.Naming;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

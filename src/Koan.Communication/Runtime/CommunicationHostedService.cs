@@ -2,14 +2,11 @@ using Microsoft.Extensions.Hosting;
 
 namespace Koan.Communication.Runtime;
 
-internal sealed class CommunicationHostedService(InProcessCommunicationRuntime runtime) : IHostedService
+internal sealed class CommunicationHostedService(CommunicationRouter router) : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken)
-    {
-        runtime.Start();
-        return Task.CompletedTask;
-    }
+        => router.Start(cancellationToken);
 
     public Task StopAsync(CancellationToken cancellationToken)
-        => runtime.Stop(cancellationToken);
+        => router.Stop(cancellationToken);
 }

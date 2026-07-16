@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions;
+using Koan.Core;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Microsoft.Extensions.DependencyInjection;

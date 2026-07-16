@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
+using Koan.Core;
 using Koan.Data.Core.Routing;
 using Koan.Data.Core.Infrastructure;
 

@@ -1,4 +1,5 @@
 using Koan.Communication.Infrastructure;
+using Koan.Communication.Adapters;
 using Koan.Communication.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -35,7 +36,9 @@ public static class CommunicationServiceCollectionExtensions
         }
 
         services.TryAddSingleton<CommunicationIngress>();
-        services.TryAddSingleton<InProcessCommunicationRuntime>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<ICommunicationAdapter, InProcessCommunicationRuntime>());
+        services.TryAddSingleton<CommunicationRouter>();
         services.TryAddSingleton<EventCoordinator>();
         services.TryAddSingleton<TransportCoordinator>();
         services.TryAddEnumerable(

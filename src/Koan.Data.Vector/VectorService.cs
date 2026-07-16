@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
+using Koan.Core;
 using Koan.Data.Core.Routing;
 using Koan.Data.Vector.Abstractions;
 

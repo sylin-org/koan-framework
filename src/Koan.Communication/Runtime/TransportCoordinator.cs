@@ -1,4 +1,5 @@
 using System.Text;
+using Koan.Communication.Adapters;
 using Koan.Core.Context;
 using Koan.Core.Json;
 using Koan.Data.Abstractions;
@@ -7,9 +8,8 @@ using Microsoft.Extensions.Options;
 namespace Koan.Communication.Runtime;
 
 internal sealed class TransportCoordinator(
-    CommunicationHandlerCatalog handlers,
     KoanContextCarrierRegistry contextCarriers,
-    InProcessCommunicationRuntime runtime,
+    CommunicationRouter router,
     IOptions<CommunicationOptions> options)
 {
     public async Task<TransportAcceptance> Send<TEntity>(
@@ -19,41 +19,28 @@ internal sealed class TransportCoordinator(
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        var targets = handlers.TransportFor(typeof(TEntity));
-        var operation = new CommunicationOperation(targets.Count);
+        var route = router.For(CommunicationLane.Transport);
+        var contract = CommunicationContractIdentity.Transport(typeof(TEntity));
+        var operation = new CommunicationOperation(route);
+        if (router.KnownTargetGroups(route, contract) == 0)
+        {
+            operation.Seal(false);
+            throw NoReceivers<TEntity>(operation);
+        }
+
         var capturedContext = contextCarriers.Capture();
-        if (targets.Count == 0)
-        {
-            operation.Seal(false);
-            throw new TransportException(
-                TransportException.FailureKind.NoReceivers,
-                $"Entity Transport has no IReceiveEntity<{typeof(TEntity).Name}> receiver group. " +
-                "Add a business-named receiver class or remove this Send call.",
-                new TransportAcceptance(operation.Snapshot()));
-        }
-
-        try
-        {
-            runtime.EnsureAvailable();
-        }
-        catch (Exception ex)
-        {
-            operation.Seal(false);
-            throw ProviderUnavailable(operation, ex);
-        }
-
         var ordinal = 0L;
         try
         {
             await foreach (var entity in source.WithCancellation(ct).ConfigureAwait(false))
             {
                 operation.MarkEnumerated();
-                string payload;
+                string entityPayload;
                 try
                 {
-                    payload = entity.ToJson();
+                    entityPayload = entity.ToJson();
                 }
-                catch (Exception ex)
+                catch (Exception error)
                 {
                     operation.MarkRejected();
                     operation.Seal(false);
@@ -62,10 +49,10 @@ internal sealed class TransportCoordinator(
                         $"Entity Transport could not serialize '{typeof(TEntity).Name}' at ordinal {ordinal}. " +
                         "Use a finite JSON snapshot without reference cycles or unsupported values.",
                         new TransportAcceptance(operation.Snapshot()),
-                        ex);
+                        error);
                 }
 
-                if (Encoding.UTF8.GetByteCount(payload) > options.Value.MaxPayloadBytes)
+                if (Encoding.UTF8.GetByteCount(entityPayload) > options.Value.MaxPayloadBytes)
                 {
                     operation.MarkRejected();
                     operation.Seal(false);
@@ -76,31 +63,47 @@ internal sealed class TransportCoordinator(
                         new TransportAcceptance(operation.Snapshot()));
                 }
 
-                var envelope = new TransportEnvelope(
-                    operation,
+                var wire = new CommunicationWireEnvelope(
+                    CommunicationWireCodec.SchemaVersion,
+                    router.MeshId,
+                    CommunicationLane.Transport,
+                    route.Channel,
+                    contract,
+                    operation.OperationId,
                     ordinal,
-                    typeof(TEntity),
-                    payload,
-                    capturedContext,
-                    targets.Cast<CommunicationTargetBinding>().ToArray());
-                operation.ReserveAcceptance();
+                    entityPayload,
+                    capturedContext);
                 try
                 {
-                    await runtime.Accept(envelope, ct).ConfigureAwait(false);
+                    var accepted = await router.Publish(
+                            route,
+                            contract,
+                            MessageId(operation.OperationId, ordinal),
+                            CommunicationWireCodec.Encode(wire),
+                            operation,
+                            ct)
+                        .ConfigureAwait(false);
+                    operation.ReserveAcceptance(accepted.TargetGroups, accepted.SettlementObservable);
                 }
-                catch (OperationCanceledException ex) when (ct.IsCancellationRequested)
+                catch (OperationCanceledException error) when (ct.IsCancellationRequested)
                 {
-                    operation.RollBackAcceptance();
                     operation.MarkRejected();
                     operation.Seal(false);
-                    throw Canceled(operation, ex, ct);
+                    throw Canceled(operation, error, ct);
                 }
-                catch (Exception ex)
+                catch (CommunicationAdapterException error)
                 {
-                    operation.RollBackAcceptance();
                     operation.MarkRejected();
                     operation.Seal(false);
-                    throw ProviderUnavailable(operation, ex);
+                    if (error.Failure == CommunicationAdapterException.FailureKind.NoRoute)
+                        throw NoReceivers<TEntity>(operation, error);
+                    throw ProviderUnavailable(operation, route, error);
+                }
+                catch (Exception error)
+                {
+                    operation.MarkRejected();
+                    operation.Seal(false);
+                    throw ProviderUnavailable(operation, route, error);
                 }
 
                 ordinal++;
@@ -109,35 +112,44 @@ internal sealed class TransportCoordinator(
             operation.Seal(true);
             return new TransportAcceptance(operation.Snapshot());
         }
-        catch (TransportException)
-        {
-            throw;
-        }
-        catch (TransportCanceledException)
-        {
-            throw;
-        }
-        catch (OperationCanceledException ex) when (ct.IsCancellationRequested)
+        catch (TransportException) { throw; }
+        catch (TransportCanceledException) { throw; }
+        catch (OperationCanceledException error) when (ct.IsCancellationRequested)
         {
             operation.Seal(false);
-            throw Canceled(operation, ex, ct);
+            throw Canceled(operation, error, ct);
         }
-        catch (Exception ex)
+        catch (Exception error)
         {
             operation.Seal(false);
             throw new TransportException(
                 TransportException.FailureKind.SourceFailed,
                 $"Entity Transport source '{typeof(TEntity).Name}' failed after {ordinal} accepted snapshot(s).",
                 new TransportAcceptance(operation.Snapshot()),
-                ex);
+                error);
         }
     }
 
-    private static TransportException ProviderUnavailable(CommunicationOperation operation, Exception error)
+    private static string MessageId(Guid operationId, long ordinal) => $"{operationId:N}:{ordinal}";
+
+    private static TransportException NoReceivers<TEntity>(
+        CommunicationOperation operation,
+        Exception? error = null)
+        => new(
+            TransportException.FailureKind.NoReceivers,
+            $"Entity Transport has no route to an IReceiveEntity<{typeof(TEntity).Name}> receiver group. " +
+            "Start a receiver on the elected mesh, add a business-named local receiver, or remove this Send call.",
+            new TransportAcceptance(operation.Snapshot()),
+            error);
+
+    private static TransportException ProviderUnavailable(
+        CommunicationOperation operation,
+        CommunicationRouteDecision route,
+        Exception error)
         => new(
             TransportException.FailureKind.ProviderUnavailable,
-            "Entity Transport could not accept the snapshot into the process-local channel. " +
-            "Ensure the Koan host is running and not stopping.",
+            $"Entity Transport provider '{route.AdapterId}' could not accept the snapshot. " +
+            "Inspect Communication readiness and provider facts; Koan will not fall back to process-local reach.",
             new TransportAcceptance(operation.Snapshot()),
             error);
 

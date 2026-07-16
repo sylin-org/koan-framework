@@ -27,20 +27,20 @@ public sealed class KoanCommunicationModule : KoanModule
 
         module.Describe(Version);
         module.SetSetting(Constants.Provenance.Adapter, builder => builder
-            .Label("Default Entity Transport")
-            .Value(Constants.Transport.InProcessAdapter));
+            .Label("Entity Transport provider")
+            .Value("runtime election (see Koan facts)"));
         module.SetSetting(Constants.Provenance.Assurance, builder => builder
             .Label("Delivery assurance")
-            .Value(Constants.Transport.ProcessMemoryAssurance));
+            .Value("provider-declared at runtime"));
         module.SetSetting(Constants.Provenance.ReceiverGroups, builder => builder
             .Label("Typed receiver groups")
             .Value(receiverCount.ToString(CultureInfo.InvariantCulture)));
         module.SetSetting(Constants.Provenance.EventAdapter, builder => builder
-            .Label("Default Entity Events")
-            .Value(Constants.Events.InProcessAdapter));
+            .Label("Entity Events provider")
+            .Value("runtime election (see Koan facts)"));
         module.SetSetting(Constants.Provenance.EventAssurance, builder => builder
             .Label("Event delivery assurance")
-            .Value(Constants.Events.ProcessMemoryAssurance));
+            .Value("provider-declared at runtime"));
         module.SetSetting(Constants.Provenance.EventSubscriptions, builder => builder
             .Label("Typed Event subscriptions")
             .Value(subscriptionCount.ToString(CultureInfo.InvariantCulture)));

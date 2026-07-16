@@ -1,4 +1,3 @@
-using Koan.Communication.Infrastructure;
 using Koan.Communication.Runtime;
 
 namespace Koan.Communication;
@@ -16,9 +15,10 @@ public sealed class TransportAcceptance
         Rejected = snapshot.Rejected;
         SourceCompleted = snapshot.SourceCompleted;
         ReceiverGroups = snapshot.TargetGroups;
-        Channel = Constants.Transport.DefaultChannel;
-        Adapter = Constants.Transport.InProcessAdapter;
-        Assurance = Constants.Transport.ProcessMemoryAssurance;
+        SettlementObservable = snapshot.SettlementObservable;
+        Channel = snapshot.Channel;
+        Adapter = snapshot.Adapter;
+        Assurance = snapshot.Assurance;
         _settlement = snapshot.Settlement;
     }
 
@@ -27,7 +27,9 @@ public sealed class TransportAcceptance
     public long Accepted { get; }
     public long Rejected { get; }
     public bool SourceCompleted { get; }
-    public int ReceiverGroups { get; }
+    /// <summary>Known publisher-side receiver groups, or null when the provider cannot observe remote topology.</summary>
+    public int? ReceiverGroups { get; }
+    public bool SettlementObservable { get; }
     public string Channel { get; }
     public string Adapter { get; }
     public string Assurance { get; }
@@ -35,6 +37,15 @@ public sealed class TransportAcceptance
     /// <summary>Waits only for this operation's accepted local receiver targets to settle.</summary>
     public async Task<TransportSettlement> WaitForSettlement(CancellationToken ct = default)
     {
+        if (!SettlementObservable)
+        {
+            throw new TransportException(
+                TransportException.FailureKind.SettlementUnavailable,
+                $"Entity Transport operation {OperationId} was accepted by '{Adapter}', but that provider does not " +
+                "return remote handler settlement to the publisher. Inspect receiver and provider facts instead.",
+                this);
+        }
+
         var counts = ct.CanBeCanceled
             ? await _settlement.WaitAsync(ct).ConfigureAwait(false)
             : await _settlement.ConfigureAwait(false);

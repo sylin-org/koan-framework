@@ -9,6 +9,7 @@ using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Options;
 using Koan.Cache.Topology;
 using Koan.Data.Abstractions;
+using Koan.Core;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

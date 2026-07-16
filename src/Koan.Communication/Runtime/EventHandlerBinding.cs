@@ -50,7 +50,7 @@ internal abstract class EventHandlerBinding : CommunicationTargetBinding
             }
 
             var occurrence = new EventOccurrence<TEvent>(
-                eventEnvelope.Operation.OperationId,
+                eventEnvelope.OperationId,
                 eventEnvelope.OccurrenceId,
                 eventEnvelope.Ordinal,
                 eventEnvelope.OccurredAt,

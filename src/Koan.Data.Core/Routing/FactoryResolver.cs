@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Koan.Data.Abstractions;
+using Koan.Core;
 
 namespace Koan.Data.Core.Routing;
 

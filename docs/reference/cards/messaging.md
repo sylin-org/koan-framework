@@ -51,5 +51,8 @@ typed subscription fan-out and Entity Transport with typed receiver groups. Both
 stream Entity sources, isolate copies, carry opaque context, bound publication acceptance, expose local
 settlement, and report boot facts. Use the current [Communication reference](../communication/index.md).
 
-Build-manifest connector intent, per-channel election, retries, and RabbitMQ conformance remain
-specified but unimplemented. They are not implied by the shipped local runtime.
+Direct-reference provider election now ships. The RabbitMQ Communication connector proves confirmed
+durable Transport publication, stable receiver-group fan-out, authenticated context, and fail-loud
+no-route behavior while Events remain local. It does not provide retry, dedupe, remote settlement,
+logical channel authoring, or exactly-once effects. None of those guarantees should be inferred from
+the legacy Messaging packages.

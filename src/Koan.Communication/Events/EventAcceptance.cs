@@ -1,4 +1,3 @@
-using Koan.Communication.Infrastructure;
 using Koan.Communication.Runtime;
 
 namespace Koan.Communication;
@@ -16,9 +15,10 @@ public sealed class EventAcceptance
         Rejected = snapshot.Rejected;
         SourceCompleted = snapshot.SourceCompleted;
         SubscriptionGroups = snapshot.TargetGroups;
-        Channel = Constants.Events.DefaultChannel;
-        Adapter = Constants.Events.InProcessAdapter;
-        Assurance = Constants.Events.ProcessMemoryAssurance;
+        SettlementObservable = snapshot.SettlementObservable;
+        Channel = snapshot.Channel;
+        Adapter = snapshot.Adapter;
+        Assurance = snapshot.Assurance;
         _settlement = snapshot.Settlement;
     }
 
@@ -27,7 +27,8 @@ public sealed class EventAcceptance
     public long Accepted { get; }
     public long Rejected { get; }
     public bool SourceCompleted { get; }
-    public int SubscriptionGroups { get; }
+    public int? SubscriptionGroups { get; }
+    public bool SettlementObservable { get; }
     public string Channel { get; }
     public string Adapter { get; }
     public string Assurance { get; }
@@ -35,6 +36,15 @@ public sealed class EventAcceptance
     /// <summary>Waits only for this operation's accepted local subscription targets to settle.</summary>
     public async Task<EventSettlement> WaitForSettlement(CancellationToken ct = default)
     {
+        if (!SettlementObservable)
+        {
+            throw new EventException(
+                EventException.FailureKind.SettlementUnavailable,
+                $"Entity Event operation {OperationId} was accepted by '{Adapter}', but that provider does not " +
+                "return remote handler settlement to the publisher. Inspect subscription and provider facts instead.",
+                this);
+        }
+
         var counts = ct.CanBeCanceled
             ? await _settlement.WaitAsync(ct).ConfigureAwait(false)
             : await _settlement.ConfigureAwait(false);

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
+using Koan.Core;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 

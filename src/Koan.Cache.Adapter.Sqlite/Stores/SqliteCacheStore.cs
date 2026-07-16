@@ -3,6 +3,7 @@ using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Adapter.Sqlite.Options;
 using Koan.Data.Abstractions;
+using Koan.Core;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

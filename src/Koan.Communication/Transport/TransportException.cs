@@ -9,7 +9,8 @@ public sealed class TransportException : Exception
         Serialization,
         PayloadTooLarge,
         SourceFailed,
-        ProviderUnavailable
+        ProviderUnavailable,
+        SettlementUnavailable
     }
 
     internal TransportException(
