@@ -32,6 +32,20 @@ internal static class PackagingConstants
     public const int ReleaseManifestSchema = 3;
     public const int ReleaseLineageSchema = 3;
 
+    public static class ReleaseWave
+    {
+        public const int Schema = 1;
+        public const string MarkerFileName = "release-wave.json";
+        public const string BundleFilePrefix = "release-wave-";
+        public const string BundleFileExtension = ".zip";
+        public const string PreparedStatus = "prepared";
+        public const string TagPrefix = "release/dev/";
+        public const string PackageExtension = ".nupkg";
+        public const string SymbolsExtension = ".snupkg";
+        public const long MaximumBundleLength = 2L * 1024 * 1024 * 1024;
+        public const long MaximumMetadataEntryLength = 16L * 1024 * 1024;
+    }
+
     public static class ApplicationProbe
     {
         public const string HealthPath = "health/ready";

@@ -1,4 +1,6 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Koan.Packaging.Infrastructure;
 using Koan.Packaging.Models;
 using Koan.Packaging.Services;
@@ -8,6 +10,97 @@ namespace Koan.Packaging.Tests;
 
 public sealed class ReleaseLineageGitTests
 {
+    [Fact]
+    public async Task CommittedLineageMaterializationIsExactAndReadOnly()
+    {
+        await using var fixture = await LineageRepository.CreateAsync();
+        var process = new ProcessRunner();
+        var repository = new RepositoryInspector(fixture.Root, process);
+        var compiler = new ReleaseLineageCompiler(fixture.Root, process, repository);
+        var bootstrap = await compiler.CompileAsync(
+            fixture.BaseCommit,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            previousLineageRevision: null,
+            CancellationToken.None);
+        var headBefore = await fixture.HeadAsync();
+
+        var materialized = await compiler.MaterializeCommittedAsync(
+            bootstrap.VersionCommit,
+            CancellationToken.None);
+        var output = Path.Combine(
+            fixture.Root,
+            "artifacts",
+            "release",
+            PackagingConstants.LineageArtifactFileName);
+        await ReleaseLineageCompiler.SaveAsync(materialized, output, CancellationToken.None);
+        var loaded = await ReleaseLineageCompiler.LoadAsync(output, CancellationToken.None);
+
+        ReleaseLineageCompiler.RequireCommittedMatch(loaded, bootstrap);
+        Assert.Equal(bootstrap.VersionCommit, materialized.VersionCommit);
+        Assert.Equal(headBefore, await fixture.HeadAsync());
+        Assert.Equal(string.Empty, await fixture.TrackedStatusAsync());
+    }
+
+    [Fact]
+    public async Task CommittedLineageMaterializationRequiresExactCleanCheckout()
+    {
+        await using var fixture = await LineageRepository.CreateAsync();
+        var process = new ProcessRunner();
+        var repository = new RepositoryInspector(fixture.Root, process);
+        var compiler = new ReleaseLineageCompiler(fixture.Root, process, repository);
+        var bootstrap = await compiler.CompileAsync(
+            fixture.BaseCommit,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            previousLineageRevision: null,
+            CancellationToken.None);
+
+        await fixture.SwitchAsync("dev");
+        var checkoutError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            compiler.MaterializeCommittedAsync(bootstrap.VersionCommit, CancellationToken.None));
+        Assert.Contains("checkout", checkoutError.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(bootstrap.VersionCommit, checkoutError.Message, StringComparison.OrdinalIgnoreCase);
+
+        await fixture.SwitchAsync("automation/package-lineage-dev");
+        fixture.Touch(LineageRepository.CoreId, "dirty tracked input");
+        var dirtyError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            compiler.MaterializeCommittedAsync(bootstrap.VersionCommit, CancellationToken.None));
+        Assert.Contains("no tracked modifications", dirtyError.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CommittedLineageMaterializationRejectsWrongSchemaAndTamper()
+    {
+        await using var fixture = await LineageRepository.CreateAsync();
+        var process = new ProcessRunner();
+        var repository = new RepositoryInspector(fixture.Root, process);
+        var compiler = new ReleaseLineageCompiler(fixture.Root, process, repository);
+        await compiler.CompileAsync(
+            fixture.BaseCommit,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            previousLineageRevision: null,
+            CancellationToken.None);
+        var original = fixture.ReadLineageState();
+
+        var wrongSchema = JsonNode.Parse(original)!.AsObject();
+        wrongSchema["schemaVersion"] = PackagingConstants.ReleaseLineageSchema + 1;
+        fixture.WriteLineageState(wrongSchema.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        var wrongSchemaCommit = await fixture.AmendAsync();
+        var schemaError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            compiler.MaterializeCommittedAsync(wrongSchemaCommit, CancellationToken.None));
+        Assert.Contains("expected", schemaError.Message, StringComparison.OrdinalIgnoreCase);
+
+        var tampered = JsonNode.Parse(original)!.AsObject();
+        tampered["closurePackages"]!.AsArray().RemoveAt(0);
+        fixture.WriteLineageState(tampered.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        var tamperedCommit = await fixture.AmendAsync();
+        var tamperError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            compiler.MaterializeCommittedAsync(tamperedCommit, CancellationToken.None));
+        Assert.Contains("inconsistent closure", tamperError.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task TwoBreakingWavesMintDistinctClosureAndLeafRemainsIndependent()
     {
@@ -554,6 +647,26 @@ public sealed class ReleaseLineageGitTests
         public Task<string> SwitchAsync(string branch) => GitAsync("switch", branch);
 
         public Task<string> ParentAsync(string commit) => GitAsync("rev-parse", $"{commit}^");
+
+        public Task<string> HeadAsync() => GitAsync("rev-parse", "HEAD");
+
+        public Task<string> TrackedStatusAsync() =>
+            GitAsync("status", "--porcelain", "--untracked-files=no");
+
+        public string ReadLineageState() =>
+            File.ReadAllText(Path.Combine(Root, PackagingConstants.LineageStateFileName));
+
+        public void WriteLineageState(string content) =>
+            File.WriteAllText(
+                Path.Combine(Root, PackagingConstants.LineageStateFileName),
+                content + Environment.NewLine);
+
+        public async Task<string> AmendAsync()
+        {
+            await GitAsync("add", "--", PackagingConstants.LineageStateFileName);
+            await GitAsync("commit", "--amend", "--no-gpg-sign", "--no-edit");
+            return await HeadAsync();
+        }
 
         public async Task<IReadOnlyList<string>> DiffPathsAsync(string left, string right)
         {

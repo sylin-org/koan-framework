@@ -248,6 +248,23 @@ internal sealed class ReleaseLineageCompiler(
         return ToCompilation(state, versionCommit);
     }
 
+    public async Task<ReleaseLineage> MaterializeCommittedAsync(
+        string versionRevision,
+        CancellationToken cancellationToken)
+    {
+        await RequireCleanTrackedTreeAsync(cancellationToken);
+        var versionCommit = await repository.ResolveCommitAsync(versionRevision, cancellationToken);
+        var headCommit = await repository.ResolveCommitAsync("HEAD", cancellationToken);
+        if (!Same(versionCommit, headCommit))
+        {
+            throw new InvalidOperationException(
+                $"Committed lineage materialization requires version commit {versionCommit}, " +
+                $"but the checkout is {headCommit}.");
+        }
+
+        return await LoadCommittedAsync(repository, versionCommit, cancellationToken);
+    }
+
     internal static void RequireCommittedMatch(ReleaseLineage supplied, ReleaseLineage committed)
     {
         var matches =

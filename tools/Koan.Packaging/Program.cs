@@ -58,6 +58,17 @@ internal static class PackagingProgram
                     PrintLineage(lineage, output);
                     return 0;
                 }
+                case "materialize-lineage":
+                {
+                    var lineage = await lineageCompiler.MaterializeCommittedAsync(
+                        Require(options, "version-commit"),
+                        cancellationToken);
+                    var output = options.Value("output")
+                        ?? Path.Combine(root, "artifacts", "release", PackagingConstants.LineageArtifactFileName);
+                    await ReleaseLineageCompiler.SaveAsync(lineage, output, cancellationToken);
+                    PrintLineage(lineage, output);
+                    return 0;
+                }
                 case "pack":
                 {
                     var manifestPath = Require(options, "manifest");
@@ -129,6 +140,7 @@ internal static class PackagingProgram
 
           inventory [--output PATH]
           lineage   [--source GIT] [--previous-source GIT] [--previous-lineage GIT] [--branch NAME] [--output PATH]
+          materialize-lineage --version-commit GIT [--output PATH]
           plan      [--lineage PATH] [--output PATH] [--offline]
           pack      --manifest PATH [--output DIR] [--clean-room] [--resume]
           publish   --manifest PATH [--artifacts DIR] [--state PATH] [--api-key-env NAME]
