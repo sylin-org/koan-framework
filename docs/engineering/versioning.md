@@ -84,9 +84,9 @@ is not present. The first lineage deliberately mints every owner once and requir
 package inventory to remain evaluable by the pinned toolchain. Afterward, committed lineage supplies
 each prior package identity without reinterpreting history through a newer toolchain. A conservative
 input map combines known shared build policy with evaluated external packed files; changes fan out to
-mapped package consumers. Known paths remain as deletion tombstones. Persisting arbitrary external
-paths from a prior evaluation is the bounded [PMC-017](../initiatives/koan-v1/POST-CYCLE-TODO.md#current-register)
-edge.
+mapped package consumers. Lineage schema 3 persists each normalized owner map, and later impact uses
+the union of its prior and current paths. Add, change, delete, and rename therefore remain visible to
+the owning package even after a path disappears from current MSBuild evaluation.
 
 ### Add a package
 

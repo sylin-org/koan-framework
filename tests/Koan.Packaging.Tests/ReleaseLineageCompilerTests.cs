@@ -92,7 +92,7 @@ public sealed class ReleaseLineageCompilerTests
         var connector = Project("Sylin.Koan.Connector") with { SharedInputs = [shared] };
         var app = Project("Sylin.Koan.App", Reference(core));
         var graph = new PackageGraph([connector, app, core]);
-        var impact = ReleaseLineageCompiler.MapChangedSharedInputs(graph, [shared]);
+        var impact = ReleaseLineageCompiler.MapChangedSharedInputs(graph, [], [shared]);
 
         var plan = ReleaseLineageCompiler.Plan(
             graph,
@@ -106,6 +106,28 @@ public sealed class ReleaseLineageCompilerTests
         Assert.Equal(connector.PackageId, marker.PackageId);
         Assert.Equal([shared], marker.SharedInputs);
         Assert.Equal([connector.PackageId], plan.MarkerPackages);
+    }
+
+    [Fact]
+    public void PreviousAndCurrentInputUnionPreservesDeletionAndRenameOwnership()
+    {
+        const string deleted = "shared/old.txt";
+        const string added = "shared/new.txt";
+        var owner = Project("Sylin.Koan.Owner") with { SharedInputs = [added] };
+        var unrelated = Project("Sylin.Koan.Unrelated");
+        var previous = new ReleaseLineagePackage(owner.PackageId, owner.ProjectPath, "0.20.1")
+        {
+            SharedInputs = [deleted]
+        };
+
+        var impact = ReleaseLineageCompiler.MapChangedSharedInputs(
+            new PackageGraph([unrelated, owner]),
+            [previous],
+            [deleted, added]);
+
+        var inputs = Assert.Single(impact);
+        Assert.Equal(owner.PackageId, inputs.Key);
+        Assert.Equal([added, deleted], inputs.Value);
     }
 
     [Fact]

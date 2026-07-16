@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-16
   status: reviewed
-  scope: R07 passed; the semantic capability ring and business-channel contract are closed, with T7 readiness next
+  scope: R07 passed; T7 entry audit complete and R08-01 durable release-wave truth active
 ---
 
 # Koan V1 reorganization current handoff
@@ -18,7 +18,15 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Current state
 
-- R00 through R07 are passed. T6 capability-ring graduation is complete; no implementation child is active.
+- R00 through R07 are passed. T6 capability-ring graduation is complete.
+- [R08](work-items/R08-v1-release-readiness.md) is active after a bounded T7 entry audit. The local
+  package/clean-room mechanism is strong, but public NuGet is incoherent, the new workflow has never
+  run, provider promotion and templates are not release-safe, and no upgrade/support contract exists.
+- [R08-01](work-items/r08/R08-01-durable-release-wave.md) is the sole active child. It combines
+  release-wave recovery with historical input ownership. Canonical version intent and PMC-017 are
+  now implemented: lineage schema 3 persists per-owner evaluated inputs and prior/current ownership
+  passes real add/change/rename/delete Git proof. PMC-016 exact-binary escrow and the least-privilege
+  workflow split are next. No real publication or remote mutation has occurred.
 - [ARCH-0113](../../decisions/ARCH-0113-entity-capability-communication.md) accepts the greenfield
   semantic-capability rebuild and supersedes the old lifecycle/event/messaging split.
 - The canonical [Entity Semantics Contract](../../architecture/entity-semantics-contract.md) now
@@ -365,11 +373,13 @@ semantics pass over the local boundary.
 
 ## Next safe action
 
-Enter T7 with a bounded readiness assessment, not an automatic publication. Reconcile the actual
-public package state, release-correctness gates (especially PMC-016/017), connector logging security
-(PMC-019), upgrade/support guidance, and the exact first trustworthy publication observation. Open
-one work item only after that audit names the smallest meaningful release-readiness result. Publication,
-push, tag, and release still require their own explicit authorized operation.
+Implement PMC-016 as one release-wave state machine. The lineage commit remains version truth; one
+hash-bound bundle becomes durable escrow on the eventual draft GitHub Release before NuGet OIDC;
+the published Release is completion. A later event must reconcile the prior lineage tip before
+compiling its own wave. Separate read-only compile/proof, narrow lineage persistence, draft staging,
+and promotion permissions; add failure-injection and workflow-structure tests. Do not widen into
+connector security, templates, catalogs, or upgrade policy until this base passes. Publication, push,
+tag, release, and remote configuration still require their own explicit authorized operation.
 
 ## Repository boundary
 

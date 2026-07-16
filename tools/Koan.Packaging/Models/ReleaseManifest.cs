@@ -91,7 +91,11 @@ internal sealed class ReleaseLineageState
     public List<ReleaseLineagePackage> RetiredPackages { get; init; } = [];
 }
 
-internal sealed record ReleaseLineagePackage(string PackageId, string ProjectPath, string? Version);
+internal sealed record ReleaseLineagePackage(string PackageId, string ProjectPath, string? Version)
+{
+    [JsonRequired]
+    public List<string> SharedInputs { get; init; } = [];
+}
 
 internal sealed record ReleaseLineageTrigger(
     string PackageId,

@@ -475,9 +475,10 @@ boundaries remain pre-V1 work.
 - **Maturity / safe claim:** `specified`. Staged PackageReference clean rooms are demonstrated, but
   those packages were not published; source checkout remains the only coherent path currently
   available to a new user.
-- **Open risks:** observe the first trusted `dev` publication, prove cross-event partial-publication
-  recovery, and retain prior maps for arbitrary external pack inputs; retain advisory review and
-  establish explicit pre-1.0 upgrade/rollback policy before promoting the package path.
+- **Open risks:** observe the first trusted `dev` publication and prove cross-event
+  partial-publication recovery from exact retained artifacts; retain advisory review and establish
+  explicit pre-1.0 upgrade/rollback policy before promoting the package path. Historical arbitrary
+  external pack inputs are now retained and verified by lineage schema 3.
 
 ### Operations, health, and diagnostics
 

@@ -87,7 +87,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
     {
         var output = await processRunner.RequireAsync(
             "git",
-            ["diff", "--name-only", previousCommit, currentCommit, "--"],
+            ["diff", "--name-only", "--no-renames", previousCommit, currentCommit, "--"],
             repositoryRoot,
             cancellationToken);
         return output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
@@ -163,17 +163,14 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
         var properties = document.RootElement.GetProperty("Properties");
         if (!ReadBoolean(properties, "IsPackable", defaultValue: true)) return null;
 
-        var projectDirectory = Path.GetDirectoryName(project)!;
-        if (!File.Exists(Path.Combine(projectDirectory, "version.json")))
-        {
-            throw new InvalidOperationException($"Packable project '{Relative(project)}' has no project-local version.json owner.");
-        }
-
         var packageId = ReadString(properties, "PackageId");
         if (string.IsNullOrWhiteSpace(packageId))
         {
             throw new InvalidOperationException($"Packable project '{Relative(project)}' has no evaluated PackageId.");
         }
+
+        var projectDirectory = Path.GetDirectoryName(project)!;
+        ValidateVersionIntent(project, projectDirectory, packageId);
 
         var references = new List<string>();
         var sharedInputs = SharedBuildInputs(projectDirectory).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -216,6 +213,32 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             ReadString(properties, "PackageTags") ?? string.Empty,
             references,
             sharedInputs.Order(StringComparer.OrdinalIgnoreCase).ToArray());
+    }
+
+    private void ValidateVersionIntent(string project, string projectDirectory, string packageId)
+    {
+        var versionPath = Path.Combine(projectDirectory, VersionIntent.FileName);
+        var relativeVersionPath = Relative(versionPath);
+        var owner = $"package '{packageId}' owned by '{Relative(project)}'";
+        if (!File.Exists(versionPath))
+        {
+            throw new InvalidOperationException(
+                $"Packable {owner} has no project-local version intent at '{relativeVersionPath}'. " +
+                $"Add '{relativeVersionPath}' with a 'version' property set to exactly {VersionIntent.RequiredFormat}; " +
+                "NBGV owns patch versions.");
+        }
+
+        try
+        {
+            _ = VersionIntent.ParseJson(File.ReadAllText(versionPath));
+        }
+        catch (Exception error) when (error is JsonException or InvalidOperationException)
+        {
+            throw new InvalidOperationException(
+                $"Packable {owner} has invalid version intent at '{relativeVersionPath}': {error.Message} " +
+                $"Set its 'version' property to exactly {VersionIntent.RequiredFormat}; NBGV owns patch versions.",
+                error);
+        }
     }
 
     private IEnumerable<string> SharedBuildInputs(string projectDirectory)

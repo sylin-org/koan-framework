@@ -26,8 +26,15 @@ internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegist
         }
         var projects = await repository.DiscoverPackagesAsync(cancellationToken);
         var graph = new PackageGraph(projects);
+        var previousLineage = lineage.IsBootstrap
+            ? null
+            : await ReleaseLineageCompiler.LoadCommittedAsync(
+                repository,
+                previousVersionCommit,
+                cancellationToken);
         var expectedSharedInputs = ReleaseLineageCompiler.MapChangedSharedInputs(
             graph,
+            previousLineage?.Packages ?? [],
             await repository.GetChangedPathsAsync(
                 lineage.PreviousSourceCommit,
                 lineage.SourceCommit,
@@ -47,6 +54,21 @@ internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegist
         {
             throw new InvalidOperationException(
                 "Release lineage shared-input impact does not match the current evaluated package inputs. Recompile lineage before planning.");
+        }
+        var recordedSharedInputs = lineage.Triggers
+            .Where(trigger => trigger.SharedInputs.Count > 0)
+            .ToDictionary(
+                trigger => trigger.PackageId,
+                trigger => trigger.SharedInputs,
+                StringComparer.OrdinalIgnoreCase);
+        if (!recordedSharedInputs.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase)
+                .SetEquals(expectedSharedInputs.Keys) ||
+            expectedSharedInputs.Any(expected =>
+                !recordedSharedInputs[expected.Key].SequenceEqual(expected.Value, StringComparer.Ordinal)))
+        {
+            throw new InvalidOperationException(
+                "Release lineage shared-input ownership does not match the previous/current evaluated input maps. " +
+                "Recompile lineage before planning.");
         }
         Console.WriteLine(
             $"compare  {previousVersionCommit[..12]} -> {versionCommit[..12]} across {projects.Count} package owner(s); " +
@@ -72,16 +94,20 @@ internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegist
         {
             var recorded = recordedCurrent[project.PackageId];
             if (!string.Equals(recorded.ProjectPath, project.ProjectPath, StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(recorded.Version, currentVersions[project.PackageId], StringComparison.OrdinalIgnoreCase))
+                !string.Equals(recorded.Version, currentVersions[project.PackageId], StringComparison.OrdinalIgnoreCase) ||
+                recorded.SharedInputs is null ||
+                !recorded.SharedInputs.SequenceEqual(
+                    ReleaseLineageCompiler.NormalizeSharedInputs(project.SharedInputs),
+                    StringComparer.Ordinal))
             {
                 throw new InvalidOperationException(
-                    $"Committed package identity for {project.PackageId} does not match exact version commit {versionCommit}.");
+                    $"Committed package identity or evaluated input map for {project.PackageId} does not match " +
+                    $"exact version commit {versionCommit}.");
             }
         }
         IReadOnlyDictionary<string, string?> previousVersions = lineage.IsBootstrap
             ? new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
-            : (await ReleaseLineageCompiler.LoadCommittedAsync(repository, previousVersionCommit, cancellationToken))
-                .Packages.ToDictionary(
+            : previousLineage!.Packages.ToDictionary(
                     package => package.PackageId,
                     package => package.Version,
                     StringComparer.OrdinalIgnoreCase);

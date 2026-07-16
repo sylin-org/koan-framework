@@ -7,10 +7,9 @@ Git and evaluated MSBuild projects are authoritative. Every packable project und
 `ProjectReference`s form one `PackageGraph`; no XML parser or maintained package list participates.
 Each package also receives a conservative shared-input map: known repository/ancestor build policy
 plus evaluated packed inputs outside its owner directory. Known paths remain as tombstones when
-deleted. Arbitrary external inputs discovered only through current evaluation are not retained in the
-next lineage state, so their later deletion or rename is not certified until
-[PMC-017](../../docs/initiatives/koan-v1/POST-CYCLE-TODO.md#current-register) is resolved or the path is
-promoted into the known map.
+deleted. Lineage schema 3 persists the normalized evaluated map for every owner; impact is calculated
+against the previous and current maps together. An external packed input therefore keeps its owner
+through add, change, delete, and rename without turning a repository-wide change into a global wave.
 
 The human signal is a compatibility-tier change in `version.json`. Before 1.0, a minor advance is
 breaking; from 1.0 onward, a major advance is breaking.

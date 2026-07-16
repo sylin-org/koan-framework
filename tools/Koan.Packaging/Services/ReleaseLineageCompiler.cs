@@ -49,9 +49,8 @@ internal sealed class ReleaseLineageCompiler(
                 cancellationToken);
             previousInventory = previousProjects
                 .OrderBy(project => project.PackageId, StringComparer.OrdinalIgnoreCase)
-                .Select(project => new ReleaseLineagePackage(
-                    project.PackageId,
-                    Normalize(project.ProjectPath),
+                .Select(project => ToLineagePackage(
+                    project,
                     bootstrapPreviousVersions[project.PackageId]))
                 .ToArray();
             previousRetirements = [];
@@ -102,6 +101,7 @@ internal sealed class ReleaseLineageCompiler(
                 cancellationToken);
         var sharedInputsByPackage = await FindChangedSharedInputsAsync(
             graph,
+            isBootstrap ? [] : previousInventory,
             previousSourceCommit,
             sourceCommit,
             cancellationToken);
@@ -114,7 +114,7 @@ internal sealed class ReleaseLineageCompiler(
         var closurePackages = triggers.Select(trigger => trigger.PackageId).ToArray();
         var inventory = graph.Projects
             .OrderBy(project => project.PackageId, StringComparer.OrdinalIgnoreCase)
-            .Select(project => new ReleaseLineagePackage(project.PackageId, Normalize(project.ProjectPath), null))
+            .Select(project => ToLineagePackage(project, version: null))
             .ToList();
 
         ReleaseLineageState BuildState(
@@ -271,8 +271,8 @@ internal sealed class ReleaseLineageCompiler(
 
     internal static bool IsBreakingTierAdvance(string previous, string current)
     {
-        var previousVersion = ParseVersionIntent(previous);
-        var currentVersion = ParseVersionIntent(current);
+        var previousVersion = VersionIntent.Parse(previous);
+        var currentVersion = VersionIntent.Parse(current);
         var previousBand = new Version(previousVersion.Major, previousVersion.Minor);
         var currentBand = new Version(currentVersion.Major, currentVersion.Minor);
         if (currentBand < previousBand)
@@ -320,7 +320,7 @@ internal sealed class ReleaseLineageCompiler(
         PackageGraph current)
     {
         var currentPackages = current.Projects
-            .Select(project => new ReleaseLineagePackage(project.PackageId, Normalize(project.ProjectPath), null))
+            .Select(project => ToLineagePackage(project, version: null))
             .ToArray();
         var currentById = currentPackages.ToDictionary(project => project.PackageId, StringComparer.OrdinalIgnoreCase);
         var currentByPath = currentPackages.ToDictionary(project => Normalize(project.ProjectPath), StringComparer.OrdinalIgnoreCase);
@@ -439,8 +439,14 @@ internal sealed class ReleaseLineageCompiler(
         var roots = new List<string>();
         foreach (var project in graph.Projects.OrderBy(project => project.PackageId, StringComparer.OrdinalIgnoreCase))
         {
-            var versionPath = Normalize(Path.Combine(Path.GetDirectoryName(project.ProjectPath) ?? string.Empty, "version.json"));
-            var previous = await TryReadVersionIntentAsync(previousSourceCommit, versionPath, cancellationToken);
+            var versionPath = Normalize(Path.Combine(
+                Path.GetDirectoryName(project.ProjectPath) ?? string.Empty,
+                VersionIntent.FileName));
+            var previous = await TryReadVersionIntentAsync(
+                previousSourceCommit,
+                versionPath,
+                project.PackageId,
+                cancellationToken);
             if (previous is null) continue;
             var current = currentVersionIntents[project.PackageId];
             if (IsBreakingTierAdvance(previous, current)) roots.Add(project.PackageId);
@@ -456,10 +462,15 @@ internal sealed class ReleaseLineageCompiler(
         var intents = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var project in graph.Projects.OrderBy(project => project.PackageId, StringComparer.OrdinalIgnoreCase))
         {
-            var versionPath = Normalize(Path.Combine(Path.GetDirectoryName(project.ProjectPath) ?? string.Empty, "version.json"));
-            var current = await TryReadVersionIntentAsync(sourceCommit, versionPath, cancellationToken)
+            var versionPath = Normalize(Path.Combine(
+                Path.GetDirectoryName(project.ProjectPath) ?? string.Empty,
+                VersionIntent.FileName));
+            var current = await TryReadVersionIntentAsync(
+                    sourceCommit,
+                    versionPath,
+                    project.PackageId,
+                    cancellationToken)
                 ?? throw new InvalidOperationException($"Package {project.PackageId} has no version intent at {sourceCommit}.");
-            _ = ParseVersionIntent(current);
             intents[project.PackageId] = current;
         }
         return intents;
@@ -647,6 +658,7 @@ internal sealed class ReleaseLineageCompiler(
             throw new InvalidOperationException(
                 "Committed package lineage must retain each retired package's final identity and path without reusing it as an active owner.");
         }
+        ValidatePackageInputMaps(state.Packages.Concat(state.RetiredPackages));
         var triggerIds = state.Triggers.Select(trigger => trigger.PackageId).ToArray();
         if (!state.ClosurePackages.SequenceEqual(triggerIds, StringComparer.OrdinalIgnoreCase) ||
             state.MarkerPackages.Except(triggerIds, StringComparer.OrdinalIgnoreCase).Any() ||
@@ -663,9 +675,35 @@ internal sealed class ReleaseLineageCompiler(
         }
         var recordedInputs = state.Triggers.SelectMany(trigger => trigger.SharedInputs)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (!recordedInputs.SetEquals(state.SharedInputs))
+        if (!recordedInputs.SetEquals(state.SharedInputs) ||
+            state.SharedInputs.Any(input => !IsNormalizedRepositoryPath(input)) ||
+            !state.SharedInputs.SequenceEqual(
+                NormalizeSharedInputs(state.SharedInputs),
+                StringComparer.Ordinal) ||
+            state.Triggers.Any(trigger =>
+                trigger.SharedInputs.Any(input => !IsNormalizedRepositoryPath(input)) ||
+                !trigger.SharedInputs.SequenceEqual(
+                    NormalizeSharedInputs(trigger.SharedInputs),
+                    StringComparer.Ordinal)))
         {
             throw new InvalidOperationException("Committed package lineage state has an inconsistent shared-input set.");
+        }
+    }
+
+    private static void ValidatePackageInputMaps(IEnumerable<ReleaseLineagePackage> packages)
+    {
+        foreach (var package in packages)
+        {
+            if (package.SharedInputs is null ||
+                package.SharedInputs.Any(input => !IsNormalizedRepositoryPath(input)) ||
+                !package.SharedInputs.SequenceEqual(
+                    NormalizeSharedInputs(package.SharedInputs),
+                    StringComparer.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Committed package lineage input map for '{package.PackageId}' must contain unique, " +
+                    "sorted, normalized repository-relative paths.");
+            }
         }
     }
 
@@ -720,6 +758,7 @@ internal sealed class ReleaseLineageCompiler(
     private async Task<string?> TryReadVersionIntentAsync(
         string commit,
         string path,
+        string packageId,
         CancellationToken cancellationToken)
     {
         var result = await processRunner.RunAsync(
@@ -728,13 +767,17 @@ internal sealed class ReleaseLineageCompiler(
             repositoryRoot,
             cancellationToken);
         if (result.ExitCode != 0) return null;
-        using var document = JsonDocument.Parse(result.StandardOutput);
-        if (!document.RootElement.TryGetProperty("version", out var version) ||
-            string.IsNullOrWhiteSpace(version.GetString()))
+        try
         {
-            throw new InvalidOperationException($"Package version intent '{path}' at {commit} has no version.");
+            return VersionIntent.ParseJson(result.StandardOutput).ToString();
         }
-        return version.GetString();
+        catch (Exception error) when (error is JsonException or InvalidOperationException)
+        {
+            throw new InvalidOperationException(
+                $"Package '{packageId}' has invalid version intent at '{path}' in {commit}: {error.Message} " +
+                $"Set its 'version' property to exactly {VersionIntent.RequiredFormat}; NBGV owns patch versions.",
+                error);
+        }
     }
 
     private async Task<IReadOnlyList<string>> ListSourcePathsAsync(
@@ -751,29 +794,37 @@ internal sealed class ReleaseLineageCompiler(
 
     private async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> FindChangedSharedInputsAsync(
         PackageGraph graph,
+        IReadOnlyCollection<ReleaseLineagePackage> previousPackages,
         string previousSourceCommit,
         string sourceCommit,
         CancellationToken cancellationToken)
     {
         return MapChangedSharedInputs(
             graph,
+            previousPackages,
             await repository.GetChangedPathsAsync(previousSourceCommit, sourceCommit, cancellationToken));
     }
 
     internal static IReadOnlyDictionary<string, IReadOnlyList<string>> MapChangedSharedInputs(
         PackageGraph graph,
+        IEnumerable<ReleaseLineagePackage> previousPackages,
         IEnumerable<string> changedPaths)
     {
         var changed = changedPaths.Select(Normalize).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var previousByPackage = previousPackages.ToDictionary(
+            package => package.PackageId,
+            package => (IReadOnlyList<string>)(package.SharedInputs ?? []),
+            StringComparer.OrdinalIgnoreCase);
         return graph.Projects
             .Select(project => new
             {
                 project.PackageId,
-                Inputs = project.SharedInputs
-                    .Select(Normalize)
+                Inputs = NormalizeSharedInputs(
+                        project.SharedInputs.Concat(
+                            previousByPackage.TryGetValue(project.PackageId, out var previous)
+                                ? previous
+                                : []))
                     .Where(changed.Contains)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Order(StringComparer.OrdinalIgnoreCase)
                     .ToArray()
             })
             .Where(item => item.Inputs.Length > 0)
@@ -932,20 +983,6 @@ internal sealed class ReleaseLineageCompiler(
             cancellationToken);
     }
 
-    private static Version ParseVersionIntent(string value)
-    {
-        var parts = value.Split('.');
-        if (parts.Length != 2 ||
-            parts.Any(part => part.Length == 0 || !part.All(char.IsAsciiDigit)) ||
-            !int.TryParse(parts[0], out var major) ||
-            !int.TryParse(parts[1], out var minor))
-        {
-            throw new InvalidOperationException(
-                $"Package version intent '{value}' must be exactly unsigned major.minor (for example, 0.18 or 1.0).");
-        }
-        return new Version(major, minor);
-    }
-
     private static string MarkerPath(PackageProject project) =>
         Normalize(Path.Combine(Path.GetDirectoryName(project.ProjectPath) ?? string.Empty, PackagingConstants.LineageMarkerFileName));
 
@@ -970,6 +1007,34 @@ internal sealed class ReleaseLineageCompiler(
                 normalized.EndsWith("/version.json", StringComparison.OrdinalIgnoreCase));
     }
 
+    private static ReleaseLineagePackage ToLineagePackage(PackageProject project, string? version) =>
+        new(project.PackageId, Normalize(project.ProjectPath), version)
+        {
+            SharedInputs = NormalizeSharedInputs(project.SharedInputs).ToList()
+        };
+
+    internal static IReadOnlyList<string> NormalizeSharedInputs(IEnumerable<string> inputs) =>
+        inputs
+            .Select(Normalize)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(input => input, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(input => input, StringComparer.Ordinal)
+            .ToArray();
+
+    private static bool IsNormalizedRepositoryPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) ||
+            !string.Equals(path, Normalize(path), StringComparison.Ordinal) ||
+            Path.IsPathRooted(path) ||
+            path.StartsWith("./", StringComparison.Ordinal) ||
+            path.EndsWith("/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return path.Split('/').All(segment => segment.Length > 0 && segment is not "." and not "..");
+    }
+
     private static string Normalize(string path) => path.Replace('\\', '/');
 
     private static bool Same(string left, string right) =>
@@ -989,7 +1054,10 @@ internal sealed class ReleaseLineageCompiler(
         left.Count == right.Count && left.Zip(right).All(pair =>
             Same(pair.First.PackageId, pair.Second.PackageId) &&
             Same(pair.First.ProjectPath, pair.Second.ProjectPath) &&
-            string.Equals(pair.First.Version, pair.Second.Version, StringComparison.OrdinalIgnoreCase));
+            string.Equals(pair.First.Version, pair.Second.Version, StringComparison.OrdinalIgnoreCase) &&
+            pair.First.SharedInputs is not null &&
+            pair.Second.SharedInputs is not null &&
+            pair.First.SharedInputs.SequenceEqual(pair.Second.SharedInputs, StringComparer.Ordinal));
 
     internal sealed record ReleaseLineagePlan(
         IReadOnlyList<string> ClosurePackages,

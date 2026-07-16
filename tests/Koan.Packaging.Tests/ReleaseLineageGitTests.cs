@@ -294,7 +294,10 @@ public sealed class ReleaseLineageGitTests
             CancellationToken.None);
 
         var retained = Assert.Single(next.RetiredPackages);
-        Assert.Equal(retired, retained);
+        Assert.Equal(retired.PackageId, retained.PackageId);
+        Assert.Equal(retired.ProjectPath, retained.ProjectPath);
+        Assert.Equal(retired.Version, retained.Version);
+        Assert.Equal(retired.SharedInputs, retained.SharedInputs);
     }
 
     [Fact]
@@ -327,6 +330,106 @@ public sealed class ReleaseLineageGitTests
         var package = Assert.Single(manifest.Packages, item => item.PackageId == newPackageId);
         Assert.Null(package.PreviousVersion);
         Assert.Empty(lineage.ClosurePackages);
+    }
+
+    [Fact]
+    public async Task EvaluatedExternalInputHistorySelectsOnlyItsOwnerAcrossEveryMutation()
+    {
+        const string firstInput = "shared/catalog-a.txt";
+        const string renamedInput = "shared/catalog-b.txt";
+        await using var fixture = await LineageRepository.CreateAsync();
+        var process = new ProcessRunner();
+        var repository = new RepositoryInspector(fixture.Root, process);
+        var compiler = new ReleaseLineageCompiler(fixture.Root, process, repository);
+        var planner = new ReleasePlanner(repository, new NuGetRegistry(new HttpClient()));
+        var bootstrap = await compiler.CompileAsync(
+            fixture.BaseCommit,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            previousLineageRevision: null,
+            CancellationToken.None);
+
+        await fixture.SwitchAsync("dev");
+        fixture.ConfigureExternalPackInputs(LineageRepository.UnrelatedId);
+        fixture.WriteSharedInput("catalog-a.txt", "added");
+        var addSource = await fixture.CommitAsync("add evaluated external package input");
+        var added = await compiler.CompileAsync(
+            addSource,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            bootstrap.VersionCommit,
+            CancellationToken.None);
+        await AssertInputWaveAsync(bootstrap, added, [firstInput]);
+        Assert.Contains(
+            firstInput,
+            added.Packages.Single(package => package.PackageId == LineageRepository.UnrelatedId).SharedInputs);
+
+        await fixture.SwitchAsync("dev");
+        fixture.WriteSharedInput("catalog-a.txt", "changed");
+        var changeSource = await fixture.CommitAsync("change evaluated external package input");
+        var changed = await compiler.CompileAsync(
+            changeSource,
+            addSource,
+            "automation/package-lineage-dev",
+            added.VersionCommit,
+            CancellationToken.None);
+        await AssertInputWaveAsync(added, changed, [firstInput]);
+
+        await fixture.SwitchAsync("dev");
+        fixture.RenameSharedInput("catalog-a.txt", "catalog-b.txt");
+        var renameSource = await fixture.CommitAsync("rename evaluated external package input");
+        var renamed = await compiler.CompileAsync(
+            renameSource,
+            changeSource,
+            "automation/package-lineage-dev",
+            changed.VersionCommit,
+            CancellationToken.None);
+        await AssertInputWaveAsync(changed, renamed, [firstInput, renamedInput]);
+        var renamedMap = renamed.Packages
+            .Single(package => package.PackageId == LineageRepository.UnrelatedId)
+            .SharedInputs;
+        Assert.DoesNotContain(firstInput, renamedMap);
+        Assert.Contains(renamedInput, renamedMap);
+
+        await fixture.SwitchAsync("dev");
+        fixture.DeleteSharedInput("catalog-b.txt");
+        var deleteSource = await fixture.CommitAsync("delete evaluated external package input");
+        var deleted = await compiler.CompileAsync(
+            deleteSource,
+            renameSource,
+            "automation/package-lineage-dev",
+            renamed.VersionCommit,
+            CancellationToken.None);
+        await AssertInputWaveAsync(renamed, deleted, [renamedInput]);
+        Assert.DoesNotContain(
+            renamedInput,
+            deleted.Packages.Single(package => package.PackageId == LineageRepository.UnrelatedId).SharedInputs);
+
+        async Task AssertInputWaveAsync(
+            ReleaseLineage previous,
+            ReleaseLineage current,
+            IReadOnlyList<string> expectedInputs)
+        {
+            Assert.Equal([LineageRepository.UnrelatedId], current.ClosurePackages);
+            var trigger = Assert.Single(current.Triggers);
+            Assert.Equal(LineageRepository.UnrelatedId, trigger.PackageId);
+            Assert.Equal(expectedInputs, trigger.SharedInputs);
+
+            var previousVersions = Versions(previous);
+            var currentVersions = Versions(current);
+            Assert.NotEqual(
+                previousVersions[LineageRepository.UnrelatedId],
+                currentVersions[LineageRepository.UnrelatedId]);
+            foreach (var packageId in currentVersions.Keys.Where(id => id != LineageRepository.UnrelatedId))
+            {
+                Assert.Equal(previousVersions[packageId], currentVersions[packageId]);
+            }
+
+            var manifest = await planner.CreateAsync(current, offline: true, CancellationToken.None);
+            Assert.Equal(
+                [LineageRepository.UnrelatedId],
+                manifest.Packages.Select(package => package.PackageId));
+        }
     }
 
     private static IReadOnlyDictionary<string, string?> Versions(ReleaseLineage lineage) =>
@@ -399,6 +502,35 @@ public sealed class ReleaseLineageGitTests
 
         public void TouchRootBuild(string value) =>
             File.AppendAllText(Path.Combine(Root, "Directory.Build.props"), $"<!-- {value} -->{Environment.NewLine}");
+
+        public void ConfigureExternalPackInputs(string packageId)
+        {
+            var project = Directory.GetFiles(directories[packageId], "*.csproj").Single();
+            var content = File.ReadAllText(project);
+            content = content.Replace(
+                "</Project>",
+                """
+                  <ItemGroup>
+                    <None Include="../../shared/*.txt" Pack="true" PackagePath="content/" />
+                  </ItemGroup>
+                </Project>
+                """,
+                StringComparison.Ordinal);
+            File.WriteAllText(project, content);
+        }
+
+        public void WriteSharedInput(string fileName, string value)
+        {
+            var directory = Path.Combine(Root, "shared");
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, fileName), value + Environment.NewLine);
+        }
+
+        public void RenameSharedInput(string oldName, string newName) =>
+            File.Move(Path.Combine(Root, "shared", oldName), Path.Combine(Root, "shared", newName));
+
+        public void DeleteSharedInput(string fileName) =>
+            File.Delete(Path.Combine(Root, "shared", fileName));
 
         public void AddProject(string name, string packageId) =>
             directories[packageId] = CreateProject(Root, name, packageId);

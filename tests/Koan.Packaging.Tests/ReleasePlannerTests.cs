@@ -130,6 +130,40 @@ public sealed class ReleasePlannerTests
         }
     }
 
+    [Fact]
+    public async Task LineagePackageWithoutEvaluatedInputMapIsRejected()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllTextAsync(path, $$"""
+                {
+                  "schemaVersion": {{PackagingConstants.ReleaseLineageSchema}},
+                  "previousSourceCommit": "{{new string('a', 40)}}",
+                  "sourceCommit": "{{new string('b', 40)}}",
+                  "previousVersionCommit": "{{new string('c', 40)}}",
+                  "versionCommit": "{{new string('d', 40)}}",
+                  "isBootstrap": false,
+                  "sharedInputs": [],
+                  "packages": [
+                    {
+                      "packageId": "Sylin.Koan.Core",
+                      "projectPath": "src/Koan.Core/Koan.Core.csproj",
+                      "version": "0.20.1"
+                    }
+                  ]
+                }
+                """);
+
+            await Assert.ThrowsAnyAsync<Exception>(() =>
+                ReleaseLineageCompiler.LoadAsync(path, CancellationToken.None));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static PackagePipeline Pipeline(HttpStatusCode registryStatus) =>
         new(
             Path.GetTempPath(),

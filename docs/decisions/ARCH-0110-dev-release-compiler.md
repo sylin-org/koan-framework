@@ -53,10 +53,10 @@ marker; the final commit is rechecked member by member.
 Known repository/ancestor build policy and evaluated packed files outside an owner directory form a
 conservative per-package input map. A change fans out to mapped package owners and uses the same
 marker/identity proof; it cannot silently alter package bits beneath an unchanged identity.
-Known paths remain mapped as tombstones, so their deletion is visible. The lineage does not yet retain
-arbitrary external pack inputs discovered only by a prior evaluation; deleting or renaming one of
-those paths is not certified until [PMC-017](../initiatives/koan-v1/POST-CYCLE-TODO.md#current-register)
-is resolved or the path is promoted into the known map.
+Lineage schema 3 persists the normalized map for every owner. Impact is derived from the prior and
+current maps together, so add, change, deletion, and rename remain package-local even when a path has
+disappeared from current evaluation. Missing or noncanonical maps fail closed rather than being
+inferred from a newer toolchain.
 
 The online plan also reconciles a current identity missing from nuget.org. This makes a retry or an
 initial migration converge without asking an operator to reconstruct the failed subset. The manifest

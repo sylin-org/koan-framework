@@ -30,7 +30,7 @@ internal static class PackagingConstants
     public const int RegistryAttempts = 20;
     public const int RegistryHttpAttempts = 5;
     public const int ReleaseManifestSchema = 3;
-    public const int ReleaseLineageSchema = 2;
+    public const int ReleaseLineageSchema = 3;
 
     public static class ApplicationProbe
     {
