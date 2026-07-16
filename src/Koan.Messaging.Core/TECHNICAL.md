@@ -9,9 +9,10 @@ source: src/Koan.Messaging.Core/
 
 ## Status
 
-This is a legacy experimental implementation scheduled for replacement by
-[ARCH-0113](../../docs/decisions/ARCH-0113-entity-capability-communication.md). It is code evidence, not
-a stable delivery contract.
+This is a legacy experimental implementation being replaced under
+[ARCH-0113](../../docs/decisions/ARCH-0113-entity-capability-communication.md). Process-local Entity
+Transport now ships separately in `Koan.Communication`; this package remains only for unmigrated legacy
+and internal bridge consumers. It is code evidence, not a stable delivery contract.
 
 ## Current mechanism
 

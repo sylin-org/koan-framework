@@ -5,7 +5,7 @@ title: "Messaging — Current Legacy Surface"
 audience: [developers, architects, ai-agents]
 status: deprecated
 last_updated: 2026-07-15
-framework_version: v0.17.0
+framework_version: v0.18.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
@@ -18,18 +18,18 @@ Koan v0.17 contains an experimental Messaging implementation. It demonstrates au
 discovery and real InMemory/RabbitMQ message movement, but it does **not** define a stable delivery or
 application contract. Do not base new application architecture on this surface.
 
-[ARCH-0113](../../decisions/ARCH-0113-entity-capability-communication.md) replaces it with the target
-Communication ring:
+[ARCH-0113](../../decisions/ARCH-0113-entity-capability-communication.md) replaces it with the
+Communication ring. Its first supported slice now ships as
+[process-local Entity Transport](../communication/index.md):
 
 ```csharp
-await order.Events.Raise<OrderApproved>(ct);
 await order.Transport.Send(ct);
 ```
 
-The target includes faithful process-local behavior under `AddKoan()`, scalar/set/stream Entity
-semantics, build-manifest-driven connector intent, deterministic per-channel election, source/ingress
-filters, immutable copies, context isolation, bounded acceptance plus correlated settlement facts, and
-boot-time explanation. Those APIs are **not implemented yet**.
+The shipped local path provides `AddKoan()` composition, scalar/set/stream Entity semantics, typed
+receiver filters, immutable copies, context isolation, bounded acceptance, local correlated settlement,
+and boot-time explanation. Events, connector manifests/election, brokers, retries, and RabbitMQ parity
+remain unimplemented and must not be inferred from local Transport.
 
 ## What exists in v0.17
 
@@ -96,18 +96,18 @@ framework signals. If you use it temporarily:
 - inspect the selected provider and test the exact topology you deploy.
 
 For durable work, prefer [Koan Jobs](../cards/jobs.md), whose ledger is the work truth. For new Entity
-communication work, follow R07 rather than expanding the legacy Messaging generation.
+communication work, use [Communication](../communication/index.md) rather than expanding this legacy
+Messaging generation.
 
 ## Replacement path
 
 R07 proceeds in this order:
 
-1. move ambient context beneath Data;
-2. make Data Lifecycle and streaming truthful;
-3. replace the public generic Pipeline DSL with minimal Data.Core cardinality normalization and
-   pillar-owned execution;
-4. prove local Transport and Events under `AddKoan()`;
-5. prove zero-application-routing-code connector mesh/channel/filter behavior; and
-6. rebuild RabbitMQ only against the same conformance kit.
+1. Core-owned ambient context, truthful Lifecycle/streaming, and minimal Entity cardinality are
+   complete;
+2. process-local Entity Transport under `AddKoan()` is complete;
+3. Event occurrence semantics follow on the same proven boundary;
+4. zero-application-routing-code connector mesh/channel behavior follows local semantics; and
+5. RabbitMQ is rebuilt only against that conformance kit.
 
 No public maturity or package support claim follows from this target until those executable gates pass.

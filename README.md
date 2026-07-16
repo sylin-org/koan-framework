@@ -117,9 +117,17 @@ most) one attribute:
 [Cacheable(300)]
 public sealed class Todo : Entity<Todo> { /* … */ }
 
-// Legacy experimental message movement; delivery semantics are provider-specific:
-// dotnet add package Sylin.Koan.Messaging.Connector.RabbitMq
-await new TodoCompleted { TodoId = todo.Id }.Send();
+// Entity Transport is included in the foundation: no adapter or registration code.
+public sealed class NotifyApproval : IReceiveEntity<Approval>
+{
+    public bool Where(Approval approval) => approval.State == ApprovalState.Approved;
+
+    public Task Receive(Approval approval, CancellationToken ct)
+    { /* business code over an isolated snapshot */ return Task.CompletedTask; }
+}
+
+await approval.Transport.Send(ct);
+await pending.Transport.Send(ct);
 
 // dotnet add package Sylin.Koan.Jobs → durable background work, jobs are entities too:
 public sealed class ImportJob : Entity<ImportJob>, IKoanJob<ImportJob>
@@ -142,8 +150,10 @@ var related = await SemanticSearch<Todo>("groceries and meal planning");
 public sealed class Todo : Entity<Todo> { /* agents can now query and mutate Todos */ }
 ```
 
-The current Messaging path is [experimental and provider-specific](docs/reference/messaging/index.md);
-R07 defines its future Entity `Events`/`Transport` replacement but does not advertise it as shipped.
+Process-local Entity [Transport](docs/reference/communication/index.md) is a tested foundation
+capability under `AddKoan()`. The older generic [Messaging](docs/reference/messaging/index.md) path is
+deprecated and remains temporarily for internal bridges; Events and external connector parity are not
+yet shipped.
 
 Backends differ, and Koan refuses to pretend otherwise: every adapter declares its capabilities,
 the framework negotiates them, and an unsupported operation **fails loudly** instead of silently

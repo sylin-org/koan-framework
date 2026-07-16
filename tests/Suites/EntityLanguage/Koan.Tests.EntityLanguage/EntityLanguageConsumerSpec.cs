@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Koan.Cache.Abstractions;
+using Koan.Communication;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
@@ -93,10 +94,37 @@ public sealed class EntityLanguageConsumerSpec
         removed.Output.Should().Contain("Cache");
     }
 
+    [Fact]
+    public void Referencing_communication_adds_scalar_set_and_stream_transport_with_typed_receivers()
+    {
+        var result = Compile("TransportAccess", includeCache: false, includeCommunication: true);
+
+        result.Succeeded.Should().BeTrue(result.Output);
+    }
+
+    [Fact]
+    public void Removing_communication_removes_the_transport_language_from_the_same_source()
+    {
+        var result = Compile("TransportAccess", includeCache: false, includeCommunication: false);
+
+        result.Succeeded.Should().BeFalse();
+        result.Output.Should().Contain("Communication");
+    }
+
+    [Fact]
+    public void Transport_rejects_non_entity_receivers_at_compile_time()
+    {
+        var result = Compile("InvalidTransportReceiver", includeCache: false, includeCommunication: true);
+
+        result.Succeeded.Should().BeFalse();
+        result.Output.Should().Contain("Transport");
+    }
+
     private static CompilationResult Compile(
         string cell,
         bool includeCache,
-        bool includeAllModules = false)
+        bool includeAllModules = false,
+        bool includeCommunication = false)
     {
         var root = FindRepositoryRoot();
         var fixture = Path.Combine(root, "tests", "Fixtures", "EntityLanguage");
@@ -129,6 +157,12 @@ public sealed class EntityLanguageConsumerSpec
         {
             AddAssembly(typeof(JobAccessorExtensions), assemblyPaths);
             AddAssembly(typeof(SoftDeleteExtensions), assemblyPaths);
+            AddAssembly(typeof(EntityTransportFacetExtensions), assemblyPaths);
+        }
+
+        if (includeCommunication)
+        {
+            AddAssembly(typeof(EntityTransportFacetExtensions), assemblyPaths);
         }
 
         var compilation = CSharpCompilation.Create(

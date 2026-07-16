@@ -1,5 +1,6 @@
 global using Koan.Data.SoftDelete;
 global using Koan.Jobs;
+global using Koan.Communication;
 
 // One receiver deliberately satisfies every current module constraint. This makes the cell prove
 // actual member coexistence, rather than merely proving that the namespaces can be imported together.
@@ -10,6 +11,11 @@ public sealed class AllModuleTodo : Entity<AllModuleTodo>, IKoanJob<AllModuleTod
         => Task.CompletedTask;
 }
 
+public sealed class ReceiveAllModuleTodo : IReceiveEntity<AllModuleTodo>
+{
+    public Task Receive(AllModuleTodo todo, CancellationToken ct) => Task.CompletedTask;
+}
+
 public static class AllModuleConsumer
 {
     public static EntityCacheExplanation Explain() => AllModuleTodo.Cache.Explain();
@@ -18,4 +24,5 @@ public static class AllModuleConsumer
     public static JobOps<AllModuleTodo> Job(AllModuleTodo todo) => todo.Job;
     public static Task<bool> HardDelete(AllModuleTodo todo) => todo.HardDelete();
     public static void ConfigureLifecycle() => AllModuleTodo.Lifecycle.AfterUpsert(_ => { });
+    public static Task<TransportAcceptance> Send(AllModuleTodo todo) => todo.Transport.Send();
 }

@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="../../../../src/Koan.Cache/Koan.Cache.csproj" />
     <ProjectReference Include="../../../../src/Koan.Cache.Abstractions/Koan.Cache.Abstractions.csproj" />
+    <ProjectReference Include="../../../../src/Koan.Communication/Koan.Communication.csproj" />
     <ProjectReference Include="../../../../src/Koan.Core/Koan.Core.csproj" />
     <ProjectReference Include="../../../../src/Koan.Data.Core/Koan.Data.Core.csproj" />
     <ProjectReference Include="../../../../src/Koan.Data.SoftDelete/Koan.Data.SoftDelete.csproj" />

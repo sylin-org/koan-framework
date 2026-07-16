@@ -219,15 +219,16 @@ Use this reference when you plan a Koan solution and need to understand which mo
 - **Current status**: legacy experimental arbitrary-object messaging. Its InMemory and RabbitMQ paths
   are demonstrated but do not share copy, cardinality, context, idempotency, or durability semantics.
 - **New work**: do not extend this generation. See the truthful
-  [Messaging boundary](messaging/index.md) and the accepted ARCH-0113 Communication rebuild.
+  [Messaging boundary](messaging/index.md) and the shipped process-local
+  [Communication Transport](communication/index.md).
 
 ### Messaging Connectors (RabbitMQ, etc.)
 
 - **Current purpose**: provider-specific transport for the legacy demonstration surface.
 - **Boundary**: a connector reference is not evidence of reliable delivery. Test the exact topology
   and do not infer outbox, inbox, retry, ordering, or tenant-isolation guarantees.
-- **Target**: R07 rebuilds connectors as capability-declaring channels behind Entity `Events` and
-  `Transport`, with a complete local `AddKoan()` ring and boot-reported election.
+- **Current replacement**: process-local Entity `Transport` now ships under foundation `AddKoan()`.
+  Events and capability-declaring connector/channel election remain later R07 work.
 
 ## 9. Secrets & Storage
 

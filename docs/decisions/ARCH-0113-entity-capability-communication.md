@@ -11,14 +11,23 @@
 > **Implementation update (2026-07-15):** [DATA-0107](DATA-0107-provider-bounded-entity-streams.md)
 > now satisfies the provider-query streaming prerequisite for SQLite, PostgreSQL, SQL Server,
 > CockroachDB, MongoDB, and Couchbase. InMemory, JSON, and Redis reject before query/yield. The
-> Communication implementation remains pending; this note unlocks its qualified query-stream cell
-> without claiming universal adapter parity.
+> That work unlocked the qualified query-stream Transport cell without claiming universal adapter
+> parity; R07-07 now exercises the resulting local terminal.
 
 > **Implementation update (R07-06, 2026-07-15):** Data.Core now owns only lazy scalar/set/stream
 > Entity-cardinality normalization. The generic `PipelineBuilder<T>`, mutable envelope/feature bags,
 > and AI/Data/Vector/Messaging/Observability pipeline extensions are deleted. Ordinary embedding is
-> Lifecycle-owned and explicit rebuilds are Data.AI migration operations. Communication remains the
-> next unopened child.
+> Lifecycle-owned and explicit rebuilds are Data.AI migration operations. This substrate is now
+> consumed by R07-07's Transport terminal.
+
+> **Implementation update (R07-07, 2026-07-15):** `Koan.Communication` now ships the foundation's
+> process-local Transport floor. The compile contract fixes `IReceiveEntity<TEntity>`, receiver
+> `Where`/`Receive`, scalar/set/stream `.Transport.Send()`, `TransportAcceptance`, and
+> `WaitForSettlement`. The real `AddKoan()` suite proves serialized per-group copies, source order and
+> multiplicity, bounded backpressure, context capture/restoration and absence suppression, typed
+> filtering, partial cancellation, fail-loud zero receivers, handler-failure settlement, boot facts,
+> graceful drain, and repeated-host isolation. The built-in provider performs no retries, so broker
+> retry/dedupe conformance remains part of the connector slice rather than a local durability claim.
 
 ## Context
 
@@ -345,8 +354,10 @@ The sole V1 application receiver path is a business-named typed handler discover
 a default receiver-group identity derived from its application contract type. The same handler works
 in-process and through a connector. A type rename changes that default identity and is reported in boot
 facts and the build manifest; long-lived distributed groups use an explicit stable business alias and
-version. Lambdas are deferred except for an explicitly local test convenience. Exact typed-handler and
-alias spellings are compile-probed before implementation.
+version. Lambdas are deferred. R07-07 fixes the V1 local handler spelling as
+`IReceiveEntity<TEntity>` with optional synchronous `Where(TEntity)` and asynchronous
+`Receive(TEntity, CancellationToken)`. Stable distributed aliases remain deferred until the first
+connector gives that identity a real second consumer.
 
 ### 8. Data owns Lifecycle and truthful selection
 

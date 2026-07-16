@@ -91,7 +91,9 @@
       href: api/patch-normalization.md
     - name: AI
       href: reference/ai/index.md
-    - name: Messaging
+    - name: Communication
+      href: reference/communication/index.md
+    - name: Messaging (legacy)
       href: reference/messaging/index.md
     - name: Storage
       href: reference/storage/index.md

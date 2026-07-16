@@ -9,7 +9,7 @@ framework_version: v0.18.0
 validation:
   date_last_tested: 2026-07-15
   status: in-progress
-  scope: R07-01 through R07-06 passed; faithful local Transport is next
+  scope: R07-01 through R07-07 passed; Event occurrence policy is next
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T6 — capability-ring graduation`
 - Active work item: R07 — rebuild the semantic capability ring
-- Active child: none; faithful local Transport is the next bounded R07 child
+- Active child: none; Event occurrence policy is the next bounded R07 child
 - V1 readiness: `not ready`; T7 remains gated by T6 and an observed public package publication
 
 ## Work items
@@ -36,7 +36,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 | R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
-| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | R07-01 through [R07-06](work-items/r07/R07-06-typed-capability-substrate.md) pass. Generic Pipeline machinery is gone; faithful local Transport is next. |
+| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-15 | R07-01 through [R07-07](work-items/r07/R07-07-local-transport.md) pass. Foundation local Transport is green; Event occurrence policy is next. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -52,12 +52,13 @@ item should normally be `in-progress`.
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 | R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
-| R07 | in progress | R07-01 through R07-06 passed their closures. Faithful local Transport is the next bounded child. |
+| R07 | in progress | R07-01 through R07-07 passed. Event occurrence policy is the next bounded child. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-15 | R07-07 | Legacy Messaging could move arbitrary objects but shared mutable references locally, changed cardinality by provider, carried no Koan context, and exposed no bounded acceptance/settlement distinction. A compatibility wrapper would preserve those faults. | Build `Koan.Communication` independently: typed Entity receivers, serialized per-group copies, one bounded local queue, Core context ingress, fixed-size acceptance and local settlement, host drain, and shared facts. Communication 14/14, Entity language 16/16, Packaging 54/54, warning-as-error build, packs, examples, docs, locks, diff, and privacy gates pass. Legacy bridges remain isolated for later internal convergence. |
 | 2026-07-15 | R07-06 | The generic Pipeline DSL made mutable string-keyed envelopes the integration point for Data, AI, Vector, Messaging, and observability, while its only two application consumers duplicated business and pillar behavior. | Replace it without an alias by lazy Entity-only cardinality normalization. Keep execution/outcomes pillar-owned; move ordinary S5 indexing to `[Embedding]` Lifecycle and explicit subset rebuilds to `EmbeddingMigrator.ReEmbed`; name S0's operation in business terms. Cardinality 6/6, Entity language 13/13, Data.AI 86/86, Packaging 54/54, affected builds, docs, diff, and privacy gates pass. |
 | 2026-07-15 | R07-05 | Persistence lifecycle behavior lived in a process-static registry above Data, so direct Data, cache short-circuits, Patch, generated REST/MCP, repeated hosts, and batch/transaction timing could disagree. The same `Events` noun also obscured the future domain-occurrence intent. | Replace it without an alias by host-owned `Entity.Lifecycle` declarations in `AddKoan(...)`; make one outer RepositoryFacade the unavoidable boundary; place decorators inside; delete Setup/faux batch state; lower Patch and soft-delete batch truthfully; report plans in shared facts. Full affected regression, Packaging 54/54, Release build, docs, diff, and privacy gates pass. |
 | 2026-07-15 | R07-04 | The exact public-release ratchet passed all eight legs from clean commit `50002c262` in 24 minutes 33 seconds. The three prior aggregate-only Jobs failures did not recur, Couchbase completed without the earlier node-readiness failure, and no hang timeout fired. The console emits per-project VSTest summaries but retains no machine-readable aggregate count. | Mark R07-04 passed. No package, release, tag, push, or remote mutation occurred. Keep the successful runner unchanged; defer persisted aggregate certification evidence to PMC-020 and open canonical Lifecycle next. |

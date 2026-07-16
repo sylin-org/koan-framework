@@ -189,7 +189,7 @@ cardinality and copy semantics. Neither is a compatibility base for Events or Tr
 | 4 | [Public-release ratchet rehabilitation](r07/R07-04-public-release-ratchet.md) | **Passed.** The exact automatic release floor passes with bounded project fan-out, every runnable suite retained, and no leaked host state | misclassified helper projects, unbounded certification concurrency, and a red solution-test baseline |
 | 5 | [Canonical Lifecycle](r07/R07-05-canonical-lifecycle.md) | **Passed.** Lifecycle is host-owned, unavoidable, inspectable, and honestly named across Entity/Data/REST/MCP | lifecycle `Events` name, process-static registry, parallel repository construction, and bypassable hooks |
 | 6 | [Typed capability substrate](r07/R07-06-typed-capability-substrate.md) | **Passed.** A minimal lazy Data.Core cardinality adapter and pillar-owned execution replace generic public flow machinery | `PipelineBuilder`, mutable envelopes, and pillar pipeline extensions |
-| 7 | In-process Transport flagship | a foundation + `AddKoan()` app gets local scalar/set/stream snapshots, stable typed receivers, source/ingress filters, isolated copies, bounded acceptance, operation-scoped settlement wait, and tenant-safe retry identity | old Messaging Core, proxy/buffer, broad `Send`, separate InMemory connector |
+| 7 | [In-process Transport flagship](r07/R07-07-local-transport.md) | **Passed.** Foundation `AddKoan()` provides bounded local scalar/set/stream snapshots, typed receiver groups/filters, isolated copies, opaque context carriage, acceptance, local settlement, host drain, and facts | old Messaging semantics are superseded for new application Transport; bridge-dependent packages remain until internal convergence |
 | 8 | Events policy | payload-less occurrences fan out over the proved kernel | event/messaging conflation and service-collection handlers |
 | 9 | Mesh, broker, and internal parity | a build manifest turns connector references into zero-routing-code channel election; RabbitMQ, Jobs wake, and Cache coherence obey the same groups/context/facts | current RabbitMQ implementation and two Messaging bridge packages |
 | 10 | Secondary capability lifts | Relationships, Jobs, AI, Cache, then Media adopt only proven pointwise verbs | fragmented or misleading per-pillar surfaces |
@@ -222,8 +222,11 @@ backlogs until their prerequisites pass.
 10. Replace generic Pipeline machinery with the typed capability substrate. **Complete.** R07-06
     leaves one lazy Entity-cardinality seam, makes embedding execution pillar-owned, migrates the two
     real consumers, and deletes the DSL without an alias.
-11. Open each later implementation slice only after its lower boundary passes.
-12. Prove in-process semantics before any broker migration or public maturity change.
+11. Complete faithful process-local Entity Transport under foundation `AddKoan()`. **Complete.** The
+    public grammar, serialized receiver-group copies, context ingress, bounded acceptance, local
+    settlement, shutdown, facts, package admission, and focused closure pass.
+12. Open each later implementation slice only after its lower boundary passes.
+13. Prove in-process semantics before any broker migration or public maturity change.
 
 R07-02 was intentionally additive and preceded the Lifecycle source break. R07-03 removed the package-
 lineage stop condition: once R07-04 restores the release floor, public 0.17's lifecycle `Events`
@@ -265,6 +268,9 @@ identity automatically.
 - R07-06 passes cardinality 6/6, Entity language 13/13, Data.AI 86/86, Packaging 54/54,
   affected Release builds, docs lint with 0 errors, generated lockfiles, and stale-surface/diff/privacy
   gates without rerunning release certification.
+- R07-07 passes Communication 14/14, Entity language 16/16, Packaging 54/54, a warning-as-error
+  Communication build, direct/foundation packs, changed examples 2/2, docs lint with 0 errors, and
+  generated FirstUse/GoldenJourney composition locks. No release-certification suite was run.
 
 ## Acceptance additions
 

@@ -5,7 +5,7 @@ title: "Messaging — legacy implementation map"
 audience: [developers, ai-agents]
 status: deprecated
 last_updated: 2026-07-15
-framework_version: v0.17.0
+framework_version: v0.18.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
@@ -37,17 +37,18 @@ Those providers do not share copy, cardinality, context, idempotency, durability
 guarantees. Older attribute, batch, routing, inbox/outbox, and dead-letter examples are not shipped
 APIs.
 
-## Target replacement
+## Current replacement status
 
 R07 deletes this broad arbitrary-object grammar and introduces:
 
 ```csharp
-await order.Events.Raise<OrderApproved>(ct);
 await order.Transport.Send(ct);
 ```
 
-The foundation plus `AddKoan()` supplies a complete local ring. A build manifest later turns direct
-connector references into deterministic, per-channel, boot-reported election without application
-routing code. Awaits return bounded publication acceptance; later receiver settlement remains
-correlated and inspectable. This target remains specified—not implemented—until its conformance slices
-pass.
+The foundation plus `AddKoan()` now supplies the tested process-local Transport half of the ring:
+scalar/set/stream Entity snapshots, typed receiver groups and filters, isolated copies, opaque context
+carriage, bounded publication acceptance, local settlement, and boot facts. Use the current
+[Communication reference](../communication/index.md).
+
+Events, build-manifest connector intent, per-channel election, retries, and RabbitMQ conformance remain
+specified but unimplemented. They are not implied by the shipped local Transport path.

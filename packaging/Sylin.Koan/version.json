@@ -1,10 +1,11 @@
 {
   "$schema": "https://raw.githubusercontent.com/dotnet/Nerdbank.GitVersioning/main/src/NerdBank.GitVersioning/version.schema.json",
-  "version": "0.17",
+  "version": "0.18",
   "versionHeightOffset": -1,
   "pathFilters": [
     ".",
     "../../src/Koan.Core",
+    "../../src/Koan.Communication",
     "../../src/Koan.Data.Abstractions",
     "../../src/Koan.Data.Core",
     "../../src/Connectors/Data/Json"

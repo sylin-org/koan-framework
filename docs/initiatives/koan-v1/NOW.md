@@ -9,7 +9,7 @@ framework_version: v0.18.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 through R07-06 passed; faithful local Transport is next
+  scope: R07-01 through R07-07 passed; Event occurrence policy is next
 ---
 
 # Koan V1 reorganization current handoff
@@ -57,7 +57,13 @@ Replace this file at every handoff. It is a restart point, not a diary.
   feature bags, and every pillar extension are deleted without an alias. Ordinary embedding is
   Lifecycle-owned; explicit subset and whole-collection rebuilds are Data.AI migration operations
   with aggregate outcomes. The two real sample consumers are smaller and business-named.
-- Public Messaging guidance is reduced to the truthful v0.17 legacy surface. The former long reference
+- [R07-07](work-items/r07/R07-07-local-transport.md) passed. The new `Koan.Communication` package and
+  foundation `AddKoan()` path provide bounded process-local scalar/set/stream Entity Transport,
+  auto-discovered typed receiver groups and filters, serialized per-group copies, opaque context
+  capture/restoration, fixed-size acceptance and local settlement, graceful drain, and structured
+  startup/operator/agent facts. Communication passes 14/14; Entity language 16/16; Packaging 54/54;
+  direct/foundation packs, changed examples, docs, locks, diff, and privacy gates pass.
+- Public Messaging guidance is reduced to the truthful legacy v0.17 generation. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
 
@@ -158,13 +164,14 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
 5. Rebuild canonical host-owned Lifecycle as a clean 0.18 wave. **Passed as R07-05.**
 6. Minimal Data.Core Entity-cardinality adapter, pillar-owned execution, and deletion of the two real
    public Pipeline uses. **Passed as R07-06.**
-7. Faithful local Transport under `AddKoan()`.
+7. Faithful local Transport under `AddKoan()`. **Passed as R07-07.**
 8. Events occurrence policy on the same kernel.
 9. Multi-connector mesh, RabbitMQ parity, Jobs wake, and Cache coherence migration.
 10. Secondary pointwise lifts: Relationships, constrained Jobs streams, AI Embed/Index, Cache eviction,
    then Media if a real derivative operation earns it.
 
-Only the next slice has a detailed child card. Do not open broker breadth before local semantics pass.
+Only completed/current slices have detailed child cards. Do not open broker breadth before Event
+semantics pass over the local boundary.
 
 ## Verified
 
@@ -223,14 +230,19 @@ Only the next slice has a detailed child card. Do not open broker breadth before
 - R07-06 passes its bounded closure: cardinality 6/6; Entity language 13/13; Data.AI 86/86;
   Packaging 54/54; affected Release builds; docs lint 0 errors; generated source-application
   lockfiles; stale-surface, diff, and privacy inventories. No release-certification suite was rerun.
+- R07-07 passes Communication 14/14; Entity language 16/16; Packaging 54/54; warning-as-error
+  Communication build; direct/foundation packs; changed examples 2/2; docs lint 0 errors; generated
+  FirstUse/GoldenJourney locks; and stale-claim/diff/privacy inventories. No release-certification
+  suite was rerun.
 
 ## Next safe action
 
-Open faithful local Transport as the next bounded child. Start with fresh exploration of the current
-Messaging contracts, in-process adapter behavior, host discovery, serialization/copy semantics,
-logical-flow context carriage, and boot facts. Build only the process-local `AddKoan()` path first;
-do not open Events, brokers, RabbitMQ compatibility, or multi-connector election until scalar/set/
-stream Transport semantics pass locally.
+Explore Event occurrence semantics as R07-08. Reuse only the local mechanisms Transport proved truly
+shared—host/context scope, bounded ingress lifecycle, discovery, and aggregate observation—while
+keeping occurrence identity, zero-subscriber success, fan-out, event details policy, acceptance, and
+settlement Event-owned. Lock `IHandleEntityEvent<TEntity,TEvent>` and payload-less
+`entity.Events.Raise<TEvent>()` with compile probes before implementation. Do not open brokers,
+RabbitMQ compatibility, multi-connector election, or legacy bridge migration yet.
 
 ## Repository boundary
 

@@ -11,6 +11,10 @@
       "version": "0.17"
     },
     {
+      "id": "Koan.Communication",
+      "version": "0.18"
+    },
+    {
       "id": "Koan.Core",
       "version": "0.18"
     },

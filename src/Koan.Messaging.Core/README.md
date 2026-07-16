@@ -3,7 +3,8 @@
 > **Legacy experimental implementation.** Do not treat this package as a stable messaging contract or
 > add new application APIs to it. [ARCH-0113](../../docs/decisions/ARCH-0113-entity-capability-communication.md)
 > replaces arbitrary-object Messaging with Entity `Events` and `Transport` over a rebuilt Communication
-> pillar.
+> pillar. The process-local Transport replacement now ships in `Sylin.Koan.Communication`; Events and
+> broker parity remain later work.
 
 The current v0.17 package supplies the proxy, startup buffer, handler catalog, lifecycle, and provider
 seams behind this demonstrated shape:
@@ -26,8 +27,9 @@ Current boundaries:
 Attributes, aliases, `SendTo`, batch APIs, headers, partitions, and envelope-oriented handler examples
 from older documents are not shipped by this implementation.
 
-See the [truthful current boundary](../../docs/reference/messaging/index.md) and the active R07 work item
-before maintaining or migrating this package.
+See the [truthful current boundary](../../docs/reference/messaging/index.md) and the
+[Communication reference](../../docs/reference/communication/index.md) before maintaining or migrating
+this package.
 
 - Target framework: .NET 10
 - License: Apache-2.0

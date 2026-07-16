@@ -4,14 +4,15 @@
     <PackageId>Sylin.Koan</PackageId>
     <KoanPackageKind>Bundle</KoanPackageKind>
     <PackageType>Dependency</PackageType>
-    <Description>Tested Koan foundation bundle: core runtime, data abstractions, data core, and the JSON connector.</Description>
-    <PackageTags>$(CommonPackageTags);bundle;data;json</PackageTags>
+    <Description>Tested Koan foundation bundle: core runtime, Entity data, local Communication, and the JSON connector.</Description>
+    <PackageTags>$(CommonPackageTags);bundle;data;communication;transport;json</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <IncludeSymbols>false</IncludeSymbols>
     <NoWarn>$(NoWarn);NU5128</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Koan.Core/Koan.Core.csproj" />
+    <ProjectReference Include="../../src/Koan.Communication/Koan.Communication.csproj" />
     <ProjectReference Include="../../src/Koan.Data.Abstractions/Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="../../src/Koan.Data.Core/Koan.Data.Core.csproj" />
     <ProjectReference Include="../../src/Connectors/Data/Json/Koan.Data.Connector.Json.csproj" />
