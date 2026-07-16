@@ -6,7 +6,12 @@ namespace Koan.Communication.Adapters;
 public enum CommunicationLane
 {
     Events,
-    Transport
+    Transport,
+    /// <summary>
+    /// Framework-owned, non-application signals such as a Jobs wake hint. This infrastructure lane does not
+    /// add an arbitrary-object Messaging surface to Entity or application code.
+    /// </summary>
+    FrameworkSignals
 }
 
 /// <summary>The point at which an adapter reports publication acceptance.</summary>

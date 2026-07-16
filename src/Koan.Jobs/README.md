@@ -19,8 +19,8 @@ await review.Job.Submit();
 var status = await review.Job.Status();
 ```
 
-The package registers its coordinator, worker, ledger, health contributor, and default in-process
-wake transport through `AddKoan()` discovery. Application registration code is not required.
+The package registers its coordinator, worker, ledger, health contributor, and Communication-backed
+wake hint through `AddKoan()` discovery. Application registration code is not required.
 
 Submission also captures every composed `IKoanContextCarrier` before its first asynchronous boundary.
 Execution restores that opaque context before loading the work item; an absent registered axis is
@@ -35,9 +35,10 @@ concept or requiring application plumbing.
 | No durable data adapter | In-memory ledger; work is lost on restart |
 | SQLite, Postgres, SQL Server, Mongo, or another durable adapter | Data-backed ledger; job state survives restart |
 | Shared durable store across nodes | Competing consumers share the ledger |
-| `Sylin.Koan.Jobs.Transport.Messaging` | Cross-node wake signal; the ledger remains the source of truth |
+| Direct Communication connector that claims framework signals, such as RabbitMQ | The same internal wake hint crosses nodes; the ledger remains the source of truth |
 
-Inspect `jobs:ledger` and `jobs:transport` through `/.well-known/Koan/facts` or `koan://facts`.
+Inspect `jobs:ledger`, `jobs:wake`, and `communication:framework-signals:default` through
+`/.well-known/Koan/facts` or `koan://facts`.
 The standard `/health/ready` response includes queue depth, running depth, reclaim backlog, and oldest
 queued age in Development; production returns only aggregate readiness. Per-work-item status and history
 are available through `entity.Job` and `Entity.Jobs`.

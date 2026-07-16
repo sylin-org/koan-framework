@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace Koan.Jobs;
 
 /// <inheritdoc/>
-public sealed class JobCoordinator : IJobCoordinator
+internal sealed class JobCoordinator : IJobCoordinator
 {
     /// <summary>Stable id used by type-level triggers and scheduled ticks. Not persisted to the consumer's entity
     /// collection — the singleton is created in-memory at execution time by <see cref="JobTypeBinding.NewSingleton"/>.</summary>
@@ -17,36 +17,20 @@ public sealed class JobCoordinator : IJobCoordinator
     private readonly IJobLedger _ledger;
     private readonly JobTypeRegistry _registry;
     private readonly JobOrchestrator _orchestrator;
-    private readonly IJobTransport _transport;
+    private readonly JobWakeCoordinator _wake;
     private readonly IServiceProvider _services;
     private readonly JobsOptions _options;
     private readonly TimeProvider _clock;
     private readonly KoanContextCarrierRegistry _contextCarriers;
 
-    /// <summary>Compatibility constructor for the public 0.17.0 infrastructure shape.</summary>
-    [Obsolete("Direct JobCoordinator construction is compatibility-only; let AddKoan compose the Core context registry.")]
     public JobCoordinator(IJobLedger ledger, JobTypeRegistry registry, JobOrchestrator orchestrator,
-        IJobTransport transport, IServiceProvider services, IOptions<JobsOptions> options, TimeProvider clock)
-        : this(
-            ledger,
-            registry,
-            orchestrator,
-            transport,
-            services,
-            options,
-            clock,
-            services.GetService<KoanContextCarrierRegistry>() ?? new KoanContextCarrierRegistry([]))
-    {
-    }
-
-    public JobCoordinator(IJobLedger ledger, JobTypeRegistry registry, JobOrchestrator orchestrator,
-        IJobTransport transport, IServiceProvider services, IOptions<JobsOptions> options, TimeProvider clock,
+        JobWakeCoordinator wake, IServiceProvider services, IOptions<JobsOptions> options, TimeProvider clock,
         KoanContextCarrierRegistry contextCarriers)
     {
         _ledger = ledger;
         _registry = registry;
         _orchestrator = orchestrator;
-        _transport = transport;
+        _wake = wake;
         _services = services;
         _options = options.Value;
         _clock = clock;
@@ -93,7 +77,7 @@ public sealed class JobCoordinator : IJobCoordinator
         // Transactional outbox: inside an ambient transaction the work-item Save + the ledger Append enlist (TrackSave)
         // and only become claimable on commit (discarded on rollback). Don't inline-drain or push-notify mid-transaction —
         // the row isn't visible yet; the worker (or a post-commit drain) picks it up.
-        if (!EntityContext.InTransaction) _transport.Notify();          // wake the worker now (push-dispatch)
+        if (!EntityContext.InTransaction) _wake.Notify();               // best-effort hint; ledger remains the truth
         if (_options.Mode == JobMode.Inline && !EntityContext.InTransaction) await _orchestrator.DrainAsync(ct);
         return Handle(rec.Id);
     }
@@ -127,7 +111,7 @@ public sealed class JobCoordinator : IJobCoordinator
         }
 
         if (batch.Count > 0) await _ledger.AppendMany(batch, ct);
-        if (batch.Count > 0 && !EntityContext.InTransaction) _transport.Notify();
+        if (batch.Count > 0 && !EntityContext.InTransaction) _wake.Notify();
         if (_options.Mode == JobMode.Inline && !EntityContext.InTransaction) await _orchestrator.DrainAsync(ct);
         return batch.Count;
     }
@@ -153,7 +137,7 @@ public sealed class JobCoordinator : IJobCoordinator
         var rec = JobRecordFactory.Create(binding, policy, workItem, SingletonWorkId, action, now, null, Correlation(), gateKey, carrier);
         await _ledger.Append(rec, ct);
 
-        if (!EntityContext.InTransaction) _transport.Notify();
+        if (!EntityContext.InTransaction) _wake.Notify();
         if (_options.Mode == JobMode.Inline && !EntityContext.InTransaction) await _orchestrator.DrainAsync(ct);
         return Handle(rec.Id);
     }

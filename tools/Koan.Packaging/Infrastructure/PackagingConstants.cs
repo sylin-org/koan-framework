@@ -119,7 +119,7 @@ internal static class PackagingConstants
         public const string PendingTool = "review_pending";
         public const string RecommendTool = "review_recommend";
         public const string JobsLedgerSubject = "jobs:ledger";
-        public const string JobsTransportSubject = "jobs:transport";
+        public const string JobsWakeSubject = "jobs:wake";
         public const string DefaultDataSubject = "data:default";
         public const string AdapterRejectedCode = "koan.data.adapter.rejected";
         public const string AdapterSelectedCode = "koan.data.adapter.selected";
@@ -127,7 +127,7 @@ internal static class PackagingConstants
         public const string UnavailableAdapter = "not-referenced";
         public const string SqliteAdapter = "sqlite";
         public const string DurableLedger = "durable-data";
-        public const string InProcessTransport = "in-process";
+        public const string InProcessCommunication = "in-process";
         public const string NotReadyOutcome = "review.not-ready";
         public const string AcceptedOutcome = "review.recommendation-recorded";
         public static readonly IReadOnlyList<string> SourceDirectReferences =

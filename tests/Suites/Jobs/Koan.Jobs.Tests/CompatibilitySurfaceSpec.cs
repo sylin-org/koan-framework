@@ -9,18 +9,10 @@ namespace Koan.Jobs.Tests;
 public sealed class CompatibilitySurfaceSpec
 {
     [Fact]
-    public void Public_017_infrastructure_constructor_shapes_remain_available()
+    public void Public_orchestrator_constructor_shape_remains_available()
     {
-        typeof(JobCoordinator).GetConstructor(
-        [
-            typeof(IJobLedger),
-            typeof(JobTypeRegistry),
-            typeof(JobOrchestrator),
-            typeof(IJobTransport),
-            typeof(IServiceProvider),
-            typeof(IOptions<JobsOptions>),
-            typeof(TimeProvider)
-        ]).Should().NotBeNull();
+        typeof(JobCoordinator).IsNotPublic.Should().BeTrue(
+            "applications compose IJobCoordinator; the host-owned implementation is not an authoring surface");
 
         typeof(JobOrchestrator).GetConstructor(
         [

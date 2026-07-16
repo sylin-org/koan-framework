@@ -23,7 +23,7 @@ internal sealed class RabbitMqCommunicationAdapter(
 {
     private static readonly CommunicationAdapterDescriptor AdapterDescriptor = new(
         Constants.ProviderId,
-        [CommunicationLane.Transport],
+        [CommunicationLane.Transport, CommunicationLane.FrameworkSignals],
         CommunicationDeliveryAssurance.DurablyAcknowledged,
         CommunicationAdapterCapabilities.ContractIdentity
         | CommunicationAdapterCapabilities.SnapshotCopy
@@ -110,7 +110,7 @@ internal sealed class RabbitMqCommunicationAdapter(
             await _consumer.BasicQosAsync(0, options.Value.Prefetch, global: false, ct).ConfigureAwait(false);
 
             foreach (var binding in host.Bindings
-                         .Where(static binding => binding.Lane == CommunicationLane.Transport)
+                         .Where(binding => AdapterDescriptor.Lanes.Contains(binding.Lane))
                          .OrderBy(static binding => binding.Id, StringComparer.Ordinal))
             {
                 await Bind(host, binding, ct).ConfigureAwait(false);
@@ -128,7 +128,7 @@ internal sealed class RabbitMqCommunicationAdapter(
                 LastFailure);
             throw new InvalidOperationException(
                 "RabbitMQ Communication is directly selected but unavailable. Correct the endpoint, credentials, " +
-                "or broker readiness; Koan will not fall back to process-local Transport.");
+                "or broker readiness; Koan will not silently reduce the elected mesh to process-local reach.");
         }
     }
 
@@ -136,10 +136,10 @@ internal sealed class RabbitMqCommunicationAdapter(
         CommunicationAdapterPublication publication,
         CancellationToken ct)
     {
-        if (publication.Lane != CommunicationLane.Transport)
+        if (!AdapterDescriptor.Lanes.Contains(publication.Lane))
             throw new CommunicationAdapterException(
                 CommunicationAdapterException.FailureKind.Unavailable,
-                "The RabbitMQ provider does not claim Entity Events.");
+                $"The RabbitMQ provider does not claim {publication.Lane}.");
         EnsureReady();
 
         await _publisherGate.WaitAsync(ct).ConfigureAwait(false);
@@ -155,7 +155,7 @@ internal sealed class RabbitMqCommunicationAdapter(
                 ContentType = Constants.Broker.ContentType,
                 DeliveryMode = DeliveryModes.Persistent,
                 MessageId = publication.MessageId,
-                Type = Constants.Broker.TransportType,
+                Type = Topology.MessageType(publication.Lane),
                 UserId = _userId,
                 Headers = new Dictionary<string, object?>
                 {
@@ -167,7 +167,7 @@ internal sealed class RabbitMqCommunicationAdapter(
             {
                 await _publisher!.BasicPublishAsync(
                         _exchange!,
-                        Topology.Route(publication.ContractId),
+                        Topology.Route(publication.Lane, publication.ContractId),
                         mandatory: true,
                         properties,
                         body,
@@ -239,7 +239,7 @@ internal sealed class RabbitMqCommunicationAdapter(
         await _consumer.QueueBindAsync(
                 queue,
                 _exchange!,
-                Topology.Route(binding.ContractId),
+                Topology.Route(binding.Lane, binding.ContractId),
                 cancellationToken: ct)
             .ConfigureAwait(false);
 
@@ -363,12 +363,18 @@ internal sealed class RabbitMqCommunicationAdapter(
     private static class Topology
     {
         internal static string Exchange(string meshId)
-            => $"{Constants.Broker.ExchangePrefix}.{Slug(meshId)}.transport.default.v1";
+            => $"{Constants.Broker.ExchangePrefix}.{Slug(meshId)}.default.v2";
 
         internal static string Queue(string meshId, CommunicationAdapterBinding binding)
-            => $"{Exchange(meshId)}.group.{Hash(binding.GroupId)}.{Hash(binding.ContractId)}";
+            => $"{Exchange(meshId)}.{Lane(binding.Lane)}.group.{Hash(binding.GroupId)}.{Hash(binding.ContractId)}";
 
-        internal static string Route(string contractId) => $"contract.{Hash(contractId)}";
+        internal static string Route(CommunicationLane lane, string contractId)
+            => $"{Lane(lane)}.contract.{Hash(contractId)}";
+
+        internal static string MessageType(CommunicationLane lane)
+            => $"{Constants.Broker.MessageTypePrefix}.{Lane(lane)}.v2";
+
+        private static string Lane(CommunicationLane lane) => lane.ToString().ToLowerInvariant();
 
         internal static string Slug(string value)
         {

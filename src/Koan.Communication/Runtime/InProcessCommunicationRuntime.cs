@@ -12,7 +12,7 @@ internal sealed class InProcessCommunicationRuntime : ICommunicationAdapter
 {
     private static readonly CommunicationAdapterDescriptor AdapterDescriptor = new(
         "in-process",
-        [CommunicationLane.Events, CommunicationLane.Transport],
+        [CommunicationLane.Events, CommunicationLane.Transport, CommunicationLane.FrameworkSignals],
         CommunicationDeliveryAssurance.ProcessMemory,
         CommunicationAdapterCapabilities.ContractIdentity
         | CommunicationAdapterCapabilities.SnapshotCopy
@@ -25,13 +25,11 @@ internal sealed class InProcessCommunicationRuntime : ICommunicationAdapter
         [],
         IsBuiltIn: true);
 
-    private readonly Channel<LocalPublication> _events;
-    private readonly Channel<LocalPublication> _transport;
+    private readonly IReadOnlyDictionary<CommunicationLane, Channel<LocalPublication>> _channels;
+    private readonly Dictionary<CommunicationLane, Task> _workers = [];
     private readonly ILogger<InProcessCommunicationRuntime> _logger;
     private readonly CancellationTokenSource _abort = new();
     private CommunicationAdapterHost? _host;
-    private Task? _eventsWorker;
-    private Task? _transportWorker;
     private int _state;
 
     public InProcessCommunicationRuntime(
@@ -39,8 +37,9 @@ internal sealed class InProcessCommunicationRuntime : ICommunicationAdapter
         ILogger<InProcessCommunicationRuntime> logger)
     {
         _logger = logger;
-        _events = CreateLane(options.Value.InProcessCapacity);
-        _transport = CreateLane(options.Value.InProcessCapacity);
+        _channels = AdapterDescriptor.Lanes.ToDictionary(
+            static lane => lane,
+            _ => CreateLane(options.Value.InProcessCapacity));
     }
 
     public CommunicationAdapterDescriptor Descriptor => AdapterDescriptor;
@@ -53,8 +52,8 @@ internal sealed class InProcessCommunicationRuntime : ICommunicationAdapter
             throw new InvalidOperationException("The process-local Communication provider cannot be started more than once.");
 
         _host = host;
-        _eventsWorker = Pump(_events, CommunicationLane.Events, _abort.Token);
-        _transportWorker = Pump(_transport, CommunicationLane.Transport, _abort.Token);
+        foreach (var (lane, channel) in _channels)
+            _workers.Add(lane, Pump(channel, lane, _abort.Token));
         return Task.CompletedTask;
     }
 
@@ -69,10 +68,10 @@ internal sealed class InProcessCommunicationRuntime : ICommunicationAdapter
                 && string.Equals(binding.Channel, publication.Channel, StringComparison.Ordinal)
                 && string.Equals(binding.ContractId, publication.ContractId, StringComparison.Ordinal))
             .ToArray();
-        if (publication.Lane == CommunicationLane.Transport && targets.Length == 0)
+        if (publication.Lane != CommunicationLane.Events && targets.Length == 0)
             throw new CommunicationAdapterException(
                 CommunicationAdapterException.FailureKind.NoRoute,
-                $"The process-local Transport provider has no receiver group for '{publication.ContractId}'.");
+                $"The process-local {publication.Lane} provider has no receiver group for '{publication.ContractId}'.");
 
         await WriterFor(publication.Lane)
             .WriteAsync(new LocalPublication(publication, targets), ct)
@@ -190,19 +189,19 @@ internal sealed class InProcessCommunicationRuntime : ICommunicationAdapter
         });
 
     private ChannelWriter<LocalPublication> WriterFor(CommunicationLane lane)
-        => lane == CommunicationLane.Events ? _events.Writer : _transport.Writer;
+        => _channels.TryGetValue(lane, out var channel)
+            ? channel.Writer
+            : throw new CommunicationAdapterException(
+                CommunicationAdapterException.FailureKind.Unavailable,
+                $"The process-local Communication provider does not claim {lane}.");
 
     private void CompleteWriters()
     {
-        _events.Writer.TryComplete();
-        _transport.Writer.TryComplete();
+        foreach (var channel in _channels.Values) channel.Writer.TryComplete();
     }
 
     private Task[] Workers()
-        => new[] { _eventsWorker, _transportWorker }
-            .Where(static worker => worker is not null)
-            .Cast<Task>()
-            .ToArray();
+        => _workers.OrderBy(static pair => pair.Key).Select(static pair => pair.Value).ToArray();
 
     private sealed record LocalPublication(
         CommunicationAdapterPublication Publication,

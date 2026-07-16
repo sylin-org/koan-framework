@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Koan.Communication.Connector.RabbitMq.Orchestration;
+using Koan.Communication.Signals;
 using Koan.Core.Composition;
 using Koan.Core.Diagnostics;
 using Koan.Core.Observability.Health;
@@ -75,6 +76,34 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
     }
 
     [Fact]
+    public async Task Direct_connector_carries_internal_framework_signals_without_an_application_bus()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var state = new RabbitState(expected: 1);
+        await using var host = await Start(
+            state,
+            rabbit.ConnectionString,
+            ct,
+            services =>
+            {
+                services.AddSingleton<ProbeSignalHandler>();
+                services.AddFrameworkSignal<ProbeSignal, ProbeSignalHandler>();
+            });
+
+        var publisher = host.Services.GetRequiredService<IFrameworkSignalPublisher>();
+        publisher.TryPublish(new ProbeSignal()).Should().BeTrue();
+        await state.Completed.Task.WaitAsync(ct);
+
+        publisher.ProviderId.Should().Be("rabbitmq");
+        state.Observations.Should().Equal("framework-signal");
+        host.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts.Should().Contain(fact =>
+            fact.Code == "koan.communication.framework-signals.selected"
+            && fact.Subject == "communication:framework-signals:default"
+            && fact.ReasonCode == "direct-reference-intent"
+            && fact.Summary.Contains("'rabbitmq'", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Mandatory_confirm_reports_no_receiver_without_local_fallback()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -133,6 +162,7 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
             .WithSetting("Koan:Application:Code", "rabbit-spec-" + Guid.NewGuid().ToString("N"))
             .WithSetting("Koan:Communication:RabbitMq:ConnectionString", rabbit.ConnectionString)
             .WithSetting("Koan:Communication:TransportProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkSignalsProvider", "in-process")
             .ConfigureServices(services =>
             {
                 services.AddSingleton(state);
@@ -151,7 +181,8 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
     private static Task<IntegrationHost> Start(
         RabbitState state,
         string connectionString,
-        CancellationToken ct)
+        CancellationToken ct,
+        Action<IServiceCollection>? configure = null)
         => KoanIntegrationHost.Configure()
             .WithEnvironment("Test")
             .WithSetting("Koan:Application:Code", "rabbit-spec-" + Guid.NewGuid().ToString("N"))
@@ -160,6 +191,7 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
             {
                 services.AddSingleton(state);
                 services.AddKoan();
+                configure?.Invoke(services);
             })
             .StartAsync(ct);
 
@@ -199,6 +231,21 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
     }
 
     public sealed class NoReceiverOrder : Entity<NoReceiverOrder>;
+
+    internal readonly record struct ProbeSignal : IFrameworkSignal<ProbeSignal>
+    {
+        public static string ContractId => "koan.tests.framework-probe@1";
+        public static string GroupId => "koan.tests.framework-probe-handler@1";
+    }
+
+    internal sealed class ProbeSignalHandler(RabbitState state) : IHandleFrameworkSignal<ProbeSignal>
+    {
+        public ValueTask Handle(ProbeSignal signal, CancellationToken ct)
+        {
+            state.Record("framework-signal");
+            return ValueTask.CompletedTask;
+        }
+    }
 
     public sealed class RabbitState(int expected)
     {

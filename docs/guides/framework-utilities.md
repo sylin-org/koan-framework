@@ -614,7 +614,7 @@ using (EntityContext.Partition("tenant/7")) { /* throws ArgumentException — wo
 
 ## Background Jobs
 
-**Location**: `src/Koan.Jobs` (+ optional `src/Koan.Jobs.Transport.Messaging`)
+**Location**: `src/Koan.Jobs` (internal wake carriage is supplied by `Koan.Communication`)
 **Pattern**: Entity-first pillar, auto-discovered (`[KoanDiscoverable]` / `KoanModule`)
 **ADR**: [JOBS-0005](../decisions/JOBS-0005-job-orchestrator-rebuild.md) · **Authoring guide**: [Background Jobs How-To](jobs-howto.md)
 
@@ -673,7 +673,8 @@ Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
   support an atomic conditional claim (SQLite/Postgres/SqlServer/Mongo), the default `Optimistic` strategy marks
   `Running` via a compare-and-set, so each ready job runs on **exactly one** node (no duplicate executions); `Ticket`
   is the leaderless-election alternative. Resource gates are honored cross-node. (JOBS-0005 §20.3)
-- **+bus** (`Koan.Jobs.Transport.Messaging`): cross-node push-dispatch — a submit wakes every node immediately
+- **+Communication connector**: cross-node wake — a submit emits one bounded hint to
+  the elected worker group; no Jobs-specific transport package or application bus API
   instead of waiting out the poll interval. Latency upgrade only; the ledger stays the truth.
 
 > Scheduling is initiator-driven: a `Schedule` re-submits a fresh job on its cadence (interval / cron via Cronos /

@@ -1,11 +1,12 @@
 using Koan.Core.Composition;
+using Koan.Communication.Signals;
 using Koan.Jobs.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Jobs.Composition;
 
 /// <summary>
-/// Projects the host's elected Jobs ledger and wake transport into Koan's shared composition facts.
+/// Projects the host's elected Jobs ledger and Communication-backed wake path into Koan's shared composition facts.
 /// It deliberately reports semantic tiers rather than CLR implementation names.
 /// </summary>
 internal sealed class JobsCompositionContributor : IKoanCompositionContributor
@@ -24,16 +25,15 @@ internal sealed class JobsCompositionContributor : IKoanCompositionContributor
                 factCode: Constants.Diagnostics.Codes.LedgerSelected);
         }
 
-        var transport = services.GetService<IJobTransport>();
-        if (transport is not null)
+        var signals = services.GetService<IFrameworkSignalPublisher>();
+        if (signals is not null)
         {
-            var builtIn = transport is InProcessJobTransport;
             builder.AddElection(
-                Constants.Diagnostics.Subjects.Transport,
-                builtIn ? Constants.Diagnostics.Selections.InProcess : Constants.Diagnostics.Selections.Custom,
-                builtIn ? Constants.Diagnostics.Reasons.DefaultTransport : Constants.Diagnostics.Reasons.RegisteredTransport,
+                Constants.Diagnostics.Subjects.Wake,
+                signals.ProviderId,
+                Constants.Diagnostics.Reasons.CommunicationSignal,
                 source: typeof(JobsCompositionContributor).FullName,
-                factCode: Constants.Diagnostics.Codes.TransportSelected);
+                factCode: Constants.Diagnostics.Codes.WakeSelected);
         }
     }
 }

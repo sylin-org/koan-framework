@@ -5,16 +5,16 @@ namespace Koan.Communication.Runtime;
 internal abstract class CommunicationTargetBinding
 {
     protected CommunicationTargetBinding(
-        Type entityType,
+        Type contractType,
         Type handlerType,
         string groupIdentity)
     {
-        EntityType = entityType;
+        ContractType = contractType;
         HandlerType = handlerType;
         GroupIdentity = groupIdentity;
     }
 
-    public Type EntityType { get; }
+    public Type ContractType { get; }
     public Type HandlerType { get; }
     public string GroupIdentity { get; }
 

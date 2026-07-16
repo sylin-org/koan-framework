@@ -53,6 +53,16 @@
 > elected health. Publisher acceptance is explicit; remote handler settlement, Events, retries,
 > inbox/outbox, dedupe, dead letters, schema negotiation, and exactly-once effects remain non-claims.
 
+> **Implementation update (R07-11, 2026-07-15):** Communication now owns a third, internal-only
+> framework-signal lane over the same election, adapter, lifecycle, wire, ingress, health, and facts
+> boundary. Its bounded non-blocking egress exposes no Entity or arbitrary-object Messaging API.
+> Jobs wake is the first consumer: `JobWakeCoordinator` emits a stable worker-group hint, the built-in
+> provider supplies local wake, and direct RabbitMQ intent transparently changes reach. The ledger and
+> poll remain truth; signal loss or duplication changes latency only. The public `IJobTransport`,
+> in-process implementation, Jobs Messaging package, and its service-locator/fire-and-forget bridge
+> are deleted. Cache coherence remains separate because its node-broadcast, layered activation,
+> catch-up, and bounded-staleness contract is not the Jobs competing-group shape.
+
 ## Context
 
 Koan's Entity-first language has the right center but the wrong boundaries around communication.

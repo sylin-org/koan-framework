@@ -9,6 +9,9 @@ public sealed class CommunicationOptions
     /// <summary>Optional deployment pin for the default Events channel.</summary>
     public string? EventsProvider { get; set; }
 
+    /// <summary>Optional deployment pin for framework-owned internal signals.</summary>
+    public string? FrameworkSignalsProvider { get; set; }
+
     /// <summary>Maximum accepted Entity communication items waiting in each local semantic lane.</summary>
     public int InProcessCapacity { get; set; } = 256;
 

@@ -68,7 +68,7 @@ internal sealed class GoldenJourneyApplicationProbe
 
                 var facts = root.GetProperty("facts").EnumerateArray().ToArray();
                 AssertSelected(facts, PackagingConstants.GoldenJourney.JobsLedgerSubject, PackagingConstants.GoldenJourney.DurableLedger);
-                AssertSelected(facts, PackagingConstants.GoldenJourney.JobsTransportSubject, PackagingConstants.GoldenJourney.InProcessTransport);
+                AssertSelected(facts, PackagingConstants.GoldenJourney.JobsWakeSubject, PackagingConstants.GoldenJourney.InProcessCommunication);
                 jobsCompositionObserved = true;
                 return json;
             });

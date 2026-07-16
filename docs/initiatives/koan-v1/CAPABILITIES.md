@@ -224,9 +224,11 @@ boundaries remain pre-V1 work.
 - **Entry point and owner:** [`Koan.Communication`](../../../src/Koan.Communication/README.md) owns both
   semantic lanes and its minimum-priority process-local provider. A direct
   [`RabbitMQ Communication connector`](../../../src/Connectors/Communication/RabbitMq/README.md)
-  reference elects RabbitMQ for Transport without changing application code; Events stay local.
-- **Executable evidence:** Communication passes 31/31 local semantic/election tests. The connector's
-  real RabbitMQ container passes 5/5 for direct-intent election, confirmed persistent publication,
+  reference elects RabbitMQ for Transport and internal framework signals without changing application
+  code; Events stay local. Jobs wake uses that internal lane automatically and exposes no application bus.
+- **Executable evidence:** Communication passes 31/31 local semantic/election tests; Jobs passes
+  77/77 including local signal/coalescing/submission behavior. The connector's real RabbitMQ container
+  passes 6/6 for direct-intent election, confirmed persistent publication,
   two-group isolated fan-out, authenticated tenant restoration, mandatory no-route failure, boot
   facts, elected health, and zero-configuration orchestration intent.
 - **Inspection and failure:** startup/operator/agent facts report lane provider, reason, priority,
@@ -234,12 +236,12 @@ boundaries remain pre-V1 work.
   critical to health; unavailable direct intent never falls back to local reach.
 - **Unsupported / compatibility:** RabbitMQ Events, logical channel authoring, retry, dedupe,
   inbox/outbox, dead letters, replay, schema negotiation, remote settlement, exactly-once effects, and
-  Jobs/Cache convergence are not supported. Legacy `Koan.Messaging` remains a separate bridge-era API
-  and is not the implementation behind Entity Communication.
+  Cache coherence convergence are not supported. Legacy `Koan.Messaging` remains a separate
+  bridge-era API for surviving consumers and is not the implementation behind Entity Communication.
 - **Maturity / safe claim:** `verified` for the process-local ring and the named RabbitMQ Transport
   guarantees above. No broader production-mesh or provider-parity claim follows.
 - **Open risks:** add compatibility aliases/version negotiation before heterogeneous deployments;
-  prove the next internal consumer against the same provider boundary before adding routing grammar.
+  preserve Cache's node-broadcast/layered activation semantics before moving its bridge.
 
 ### Jobs and scheduling
 

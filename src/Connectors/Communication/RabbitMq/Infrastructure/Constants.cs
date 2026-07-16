@@ -24,8 +24,8 @@ internal static class Constants
         internal const string ServiceName = "rabbitmq";
         internal const string ExchangePrefix = "koan.communication";
         internal const string SignatureHeader = "x-koan-signature-v1";
-        internal const string ContentType = "application/vnd.koan.communication+json;v=1";
-        internal const string TransportType = "koan.communication.transport.v1";
+        internal const string ContentType = "application/vnd.koan.communication+json;v=2";
+        internal const string MessageTypePrefix = "koan.communication";
         internal const string EnvironmentUrl = "RABBITMQ_URL";
         internal const string KoanEnvironmentUrl = "Koan_RABBITMQ_URL";
         internal const string DefaultUsername = "koan";

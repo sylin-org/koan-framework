@@ -9,7 +9,7 @@ framework_version: v0.18.0
 validation:
   date_last_tested: 2026-07-15
   status: verified
-  scope: foundation AddKoan local Events and Transport plus directly elected RabbitMQ Transport
+  scope: foundation AddKoan local Events and Transport plus internal signals and directly elected RabbitMQ carriage
 ---
 
 # Communication — Entity Events and Transport
@@ -122,8 +122,8 @@ external providers may not.
   none of them, and suppresses an absent axis while a handler runs.
 - Publication failures and cancellation expose a bounded accepted prefix. Handler exceptions become
   failed settlement and payload-free operator logs.
-- Events and Transport use separate bounded local lanes, so a slow Event handler does not block
-  Transport delivery.
+- Events, Transport, and framework signals use separate bounded local lanes, so a slow handler in one
+  lane does not block another.
 - Graceful host shutdown drains accepted local work when handlers honor cancellation.
 
 ## Configure local safety bounds
@@ -150,7 +150,8 @@ Reference the connector directly from the application:
 dotnet add package Sylin.Koan.Communication.Connector.RabbitMq
 ```
 
-That direct reference elects RabbitMQ for `Transport/default`; Events remain process-local. A
+That direct reference elects RabbitMQ for `Transport/default` and the internal
+`FrameworkSignals/default` lane; Events remain process-local. A
 transitive connector remains inert. Koan orchestration can provision the broker automatically, or an
 existing endpoint can be supplied with
 `Koan:Communication:RabbitMq:ConnectionString=amqp://user:password@host:5672`.
@@ -165,6 +166,10 @@ If the directly intended provider is unavailable, startup or publication fails. 
 back to local Transport because doing so would silently change reach. Current RabbitMQ limits include
 no Events, retry, dedupe, inbox/outbox, dead letters, replay, schema negotiation, or exactly-once
 side-effect claim.
+
+Framework signals are not an application bus. Koan modules use them for lossy internal hints; Jobs
+wake is the first consumer. Adding Jobs requires no messaging package or registration, and adding the
+RabbitMQ connector transparently extends the wake mesh while the durable ledger remains authoritative.
 
 ## Inspect composition
 
@@ -182,8 +187,8 @@ Use Jobs when durable work, retry, or scheduling is the requirement.
 
 The built-in Communication runtime is memory-only and process-local. It does not survive restart,
 cross nodes, retry, deduplicate, dead-letter, replay, or couple to a Data transaction. Direct provider
-election and RabbitMQ Transport are supported; logical channel authoring, additional providers, and
-internal Jobs/Cache bridge migration remain later R07 work.
+election, RabbitMQ Transport, and Jobs wake convergence are supported. Logical channel authoring,
+additional providers, and Cache coherence convergence remain later R07 work.
 
 Do not use the deprecated generic [Messaging](../messaging/index.md) API as an alias. It has different
 copy, cardinality, context, and failure semantics.

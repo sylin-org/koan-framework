@@ -1,6 +1,7 @@
 using Koan.Communication.Infrastructure;
 using Koan.Communication.Adapters;
 using Koan.Communication.Runtime;
+using Koan.Communication.Signals;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -39,6 +40,7 @@ public static class CommunicationServiceCollectionExtensions
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<ICommunicationAdapter, InProcessCommunicationRuntime>());
         services.TryAddSingleton<CommunicationRouter>();
+        services.TryAddSingleton<IFrameworkSignalPublisher, FrameworkSignalRuntime>();
         services.TryAddSingleton<EventCoordinator>();
         services.TryAddSingleton<TransportCoordinator>();
         services.TryAddEnumerable(

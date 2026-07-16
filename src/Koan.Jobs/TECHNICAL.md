@@ -3,7 +3,7 @@
 ## Composition
 
 `KoanJobsModule` is discovered from the referenced assembly. It calls `AddKoanJobs()`, which registers
-one `IJobCoordinator`, worker, scheduler, ledger, transport, and health contributor per host.
+one `IJobCoordinator`, worker, scheduler, ledger, wake coordinator, and health contributor per host.
 
 Ledger election is capability-driven:
 
@@ -18,8 +18,7 @@ Ledger election is capability-driven:
 |---|---|---|
 | `jobs:ledger` | `in-memory` | `no-durable-data-adapter` |
 | `jobs:ledger` | `durable-data` | `durable-data-adapter` |
-| `jobs:transport` | `in-process` | `default-transport` |
-| `jobs:transport` | `custom` | `registered-transport` |
+| `jobs:wake` | elected Communication provider | `ledger-backed-latency-hint` |
 
 These are semantic tiers, not CLR implementation names. They describe the running host without
 claiming provider-fleet certification.
@@ -41,8 +40,15 @@ Calling more than one control signal in a handler fails immediately.
 
 ## Delivery and recovery
 
-The ledger is the queue. Wake transports reduce latency but never carry correctness. A dropped wake
-costs at most one poll interval. Claims, leases, retries, and reclaim behavior remain ledger-owned.
+The ledger is the queue. `JobWakeCoordinator` emits one internal, bounded Communication signal after
+a non-transactional submit. The process-local provider is automatic; directly referencing a
+Communication connector transparently changes its reach. A dropped or duplicated signal costs at
+most one poll interval. Claims, leases, retries, and reclaim behavior remain ledger-owned.
+
+Jobs does not own a transport provider or application-visible message contract. Connector election,
+health, wire encoding, and local/network delivery belong exclusively to Communication. The internal
+signal carries no job or ambient business context; the claimed ledger record remains the durable,
+context-bearing truth.
 
 ## Logical-flow context
 
@@ -65,7 +71,7 @@ Koan does not imply cross-provider transactions.
 ## Inspection
 
 - startup provenance reports the number of discovered job types;
-- runtime facts report ledger and transport elections;
+- runtime facts report ledger selection, the wake provider, and Communication's framework-signal election;
 - `/health/ready` reports bounded aggregate queue facts in Development and aggregate status in production;
 - `JobRecord` queries provide per-work-item transitions, progress, and failure text;
 - optional metrics preserve aggregate outcomes beyond ledger retention.
@@ -81,6 +87,6 @@ are not.
 ## Unsupported claims
 
 Current focused evidence covers the core/in-process suite and SQLite-backed durable behavior. It does
-not certify every database adapter, clock-skew envelope, multi-region topology, messaging transport,
+not certify every database adapter, clock-skew envelope, multi-region topology, every Communication connector,
 upgrade path, or exactly-once external effect. See the V1 capability ledger before making broader
 support claims.

@@ -13,6 +13,7 @@ internal abstract class EventHandlerBinding : CommunicationTargetBinding
             $"<{entityType.FullName ?? entityType.Name},{eventType.FullName ?? eventType.Name}>")
         => EventType = eventType;
 
+    public Type EntityType => ContractType;
     public Type EventType { get; }
 
     public static EventHandlerBinding Create(Type entityType, Type eventType, Type handlerType)
@@ -38,7 +39,7 @@ internal abstract class EventHandlerBinding : CommunicationTargetBinding
                     $"Event handler '{HandlerType.FullName}' received an incompatible occurrence envelope.");
             }
 
-            var entity = eventEnvelope.EntityPayload.FromJson<TEntity>()
+            var entity = eventEnvelope.Payload.FromJson<TEntity>()
                 ?? throw new InvalidOperationException(
                     $"The Event snapshot for Entity '{typeof(TEntity).FullName}' deserialized to null.");
             TEvent? details = null;

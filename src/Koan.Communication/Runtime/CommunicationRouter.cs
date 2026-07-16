@@ -1,6 +1,7 @@
 using System.Reflection;
 using Koan.Communication.Adapters;
 using Koan.Communication.Infrastructure;
+using Koan.Communication.Signals;
 using Koan.Core;
 using Koan.Core.Composition;
 using Koan.Core.Context;
@@ -24,6 +25,14 @@ internal sealed class CommunicationRouter
     private static readonly CommunicationAdapterCapabilities EventRequirements =
         TransportRequirements | CommunicationAdapterCapabilities.ZeroTargetEvents;
 
+    private static readonly CommunicationAdapterCapabilities FrameworkSignalRequirements =
+        CommunicationAdapterCapabilities.ContractIdentity
+        | CommunicationAdapterCapabilities.SnapshotCopy
+        | CommunicationAdapterCapabilities.TypedGroups
+        | CommunicationAdapterCapabilities.GroupFanOut
+        | CommunicationAdapterCapabilities.MessageIdentity
+        | CommunicationAdapterCapabilities.BoundedAcceptance;
+
     private readonly IReadOnlyDictionary<CommunicationLane, CommunicationRouteDecision> _routes;
     private readonly IReadOnlyDictionary<string, BoundTarget> _bindings;
     private readonly CommunicationAdapterHost _host;
@@ -37,6 +46,7 @@ internal sealed class CommunicationRouter
         KoanApplicationReferenceManifest references,
         ApplicationIdentitySnapshot application,
         CommunicationHandlerCatalog handlers,
+        IEnumerable<FrameworkSignalTargetBinding> frameworkSignals,
         CommunicationIngress ingress,
         IOptions<CommunicationOptions> options,
         ILogger<CommunicationRouter> logger)
@@ -48,7 +58,7 @@ internal sealed class CommunicationRouter
             .ToArray();
         EnsureValidCandidates(candidates);
 
-        _bindings = BuildBindings(handlers);
+        _bindings = BuildBindings(handlers, frameworkSignals);
         var publicBindings = _bindings.Values
             .Select(static target => target.Declaration)
             .OrderBy(static binding => binding.Id, StringComparer.Ordinal)
@@ -70,6 +80,12 @@ internal sealed class CommunicationRouter
                 CommunicationLane.Events,
                 options.Value.EventsProvider,
                 EventRequirements,
+                candidates,
+                references),
+            [CommunicationLane.FrameworkSignals] = Elect(
+                CommunicationLane.FrameworkSignals,
+                options.Value.FrameworkSignalsProvider,
+                FrameworkSignalRequirements,
                 candidates,
                 references)
         };
@@ -166,11 +182,11 @@ internal sealed class CommunicationRouter
                 $"Communication provider '{route.AdapterId}' returned an invalid publication acceptance.");
         }
 
-        if (route.Lane == CommunicationLane.Transport && acceptance.TargetGroups == 0)
+        if (route.Lane != CommunicationLane.Events && acceptance.TargetGroups == 0)
         {
             throw new CommunicationAdapterException(
                 CommunicationAdapterException.FailureKind.NoRoute,
-                $"Communication provider '{route.AdapterId}' reported no Transport receiver group for '{contractId}'.");
+                $"Communication provider '{route.AdapterId}' reported no {route.Lane} receiver group for '{contractId}'.");
         }
 
         return acceptance;
@@ -212,7 +228,7 @@ internal sealed class CommunicationRouter
                     wire.OperationId,
                     wire.Ordinal,
                     eventBinding.EntityType,
-                    wire.EntityPayload,
+                    wire.Payload,
                     wire.Context,
                     eventBinding.EventType,
                     wire.OccurrenceId ?? throw new InvalidDataException("An Event envelope has no occurrence identity."),
@@ -223,8 +239,12 @@ internal sealed class CommunicationRouter
                     wire.OperationId,
                     wire.Ordinal,
                     transportBinding.EntityType,
-                    wire.EntityPayload,
+                    wire.Payload,
                     wire.Context),
+                FrameworkSignalTargetBinding signalBinding => new FrameworkSignalEnvelope(
+                    wire.OperationId,
+                    signalBinding.SignalType,
+                    wire.Payload),
                 _ => throw new InvalidDataException("The Communication binding has an unsupported target type.")
             };
 
@@ -358,7 +378,9 @@ internal sealed class CommunicationRouter
         }
     }
 
-    private static IReadOnlyDictionary<string, BoundTarget> BuildBindings(CommunicationHandlerCatalog handlers)
+    private static IReadOnlyDictionary<string, BoundTarget> BuildBindings(
+        CommunicationHandlerCatalog handlers,
+        IEnumerable<FrameworkSignalTargetBinding> frameworkSignals)
     {
         var result = new Dictionary<string, BoundTarget>(StringComparer.Ordinal);
         foreach (var target in handlers.TransportReceivers)
@@ -371,6 +393,11 @@ internal sealed class CommunicationRouter
         {
             var contract = CommunicationContractIdentity.Events(target.EntityType, target.EventType);
             Add(result, target, CommunicationLane.Events, contract);
+        }
+
+        foreach (var target in frameworkSignals.OrderBy(static target => target.ContractId, StringComparer.Ordinal))
+        {
+            Add(result, target, CommunicationLane.FrameworkSignals, target.ContractId);
         }
 
         return result;
@@ -404,7 +431,7 @@ internal sealed class CommunicationRouter
             || !string.Equals(wire.Contract, binding.ContractId, StringComparison.Ordinal)
             || wire.OperationId == Guid.Empty
             || wire.Ordinal < 0
-            || wire.EntityPayload is null)
+            || wire.Payload is null)
         {
             throw new InvalidDataException(
                 "The Communication envelope does not match the elected mesh, lane, channel, contract, or schema.");

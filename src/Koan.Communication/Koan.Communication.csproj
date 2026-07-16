@@ -20,4 +20,9 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.8" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Koan.Jobs" />
+    <InternalsVisibleTo Include="Koan.Communication.Tests" />
+    <InternalsVisibleTo Include="Koan.Communication.Connector.RabbitMq.Tests" />
+  </ItemGroup>
 </Project>

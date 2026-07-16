@@ -44,11 +44,14 @@ public sealed class KoanCommunicationModule : KoanModule
         module.SetSetting(Constants.Provenance.EventSubscriptions, builder => builder
             .Label("Typed Event subscriptions")
             .Value(subscriptionCount.ToString(CultureInfo.InvariantCulture)));
+        module.SetSetting(Constants.Provenance.FrameworkSignalsAdapter, builder => builder
+            .Label("Framework-signal provider")
+            .Value("runtime election (see Koan facts)"));
         module.SetSetting(Constants.Provenance.Capacity, builder => builder
             .Label("Bounded local queue")
             .Value(options.InProcessCapacity.ToString(CultureInfo.InvariantCulture)));
         module.SetSetting(Constants.Provenance.MaxPayloadBytes, builder => builder
-            .Label("Maximum snapshot bytes")
+            .Label("Maximum payload bytes")
             .Value(options.MaxPayloadBytes.ToString(CultureInfo.InvariantCulture)));
     }
 }

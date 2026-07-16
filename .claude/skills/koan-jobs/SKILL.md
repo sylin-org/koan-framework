@@ -11,7 +11,7 @@ description: Entity-first background jobs, IKoanJob<TSelf>, .Job/.Jobs accessors
 - `.Job.Submit(...)` / `.Jobs.Trigger(...)` / `.Job.Status()` accessors, or `list.Submit(...)`
 - `[JobAction]`, `[JobChain]`, `[JobIdempotent]`, `[JobGate]`, `[JobPersistence]`, `[ParallelSafe]`
 - `JobContext` verbs — `ctx.Progress`, `ctx.ContinueWith`, `ctx.StopChain`, `ctx.Reschedule`, `ctx.Backoff`
-- References to `Koan.Jobs` / `Koan.Jobs.Transport.Messaging`
+- References to `Koan.Jobs` or its Communication-backed work-ready signaling
 - "background job", "queue", "worker", "scheduled task", "retry", "at-least-once", "lane", "conveyor"
 - Talk of running work off the request thread, draining a large feed, or cron/`@boot`/`@continuous` cadences
 
@@ -56,7 +56,7 @@ The same handler code runs on every tier — the contract is constant **at-least
 | `Koan.Jobs` (alone) | In-memory tier — ephemeral, single-process. Great for dev and fire-and-forget. |
 | `+ any data adapter` | **Durable** tier — the ledger (`Entity<JobRecord>`) follows your adapter; claim/retry/history survive restart. |
 | `+ multiple nodes on the shared ledger` | **Distributed** — competing consumers; the claim is an atomic compare-and-set, so each ready job runs on exactly one node. |
-| `+ Koan.Jobs.Transport.Messaging` | Cross-node **push-dispatch** over `Koan.Messaging` — no claim-latency polling. |
+| `+ a Communication adapter that claims framework signals` | Cross-node work-ready hints use the elected adapter automatically. The ledger remains authoritative; dropped hints affect latency, not correctness. |
 
 Lane-fair dispatch keeps a busy lane (e.g. crawl) from starving a quiet downstream one (e.g. translation); each non-empty lane gets a guaranteed share ([JOBS-0008](../../../docs/decisions/JOBS-0008-lane-fair-dispatch.md)).
 

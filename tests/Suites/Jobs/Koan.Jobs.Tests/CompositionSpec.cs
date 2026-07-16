@@ -7,7 +7,7 @@ namespace Koan.Jobs.Tests;
 public sealed class CompositionSpec
 {
     [Fact]
-    public async Task In_memory_host_explains_its_ledger_and_transport()
+    public async Task In_memory_host_explains_its_ledger_and_communication_wake()
     {
         await using var host = await JobsHarness.StartInMemoryAsync();
 
@@ -19,9 +19,14 @@ public sealed class CompositionSpec
         ledger.Summary.Should().Contain("in-memory");
         ledger.ReasonCode.Should().Be("no-durable-data-adapter");
 
-        var transport = facts.Single(fact => fact.Code == "koan.jobs.transport.selected");
-        transport.Subject.Should().Be("jobs:transport");
-        transport.Summary.Should().Contain("in-process");
-        transport.ReasonCode.Should().Be("default-transport");
+        var wake = facts.Single(fact => fact.Code == "koan.jobs.wake.selected");
+        wake.Subject.Should().Be("jobs:wake");
+        wake.Summary.Should().Contain("in-process");
+        wake.ReasonCode.Should().Be("ledger-backed-latency-hint");
+
+        facts.Should().Contain(fact =>
+            fact.Code == "koan.communication.framework-signals.selected"
+            && fact.Subject == "communication:framework-signals:default"
+            && fact.ReasonCode == "built-in-floor");
     }
 }

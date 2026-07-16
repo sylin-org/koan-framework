@@ -22,8 +22,9 @@ public sealed class CompositionSpec
         ledger.Summary.Should().Contain("durable-data");
         ledger.ReasonCode.Should().Be("durable-data-adapter");
 
-        var transport = facts.Single(fact => fact.Code == "koan.jobs.transport.selected");
-        transport.Subject.Should().Be("jobs:transport");
-        transport.Summary.Should().Contain("in-process");
+        var wake = facts.Single(fact => fact.Code == "koan.jobs.wake.selected");
+        wake.Subject.Should().Be("jobs:wake");
+        wake.Summary.Should().Contain("in-process");
+        wake.ReasonCode.Should().Be("ledger-backed-latency-hint");
     }
 }

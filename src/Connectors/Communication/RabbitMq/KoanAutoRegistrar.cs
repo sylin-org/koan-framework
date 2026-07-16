@@ -43,7 +43,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         module.Describe(ModuleVersion);
         module.AddSetting("Provider", Constants.ProviderId);
-        module.AddSetting("Claims", "Transport/default");
+        module.AddSetting("Claims", "Transport/default, FrameworkSignals/default");
         module.AddSetting("Assurance", "durably-acknowledged publication");
         module.AddNote("Candidacy is inert unless direct application intent or an explicit provider binding elects it.");
     }

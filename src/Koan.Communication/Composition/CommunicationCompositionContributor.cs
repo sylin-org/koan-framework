@@ -1,6 +1,7 @@
 using Koan.Communication.Infrastructure;
 using Koan.Communication.Runtime;
 using Koan.Communication.Adapters;
+using Koan.Communication.Signals;
 using Koan.Core.Composition;
 using Koan.Core.Context;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +19,7 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
         var router = services.GetService<CommunicationRouter>();
         var transport = router?.For(CommunicationLane.Transport);
         var events = router?.For(CommunicationLane.Events);
+        var frameworkSignals = router?.For(CommunicationLane.FrameworkSignals);
 
         builder.AddElection(
             Constants.Diagnostics.Subjects.Transport,
@@ -72,6 +74,31 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
         builder.AddConfigKey(Constants.Configuration.MaxPayloadBytes);
         builder.AddConfigKey(Constants.Configuration.TransportProvider);
         builder.AddConfigKey(Constants.Configuration.EventsProvider);
+        builder.AddConfigKey(Constants.Configuration.FrameworkSignalsProvider);
+
+        builder.AddElection(
+            Constants.Diagnostics.Subjects.FrameworkSignals,
+            frameworkSignals?.AdapterId ?? Constants.Transport.InProcessAdapter,
+            frameworkSignals?.Reason ?? Constants.Diagnostics.Reasons.BuiltInFloor,
+            frameworkSignals?.Priority,
+            source: typeof(CommunicationCompositionContributor).FullName,
+            factCode: Constants.Diagnostics.Codes.FrameworkSignalsSelected);
+        builder.AddCapability(
+            Constants.Diagnostics.Subjects.FrameworkSignals,
+            [
+                Constants.Diagnostics.Capabilities.InternalFrameworkSignals,
+                Constants.Diagnostics.Capabilities.BestEffortFallback,
+                Constants.Diagnostics.Capabilities.BoundedSignalEgress
+            ]);
+
+        var signalBindings = services.GetServices<FrameworkSignalTargetBinding>().ToArray();
+        builder.AddObservation(
+            Constants.Diagnostics.Codes.FrameworkSignalGroupsDiscovered,
+            Constants.Diagnostics.Subjects.FrameworkSignalGroups,
+            $"Koan registered {signalBindings.Length} internal framework-signal group(s); " +
+            "signals are bounded latency hints and are not an application Messaging API.",
+            Constants.Diagnostics.Reasons.TypedDiscovery,
+            typeof(CommunicationCompositionContributor).FullName);
         if (options is not null)
         {
             if (transport?.Adapter.Descriptor.IsBuiltIn != false)

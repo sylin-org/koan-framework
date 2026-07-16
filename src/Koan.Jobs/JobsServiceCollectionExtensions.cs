@@ -1,4 +1,6 @@
 using Koan.Core;
+using Koan.Communication;
+using Koan.Communication.Signals;
 using Koan.Data.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,6 +15,8 @@ public static class JobsServiceCollectionExtensions
 {
     public static IServiceCollection AddKoanJobs(this IServiceCollection services, Action<JobsOptions>? configure = null)
     {
+        // Jobs owns the wake meaning; Communication owns its local/network carriage and provider election.
+        services.AddKoanCommunication();
         services.AddOptions();
         if (configure is not null) services.Configure(configure);
 
@@ -26,8 +30,8 @@ public static class JobsServiceCollectionExtensions
                 sp.GetRequiredService<JobTypeRegistry>())
             : new InMemoryJobLedger(sp.GetRequiredService<IOptions<JobsOptions>>()));
         services.TryAddSingleton(_ => JobTypeRegistry.FromDiscovery());
-        // Push-dispatch seam: in-process by default; Koan.Jobs.Transport.Messaging preempts it for cross-node wake.
-        services.TryAddSingleton<IJobTransport, InProcessJobTransport>();
+        services.TryAddSingleton<JobWakeCoordinator>();
+        services.AddFrameworkSignal<JobReadySignal, JobWakeCoordinator>();
         services.TryAddSingleton<JobOrchestrator>();
         services.TryAddSingleton<JobScheduler>();
         services.TryAddSingleton<IJobCoordinator, JobCoordinator>();

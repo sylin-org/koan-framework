@@ -4,7 +4,13 @@
 **Date**: 2026-06-04
 **Deciders**: Enterprise Architect
 **Scope**: Replace the scattered job subsystem with a single, encapsulated **Job Orchestrator** concern that owns a ledger, dispatch/recall, cancellation, and scheduling. Define the entity-first authoring surface, the capability-graded backend, and the state-machine execution model (edge-triggered `Submit` + level-triggered `Schedule`).
-**Related**: supersedes JOBS-0001/0002/0003 · DATA-0077 (partitions / `EntityContext.With`) · Entity Transfer `Entity<T>.Move()` · DATA-0098 (boundary encoding) · ARCH-0084 (capability tokens + provider election) · ARCH-0086 (`KoanModule` bootstrap + `Report`) · `[KoanDiscoverable]` + `KoanRegistry.GetDiscoveredImplementors` (auto-registration) · `Koan.Messaging.IMessageBus` (distributed transport) · ARCH-0079 (integration tests as canon) · the Koan redesign initiative ("fewer but more meaningful parts").
+**Related**: supersedes JOBS-0001/0002/0003 · DATA-0077 (partitions / `EntityContext.With`) · Entity Transfer `Entity<T>.Move()` · DATA-0098 (boundary encoding) · ARCH-0084 (capability tokens + provider election) · ARCH-0086 (`KoanModule` bootstrap + `Report`) · `[KoanDiscoverable]` + `KoanRegistry.GetDiscoveredImplementors` (auto-registration) · ARCH-0113 (Communication-owned internal signals) · ARCH-0079 (integration tests as canon) · the Koan redesign initiative ("fewer but more meaningful parts").
+
+> **Implementation update (2026-07-15):** ARCH-0113/R07-11a removes the public `IJobTransport`,
+> `InProcessJobTransport`, and `Koan.Jobs.Transport.Messaging` bridge. `JobWakeCoordinator` now emits
+> one bounded internal Communication signal. The built-in provider supplies local wake automatically;
+> a directly referenced Communication connector transparently changes reach. The signal remains a
+> lossy latency hint, carries neither work nor business context, and never replaces ledger polling.
 
 ---
 
@@ -42,7 +48,7 @@ Separate the entity from the unit of work — the single most clarifying rename:
 | **Job** | the **enqueued unit** = (work-item id × action × lifecycle). This is the **ledger entry**, not the entity. |
 | **`IJobLedger`** | the single source of truth: the durable record of every Job + its transitions. Also *is* the queue. |
 | **`JobOrchestrator`** | the one concern that claims, executes, settles, recalls, cancels, and schedules. |
-| **`IJobTransport`** | how dispatch reaches a worker (in-proc / message bus). Optional; selected by capability. |
+| **Wake hint** | an internal Communication signal that may shorten the next ledger poll; never a Jobs provider or application API. |
 
 ## 4. Decision — the authoring surface
 
@@ -219,16 +225,17 @@ case Stage.Fetch:
 
 ## 8. Decision — capability-graded backend (Reference = Intent)
 
-A capability token + provider election (ARCH-0084, same machinery as the cache pillar) picks the implementations:
+A capability decision selects the ledger; Communication independently elects physical carriage for
+the optional internal wake hint:
 
-| Tier | Trigger | `IJobLedger` | `IJobTransport` | Guarantee |
+| Tier | Trigger | `IJobLedger` | Wake hint | Guarantee |
 |---|---|---|---|---|
-| **Local** | no data adapter | in-memory | in-proc | at-least-once, **non-durable** (lost on crash) |
-| **Durable** | a data adapter present (Mongo/PG/…) | the adapter's store | in-proc | at-least-once, **survives restart** |
+| **Local** | no data adapter | in-memory | built-in Communication provider | at-least-once, **non-durable** (lost on crash) |
+| **Durable** | a data adapter present (Mongo/PG/…) | the adapter's store | built-in Communication provider | at-least-once, **survives restart** |
 | **Distributed** | multiple nodes on the shared durable store | shared store | competing consumers (the **store is the coordinator**) | at-least-once, multi-node |
-| **Distributed + push** | `Koan.Messaging` present | shared store | message bus (push/route) | at-least-once, low-latency dispatch |
+| **Distributed + push** | a Communication connector is directly elected | shared store | stable internal worker group | at-least-once, low-latency dispatch |
 
-The **delivery contract is constant** across tiers; only durability/scale change. "Distributed" is mostly free once durable (N nodes claim from the same ledger); the bus is a latency/routing *upgrade*, not a prerequisite. The **resource gate** (§6.5) is graded the same way — in-memory locally, a shared ledger-store record when durable — so cooperative backoff (429 cooldowns) is honored across all nodes, not just the one that hit the limit. The chosen tier is announced in the **boot report**:
+The **delivery contract is constant** across tiers; only durability/scale change. "Distributed" is mostly free once durable (N nodes claim from the same ledger); Communication reach is a latency *upgrade*, not a prerequisite. The **resource gate** (§6.5) is graded the same way — in-memory locally, a shared ledger-store record when durable — so cooperative backoff (429 cooldowns) is honored across all nodes, not just the one that hit the limit. The chosen ledger and wake provider are announced in shared facts:
 
 ```
 [Koan.Jobs] ledger=Mongo (durable) · transport=in-proc · distributed=1 node · 6 actions, 2 scheduled, 1 chain · mode=normal
@@ -341,7 +348,7 @@ All positions below are **adopted as the decision** (each proposed/recommended o
 7. **Default physical layout** — *Proposed:* **single active store + composite index + terminal sweep**; hot/cold and per-stage partitioning are opt-in scale knobs behind `IJobLedger`. **Recommend: accept** (don't ship per-state moves in v1).
 8. **v1 "can't-retrofit" commitments** — *Proposed:* commit to **transactional outbox**, **unified queryable ledger**, **declared idempotency**, **boot-report visibility**, **inline test mode** in v1 (the rest — recurring beyond `Schedule`, dead-letter replay UX, multi-tenant partitions — are seams). **Recommend: accept.**
 9. **DI in handlers** — *Proposed:* `ctx.Services` default + optional `IKoanJobHandler<T>` class for DI-heavy jobs. **Recommend: accept.**
-10. **`JobHandle.Completion` in the distributed tier** — awaiting a result across nodes needs the ledger polled or a completion signal on the bus. *Proposed:* support `Completion(timeout)` always; back it with ledger polling, upgrade to a push signal when the bus is present. **Recommend: accept.**
+10. **`JobHandle.Completion` in the distributed tier** — awaiting a result across nodes needs the ledger polled or a completion signal. *Proposed:* support `Completion(timeout)` always; back it with ledger polling, with a future internal Communication signal as a latency upgrade. **Recommend: accept.**
 11. **Gate-key declaration** — `[JobGate(nameof(Source))]` (declarative, readable at dispatch) vs a dynamic `string? GateKey` convention vs both. *Proposed:* **both** — attribute for the common static case, `GateKey` override for per-tenant/per-host dynamic keys. **Recommend: accept.**
 12. **Reschedule honoring + jitter** — *Proposed:* `ctx.Reschedule`/`Backoff` honor the supplied delay (e.g. a 429 `Retry-After`) as the base, and the orchestrator adds **release jitter** (spread `visibleAt` past `ReleaseAt`) so a deferred herd doesn't wake in lockstep; lane `MaxConcurrency` is the second line of defense. **Recommend: accept** (jitter default ~a few seconds or ±10% of the delay — to be tuned).
 13. **Runaway guards (`Deadline` + `MaxReschedules`)** — *Proposed:* `Deadline` (total wall-clock) is the **primary** guard; `MaxReschedules` (count) is a **secondary**, default-high/off spin-guard; the reschedule counter is **separate** from the retry `Attempt` counter. *Open:* whether `Deadline` should have a sane default cap (e.g. 24h) so a forgotten `Deadline` can't accumulate infinitely-deferred jobs. **Recommend: accept both as optional; lean toward a 24h default `Deadline`.**
@@ -377,7 +384,7 @@ The identical suite re-runs against **every data adapter — Mongo, Postgres, Sq
 - No double-claim under contention (CAS); fair-ish work-stealing across nodes.
 - The resource gate is honored **cross-node** (node B does not hammer an API node A was 429'd on) — the old in-memory-gate behavior is an explicit **regression** test.
 - `JobHandle.Completion` resolves on a node that didn't submit (ledger poll; bus push when present).
-- **+bus** variant (`Koan.Messaging`): push-dispatch latency without changing the contract.
+- **Communication-signal** variant: cross-node wake latency through the elected adapter without changing the ledger contract.
 
 ### D. Scale / soak
 - 1000-job batch drains within bounded concurrency; the ledger `active` set stays lean (terminal sweep keeps up).
@@ -401,7 +408,11 @@ Greenfield: delete `Koan.Jobs.Core`, re-author against `IKoanJob<T>`. Dogfeed re
 
 ## 16. Implementation status (2026-06-04)
 
-Built as a single project **`src/Koan.Jobs`** (no Abstractions/Core split — extract only if an external adapter later needs the contracts), plus the optional **`src/Koan.Jobs.Transport.Messaging`** package for cross-node push-dispatch. **The full capability ladder is complete and green: in-memory → durable → per-DB container matrix (SQLite/Postgres/Mongo/SqlServer) → distributed → `+bus`.** Every item below ships with tests; the detailed status follows.
+Built as a single project **`src/Koan.Jobs`** (no Abstractions/Core split). Communication owns the
+optional physical wake mesh, so Jobs has no transport package or provider seam. **The full capability
+ladder is complete and green: in-memory → durable → per-DB container matrix
+(SQLite/Postgres/Mongo/SqlServer) → distributed → Communication-backed wake.** Every item below ships
+with tests; the detailed status follows.
 
 **Shipped & verified** (the same behavioral suite — `JobBehaviorSuite`, 28 specs — runs across every tier per ARCH-0079)
 - **In-memory tier** — the full engine (claim/execute/settle/chain/reschedule/backoff/gate/cancel/timeout/lanes/reap/schedule/archival) behind `IJobLedger`, driven by a `FakeTimeProvider` harness. **In-memory project: 32 green** (28 convergence + 2 distributed + 2 transport).
@@ -423,7 +434,7 @@ Built as a single project **`src/Koan.Jobs`** (no Abstractions/Core split — ex
 - **Convergence suite — shipped**: the behavioral contract lives in `Koan.Jobs.TestKit`'s `JobBehaviorSuite` (28 specs); each tier is a thin subclass providing a harness, so the *same* assertions run on in-memory and on a real SQLite store (ARCH-0079). Adding a per-adapter tier is now just a subclass + connector reference.
 - **Distributed core — shipped** (2 specs): two orchestrators ("nodes") share one ledger — competing consumers never double-claim (50 jobs, 2 nodes, exactly 50 runs), and a resource gate set by one node is honored by the other.
 - **`[JobPersistence]` two-ledger routing — shipped** (1 spec): when a durable adapter is present, the election yields a `RoutingJobLedger` (public) wrapping `{InMemoryJobLedger, DataJobLedger}`. Per-record ops route by `WorkType → binding.Persistence` (`InMemory` → volatile; `Auto`/`DataStore` → durable); queue-wide reads union both; `ClaimNext` claims from both (disjoint sets); **resource gates are mirrored to both ledgers** so a cooperative backoff holds across persistence tiers. The orchestrator stays storage-agnostic (still one `IJobLedger`). Verified on SQLite: an `InMemory`-typed job leaves no durable `JobRecord` row yet runs, while a `DataStore`-typed job persists.
-- **`+bus` push-transport — shipped**: an `IJobTransport` seam (Koan.Jobs) replaces the worker's fixed poll delay with `WaitForWork(PollInterval)`; the coordinator calls `Notify()` after a non-transactional submit so the worker wakes immediately. Default `InProcessJobTransport` (coalescing in-process signal); **`Koan.Jobs.Transport.Messaging`** (new package, Reference = Intent) replaces it with `MessagingJobTransport`, which fans a `JobReadySignal` across nodes over `Koan.Messaging` (echo-filtered by origin node id) so every node wakes on any submit. The ledger stays the truth — a dropped signal costs at most one poll interval, never correctness. Tests: in-process signal/coalesce/timeout + submit-notifies-transport (Koan.Jobs.Tests); messaging fan-out/echo-filter (Koan.Jobs.Transport.Messaging.Tests). **This closes the JOBS-0005 capability ladder (in-memory → durable → per-DB matrix → distributed → +bus).**
+- **Communication-backed wake — shipped, rebuilt under ARCH-0113**: `JobWakeCoordinator` replaces the worker's fixed poll delay with `WaitForWork(PollInterval)` and emits a bounded internal signal after a non-transactional submit. The built-in Communication provider coalesces locally; a directly elected connector such as RabbitMQ carries the same stable worker-group signal across nodes. There is no public Jobs transport or arbitrary-object bus. The ledger stays the truth—a dropped or duplicated signal costs at most one poll interval, never correctness. Tests: Jobs 77/77 including local wake/coalescing/submission; Communication 31/31; real RabbitMQ 6/6 including the internal signal lane.
 - **Transactional outbox — shipped** (automatic): on the durable tier a `Submit` inside an ambient transaction enlists (`TrackSave`) and is enqueued on commit / discarded on rollback; inline mode skips its synchronous drain inside a transaction.
 - **Terminal archival — shipped**: a worker sweep (`ArchiveInterval`) purges Completed/Cancelled rows older than `ArchiveAfter` (default 7d) via `IJobLedger.PurgeArchivable`; Failed/Dead are retained (replayable).
 - **Boot-report — shipped**: `KoanJobsModule.Report` publishes the discovered job-type count (`jobs.types`); the worker logs a startup summary `[Koan.Jobs] ledger={ledger} · {N} job types · {M} scheduled · claim={strategy}` (the runtime-elected ledger is only available there, not in `Report`). Bootstrap spec asserts both reads resolve and never throw through real `AddKoan()`.

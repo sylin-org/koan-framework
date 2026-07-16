@@ -2,8 +2,8 @@
 
 ## Provider boundary
 
-The connector implements `ICommunicationAdapter` and declares only `CommunicationLane.Transport`.
-Its descriptor advertises the invariants required by the default Entity Transport route: stable
+The connector implements `ICommunicationAdapter` and declares `CommunicationLane.Transport` plus
+`CommunicationLane.FrameworkSignals`. Its descriptor advertises the invariants required by both routes: stable
 contract identity, serialized snapshot copies, opaque context carriage, typed receiver groups,
 group fan-out, message identity, and bounded acceptance. It reports
 `CommunicationDeliveryAssurance.DurablyAcknowledged`.
@@ -13,7 +13,8 @@ dispatch. RabbitMQ sees host-produced bytes and routing identities; it does not 
 tenant semantics, or business handlers. The same host-owned wire is exercised by the built-in local
 provider.
 
-Provider election is lane-specific. An explicit `CommunicationOptions.TransportProvider` binding
+Provider election is lane-specific. An explicit `CommunicationOptions.TransportProvider` or
+`FrameworkSignalsProvider` binding
 wins first. Otherwise a direct package/project reference makes this connector eligible. Without
 direct intent, only the minimum-priority built-in provider participates. Capability requirements,
 assurance, Core-owned `[ProviderPriority]`, and stable provider ID resolve eligible candidates.
@@ -22,13 +23,13 @@ Direct or explicit external intent never falls back locally when unavailable.
 ## Topology
 
 The application identity code is the mesh identity. The connector declares one durable direct
-exchange per mesh and Transport channel:
+exchange per mesh for the schema-2 default channels:
 
 ```text
-koan.communication.{mesh}.transport.default.v1
+koan.communication.{mesh}.default.v2
 ```
 
-Every discovered `IReceiveEntity<TEntity>` group gets one durable, non-exclusive queue. Queue and
+Every discovered Entity receiver or internal signal group gets one durable, non-exclusive queue. Queue and
 routing-key suffixes are deterministic SHA-256-derived identifiers over the stable group and
 contract identities. All replicas with the same mesh, contract, and group consume from the same
 queue; distinct groups bind separate queues to the same contract route and therefore fan out.
@@ -74,7 +75,8 @@ errors are de-identified and never include Entity payloads or credentials.
 
 ## Wire compatibility and non-claims
 
-The current wire schema is version `1`. Contract identity is derived from CLR full names; there is no
+The current wire schema is version `2`; its neutral payload field carries either an Entity snapshot or
+a typed framework signal. Entity contract identity is derived from CLR full names; there is no
 alias registry or rolling schema negotiation yet. Mesh, lane, channel, contract, operation identity,
 source ordinal, and Entity payload are validated at host ingress before business dispatch.
 

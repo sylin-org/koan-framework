@@ -9,7 +9,7 @@ framework_version: v0.18.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 through R07-10 passed; provider-neutral Communication and RabbitMQ Transport are proven
+  scope: R07-01 through R07-11 passed; Jobs wake now uses the Communication provider boundary
 ---
 
 # Koan V1 reorganization current handoff
@@ -83,6 +83,12 @@ Replace this file at every handoff. It is a restart point, not a diary.
   Communication passes 31/31 and a real RabbitMQ container passes 5/5 for confirmed publication,
   isolated group fan-out, authenticated tenant restoration, mandatory no-route, truthful facts/health,
   and zero-configuration orchestration intent. No unavailable direct route falls back locally.
+- [R07-11](work-items/r07/R07-11-jobs-wake-convergence.md) passed. Communication now has one
+  internal-only bounded framework-signal lane over the same provider, lifecycle, wire, health, and
+  fact boundary. Jobs wake is its first consumer: local carriage is automatic, a direct RabbitMQ
+  reference changes reach, and the ledger/poll remains correctness. Jobs passes 77/77, Communication
+  31/31, and real RabbitMQ 6/6. Public `IJobTransport`, the in-process implementation, the Jobs
+  Messaging package, its service locator, and unmanaged fire-and-forget path are deleted.
 - Public Messaging guidance is reduced to the truthful legacy v0.17 generation. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -111,7 +117,8 @@ await order.Transport.Send(ct);
 ```
 
 - Data owns `Lifecycle` and never knows Communication.
-- One Communication pillar owns distinct Events occurrence semantics and Transport snapshot semantics.
+- One Communication pillar owns distinct Events occurrence semantics, Transport snapshot semantics,
+  and an internal framework-signal mechanism that is not an application bus.
 - Scalar, finite-set, and lazy-stream forms share one pointwise meaning; no batch atomicity is implied.
 - Data.Core owns only Entity cardinality normalization; each pillar owns its callbacks, execution, and
   outcomes.
@@ -188,8 +195,9 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
 8. Events occurrence policy on the same kernel. **Passed as R07-08.**
 9. Direct package/project reference provenance. **Passed as R07-09.**
 10. Provider-neutral election and RabbitMQ Transport. **Passed as R07-10.**
-11. Jobs wake and Cache coherence migration onto the Communication-owned internal mechanism.
-12. Secondary pointwise lifts: Relationships, constrained Jobs streams, AI Embed/Index, Cache eviction,
+11. Jobs wake migration onto the Communication-owned internal mechanism. **Passed as R07-11.**
+12. Cache coherence convergence only after preserving its node-broadcast and layered semantics.
+13. Secondary pointwise lifts: Relationships, constrained Jobs streams, AI Embed/Index, Cache eviction,
    then Media if a real derivative operation earns it.
 
 Only completed/current slices have detailed child cards. Do not open broker breadth before Event
@@ -267,14 +275,19 @@ semantics pass over the local boundary.
   warning-clean; Core-owned provider priority remains green through Data Vector 1/1, Cache topology
   2/2, and Cache Messaging 1/1 focused proofs. The independently versioned connector packs with its
   DLL, XML docs, README, and exact dependencies. No release-certification suite was rerun.
+- R07-11 passes Jobs 77/77, Communication 31/31, and real RabbitMQ 6/6, including bounded local
+  signal/coalescing/submission and direct-provider broker carriage. Communication, Jobs, and RabbitMQ
+  build warning-as-error; the obsolete Jobs Messaging project/package/test and public transport seam
+  are gone. Focused pack/docs/lock/diff/privacy gates pass; no release-certification suite was rerun.
 
 ## Next safe action
 
-Open one bounded R07-11 internal-convergence child. Inventory Jobs wake and Cache coherence as
-consumers—not public Entity verbs—and identify whether the Communication provider mechanism can carry
-their internal signals without exposing arbitrary-object Messaging or adding routing grammar. Choose
-one smaller consumer first, preserve its semantics with focused proof, and delete its legacy bridge
-only after parity. Do not add retries, channels, or broker breadth speculatively.
+Open one bounded Cache coherence inventory child. Preserve its distinct requirements—delivery to each
+node rather than one competing replica, layered Redis capability activation, optional catch-up,
+coalescing, required/auto-detect posture, and TTL-bounded staleness. Decide whether Communication can
+carry that contract without public routing grammar; do not force it through the Jobs worker-group
+shape or delete the Cache Messaging bridge before parity. Do not add retries, channels, or broker
+breadth speculatively.
 
 ## Repository boundary
 

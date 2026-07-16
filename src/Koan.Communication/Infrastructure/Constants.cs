@@ -9,6 +9,7 @@ internal static class Constants
         public const string MaxPayloadBytes = Section + ":MaxPayloadBytes";
         public const string TransportProvider = Section + ":TransportProvider";
         public const string EventsProvider = Section + ":EventsProvider";
+        public const string FrameworkSignalsProvider = Section + ":FrameworkSignalsProvider";
     }
 
     internal static class Transport
@@ -40,8 +41,9 @@ internal static class Constants
         public const string EventAdapter = "communication.events.adapter";
         public const string EventAssurance = "communication.events.assurance";
         public const string EventSubscriptions = "communication.events.subscription-groups";
-        public const string Capacity = "communication.transport.in-process-capacity";
-        public const string MaxPayloadBytes = "communication.transport.max-payload-bytes";
+        public const string FrameworkSignalsAdapter = "communication.framework-signals.adapter";
+        public const string Capacity = "communication.in-process-capacity";
+        public const string MaxPayloadBytes = "communication.max-payload-bytes";
     }
 
     internal static class Diagnostics
@@ -57,6 +59,8 @@ internal static class Constants
             public const string TransportBounds = "koan.communication.transport.bounds";
             public const string EventsBounds = "koan.communication.events.bounds";
             public const string ContextCarriage = "koan.communication.context.carriage";
+            public const string FrameworkSignalsSelected = "koan.communication.framework-signals.selected";
+            public const string FrameworkSignalGroupsDiscovered = "koan.communication.framework-signals.groups.discovered";
         }
 
         internal static class Subjects
@@ -70,6 +74,8 @@ internal static class Constants
             public const string TransportBounds = "communication:transport:bounds";
             public const string EventsBounds = "communication:events:bounds";
             public const string Context = "communication:context";
+            public const string FrameworkSignals = "communication:framework-signals:default";
+            public const string FrameworkSignalGroups = "communication:framework-signals:groups";
         }
 
         internal static class Reasons
@@ -101,6 +107,9 @@ internal static class Constants
             public const string EventBoundedIngress = "events.bounded-ingress";
             public const string ConfirmedPublication = "transport.confirmed-publication";
             public const string RemoteSettlementUnobservable = "transport.remote-settlement-unobservable";
+            public const string InternalFrameworkSignals = "framework-signals.internal";
+            public const string BestEffortFallback = "framework-signals.best-effort-fallback";
+            public const string BoundedSignalEgress = "framework-signals.bounded-egress";
         }
     }
 }

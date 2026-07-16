@@ -13,6 +13,10 @@ internal static class CommunicationContractIdentity
     public static string Events(Type entityType, Type eventType)
         => $"event:{RequiredName(entityType)}:{RequiredName(eventType)}@{Version}";
 
+    public static string FrameworkSignal<TSignal>()
+        where TSignal : struct, Signals.IFrameworkSignal<TSignal>
+        => TSignal.ContractId;
+
     private static string RequiredName(Type type)
         => type.FullName ?? throw new InvalidOperationException(
             $"Communication contract type '{type}' has no stable full name.");
@@ -26,7 +30,7 @@ internal sealed record CommunicationWireEnvelope(
     string Contract,
     Guid OperationId,
     long Ordinal,
-    string EntityPayload,
+    string Payload,
     IReadOnlyDictionary<string, string>? Context,
     Guid? OccurrenceId = null,
     DateTimeOffset? OccurredAt = null,
@@ -35,7 +39,7 @@ internal sealed record CommunicationWireEnvelope(
 
 internal static class CommunicationWireCodec
 {
-    internal const int SchemaVersion = 1;
+    internal const int SchemaVersion = 2;
 
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
@@ -51,7 +55,7 @@ internal static class CommunicationWireCodec
         }
         catch (JsonException error)
         {
-            throw new InvalidDataException("The Communication envelope is not valid schema-1 JSON.", error);
+            throw new InvalidDataException($"The Communication envelope is not valid schema-{SchemaVersion} JSON.", error);
         }
     }
 }

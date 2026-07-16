@@ -436,7 +436,14 @@ builder.Services.AddKoanJobs(o => o.ClaimStrategy = ClaimStrategy.Ticket);
 
 **Lane fairness is per node.** Each worker fairly multiplexes the lanes *it* claims (§4), so no lane starves on any node. Lane weights are honored per node too — so across many nodes the global split tracks the weights when feed is balanced across them, and stays approximate (but never starving) under node-asymmetric feed. Exact global weight proportions are deliberately *not* bought with per-claim cross-node coordination; see ADR JOBS-0008.
 
-**Push dispatch (lower latency).** Out of the box a worker wakes the instant *it* submits a job and otherwise polls at `PollInterval`. Reference **`Koan.Jobs.Transport.Messaging`** and a submit on *any* node fans a lightweight "job ready" wake across the bus, so every node claims new work immediately instead of waiting out its poll interval. It's purely a latency upgrade—the ledger is still the truth, so a dropped signal costs at most one poll interval and never correctness.
+**Wake latency.** Out of the box, Jobs emits a bounded internal Communication wake
+hint and otherwise polls at `PollInterval`. The process-local provider requires no configuration. If
+the application directly references a Communication connector that claims framework signals, such as
+RabbitMQ, the same hint uses
+the elected mesh automatically—there is no Jobs transport package or bus registration. Replicas
+compete to wake and claim from the shared ledger. This is purely a latency upgrade: the ledger is
+still the truth, so a dropped or duplicated signal costs at most one poll interval and never
+correctness.
 
 **Transactional submit (outbox).** On the durable tier, a `Submit` inside an ambient transaction is part of that transaction—the job is enqueued **on commit** and **discarded on rollback**. So a job submitted as a side effect of saving an entity can never be "saved but never enqueued," and a rolled-back save never leaves a stray job:
 

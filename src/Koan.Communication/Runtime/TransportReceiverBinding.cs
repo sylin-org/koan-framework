@@ -13,6 +13,8 @@ internal abstract class TransportReceiverBinding : CommunicationTargetBinding
     {
     }
 
+    public Type EntityType => ContractType;
+
     public static TransportReceiverBinding Create(Type entityType, Type handlerType)
     {
         var closed = typeof(Bound<>).MakeGenericType(entityType);
@@ -34,7 +36,7 @@ internal abstract class TransportReceiverBinding : CommunicationTargetBinding
                     $"Transport receiver '{HandlerType.FullName}' received a non-Transport envelope.");
             }
 
-            var entity = envelope.EntityPayload.FromJson<TEntity>()
+            var entity = envelope.Payload.FromJson<TEntity>()
                 ?? throw new InvalidOperationException(
                     $"The Transport snapshot for Entity '{typeof(TEntity).FullName}' deserialized to null.");
             var handler = (IReceiveEntity<TEntity>)ResolveHandler(services);

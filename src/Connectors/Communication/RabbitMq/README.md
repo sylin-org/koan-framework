@@ -1,7 +1,7 @@
 # Koan Communication RabbitMQ
 
-`Sylin.Koan.Communication.Connector.RabbitMq` carries Entity Transport across a RabbitMQ mesh while
-leaving the application language unchanged:
+`Sylin.Koan.Communication.Connector.RabbitMq` carries Entity Transport and framework-owned internal
+signals across a RabbitMQ mesh while leaving the application language unchanged:
 
 ```powershell
 dotnet add package Sylin.Koan.Communication.Connector.RabbitMq
@@ -23,8 +23,8 @@ await order.Transport.Send(ct);
 ```
 
 A direct application reference is the routing decision. `AddKoan()` discovers the connector and
-elects RabbitMQ for `Transport/default`; Entity Events remain on Koan's built-in process-local
-provider. A transitive reference does not change network reach. No bus registration, queue names,
+elects RabbitMQ for `Transport/default` and `FrameworkSignals/default`; Entity Events remain on Koan's
+built-in process-local provider. A transitive reference does not change network reach. No bus registration, queue names,
 handler registration, or provider-selection code is required.
 
 ## Connection
@@ -76,7 +76,7 @@ All options live under `Koan:Communication:RabbitMq`:
 - `Prefetch` — maximum unacknowledged consumer deliveries; default `32`.
 - `PublishTimeout` — confirmed-publication timeout; default `00:00:15`.
 
-Startup facts report RabbitMQ as the elected Transport provider, why it won, its assurance, and the
+Startup facts report RabbitMQ as the elected Transport/framework-signal provider, why it won, its assurance, and the
 fact that remote settlement is unobservable. Health `communication.rabbitmq` becomes critical only
 when RabbitMQ is elected.
 
@@ -86,6 +86,10 @@ This connector does not currently provide Entity Events, retries, inbox/outbox, 
 dead-letter policy, replay, ordering guarantees beyond RabbitMQ's queue behavior, remote handler
 settlement, transactional coupling to Data, schema aliases/migrations, or exactly-once side effects.
 The application mesh and CLR contract identities must match across participants.
+
+Framework signals are reserved for Koan modules. Applications do not receive a generic publish or
+subscribe API. Jobs wake uses this lane automatically; the signal remains a lossy latency hint and
+the Jobs ledger remains the source of truth.
 
 This is the Entity Communication connector. The legacy `Sylin.Koan.Messaging.Connector.RabbitMq`
 package has a different arbitrary-message contract and is not used underneath `Entity.Transport`.

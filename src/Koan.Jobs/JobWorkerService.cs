@@ -16,19 +16,19 @@ internal sealed class JobWorkerService : BackgroundService
     private readonly JobScheduler _scheduler;
     private readonly IJobLedger _ledger;
     private readonly JobTypeRegistry _registry;
-    private readonly IJobTransport _transport;
+    private readonly JobWakeCoordinator _wake;
     private readonly JobsOptions _options;
     private readonly TimeProvider _clock;
     private readonly ILogger<JobWorkerService> _logger;
 
     public JobWorkerService(JobOrchestrator orchestrator, JobScheduler scheduler, IJobLedger ledger,
-        JobTypeRegistry registry, IJobTransport transport, IOptions<JobsOptions> options, TimeProvider clock, ILogger<JobWorkerService> logger)
+        JobTypeRegistry registry, JobWakeCoordinator wake, IOptions<JobsOptions> options, TimeProvider clock, ILogger<JobWorkerService> logger)
     {
         _orchestrator = orchestrator;
         _scheduler = scheduler;
         _ledger = ledger;
         _registry = registry;
-        _transport = transport;
+        _wake = wake;
         _options = options.Value;
         _clock = clock;
         _logger = logger;
@@ -99,7 +99,7 @@ internal sealed class JobWorkerService : BackgroundService
                 if (iterationFailed)
                     await Task.Delay(_options.PollInterval, stoppingToken);
                 else
-                    await _transport.WaitForWork(_options.PollInterval, stoppingToken);
+                    await _wake.WaitForWork(_options.PollInterval, stoppingToken);
             }
             catch (OperationCanceledException) { break; }
         }

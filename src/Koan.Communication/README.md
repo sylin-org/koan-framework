@@ -68,24 +68,27 @@ retries.
 ## Provider election, local limits, and inspection
 
 With no connector, the default runtime has separate bounded, single-process, memory-only lanes for
-Events and Transport. Configure `CommunicationOptions.InProcessCapacity` and `MaxPayloadBytes` only
-when the defaults are inappropriate.
+Events, Transport, and framework-owned internal signals. The third lane is not an application bus;
+it lets modules such as Jobs reuse the elected provider without exposing arbitrary-object messaging.
+Configure `CommunicationOptions.InProcessCapacity` and `MaxPayloadBytes` only when the defaults are
+inappropriate.
 
-A directly referenced connector may claim one or both lanes. Election is per lane, so a RabbitMQ
-Transport connector can coexist with process-local Events. A transitive connector is inert. Direct
+A directly referenced connector may claim supported lanes. Election is per lane, so RabbitMQ can
+carry Transport and internal framework signals while Events remain process-local. A transitive connector is inert. Direct
 or explicit external intent never falls back to process-local reach when unavailable. Advanced hosts
-may pin `CommunicationOptions.TransportProvider` or `EventsProvider`; normal applications should let
-their direct references express intent.
+may pin `CommunicationOptions.TransportProvider`, `EventsProvider`, or `FrameworkSignalsProvider`;
+normal applications should let their direct references express intent.
 
 Startup reporting and shared facts show both adapters, assurances, bounds, typed handler groups, and
 context carriage. The same facts reach `/.well-known/Koan/facts` and `koan://facts` when those host
 surfaces are present.
 
 The local runtime is not durable and does not cross processes. The RabbitMQ connector currently
-provides confirmed, durable Transport publication with group fan-out and authenticated context, but
+provides confirmed, durable Transport and internal-signal publication with group fan-out and authenticated context, but
 not remote settlement, retries, deduplication, dead letters, replay, Events, or outbox coupling.
-Logical channel authoring and legacy Jobs/Cache bridge migration remain later slices. Legacy
-`Koan.Messaging` is not the implementation behind this API.
+Jobs wake now uses the internal lane and its old Messaging bridge is removed. Cache coherence remains
+a separate later convergence because its broadcast/catch-up semantics are not the Jobs competing-group shape.
+Legacy `Koan.Messaging` is not the implementation behind this API.
 
 See the [Communication reference](../../docs/reference/communication/index.md) and
 [ARCH-0113](../../docs/decisions/ARCH-0113-entity-capability-communication.md).

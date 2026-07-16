@@ -27,7 +27,7 @@ runtime.
 ## Result
 
 `ReviewRequest` implements `IKoanJob<ReviewRequest>`; its handler invokes the same `Assess` rule and
-reports completion. Jobs now contributes semantic `jobs:ledger` and `jobs:transport` facts. A defect
+reports completion. Jobs now contributes semantic `jobs:ledger` and `jobs:wake` facts. A defect
 found by the running journey—terminal settlement overwriting newer progress—was repaired by updating
 the claimed record before ledger persistence; shared in-memory and SQLite tests protect it.
 
