@@ -120,6 +120,40 @@ public sealed class EntityLanguageConsumerSpec
         result.Output.Should().Contain("Transport");
     }
 
+    [Fact]
+    public void Referencing_communication_adds_scalar_set_and_stream_events_with_typed_handlers()
+    {
+        var result = Compile("EventsAccess", includeCache: false, includeCommunication: true);
+
+        result.Succeeded.Should().BeTrue(result.Output);
+    }
+
+    [Fact]
+    public void Removing_communication_removes_the_events_language_from_the_same_source()
+    {
+        var result = Compile("EventsAccess", includeCache: false, includeCommunication: false);
+
+        result.Succeeded.Should().BeFalse();
+        result.Output.Should().Contain("Communication");
+    }
+
+    [Fact]
+    public void Events_reject_non_entity_receivers_at_compile_time()
+    {
+        var result = Compile("InvalidEventsReceiver", includeCache: false, includeCommunication: true);
+
+        result.Succeeded.Should().BeFalse();
+        result.Output.Should().Contain("Events");
+    }
+
+    [Fact]
+    public void Communication_facets_are_discoverable_from_the_normal_entity_namespace()
+    {
+        var result = Compile("CommunicationFacetNamespaceAccess", includeCache: false, includeCommunication: true);
+
+        result.Succeeded.Should().BeTrue(result.Output);
+    }
+
     private static CompilationResult Compile(
         string cell,
         bool includeCache,
@@ -157,12 +191,12 @@ public sealed class EntityLanguageConsumerSpec
         {
             AddAssembly(typeof(JobAccessorExtensions), assemblyPaths);
             AddAssembly(typeof(SoftDeleteExtensions), assemblyPaths);
-            AddAssembly(typeof(EntityTransportFacetExtensions), assemblyPaths);
+            AddAssembly(typeof(IReceiveEntity), assemblyPaths);
         }
 
         if (includeCommunication)
         {
-            AddAssembly(typeof(EntityTransportFacetExtensions), assemblyPaths);
+            AddAssembly(typeof(IReceiveEntity), assemblyPaths);
         }
 
         var compilation = CSharpCompilation.Create(

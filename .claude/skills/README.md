@@ -60,7 +60,7 @@ Every skill conforms — exemplars: **koan-caching**, **koan-jobs**.
 
 | Skill | Status | When to use |
 |-------|--------|-------------|
-| **koan-data-modeling** | ✅ (absorbed relationships) | Aggregates, lifecycle (`Events`), value objects, `[Parent]`/`Relatives()` |
+| **koan-data-modeling** | ✅ (absorbed relationships) | Aggregates, persistence `Lifecycle`, value objects, `[Parent]`/`Relatives()` |
 | **koan-multi-provider** | ✅ | Provider transparency, capability detection (`CapabilitySet`/`DataCaps`), context routing |
 | **koan-performance** | ✅ | Streaming, pagination (`QueryDefinition`), count strategies, bulk operations |
 | **koan-relationships** | ⟳ (retiring → data-modeling; dir removed in Phase 6) | Entity navigation, batch loading |
@@ -70,7 +70,7 @@ Every skill conforms — exemplars: **koan-caching**, **koan-jobs**.
 | Skill | Card | Status | When to use |
 |-------|------|--------|-------------|
 | **koan-storage** | storage.md | ✅ | `StorageEntity<T>` + `[StorageBinding]`, profiles, streaming, `MoveTo`/`CopyTo` tiering |
-| **koan-messaging** | messaging.md | ✅ | `myMsg.Send()` buffered-until-live, `services.On<T>()`, Reference=Intent transports |
+| **koan-messaging** | messaging.md | ✅ | Entity `Events.Raise`/`Transport.Send`, typed handlers, local outcomes, legacy Messaging boundary |
 | **koan-media** | media.md | ✅ | `MediaEntity<T>`, content-addressed `Store`, `[MediaRecipe]` transforms, `[MediaAnalysis]` |
 | **koan-tenancy** | tenancy.md | ✅ | Automatic tenant isolation (data/blob/cache), `Tenant.Use`/`None`, `[HostScoped]`, dev-open/prod-closed posture, `AssertNoLeak` |
 | **koan-orchestration** | orchestration.md | ✅ | `[KoanService]` descriptors, DevHost CLI, `OrchestrationMode` self-orchestration, Aspire |

@@ -21,7 +21,9 @@ public sealed class KoanCommunicationModule : KoanModule
     {
         var options = new CommunicationOptions();
         cfg.GetSection(Constants.Configuration.Section).Bind(options);
-        var receiverCount = TransportReceiverRegistry.FromDiscovery().All.Count;
+        var handlers = CommunicationHandlerCatalog.FromDiscovery();
+        var receiverCount = handlers.TransportReceivers.Count;
+        var subscriptionCount = handlers.EventSubscriptions.Count;
 
         module.Describe(Version);
         module.SetSetting(Constants.Provenance.Adapter, builder => builder
@@ -33,6 +35,15 @@ public sealed class KoanCommunicationModule : KoanModule
         module.SetSetting(Constants.Provenance.ReceiverGroups, builder => builder
             .Label("Typed receiver groups")
             .Value(receiverCount.ToString(CultureInfo.InvariantCulture)));
+        module.SetSetting(Constants.Provenance.EventAdapter, builder => builder
+            .Label("Default Entity Events")
+            .Value(Constants.Events.InProcessAdapter));
+        module.SetSetting(Constants.Provenance.EventAssurance, builder => builder
+            .Label("Event delivery assurance")
+            .Value(Constants.Events.ProcessMemoryAssurance));
+        module.SetSetting(Constants.Provenance.EventSubscriptions, builder => builder
+            .Label("Typed Event subscriptions")
+            .Value(subscriptionCount.ToString(CultureInfo.InvariantCulture)));
         module.SetSetting(Constants.Provenance.Capacity, builder => builder
             .Label("Bounded local queue")
             .Value(options.InProcessCapacity.ToString(CultureInfo.InvariantCulture)));

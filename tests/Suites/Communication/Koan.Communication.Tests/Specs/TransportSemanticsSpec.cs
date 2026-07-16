@@ -10,7 +10,7 @@ public sealed class TransportSemanticsSpec
     {
         var ct = TestContext.Current.CancellationToken;
         var state = new TransportTestState();
-        await using var host = await TransportTestHost.Start(state, ct);
+        await using var host = await CommunicationTestHost.Start(state, ct);
         using var hostScope = AppHost.PushScope(host.Services);
         var order = new BlockingOrder { Name = "accepted-copy" };
 
@@ -37,7 +37,7 @@ public sealed class TransportSemanticsSpec
     {
         var ct = TestContext.Current.CancellationToken;
         var state = new TransportTestState();
-        await using var host = await TransportTestHost.Start(state, ct);
+        await using var host = await CommunicationTestHost.Start(state, ct);
         using var hostScope = AppHost.PushScope(host.Services);
 
         var acceptance = await new CopyOrder { Name = "original" }.Transport.Send(ct);
@@ -53,7 +53,7 @@ public sealed class TransportSemanticsSpec
     {
         var ct = TestContext.Current.CancellationToken;
         var state = new TransportTestState();
-        await using var host = await TransportTestHost.Start(state, ct);
+        await using var host = await CommunicationTestHost.Start(state, ct);
         using var hostScope = AppHost.PushScope(host.Services);
         var repeated = new SequenceOrder { Value = 2 };
 
@@ -77,7 +77,7 @@ public sealed class TransportSemanticsSpec
     {
         var ct = TestContext.Current.CancellationToken;
         var state = new TransportTestState();
-        await using var host = await TransportTestHost.Start(state, ct);
+        await using var host = await CommunicationTestHost.Start(state, ct);
         using var hostScope = AppHost.PushScope(host.Services);
         var order = new SequenceOrder { Value = 7 };
 
@@ -95,7 +95,7 @@ public sealed class TransportSemanticsSpec
     {
         var ct = TestContext.Current.CancellationToken;
         var state = new TransportTestState();
-        await using var host = await TransportTestHost.Start(state, ct);
+        await using var host = await CommunicationTestHost.Start(state, ct);
         using var hostScope = AppHost.PushScope(host.Services);
 
         var acceptance = await new[]
@@ -116,7 +116,7 @@ public sealed class TransportSemanticsSpec
     {
         var ct = TestContext.Current.CancellationToken;
         var state = new TransportTestState();
-        await using var host = await TransportTestHost.Start(state, ct);
+        await using var host = await CommunicationTestHost.Start(state, ct);
         using var hostScope = AppHost.PushScope(host.Services);
 
         var acceptance = await new FailureOrder().Transport.Send(ct);
@@ -132,7 +132,7 @@ public sealed class TransportSemanticsSpec
     {
         var ct = TestContext.Current.CancellationToken;
         var state = new TransportTestState();
-        await using var host = await TransportTestHost.Start(state, ct);
+        await using var host = await CommunicationTestHost.Start(state, ct);
         using var hostScope = AppHost.PushScope(host.Services);
         var enumerated = false;
 

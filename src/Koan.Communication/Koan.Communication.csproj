@@ -5,8 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Description>Koan Communication: Entity-first local Transport with typed receivers, isolated snapshots, context carriage, and bounded acceptance.</Description>
-    <PackageTags>$(CommonPackageTags);communication;transport;entity;local-first</PackageTags>
+    <Description>Koan Communication: Entity-first local Events and Transport with typed handlers, isolated snapshots, context carriage, and bounded acceptance.</Description>
+    <PackageTags>$(CommonPackageTags);communication;events;transport;entity;local-first</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />

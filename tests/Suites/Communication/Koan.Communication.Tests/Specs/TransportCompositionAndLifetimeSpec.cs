@@ -12,7 +12,7 @@ public sealed class TransportCompositionAndLifetimeSpec
     {
         var ct = TestContext.Current.CancellationToken;
         var state = new TransportTestState();
-        await using var host = await TransportTestHost.Start(state, ct);
+        await using var host = await CommunicationTestHost.Start(state, ct);
 
         var facts = host.Services.GetRequiredService<IKoanRuntimeFacts>().Current;
         facts.Complete.Should().BeTrue();
@@ -37,7 +37,7 @@ public sealed class TransportCompositionAndLifetimeSpec
     {
         var ct = TestContext.Current.CancellationToken;
         var state = new TransportTestState();
-        await using var host = await TransportTestHost.Start(state, ct);
+        await using var host = await CommunicationTestHost.Start(state, ct);
         using var hostScope = AppHost.PushScope(host.Services);
 
         var acceptance = await new DrainOrder().Transport.Send(ct);
@@ -59,7 +59,7 @@ public sealed class TransportCompositionAndLifetimeSpec
     {
         var ct = TestContext.Current.CancellationToken;
         var first = new TransportTestState();
-        await using (var host = await TransportTestHost.Start(first, ct))
+        await using (var host = await CommunicationTestHost.Start(first, ct))
         {
             using var hostScope = AppHost.PushScope(host.Services);
             var acceptance = await new IsolationOrder().Transport.Send(ct);
@@ -67,7 +67,7 @@ public sealed class TransportCompositionAndLifetimeSpec
         }
 
         var second = new TransportTestState();
-        await using (var host = await TransportTestHost.Start(second, ct))
+        await using (var host = await CommunicationTestHost.Start(second, ct))
         {
             using var hostScope = AppHost.PushScope(host.Services);
             var acceptance = await new IsolationOrder().Transport.Send(ct);
@@ -84,7 +84,7 @@ public sealed class TransportCompositionAndLifetimeSpec
         var ct = TestContext.Current.CancellationToken;
         var state = new TransportTestState();
 
-        var action = () => TransportTestHost.Start(
+        var action = () => CommunicationTestHost.Start(
             state,
             ct,
             services => services.Configure<CommunicationOptions>(options => options.InProcessCapacity = 0));

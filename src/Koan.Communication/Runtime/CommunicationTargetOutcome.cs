@@ -1,6 +1,6 @@
 namespace Koan.Communication.Runtime;
 
-internal enum TransportTargetOutcome
+internal enum CommunicationTargetOutcome
 {
     Delivered,
     Filtered

@@ -220,15 +220,15 @@ Use this reference when you plan a Koan solution and need to understand which mo
   are demonstrated but do not share copy, cardinality, context, idempotency, or durability semantics.
 - **New work**: do not extend this generation. See the truthful
   [Messaging boundary](messaging/index.md) and the shipped process-local
-  [Communication Transport](communication/index.md).
+  [Communication Events and Transport](communication/index.md).
 
 ### Messaging Connectors (RabbitMQ, etc.)
 
 - **Current purpose**: provider-specific transport for the legacy demonstration surface.
 - **Boundary**: a connector reference is not evidence of reliable delivery. Test the exact topology
   and do not infer outbox, inbox, retry, ordering, or tenant-isolation guarantees.
-- **Current replacement**: process-local Entity `Transport` now ships under foundation `AddKoan()`.
-  Events and capability-declaring connector/channel election remain later R07 work.
+- **Current replacement**: process-local Entity `Events` and `Transport` now ship under foundation
+  `AddKoan()`. Capability-declaring connector/channel election remains later R07 work.
 
 ## 9. Secrets & Storage
 

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Koan.Communication;
 
-/// <summary>Registers Koan Communication and its built-in process-local Transport floor.</summary>
+/// <summary>Registers Koan Communication and its built-in process-local Events and Transport floor.</summary>
 public static class CommunicationServiceCollectionExtensions
 {
     public static IServiceCollection AddKoanCommunication(
@@ -27,15 +27,16 @@ public static class CommunicationServiceCollectionExtensions
             options.Configure(configure);
         }
 
-        var registry = TransportReceiverRegistry.FromDiscovery();
-        services.TryAddSingleton(registry);
-        foreach (var handlerType in registry.HandlerTypes)
+        var handlers = CommunicationHandlerCatalog.FromDiscovery();
+        services.TryAddSingleton(handlers);
+        foreach (var handlerType in handlers.HandlerTypes)
         {
             services.TryAdd(ServiceDescriptor.Scoped(handlerType, handlerType));
         }
 
-        services.TryAddSingleton<TransportIngress>();
-        services.TryAddSingleton<InProcessTransportRuntime>();
+        services.TryAddSingleton<CommunicationIngress>();
+        services.TryAddSingleton<InProcessCommunicationRuntime>();
+        services.TryAddSingleton<EventCoordinator>();
         services.TryAddSingleton<TransportCoordinator>();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IHostedService, CommunicationHostedService>());

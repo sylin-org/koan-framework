@@ -1,26 +1,17 @@
 using Koan.Core.Json;
 using Koan.Data.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Communication.Runtime;
 
-internal abstract class TransportReceiverBinding
+internal abstract class TransportReceiverBinding : CommunicationTargetBinding
 {
     protected TransportReceiverBinding(Type entityType, Type handlerType)
+        : base(
+            entityType,
+            handlerType,
+            $"{handlerType.FullName ?? handlerType.Name}<{entityType.FullName ?? entityType.Name}>")
     {
-        EntityType = entityType;
-        HandlerType = handlerType;
-        GroupIdentity = $"{handlerType.FullName ?? handlerType.Name}<{entityType.FullName ?? entityType.Name}>";
     }
-
-    public Type EntityType { get; }
-    public Type HandlerType { get; }
-    public string GroupIdentity { get; }
-
-    public abstract Task<TransportTargetOutcome> Dispatch(
-        IServiceProvider services,
-        string payload,
-        CancellationToken ct);
 
     public static TransportReceiverBinding Create(Type entityType, Type handlerType)
     {
@@ -32,22 +23,28 @@ internal abstract class TransportReceiverBinding
         : TransportReceiverBinding(typeof(TEntity), handlerType)
         where TEntity : class, IEntity
     {
-        public override async Task<TransportTargetOutcome> Dispatch(
+        public override async Task<CommunicationTargetOutcome> Dispatch(
             IServiceProvider services,
-            string payload,
+            CommunicationEnvelope envelope,
             CancellationToken ct)
         {
-            var entity = payload.FromJson<TEntity>()
+            if (envelope is not TransportEnvelope)
+            {
+                throw new InvalidOperationException(
+                    $"Transport receiver '{HandlerType.FullName}' received a non-Transport envelope.");
+            }
+
+            var entity = envelope.EntityPayload.FromJson<TEntity>()
                 ?? throw new InvalidOperationException(
                     $"The Transport snapshot for Entity '{typeof(TEntity).FullName}' deserialized to null.");
-            var handler = (IReceiveEntity<TEntity>)services.GetRequiredService(HandlerType);
+            var handler = (IReceiveEntity<TEntity>)ResolveHandler(services);
             if (!handler.Where(entity))
             {
-                return TransportTargetOutcome.Filtered;
+                return CommunicationTargetOutcome.Filtered;
             }
 
             await handler.Receive(entity, ct).ConfigureAwait(false);
-            return TransportTargetOutcome.Delivered;
+            return CommunicationTargetOutcome.Delivered;
         }
     }
 }

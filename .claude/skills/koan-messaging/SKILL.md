@@ -1,113 +1,122 @@
 ---
 name: koan-messaging
-description: Any object as a message — myMessage.Send() buffered-until-live (AdaptiveMessageProxy), services.On<T>(handler) registration, IMessagingProvider Reference=Intent transport (RabbitMQ), MessagingInterceptors payload substitution, and the pipeline Notify() stage
-pillar: messaging
+description: Entity communication through Events.Raise and Transport.Send, typed discovered handlers, local acceptance/settlement, context carriage, and the boundary from legacy Koan.Messaging or RabbitMQ
+pillar: communication
 card: docs/reference/cards/messaging.md
 status: current
-last_validated: 2026-06-18
+last_validated: 2026-07-15
 ---
 
-# Koan Messaging
+# Koan Entity Communication
 
 ## Trigger this skill when you see
 
-- `myMessage.Send(ct)` / `.Send()` on a plain object (`MessagingExtensions.Send`)
-- `services.On<T>(handler)` handler registration, `HandlerRegistry`
-- `IMessageProxy` (`IsLive`, `BufferedMessageCount`), `AdaptiveMessageProxy`, "buffered until live"
-- `IMessagingProvider` (`Name`, `Priority`, `CanConnect`, `CreateBus`), `IMessageBus`, `IMessageConsumer`
-- `MessagingInterceptors.RegisterForType<T>` / `RegisterForInterface<T>`, `TransportEnvelope`
-- References to `Koan.Messaging.Core` / `Koan.Messaging.Connector.RabbitMq`, `AddKoanMessaging()`
-- `.Pipeline().Notify(...)` (`PipelineMessagingExtensions`)
-- "fire and forget", "publish a message", "message bus", "broker", "RabbitMQ", "send without wiring a bus"
+- `entity.Events.Raise<TEvent>()`, Event details, or `IHandleEntityEvent<TEntity,TEvent>`
+- `entity.Transport.Send()`, Entity distribution, or `IReceiveEntity<TEntity>`
+- the same operation over `IEnumerable<TEntity>` or `IAsyncEnumerable<TEntity>`
+- acceptance, settlement, local fan-out, immutable copies, or context carriage
+- questions about message buses, RabbitMQ, `Koan.Messaging`, `.Send()` on arbitrary objects, or
+  `services.On<T>()`
 
 ## Core principle
 
-**Any object is a message — `.Send()` it, register a handler with `services.On<T>()`, never wire a bus.** `Send()` routes through an `IMessageProxy` that **buffers during startup and goes live once a transport connects** (`AdaptiveMessageProxy`), so it works from the first line of code with no broker yet. Transport is **Reference = Intent**: referencing `Koan.Messaging.Connector.RabbitMq` self-registers an `IMessagingProvider` (priority 100) that the lifecycle auto-selects over the in-memory fallback by probing `CanConnect` in descending `Priority`. No bus wiring in `Program.cs` beyond `AddKoan()`. `Send<T>` dispatches on the payload's **concrete runtime type** (after any registered interceptor), so derived / envelope-substituted types route correctly.
+**Application code states intent on an Entity; Communication chooses how it moves.** Use Events when a
+typed business occurrence happened to an Entity. Use Transport when receivers need a copy of the
+Entity state currently held. `AddKoan()` supplies both process-local paths with no registration DSL,
+bus, or routing configuration.
 
 <!-- validate -->
 ```csharp
-using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Koan.Messaging;
+using Koan.Communication;
+using Koan.Data.Core.Model;
 
-// Any plain class is a message — no base type, no [Message] attribute required.
-public sealed class UserRegistered
+public sealed class Order : Entity<Order>
 {
-    public string UserId { get; init; } = "";
-    public string Email { get; init; } = "";
+    public bool Ready { get; set; }
 }
 
-public static class MessagingWiring
-{
-    // Register a handler during startup (ConfigureServices). A consumer is
-    // created for it when messaging goes live.
-    public static IServiceCollection AddUserHandlers(this IServiceCollection services)
-        => services.On<UserRegistered>(async msg =>
-        {
-            Console.WriteLine($"Welcome {msg.UserId} ({msg.Email})");
-            await Task.CompletedTask;
-        });
+public sealed record OrderApproved;
 
-    // Substitute the outbound payload at send time (e.g. wrap in a transport
-    // envelope) by concrete type — applied inside Send before dispatch.
-    public static void RegisterEnvelope()
-        => MessagingInterceptors.RegisterForType<UserRegistered>(m => m);
+public sealed class RecordApproval : IHandleEntityEvent<Order, OrderApproved>
+{
+    public Task Handle(
+        Order order,
+        EventOccurrence<OrderApproved> occurrence,
+        CancellationToken ct) => Task.CompletedTask;
 }
 
-public sealed class Registration
+public sealed class ImportOrder : IReceiveEntity<Order>
 {
-    // Fire-and-forget from anywhere: buffered pre-live, routed to the bus once connected.
-    public async Task Complete(string userId, string email, CancellationToken ct = default)
-        => await new UserRegistered { UserId = userId, Email = email }.Send(ct);
+    public bool Where(Order order) => order.Ready;
+    public Task Receive(Order order, CancellationToken ct) => Task.CompletedTask;
+}
+
+public static class OrderCommunication
+{
+    public static async Task Publish(Order order, CancellationToken ct = default)
+    {
+        await order.Events.Raise<OrderApproved>(ct);
+        await order.Transport.Send(ct);
+    }
 }
 ```
 
-## Reference = Intent activation
+## Choose the semantic lane
 
-| Add this reference | Effect |
-|---|---|
-| `Koan.Messaging.Core` | `.Send()` + `services.On<T>()` live; `AdaptiveMessageProxy` buffers until a transport connects. In-memory fallback provider when nothing else elects. |
-| `+ Koan.Messaging.Connector.RabbitMq` | Self-registers an `IMessagingProvider` (priority 100) via `IKoanAutoRegistrar`; lifecycle auto-selects it over in-memory when `CanConnect` succeeds. Connection is orchestration-discovered. |
+| Intent | Canonical surface | Meaning |
+|---|---|---|
+| Persistence rule | `Order.Lifecycle.BeforeUpsert(...)` | Data behavior around load/upsert/remove |
+| Business occurrence | `order.Events.Raise<OrderApproved>()` | a typed fact happened to this Entity |
+| Entity distribution | `order.Transport.Send()` | deliver isolated copies of current Entity state |
+| Durable/retried work | `job.Job.Submit(...)` | ledger-backed execution, not an Event guarantee |
 
-| Surface | What it does |
-|---|---|
-| `myMessage.Send(ct)` (`MessagingExtensions.Send`) | Fire-and-forget; auto-buffers pre-live, routes to the live `IMessageBus`. Dispatches on the concrete runtime type. |
-| `services.On<T>(Func<T,Task>)` (`MessagingExtensions.On`) | Adds a handler to the `HandlerRegistry`; a consumer is created when messaging goes live. |
-| `IMessageProxy` (`IsLive`, `BufferedMessageCount`) | The buffer→live seam, resolved from `AppHost.Current` — `Send()` needs no injection. |
-| `IMessagingProvider` (`Name`, `Priority`, `CanConnect`, `CreateBus`) | Transport contract; self-registers via `IKoanAutoRegistrar`, auto-selected by descending `Priority`. |
-| `MessagingInterceptors.RegisterForType<T>` / `RegisterForInterface<T>` | Substitute the outbound payload at send time, by concrete type or by implemented interface. |
+The terminals lift pointwise over one Entity, a finite collection, and a lazy async stream. Standard
+LINQ or a provider-qualified Data query selects senders; there is no routing DSL.
 
-## The buffer → live lifecycle
+## Event details and outcomes
 
-`Send()` resolves the singleton `IMessageProxy` (`AdaptiveMessageProxy`) from `AppHost.Current`. Until a provider goes live it calls `_buffer.BufferAsync`; on `GoLive(bus)` the lifecycle flushes the buffer to the bus and flips `IsLive`. `MessagingLifecycleService` (an `IHostedService` wired by `AddKoanMessaging()`) iterates `availableProviders.OrderByDescending(p => p.Priority)`, calls `CanConnect`, and `CreateBus()` on the first that answers — then `HandlerRegistry.CreateConsumers(bus)` binds every `On<T>` handler. So a `Send()` issued in startup, before any broker check, is never lost.
+Prefer payloadless event-kind tokens because the Entity supplies identity and state. Pass an explicit
+details value when the occurrence needs more information. `[EventDetailsRequired]` makes omission a
+pre-enumeration error.
+
+Awaiting Raise/Send means bounded publication acceptance, not handler completion. Call
+`WaitForSettlement(ct)` on the returned receipt only when the caller needs local correlated
+observation. Event handler filtering/failure and Transport receiver filtering/failure settle
+independently.
+
+## Guarantees and current boundary
+
+- Every handler group receives newly deserialized Entity state; Event details are copied per group.
+- Context carriers are captured once and restored without Communication naming tenant or subject.
+- Zero Event subscriptions is valid; zero Transport receivers fails before source enumeration.
+- Events and Transport have separate bounded local lanes and drain on cooperative host shutdown.
+- The built-in adapter is process-local, memory-only, and has no retry, durability, outbox, replay,
+  dead-letter, or transaction-coupling guarantee.
+
+External connector/channel election and RabbitMQ parity are not yet shipped. The old arbitrary-object
+`Koan.Messaging` surface (`message.Send()`, `services.On<T>()`, startup proxy/buffer, interceptors) is
+deprecated and remains only for unmigrated internal bridges and repository demonstrations. Do not
+teach it as the application path or adapt it beneath Entity Communication.
 
 ## Anti-patterns to flag
 
 | If you see | Suggest |
 |---|---|
-| `IBus` / `IMessageBus` injected into a service just to publish | `myMessage.Send()` — the proxy is resolved ambiently; no injection, and it works pre-live. |
-| `bus.SendAsync(msg)` / `_bus.PublishAsync(msg)` as the app-facing verb | `msg.Send(ct)` is the canonical surface (`IMessageBus.SendAsync` is the transport-internal sink the proxy calls). |
-| `this.On<T>((msg, sp, ct) => …)` / `services.OnMessage<T>(…)` (3-arg) | `services.On<T>(Func<T,Task>)` — the handler takes the message only; resolve dependencies inside it. |
-| A hand-rolled `IHostedService` that connects RabbitMQ in `Program.cs` | Reference `Koan.Messaging.Connector.RabbitMq` — Reference = Intent self-registers the provider; the lifecycle elects it. |
-| `if (!busReady) queue.Enqueue(msg)` startup buffering by hand | The `AdaptiveMessageProxy` already buffers pre-live and flushes on `GoLive` — just `Send()`. |
-| `services.AddSingleton<IMessageProxy>(...)` / manual provider wiring | Don't hand-register the proxy/lifecycle; `AddKoan()` (or `AddKoanMessaging()`) wires the core. |
-| Manually wrapping every payload in an envelope at each call site | `MessagingInterceptors.RegisterForType<T>` / `RegisterForInterface<T>` once — substitution happens inside `Send`. |
-| Sending inside the pipeline DSL with a try/catch around `Send` | `.Notify(e => new …)` (`PipelineMessagingExtensions`) — faults are recorded on the envelope, not thrown. |
-
-## Escape hatches
-
-- **Pipeline notification**: inside the semantic pipeline DSL, `await someEntities.Pipeline().Notify(e => new UserRegistered { UserId = e.Id })` sends a per-entity message as a stage; a send fault is recorded on the envelope (`envelope.RecordError`), not thrown (`PipelineMessagingExtensions.Notify`).
-- **Payload substitution**: `MessagingInterceptors.RegisterForType<T>(m => wrapped)` (exact concrete type) or `RegisterForInterface<T>(...)` (any implementer) rewrites the outbound payload at send time — used to wrap in a `TransportEnvelope`. Dispatch is then on the substituted object's runtime type.
-- **Manual core wiring**: `services.AddKoanMessaging()` registers the proxy / buffer / lifecycle by hand — normally the auto-registrar does this for you under `AddKoan()`.
-- **Provider config**: the RabbitMQ transport reads `Koan:Messaging:RabbitMQ:ConnectionString` (fallback `Koan:Messaging:ConnectionString`), but orchestration discovery resolves the broker automatically when omitted — no config needed for the local/container path.
-- **Proxy introspection**: resolve `IMessageProxy` to read `IsLive` / `BufferedMessageCount` for health/diagnostics (e.g. assert the buffer drained after startup).
+| `.Send()` on an arbitrary DTO as new application code | Model the business subject as an Entity and choose `.Events.Raise<E>()` or `.Transport.Send()`. |
+| `services.On<T>(...)` or a handler lambda | A business-named `IHandleEntityEvent<TEntity,TEvent>` or `IReceiveEntity<TEntity>` class; discovery is automatic. |
+| Persistence hooks called `Events` | `Entity.Lifecycle`; Events are business occurrences. |
+| Injecting a bus only to publish | Use the Entity terminal; transport is an internal adapter concern. |
+| Assuming Raise waits for side effects | Inspect `EventAcceptance`, then explicitly wait for local settlement when needed. |
+| Treating a collection Raise as one group fact | Model the group as its own Entity; collection terminals mean one occurrence per yielded Entity. |
+| Claiming tenant isolation from Communication-specific code | Context axes are owned by their modules; Communication carries opaque sealed context. |
+| Claiming RabbitMQ/durability because a legacy connector is referenced | The current supported ring is local-only until connector conformance ships. |
 
 ## See also
 
-- [Reference card: messaging.md](../../../docs/reference/cards/messaging.md) — one-screen pillar map
-- [Messaging pillar reference](../../../docs/reference/messaging/index.md) — full detail (message types, routing, config)
-- [`samples/S3.Mq.Sample`](../../../samples/S3.Mq.Sample/README.md) — minimal end-to-end over RabbitMQ: `AddKoan()` self-wires the connector, then `new UserRegistered { … }.Send()` fires over the live bus
-- [koan-jobs](../koan-jobs/SKILL.md) — `Koan.Jobs.Transport.Messaging` rides this bus for cross-node push-dispatch
-- [koan-caching](../koan-caching/SKILL.md) — `Koan.Cache.Coherence.Messaging` rides this bus for cross-node invalidation
+- [Communication reference](../../../docs/reference/communication/index.md) — current supported API
+- [Messaging card](../../../docs/reference/cards/messaging.md) — legacy boundary and replacement
+- [ARCH-0113](../../../docs/decisions/ARCH-0113-entity-capability-communication.md) — semantic laws
+- [Entity semantics contract](../../../docs/architecture/entity-semantics-contract.md) — capability ring
+- [koan-jobs](../koan-jobs/SKILL.md) — choose durable work when delivery is not enough

@@ -11,8 +11,8 @@ source: src/Koan.Messaging.Core/
 
 This is a legacy experimental implementation being replaced under
 [ARCH-0113](../../docs/decisions/ARCH-0113-entity-capability-communication.md). Process-local Entity
-Transport now ships separately in `Koan.Communication`; this package remains only for unmigrated legacy
-and internal bridge consumers. It is code evidence, not a stable delivery contract.
+Events and Transport now ship separately in `Koan.Communication`; this package remains only for
+unmigrated legacy and internal bridge consumers. It is code evidence, not a stable delivery contract.
 
 ## Current mechanism
 
@@ -41,7 +41,7 @@ Do not infer those guarantees from connector names, historical MESS decisions, o
 
 ## Replacement boundary
 
-R07 moves ambient context beneath Data, makes Data Lifecycle/streaming truthful, and then proves Entity
-`Transport` and `Events` first through a faithful built-in in-process adapter. External connectors are
+R07 moved ambient context beneath Data, made Data Lifecycle/streaming truthful, and proved Entity
+`Events` and `Transport` through a faithful built-in in-process adapter. External connectors are
 rebuilt only against the same conformance kit. See the
 [current Messaging reference](../../docs/reference/messaging/index.md).

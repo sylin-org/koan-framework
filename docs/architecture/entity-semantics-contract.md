@@ -253,10 +253,12 @@ public sealed class ImportTodo : IReceiveEntity<Todo> { /* business code */ }
 await todo.Transport.Send(ct);
 ```
 
-Implementation status at R07-07: Lifecycle and the process-local Transport half of this grammar ship.
-Events, stable distributed receiver aliases, connector manifests/election, and broker conformance remain
-specified but unimplemented. The local Transport spellings and guarantees below are executable; the
-remaining paragraphs are the admission contract for later slices, not current capability claims.
+Implementation status at R07-08: Lifecycle and both process-local Communication lanes ship. Local
+Events prove payloadless/explicit details, occurrence identity, subscription fan-out, zero-subscriber
+success, isolated copies, context carriage, acceptance, settlement, and independent bounded ingress.
+Stable distributed receiver aliases, connector manifests/election, retries, and broker conformance
+remain specified but unimplemented. Distributed paragraphs below are admission contracts for later
+slices, not current capability claims.
 
 Lifecycle registration is deterministic, idempotent per owner, removable, host-scoped, and invoked by
 the canonical Data operation path. Before-hooks may reject with a stable code and correction.
@@ -300,9 +302,9 @@ occurrence/snapshot identity, fan-out/receiver-group cardinality, copy, context,
 semantics. Crossing a process does not itself cross a bounded context; crossing a bounded context
 requires the explicit integration contract rather than silently publishing a persisted Entity schema.
 
-The V1 foundation must provide the complete ring through one faithful in-process adapter. R07-07 now
-provides local `Send` with auto-discovered typed handlers and zero routing configuration; local `Raise`
-is the next slice. A future build-generated application communication manifest distinguishes direct
+The V1 foundation provides the complete local ring through one faithful in-process adapter. R07-07
+provides local `Send`; R07-08 provides local `Raise`; both use auto-discovered typed handlers and zero
+routing configuration. A future build-generated application communication manifest distinguishes direct
 PackageReference/ProjectReference connector intent from transitive availability. One eligible outbound
 adapter is elected per logical channel; every local group binds once to the same channel. Publishers
 publish once and never infer remote receiver acceptance. InProcess implements that same contract when
@@ -326,8 +328,9 @@ communication requires a future explicit integration manifest. Wire identity is 
 channel, versioned contract, operation/item, correlation, and sealed context—not a deployment plan
 hash. The plan hash remains diagnostic so compatible rolling configuration can coexist.
 
-Boot currently emits the selected local Transport floor, assurance, bounds, typed groups, and context
-carriage. Later mesh work must expand this into the complete contract/channel/outbound-adapter/local-
+Boot currently emits both selected local Communication lanes, assurance, separate bounds, typed Event
+subscription and Transport receiver groups, and context carriage. Later mesh work must expand this into
+the complete contract/channel/outbound-adapter/local-
 group/inbound-binding matrix through the same startup, operator, and authorized agent projections.
 Every surface reuses the same reason codes and safe corrections.
 

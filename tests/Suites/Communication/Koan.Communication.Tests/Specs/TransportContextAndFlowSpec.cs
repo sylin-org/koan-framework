@@ -12,7 +12,7 @@ public sealed class TransportContextAndFlowSpec
     {
         var ct = TestContext.Current.CancellationToken;
         var state = new TransportTestState();
-        await using var host = await TransportTestHost.Start(state, ct);
+        await using var host = await CommunicationTestHost.Start(state, ct);
         using var hostScope = AppHost.PushScope(host.Services);
 
         TransportAcceptance tenantAcceptance;
@@ -35,7 +35,7 @@ public sealed class TransportContextAndFlowSpec
         var outerCt = TestContext.Current.CancellationToken;
         using var sendCts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
         var state = new TransportTestState();
-        await using var host = await TransportTestHost.Start(
+        await using var host = await CommunicationTestHost.Start(
             state,
             outerCt,
             services => services.Configure<CommunicationOptions>(options => options.InProcessCapacity = 1));
@@ -65,7 +65,7 @@ public sealed class TransportContextAndFlowSpec
     {
         var ct = TestContext.Current.CancellationToken;
         var state = new TransportTestState();
-        await using var host = await TransportTestHost.Start(
+        await using var host = await CommunicationTestHost.Start(
             state,
             ct,
             services => services.Configure<CommunicationOptions>(options => options.MaxPayloadBytes = 8));

@@ -75,6 +75,30 @@ background work, `[Embedding]` semantic search, `[McpEntity]` agent tools. Backe
 Koan refuses to pretend otherwise: every adapter declares its capabilities, the framework
 negotiates them, and an unsupported operation fails loudly instead of silently degrading.
 
+Entity Communication is included in the foundation and activates through the same `AddKoan()` call:
+
+```csharp
+public sealed record OrderApproved;
+
+public sealed class RecordApproval : IHandleEntityEvent<Order, OrderApproved>
+{
+    public Task Handle(Order order, EventOccurrence<OrderApproved> occurrence, CancellationToken ct)
+        => Task.CompletedTask;
+}
+
+public sealed class ImportOrder : IReceiveEntity<Order>
+{
+    public Task Receive(Order order, CancellationToken ct) => Task.CompletedTask;
+}
+
+await order.Events.Raise<OrderApproved>(ct); // a typed occurrence happened to this Entity
+await order.Transport.Send(ct);              // distribute an isolated copy of current Entity state
+```
+
+Both terminals lift pointwise over finite Entity collections and lazy streams. The current supported
+adapter is bounded, process-local, and memory-only. The older arbitrary-object `Koan.Messaging`
+surface is deprecated; do not infer RabbitMQ, retry, or durability from the local Communication API.
+
 ### 3 · The app explains itself
 
 The boot report printed at startup names every discovered module, the elected adapters, and the

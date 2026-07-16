@@ -9,7 +9,7 @@ framework_version: v0.18.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 through R07-07 passed; Event occurrence policy is next
+  scope: R07-01 through R07-08 passed; the local semantic ring is complete and mesh exploration is next
 ---
 
 # Koan V1 reorganization current handoff
@@ -63,6 +63,14 @@ Replace this file at every handoff. It is a restart point, not a diary.
   capture/restoration, fixed-size acceptance and local settlement, graceful drain, and structured
   startup/operator/agent facts. Communication passes 14/14; Entity language 16/16; Packaging 54/54;
   direct/foundation packs, changed examples, docs, locks, diff, and privacy gates pass.
+- [R07-08](work-items/r07/R07-08-local-events.md) passed. Foundation `AddKoan()` now provides
+  payloadless and explicit-details Entity Events over scalar/set/stream sources, with typed discovered
+  subscriptions, occurrence identity, fan-out copies, zero-subscriber success, opaque context,
+  bounded acceptance, local settlement, and boot facts. Communication's implementation coalesces
+  host lifecycle, discovery, context ingress, bounded accounting, and observation while retaining
+  separate Event and Transport queues and lane-owned semantics. Communication passes 28/28; Entity
+  language passes 20/20; warning-as-error build, direct/foundation packs, changed examples, docs, and
+  skills gates pass.
 - Public Messaging guidance is reduced to the truthful legacy v0.17 generation. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -165,7 +173,7 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
 6. Minimal Data.Core Entity-cardinality adapter, pillar-owned execution, and deletion of the two real
    public Pipeline uses. **Passed as R07-06.**
 7. Faithful local Transport under `AddKoan()`. **Passed as R07-07.**
-8. Events occurrence policy on the same kernel.
+8. Events occurrence policy on the same kernel. **Passed as R07-08.**
 9. Multi-connector mesh, RabbitMQ parity, Jobs wake, and Cache coherence migration.
 10. Secondary pointwise lifts: Relationships, constrained Jobs streams, AI Embed/Index, Cache eviction,
    then Media if a real derivative operation earns it.
@@ -234,15 +242,18 @@ semantics pass over the local boundary.
   Communication build; direct/foundation packs; changed examples 2/2; docs lint 0 errors; generated
   FirstUse/GoldenJourney locks; and stale-claim/diff/privacy inventories. No release-certification
   suite was rerun.
+- R07-08 passes Communication 28/28 and Entity language 20/20; warning-as-error Communication build;
+  direct/foundation packs; changed examples 4/4; docs lint 0 errors; and skills lint 0 errors/warnings.
+  No release-certification suite was rerun.
 
 ## Next safe action
 
-Explore Event occurrence semantics as R07-08. Reuse only the local mechanisms Transport proved truly
-shared—host/context scope, bounded ingress lifecycle, discovery, and aggregate observation—while
-keeping occurrence identity, zero-subscriber success, fan-out, event details policy, acceptance, and
-settlement Event-owned. Lock `IHandleEntityEvent<TEntity,TEvent>` and payload-less
-`entity.Events.Raise<TEvent>()` with compile probes before implementation. Do not open brokers,
-RabbitMQ compatibility, multi-connector election, or legacy bridge migration yet.
+Explore R07-09 as the smallest truthful mesh slice. Start with the build manifest and channel/provider
+election boundary: prove direct versus transitive connector intent, the minimum-priority in-process
+floor, unavailable selected-provider failure, and startup/fact explanation before designing RabbitMQ
+or migrating legacy bridges. Preserve the local Event/Transport semantics and separate lanes; do not
+add application routing code, retries, durability claims, or broker breadth until an adapter
+conformance plan earns them.
 
 ## Repository boundary
 

@@ -1,11 +1,9 @@
-using Koan.Communication.Infrastructure;
-
 namespace Koan.Communication.Runtime;
 
-internal sealed class TransportOperation
+internal sealed class CommunicationOperation
 {
-    private readonly int _receiverGroups;
-    private readonly TaskCompletionSource<TransportSettlement> _settlement =
+    private readonly int _targetGroups;
+    private readonly TaskCompletionSource<CommunicationSettlementCounts> _settlement =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private long _enumerated;
     private long _accepted;
@@ -18,9 +16,10 @@ internal sealed class TransportOperation
     private int _sealed;
     private int _sourceCompleted;
 
-    public TransportOperation(int receiverGroups)
+    public CommunicationOperation(int targetGroups)
     {
-        _receiverGroups = receiverGroups;
+        ArgumentOutOfRangeException.ThrowIfNegative(targetGroups);
+        _targetGroups = targetGroups;
         OperationId = Guid.CreateVersion7();
     }
 
@@ -32,13 +31,13 @@ internal sealed class TransportOperation
     public void ReserveAcceptance()
     {
         Interlocked.Increment(ref _accepted);
-        Interlocked.Add(ref _expected, _receiverGroups);
+        Interlocked.Add(ref _expected, _targetGroups);
     }
 
     public void RollBackAcceptance()
     {
         Interlocked.Decrement(ref _accepted);
-        Interlocked.Add(ref _expected, -_receiverGroups);
+        Interlocked.Add(ref _expected, -_targetGroups);
     }
 
     public void MarkDelivered()
@@ -72,17 +71,14 @@ internal sealed class TransportOperation
         }
     }
 
-    public TransportAcceptance Snapshot()
+    public CommunicationOperationSnapshot Snapshot()
         => new(
             OperationId,
             Volatile.Read(ref _enumerated),
             Volatile.Read(ref _accepted),
             Volatile.Read(ref _rejected),
             Volatile.Read(ref _sourceCompleted) == 1,
-            _receiverGroups,
-            Constants.Transport.DefaultChannel,
-            Constants.Transport.InProcessAdapter,
-            Constants.Transport.ProcessMemoryAssurance,
+            _targetGroups,
             _settlement.Task);
 
     private void MarkSettled()
@@ -99,8 +95,7 @@ internal sealed class TransportOperation
             return;
         }
 
-        _settlement.TrySetResult(new TransportSettlement(
-            OperationId,
+        _settlement.TrySetResult(new CommunicationSettlementCounts(
             Volatile.Read(ref _expected),
             Volatile.Read(ref _delivered),
             Volatile.Read(ref _filtered),

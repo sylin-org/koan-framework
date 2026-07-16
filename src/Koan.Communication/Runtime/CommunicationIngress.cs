@@ -4,13 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Communication.Runtime;
 
-internal sealed class TransportIngress(
+internal sealed class CommunicationIngress(
     IServiceScopeFactory scopeFactory,
     KoanContextCarrierRegistry contextCarriers)
 {
-    public async Task<TransportTargetOutcome> Dispatch(
-        TransportReceiverBinding receiver,
-        TransportEnvelope envelope,
+    public async Task<CommunicationTargetOutcome> Dispatch(
+        CommunicationTargetBinding target,
+        CommunicationEnvelope envelope,
         CancellationToken ct)
     {
         using var serviceScope = scopeFactory.CreateScope();
@@ -18,7 +18,7 @@ internal sealed class TransportIngress(
         using var contextScope = contextCarriers.Restore(
             envelope.Context,
             ContextIngressTrust.HostTrusted);
-        return await receiver.Dispatch(serviceScope.ServiceProvider, envelope.Payload, ct)
+        return await target.Dispatch(serviceScope.ServiceProvider, envelope, ct)
             .ConfigureAwait(false);
     }
 }

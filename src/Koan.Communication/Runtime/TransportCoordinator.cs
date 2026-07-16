@@ -7,9 +7,9 @@ using Microsoft.Extensions.Options;
 namespace Koan.Communication.Runtime;
 
 internal sealed class TransportCoordinator(
-    TransportReceiverRegistry receivers,
+    CommunicationHandlerCatalog handlers,
     KoanContextCarrierRegistry contextCarriers,
-    InProcessTransportRuntime runtime,
+    InProcessCommunicationRuntime runtime,
     IOptions<CommunicationOptions> options)
 {
     public async Task<TransportAcceptance> Send<TEntity>(
@@ -19,8 +19,8 @@ internal sealed class TransportCoordinator(
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        var targets = receivers.For(typeof(TEntity));
-        var operation = new TransportOperation(targets.Count);
+        var targets = handlers.TransportFor(typeof(TEntity));
+        var operation = new CommunicationOperation(targets.Count);
         var capturedContext = contextCarriers.Capture();
         if (targets.Count == 0)
         {
@@ -29,7 +29,7 @@ internal sealed class TransportCoordinator(
                 TransportException.FailureKind.NoReceivers,
                 $"Entity Transport has no IReceiveEntity<{typeof(TEntity).Name}> receiver group. " +
                 "Add a business-named receiver class or remove this Send call.",
-                operation.Snapshot());
+                new TransportAcceptance(operation.Snapshot()));
         }
 
         try
@@ -61,7 +61,7 @@ internal sealed class TransportCoordinator(
                         TransportException.FailureKind.Serialization,
                         $"Entity Transport could not serialize '{typeof(TEntity).Name}' at ordinal {ordinal}. " +
                         "Use a finite JSON snapshot without reference cycles or unsupported values.",
-                        operation.Snapshot(),
+                        new TransportAcceptance(operation.Snapshot()),
                         ex);
                 }
 
@@ -73,7 +73,7 @@ internal sealed class TransportCoordinator(
                         TransportException.FailureKind.PayloadTooLarge,
                         $"Entity Transport rejected '{typeof(TEntity).Name}' at ordinal {ordinal} because its " +
                         $"snapshot exceeds the configured {nameof(CommunicationOptions.MaxPayloadBytes)} limit.",
-                        operation.Snapshot());
+                        new TransportAcceptance(operation.Snapshot()));
                 }
 
                 var envelope = new TransportEnvelope(
@@ -82,7 +82,7 @@ internal sealed class TransportCoordinator(
                     typeof(TEntity),
                     payload,
                     capturedContext,
-                    targets);
+                    targets.Cast<CommunicationTargetBinding>().ToArray());
                 operation.ReserveAcceptance();
                 try
                 {
@@ -107,7 +107,7 @@ internal sealed class TransportCoordinator(
             }
 
             operation.Seal(true);
-            return operation.Snapshot();
+            return new TransportAcceptance(operation.Snapshot());
         }
         catch (TransportException)
         {
@@ -128,26 +128,26 @@ internal sealed class TransportCoordinator(
             throw new TransportException(
                 TransportException.FailureKind.SourceFailed,
                 $"Entity Transport source '{typeof(TEntity).Name}' failed after {ordinal} accepted snapshot(s).",
-                operation.Snapshot(),
+                new TransportAcceptance(operation.Snapshot()),
                 ex);
         }
     }
 
-    private static TransportException ProviderUnavailable(TransportOperation operation, Exception error)
+    private static TransportException ProviderUnavailable(CommunicationOperation operation, Exception error)
         => new(
             TransportException.FailureKind.ProviderUnavailable,
             "Entity Transport could not accept the snapshot into the process-local channel. " +
             "Ensure the Koan host is running and not stopping.",
-            operation.Snapshot(),
+            new TransportAcceptance(operation.Snapshot()),
             error);
 
     private static TransportCanceledException Canceled(
-        TransportOperation operation,
+        CommunicationOperation operation,
         OperationCanceledException error,
         CancellationToken ct)
         => new(
             "Entity Transport publication was canceled; the acceptance reports the already accepted prefix.",
-            operation.Snapshot(),
+            new TransportAcceptance(operation.Snapshot()),
             error,
             ct);
 }

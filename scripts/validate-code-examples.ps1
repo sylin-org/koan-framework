@@ -259,6 +259,7 @@ function Create-TestProject {
     <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.AI\Koan.Data.AI.csproj" />
     <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Communication\Koan.Communication.csproj" />
     <ProjectReference Include="..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
     <ProjectReference Include="..\..\src\Koan.Observability\Koan.Observability.csproj" />

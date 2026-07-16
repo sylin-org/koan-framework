@@ -19,17 +19,19 @@ discovery and real InMemory/RabbitMQ message movement, but it does **not** defin
 application contract. Do not base new application architecture on this surface.
 
 [ARCH-0113](../../decisions/ARCH-0113-entity-capability-communication.md) replaces it with the
-Communication ring. Its first supported slice now ships as
-[process-local Entity Transport](../communication/index.md):
+Communication ring. Its supported process-local Events and Transport paths now ship under
+foundation `AddKoan()`:
 
 ```csharp
+await order.Events.Raise<OrderApproved>(ct);
 await order.Transport.Send(ct);
 ```
 
-The shipped local path provides `AddKoan()` composition, scalar/set/stream Entity semantics, typed
-receiver filters, immutable copies, context isolation, bounded acceptance, local correlated settlement,
-and boot-time explanation. Events, connector manifests/election, brokers, retries, and RabbitMQ parity
-remain unimplemented and must not be inferred from local Transport.
+The [Communication reference](../communication/index.md) describes the supported paths: scalar/set/
+stream Entity semantics, typed Event subscriptions and Transport receivers, isolated copies, context
+isolation, bounded acceptance, local correlated settlement, and boot-time explanation. Connector
+manifests/election, brokers, retries, and RabbitMQ parity remain unimplemented and must not be inferred
+from the local runtime.
 
 ## What exists in v0.17
 
@@ -106,7 +108,7 @@ R07 proceeds in this order:
 1. Core-owned ambient context, truthful Lifecycle/streaming, and minimal Entity cardinality are
    complete;
 2. process-local Entity Transport under `AddKoan()` is complete;
-3. Event occurrence semantics follow on the same proven boundary;
+3. process-local Entity Event occurrence semantics on the same proven boundary are complete;
 4. zero-application-routing-code connector mesh/channel behavior follows local semantics; and
 5. RabbitMQ is rebuilt only against that conformance kit.
 

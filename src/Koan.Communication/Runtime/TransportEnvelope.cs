@@ -1,9 +1,17 @@
 namespace Koan.Communication.Runtime;
 
-internal sealed record TransportEnvelope(
-    TransportOperation Operation,
-    long Ordinal,
-    Type EntityType,
-    string Payload,
-    IReadOnlyDictionary<string, string>? Context,
-    IReadOnlyList<TransportReceiverBinding> Receivers);
+internal sealed class TransportEnvelope(
+    CommunicationOperation operation,
+    long ordinal,
+    Type entityType,
+    string entityPayload,
+    IReadOnlyDictionary<string, string>? context,
+    IReadOnlyList<CommunicationTargetBinding> targets)
+    : CommunicationEnvelope(
+        CommunicationLane.Transport,
+        operation,
+        ordinal,
+        entityType,
+        entityPayload,
+        context,
+        targets);

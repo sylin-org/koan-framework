@@ -1,9 +1,10 @@
+using Koan.Communication;
 using Koan.Communication.Infrastructure;
 using Koan.Communication.Runtime;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 
-namespace Koan.Communication;
+namespace Koan.Data.Core.Model;
 
 /// <summary>A terminal-only Entity Transport facet; it does not expose a general flow container.</summary>
 public readonly struct EntityTransportFacet<TEntity>

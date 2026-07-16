@@ -1,11 +1,26 @@
 # Koan Communication
 
-Entity Transport is available automatically when an application references `Sylin.Koan` and calls
-`AddKoan()`. A lower-level application can reference `Sylin.Koan.Communication` directly. No receiver
-registration or transport configuration is required.
+Entity Events and Transport are available automatically when an application references `Sylin.Koan`
+and calls `AddKoan()`. A lower-level application can reference `Sylin.Koan.Communication` directly.
+No handler registration, bus, or transport configuration is required.
 
 ```csharp
 using Koan.Communication;
+using Koan.Data.Core.Model;
+
+public sealed record OrderApproved;
+
+public sealed class RecordApproval : IHandleEntityEvent<Order, OrderApproved>
+{
+    public Task Handle(
+        Order order,
+        EventOccurrence<OrderApproved> occurrence,
+        CancellationToken ct)
+    {
+        // business reaction to an occurrence
+        return Task.CompletedTask;
+    }
+}
 
 public sealed class ImportOrder : IReceiveEntity<Order>
 {
@@ -13,68 +28,51 @@ public sealed class ImportOrder : IReceiveEntity<Order>
 
     public Task Receive(Order order, CancellationToken ct)
     {
-        // business code
+        // business code over an isolated snapshot
         return Task.CompletedTask;
     }
 }
 
-var accepted = await order.Transport.Send(ct);
-var settled = await accepted.WaitForSettlement(ct);
+var eventAccepted = await order.Events.Raise<OrderApproved>(ct);
+var eventSettled = await eventAccepted.WaitForSettlement(ct);
+
+var sendAccepted = await order.Transport.Send(ct);
+var sendSettled = await sendAccepted.WaitForSettlement(ct);
 ```
 
-The same terminal works pointwise for a finite set or a lazy async stream:
+Both terminals work pointwise for an Entity, a finite set, or a lazy async stream. Event kinds are
+payloadless by default; pass a details value when the fact needs more information and mark contracts
+that require it with `[EventDetailsRequired]`.
 
-```csharp
-await orders.Transport.Send(ct);
-await Order.QueryStream(order => order.Ready).Transport.Send(ct);
-```
-
-`Send` serializes each Entity when the operation accepts it. Every discovered receiver group gets a
-fresh deserialized copy; handlers never share the sender's mutable object or another group's object.
-The operation captures all composed Koan context carriers once at terminal invocation and restores
-them around each receiver. Tenant and subject semantics therefore remain owned by their modules,
-while Communication transports their opaque values.
+Communication serializes each accepted Entity. Every discovered handler group receives a fresh copy;
+Event details are copied per subscription too. The operation captures composed Koan context carriers
+once and restores them around every handler, without Communication naming tenant, subject, or any
+other axis.
 
 ## Acceptance and settlement
 
-Awaiting `Send` means the bounded local channel accepted the enumerated snapshots. It does not wait
-for receiver code:
+Awaiting `Raise` or `Send` means a bounded local lane accepted the enumerated items. It does not wait
+for handler code. Each receipt reports fixed-size aggregate counts and offers an operation-scoped
+`WaitForSettlement`. Event filtering/failure and Transport filtering/failure are settlement outcomes.
+Publication failures and cancellation carry the accepted prefix.
 
-- `TransportAcceptance` reports enumerated, accepted, and rejected counts plus the operation id,
-  receiver-group count, selected adapter, and assurance.
-- `WaitForSettlement` waits only for that operation and returns delivered, filtered, and failed
-  target counts.
-- A missing receiver fails before source enumeration.
-- Publication cancellation and other publication failures carry the accepted prefix.
-- Receiver filters and handler failures are terminal settlement outcomes, not publication failures.
+Zero Event subscriptions is a valid occurrence. Transport with no receiver group fails before source
+enumeration. Each deliberate terminal call has a new operation identity; the built-in runtime does no
+retries.
 
-Every deliberate `Send` has a new operation identity. The built-in local runtime performs no retries.
+## Local limits and inspection
 
-## Local limits
+The default runtime has separate bounded, single-process, memory-only lanes for Events and Transport.
+Configure `CommunicationOptions.InProcessCapacity` and `MaxPayloadBytes` only when the defaults are
+inappropriate.
 
-The built-in floor is a bounded, single-process, memory-only channel. Configure its safety bounds only
-when the defaults are inappropriate:
+Startup reporting and shared facts show both adapters, assurances, bounds, typed handler groups, and
+context carriage. The same facts reach `/.well-known/Koan/facts` and `koan://facts` when those host
+surfaces are present.
 
-```csharp
-builder.Services.Configure<CommunicationOptions>(options =>
-{
-    options.InProcessCapacity = 512;
-    options.MaxPayloadBytes = 8 * 1024 * 1024;
-});
-```
+The local runtime is not durable and does not cross processes. Connector election, logical channels,
+RabbitMQ, retries, dead letters, replay, outbox coupling, and legacy Jobs/Cache bridge migration are
+later slices. Legacy `Koan.Messaging` is not the implementation behind this API.
 
-Inspect `communication:transport:default`, discovered receiver groups, assurance, queue capacity,
-payload limit, and context carriage through Koan's startup report and `/.well-known/Koan/facts` or
-`koan://facts` when those host surfaces are present.
-
-## Boundaries
-
-- The local channel is not durable and does not cross processes or survive restart.
-- Receiver handlers must honor their cancellation token so host shutdown can drain responsibly.
-- Source order and multiplicity are preserved by the local runtime; no collection atomicity is implied.
-- Transport does not save, reload, or otherwise involve the Data pipeline.
-- Events, connector election, broker retries, dead letters, and RabbitMQ parity are later Communication
-  slices. Legacy `Koan.Messaging` is not the implementation behind this API.
-
-See the [Communication reference](../../docs/reference/communication/index.md) for the supported path
-and [ARCH-0113](../../docs/decisions/ARCH-0113-entity-capability-communication.md) for the semantic laws.
+See the [Communication reference](../../docs/reference/communication/index.md) and
+[ARCH-0113](../../docs/decisions/ARCH-0113-entity-capability-communication.md).

@@ -29,6 +29,15 @@
 > graceful drain, and repeated-host isolation. The built-in provider performs no retries, so broker
 > retry/dedupe conformance remains part of the connector slice rather than a local durability claim.
 
+> **Implementation update (R07-08, 2026-07-15):** the same package now ships process-local Entity
+> Events without collapsing them into Transport. The compile contract fixes
+> `IHandleEntityEvent<TEntity,TEvent>`, payloadless and explicit-details `.Events.Raise`, and
+> scalar/set/stream discovery from the normal Entity namespace. The real `AddKoan()` suite proves
+> per-Entity occurrence identity, fan-out identity, per-subscription copies, zero-subscriber success,
+> details-required pre-enumeration rejection, filtering/failure settlement, context isolation, bounded
+> partial cancellation, separate Event/Transport lanes, composition facts, drain, and repeated hosts.
+> No connector, retry, durability, or broker claim follows from the local floor.
+
 ## Context
 
 Koan's Entity-first language has the right center but the wrong boundaries around communication.
