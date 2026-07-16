@@ -63,7 +63,7 @@ An axis's scope is one knob: **broad** (tenant: `Entity.Without<HostScoped>()`) 
 
 ### 6. Modules extend the entity verb surface
 
-Axis modules add verbs to `Entity<T>` via **C# 14 extension members** — the established Koan idiom (`.Uncache()`, `.Job`/`.Jobs`, `.Copy()/.Move()`). `Koan.Data.SoftDelete` adds `.HardDelete()`/`.Restore()`/`Todo.WithDeleted()`. Reference = Intent reaches the call site.
+Axis modules add verbs to `Entity<T>` via **C# 14 extension members** — the established Koan idiom (`.Cache.Evict()`, `.Job`/`.Jobs`, `.Copy()/.Move()`). `Koan.Data.SoftDelete` adds `.HardDelete()`/`.Restore()`/`Todo.WithDeleted()`. Reference = Intent reaches the call site.
 
 ### 7. The `[DataAxis]` premium authoring layer — sugar over the conformant seams
 

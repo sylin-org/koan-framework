@@ -7,9 +7,9 @@ status: draft
 last_updated: 2026-07-16
 framework_version: v0.19.0
 validation:
-  date_last_tested: 2026-07-15
+  date_last_tested: 2026-07-16
   status: in-progress
-  scope: R07-01 through R07-15 passed; Entity-entry Cache eviction is the next candidate
+  scope: R07-01 through R07-16 passed; Media derivative/prewarm semantics are the next candidate
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,7 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T6 — capability-ring graduation`
 - Active work item: R07 — rebuild the semantic capability ring
-- Active child: none; R07-15 passed and Cache eviction inventory is next
+- Active child: none; R07-16 passed and Media capability inventory is next
 - V1 readiness: `not ready`; T7 remains gated by T6 and an observed public package publication
 
 ## Work items
@@ -36,7 +36,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 | R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
-| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-16 | R07-01 through [R07-15](work-items/r07/R07-15-embedding-write-convergence.md) pass. Inventory Entity-entry Cache eviction next; keep policy/topology/flush at control plane. |
+| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-16 | R07-01 through [R07-16](work-items/r07/R07-16-entity-cache-eviction.md) pass. Inventory Media derivative/prewarm semantics next; add nothing for symmetry. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -52,12 +52,13 @@ item should normally be `in-progress`.
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 | R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
-| R07 | in progress | R07-01 through R07-15 passed. Inventory Entity-entry Cache eviction next; open a child only after semantic election. |
+| R07 | in progress | R07-01 through R07-16 passed. Inventory Media derivative/prewarm semantics next; open a child only after semantic election. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-16 | R07-16 | Explicit Cache eviction had developer intent but split identity from repository caching: the repository honored custom policy templates while `Uncache`/the generic handle forced a default template. The scalar APIs also could not express bounded finite/stream work or partial outcomes. | Replace the split surface with scalar/set/stream `entity.Cache.Evict()`. One Cache-owned plan now supplies policy, safety exclusion, template, Data routing tokens, and managed equality scope to repository, eviction, and startup facts. Preserve type/tag control plane, capture context once, execute sequentially with fixed-size outcomes, delete old APIs without aliases. Cache topology 57/57, cross-engine 14/14, Entity Language 25/25, real Tenancy + SQLite 6/6, strict build/pack/docs/examples/inventory pass. |
 | 2026-07-16 | R07-15 | AI had three implementations of the same model/source/embed/guard/provenance/vector/state write, while the async worker re-saved the domain Entity and its durable job copied business text plus unused per-item policy. Visual symmetry suggested `.Index()`/source `.Embed()`, but ordinary indexing and rebuild already had distinct canonical owners. | Add no public synonym. Keep `[Embedding]` + `Save` as ordinary Lifecycle indexing and `EmbeddingMigrator` as rebuild control plane. Route lifecycle, worker, and migrator through one vector-only writer; reload current Entity under restored context; honor `EmbedOptions.Source`; remove duplicated queue policy and inert per-Entity worker knobs. Data.AI 87/87, AI Unit 158/158, focused packs/docs/examples/inventory pass. |
 | 2026-07-16 | R07-14 | Jobs exposed scalar `.Job.Submit`, a duplicate type-level list submit, and a direct finite extension whose coordinator materialized every `JobRecord` and returned only an opaque count. Async Entity sources had no natural terminal; deferred enumeration could drift from the logical context captured for ledger rows. | Keep `.Job` scalar and `.Jobs` control-plane intent distinct. Converge scalar/set/stream only at one Jobs-owned acceptance operation; seal context once around enumeration and persistence, accept sequentially, wake at bounded intervals, return a fixed-size accepted-prefix summary, and delete the duplicate batch path/materialization without claiming collection atomicity or bounded ledger growth. |
 | 2026-07-16 | R07-13 | The advertised finite/stream `Relatives<TEntity,TKey>` API cannot infer `TKey`, so S1 teaches explicit framework generics; graph loading is split between the Entity base, a public one-consumer batch loader, reflection, and a fixed literal. | Lift only `Relatives`: use a receiver shape that infers custom keys, reuse `EntityCardinality` and the bounded child executor, centralize graph batching in one internal owner, batch parents with `GetMany`, and delete `GetRelatives` plus the public loader without aliases. |

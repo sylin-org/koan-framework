@@ -79,7 +79,7 @@ public sealed class Billing
 |---|---|
 | `Koan.Tenancy` | Registers the `__koan_tenant` discriminator + the fail-closed guard + read-filter + blob-key particle + cache-key segment + the async-hop carrier. Every non-`[HostScoped]` entity is now isolated. |
 | (already present) `Koan.Storage` | Blob keys gain a leading tenant particle at the `IStorageService` chokepoint (STOR-0011) — `StorageEntity`/`MediaEntity`/presign/raw all covered. |
-| (already present) `Koan.Cache` | `[Cacheable]` entities partition their cache key by tenant; out-of-band `Uncache`/`Flush` evict the right scoped key. |
+| (already present) `Koan.Cache` | `[Cacheable]` entities partition their cache key by tenant; out-of-band `entity.Cache.Evict()` consumes the same captured policy/key/scope plan. |
 | (already present) `Koan.Jobs` | The ambient tenant rides the async-hop (ARCH-0100): a job executes in the tenant it was submitted under. |
 
 Posture is environment-derived (Development → `Open`, else → `Closed`); override only to test the strict path:

@@ -14,6 +14,12 @@ title: Cache Control Surface Helpers and Entity Policy Integration
 > but its syntax is now owned by `Koan.Cache`. `Todo.Cache` appears only when that module is
 > referenced; Data.Core no longer predicts an unavailable cache capability.
 
+> **2026-07-16 amendment (ARCH-0113 / R07-16):** the static facet is explicitly the type/tag control
+> plane (`Explain/Flush/Count/Any`). Concrete entry invalidation is the distinct pointwise
+> `entity.Cache.Evict()` operation, lifted to finite and async sources with fixed-size partial outcomes.
+> Repository caching and explicit eviction consume one host-owned policy/key/scope plan. The former
+> `Uncache()` and generic cache handle are deleted without aliases.
+
 > **Contract**
 >
 > - **Inputs:** Koan.Cache client abstractions, cache policy registry metadata, Entity<TEntity> lifecycles, and developer requests for targeted cache invalidation diagnostics.

@@ -21,5 +21,6 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Cache\Koan.Cache.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Cache.Abstractions\Koan.Cache.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Communication\Koan.Communication.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
   </ItemGroup>
 </Project>

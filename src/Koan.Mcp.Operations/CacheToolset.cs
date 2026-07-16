@@ -11,8 +11,9 @@ namespace Koan.Mcp.Operations;
 /// <summary>
 /// P3.2 — the <c>cache</c> operational toolset (opt-in via <c>Koan:Mcp:Operations:Cache</c>). Governed agent verbs
 /// over the cache: flush one entity type's entries, or flush the whole cache. All require an <c>@ops:cache</c> grant;
-/// both verbs audit; <c>flushAll</c> is destructive (needs <c>confirm</c>). Wraps <see cref="ICacheClient"/> directly
-/// (the generic entity-cache handle is type-parameterized). There is no global cache-clear primitive, so
+/// both verbs audit; <c>flushAll</c> is destructive (needs <c>confirm</c>). This is a distinct type/global
+/// control plane and therefore wraps <see cref="ICacheClient"/> directly rather than projecting pointwise
+/// Entity entry eviction. There is no global cache-clear primitive, so
 /// <c>flushAll</c> enumerates the registered <see cref="ICachePolicyRegistry"/> entity tags.
 /// </summary>
 [McpOperationalToolset("cache")]

@@ -79,6 +79,14 @@
 > batch materialization, and opaque count are deleted. The result does not claim collection atomicity,
 > handler completion, or bounded ledger growth.
 
+> **Implementation update (R07-16, 2026-07-16):** Cache entry eviction now follows the pointwise
+> lifting law through `entity.Cache.Evict()` and its finite/async source forms. One Cache-owned plan
+> selects policy, exclusion, custom template, Data routing tokens, and managed equality scope for both
+> repository caching and explicit eviction. Execution captures/restores logical context once, applies
+> sequential backpressure, and returns a fixed-size removed/absent/skipped summary; typed failure and
+> cancellation retain the confirmed prefix. Static `EntityType.Cache` remains policy/tag control
+> plane. `Uncache`, the generic handle, and the default-template-only key path are deleted.
+
 ## Context
 
 Koan's Entity-first language has the right center but the wrong boundaries around communication.

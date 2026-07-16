@@ -6,15 +6,13 @@ using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
-using Koan.Cache.Keys;
+using Koan.Cache.Entity;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
-using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core;
-using Koan.Data.Core.Pipeline;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Cache.Decorators;
@@ -34,74 +32,26 @@ internal sealed class CachedRepository<TEntity, TKey> :
     private readonly IInstructionExecutor<TEntity>? _instructionExecutor;
     private readonly ICacheClient _cacheClient;
     private readonly CachePolicyDescriptor _entityPolicy;
-    private readonly CacheKeyTemplate _entityTemplate;
+    private readonly EntityCachePlan.Resolution _plan;
     private readonly ILogger<CachedRepository<TEntity, TKey>> _logger;
-    private readonly Func<TEntity, TKey> _keyAccessor;
     private readonly string _entityName;
-    private readonly bool _excludeFromCache;
 
     public CachedRepository(
         IDataRepository<TEntity, TKey> inner,
         ICacheClient cacheClient,
-        CachePolicyDescriptor entityPolicy,
-        ILogger<CachedRepository<TEntity, TKey>> logger,
-        IEnumerable<IReadFilterContributor> readContributors)
+        EntityCachePlan.Resolution plan,
+        ILogger<CachedRepository<TEntity, TKey>> logger)
     {
         _inner = inner ?? throw new ArgumentNullException(nameof(inner));
         _cacheClient = cacheClient ?? throw new ArgumentNullException(nameof(cacheClient));
-        _entityPolicy = entityPolicy ?? throw new ArgumentNullException(nameof(entityPolicy));
+        _plan = plan ?? throw new ArgumentNullException(nameof(plan));
+        _entityPolicy = plan.Policy;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        _entityTemplate = CacheKeyTemplate.For(_entityPolicy.KeyTemplate);
         _query = inner as IQueryRepository<TEntity, TKey>;
         _rawQuery = inner as IRawQueryRepository<TEntity, TKey>;
         _instructionExecutor = inner as IInstructionExecutor<TEntity>;
-        _keyAccessor = static entity => ((IEntity<TKey>)entity).Id;
-        _entityName = CacheKey.EntityTypeName(typeof(TEntity));
-        // ARCH-0098 §6: an entity whose stored value is transformed on read (e.g. a [Classified] field encrypted at
-        // rest) must NOT be cached. The Data facade owns reversal and remains outside decorators; retaining the
-        // exclusion also prevents transformed provider payloads from becoming a second cache representation.
-        // Generic: the cache never names classification; it asks the field-transform registry. Off ⇒ false ⇒ no change.
-        //
-        // DATA-0106 §5: an entity read-scoped by a NON-equality axis (a viewer-context row-visibility predicate, e.g.
-        // moderation) is excluded from caching. An id-keyed cache namespace is equality-by-construction; partitioning by
-        // the row's stamped scalar is the wrong operand for a viewer predicate (it would serve a hidden row to a viewer
-        // who shouldn't see it). Correctness dominates the lost partition — even a MIXED (equality + non-equality) entity
-        // is excluded for the whole type. Equality axes (tenancy) stay cache-partitioned via ScopedEntityCacheKey as before.
-        //
-        // The exclusion signal rides the WHOLE read-scope surface, not just the managed registry: a managed non-equality
-        // descriptor (AutoReadFilter==false) AND a PURE predicate IReadFilterContributor with no managed field (the
-        // canonical moderation shape). Keying only off the managed registry would miss the latter and silently cache-leak.
-        var nonEqualityAxis = NonEqualityManagedAxis(typeof(TEntity));
-        var predicateAxisExcludes = ReadContributorExcludes(readContributors, typeof(TEntity));
-        _excludeFromCache = StorageFieldTransformRegistry.HasTransformsFor(typeof(TEntity))
-            || nonEqualityAxis is not null
-            || predicateAxisExcludes;
-        if (nonEqualityAxis is not null || predicateAxisExcludes)
-            _logger.LogInformation(
-                "[Cacheable] {Entity} excluded from cache: a non-equality read-scope ('{Axis}') cannot be an equality cache-key segment (DATA-0106 §5); reads stay isolated via its read-filter predicate.",
-                _entityName, nonEqualityAxis ?? "predicate-contributor");
-    }
-
-    // The first non-equality managed axis (AutoReadFilter == false) applicable to the type, or null. Drives the
-    // cache-exclusion above. Off / no managed field ⇒ null ⇒ byte-identical (the registry IsEmpty fast path).
-    private static string? NonEqualityManagedAxis(Type entityType)
-    {
-        if (ManagedFieldRegistry.IsEmpty) return null;
-        var managed = ManagedFieldRegistry.ForType(entityType);
-        for (var i = 0; i < managed.Count; i++)
-            if (!managed[i].AutoReadFilter) return managed[i].StorageName;
-        return null;
-    }
-
-    // Whether any registered read-filter contributor declares this type's read-scope non-cacheable (a non-equality
-    // predicate). Ambient-independent — consulted once at decorator construction. Catches a PURE predicate axis that
-    // registers NO managed descriptor (so NonEqualityManagedAxis above cannot see it).
-    private static bool ReadContributorExcludes(IEnumerable<IReadFilterContributor> contributors, Type entityType)
-    {
-        foreach (var c in contributors)
-            if (c.ExcludesFromCache(entityType)) return true;
-        return false;
+        _entityName = plan.EntityName;
     }
 
     // ARCH-0084: forward the inner provider's unified capabilities (native IDescribesCapabilities,
@@ -112,8 +62,6 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
-        if (_excludeFromCache) return await _inner.Get(id, ct);   // never cache a read-transformed (e.g. classified) value
-
         var effectiveStrategy = ResolveEffectiveStrategy();
 
         if (effectiveStrategy is CacheStrategy.NoCache or CacheStrategy.SetOnly or CacheStrategy.Invalidate)
@@ -318,8 +266,6 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     private async ValueTask HandleWrite(TEntity entity, CancellationToken ct)
     {
-        if (_excludeFromCache) return;   // a read-transformed entity is never written to the cache (would store plaintext)
-
         if (_entityPolicy.Strategy is CacheStrategy.NoCache)
         {
             return;
@@ -347,9 +293,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     private async ValueTask Remove(TKey id, CancellationToken ct)
     {
-        if (_excludeFromCache) return;   // nothing was cached for this type
-
-        if (_entityPolicy.Strategy is CacheStrategy.NoCache or CacheStrategy.SetOnly)
+        if (_entityPolicy.Strategy is CacheStrategy.NoCache)
         {
             return;
         }
@@ -364,7 +308,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     private CacheKey? ResolveKey(TEntity entity)
     {
-        var id = _keyAccessor(entity);
+        var id = entity.Id;
         if (IsDefaultKey(id))
         {
             _logger.LogDebug("Entity of type {Entity} produced a default key; skipping cache interaction.", _entityName);
@@ -381,43 +325,14 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     private bool TryBuildEntityKey(TEntity? entity, object? id, out CacheKey key)
     {
-        // Ambient context for the key template. {Partition} and {Source} are pulled from
-        // EntityContext so the same Id under different partitions / data sources produces
-        // distinct keys (correctness — without this, multi-partition deployments collide).
-        var ctx = EntityContext.Current;
-        var ambient = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        if (!_plan.TryBuildKey(entity, id, out key))
         {
-            ["Id"] = id,
-            ["Key"] = id,
-            ["TypeName"] = _entityName,
-            ["Partition"] = string.IsNullOrWhiteSpace(ctx?.Partition) ? "_" : ctx.Partition,
-            ["Source"] = string.IsNullOrWhiteSpace(ctx?.Source) ? "_" : ctx.Source,
-        };
-
-        if (entity is not null)
-        {
-            ambient["Entity"] = entity;
-        }
-
-        var formatted = _entityTemplate.TryFormat(entity, ambient, out var missingToken);
-        if (formatted is null)
-        {
-            if (missingToken)
-            {
-                _logger.LogDebug("Cache policy for {Entity} could not resolve key template '{Template}'. Skipping cache interaction.", _entityName, _entityPolicy.KeyTemplate);
-            }
-
-            key = default;
+            _logger.LogDebug(
+                "Cache policy for {Entity} could not resolve key template '{Template}'. Skipping cache interaction.",
+                _entityName,
+                _entityPolicy.KeyTemplate);
             return false;
         }
-
-        // DATA-0105 §3.2 — the cache decorator sits inside the Data facade, but a keyed cache lookup still cannot carry
-        // the facade's managed read predicate into its physical lookup. The managed equality scope
-        // (tenant/classification) MUST therefore partition the cache key or a [Cacheable] managed entity can serve one
-        // scope's row to another. The scope-fold is delegated to the one
-        // canonical builder (gap B) so the read path and the out-of-band evict sites compose the SAME key. Off / no
-        // managed field for this type ⇒ no suffix ⇒ byte-identical key.
-        key = new CacheKey(ScopedEntityCacheKey.AppendScope(formatted, typeof(TEntity)));
         return true;
     }
 

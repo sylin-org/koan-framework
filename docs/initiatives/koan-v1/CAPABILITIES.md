@@ -280,20 +280,23 @@ boundaries remain pre-V1 work.
   attributes/extensions; Koan resolves stores, policy, tiers, and coherence.
 - **Entry point and owner:** [`CacheableAttribute`](../../../src/Koan.Cache.Abstractions/Policies/CacheableAttribute.cs),
   the module-owned [`EntityCacheFacet`](../../../src/Koan.Cache/Entity/EntityCacheFacet.cs),
-  [`EntityCacheExtensions`](../../../src/Koan.Cache/Extensions/EntityCacheExtensions.cs), typed stores,
+  [`EntityCacheEntryFacet`](../../../src/Koan.Cache/Entity/EntityCacheEntryFacet.cs), the host-owned
+  [`EntityCachePlan`](../../../src/Koan.Cache/Entity/EntityCachePlan.cs), typed stores,
   and the Cache-owned peer-invalidation coordinator over Communication.
 - **Executable evidence:** the
   [cross-engine suite](../../../tests/Suites/Cache/CrossEngine/Koan.Tests.Cache.CrossEngine/Koan.Tests.Cache.CrossEngine.csproj)
   passes 14/14; the
   [Entity-language consumer suite](../../../tests/Suites/EntityLanguage/Koan.Tests.EntityLanguage/Koan.Tests.EntityLanguage.csproj)
-  passes 9/9 for module absence/presence/removal, receiver validity, collision safety, explanation,
-  compatibility operations, corrective failure, and repeated-host resolution. Cache Abstractions pass
-  51/51, topology passes 49/49, analyzer passes 6/6, and Communication passes 33/33. Real Redis passes
+  proves module absence/presence/removal, scalar/set/stream receiver validity, collision safety,
+  explanation, control-plane operations, and corrective failure. Cache topology proves one shared
+  repository/eviction plan, bounded execution, captured context, and partial outcomes. Cache Abstractions pass
+  51/51, topology passes its current focused suite, analyzer passes 6/6, and Communication passes 33/33. Real Redis passes
   5/5 and real RabbitMQ passes 7/7, including every-node carriage.
 - **Inspection and failure:** composition facts and health report topology, coherence mode, elected carrier,
   assurance, L1-only receipt, origin filtering, and the L1-TTL safety bound. Invalid provider pins fail loud.
 - **Unsupported / compatibility:** no durable replay/catch-up, retry, dedupe, multi-carrier publication,
-  remote settlement, or global flush wire contract is claimed.
+  remote settlement, global flush wire contract, or batch-atomic source eviction is claimed. The former
+  `Uncache` and generic cache handle have no compatibility alias.
 - **Maturity / safe claim:** `verified`. The tested cache contract and cross-engine semantics pass;
   production coherence guarantees remain topology- and provider-specific.
 - **Open risks:** production guarantees remain provider/topology-specific; durable replay requires a real

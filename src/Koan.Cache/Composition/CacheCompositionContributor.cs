@@ -1,6 +1,7 @@
 using Koan.Cache.Abstractions;
 using Koan.Cache.Abstractions.Coherence;
 using Koan.Cache.Coherence;
+using Koan.Cache.Entity;
 using Koan.Cache.Options;
 using Koan.Cache.Policies;
 using Koan.Cache.Topology;
@@ -15,10 +16,13 @@ internal sealed class CacheCompositionContributor : IKoanCompositionContributor
 {
     public void Contribute(KoanCompositionBuilder builder, IServiceProvider services)
     {
+        services.GetService<CachePolicyBootstrapper>()?.EnsureInitialized();
+
         var topology = services.GetService<CacheTopology>();
         var coordinator = services.GetService<CoherenceCoordinator>();
         var options = services.GetService<IOptions<CacheOptions>>()?.Value;
         var policies = services.GetService<CachePolicyRegistry>();
+        var entityPlans = services.GetService<EntityCachePlan>()?.ResolveAll() ?? [];
         if (topology is null || coordinator is null || options is null) return;
 
         var topologySelection = topology switch
@@ -72,8 +76,36 @@ internal sealed class CacheCompositionContributor : IKoanCompositionContributor
         builder.AddObservation(
             "koan.cache.policies.discovered",
             "cache:policies",
-            $"Koan materialized {policies?.GetAllPolicies().Count ?? 0} cache policy declaration(s).",
+            $"Koan materialized {policies?.GetAllPolicies().Count ?? 0} cache policy declaration(s) and resolved " +
+            $"{entityPlans.Count} Entity entry plan(s): " +
+            $"{entityPlans.Count(static plan => plan.ExclusionReason is null)} active, " +
+            $"{entityPlans.Count(static plan => plan.ExclusionReason is not null)} safety-excluded.",
             "typed-policy-discovery",
             typeof(CacheCompositionContributor).FullName);
+
+        foreach (var plan in entityPlans)
+        {
+            var typeName = plan.EntityType.FullName ?? plan.EntityType.Name;
+            var subject = $"cache:entity-plan:{typeName}";
+            if (plan.ExclusionReason is null)
+            {
+                builder.AddObservation(
+                    "koan.cache.entity-plan.resolved",
+                    subject,
+                    $"{typeName} uses {plan.Policy.Strategy} Entity entry caching with key template " +
+                    $"'{plan.Policy.KeyTemplate}'; managed equality axes are appended to the rendered key.",
+                    "entity-cache-plan",
+                    typeof(CacheCompositionContributor).FullName);
+            }
+            else
+            {
+                builder.AddObservation(
+                    "koan.cache.entity-plan.excluded",
+                    subject,
+                    $"{typeName} is excluded from Entity entry caching because {plan.ExclusionReason}.",
+                    "cache-safety-exclusion",
+                    typeof(CacheCompositionContributor).FullName);
+            }
+        }
     }
 }

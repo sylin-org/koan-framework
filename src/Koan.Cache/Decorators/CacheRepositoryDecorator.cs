@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Linq;
-using Koan.Cache.Abstractions.Policies;
-using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
-using Koan.Data.Abstractions;
+using Koan.Cache.Entity;
 using Koan.Core;
 using Koan.Data.Core.Decorators;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,12 +17,12 @@ namespace Koan.Cache.Decorators;
 [ProviderPriority(100)]
 internal sealed class CacheRepositoryDecorator : IDataRepositoryDecorator
 {
-    private readonly ICachePolicyRegistry _policyRegistry;
+    private readonly EntityCachePlan _plans;
     private readonly ILogger<CacheRepositoryDecorator> _logger;
 
-    public CacheRepositoryDecorator(ICachePolicyRegistry policyRegistry, ILogger<CacheRepositoryDecorator> logger)
+    public CacheRepositoryDecorator(EntityCachePlan plans, ILogger<CacheRepositoryDecorator> logger)
     {
-        _policyRegistry = policyRegistry ?? throw new ArgumentNullException(nameof(policyRegistry));
+        _plans = plans ?? throw new ArgumentNullException(nameof(plans));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -36,15 +33,18 @@ internal sealed class CacheRepositoryDecorator : IDataRepositoryDecorator
             return null;
         }
 
-        var policies = _policyRegistry.GetPoliciesFor(entityType);
-        if (policies.Count == 0)
+        var plan = _plans.TryResolve(entityType);
+        if (plan is null)
         {
             return null;
         }
 
-        var entityPolicy = policies.FirstOrDefault(p => p.Scope == CacheScope.Entity && p.Strategy != CacheStrategy.NoCache);
-        if (entityPolicy is null)
+        if (plan.ExclusionReason is not null)
         {
+            _logger.LogInformation(
+                "[Cacheable] {Entity} excluded from cache: {Reason}.",
+                plan.EntityName,
+                plan.ExclusionReason);
             return null;
         }
 
@@ -55,8 +55,11 @@ internal sealed class CacheRepositoryDecorator : IDataRepositoryDecorator
         }
 
         var decoratorType = typeof(CachedRepository<,>).MakeGenericType(entityType, keyType);
-        var decorated = ActivatorUtilities.CreateInstance(services, decoratorType, repository, cacheClient, entityPolicy);
-        _logger.LogDebug("Cache decorator applied to repository for {EntityType} using strategy {Strategy}.", entityType.Name, entityPolicy.Strategy);
+        var decorated = ActivatorUtilities.CreateInstance(services, decoratorType, repository, cacheClient, plan);
+        _logger.LogDebug(
+            "Cache decorator applied to repository for {EntityType} using strategy {Strategy}.",
+            entityType.Name,
+            plan.Policy.Strategy);
         return decorated;
     }
 }

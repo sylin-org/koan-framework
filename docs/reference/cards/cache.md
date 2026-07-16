@@ -4,12 +4,12 @@ domain: data
 title: "Cache — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-06-18
-framework_version: v0.17.0
+last_updated: 2026-07-16
+framework_version: v0.19.0
 validation:
-  date_last_tested: 2026-06-18
+  date_last_tested: 2026-07-16
   status: verified
-  scope: docs/reference/cards/cache.md
+  scope: Entity entry eviction, type control plane, repository key convergence, topology, and coherence
 ---
 
 # Cache — pillar map
@@ -57,14 +57,17 @@ using (EntityContext.NoCache())               // bypass cache for this scope (Re
     var fresh = await Todo.Get(id);           // straight from the store
 }
 
-await todo.Uncache();                         // evict one entity (e.g. after a Direct SQL write)
+await todo.Cache.Evict();                     // one entry after an out-of-band write
+await todos.Cache.Evict();                    // finite/stream pointwise form, bounded and sequential
 await Todo.Cache.Flush();                     // evict every entry tagged for this type
 ```
 
 `Todo.Cache` exists only when `Koan.Cache` is referenced; Data.Core no longer advertises unavailable
 cache behavior. Writes always invalidate regardless of `EntityContext`
 ([CacheBehavior](../../decisions/ARCH-0075-koan-cache-pillar.md)). `Todo.Cache.Count()` reports
-tagged-entry counts, while `Todo.Cache.Explain()` inspects policy without cache I/O.
+tagged-entry counts, while `Todo.Cache.Explain()` inspects policy without cache I/O. Instance/set/stream
+`Cache.Evict()` is a distinct entry plane with fixed-size removed/absent/skipped outcomes; it shares the
+repository's policy, custom-template, partition, and managed-scope plan.
 
 ## The sample that shows it
 

@@ -9,7 +9,7 @@ framework_version: v0.19.0
 validation:
   date_last_tested: 2026-07-16
   status: reviewed
-  scope: R07-01 through R07-15 passed; embedding lifecycle, worker, and migration share one vector-only write seam
+  scope: R07-01 through R07-16 passed; repository caching and Entity eviction share one policy/key/context plan
 ---
 
 # Koan V1 reorganization current handoff
@@ -111,6 +111,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
   `Save`, while explicit rebuilds remain migration control plane. Lifecycle, deferred worker, and
   migrator now share one vector-only writer; queued business text/duplicated policy and inert
   per-Entity worker knobs are gone. Data.AI passes 87/87 and AI Unit 158/158.
+- [R07-16](work-items/r07/R07-16-entity-cache-eviction.md) passed. Scalar, finite, and async
+  `Cache.Evict()` now share one context-sealed coordinator and the repository's exact policy,
+  exclusion, custom-template, partition/source, and managed-scope plan. The old `Uncache`, generic
+  handle, and public default-template bypass are gone. Cache topology passes 57/57, Entity Language
+  25/25, Cache cross-engine 14/14, and the real Tenancy + SQLite convergence class 6/6.
 - Public Messaging guidance is reduced to the truthful legacy v0.17 generation. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -224,7 +229,10 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
 14. Constrained pointwise Jobs submission. **Passed as R07-14.**
 15. Inventory AI pointwise `Embed`/`Index`. **Passed as R07-15:** no duplicate public terminal; one
     internal writer now owns the common vector seam.
-16. Inventory Entity-entry Cache eviction next; keep policy, topology, and flush at type/control plane.
+16. Entity-entry Cache eviction. **Passed as R07-16:** one shared repository/eviction plan, captured
+    context, sequential scalar/set/stream execution, and fixed-size partial outcomes; policy/tag flush
+    stays type/control plane.
+17. Inventory Media derivative/prewarm semantics next; require a real contract and consumer.
 
 Only completed/current slices have detailed child cards. Do not open broker breadth before Event
 semantics pass over the local boundary.
@@ -322,12 +330,17 @@ semantics pass over the local boundary.
   AI 0.18.1 and Data.AI 0.19.0 pack with public companions and exact dependency floors; inventory
   remains 112. Docs lint has 0 errors, skills pass 20/20, and changed examples pass 2/2. No
   release-certification suite was run.
+- R07-16 passes Cache topology 57/57, Cache cross-engine 14/14, Entity Language 25/25, and focused real Tenancy + SQLite 6/6.
+  Cache builds warning-as-error; Cache 0.19.0 packs with DLL/XML/README and bounded dependency ranges;
+  inventory remains 112. Docs lint has 0 errors, skills pass 20/20, and changed examples pass 2/2.
+  No release-certification suite was run.
 
 ## Next safe action
 
-Inventory Entity-entry Cache eviction. Start from real scalar behavior, scope, and topology facts;
-admit a finite/stream lift only if it preserves pointwise meaning and fixed-size partial outcomes.
-Keep policy, region/topology selection, and broad flush operations at the type/control plane.
+Inventory Media derivative/prewarm semantics. Start from current constrained media Entities and real
+consumers; admit no generic facet or finite/stream lift for symmetry. Require one distinct business
+meaning, bounded work, storage/provider negotiation, fixed-size partial outcomes where appropriate,
+and a shorter application path than the mechanism it replaces.
 
 ## Repository boundary
 

@@ -161,7 +161,7 @@ identity, and Core-owned context carriage lets Jobs preserve the scope across a 
 | **Write** | The invisible `__koan_tenant` field is stamped at the data chokepoint; a cross-tenant upsert-by-id is rejected (no row takeover). | DATA-0105 |
 | **Read** | A `__koan_tenant == <ambient>` equality filter is pushed down on every read; get-by-id returns null across tenants (IDOR-safe). | DATA-0106 |
 | **Blob storage** | `StorageEntity`/`MediaEntity` blob keys gain a leading tenant particle (`acme/photo.jpg`); the chokepoint is the `IStorageService` decorator, so the media/presign/raw paths are covered too. | STOR-0011 |
-| **Cache** | A `[Cacheable]` entity's cache key gains a tenant segment, so one tenant's cached row is never served to another; out-of-band `Uncache`/`Flush` evict the right scoped key. | DATA-0106 §5 + the cache scope-key convergence |
+| **Cache** | A `[Cacheable]` entity's cache key gains a tenant segment, so one tenant's cached row is never served to another; `entity.Cache.Evict()` captures the same tenant context and consumes the repository's policy/key plan. | DATA-0106 §5 + the cache scope-key convergence |
 | **Async-hop** | The Core context carrier captures the tenant at job submit and Jobs restores it before loading the work item, so execution stays in the submitter's tenant. | R07-01 amendment to ARCH-0100 |
 
 **Recipe.** Nothing — this is automatic. Just be aware that a non-isolating adapter **fails closed** and that a

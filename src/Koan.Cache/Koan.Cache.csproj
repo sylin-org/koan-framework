@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Description>Core cache module for Koan: fluent builders, policy registry, singleflight coordination, instrumentation, and DI extensions.</Description>
+    <Description>Koan Cache: transparent Entity caching, policy and topology negotiation, bounded explicit eviction, coherence, health, and inspection.</Description>
     <PackageTags>$(CommonPackageTags);cache;redis;memory;policies</PackageTags>
   </PropertyGroup>
   <ItemGroup>

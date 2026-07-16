@@ -198,6 +198,7 @@ cardinality and copy semantics. Neither is a compatibility base for Events or Tr
 | 13 | [Pointwise Relationships](r07/R07-13-pointwise-relationships.md) | **Passed.** `Relatives` is one inferred scalar/set/stream Data operation with bounded execution facts | public batch loader, explicit key arguments, and duplicate graph orchestration |
 | 14 | [Pointwise Jobs submission](r07/R07-14-pointwise-job-submission.md) | **Passed.** Scalar and finite/async sources share one context-sealed ledger-acceptance operation with fixed-size partial outcomes | duplicate type-level list submit, record materialization, opaque count, and split scalar/source preparation |
 | 15 | [Embedding write convergence](r07/R07-15-embedding-write-convergence.md) | **Passed.** Ordinary indexing stays `[Embedding]` + `Save`; lifecycle, deferred work, and migration share one vector-only writer without a speculative source API | three write implementations, recursive Entity save, queued business text/duplicate policy, and inert per-Entity worker knobs |
+| 16 | [Entity Cache eviction convergence](r07/R07-16-entity-cache-eviction.md) | **Passed.** `entity.Cache.Evict()` and finite/async sources share one context-sealed, fixed-size operation and the repository's exact policy/key plan | `Uncache`, generic handle, public default-template bypass, duplicate repository identity logic, and custom-template miss |
 
 Only the next slice receives a child card. Later rows remain outcomes rather than speculative API
 backlogs until their prerequisites pass.
@@ -248,8 +249,10 @@ backlogs until their prerequisites pass.
 18. Inventory AI pointwise `Embed`/`Index`. **Complete as R07-15.** No new public terminal is admitted;
     ordinary indexing remains Lifecycle, explicit rebuilds remain migration, and one writer now owns
     the shared vector seam.
-19. Inventory Entity-entry Cache eviction next; admit only a pointwise operation that preserves Cache
-    scope, topology, and partial-outcome truth without lifting policy or flush control plane.
+19. Inventory Entity-entry Cache eviction. **Complete as R07-16.** One host-owned plan now supplies
+    repository caching and scalar/set/stream eviction; policy/tag flush remains type/control plane.
+20. Inventory Media derivative/prewarm semantics next. Admit nothing for symmetry; require a distinct
+    business meaning, a real consumer, bounded execution, and honest storage/provider outcomes.
 
 R07-02 was intentionally additive and preceded the Lifecycle source break. R07-03 removed the package-
 lineage stop condition: once R07-04 restores the release floor, public 0.17's lifecycle `Events`
@@ -321,6 +324,10 @@ identity automatically.
   AI 0.18.1 and Data.AI 0.19.0 pack with their public companions and exact dependency floors; package
   inventory remains 112. Docs lint has 0 errors, skills pass 20/20, and changed marked examples pass
   2/2. No release-certification suite was run.
+- R07-16 passes Cache topology 57/57, Cache cross-engine 14/14, Entity Language 25/25, and focused real Tenancy + SQLite 6/6.
+  Cache builds warning-as-error; Cache 0.19.0 packs with DLL/XML/README and bounded dependency ranges;
+  inventory remains 112. Docs lint has 0 errors, skills pass 20/20, and changed examples pass 2/2.
+  No release-certification suite was run.
 
 ## Acceptance additions
 

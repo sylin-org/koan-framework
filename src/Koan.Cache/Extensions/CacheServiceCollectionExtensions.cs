@@ -8,6 +8,7 @@ using Koan.Cache.Adapters.Memory;
 using Koan.Cache.Coherence;
 using Koan.Cache.Decorators;
 using Koan.Cache.Diagnostics;
+using Koan.Cache.Entity;
 using Koan.Cache.Options;
 using Koan.Cache.Policies;
 using Koan.Cache.Scope;
@@ -99,11 +100,14 @@ public static class CacheServiceCollectionExtensions
         // Policies + repository decorator
         services.TryAddSingleton<CachePolicyRegistry>();
         services.TryAddSingleton<ICachePolicyRegistry>(sp => sp.GetRequiredService<CachePolicyRegistry>());
+        services.TryAddSingleton<EntityCachePlan>();
+        services.TryAddSingleton<EntityCacheEvictionCoordinator>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IDataRepositoryDecorator, CacheRepositoryDecorator>());
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<CacheOptions>, CacheOptionsValidator>());
 
-        services.AddHostedService<CachePolicyBootstrapper>();
+        services.TryAddSingleton<CachePolicyBootstrapper>();
+        services.AddHostedService(sp => sp.GetRequiredService<CachePolicyBootstrapper>());
 
         // Health check — registered against the standard ASP.NET Core IHealthCheck registry.
         // Kubernetes / Aspire readiness probes pick it up automatically.

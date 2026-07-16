@@ -1,26 +1,27 @@
 ---
 name: koan-caching
-description: Transparent L1/L2 caching for Entity<T>, [Cacheable] attribute, cross-node coherence, per-request opt-out, out-of-band evict, stale-while-revalidate opt-in
+description: Transparent Entity caching, policy and topology negotiation, pointwise cache-entry eviction, request scopes, tags, coherence, health, and startup inspection
 pillar: cache
 card: docs/reference/cards/cache.md
 status: current
-last_validated: 2026-06-18
+last_validated: 2026-07-16
 ---
 
 # Koan Caching
 
 ## Trigger this skill when you see
 
-- `[Cacheable(...)]` or `[CachePolicy(...)]` on an `Entity<T>`
-- `EntityContext.NoCache()` / `RefreshCache()` / `WithCacheBehavior(...)`
-- `CacheKey.For<T>(...)`, `Cache.WithJson<T>(...)`, `Cache.Tags(...)`, `entity.Uncache()`
-- References to `Koan.Cache` / `Koan.Cache.Adapter.Redis` / `Koan.Cache.Adapter.Sqlite` / `Koan.Cache.Coherence.*`
-- HTTP `Cache-Control` headers or the `X-Koan-Cache` header, `app.UseKoanCacheControl()`
-- "cache invalidation", "L1/L2", "cache coherence", "write-through", "TTL", "tags", "stampede", "stale-while-revalidate", "cross-node staleness"
+- `[Cacheable(...)]` or Entity-scoped `[CachePolicy(...)]`
+- `entity.Cache.Evict()` / `entities.Cache.Evict()` / `EntityType.Cache.*`
+- `EntityContext.NoCache()`, `RefreshCache()`, or `WithCacheBehavior(...)`
+- `Cache.WithJson<T>(...)`, `Cache.Tags(...)`, cache policy, topology, tiers, TTL, SWR, or singleflight
+- Cache Memory/SQLite/Redis adapters, peer invalidation, or Communication `FrameworkBroadcasts`
+- cache startup facts, health, MCP operational flush, or `UseKoanCacheControl()`
 
-## Core principle
+## The shortest path
 
-**Reference = Intent.** Add `Koan.Cache` to project references and `[Cacheable]` to an `Entity<T>` — that's the whole 90% case. Reads become transparently cached (L1 in-process, L2 remote when a remote adapter is present); writes evict through every node via coherence. The same `Todo.Get(id)` / `todo.Save()` verbs (canonical **Save / Get / Remove**) are unchanged — the decorator short-circuits reads and broadcasts evicts. Reads are **fresh-or-null** by default; stale-while-revalidate is **opt-in only** ([ARCH-0078](../../../docs/decisions/ARCH-0078-stale-while-revalidate-opt-in.md)). No `services.AddX()` cache wiring.
+**Reference = Intent.** Reference `Sylin.Koan.Cache`, keep the normal `AddKoan()` boot, and put
+`[Cacheable]` on the Entity. Application code continues to read as persistence and business logic.
 
 <!-- validate -->
 ```csharp
@@ -28,80 +29,132 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Policies;
+using Koan.Data.Core;
 using Koan.Data.Core.Model;
 
-[Cacheable(300)]                              // 5-minute L2 TTL; L1 derived = max(30s, ttl/2)
+[Cacheable(300)]
 public sealed class Todo : Entity<Todo>
 {
     public string Title { get; set; } = "";
-    public bool Done { get; set; }
 }
 
 public sealed class TodoService
 {
-    public async Task<Todo?> Read(string id, CancellationToken ct = default)
-    {
-        var todo = await Todo.Get(id, ct);    // first call hits the store + populates cache
-        var again = await Todo.Get(id, ct);   // L1 hit, sub-ms
-        return again ?? todo;
-    }
-
-    public async Task<Todo> Rename(string id, string title, CancellationToken ct = default)
+    public async Task<Todo> Complete(string id, CancellationToken ct = default)
     {
         var todo = await Todo.Get(id, ct)
             ?? throw new InvalidOperationException($"Todo {id} not found");
-        todo.Title = title;
-        return await todo.Save(ct);           // write-through; peers get an evict broadcast
+        todo.Title = "done";
+        return await todo.Save(ct);
     }
 
     public async Task<Todo?> Fresh(string id, CancellationToken ct = default)
     {
-        using (EntityContext.NoCache())       // CacheBehavior.Bypass — skip read, hit DB, no populate
+        using (EntityContext.NoCache())
             return await Todo.Get(id, ct);
     }
 }
 ```
 
-## Reference = Intent activation
+The Cache module contributes its Entity language. Remove the reference and both static `Todo.Cache`
+and instance/set/stream `.Cache` disappear at compile time.
 
-| Add this reference | Effect |
+## Entry plane versus control plane
+
+Ordinary `Save` and `Delete` maintain cache state automatically. Use explicit entry eviction only
+after an out-of-band write that bypassed the Entity repository:
+
+```csharp
+var one = await todo.Cache.Evict(ct);
+var many = await todos.Cache.Evict(ct);
+var stream = await Todo.QueryStream(x => x.Done).Cache.Evict(ct);
+```
+
+All three forms preserve pointwise meaning, source order, and multiplicity. Execution is sequential,
+constant-memory, and context-stable. `EntityCacheEviction` reports `Removed`, idempotently `Absent`,
+default-id `Skipped`, `Failed`, `Confirmed`, and `SourceCompleted`. Typed failure/cancellation errors
+carry the confirmed prefix. There is no batch atomicity or automatic retry claim.
+
+The static facet is the type/tag control plane:
+
+```csharp
+var policy = Todo.Cache.Explain();
+var populated = await Todo.Cache.Any(ct);
+var count = await Todo.Cache.Count(ct);
+var flushed = await Todo.Cache.Flush(ct);
+```
+
+Do not substitute type/tag flush for a pointwise stream by accident: broad flush enumerates every
+tagged key, while source eviction emits one removal/invalidation per supplied Entity.
+
+## One canonical Entity cache identity
+
+Repository caching and explicit eviction consume the same host-owned plan. It owns active policy
+selection, safe-cache exclusion, custom key template, Entity type identity, partition/source tokens,
+and managed equality-axis scope. Do not construct Entity eviction keys in application code.
+
+Invoke `Evict()` under the logical scope that owns the entry. The operation captures Data routing
+context and registered Core carriers before deferred enumeration, so a tenant-A operation addresses
+only tenant A. A missing policy or a type that cannot safely have an equality-keyed cache fails before
+the source is enumerated.
+
+## Reference = Intent topology
+
+| Direct reference | Effect |
 |---|---|
-| `Koan.Cache` | L1 = in-memory, single-node, no coherence. `[Cacheable]` is live. |
-| `+ Koan.Cache.Adapter.Sqlite` | L1 = SQLite (persistent across restart; priority 50, preempts memory). |
-| `+ Koan.Cache.Adapter.Redis` | L2 = Redis **and coherence auto-activates** (`RedisCoherenceChannel`). |
-| `+ Koan.Cache.Coherence.Messaging` | Rides the existing `Koan.Messaging` bus (preempts Redis pub/sub). |
-| `+ Koan.Cache.Coherence.InMemory` | In-process channel — tests / single-process verification. |
-| `Koan.Web` + `app.UseKoanCacheControl()` | Maps `Cache-Control` / `X-Koan-Cache` headers onto `EntityContext.CacheBehavior` (opt-in middleware). |
+| `Sylin.Koan.Cache` | Built-in process-memory local floor |
+| `Sylin.Koan.Cache.Adapter.Sqlite` | Eligible persistent local store |
+| `Sylin.Koan.Cache.Adapter.Redis` | Eligible L2; Redis broadcast activates only when Redis owns L2 |
+| `Sylin.Koan.Communication.Connector.RabbitMq` | Direct Communication intent may carry peer invalidation |
+| `Sylin.Koan.Web` + middleware | Optional request-header projection into `EntityContext.CacheBehavior` |
 
-Critical invariant ([ARCH-0075](../../../docs/decisions/ARCH-0075-koan-cache-pillar.md)): the store contract has **no** publish methods. Coherence is its own pillar (`ICacheCoherenceChannel`). `LayeredCache.ApplyRemoteInvalidation` touches **L1 only** — never L2 (shared, already evicted by the writer), never republishes (would feed back).
+Adapters describe layered capability but do not activate it until the owning mechanism is active.
+Explicit provider pins fail loud when unavailable; intended external reach never silently falls back
+to process-local delivery.
 
-## Anti-patterns to flag
-
-| If you see | Suggest |
-|---|---|
-| `services.AddMemoryCache()` + a hand-rolled cache wrapper | `[Cacheable]` on the entity — caching is policy-driven, not DI-imperative. |
-| `IMemoryCache` injected into a service for entity reads | Same — the decorator handles entity reads transparently. |
-| `redis.GetDatabase().StringGetAsync(...)` for entity reads | `[Cacheable]` for entities; `Cache.WithJson<T>(key).GetOrAdd(...)` for arbitrary values. |
-| `Cache.Evict<T,K>(id)` (does not exist) | `await entity.Uncache()` or `EntityCacheExtensions.Cache<Todo, string>().Flush(id)` / `.FlushAll()`. |
-| String concatenation for cache keys | `CacheKey.For<TEntity>(id, partition)` — canonical, partition-aware. |
-| `[Cacheable(60, AllowStaleForSeconds: 10)]` to enable stale-while-revalidate | The per-entity `AllowStaleForSeconds` / `L1TtlSeconds` / `SlidingTtlSeconds` setters are `init`-only and can't be used as attribute named args today (a framework gap) — opt into SWR **per call** via `.AllowStaleFor(TimeSpan)` on the fluent builder. |
-| `if (skipCache) ...` branches threaded through business code | `EntityContext.NoCache()` / `RefreshCache()` scopes — declarative, no call-site pollution. |
-| A custom cache-invalidation pub/sub | Writes broadcast automatically; for non-entity cases use `ICacheCoherenceChannel` directly. |
-| `L1 TTL > L2 TTL` | The boot-time materializer throws — L1 may not outlive L2. |
+Cache owns the invalidation meaning. Communication owns bounded carriage, provider election, wire,
+lifecycle, ingress, facts, and health. Peers evict L1 only, never shared L2 and never rebroadcast.
+Best-effort loss is bounded by L1 TTL.
 
 ## Escape hatches
 
-- **Per-request opt-out**: `using (EntityContext.NoCache())` (Bypass — skip read, no populate), `using (EntityContext.RefreshCache())` (skip read, hit DB, repopulate), or `EntityContext.WithCacheBehavior(CacheBehavior.ReadOnly)` (`Koan.Cache.Abstractions.Policies`). **Writes always invalidate** regardless of scope — peer L1 entries evict via coherence even under Bypass, preventing silent multi-node desync.
-- **Out-of-band evict** (after a `IDataService.Direct(...)` write — folded into `Koan.Data.Core`, ARCH-0090 — or a batch job that bypasses the decorator): `await todo.Uncache()` (single entity), `await EntityCacheExtensions.Cache<Todo, string>().Flush(id)` (one id), `.FlushAll()` (every entry tagged with the type name). There is **no** `Cache.Evict<T,K>`.
-- **Non-entity caching**: `Cache.WithJson<T>(key).WithAbsoluteTtl(ttl).WithTags(...).AllowStaleFor(ts).GetOrAdd(factory, ct)` for computed/expensive values; `await Cache.Tags("tenant:42").Flush(ct)` for bulk tag invalidation. SWR here is opt-in per call via `AllowStaleFor` — omit it and the read is strict fresh-or-null.
-- **SWR is opt-in only**: opt in **per call** via `.AllowStaleFor(TimeSpan)` on the fluent builder. There are **no** global SWR toggles in adapter options or app config — the per-call opt-in is the only switch. (The per-entity `[Cacheable(..., AllowStaleForSeconds = N)]` form is documented but does **not** compile today — the setter is `init`-only and so can't be an attribute named argument; tracked as a framework gap.)
-- **Coherence mode**: set `Koan:Cache:CoherenceMode = "Required"` in production to fail fast if a remote tier is present with no coherence channel registered.
+- **Request behavior:** `EntityContext.NoCache()` bypasses read/population;
+  `RefreshCache()` forces a provider read and refill; `ReadOnly` reads cache without filling.
+- **Non-Entity values:** `Cache.WithJson<T>(key).WithAbsoluteTtl(ttl).WithTags(...)
+  .AllowStaleFor(window).GetOrAdd(factory, ct)`.
+- **Bulk maintenance:** `Cache.Tags("tenant:42").Flush(ct)` or `EntityType.Cache.Flush(ct)`.
+- **SWR:** explicitly set `AllowStaleForSeconds` on `[Cacheable]` or `.AllowStaleFor(...)` on a
+  fluent entry. Default reads are fresh-or-null.
+- **Production posture:** `Koan:Cache:CoherenceMode = Required` rejects a layered topology that has
+  only process-local invalidation reach.
+
+## Anti-patterns to flag
+
+| If you see | Prefer |
+|---|---|
+| Hand-rolled `IMemoryCache` for Entity reads | `[Cacheable]`; keep `Get/Save/Delete` business-shaped |
+| Manual cache registration in application boot | Reference the package and keep `AddKoan()` |
+| `Uncache()` or `EntityCacheExtensions.Cache<T,K>()` | `entity.Cache.Evict()`; the old split API is deleted |
+| Application string-building of Entity cache keys | Let the host-owned Entity cache plan build them |
+| A custom invalidation bus or old coherence package | Cache's internal every-node Communication route |
+| A source loop that accumulates per-item outcomes | One `entities.Cache.Evict()` fixed-size terminal |
+| Treating `Absent` as failure | It is idempotent success and still requests peer invalidation |
+| Equating broker acceptance with peer settlement | Inspect reported provider assurance and L1 TTL bound |
+| Projecting entry eviction directly to an agent | Use the governed/audited MCP type/global control plane |
+
+## Non-claims
+
+- no collection or cross-store atomicity;
+- no durable invalidation replay/catch-up or automatic removal retry;
+- no remote handler settlement;
+- no global-clear wire primitive; and
+- no guarantee beyond the elected provider/topology facts.
 
 ## See also
 
-- [Reference card: cache.md](../../../docs/reference/cards/cache.md) — one-screen pillar map
-- [Reference: cache.md](../../../docs/reference/data/cache.md) — full detail
-- [Architecture: koan-cache-module.md](../../../docs/architecture/koan-cache-module.md)
-- [`samples/S1.Web`](../../../samples/S1.Web/README.md) — `Entity<Todo>`; reference `Koan.Cache` to watch read-through + write-through evicts in the boot report
-- [ARCH-0075 — cache pillar architecture](../../../docs/decisions/ARCH-0075-koan-cache-pillar.md)
-- [ARCH-0078 — stale-while-revalidate opt-in](../../../docs/decisions/ARCH-0078-stale-while-revalidate-opt-in.md)
+- [Reference card](../../../docs/reference/cards/cache.md)
+- [Full reference](../../../docs/reference/data/cache.md)
+- [Architecture](../../../docs/architecture/koan-cache-module.md)
+- [Entity identity convergence](../../../docs/architecture/cache-scope-key-convergence.md)
+- [ARCH-0075](../../../docs/decisions/ARCH-0075-koan-cache-pillar.md)
+- [ARCH-0113](../../../docs/decisions/ARCH-0113-entity-capability-communication.md)

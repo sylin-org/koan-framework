@@ -7,7 +7,7 @@ namespace Koan.Cache.Abstractions.Policies;
 /// Entity-friendly shortcut for <see cref="CachePolicyAttribute"/>. Defaults match the 90% case:
 /// 300s TTL, Layered tier, GetOrSet strategy, canonical key template
 /// <c>"{TypeName}:{Partition}:{Id}"</c>, and a single tag <c>"{TypeName}"</c> so
-/// <c>EntityCache&lt;T&gt;.FlushAll()</c> works out of the box.
+/// <c>EntityType.Cache.Flush()</c> works out of the box.
 /// </summary>
 /// <remarks>
 /// <para>

@@ -89,7 +89,7 @@ workflow, service, or control plane instead of the Entity surface.
 ### 1. Direct instance verbs require an essential receiver
 
 An instance extension is appropriate when the operation acts on that instance and its identity/state
-matters. `Save`, `Remove`, `Uncache`, `FindSimilar`, and a media object's `Url` are representative
+matters. `Save`, `Remove`, `entity.Cache.Evict`, `FindSimilar`, and a media object's `Url` are representative
 shapes.
 
 - The receiver is constrained to the narrowest semantic interface or Entity form.

@@ -1,17 +1,15 @@
-﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 
-namespace Koan.Cache.Decorators;
+namespace Koan.Cache.Entity;
 
+/// <summary>Parses and renders the key template selected by an Entity cache plan.</summary>
 internal sealed class CacheKeyTemplate
 {
-    private static readonly ConcurrentDictionary<string, CacheKeyTemplate> Cache = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, CacheKeyTemplate> Templates = new(StringComparer.Ordinal);
 
     private readonly Segment[] _segments;
 
@@ -30,7 +28,7 @@ internal sealed class CacheKeyTemplate
             throw new ArgumentException("Template must be provided.", nameof(template));
         }
 
-        return Cache.GetOrAdd(template, static t => new CacheKeyTemplate(t, ParseSegments(t)));
+        return Templates.GetOrAdd(template, static value => new CacheKeyTemplate(value, ParseSegments(value)));
     }
 
     public string? TryFormat(object? entity, IReadOnlyDictionary<string, object?> ambient, out bool missingToken)
@@ -150,19 +148,20 @@ internal sealed class CacheKeyTemplate
         return segments.ToArray();
     }
 
-    private static bool TryResolveValue(string token, object? entity, IReadOnlyDictionary<string, object?> ambient, out object? value)
+    private static bool TryResolveValue(
+        string token,
+        object? entity,
+        IReadOnlyDictionary<string, object?> ambient,
+        out object? value)
     {
         if (ambient.TryGetValue(token, out value))
         {
             return true;
         }
 
-        if (entity is not null)
+        if (entity is not null && TryResolveFromObject(entity, token, out value))
         {
-            if (TryResolveFromObject(entity, token, out value))
-            {
-                return true;
-            }
+            return true;
         }
 
         value = null;
@@ -180,7 +179,6 @@ internal sealed class CacheKeyTemplate
         var segments = path.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (segments.Length == 0)
         {
-            value = null;
             return false;
         }
 
@@ -189,7 +187,6 @@ internal sealed class CacheKeyTemplate
         {
             if (current is null)
             {
-                value = null;
                 return false;
             }
 
@@ -199,44 +196,40 @@ internal sealed class CacheKeyTemplate
                 continue;
             }
 
-            if (current is IReadOnlyDictionary<string, object?> readOnlyDict)
+            if (current is IReadOnlyDictionary<string, object?> readOnlyDictionary &&
+                readOnlyDictionary.TryGetValue(segment, out var readOnlyValue))
             {
-                if (readOnlyDict.TryGetValue(segment, out var dictValue))
-                {
-                    current = dictValue;
-                    continue;
-                }
+                current = readOnlyValue;
+                continue;
             }
-            else if (current is IDictionary dictionary)
+
+            if (current is IDictionary dictionary && dictionary.Contains(segment))
             {
-                if (dictionary.Contains(segment))
-                {
-                    current = dictionary[segment];
-                    continue;
-                }
+                current = dictionary[segment];
+                continue;
             }
 
             var type = current.GetType();
-            var property = type.GetProperty(segment, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase | BindingFlags.FlattenHierarchy);
-            if (property is null)
-            {
-                property = type.GetProperty(segment, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.IgnoreCase | BindingFlags.FlattenHierarchy);
-            }
-
+            var property = type.GetProperty(
+                segment,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic |
+                BindingFlags.IgnoreCase | BindingFlags.FlattenHierarchy);
             if (property is not null)
             {
                 current = property.GetValue(current);
                 continue;
             }
 
-            var field = type.GetField(segment, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.IgnoreCase | BindingFlags.FlattenHierarchy);
+            var field = type.GetField(
+                segment,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic |
+                BindingFlags.IgnoreCase | BindingFlags.FlattenHierarchy);
             if (field is not null)
             {
                 current = field.GetValue(current);
                 continue;
             }
 
-            value = null;
             return false;
         }
 
@@ -251,9 +244,9 @@ internal sealed class CacheKeyTemplate
             return null;
         }
 
-        if (value is string s)
+        if (value is string text)
         {
-            return s;
+            return text;
         }
 
         if (value is IEnumerable enumerable and not string)
@@ -271,12 +264,9 @@ internal sealed class CacheKeyTemplate
             return string.Join(',', parts);
         }
 
-        if (value is IFormattable formattable)
-        {
-            return formattable.ToString(null, CultureInfo.InvariantCulture);
-        }
-
-        return value.ToString();
+        return value is IFormattable formattable
+            ? formattable.ToString(null, CultureInfo.InvariantCulture)
+            : value.ToString();
     }
 
     private readonly record struct Segment(string Content, bool IsPlaceholder);

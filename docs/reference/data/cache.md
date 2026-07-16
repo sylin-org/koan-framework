@@ -99,13 +99,32 @@ using (EntityContext.WithCacheBehavior(CacheBehavior.ReadOnly))
 ## Explicit inspection and eviction
 
 ```csharp
-await todo.Uncache();
+var one = await todo.Cache.Evict();
+var many = await todos.Cache.Evict();
+var stream = await Todo.QueryStream(x => x.Done).Cache.Evict();
+
 await Todo.Cache.Flush();
 var explanation = Todo.Cache.Explain();
 ```
 
-`Explain()` does not read or mutate entries. It reports the materialized Entity policy; cluster operations
-remain Cache-owned rather than becoming generic Entity verbs.
+Ordinary `Save` and `Delete` already maintain cache state. Use pointwise `Evict()` after an out-of-band
+write that bypassed the Entity repository. Scalar, finite, and stream forms preserve the same meaning:
+one key removal and peer invalidation request per non-default Entity, in source order, with sequential
+backpressure and no batch-atomicity claim.
+
+The fixed-size `EntityCacheEviction` distinguishes entries actually `Removed`, idempotently `Absent`,
+and `Skipped` because an unset id could never have been cached. Source/removal failures and cancellation
+carry the confirmed prefix through typed exceptions. Store removal and peer carriage are not atomic;
+the failing current item may already be partly removed.
+
+`Todo.Cache` remains the type/control plane. `Explain()` does not read or mutate entries; `Flush`,
+`Count`, and `Any` operate on policy-derived tags. Pointwise eviction and broad maintenance are not
+aliases.
+
+Repository caching and `Evict()` consume one host-owned Entity cache plan. Policy selection, custom
+key template, partition/source values, and managed equality-axis scope therefore agree by construction.
+Call eviction under the logical context that owns the entry; Koan captures that context once before a
+finite or deferred source begins.
 
 Tag flush enumerates matching keys through the elected store and removes each key. Each removal emits the
 same peer-key invalidation contract; there is no separate, partially implemented “flush everything” wire command.
@@ -144,7 +163,8 @@ Startup logs and Koan composition facts report:
 - coherence mode and active/inactive posture;
 - the elected `FrameworkBroadcasts` provider and assurance;
 - L1-only receive behavior and the L1-TTL safety bound; and
-- materialized policy count.
+- materialized policy count plus every resolved Entity entry plan, including its selected strategy/key
+  template or its cache-safety exclusion reason.
 
 The same facts appear through `/.well-known/Koan/facts` and `koan://facts` when those host surfaces are
 present. `CacheHealthCheck` reports tier reachability plus coherence provider, assurance, active state, and
@@ -157,5 +177,8 @@ node identity.
 - Peer invalidation is key-scoped and L1-only.
 - L1 TTL is part of the correctness posture, not optional decoration for layered caches.
 - Store and Communication provider behavior remains provider-specific and visible in facts.
+- Pointwise set/stream eviction is sequential and non-atomic; use type/tag flush for broad maintenance.
+- Explicit entry eviction is not automatically exposed as an MCP mutation. Governed operational flush
+  remains a separate audited control plane.
 
 See the [architecture guide](../../architecture/koan-cache-module.md) for the internal boundary.

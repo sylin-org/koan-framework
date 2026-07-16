@@ -21,6 +21,13 @@ ARCH-0057 (KoanLog facade), ARCH-0071 (partition context provider), ARCH-0074 (f
 > deleted. The historical design below records the path to the decision but those mechanisms are superseded
 > by this amendment and [ARCH-0113](ARCH-0113-entity-capability-communication.md).
 
+> **Implementation amendment (R07-16, 2026-07-16):** out-of-band Entity eviction is now the
+> module-contributed `entity.Cache.Evict()` terminal, lifted pointwise to finite and async sources.
+> It and the repository decorator consume one Cache-owned policy/template/context/scope plan. Static
+> `EntityType.Cache` remains the policy/tag control plane. The historical item 12 spellings,
+> default-template-only builder, `Uncache`, and generic handle are deleted without aliases. Fixed-size
+> outcomes and typed failure/cancellation preserve the confirmed prefix without claiming atomicity.
+
 ---
 
 ## Context

@@ -14,6 +14,23 @@ Cache is a semantic pillar, not a storage adapter and not a messaging system.
 The data layer never decides how an invalidation travels. A Communication adapter never decides what Cache
 does with it.
 
+## Entity entry and control planes
+
+`EntityCachePlan` is the one host-owned decision for whether and how an Entity cache entry exists. It
+selects the active Entity policy, rejects unsafe transformed/non-equality-scoped types, parses the key
+template, supplies partition/source tokens, and folds managed equality axes. Both the repository
+decorator and explicit `entity.Cache.Evict()` consume that resolved plan; neither reconstructs cache
+identity independently.
+
+Scalar, finite-set, and async-stream eviction normalize through Data.Core's cardinality helper and run
+sequentially in constant memory. The coordinator captures Data routing context and registered Core
+carriers once, restores them around deferred enumeration/removal, and returns aggregate counters only.
+Typed failures and cancellation retain the confirmed prefix. Selected-tier removal and peer carriage
+are not atomic, so no collection or per-item transaction is claimed.
+
+Static `EntityType.Cache.Explain/Flush/Count/Any` remains policy/tag control plane. It is deliberately
+separate from pointwise entry eviction and from the governed MCP operational surface.
+
 ## Runtime shape
 
 ```text
@@ -119,7 +136,9 @@ declared Communication capability, owned lifecycle, and executable provider proo
 
 Communication facts report the elected `FrameworkBroadcasts` carrier, election reason, priority, assurance, and
 node-scoped bindings. Cache facts report L1/L2 topology, coherence mode, active state, L1-only receiver semantics,
-TTL safety bound, and policy count. Health includes tier probes plus the active carrier and node identity.
+TTL safety bound, policy count, and each resolved Entity entry plan or cache-safety exclusion. The policy lifecycle
+owner initializes once before this composition snapshot, so startup never reports a pre-bootstrap empty registry.
+Health includes tier probes plus the active carrier and node identity.
 
 The module boot report contains configuration-derived settings only. It does not service-locate live state or swallow
 reporting errors; live decisions come from the shared composition model.
@@ -131,6 +150,9 @@ reporting errors; live decisions come from the shared composition model.
 - Redis integration proves two Cache nodes share L2, select the layered `redis-cache` carrier, evict only the peer L1,
   and observe the new value on the next read.
 - Cache topology specs prove L1-only receipt, deterministic store election, fail-loud pins, facts, and health posture.
+- Entity cache eviction specs prove shared custom-template identity, captured context, no read-ahead,
+  idempotent absence/default-key skips, and typed partial failures/cancellation; the real tenancy suite
+  proves same-tenant removal and cross-tenant isolation through a composed SQLite host.
 
 See [ARCH-0075](../decisions/ARCH-0075-koan-cache-pillar.md) and
 [ARCH-0113](../decisions/ARCH-0113-entity-capability-communication.md).

@@ -8,11 +8,9 @@ namespace Koan.Cache.Keys;
 
 /// <summary>
 /// The one canonical builder for a <b>scoped</b> entity cache key (redesign gap B,
-/// <c>docs/architecture/cache-scope-key-convergence.md</c>). Both the read path (<c>CachedRepository</c>) and the
-/// out-of-band evict sites (<c>entity.Uncache()</c>, <c>EntityCache&lt;T,K&gt;.Flush(id)</c>) compose their key
-/// here, so they agree by construction — closing the divergence that let a scoped entry be cached on the read path
-/// but never evicted (the evict sites built a scope-less, partition-less <c>{Type}:{Id}</c> key that matched
-/// nothing).
+/// <c>docs/architecture/cache-scope-key-convergence.md</c>). The host-owned Entity cache plan formats the selected
+/// policy template once and delegates managed equality-axis folding here, so repository reads/writes and explicit
+/// <c>entity.Cache.Evict()</c> operations agree by construction.
 ///
 /// <para>The scope segment is the set of <b>equality</b> managed axes (e.g. the tenant <c>__koan_tenant</c>
 /// discriminator) applicable to the entity, folded through the ONE ARCH-0096 <see cref="AmbientAxisComposer"/> —
@@ -23,7 +21,7 @@ namespace Koan.Cache.Keys;
 /// entities are cache-excluded entirely (DATA-0106 §5). Off / no managed field applicable ⇒ the base key is
 /// returned unchanged (0-alloc fast path, byte-identical to the bare key).</para>
 /// </summary>
-public static class ScopedEntityCacheKey
+internal static class ScopedEntityCacheKey
 {
     private const string ScopeSeparator = "::";
 
@@ -41,20 +39,6 @@ public static class ScopedEntityCacheKey
             ? baseKey
             : AmbientAxisComposer.Append(baseKey, scope, ParticlePosition.Trailing, ScopeSeparator);
     }
-
-    /// <summary>
-    /// Build the full canonical scoped key from scratch — the out-of-band evict entry point. The base is the
-    /// canonical default-template shape (<see cref="CacheKey.For(Type, object, string?)"/>,
-    /// i.e. <c>{TypeName}:{Partition}:{Id}</c>); the same <see cref="AppendScope"/> adds the equality scope. Pass
-    /// the ambient <paramref name="partition"/> (<c>EntityContext.Current?.Partition</c>) so the key matches the
-    /// read-path key for a default-templated entity.
-    /// </summary>
-    public static CacheKey For(Type entityType, object id, string? partition)
-        => new(AppendScope(CacheKey.For(entityType, id, partition).Value, entityType));
-
-    /// <summary>Generic sugar for <see cref="For(Type, object, string?)"/>.</summary>
-    public static CacheKey For<TEntity>(object id, string? partition)
-        => For(typeof(TEntity), id, partition);
 
     // The equality managed axes applicable to the type, as an axis bag { StorageName -> ValueProvider() }. Returns
     // null when none apply (the off / no-axis fast path) so AppendScope returns the base unchanged. The equality
