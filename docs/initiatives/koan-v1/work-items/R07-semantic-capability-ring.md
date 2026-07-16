@@ -191,8 +191,9 @@ cardinality and copy semantics. Neither is a compatibility base for Events or Tr
 | 6 | [Typed capability substrate](r07/R07-06-typed-capability-substrate.md) | **Passed.** A minimal lazy Data.Core cardinality adapter and pillar-owned execution replace generic public flow machinery | `PipelineBuilder`, mutable envelopes, and pillar pipeline extensions |
 | 7 | [In-process Transport flagship](r07/R07-07-local-transport.md) | **Passed.** Foundation `AddKoan()` provides bounded local scalar/set/stream snapshots, typed receiver groups/filters, isolated copies, opaque context carriage, acceptance, local settlement, host drain, and facts | old Messaging semantics are superseded for new application Transport; bridge-dependent packages remain until internal convergence |
 | 8 | [Local Events policy](r07/R07-08-local-events.md) | **Passed.** Payloadless/explicit-details occurrences fan out as isolated copies over a shared host kernel with Event-owned identity and outcomes | event/messaging conflation and service-collection handlers |
-| 9 | Mesh, broker, and internal parity | a build manifest turns connector references into zero-routing-code channel election; RabbitMQ, Jobs wake, and Cache coherence obey the same groups/context/facts | current RabbitMQ implementation and two Messaging bridge packages |
-| 10 | Secondary capability lifts | Relationships, Jobs, AI, Cache, then Media adopt only proven pointwise verbs | fragmented or misleading per-pillar surfaces |
+| 9 | [Direct-reference intent](r07/R07-09-direct-reference-intent.md) | **Passed.** Core records direct package/project provenance separately from the transitive module closure, ready for truthful provider eligibility | assembly-presence inference and Communication-specific build machinery |
+| 10 | Mesh, broker, and internal parity | direct intent turns connector references into zero-routing-code channel election; RabbitMQ, Jobs wake, and Cache coherence obey the same groups/context/facts | current RabbitMQ implementation and two Messaging bridge packages |
+| 11 | Secondary capability lifts | Relationships, Jobs, AI, Cache, then Media adopt only proven pointwise verbs | fragmented or misleading per-pillar surfaces |
 
 Only the next slice receives a child card. Later rows remain outcomes rather than speculative API
 backlogs until their prerequisites pass.

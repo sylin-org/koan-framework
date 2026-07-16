@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
 using Koan.Core.Diagnostics;
+using Koan.Core.Composition;
 using Koan.Core.Infrastructure;
 
 namespace Koan.Core.Hosting.Bootstrap;
@@ -162,6 +163,11 @@ public static class AppBootstrapper
 
         EmitAssemblySummary(assemblyLog, discoveredAssemblies, verboseAssemblies, lenientAssemblySkips);
 
+        // Build provenance is host-owned application composition, not assembly discovery. Register it
+        // before pillar initializers so future provider elections can distinguish direct intent from
+        // transitive module presence without probing the load graph.
+        services.AddSingleton(KoanApplicationReferenceManifest.Load(Assembly.GetEntryAssembly()));
+
         var initializerTypes = KoanRegistry.GetInitializerTypes();
         var autoRegistrarTypes = KoanRegistry.GetAutoRegistrarTypes();
         var backgroundServices = KoanRegistry.GetBackgroundServices();
@@ -231,7 +237,7 @@ public static class AppBootstrapper
     /// <summary>The build-embedded module manifest resource (one <c>Koan.*</c> assembly name per line). Emitted
     /// by <c>build/Sylin.Koan.Core.targets</c> from the same <c>@(ReferencePath)</c> Koan-filter as the
     /// composition lockfile, into the app assembly — so it survives single-file bundling.</summary>
-    internal const string ModuleManifestResourceName = "koan.modules.manifest";
+    internal const string ModuleManifestResourceName = Constants.Composition.ModuleManifestResourceName;
 
     /// <summary>
     /// Loads every <c>Koan.*</c> assembly named in the entry assembly's embedded <see cref="ModuleManifestResourceName"/>

@@ -68,10 +68,10 @@ internal readonly record struct KoanLockComparison(KoanLockStatus Status, IReadO
 }
 
 /// <summary>
-/// Compares a checked-in lockfile against the boot-resolved composition. App identity and the module
-/// set (id + major.minor) are always compared. The richer sections — elections, capabilities, config
+/// Compares a checked-in lockfile against the boot-resolved composition. Schema, app identity, the module
+/// set (id + major.minor), and direct-reference provenance are compared. The richer sections — elections, capabilities, config
 /// keys, entities — are compared ONLY when both files carry them: the build-time file omits them (they
-/// are runtime-resolved), so the boot-line comparison stays app+modules-clean, while a full-vs-full
+/// are runtime-resolved), so the boot-line comparison stays static-composition-clean, while a full-vs-full
 /// comparison (two resolved twins) surfaces election/capability/key drift too. Drift keys read as a
 /// diff: <c>+X</c> appeared at runtime, <c>-X</c> is locked but absent, <c>X@v</c> changed.
 /// </summary>
@@ -84,12 +84,20 @@ internal static class KoanLockfileComparer
 
         var keys = new List<string>();
 
+        if (locked.Schema != resolved.Schema) keys.Add("schema");
         if (!AppMatches(locked.App, resolved.App)) keys.Add("app");
 
         DiffMap(
             keys, prefix: null,
             locked.Modules.ToDictionary(m => m.Id, m => m.Version, StringComparer.Ordinal),
             resolved.Modules.ToDictionary(m => m.Id, m => m.Version, StringComparer.Ordinal));
+
+        if (locked.DirectReferences is not null || resolved.DirectReferences is not null)
+            DiffSet(
+                keys,
+                "reference:",
+                (locked.DirectReferences ?? Array.Empty<KoanLockReference>()).Select(ReferenceKey),
+                (resolved.DirectReferences ?? Array.Empty<KoanLockReference>()).Select(ReferenceKey));
 
         // Richer sections: compared only when BOTH sides declare them (different tiers otherwise).
         if (locked.Elections is { } le && resolved.Elections is { } re)
@@ -139,4 +147,6 @@ internal static class KoanLockfileComparer
         => string.Equals(a.Name, b.Name, StringComparison.Ordinal)
         && string.Equals(a.Koan, b.Koan, StringComparison.Ordinal)
         && string.Equals(a.Tfm, b.Tfm, StringComparison.Ordinal);
+
+    private static string ReferenceKey(KoanLockReference reference) => $"{reference.Kind}:{reference.Id}";
 }

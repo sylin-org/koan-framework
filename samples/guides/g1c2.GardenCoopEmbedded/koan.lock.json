@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "app": {
     "name": "GardenCoopEmbedded",
     "koan": "0.18",
@@ -89,6 +89,48 @@
     {
       "id": "Koan.Web",
       "version": "0.17"
+    }
+  ],
+  "directReferences": [
+    {
+      "kind": "project",
+      "id": "Koan.AI"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.AI.Connector.Onnx"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.AI"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Connector.Sqlite"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Core"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Vector"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Vector.Connector.SqliteVec"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Messaging.Connector.InMemory"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Messaging.Core"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Web"
     }
   ]
 }

@@ -41,7 +41,24 @@ internal static class KoanCompositionSnapshot
         RunContributors(builder, services);
 
         builder.ApplyTo(out var elections, out var capabilities, out var configKeys, out var entities, out var facts);
-        var lockfile = new KoanLockfile(KoanLockfile.CurrentSchema, app, lockModules, elections, capabilities, configKeys, entities);
+        var referenceManifest = services.GetService(typeof(KoanApplicationReferenceManifest))
+            as KoanApplicationReferenceManifest;
+        var directReferences = referenceManifest?.IsPresent == true
+            ? referenceManifest.DirectReferences
+                .Select(reference => new KoanLockReference(
+                    reference.Kind == KoanReferenceKind.Package ? "package" : "project",
+                    reference.Identity))
+                .ToArray()
+            : null;
+        var lockfile = new KoanLockfile(
+            KoanLockfile.CurrentSchema,
+            app,
+            lockModules,
+            DirectReferences: directReferences,
+            Elections: elections,
+            Capabilities: capabilities,
+            ConfigKeys: configKeys,
+            Entities: entities);
         return new KoanCompositionResult(lockfile, facts);
     }
 

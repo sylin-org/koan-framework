@@ -3,6 +3,12 @@ namespace Koan.Core.Infrastructure;
 // Centralized constants across the Koan platform
 public static class Constants
 {
+    public static class Composition
+    {
+        public const string ModuleManifestResourceName = "koan.modules.manifest";
+        public const string ReferenceManifestResourceName = "koan.references.manifest";
+    }
+
     public static class Diagnostics
     {
         public const int FactSchemaVersion = 1;

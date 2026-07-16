@@ -18,8 +18,13 @@ public class KoanLockfileSpec
     public void Round_trips_a_full_lockfile()
     {
         var original = new KoanLockfile(
-            1, App,
+            KoanLockfile.CurrentSchema, App,
             Modules: new[] { new KoanLockModule("Koan.Core", "0.17"), new KoanLockModule("Koan.Data.Core", "0.17") },
+            DirectReferences: new[]
+            {
+                new KoanLockReference("package", "Sylin.Koan.App"),
+                new KoanLockReference("package", "Sylin.Koan.Data.Connector.Postgres"),
+            },
             Elections: new System.Collections.Generic.Dictionary<string, KoanLockElection>
             {
                 ["data:default"] = new("postgres", "reference-priority", 14),
@@ -35,9 +40,10 @@ public class KoanLockfileSpec
         var back = KoanLockfileSerializer.Deserialize(json);
 
         back.Should().NotBeNull();
-        back!.Schema.Should().Be(1);
+        back!.Schema.Should().Be(KoanLockfile.CurrentSchema);
         back.App.Should().Be(App);
         back.Modules.Should().HaveCount(2);
+        back.DirectReferences.Should().HaveCount(2);
         back.Elections!["data:default"].Adapter.Should().Be("postgres");
         back.Capabilities!["data:postgres"].Should().Contain("write.bulkUpsert");
         back.ConfigKeys.Should().ContainSingle().Which.Should().Be("Koan:Data:Postgres:ConnectionString");
@@ -47,12 +53,17 @@ public class KoanLockfileSpec
     [Fact]
     public void Omits_runtime_sections_for_a_build_time_lockfile()
     {
-        // The build-time file carries app + modules only; null sections must not appear.
-        var buildTime = new KoanLockfile(1, App, new[] { new KoanLockModule("Koan.Core", "0.17") });
+        // The build-time file carries app + modules + direct references; runtime sections stay absent.
+        var buildTime = new KoanLockfile(
+            KoanLockfile.CurrentSchema,
+            App,
+            new[] { new KoanLockModule("Koan.Core", "0.17") },
+            DirectReferences: new[] { new KoanLockReference("project", "Koan.Data.Core") });
 
         var json = KoanLockfileSerializer.Serialize(buildTime);
 
-        json.Should().Contain("\"schema\": 1").And.Contain("\"modules\"");
+        json.Should().Contain("\"schema\": 2").And.Contain("\"modules\"")
+            .And.Contain("\"directReferences\"");
         json.Should().NotContain("elections").And.NotContain("capabilities")
             .And.NotContain("configKeys").And.NotContain("entities");
     }
@@ -64,7 +75,7 @@ public class KoanLockfileSpec
         // drifts from the C# model, this deserialization breaks — the cross-emitter consistency guard.
         const string golden = """
             {
-              "schema": 1,
+              "schema": 2,
               "app": {
                 "name": "S0.ConsoleJsonRepo",
                 "koan": "0.17",
@@ -79,6 +90,12 @@ public class KoanLockfileSpec
                   "id": "Koan.Data.Core",
                   "version": "0.17"
                 }
+              ],
+              "directReferences": [
+                {
+                  "kind": "project",
+                  "id": "Koan.Core"
+                }
               ]
             }
             """;
@@ -89,6 +106,7 @@ public class KoanLockfileSpec
         parsed!.Schema.Should().Be(KoanLockfile.CurrentSchema);
         parsed.App.Should().Be(new KoanLockApp("S0.ConsoleJsonRepo", "0.17", "net10.0"));
         parsed.Modules.Select(m => m.Id).Should().Equal("Koan.Core", "Koan.Data.Core");
+        parsed.DirectReferences.Should().ContainSingle().Which.Id.Should().Be("Koan.Core");
         parsed.Elections.Should().BeNull();
     }
 

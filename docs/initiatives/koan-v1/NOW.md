@@ -9,7 +9,7 @@ framework_version: v0.18.0
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
-  scope: R07-01 through R07-08 passed; the local semantic ring is complete and mesh exploration is next
+  scope: R07-01 through R07-09 passed; direct reference intent is proven and connector election exploration is next
 ---
 
 # Koan V1 reorganization current handoff
@@ -71,6 +71,12 @@ Replace this file at every handoff. It is a restart point, not a diary.
   separate Event and Transport queues and lane-owned semantics. Communication passes 28/28; Entity
   language passes 20/20; warning-as-error build, direct/foundation packs, changed examples, docs, and
   skills gates pass.
+- [R07-09](work-items/r07/R07-09-direct-reference-intent.md) passed. Core now snapshots direct
+  PackageReference/ProjectReference intent before MSBuild resolution adds transitive items, embeds and
+  registers one immutable host manifest, and records the same provenance in composition lock schema 2.
+  Core 265/265, Bootstrap 17/17, FirstUse 1/1, GoldenJourney 1/1, a disposable package-reference build 1/1, the Core
+  build-asset contract 1/1, all five tracked locks, direct pack inspection, docs, and changed examples
+  pass. `Koan.Communication` is visibly present as a transitive module without becoming direct intent.
 - Public Messaging guidance is reduced to the truthful legacy v0.17 generation. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -174,8 +180,9 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
    public Pipeline uses. **Passed as R07-06.**
 7. Faithful local Transport under `AddKoan()`. **Passed as R07-07.**
 8. Events occurrence policy on the same kernel. **Passed as R07-08.**
-9. Multi-connector mesh, RabbitMQ parity, Jobs wake, and Cache coherence migration.
-10. Secondary pointwise lifts: Relationships, constrained Jobs streams, AI Embed/Index, Cache eviction,
+9. Direct package/project reference provenance. **Passed as R07-09.**
+10. Multi-connector mesh, RabbitMQ parity, Jobs wake, and Cache coherence migration.
+11. Secondary pointwise lifts: Relationships, constrained Jobs streams, AI Embed/Index, Cache eviction,
    then Media if a real derivative operation earns it.
 
 Only completed/current slices have detailed child cards. Do not open broker breadth before Event
@@ -245,15 +252,19 @@ semantics pass over the local boundary.
 - R07-08 passes Communication 28/28 and Entity language 20/20; warning-as-error Communication build;
   direct/foundation packs; changed examples 4/4; docs lint 0 errors; and skills lint 0 errors/warnings.
   No release-certification suite was rerun.
+- R07-09 passes Core 265/265; Bootstrap 17/17; FirstUse and GoldenJourney source contracts 1/1 each; a disposable
+  PackageReference/ProjectReference build 1/1; the Core package build-asset contract 1/1; direct pack
+  inspection; all five schema-2 lockfiles; docs lint with 0 errors; and the changed example 1/1.
+  No release-certification suite was rerun.
 
 ## Next safe action
 
-Explore R07-09 as the smallest truthful mesh slice. Start with the build manifest and channel/provider
-election boundary: prove direct versus transitive connector intent, the minimum-priority in-process
-floor, unavailable selected-provider failure, and startup/fact explanation before designing RabbitMQ
-or migrating legacy bridges. Preserve the local Event/Transport semantics and separate lanes; do not
-add application routing code, retries, durability claims, or broker breadth until an adapter
-conformance plan earns them.
+Explore R07-10 against a real connector rather than inventing a generic adapter in isolation. Inventory
+the current RabbitMQ wire, topology, lifecycle, context, receiver-group, and settlement behavior; then
+identify the smallest Communication-owned provider declaration/election seam that can consume R07-09
+direct intent while retaining the in-process minimum-priority floor. Prove unavailable direct intent
+fails without local fallback and every decision is reported before adding channel grammar, retries,
+durability claims, Jobs/Cache migration, or broader broker behavior.
 
 ## Repository boundary
 

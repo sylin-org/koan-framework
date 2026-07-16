@@ -1,15 +1,17 @@
 <Project>
   <!--
-    P1.1 · Composition lockfile (build-time emitter).
+    P1.1 / R07-09 · Composition lockfile and direct-reference provenance (build-time emitter).
 
     NuGet auto-imports buildTransitive/<PackageId>.targets for direct and transitive PackageReference
     consumers, so referencing a Koan application bundle gives an app a checked-in koan.lock.json
     refreshed on every build — `git diff` then shows composition drift in PR review WITHOUT booting
     the app. The boot-time host writes the richer resolved twin (obj/koan.lock.resolved.json) and compares.
 
-    Build-time we can honestly emit only app + modules (capabilities/elections/entities are
-    runtime-negotiated — ARCH-0084). Module versions are major.minor (ARCH-0085 pre-1.0 breaking
-    tier) so the checked-in file is byte-stable across commits and diffs stay meaningful.
+    Build-time we can honestly emit app + resolved modules + direct application references
+    (capabilities/elections/entities are runtime-negotiated — ARCH-0084). Direct references come
+    from @(PackageReference)/@(ProjectReference), never the flattened @(ReferencePath), so transitive
+    connectors cannot masquerade as application intent. Module versions are major.minor (ARCH-0085
+    pre-1.0 breaking tier) so the checked-in file is byte-stable across commits and diffs stay meaningful.
 
     Scope: app projects (OutputType=Exe) by default; force on/off with $(KoanComposition)=true|false.
     ProjectReference does not import package build assets. The repository's supported source
@@ -22,6 +24,7 @@
     <!-- obj/ root (BaseIntermediateOutputPath is set in SDK props, available at this import; content is
          config-independent so the shared path is safe with WriteOnlyWhenDifferent). -->
     <_KoanModuleManifestFile>$(BaseIntermediateOutputPath)koan.modules.manifest</_KoanModuleManifestFile>
+    <_KoanReferenceManifestFile>$(BaseIntermediateOutputPath)koan.references.manifest</_KoanReferenceManifestFile>
     <_KoanTrimRootsFile>$(BaseIntermediateOutputPath)koan.trimroots.xml</_KoanTrimRootsFile>
     <!-- The trim-root descriptor is only meaningful for a trimming/NativeAOT publish; emitting it for plain
          builds would be inert noise. PublishAot is set in the app csproj before this import, so it's visible here. -->
@@ -33,6 +36,11 @@
        CoreCompile; with LogicalName set, nothing reads the file until Csc embeds it. -->
   <ItemGroup Condition="'$(_KoanCompositionEnabled)' == 'true'">
     <EmbeddedResource Include="$(_KoanModuleManifestFile)" LogicalName="koan.modules.manifest" Visible="false" />
+    <EmbeddedResource Include="$(_KoanReferenceManifestFile)" LogicalName="koan.references.manifest" Visible="false" />
+    <!-- Snapshot application-authored items during evaluation. ResolveProjectReferences may add
+         transitive project items later; those are module presence, never direct application intent. -->
+    <_KoanDeclaredPackageReference Include="@(PackageReference)" />
+    <_KoanDeclaredProjectReference Include="@(ProjectReference)" />
   </ItemGroup>
 
   <!-- AOT/trim discovery roots. The file is produced by KoanWriteTrimRoots before CoreCompile (well before ILC
@@ -46,6 +54,7 @@
              AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
     <ParameterGroup>
       <ModuleAssemblies ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <DirectReferences ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
       <AppName ParameterType="System.String" Required="true" />
       <Tfm ParameterType="System.String" Required="true" />
       <OutputPath ParameterType="System.String" Required="true" />
@@ -82,9 +91,19 @@
             .ToList();
         if (koan == null) koan = distinct.Count > 0 ? distinct[0].Value : "0.0";
 
+        var directReferences = (DirectReferences ?? Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+            .Select(item => item.ItemSpec.Split(new[] { '|' }, 2))
+            .Where(parts => parts.Length == 2 && parts[0].Length > 0 && parts[1].Length > 0)
+            .Select(parts => new KeyValuePair<string, string>(parts[0], parts[1]))
+            .GroupBy(reference => reference.Key + "|" + reference.Value, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .OrderBy(reference => reference.Key, StringComparer.Ordinal)
+            .ThenBy(reference => reference.Value, StringComparer.Ordinal)
+            .ToList();
+
         var sb = new StringBuilder();
         sb.Append("{\n");
-        sb.Append("  \"schema\": 1,\n");
+        sb.Append("  \"schema\": 2,\n");
         sb.Append("  \"app\": {\n");
         sb.Append("    \"name\": \"" + esc(AppName) + "\",\n");
         sb.Append("    \"koan\": \"" + esc(koan) + "\",\n");
@@ -99,7 +118,17 @@
             sb.Append("      \"version\": \"" + esc(distinct[i].Value) + "\"\n");
             sb.Append("    }");
         }
-        sb.Append(distinct.Count == 0 ? "]\n" : "\n  ]\n");
+        sb.Append(distinct.Count == 0 ? "],\n" : "\n  ],\n");
+        sb.Append("  \"directReferences\": [");
+        for (int i = 0; i < directReferences.Count; i++)
+        {
+            sb.Append(i == 0 ? "\n" : ",\n");
+            sb.Append("    {\n");
+            sb.Append("      \"kind\": \"" + esc(directReferences[i].Key) + "\",\n");
+            sb.Append("      \"id\": \"" + esc(directReferences[i].Value) + "\"\n");
+            sb.Append("    }");
+        }
+        sb.Append(directReferences.Count == 0 ? "]\n" : "\n  ]\n");
         sb.Append("}\n");
         var content = sb.ToString();
 
@@ -114,14 +143,86 @@
     </Task>
   </UsingTask>
 
+  <UsingTask TaskName="WriteKoanReferenceManifest"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <PackageReferences ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <ProjectReferences ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <DirectReferences ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
+      <OutputPath ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Reference Include="$(MSBuildToolsPath)\Microsoft.Build.Utilities.Core.dll" />
+      <Using Namespace="System" />
+      <Using Namespace="System.Collections.Generic" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        Func<string, bool> isPackage = id =>
+            string.Equals(id, "Sylin.Koan", StringComparison.OrdinalIgnoreCase)
+            || (id ?? "").StartsWith("Sylin.Koan.", StringComparison.OrdinalIgnoreCase);
+        Func<string, bool> isProject = id =>
+            string.Equals(id, "Koan", StringComparison.OrdinalIgnoreCase)
+            || (id ?? "").StartsWith("Koan.", StringComparison.OrdinalIgnoreCase)
+            || isPackage(id);
+
+        var candidates = new List<string>();
+        foreach (var item in PackageReferences ?? Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+        {
+            var id = item.ItemSpec;
+            if (isPackage(id)) candidates.Add("package|" + id);
+        }
+        foreach (var item in ProjectReferences ?? Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+        {
+            if (string.Equals(item.GetMetadata("ReferenceOutputAssembly"), "false", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.GetMetadata("OutputItemType"), "Analyzer", StringComparison.OrdinalIgnoreCase)) continue;
+            var id = Path.GetFileNameWithoutExtension(item.ItemSpec);
+            if (isProject(id)) candidates.Add("project|" + id);
+        }
+
+        var lines = candidates
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(line => line, StringComparer.Ordinal)
+            .ToArray();
+        DirectReferences = lines
+            .Select(line => (Microsoft.Build.Framework.ITaskItem)new Microsoft.Build.Utilities.TaskItem(line))
+            .ToArray();
+        var content = lines.Length == 0 ? string.Empty : string.Join(Environment.NewLine, lines) + Environment.NewLine;
+        var existing = File.Exists(OutputPath) ? File.ReadAllText(OutputPath) : null;
+        if (!string.Equals(existing, content, StringComparison.Ordinal)) File.WriteAllText(OutputPath, content);
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <!--
+    Direct reference provenance. @(PackageReference) and @(ProjectReference) are application-authored
+    inputs; @(ReferencePath) is the resolved transitive closure. Preserve that distinction so an
+    indirectly supplied connector cannot become an automatic provider candidate.
+  -->
+  <Target Name="KoanWriteReferenceManifest"
+          BeforeTargets="PrepareResources;CoreCompile"
+          Condition="'$(_KoanCompositionEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <WriteKoanReferenceManifest PackageReferences="@(_KoanDeclaredPackageReference)"
+                                ProjectReferences="@(_KoanDeclaredProjectReference)"
+                                OutputPath="$(_KoanReferenceManifestFile)">
+      <Output TaskParameter="DirectReferences" ItemName="_KoanDirectReference" />
+    </WriteKoanReferenceManifest>
+    <ItemGroup>
+      <FileWrites Include="$(_KoanReferenceManifestFile)" />
+    </ItemGroup>
+  </Target>
+
   <Target Name="KoanWriteCompositionLockfile"
           AfterTargets="Build"
+          DependsOnTargets="KoanWriteReferenceManifest"
           Condition="'$(_KoanCompositionEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
     <ItemGroup>
       <_KoanModuleAssembly Include="@(ReferencePath)"
                            Condition="$([System.String]::Copy('%(Filename)').StartsWith('Koan.'))" />
     </ItemGroup>
     <WriteKoanLockfile ModuleAssemblies="@(_KoanModuleAssembly)"
+                       DirectReferences="@(_KoanDirectReference)"
                        AppName="$(AssemblyName)"
                        Tfm="$(TargetFramework)"
                        OutputPath="$(MSBuildProjectDirectory)\koan.lock.json" />

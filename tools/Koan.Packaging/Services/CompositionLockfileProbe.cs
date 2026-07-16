@@ -8,6 +8,7 @@ internal static class CompositionLockfileProbe
     public static bool Require(
         string applicationDirectory,
         string expectedApplicationName,
+        IReadOnlyCollection<string> expectedDirectReferences,
         params string[] requiredModules)
     {
         var path = Path.Combine(
@@ -48,6 +49,24 @@ internal static class CompositionLockfileProbe
         {
             throw new InvalidOperationException(
                 $"The composition lockfile is missing required modules: {string.Join(", ", missing)}.");
+        }
+
+        var directReferences = root
+            .GetProperty(PackagingConstants.ApplicationProbe.CompositionDirectReferencesProperty)
+            .EnumerateArray()
+            .Select(reference => string.Join(
+                '|',
+                reference.GetProperty(PackagingConstants.ApplicationProbe.CompositionReferenceKindProperty).GetString(),
+                reference.GetProperty(PackagingConstants.ApplicationProbe.CompositionReferenceIdProperty).GetString()))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var expected = expectedDirectReferences.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var missingDirect = expected.Where(reference => !directReferences.Contains(reference)).Order().ToArray();
+        var unexpectedDirect = directReferences.Where(reference => !expected.Contains(reference)).Order().ToArray();
+        if (missingDirect.Length > 0 || unexpectedDirect.Length > 0)
+        {
+            throw new InvalidOperationException(
+                "The composition lockfile direct-reference intent is invalid: " +
+                $"missing=[{string.Join(", ", missingDirect)}], unexpected=[{string.Join(", ", unexpectedDirect)}].");
         }
 
         return true;

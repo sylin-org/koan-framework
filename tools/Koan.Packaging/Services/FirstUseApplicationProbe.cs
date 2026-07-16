@@ -19,9 +19,13 @@ internal sealed class FirstUseApplicationProbe
         var compositionLockfileObserved = CompositionLockfileProbe.Require(
             applicationDirectory,
             PackagingConstants.FirstUse.ApplicationName,
+            string.Equals(lane, "package", StringComparison.OrdinalIgnoreCase)
+                ? PackagingConstants.FirstUse.PackageDirectReferences
+                : PackagingConstants.FirstUse.SourceDirectReferences,
             PackagingConstants.ApplicationProbe.CoreModuleId,
             PackagingConstants.ApplicationProbe.SqliteModuleId,
-            PackagingConstants.ApplicationProbe.McpModuleId);
+            PackagingConstants.ApplicationProbe.McpModuleId,
+            PackagingConstants.ApplicationProbe.CommunicationModuleId);
         var startedAt = DateTimeOffset.UtcNow;
         var total = Stopwatch.StartNew();
         var steps = new List<ApplicationStepEvidence>();

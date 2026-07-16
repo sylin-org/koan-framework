@@ -38,6 +38,13 @@
 > partial cancellation, separate Event/Transport lanes, composition facts, drain, and repeated hosts.
 > No connector, retry, durability, or broker claim follows from the local floor.
 
+> **Implementation update (R07-09, 2026-07-15):** Core now snapshots direct PackageReference and
+> ProjectReference intent during build evaluation, embeds it separately from the resolved module
+> closure, registers an immutable `KoanApplicationReferenceManifest` before pillar initialization,
+> and exposes the same provenance in composition lock schema 2. This proves the direct-versus-
+> transitive boundary required by connector eligibility without yet introducing an adapter SPI,
+> channel grammar, broker, or provider election.
+
 ## Context
 
 Koan's Entity-first language has the right center but the wrong boundaries around communication.

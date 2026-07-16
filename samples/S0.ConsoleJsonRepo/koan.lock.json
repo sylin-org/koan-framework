@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "app": {
     "name": "S0.ConsoleJsonRepo",
     "koan": "0.18",
@@ -33,6 +33,20 @@
     {
       "id": "Koan.Orchestration.Abstractions",
       "version": "0.17"
+    }
+  ],
+  "directReferences": [
+    {
+      "kind": "project",
+      "id": "Koan.Data.Abstractions"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Connector.Json"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Core"
     }
   ]
 }

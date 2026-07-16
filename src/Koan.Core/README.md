@@ -49,6 +49,9 @@ dotnet add package Sylin.Koan.Core
 - The package carries `buildTransitive/Sylin.Koan.Core.targets`. Any executable package consumer whose
   dependency graph contains Core refreshes a checked-in `koan.lock.json`; `KoanComposition=false`
   explicitly opts out.
+- That target also embeds direct package/project reference provenance. The host exposes it as the
+  immutable `KoanApplicationReferenceManifest` service, keeping direct application intent distinct
+  from transitive module presence for future provider elections.
 
 ## Links
 - Repo: https://github.com/sylin-org/Koan-framework

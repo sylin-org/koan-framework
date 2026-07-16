@@ -44,11 +44,12 @@ Composition  8 modules · lockfile DRIFT(+Koan.Cache)
 
 | File | Written by | When | Checked in? | Sections |
 |---|---|---|---|---|
-| `koan.lock.json` | the transitive `Sylin.Koan.Core` build target | every supported application build | **yes** | `schema`, `app`, `modules` |
+| `koan.lock.json` | the transitive `Sylin.Koan.Core` build target | every supported application build | **yes** | `schema`, `app`, `modules`, `directReferences` |
 | `obj/koan.lock.resolved.json` | the host at boot | each run (non-production) | no (gitignored) | the above **plus** `elections`, `configKeys`, `entities`, (best-effort) `capabilities` |
 
-The build-time file carries only what is honestly knowable **without running the app**: identity and
-the Koan packages it is composed of. Adapter **elections** and negotiated **capabilities** are
+The build-time file carries only what is honestly knowable **without running the app**: identity, the
+resolved Koan modules it is composed of, and the Koan package/project references the application
+declared directly. Adapter **elections** and negotiated **capabilities** are
 runtime concerns (they depend on configuration and on what each provider negotiates — ARCH-0084), so
 they live only in the resolved twin.
 
@@ -62,11 +63,14 @@ Koan assemblies only.
 
 ```jsonc
 {
-  "schema": 1,
+  "schema": 2,
   "app": { "name": "S5.Recs", "koan": "0.17", "tfm": "net10.0" },
   "modules": [
     { "id": "Koan.Core", "version": "0.17" },
     { "id": "Koan.Data.Connector.Postgres", "version": "0.17" }
+  ],
+  "directReferences": [
+    { "kind": "package", "id": "Sylin.Koan.Data.Connector.Postgres" }
   ]
 }
 ```
@@ -79,7 +83,7 @@ otherwise churn it on every build) so a diff means a *real* composition change, 
 
 ```jsonc
 {
-  "schema": 1,
+  "schema": 2,
   "app": { "name": "S5.Recs", "koan": "0.17", "tfm": "net10.0" },
   "modules": [ { "id": "Koan.Core", "version": "0.17" } /* … */ ],
   "elections": { "data:default": { "adapter": "postgres", "via": "reference-priority", "priority": 14 } },
@@ -102,6 +106,17 @@ projects (`OutputType=Exe`). Force it on or off with `$(KoanComposition)`:
   <KoanComposition>true</KoanComposition>   <!-- or false to opt a project out -->
 </PropertyGroup>
 ```
+
+The two inventories answer different questions:
+
+- `modules` is the resolved Koan assembly closure, including transitive modules needed at runtime;
+- `directReferences` is only application-authored `PackageReference`/`ProjectReference` intent.
+
+For example, an application bundle can supply `Koan.Communication` transitively, so Communication
+appears under `modules`; it does not appear under `directReferences` unless the application chose that
+component directly. Future automatic provider selection uses this provenance boundary rather than
+guessing from loaded assemblies. Package and project identities are preserved as written, together
+with their origin; connector declarations will map the identities they support.
 
 > **Source-checkout note.** A `ProjectReference` does not import a referenced package's build assets.
 > Koan's FirstUse and GoldenJourney source contracts import the same target centrally through the
@@ -153,6 +168,8 @@ public sealed class MyPillarComposition : IKoanCompositionContributor
   (`WebApplication` / generic `Host`) in development (`ContentRootPath` = the project directory). The
   build-time `koan.lock.json` is produced for supported package applications and Koan's executable
   source contracts regardless of whether the app is later started.
+- A consumer that bypasses Koan's build target has unknown direct-reference provenance. Koan does not
+  infer external-provider intent from its runtime assembly closure.
 
 ## See also
 

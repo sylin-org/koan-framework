@@ -48,6 +48,9 @@ internal static class PackagingConstants
         public const string CompositionTargetFrameworkProperty = "tfm";
         public const string CompositionModulesProperty = "modules";
         public const string CompositionModuleIdProperty = "id";
+        public const string CompositionDirectReferencesProperty = "directReferences";
+        public const string CompositionReferenceKindProperty = "kind";
+        public const string CompositionReferenceIdProperty = "id";
         public const string FactsProperty = "facts";
         public const string FactCodeProperty = "code";
         public const string FactSummaryProperty = "summary";
@@ -58,8 +61,9 @@ internal static class PackagingConstants
         public const string SqliteModuleId = "Koan.Data.Connector.Sqlite";
         public const string McpModuleId = "Koan.Mcp";
         public const string JobsModuleId = "Koan.Jobs";
+        public const string CommunicationModuleId = "Koan.Communication";
         public const string TargetFramework = "net10.0";
-        public const int CompositionLockfileSchema = 1;
+        public const int CompositionLockfileSchema = 2;
         public const string SelfUri = "koan://self";
         public const string CustomToolsProperty = "customTools";
         public const string EmptySelfMessage = "nothing here you can use yet";
@@ -92,6 +96,18 @@ internal static class PackagingConstants
         public const int StartupAttempts = ApplicationProbe.StartupAttempts;
         public const int StartupPollMilliseconds = ApplicationProbe.StartupPollMilliseconds;
         public const int HttpTimeoutSeconds = ApplicationProbe.HttpTimeoutSeconds;
+        public static readonly IReadOnlyList<string> SourceDirectReferences =
+        [
+            "project|Koan.Data.Connector.Sqlite",
+            "project|Koan.Mcp",
+            "project|Sylin.Koan.App",
+        ];
+        public static readonly IReadOnlyList<string> PackageDirectReferences =
+        [
+            "package|Sylin.Koan.App",
+            "package|Sylin.Koan.Data.Connector.Sqlite",
+            "package|Sylin.Koan.Mcp",
+        ];
     }
 
     public static class GoldenJourney
@@ -114,5 +130,19 @@ internal static class PackagingConstants
         public const string InProcessTransport = "in-process";
         public const string NotReadyOutcome = "review.not-ready";
         public const string AcceptedOutcome = "review.recommendation-recorded";
+        public static readonly IReadOnlyList<string> SourceDirectReferences =
+        [
+            "project|Koan.Data.Connector.Sqlite",
+            "project|Koan.Jobs",
+            "project|Koan.Mcp",
+            "project|Sylin.Koan.App",
+        ];
+        public static readonly IReadOnlyList<string> PackageDirectReferences =
+        [
+            "package|Sylin.Koan.App",
+            "package|Sylin.Koan.Data.Connector.Sqlite",
+            "package|Sylin.Koan.Jobs",
+            "package|Sylin.Koan.Mcp",
+        ];
     }
 }

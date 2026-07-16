@@ -19,10 +19,14 @@ internal sealed class GoldenJourneyApplicationProbe
         var compositionLockfileObserved = CompositionLockfileProbe.Require(
             applicationDirectory,
             PackagingConstants.GoldenJourney.ApplicationName,
+            string.Equals(lane, "package", StringComparison.OrdinalIgnoreCase)
+                ? PackagingConstants.GoldenJourney.PackageDirectReferences
+                : PackagingConstants.GoldenJourney.SourceDirectReferences,
             PackagingConstants.ApplicationProbe.CoreModuleId,
             PackagingConstants.ApplicationProbe.SqliteModuleId,
             PackagingConstants.ApplicationProbe.JobsModuleId,
-            PackagingConstants.ApplicationProbe.McpModuleId);
+            PackagingConstants.ApplicationProbe.McpModuleId,
+            PackagingConstants.ApplicationProbe.CommunicationModuleId);
         var startedAt = DateTimeOffset.UtcNow;
         var total = Stopwatch.StartNew();
         var steps = new List<ApplicationStepEvidence>();

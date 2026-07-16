@@ -12,7 +12,7 @@ namespace Koan.Core.Composition;
 /// </summary>
 /// <remarks>
 /// The build-time emitter (<c>build/Sylin.Koan.Core.targets</c>) hand-writes the same SCHEMA
-/// (schema/app/modules) from MSBuild — it does not call this serializer (it runs before the
+/// (schema/app/modules/directReferences) from MSBuild — it does not call this serializer (it runs before the
 /// assembly is loaded). The two are kept in lockstep by <c>KoanLockfileSchemaSpec</c>, which
 /// round-trips the target's golden output through <see cref="Deserialize"/>.
 /// </remarks>

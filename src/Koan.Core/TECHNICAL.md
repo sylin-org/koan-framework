@@ -45,13 +45,17 @@ source: src/Koan.Core/
   `ILoggerFactory` from the current `AppHost` provider, so host leases and flow scopes also govern
   logging without a second ambient owner.
 - `IKoanRuntimeFacts`: read-only access to the current host's schema-versioned runtime fact envelope.
+- `KoanApplicationReferenceManifest`: immutable host-owned direct `PackageReference`/
+  `ProjectReference` provenance. `IsPresent=false` means unknown provenance; it must never be replaced
+  by inference from loaded assemblies.
 - `KoanFactJson`: the canonical deterministic JSON projection used by Web and MCP.
 - `ServiceDiscoveryAdapterBase`: the concern-owned discovery template. Adapters supply environment,
   runtime-topology, normalization, and health hooks but cannot replace activation or precedence.
 - `DiscoveryCandidatePriority`: the canonical explicit → legacy environment → automatic → host-gateway →
   loopback ordering used by every discovery adapter and optional contributor.
-- `buildTransitive/Sylin.Koan.Core.targets`: emits static composition, the embedded intent manifest,
-  and trimming roots for applicable executable builds even when Core arrives through a bundle.
+- `buildTransitive/Sylin.Koan.Core.targets`: emits static composition, the embedded resolved-module
+  and direct-reference manifests, and trimming roots for applicable executable builds even when Core
+  arrives through a bundle.
 
 ## Usage guidance
 
@@ -80,7 +84,8 @@ source: src/Koan.Core/
   `Complete=false` as healthy.
 - Layer optional engines through the concern-owned contributor seam. Compatibility metadata is inert;
   the engine's Reference = Intent registration activates contribution; adapters never probe assemblies.
-- Keep the checked-in `koan.lock.json` under review. It contains static app/module identity only;
+- Keep the checked-in `koan.lock.json` under review. It contains static app/module identity and direct
+  application reference provenance;
   negotiated elections and runtime facts belong to `obj/koan.lock.resolved.json`.
 - Lockfile `app.name` is the executable assembly identity and is excluded from `modules`; friendly
   application identity remains an operator/runtime-facts concern.

@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "app": {
     "name": "Koan.GoldenJourney",
     "koan": "0.18",
@@ -65,6 +65,24 @@
     {
       "id": "Koan.Web.Sse",
       "version": "0.17"
+    }
+  ],
+  "directReferences": [
+    {
+      "kind": "project",
+      "id": "Koan.Data.Connector.Sqlite"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Jobs"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Mcp"
+    },
+    {
+      "kind": "project",
+      "id": "Sylin.Koan.App"
     }
   ]
 }

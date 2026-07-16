@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "app": {
     "name": "Recs",
     "koan": "0.17",
@@ -113,6 +113,48 @@
     {
       "id": "Koan.ZenGarden.Core",
       "version": "0.17"
+    }
+  ],
+  "directReferences": [
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.AI.Connector.Ollama"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Cache"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Data.AI"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Data.Connector.Postgres"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Data.Connector.Sqlite"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Data.Vector"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Data.Vector.Connector.Weaviate"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Jobs"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Mcp"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Web"
     }
   ]
 }

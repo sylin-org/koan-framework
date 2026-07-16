@@ -16,7 +16,7 @@ public class KoanLockfileComparerSpec
     private static readonly KoanLockApp App = new("S5.Recs", "0.17", "net10.0");
 
     private static KoanLockfile Lock(params (string id, string ver)[] modules)
-        => new(1, App, modules.Select(m => new KoanLockModule(m.id, m.ver)).ToArray());
+        => new(KoanLockfile.CurrentSchema, App, modules.Select(m => new KoanLockModule(m.id, m.ver)).ToArray());
 
     [Fact]
     public void No_lockfile_yields_not_found()
@@ -67,11 +67,22 @@ public class KoanLockfileComparerSpec
     [Fact]
     public void App_identity_change_is_drift()
     {
-        var locked = new KoanLockfile(1, App, new[] { new KoanLockModule("Koan.Core", "0.17") });
-        var resolved = new KoanLockfile(1, new KoanLockApp("S5.Recs", "0.18", "net10.0"),
+        var locked = new KoanLockfile(KoanLockfile.CurrentSchema, App, new[] { new KoanLockModule("Koan.Core", "0.17") });
+        var resolved = new KoanLockfile(KoanLockfile.CurrentSchema, new KoanLockApp("S5.Recs", "0.18", "net10.0"),
             new[] { new KoanLockModule("Koan.Core", "0.17") });
         var cmp = KoanLockfileComparer.Compare(locked, resolved);
         cmp.DriftKeys.Should().Contain("app");
+    }
+
+    [Fact]
+    public void Schema_change_is_explicit_drift()
+    {
+        var locked = new KoanLockfile(1, App, new[] { new KoanLockModule("Koan.Core", "0.17") });
+        var resolved = Lock(("Koan.Core", "0.17"));
+
+        var cmp = KoanLockfileComparer.Compare(locked, resolved);
+
+        cmp.DriftKeys.Should().Contain("schema");
     }
 
     [Fact]
@@ -81,8 +92,8 @@ public class KoanLockfileComparerSpec
         IReadOnlyDictionary<string, IReadOnlyList<string>> Caps(params string[] owners)
             => owners.ToDictionary(o => o, o => (IReadOnlyList<string>)new[] { "query.linq" });
 
-        var locked = new KoanLockfile(1, App, modules, Capabilities: Caps("data:postgres", "data:redis"));
-        var resolved = new KoanLockfile(1, App, modules, Capabilities: Caps("data:postgres"));
+        var locked = new KoanLockfile(KoanLockfile.CurrentSchema, App, modules, Capabilities: Caps("data:postgres", "data:redis"));
+        var resolved = new KoanLockfile(KoanLockfile.CurrentSchema, App, modules, Capabilities: Caps("data:postgres"));
 
         var cmp = KoanLockfileComparer.Compare(locked, resolved);
         cmp.DriftKeys.Should().Contain("-capability:data:redis");
@@ -92,8 +103,8 @@ public class KoanLockfileComparerSpec
     public void Config_key_added_is_drift_when_both_declare_keys()
     {
         var modules = new[] { new KoanLockModule("Koan.Core", "0.17") };
-        var locked = new KoanLockfile(1, App, modules, ConfigKeys: new[] { "Koan:Data:Sqlite:Path" });
-        var resolved = new KoanLockfile(1, App, modules,
+        var locked = new KoanLockfile(KoanLockfile.CurrentSchema, App, modules, ConfigKeys: new[] { "Koan:Data:Sqlite:Path" });
+        var resolved = new KoanLockfile(KoanLockfile.CurrentSchema, App, modules,
             ConfigKeys: new[] { "Koan:Data:Sqlite:Path", "Koan:Ai:Ollama:BaseUrl" });
 
         var cmp = KoanLockfileComparer.Compare(locked, resolved);
@@ -106,11 +117,39 @@ public class KoanLockfileComparerSpec
         // Build-time file = app + modules only; resolved twin adds elections/keys. Those extra
         // sections must NOT register as drift (different tiers) — the boot-line stays clean.
         var buildTime = Lock(("Koan.Core", "0.17"));
-        var resolved = new KoanLockfile(1, App, new[] { new KoanLockModule("Koan.Core", "0.17") },
+        var resolved = new KoanLockfile(KoanLockfile.CurrentSchema, App, new[] { new KoanLockModule("Koan.Core", "0.17") },
             Elections: new Dictionary<string, KoanLockElection> { ["data:default"] = new("sqlite", "reference-priority", 10) },
             ConfigKeys: new[] { "Koan:Data:Sqlite:Path" });
 
         var cmp = KoanLockfileComparer.Compare(buildTime, resolved);
         cmp.Status.Should().Be(KoanLockStatus.Ok);
+    }
+
+    [Fact]
+    public void Direct_reference_drift_is_distinct_from_transitive_module_presence()
+    {
+        var modules = new[]
+        {
+            new KoanLockModule("Koan.Core", "0.18"),
+            new KoanLockModule("Koan.Communication", "0.18"),
+        };
+        var locked = new KoanLockfile(
+            KoanLockfile.CurrentSchema,
+            App,
+            modules,
+            DirectReferences: new[] { new KoanLockReference("package", "Sylin.Koan.App") });
+        var resolved = new KoanLockfile(
+            KoanLockfile.CurrentSchema,
+            App,
+            modules,
+            DirectReferences: new[]
+            {
+                new KoanLockReference("package", "Sylin.Koan.App"),
+                new KoanLockReference("package", "Sylin.Koan.Communication"),
+            });
+
+        var cmp = KoanLockfileComparer.Compare(locked, resolved);
+
+        cmp.DriftKeys.Should().Contain("+reference:package:Sylin.Koan.Communication");
     }
 }
