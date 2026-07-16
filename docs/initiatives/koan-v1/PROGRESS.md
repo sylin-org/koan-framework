@@ -5,11 +5,11 @@ title: "Koan V1 Reorganization Progress"
 audience: [architects, maintainers, ai-agents]
 status: draft
 last_updated: 2026-07-16
-framework_version: v0.19.0
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-16
   status: in-progress
-  scope: R07-01 through R07-17 passed; the R07 parent acceptance audit is next
+  scope: R07 passed; T6 capability-ring graduation is complete and bounded T7 readiness assessment is next
 ---
 
 # Koan V1 Reorganization Progress
@@ -20,10 +20,11 @@ or completes a work item. The roadmap describes order; it does not report progre
 ## Initiative state
 
 - Overall: `active`
-- Current tranche: `T6 — capability-ring graduation`
-- Active work item: R07 — rebuild the semantic capability ring
-- Active child: none; R07-17 passed and the R07 parent acceptance audit is next
-- V1 readiness: `not ready`; T7 remains gated by T6 and an observed public package publication
+- Current tranche: `T7 — V1 release readiness`
+- Active work item: none; open the smallest readiness card only after the T7 entry audit
+- Active child: none; R07 and all T6 capability rings are passed
+- V1 readiness: `not ready`; public package observation, release recovery/input lineage, connector
+  logging security, upgrade/support guidance, and an explicit release decision remain
 
 ## Work items
 
@@ -36,7 +37,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 | R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
-| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-16 | R07-01 through [R07-17](work-items/r07/R07-17-media-recipe-truthfulness.md) pass. Audit parent acceptance before admitting another child. |
+| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | passed | R06 | Codex · 2026-07-16 | R07-01 through [R07-18](work-items/r07/R07-18-business-channels.md) pass. Lifecycle, Events, Transport, cardinality, context, provider election, internal convergence, pointwise pillar operations, and inspectability now share explicit owners; stable heterogeneous Communication evolution remains PMC-023. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -52,12 +53,13 @@ item should normally be `in-progress`.
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 | R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
-| R07 | in progress | R07-01 through R07-17 passed. Audit the parent contract; open another child only for named missing acceptance evidence. |
+| R07 | passed | All 18 children and the parent acceptance pass. The zero-config local ring, direct provider intent, startup-declared business channels, pointwise capability law, canonical docs, focused packages, and truthful non-claims agree. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-16 | R07-18 | ARCH-0113 promised an optional business channel, but the runtime still exposed one route per lane, adapter hosts received bindings they did not own, RabbitMQ topology ignored channel identity, and public ledgers correctly called channel authoring unsupported. | Keep `default` zero-config. Add startup-declared business channels only at the existing terminals; make one router plan own normalization, per-lane/channel election, bindings, adapter scope, validation, and facts; qualify RabbitMQ routes/queues and move its pre-release topology to v3. Communication 37/37, real RabbitMQ 9/9, Entity Language 25/25, strict builds/packs/locks/docs/diff/privacy pass. Defer stable heterogeneous aliases to PMC-023. |
 | 2026-07-16 | R07-17 | Media advertised eager prewarming, generic orphan sweeping, configurable routes, and Cache integration that current runtime paths did not implement. Its recipe configuration also bound from the wrong section, invalid recipes were not forced through real host startup, and no reusable pointwise Media operation justified an Entity facet. | Admit no facet for symmetry. Keep Entity-backed sources, named recipes, direct pipelines, on-demand HTTP rendering, and optional persisted derivations. Make one registry bind from `Koan:Media`, validate during module startup, and supply shared facts; delete inert or unsafe promises and stale dependency; rewrite package/reference guidance around current behavior. Media Core 562/562, hosted Web 4/4, strict builds/packs/docs/example/inventory pass. Defer derivative storage/lifecycle redesign to PMC-022. |
 | 2026-07-16 | R07-16 | Explicit Cache eviction had developer intent but split identity from repository caching: the repository honored custom policy templates while `Uncache`/the generic handle forced a default template. The scalar APIs also could not express bounded finite/stream work or partial outcomes. | Replace the split surface with scalar/set/stream `entity.Cache.Evict()`. One Cache-owned plan now supplies policy, safety exclusion, template, Data routing tokens, and managed equality scope to repository, eviction, and startup facts. Preserve type/tag control plane, capture context once, execute sequentially with fixed-size outcomes, delete old APIs without aliases. Cache topology 57/57, cross-engine 14/14, Entity Language 25/25, real Tenancy + SQLite 6/6, strict build/pack/docs/examples/inventory pass. |
 | 2026-07-16 | R07-15 | AI had three implementations of the same model/source/embed/guard/provenance/vector/state write, while the async worker re-saved the domain Entity and its durable job copied business text plus unused per-item policy. Visual symmetry suggested `.Index()`/source `.Embed()`, but ordinary indexing and rebuild already had distinct canonical owners. | Add no public synonym. Keep `[Embedding]` + `Save` as ordinary Lifecycle indexing and `EmbeddingMigrator` as rebuild control plane. Route lifecycle, worker, and migrator through one vector-only writer; reload current Entity under restored context; honor `EmbedOptions.Source`; remove duplicated queue policy and inert per-Entity worker knobs. Data.AI 87/87, AI Unit 158/158, focused packs/docs/examples/inventory pass. |

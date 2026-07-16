@@ -58,6 +58,47 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
     }
 
     [Fact]
+    public async Task Named_channel_can_elect_RabbitMQ_while_default_transport_stays_local()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var state = new RabbitState(expected: 2);
+        await using var host = await Start(
+            state,
+            rabbit.ConnectionString,
+            ct,
+            services => services.Configure<CommunicationOptions>(options =>
+            {
+                options.TransportProvider = "in-process";
+                options.FrameworkSignalsProvider = "in-process";
+                options.FrameworkBroadcastsProvider = "in-process";
+                options.Channels["priority"] = new CommunicationChannelOptions
+                {
+                    TransportProvider = "rabbitmq"
+                };
+            }));
+        using var scope = AppHost.PushScope(host.Services);
+
+        var acceptance = await new FanoutOrder { Name = "named" }
+            .Transport.Send(ct, channel: "priority");
+        await state.Completed.Task.WaitAsync(ct);
+
+        acceptance.Channel.Should().Be("priority");
+        acceptance.Adapter.Should().Be("rabbitmq");
+        acceptance.Assurance.Should().Be("durably-acknowledged");
+        state.Observations.Should().BeEquivalentTo(["A:named", "B:named"]);
+
+        var facts = host.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts;
+        facts.Should().Contain(fact =>
+            fact.Code == "koan.communication.transport.selected"
+            && fact.Subject == "communication:transport:default"
+            && fact.Summary.Contains("'in-process'", StringComparison.Ordinal));
+        facts.Should().Contain(fact =>
+            fact.Code == "koan.communication.transport.selected"
+            && fact.Subject == "communication:transport:priority"
+            && fact.Summary.Contains("'rabbitmq'", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Authenticated_mesh_restores_tenant_context_only_inside_the_receiver()
     {
         var ct = TestContext.Current.CancellationToken;

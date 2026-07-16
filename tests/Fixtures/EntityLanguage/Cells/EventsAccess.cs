@@ -28,4 +28,16 @@ public static class EventsConsumer
 
     public static Task<EventAcceptance> Details(Todo todo, CancellationToken ct)
         => todo.Events.Raise(new TodoRejected("not ready"), ct);
+
+    public static Task<EventAcceptance> NamedOne(Todo todo, CancellationToken ct)
+        => todo.Events.Raise<TodoCompleted>(ct, channel: "priority");
+
+    public static Task<EventAcceptance> NamedMany(IEnumerable<Todo> todos, CancellationToken ct)
+        => todos.Events.Raise<TodoCompleted>(ct, channel: "priority");
+
+    public static Task<EventAcceptance> NamedStream(IAsyncEnumerable<Todo> todos, CancellationToken ct)
+        => todos.Events.Raise<TodoCompleted>(ct, channel: "priority");
+
+    public static Task<EventAcceptance> NamedDetails(Todo todo, CancellationToken ct)
+        => todo.Events.Raise(new TodoRejected("not ready"), ct, channel: "priority");
 }

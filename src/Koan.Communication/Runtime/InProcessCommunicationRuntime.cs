@@ -29,7 +29,8 @@ internal sealed class InProcessCommunicationRuntime : ICommunicationAdapter
         | CommunicationAdapterCapabilities.ZeroTargetEvents
         | CommunicationAdapterCapabilities.NodeFanOut,
         [],
-        IsBuiltIn: true);
+        IsBuiltIn: true,
+        SettlementObservable: true);
 
     private readonly IReadOnlyDictionary<CommunicationLane, Channel<LocalPublication>> _channels;
     private readonly Dictionary<CommunicationLane, Task> _workers = [];

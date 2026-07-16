@@ -17,4 +17,13 @@ public static class TransportConsumer
 
     public static Task<TransportAcceptance> Stream(IAsyncEnumerable<Todo> todos, CancellationToken ct)
         => todos.Transport.Send(ct);
+
+    public static Task<TransportAcceptance> NamedOne(Todo todo, CancellationToken ct)
+        => todo.Transport.Send(ct, channel: "priority");
+
+    public static Task<TransportAcceptance> NamedMany(IEnumerable<Todo> todos, CancellationToken ct)
+        => todos.Transport.Send(ct, channel: "priority");
+
+    public static Task<TransportAcceptance> NamedStream(IAsyncEnumerable<Todo> todos, CancellationToken ct)
+        => todos.Transport.Send(ct, channel: "priority");
 }

@@ -82,9 +82,43 @@ may pin `CommunicationOptions.TransportProvider`, `EventsProvider`, `FrameworkSi
 `FrameworkBroadcastsProvider`;
 normal applications should let their direct references express intent.
 
-Startup reporting and shared facts show both adapters, assurances, bounds, typed handler groups, and
-context carriage. The same facts reach `/.well-known/Koan/facts` and `koan://facts` when those host
-surfaces are present.
+## Business channels
+
+Most application code should stay on the inferred `default` channel. When a workflow needs different
+reach or assurance, declare a stable business name at startup and use it at the existing terminal:
+
+```json
+{
+  "Koan": {
+    "Communication": {
+      "Channels": {
+        "priority": {
+          "TransportProvider": "rabbitmq"
+        }
+      }
+    }
+  }
+}
+```
+
+```csharp
+await urgentOrders.Transport.Send(ct, channel: "priority");
+await order.Events.Raise<OrderEscalated>(ct, channel: "priority");
+```
+
+`TransportProvider` and `EventsProvider` are independent and optional. An omitted pin uses the same
+direct-reference or built-in-floor election as `default`; therefore the example keeps
+`Events/priority` process-local. Every discovered handler group binds to every startup-declared
+public channel. Unknown channels reject before Koan enumerates the source.
+
+A channel chooses route policy; it is not authorization, confidentiality, a receiver predicate, or a
+provider type in business code. Names are case-normalized, must begin with a letter or digit, may
+contain letters, digits, `.`, `_`, and `-`, and are limited to 64 characters. Dynamic channels,
+automatic branching, mirroring, and failover are not supported.
+
+Startup reporting and shared facts show every lane/channel election, assurance, applicable bound,
+typed handler binding, and context carriage. The same facts reach `/.well-known/Koan/facts` and
+`koan://facts` when those host surfaces are present.
 
 The local runtime is not durable and does not cross processes. The RabbitMQ connector currently
 provides confirmed Transport, competing-group signals, and ephemeral per-node broadcast subscriptions with

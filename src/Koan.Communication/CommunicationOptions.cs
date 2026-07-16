@@ -3,6 +3,12 @@ namespace Koan.Communication;
 /// <summary>Host-owned Communication provider bindings and publication limits.</summary>
 public sealed class CommunicationOptions
 {
+    /// <summary>
+    /// Startup-declared business channels. Each channel uses normal provider election unless a lane is pinned.
+    /// </summary>
+    public Dictionary<string, CommunicationChannelOptions> Channels { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Optional deployment pin for the default Transport channel.</summary>
     public string? TransportProvider { get; set; }
 

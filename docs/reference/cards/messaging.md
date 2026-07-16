@@ -4,10 +4,10 @@ domain: messaging
 title: "Messaging — legacy implementation map"
 audience: [developers, ai-agents]
 status: deprecated
-last_updated: 2026-07-15
-framework_version: v0.18.0
+last_updated: 2026-07-16
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-15
+  date_last_tested: 2026-07-16
   status: reviewed
   scope: current implementation truth and replacement direction
 ---
@@ -54,5 +54,6 @@ settlement, and report boot facts. Use the current [Communication reference](../
 Direct-reference provider election now ships. The RabbitMQ Communication connector proves confirmed
 durable Transport publication, stable receiver-group fan-out, authenticated context, and fail-loud
 no-route behavior while Events remain local. It does not provide retry, dedupe, remote settlement,
-logical channel authoring, or exactly-once effects. None of those guarantees should be inferred from
-the legacy Messaging packages.
+RabbitMQ Events, or exactly-once effects. Startup-declared business channels can select an elected
+route without exposing a provider in domain code; dynamic routing, branching, mirroring, and failover
+remain unsupported. None of those guarantees should be inferred from the legacy Messaging packages.

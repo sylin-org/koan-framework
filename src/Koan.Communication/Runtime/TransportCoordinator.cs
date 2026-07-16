@@ -14,12 +14,13 @@ internal sealed class TransportCoordinator(
 {
     public async Task<TransportAcceptance> Send<TEntity>(
         IAsyncEnumerable<TEntity> source,
+        string? channel,
         CancellationToken ct)
         where TEntity : class, IEntity
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        var route = router.For(CommunicationLane.Transport);
+        var route = router.For(CommunicationLane.Transport, channel);
         var contract = CommunicationContractIdentity.Transport(typeof(TEntity));
         var operation = new CommunicationOperation(route);
         if (router.KnownTargetGroups(route, contract) == 0)

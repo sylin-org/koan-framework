@@ -87,6 +87,15 @@
 > cancellation retain the confirmed prefix. Static `EntityType.Cache` remains policy/tag control
 > plane. `Uncache`, the generic handle, and the default-template-only key path are deleted.
 
+> **Implementation update (R07-18, 2026-07-16):** the optional business-channel terminal and its
+> startup binding now ship. `Send` and both `Raise` forms accept a channel name; one immutable router
+> plan normalizes declarations, elects independently per Events/Transport channel, binds each typed
+> group once, scopes adapters to only their elected bindings, and emits matching startup/operator/
+> agent facts. Unknown channels reject before source enumeration. Real RabbitMQ proof carries a named
+> channel beside a local default; channel-qualified topology uses the pre-release v3 exchange. Dynamic
+> channels, authorization/filter semantics, branching, mirroring, failover, and RabbitMQ Events remain
+> non-claims.
+
 ## Context
 
 Koan's Entity-first language has the right center but the wrong boundaries around communication.
@@ -411,11 +420,11 @@ public registry.
 The sole V1 application receiver path is a business-named typed handler discovered by `AddKoan()`, with
 a default receiver-group identity derived from its application contract type. The same handler works
 in-process and through a connector. A type rename changes that default identity and is reported in boot
-facts and the build manifest; long-lived distributed groups use an explicit stable business alias and
-version. Lambdas are deferred. R07-07 fixes the V1 local handler spelling as
+facts; long-lived distributed groups will require an explicit stable business alias and version.
+Lambdas are deferred. R07-07 fixes the V1 local handler spelling as
 `IReceiveEntity<TEntity>` with optional synchronous `Where(TEntity)` and asynchronous
-`Receive(TEntity, CancellationToken)`. Stable distributed aliases remain deferred until the first
-connector gives that identity a real second consumer.
+`Receive(TEntity, CancellationToken)`. Stable distributed aliases and rolling evolution remain
+deferred as PMC-023; current RabbitMQ support does not silently imply them.
 
 ### 8. Data owns Lifecycle and truthful selection
 
@@ -468,10 +477,11 @@ filtering, failure behavior, tests, facts, and agent inspection before choosing 
 ### 10. Connector references form a deterministic default mesh
 
 Referencing a connector directly from the application contributes a channel candidate to the
-host-owned Communication mesh. A build-generated application communication manifest records direct
+host-owned Communication mesh. A build-generated application reference manifest records direct
 `PackageReference` and `ProjectReference` intent so runtime assembly discovery never guesses whether a
-connector was transitive. It also records versioned contracts, typed handler groups/aliases, and named
-channels. The same build seam feeds package locking and source-build tests. Transitive connectors
+connector was transitive. The host-owned runtime plan and facts—not that build manifest—record current
+lane/channel elections and typed bindings. A versioned integration manifest for contracts, aliases,
+and heterogeneous participants remains PMC-023. The build seam feeds package locking and source-build tests. Transitive connectors
 remain available for an explicit deployment binding but cannot hijack the default.
 
 Normal applications add one conforming connector package and write no application routing code or Koan
@@ -534,13 +544,16 @@ fall back to InProcess. That changes reachability. Startup or the operation fail
 reports the affected channel. Runtime connector health participates in readiness.
 
 Zero-configuration replicas are safe only with stable names and one application communication manifest.
-V1 derives:
+The current same-application mesh derives:
 
 - mesh scope from stable application identity plus environment;
-- contract alias and schema version deterministically from the Entity/event contract, with an explicit
-  stable alias for rename/version evolution;
+- contract identity deterministically from the CLR Entity/event contract under the fixed host wire schema;
 - a unique node-session identity at host start; and
-- receiver-group identity from its stable typed handler or explicit business alias.
+- receiver-group identity from its typed handler.
+
+Explicit stable aliases, application schema versions, and rename/rolling evolution are future
+compatibility mechanisms, not current V1 syntax; PMC-023 requires a real two-version proof before they
+are admitted.
 
 V1 Entity mesh is limited to replicas sharing that application manifest and trust boundary.
 Heterogeneous or cross-application communication requires a future explicit integration manifest; a
@@ -602,7 +615,7 @@ selection, channel choice, receiver selection, and the terminal intent each have
 Adapters declare candidacy and capabilities; the router alone records the effective election. A static
 boot description cannot assert selection.
 
-Per lane, startup and runtime facts name:
+The target inspection contract requires startup and runtime facts to name, as applicable:
 
 - selected adapter and local/process/network reach;
 - copy mechanism and maximum payload posture;
@@ -618,6 +631,12 @@ They also name application-manifest identity, mesh scope, versioned contract, ea
 channel/adapter election, each local group/inbound binding, diagnostic plan hash, filter placement, and
 whether each connector candidate came from direct intent, explicit binding, transitive availability,
 election, or rejection.
+
+Implementation through R07-18 emits the elected lane/channel provider, reason, priority, assurance,
+settlement observability, applicable local bounds, typed bindings, and context-carrier count. Core's
+separate build manifest reports direct reference provenance. Contract aliases/schema compatibility,
+rejected-candidate matrices, ordering/retry policy facts, and a diagnostic plan hash are not shipped;
+PMC-023 owns the compatibility portion and later evidence must earn any additional fact vocabulary.
 
 Normal boot output is concise: one Communication summary plus warnings for rejected, unavailable, or
 degraded plans. The complete per-contract/channel/group matrix remains available as structured runtime

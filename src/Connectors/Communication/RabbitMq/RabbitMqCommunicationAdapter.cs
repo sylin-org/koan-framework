@@ -172,7 +172,7 @@ internal sealed class RabbitMqCommunicationAdapter(
             {
                 await _publisher!.BasicPublishAsync(
                         _exchange!,
-                        Topology.Route(publication.Lane, publication.ContractId),
+                        Topology.Route(publication.Lane, publication.Channel, publication.ContractId),
                         mandatory: true,
                         properties,
                         body,
@@ -245,7 +245,7 @@ internal sealed class RabbitMqCommunicationAdapter(
         await _consumer.QueueBindAsync(
                 queue,
                 _exchange!,
-                Topology.Route(binding.Lane, binding.ContractId),
+                Topology.Route(binding.Lane, binding.Channel, binding.ContractId),
                 cancellationToken: ct)
             .ConfigureAwait(false);
 
@@ -366,16 +366,17 @@ internal sealed class RabbitMqCommunicationAdapter(
         await channel.DisposeAsync().ConfigureAwait(false);
     }
 
-    private static class Topology
+    internal static class Topology
     {
         internal static string Exchange(string meshId)
-            => $"{Constants.Broker.ExchangePrefix}.{Slug(meshId)}.default.v2";
+            => $"{Constants.Broker.ExchangePrefix}.{Slug(meshId)}.v3";
 
         internal static string Queue(string meshId, CommunicationAdapterBinding binding)
-            => $"{Exchange(meshId)}.{Lane(binding.Lane)}.group.{Hash(binding.GroupId)}.{Hash(binding.ContractId)}";
+            => $"{Exchange(meshId)}.{Lane(binding.Lane)}.channel.{Hash(binding.Channel)}.group." +
+               $"{Hash(binding.GroupId)}.{Hash(binding.ContractId)}";
 
-        internal static string Route(CommunicationLane lane, string contractId)
-            => $"{Lane(lane)}.contract.{Hash(contractId)}";
+        internal static string Route(CommunicationLane lane, string channel, string contractId)
+            => $"{Lane(lane)}.channel.{Hash(channel)}.contract.{Hash(contractId)}";
 
         internal static string MessageType(CommunicationLane lane)
             => $"{Constants.Broker.MessageTypePrefix}.{Lane(lane)}.v2";

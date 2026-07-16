@@ -260,12 +260,13 @@ public sealed class ImportTodo : IReceiveEntity<Todo> { /* business code */ }
 await todo.Transport.Send(ct);
 ```
 
-Implementation status at R07-08: Lifecycle and both process-local Communication lanes ship. Local
+Implementation status through R07-18: Lifecycle and both process-local Communication lanes ship. Local
 Events prove payloadless/explicit details, occurrence identity, subscription fan-out, zero-subscriber
 success, isolated copies, context carriage, acceptance, settlement, and independent bounded ingress.
-Stable distributed receiver aliases, connector manifests/election, retries, and broker conformance
-remain specified but unimplemented. Distributed paragraphs below are admission contracts for later
-slices, not current capability claims.
+Direct-reference election, RabbitMQ Transport, and startup-declared business channels also ship with
+focused conformance. Stable distributed receiver aliases, retries, RabbitMQ Events, and heterogeneous
+contract negotiation remain unimplemented; those paragraphs below remain admission contracts rather
+than current capability claims.
 
 Lifecycle registration is deterministic, idempotent per owner, removable, host-scoped, and invoked by
 the canonical Data operation path. Before-hooks may reject with a stable code and correction.
@@ -299,8 +300,9 @@ cancellation still catchable as `OperationCanceledException`.
 
 The sole V1 receiver path is a typed, auto-discovered business handler with stable application identity,
 usable unchanged in-process or through a connector. A type-derived default group identity is
-refactor-sensitive and reported; long-lived distributed groups declare an explicit business alias and
-version. Lambdas are deferred. The full laws, adapter
+refactor-sensitive and reported. Stable business aliases, schema versions, and their rolling migration
+rules are not shipped; PMC-023 owns that decision before heterogeneous or long-lived distributed use.
+Lambdas are deferred. The full laws, adapter
 rules, and greenfield deletion map are in
 [ARCH-0113](../decisions/ARCH-0113-entity-capability-communication.md).
 
@@ -311,7 +313,7 @@ requires the explicit integration contract rather than silently publishing a per
 
 The V1 foundation provides the complete local ring through one faithful in-process adapter. R07-07
 provides local `Send`; R07-08 provides local `Raise`; both use auto-discovered typed handlers and zero
-routing configuration. A future build-generated application communication manifest distinguishes direct
+routing configuration. A build-generated application communication manifest distinguishes direct
 PackageReference/ProjectReference connector intent from transitive availability. One eligible outbound
 adapter is elected per logical channel; every local group binds once to the same channel. Publishers
 publish once and never infer remote receiver acceptance. InProcess implements that same contract when
@@ -329,15 +331,22 @@ receiver may apply `Where` at ingress after authenticated deserialization; `fals
 filtered settlement, never retry/dead-letter, and never a confidentiality boundary. V1 performs no
 adapter predicate pushdown, provider lowering, automatic `When` routing, mirroring, or failover.
 
+Business-named channels are startup-declared at `Koan:Communication:Channels:{name}`. Transport and
+Events provider pins are independently optional; an omitted pin uses normal direct-reference or
+built-in-floor election. Every public typed handler group binds once to every declared public channel,
+while internal framework routes remain on their owned default channels. An unknown terminal channel
+rejects before source enumeration. The channel participates in wire and binding identity plus startup
+facts; it is not an authorization, confidentiality, or receiver-filter boundary.
+
 Mesh identity derives from stable application identity plus environment. V1 is limited to replicas
 sharing one application communication manifest and trust boundary; heterogeneous/cross-application
 communication requires a future explicit integration manifest. Wire identity is mesh/application,
 channel, versioned contract, operation/item, correlation, and sealed context—not a deployment plan
-hash. The plan hash remains diagnostic so compatible rolling configuration can coexist.
+hash. The route plan remains diagnostic rather than becoming a second wire-compatibility protocol.
 
-Boot currently emits both selected local Communication lanes, assurance, separate bounds, typed Event
-subscription and Transport receiver groups, and context carriage. Later mesh work must expand this into
-the complete contract/channel/outbound-adapter/local-
+Boot emits every selected Communication lane/channel, assurance, applicable bounds, typed Event
+subscription and Transport receiver bindings, and context carriage through the same facts envelope.
+Later heterogeneous-mesh work must expand this into the complete contract/channel/outbound-adapter/local-
 group/inbound-binding matrix through the same startup, operator, and authorized agent projections.
 Every surface reuses the same reason codes and safe corrections.
 

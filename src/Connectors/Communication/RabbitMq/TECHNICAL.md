@@ -13,8 +13,8 @@ dispatch. RabbitMQ sees host-produced bytes and routing identities; it does not 
 tenant semantics, or business handlers. The same host-owned wire is exercised by the built-in local
 provider.
 
-Provider election is lane-specific. An explicit `CommunicationOptions.TransportProvider` or
-`FrameworkSignalsProvider` or `FrameworkBroadcastsProvider` binding
+Provider election is route-specific. An explicit default `CommunicationOptions.TransportProvider`,
+named-channel `TransportProvider`, `FrameworkSignalsProvider`, or `FrameworkBroadcastsProvider` binding
 wins first. Otherwise a direct package/project reference makes this connector eligible. Without
 direct intent, only the minimum-priority built-in provider participates. Capability requirements,
 assurance, Core-owned `[ProviderPriority]`, and stable provider ID resolve eligible candidates.
@@ -23,15 +23,15 @@ Direct or explicit external intent never falls back locally when unavailable.
 ## Topology
 
 The application identity code is the mesh identity. The connector declares one durable direct
-exchange per mesh for the schema-2 default channels:
+exchange per mesh for the channel-aware topology generation:
 
 ```text
-koan.communication.{mesh}.default.v2
+koan.communication.{mesh}.v3
 ```
 
 Every discovered Entity receiver or competing internal signal group gets one durable, non-exclusive queue. Queue and
-routing-key suffixes are deterministic SHA-256-derived identifiers over the stable group and
-contract identities. All replicas with the same mesh, contract, and group consume from the same
+routing-key suffixes are deterministic SHA-256-derived identifiers over the logical channel, stable
+group, and contract identities. All replicas with the same mesh, channel, contract, and group consume from the same
 queue; distinct groups bind separate queues to the same contract route and therefore fan out. Every-node
 bindings use unique non-durable, auto-delete queues, so each active host gets a copy and departed nodes
 leave no durable subscription behind.
@@ -48,6 +48,10 @@ part of this version's contract.
 
 Publisher confirmation is the only remote acceptance observable by the sender. Consumer settlement
 is intentionally absent from the receipt rather than guessed from local topology.
+
+The v3 exchange deliberately does not consume the earlier pre-release v2 topology. RabbitMQ does not
+delete old durable exchanges or queues for Koan; an operator must retire v2 after a coordinated
+upgrade if the broker is retained.
 
 ## Context trust
 

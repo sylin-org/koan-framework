@@ -5,11 +5,11 @@ title: "Koan V1 Reorganization Current Handoff"
 audience: [maintainers, ai-agents]
 status: current
 last_updated: 2026-07-16
-framework_version: v0.19.0
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-16
   status: reviewed
-  scope: R07-01 through R07-17 passed; Media recipes are startup-validated, reported, and documented truthfully
+  scope: R07 passed; the semantic capability ring and business-channel contract are closed, with T7 readiness next
 ---
 
 # Koan V1 reorganization current handoff
@@ -18,7 +18,7 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Current state
 
-- R00 through R06 remain passed. R07 is the only active initiative work item.
+- R00 through R07 are passed. T6 capability-ring graduation is complete; no implementation child is active.
 - [ARCH-0113](../../decisions/ARCH-0113-entity-capability-communication.md) accepts the greenfield
   semantic-capability rebuild and supersedes the old lifecycle/event/messaging split.
 - The canonical [Entity Semantics Contract](../../architecture/entity-semantics-contract.md) now
@@ -122,6 +122,15 @@ Replace this file at every handoff. It is a restart point, not a diary.
   validates at startup, and supplies shared facts. Inert prewarm declarations, the unsafe/no-op generic
   sweep, unused route options, a stale Cache dependency, and fictional public guidance are gone.
   Media Core passes 562/562 and the real hosted Web suite passes 4/4.
+- [R07-18](work-items/r07/R07-18-business-channels.md) passed. The default local Communication ring
+  remains configuration-free, while startup-declared business channels independently elect Events/
+  Transport providers through the same Entity terminal grammar. One immutable router plan owns
+  normalized identity, binding, adapter scope, validation, and facts; RabbitMQ topology is channel-
+  qualified. Communication passes 37/37, real RabbitMQ 9/9, and Entity Language 25/25. Both 0.20
+  owners build strictly, pack, and advance the maintained application locks.
+- The [R07 parent](work-items/R07-semantic-capability-ring.md) passes. Its exact V1 spellings are
+  compile-probed, all acceptance additions have executable or canonical evidence, and stable
+  distributed aliases/evolution are explicitly deferred to PMC-023 rather than hidden in channels.
 - Public Messaging guidance is reduced to the truthful legacy v0.17 generation. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -193,7 +202,7 @@ await order.Transport.Send(ct);
   are proved. RabbitMQ earns only the guarantees its conformance tests prove.
 - V1 has an inferred default channel, an optional business-named channel terminal, and one
   host/deployment binding. Manifest, mesh/contract/channel, outbound adapter, local inbound group,
-  receiver filter, and diagnostic plan hash are reported at boot.
+  receiver filter, and route decisions are reported at boot from the same host plan.
 - Source `Where`, channel choice, receiver `Where`, and terminal intent form the complete V1 flow
   grammar. Receiver filters run at typed ingress, record terminal filtered settlement, and are never
   confidentiality boundaries. Automatic sender `When`, adapter predicate pushdown, provider lowering,
@@ -241,7 +250,9 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
 17. Media derivative/prewarm inventory. **Passed as R07-17:** no generic facet is admitted; one
     registry binds, validates, and reports real recipes, while inert prewarm/sweep/configuration
     promises are deleted.
-18. Audit the R07 parent acceptance and open questions before admitting another implementation child.
+18. Business-named Communication channels and the parent acceptance audit. **Passed as R07-18:** the
+    inferred default remains zero-config; declared channels select and explain route policy without
+    provider types, authorization, or a topology DSL in business code. R07 is closed.
 
 Only completed/current slices have detailed child cards. Do not open broker breadth before Event
 semantics pass over the local boundary.
@@ -347,12 +358,18 @@ semantics pass over the local boundary.
   and Web build warning-as-error and pack at 0.18.0 with public companions and bounded dependencies;
   the maintained sample builds, inventory remains 112, docs lint has 0 errors, skills pass 20/20,
   and the changed marked example passes 1/1. No release-certification suite was run.
+- R07-18 passes Communication 37/37, real RabbitMQ 9/9, and Entity Language 25/25. Communication and
+  its RabbitMQ connector build warning-as-error and pack independently at 0.20.0; FirstUse and
+  GoldenJourney build clean with updated locks; inventory remains 112. Docs lint has 0 errors,
+  changed examples pass 2/2, and diff/stale/privacy gates pass. No release-certification suite ran.
 
 ## Next safe action
 
-Audit the R07 parent against its accepted semantic laws, scope, acceptance additions, and remaining
-open questions. Close the parent if its meaningful result is proved; open another child only for a
-named missing acceptance fact, not for architectural symmetry or backlog breadth.
+Enter T7 with a bounded readiness assessment, not an automatic publication. Reconcile the actual
+public package state, release-correctness gates (especially PMC-016/017), connector logging security
+(PMC-019), upgrade/support guidance, and the exact first trustworthy publication observation. Open
+one work item only after that audit names the smallest meaningful release-readiness result. Publication,
+push, tag, and release still require their own explicit authorized operation.
 
 ## Repository boundary
 

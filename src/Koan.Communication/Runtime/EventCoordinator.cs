@@ -16,13 +16,14 @@ internal sealed class EventCoordinator(
         IAsyncEnumerable<TEntity> source,
         TEvent? details,
         bool hasDetails,
+        string? channel,
         CancellationToken ct)
         where TEntity : class, IEntity
         where TEvent : class
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        var route = router.For(CommunicationLane.Events);
+        var route = router.For(CommunicationLane.Events, channel);
         var contract = CommunicationContractIdentity.Events(typeof(TEntity), typeof(TEvent));
         var operation = new CommunicationOperation(route);
         if (!hasDetails && Attribute.IsDefined(typeof(TEvent), typeof(EventDetailsRequiredAttribute), inherit: false))

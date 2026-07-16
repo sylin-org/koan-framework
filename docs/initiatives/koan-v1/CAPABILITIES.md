@@ -64,7 +64,7 @@ it here.
 | `Entity<T>` data semantics and context | assessed | `verified` | [record](#entityt-data-semantics-and-context) | Entity streams are provider-bounded on six qualified adapters and fail closed on complete-scan resident adapters. |
 | Backend discovery and negotiation | assessed | `demonstrated` | [record](#backend-discovery-and-negotiation) | Streaming selection/rejection is capability-driven and runtime-explained; fleet-wide behavioral parity is not certified. |
 | Web/API conventions | assessed | `verified` | [record](#webapi-conventions) | In-memory API behavior is well tested; package installation is blocked. |
-| Events and messaging | assessed | `demonstrated` | [record](#events-and-messaging) | A real sample and providers exist; no current broker conformance result was obtained. |
+| Entity Events and Transport | assessed | `verified` | [record](#entity-events-and-transport) | The zero-config local ring and named RabbitMQ Transport channels have focused conformance; heterogeneous contracts, retries, and remote settlement remain unsupported. |
 | Jobs and scheduling | assessed | `verified` | [record](#jobs-and-scheduling) | Core/in-process behavior is strong; distributed tiers remain separate. |
 | Cache and distributed state | assessed | `verified` | [record](#cache-and-distributed-state) | Cross-engine behavior is tested; production coherence topologies are not certified. |
 | Media processing and serving | assessed | `verified` | [record](#media-processing-and-serving) | Recipe and HTTP behavior are strong; prewarm, automatic cleanup, and multi-source routing are unsupported. |
@@ -230,15 +230,20 @@ boundaries remain pre-V1 work.
   [`RabbitMQ Communication connector`](../../../src/Connectors/Communication/RabbitMq/README.md)
   reference elects RabbitMQ for Transport and internal framework routes without changing application
   code; Events stay local. Jobs wake uses competing groups; Cache peer invalidation uses every-node delivery.
-- **Executable evidence:** Communication passes 33/33 local semantic/election tests; Jobs passes
+- **Executable evidence:** Communication passes 37/37 local semantic/election/channel tests; Jobs passes
   82/82 including local signal/coalescing and current pointwise submission behavior. The connector's real RabbitMQ container
-  passes 7/7 for direct-intent election, confirmed persistent publication,
+  passes 9/9 for direct-intent and named-channel election, confirmed persistent publication,
   two-group isolated fan-out, authenticated tenant restoration, mandatory no-route failure, boot
   facts, elected health, and zero-configuration orchestration intent.
 - **Inspection and failure:** startup/operator/agent facts report lane provider, reason, priority,
   assurance, settlement observability, groups, bounds, and context carriage. An elected connector is
   critical to health; unavailable direct intent never falls back to local reach.
-- **Unsupported / compatibility:** RabbitMQ Events, logical channel authoring, retry, dedupe,
+- **Supported channel policy:** the default stays configuration-free. Startup-declared business
+  channels can pin Transport and Events independently, use the same terminal grammar, bind every
+  typed group once, and report exact provider/assurance/binding facts. They are route policies, not
+  authorization or receiver filters.
+- **Unsupported / compatibility:** RabbitMQ Events, dynamic channels, automatic branching,
+  mirroring/failover, retry, dedupe,
   inbox/outbox, dead letters, replay, schema negotiation, remote settlement, exactly-once effects, and
   application-authored framework signals are not supported. Legacy `Koan.Messaging` is not the
   implementation behind Entity Communication.

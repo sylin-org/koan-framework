@@ -3,19 +3,19 @@ type: SPEC
 domain: framework
 title: "R07 - Rebuild the Semantic Capability Ring"
 audience: [architects, maintainers, developers, ai-agents]
-status: draft
+status: passed
 last_updated: 2026-07-16
-framework_version: v0.19.0
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-16
-  status: in-progress
+  status: passed
   scope: greenfield Entity capability, communication, context, and execution architecture
 ---
 
 # R07 — Rebuild the semantic capability ring
 
 - Tranche: `T6 — capability-ring graduation`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R06
 - Unlocks: coherent Entity capabilities, context-safe Events and Transport, and later capability rings
 - Owner: Core context, Data lifecycle, Entity language, and communication boundaries
@@ -79,7 +79,7 @@ subordinate to arriving at one sustainable architecture.
   is per lane/channel: explicit binding; direct connector claim or built-in floor; hard semantic
   capabilities; fixed delivery-assurance rank; Core-owned provider priority; then stable identity.
   Direct intent never silently falls back to local reach when unhealthy. Effective
-  outbound/inbound/filter decisions and diagnostic plan hashes are boot-reported.
+  outbound/inbound/filter decisions are boot-reported from the same immutable route plan.
 - Sender selection, optional business-named channel choice, and named receiver filters remain typed and
   composable without reviving a general Pipeline DSL. Automatic sender `When` routing is deferred.
 - Event and Transport awaits return only lane-named acceptance facts. Receiver dedupe, handler outcome,
@@ -108,12 +108,14 @@ subordinate to arriving at one sustainable architecture.
 - A shorter Koan-owned `Order.Where(...)` selection may follow a truthful `QueryStream`; arbitrary
   `IQueryable<T>` does not receive communication terminals.
 
-### OPEN
+### RESOLVED OR DELIBERATELY DEFERRED
 
-- Exact callback overloads and lane-named receipt type spellings, to be settled by checked-in C# 14
-  consumer probes without reopening their semantics.
-- Exact typed-handler/alias spellings, optional logical-channel terminal, and named receiver `Where`,
-  subject to host-ownership and stable-identity compile probes.
+- Checked-in C# 14 consumer probes fix the callback, lane-named receipt, scalar/set/stream terminal,
+  optional channel, and receiver `Where` spellings. These no longer remain design placeholders.
+- `IReceiveEntity<TEntity>` and `IHandleEntityEvent<TEntity,TEvent>` are the sole V1 typed handler
+  shapes. CLR-derived distributed identities are truthful for one application mesh; stable aliases,
+  rolling schema evolution, and heterogeneous integration remain one explicit post-cycle decision in
+  PMC-023 rather than a second premature naming mechanism.
 
 ## Scope
 
@@ -200,9 +202,10 @@ cardinality and copy semantics. Neither is a compatibility base for Events or Tr
 | 15 | [Embedding write convergence](r07/R07-15-embedding-write-convergence.md) | **Passed.** Ordinary indexing stays `[Embedding]` + `Save`; lifecycle, deferred work, and migration share one vector-only writer without a speculative source API | three write implementations, recursive Entity save, queued business text/duplicate policy, and inert per-Entity worker knobs |
 | 16 | [Entity Cache eviction convergence](r07/R07-16-entity-cache-eviction.md) | **Passed.** `entity.Cache.Evict()` and finite/async sources share one context-sealed, fixed-size operation and the repository's exact policy/key plan | `Uncache`, generic handle, public default-template bypass, duplicate repository identity logic, and custom-template miss |
 | 17 | [Media recipe truthfulness](r07/R07-17-media-recipe-truthfulness.md) | **Passed.** Real recipe/render behavior now validates and reports at startup; no Entity facet is admitted without a reusable business operation | inert prewarm declarations, unsafe/no-op generic sweep, unused route options, stale Cache dependency, and fictional public docs |
+| 18 | [Business-named Communication channels](r07/R07-18-business-channels.md) | **Passed.** The zero-config default remains intact while startup-declared business channels select and explain independent Events/Transport reach through the same terminal grammar | one-route-per-lane router state, adapter-wide binding leakage, channel-blind RabbitMQ topology, and the remaining illustrative channel placeholder |
 
-Only the next slice receives a child card. Later rows remain outcomes rather than speculative API
-backlogs until their prerequisites pass.
+Every executed slice has a child card and bounded acceptance record. R07 admits no speculative
+follow-on row merely for API symmetry; remaining deliberate decisions live in the post-cycle register.
 
 ## Execution plan
 
@@ -256,6 +259,12 @@ backlogs until their prerequisites pass.
     recipe configuration now binds through a real host, startup validates and reports the one registry,
     and unimplemented prewarm/sweep/route promises are deleted.
 21. Audit the R07 parent acceptance and open questions before admitting another implementation child.
+    **Complete as R07-18.** The only missing V1 grammar element was the optional business channel;
+    implementing it also centralized route planning and adapter binding. Stable aliases are recorded
+    as PMC-023 rather than smuggled into this slice.
+22. Close the parent only after the acceptance additions, canonical contract, capability ledger,
+    public docs, package identities, and handoff agree. **Complete.** R07 now has no open implementation
+    child and no hidden compatibility alias.
 
 R07-02 was intentionally additive and preceded the Lifecycle source break. R07-03 removed the package-
 lineage stop condition: once R07-04 restores the release floor, public 0.17's lifecycle `Events`
@@ -335,6 +344,10 @@ identity automatically.
   build warning-as-error and pack at 0.18.0 with bounded dependencies and truthful companions; the
   maintained sample builds, inventory remains 112, docs lint has 0 errors, skills pass 20/20, and the
   changed marked example passes 1/1. No release-certification suite was run.
+- R07-18 passes Communication 37/37, real RabbitMQ 9/9, and Entity Language 25/25. Both touched
+  packages build warning-as-error and pack independently at 0.20.0; FirstUse/GoldenJourney build and
+  locks advance; package inventory remains 112; docs report 0 errors and changed examples pass 2/2.
+  Diff, stale-claim, and privacy gates pass without release certification.
 
 ## Acceptance additions
 
@@ -363,3 +376,15 @@ identity automatically.
 
 Update [`../PROGRESS.md`](../PROGRESS.md), replace [`../NOW.md`](../NOW.md), and attach the acceptance
 record before marking the card `passed`, `blocked`, or `stopped`.
+
+## Acceptance result
+
+- Outcome: PASS
+- Date: 2026-07-16
+- Meaningful result: application code now reads as Lifecycle, Event, Transport, Relationships, Jobs,
+  Cache, and Media business intent over scalar/set/stream sources, while host-owned chokepoints absorb
+  context, cardinality, provider negotiation, routing, execution, and inspectability.
+- Deferred honestly: heterogeneous Communication contracts/group aliases (PMC-023), plus the bounded
+  post-cycle register; none creates a second canonical V1 path.
+- No full-solution/public-release certification, publication, tag, push, or remote mutation was used
+  to close this semantic tranche.

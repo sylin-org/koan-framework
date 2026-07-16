@@ -12,11 +12,11 @@
     },
     {
       "id": "Koan.Communication",
-      "version": "0.19"
+      "version": "0.20"
     },
     {
       "id": "Koan.Communication.Connector.RabbitMq",
-      "version": "0.19"
+      "version": "0.20"
     },
     {
       "id": "Koan.Core",
@@ -36,7 +36,7 @@
     },
     {
       "id": "Koan.Data.Core",
-      "version": "0.18"
+      "version": "0.19"
     },
     {
       "id": "Koan.Orchestration.Abstractions",

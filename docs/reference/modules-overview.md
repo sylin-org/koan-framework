@@ -228,7 +228,8 @@ Use this reference when you plan a Koan solution and need to understand which mo
 - **Boundary**: a connector reference is not evidence of reliable delivery. Test the exact topology
   and do not infer outbox, inbox, retry, ordering, or tenant-isolation guarantees.
 - **Current replacement**: process-local Entity `Events` and `Transport` now ship under foundation
-  `AddKoan()`. Capability-declaring connector/channel election remains later R07 work.
+  `AddKoan()`. Direct-reference connector election and startup-declared business channels now ship;
+  dynamic routing, branching, mirroring, and failover remain unsupported.
 
 ## 9. Secrets & Storage
 

@@ -165,7 +165,10 @@ public sealed class Todo : Entity<Todo> { /* agents can now query and mutate Tod
 Process-local Entity [Events and Transport](docs/reference/communication/index.md) are tested
 foundation capabilities under `AddKoan()`. The older generic
 [Messaging](docs/reference/messaging/index.md) path is deprecated and remains temporarily for internal
-bridges; external connector and RabbitMQ parity are not yet shipped.
+consumers. A directly referenced RabbitMQ Communication connector can carry Transport and
+framework-owned internal routes; startup-declared business channels can choose reach without naming
+providers in domain code. RabbitMQ Events, retries, remote settlement, and cross-application contract
+negotiation are not claimed.
 
 Backends differ, and Koan refuses to pretend otherwise: every adapter declares its capabilities,
 the framework negotiates them, and an unsupported operation **fails loudly** instead of silently

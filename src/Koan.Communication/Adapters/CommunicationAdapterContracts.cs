@@ -64,7 +64,8 @@ public sealed record CommunicationAdapterDescriptor(
     CommunicationAdapterCapabilities Capabilities,
     IReadOnlyList<string> DirectReferenceIdentities,
     bool IsBuiltIn = false,
-    bool IsLayered = false);
+    bool IsLayered = false,
+    bool SettlementObservable = false);
 
 /// <summary>One stable local receiver/subscription group that an elected adapter must bind once.</summary>
 public sealed record CommunicationAdapterBinding(

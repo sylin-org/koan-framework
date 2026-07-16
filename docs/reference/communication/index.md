@@ -4,12 +4,12 @@ domain: communication
 title: "Communication — Entity Events and Transport"
 audience: [developers, architects, operators, ai-agents]
 status: current
-last_updated: 2026-07-15
-framework_version: v0.18.0
+last_updated: 2026-07-16
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-15
+  date_last_tested: 2026-07-16
   status: verified
-  scope: foundation AddKoan local Events and Transport plus internal signals and directly elected RabbitMQ carriage
+  scope: local Events/Transport, startup-declared business channels, internal routes, and directly elected RabbitMQ carriage
 ---
 
 # Communication — Entity Events and Transport
@@ -142,6 +142,43 @@ builder.Services.Configure<CommunicationOptions>(options =>
 Invalid values fail during host startup. Oversized or unserializable values fail with a typed lane
 exception carrying the operation's partial acceptance.
 
+## Choose a business channel
+
+The inferred `default` channel is the shortest path and needs no configuration. Declare a named
+channel only when a business flow needs different reach or assurance:
+
+```json
+{
+  "Koan": {
+    "Communication": {
+      "Channels": {
+        "priority": {
+          "TransportProvider": "rabbitmq"
+        }
+      }
+    }
+  }
+}
+```
+
+Use the name only at the existing terminal:
+
+```csharp
+await urgentOrders.Transport.Send(ct, channel: "priority");
+await order.Events.Raise<OrderEscalated>(ct, channel: "priority");
+```
+
+Each channel may independently set `TransportProvider` and `EventsProvider`. An omitted setting uses
+the same direct-reference or built-in-floor election as `default`; in this example Events continue to
+use the local provider because RabbitMQ does not claim Events. Every discovered public receiver or
+subscription group binds to every declared public channel. Unknown channels fail before source
+enumeration, and startup rejects invalid declarations.
+
+Channel names are normalized to lowercase, must start with a letter or digit, may contain letters,
+digits, `.`, `_`, and `-`, and may be at most 64 characters. `default` is reserved and configured with
+the existing top-level provider settings. A channel selects route policy; it is not authorization,
+confidentiality, receiver filtering, dynamic topology, mirroring, or failover.
+
 ## Add RabbitMQ Transport
 
 Reference the connector directly from the application:
@@ -150,8 +187,8 @@ Reference the connector directly from the application:
 dotnet add package Sylin.Koan.Communication.Connector.RabbitMq
 ```
 
-That direct reference elects RabbitMQ for `Transport/default` and the internal
-`FrameworkSignals/default` lane; Events remain process-local. A
+That direct reference elects RabbitMQ for `Transport/default` and both internal default routes;
+Events remain process-local. A
 transitive connector remains inert. Koan orchestration can provision the broker automatically, or an
 existing endpoint can be supplied with
 `Koan:Communication:RabbitMq:ConnectionString=amqp://user:password@host:5672`.
@@ -173,8 +210,9 @@ RabbitMQ connector transparently extends the wake mesh while the durable ledger 
 
 ## Inspect composition
 
-Startup reporting and Koan facts identify each lane's elected provider, selection reason, assurance,
-settlement observability, typed groups, applicable bounds, and the number of context carriers moved.
+Startup reporting and Koan facts identify each lane/channel's elected provider, selection reason,
+assurance, settlement observability, typed group binding, applicable bounds, and the number of context
+carriers moved.
 Health is non-critical for an unelected candidate and critical for an elected external provider. Read
 the same structured decisions through `/.well-known/Koan/facts` or `koan://facts` when the Web or MCP
 host surfaces are referenced.
@@ -187,8 +225,9 @@ Use Jobs when durable work, retry, or scheduling is the requirement.
 
 The built-in Communication runtime is memory-only and process-local. It does not survive restart,
 cross nodes, retry, deduplicate, dead-letter, replay, or couple to a Data transaction. Direct provider
-election, RabbitMQ Transport, and Jobs wake convergence are supported. Logical channel authoring,
-additional providers, and Cache coherence convergence remain later R07 work.
+election, RabbitMQ Transport, Jobs wake, Cache coherence, and startup-declared business channels are
+supported. Dynamic channels, RabbitMQ Events, additional providers, automatic branching, mirroring,
+and failover are not.
 
 Do not use the deprecated generic [Messaging](../messaging/index.md) API as an alias. It has different
 copy, cardinality, context, and failure semantics.

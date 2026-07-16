@@ -20,18 +20,30 @@ internal node broadcast. Shared mechanisms do not become a public generic pipeli
 `IReceiveEntity<TEntity>` receivers from the generated registry. Concrete handler classes are scoped;
 each dispatch creates a fresh DI and host/context scope.
 
-One host-owned `CommunicationRouter` elects a provider independently for Events, Transport, competing-group
-framework signals, and every-node framework broadcasts and
-owns their shared wire/dispatch contract. `InProcessCommunicationRuntime` implements the same
+One host-owned `CommunicationRouter` builds the complete immutable route plan. It normalizes the
+inferred `default` plus startup-declared business channels, elects a provider independently for each
+public lane/channel and each internal route, creates channel-qualified bindings, scopes each adapter
+host to only its elected bindings, and owns the shared wire/dispatch contract.
+`InProcessCommunicationRuntime` implements the same
 `ICommunicationAdapter` seam as external connectors and remains the minimum-priority built-in floor.
 Direct application reference provenance admits external candidates. A layered candidate may also participate when
 its owning engine activates it; declaring zero lanes keeps it dormant. Explicit provider options override direct intent; semantic capabilities, assurance,
 Core-owned provider priority, and stable ID resolve eligible candidates.
+The adapter descriptor is also the startup source for settlement observability; each publication
+acceptance must match it, so receipts and composition facts cannot tell different stories.
 
-The local adapter owns one bounded channel and worker per declared lane. The lanes share
-lifecycle and aggregate operation accounting but cannot head-of-line block one another. Generic
+The local adapter owns one bounded queue and worker per semantic lane. Business channels that elect
+the local adapter share their lane's bound; distinct lanes cannot head-of-line block one another. The
+lanes share lifecycle and aggregate operation accounting. Generic
 dispatch is closed during catalog construction rather than reflected per item. A directly intended
 provider that cannot start fails the host; there is no local reach fallback.
+
+Named channels are declared at `Koan:Communication:Channels:{name}` and may pin Transport and Events
+independently. A missing pin follows normal direct-reference/built-in election. Every public typed
+handler group binds once to every declared public channel; internal Jobs/Cache routes remain on their
+framework-owned default channels. Channel identity is part of binding and wire validation. Unknown,
+malformed, duplicate-normalized, and reserved-`default` declarations fail before publication; an
+unknown terminal channel fails before source enumeration.
 
 ## Publication boundary
 
@@ -86,15 +98,16 @@ receivers filter their own origin, evict only L1, and rely on L1 TTL as the loss
 
 ## Inspection
 
-The boot module and `CommunicationCompositionContributor` report each lane's elected provider,
-reason, priority, assurance, settlement observability, handler-group counts and identities, local
-bounds where applicable, payload limits, and composed context-carrier count. Stable constants feed
-the same startup, operator, and authorized-agent fact projections.
+The boot module and `CommunicationCompositionContributor` report each lane/channel's elected provider,
+reason, priority, assurance, settlement observability, handler-group bindings, applicable local
+bounds, payload limits, and composed context-carrier count. Stable constants feed the same startup,
+operator, and authorized-agent fact projections.
 
 ## Unsupported scenarios
 
 - provider-specific features outside an adapter's declared lane and assurance;
-- logical channel authoring;
+- dynamic channel creation, automatic branching, mirroring, or failover;
+- channel-based authorization, confidentiality, or receiver selection;
 - retry, dedupe, dead-letter, replay, or outbox behavior;
 - batch atomicity or transactional coupling to persistence;
 - application-authored non-Entity payloads (typed framework signals remain internal);

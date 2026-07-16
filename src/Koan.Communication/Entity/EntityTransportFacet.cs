@@ -19,7 +19,9 @@ public readonly struct EntityTransportFacet<TEntity>
     /// Publishes each Entity as a new immutable logical snapshot and returns after bounded channel acceptance.
     /// Handler completion is observed separately through the returned acceptance.
     /// </summary>
-    public Task<TransportAcceptance> Send(CancellationToken ct = default)
+    /// <param name="ct">Stops source enumeration and publication.</param>
+    /// <param name="channel">A startup-declared business channel, or null for the inferred default.</param>
+    public Task<TransportAcceptance> Send(CancellationToken ct = default, string? channel = null)
         => AppHost.GetRequiredService<TransportCoordinator>(Constants.Operations.Send)
-            .Send(_source, ct);
+            .Send(_source, channel, ct);
 }

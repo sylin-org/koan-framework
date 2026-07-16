@@ -40,12 +40,15 @@ internal sealed class CommunicationRouter
         | CommunicationAdapterCapabilities.MessageIdentity
         | CommunicationAdapterCapabilities.BoundedAcceptance;
 
-    private readonly IReadOnlyDictionary<CommunicationLane, CommunicationRouteDecision> _routes;
+    private readonly IReadOnlyDictionary<(CommunicationLane Lane, string Channel), CommunicationRouteDecision>
+        _routes;
+    private readonly CommunicationRouteDecision[] _orderedRoutes;
     private readonly IReadOnlyDictionary<string, BoundTarget> _bindings;
-    private readonly CommunicationAdapterHost _host;
+    private readonly IReadOnlyDictionary<ICommunicationAdapter, CommunicationAdapterHost> _adapterHosts;
     private readonly CommunicationIngress _ingress;
     private readonly ILogger<CommunicationRouter> _logger;
     private readonly ICommunicationAdapter[] _selectedAdapters;
+    private readonly string _meshId;
     private int _state;
 
     public CommunicationRouter(
@@ -65,54 +68,87 @@ internal sealed class CommunicationRouter
             .ToArray();
         EnsureValidCandidates(candidates);
 
-        _bindings = BuildBindings(handlers, frameworkSignals);
-        var publicBindings = _bindings.Values
-            .Select(static target => target.Declaration)
-            .OrderBy(static binding => binding.Id, StringComparer.Ordinal)
-            .ToArray();
-        _host = new CommunicationAdapterHost(
-            application.Code,
-            publicBindings,
-            Dispatch);
-
-        _routes = new Dictionary<CommunicationLane, CommunicationRouteDecision>
+        var routeList = new List<CommunicationRouteDecision>();
+        foreach (var channel in PublicChannels(options.Value))
         {
-            [CommunicationLane.Transport] = Elect(
+            routeList.Add(Elect(
                 CommunicationLane.Transport,
-                options.Value.TransportProvider,
+                channel.Name,
+                channel.TransportProvider,
                 TransportRequirements,
                 candidates,
-                references),
-            [CommunicationLane.Events] = Elect(
+                references));
+            routeList.Add(Elect(
                 CommunicationLane.Events,
-                options.Value.EventsProvider,
+                channel.Name,
+                channel.EventsProvider,
                 EventRequirements,
                 candidates,
-                references),
-            [CommunicationLane.FrameworkSignals] = Elect(
-                CommunicationLane.FrameworkSignals,
-                options.Value.FrameworkSignalsProvider,
-                FrameworkSignalRequirements,
-                candidates,
-                references),
-            [CommunicationLane.FrameworkBroadcasts] = Elect(
-                CommunicationLane.FrameworkBroadcasts,
-                options.Value.FrameworkBroadcastsProvider,
-                FrameworkBroadcastRequirements,
-                candidates,
-                references)
-        };
-        _selectedAdapters = _routes.Values
+                references));
+        }
+        routeList.Add(Elect(
+            CommunicationLane.FrameworkSignals,
+            Constants.Channels.Default,
+            options.Value.FrameworkSignalsProvider,
+            FrameworkSignalRequirements,
+            candidates,
+            references));
+        routeList.Add(Elect(
+            CommunicationLane.FrameworkBroadcasts,
+            Constants.Channels.Default,
+            options.Value.FrameworkBroadcastsProvider,
+            FrameworkBroadcastRequirements,
+            candidates,
+            references));
+
+        _orderedRoutes = routeList
+            .OrderBy(static route => route.Lane)
+            .ThenBy(static route => route.Channel, StringComparer.Ordinal)
+            .ToArray();
+        _routes = _orderedRoutes.ToDictionary(static route => (route.Lane, route.Channel));
+        _bindings = BuildBindings(handlers, frameworkSignals, _orderedRoutes);
+        _meshId = application.Code;
+        _selectedAdapters = _orderedRoutes
             .Select(static route => route.Adapter)
             .Distinct()
             .OrderBy(static adapter => adapter.Descriptor.Id, StringComparer.Ordinal)
             .ToArray();
+        _adapterHosts = _selectedAdapters.ToDictionary(
+            static adapter => adapter,
+            adapter => new CommunicationAdapterHost(
+                _meshId,
+                _bindings.Values
+                    .Where(binding => ReferenceEquals(
+                        _routes[(binding.Declaration.Lane, binding.Declaration.Channel)].Adapter,
+                        adapter))
+                    .Select(static binding => binding.Declaration)
+                    .OrderBy(static binding => binding.Id, StringComparer.Ordinal)
+                    .ToArray(),
+                Dispatch));
     }
 
-    public IReadOnlyDictionary<CommunicationLane, CommunicationRouteDecision> Routes => _routes;
-    public string MeshId => _host.MeshId;
+    public IReadOnlyList<CommunicationRouteDecision> Routes => _orderedRoutes;
+    public IReadOnlyList<CommunicationAdapterBinding> Bindings => _bindings.Values
+        .Select(static binding => binding.Declaration)
+        .OrderBy(static binding => binding.Id, StringComparer.Ordinal)
+        .ToArray();
+    public string MeshId => _meshId;
 
-    public CommunicationRouteDecision For(CommunicationLane lane) => _routes[lane];
+    public CommunicationRouteDecision For(CommunicationLane lane, string? channel = null)
+    {
+        var normalized = channel is null
+            ? Constants.Channels.Default
+            : NormalizeChannel(channel);
+        if (_routes.TryGetValue((lane, normalized), out var route)) return route;
+
+        var configured = string.Join(", ", _orderedRoutes
+            .Where(route => route.Lane == lane)
+            .Select(static route => route.Channel));
+        throw new InvalidOperationException(
+            $"Communication channel '{normalized}' is not configured for {lane}. " +
+            $"Declare '{Constants.Configuration.Channels}:{normalized}' before host startup or use '{Constants.Channels.Default}'. " +
+            $"Configured {lane} channels: {configured}.");
+    }
 
     public int? KnownTargetGroups(CommunicationRouteDecision route, string contractId)
         => route.Adapter.Descriptor.IsBuiltIn
@@ -132,11 +168,11 @@ internal sealed class CommunicationRouter
         {
             foreach (var adapter in _selectedAdapters)
             {
-                await adapter.Start(_host, ct).ConfigureAwait(false);
+                await adapter.Start(_adapterHosts[adapter], ct).ConfigureAwait(false);
                 started.Add(adapter);
             }
 
-            foreach (var route in _routes.Values.OrderBy(static route => route.Lane))
+            foreach (var route in _orderedRoutes)
             {
                 _logger.LogInformation(
                     "Koan Communication {Lane}/{Channel}: provider={Provider}, assurance={Assurance}, " +
@@ -187,7 +223,8 @@ internal sealed class CommunicationRouter
             payload,
             operation);
         var acceptance = await route.Adapter.Publish(publication, ct).ConfigureAwait(false);
-        if (acceptance.TargetGroups is < 0
+        if (acceptance.SettlementObservable != route.Adapter.Descriptor.SettlementObservable
+            || acceptance.TargetGroups is < 0
             || acceptance.SettlementObservable && !acceptance.TargetGroups.HasValue)
         {
             throw new CommunicationAdapterException(
@@ -234,7 +271,7 @@ internal sealed class CommunicationRouter
         try
         {
             var wire = CommunicationWireCodec.Decode(payload);
-            ValidateWire(binding.Declaration, wire, _host.MeshId);
+            ValidateWire(binding.Declaration, wire, _meshId);
             CommunicationEnvelope envelope = binding.Target switch
             {
                 EventHandlerBinding eventBinding => new EventEnvelope(
@@ -283,6 +320,7 @@ internal sealed class CommunicationRouter
 
     private static CommunicationRouteDecision Elect(
         CommunicationLane lane,
+        string channel,
         string? explicitProvider,
         CommunicationAdapterCapabilities requirements,
         IReadOnlyList<ICommunicationAdapter> candidates,
@@ -297,9 +335,18 @@ internal sealed class CommunicationRouter
             var pinned = laneCandidates.FirstOrDefault(candidate =>
                 string.Equals(candidate.Descriptor.Id, explicitProvider.Trim(), StringComparison.OrdinalIgnoreCase));
             if (pinned is null)
-                throw ElectionFailure(lane, $"explicit provider '{explicitProvider}' is not registered", laneCandidates);
+                throw ElectionFailure(
+                    lane,
+                    channel,
+                    $"explicit provider '{explicitProvider}' is not registered",
+                    laneCandidates);
             EnsureEligible(lane, pinned, requirements);
-            return Decision(lane, pinned, "explicit-binding", directIntent: IsDirect(pinned, references));
+            return Decision(
+                lane,
+                channel,
+                pinned,
+                "explicit-binding",
+                directIntent: IsDirect(pinned, references));
         }
 
         var direct = references.IsPresent
@@ -322,12 +369,13 @@ internal sealed class CommunicationRouter
             var reason = direct.Length > 0
                 ? "directly intended providers do not satisfy the lane's semantic requirements"
                 : "the built-in provider floor is unavailable or ineligible";
-            throw ElectionFailure(lane, reason, automatic);
+            throw ElectionFailure(lane, channel, reason, automatic);
         }
 
         var selected = eligible[0];
         return Decision(
             lane,
+            channel,
             selected,
             direct.Length > 0
                 ? "direct-reference-intent"
@@ -339,10 +387,11 @@ internal sealed class CommunicationRouter
 
     private static CommunicationRouteDecision Decision(
         CommunicationLane lane,
+        string channel,
         ICommunicationAdapter adapter,
         string reason,
         bool directIntent)
-        => new(lane, Constants.Transport.DefaultChannel, adapter, reason, directIntent, Priority(adapter));
+        => new(lane, channel, adapter, reason, directIntent, Priority(adapter));
 
     private static int Priority(ICommunicationAdapter adapter)
         => adapter.GetType().GetCustomAttribute<ProviderPriorityAttribute>()?.Priority ?? 0;
@@ -368,6 +417,7 @@ internal sealed class CommunicationRouter
 
     private static InvalidOperationException ElectionFailure(
         CommunicationLane lane,
+        string channel,
         string reason,
         IReadOnlyCollection<ICommunicationAdapter> candidates)
     {
@@ -375,8 +425,65 @@ internal sealed class CommunicationRouter
             ? "none"
             : string.Join(", ", candidates.Select(static candidate => candidate.Descriptor.Id));
         return new InvalidOperationException(
-            $"Koan Communication could not elect {lane}/default because {reason}. Candidates: {choices}. " +
+            $"Koan Communication could not elect {lane}/{channel} because {reason}. Candidates: {choices}. " +
             "Correct the explicit binding or direct connector references; Koan will not weaken the route silently.");
+    }
+
+    private static IReadOnlyList<ChannelProviders> PublicChannels(CommunicationOptions options)
+    {
+        var result = new List<ChannelProviders>
+        {
+            new(Constants.Channels.Default, options.TransportProvider, options.EventsProvider)
+        };
+        var names = new HashSet<string>(StringComparer.Ordinal) { Constants.Channels.Default };
+        foreach (var (rawName, binding) in (options.Channels
+                     ?? throw new InvalidOperationException(
+                         $"{nameof(CommunicationOptions.Channels)} cannot be null."))
+                 .OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            if (binding is null)
+            {
+                throw new InvalidOperationException(
+                    $"Communication channel '{rawName}' has no options value. Configure an object at " +
+                    $"'{Constants.Configuration.Channels}:{rawName}'.");
+            }
+
+            var name = NormalizeChannel(rawName);
+            if (string.Equals(name, Constants.Channels.Default, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"'{Constants.Channels.Default}' is the inferred Communication channel and cannot be redeclared under " +
+                    $"'{Constants.Configuration.Channels}'. Use the top-level provider options instead.");
+            }
+
+            if (!names.Add(name))
+            {
+                throw new InvalidOperationException(
+                    $"Communication channel '{name}' is declared more than once after case normalization.");
+            }
+
+            result.Add(new ChannelProviders(name, binding.TransportProvider, binding.EventsProvider));
+        }
+
+        return result;
+    }
+
+    private static string NormalizeChannel(string rawName)
+    {
+        var name = rawName.Trim().ToLowerInvariant();
+        var valid = name.Length is > 0 and <= Constants.Channels.MaximumNameLength
+                    && char.IsAsciiLetterOrDigit(name[0])
+                    && name.All(static character =>
+                        char.IsAsciiLetterOrDigit(character) || character is '.' or '_' or '-');
+        if (!valid)
+        {
+            throw new InvalidOperationException(
+                $"Communication channel '{rawName}' is invalid. Channel names must start with a letter or digit, " +
+                $"contain only letters, digits, '.', '_', or '-', and be at most " +
+                $"{Constants.Channels.MaximumNameLength} characters.");
+        }
+
+        return name;
     }
 
     private static void EnsureValidCandidates(IReadOnlyCollection<ICommunicationAdapter> candidates)
@@ -399,26 +506,37 @@ internal sealed class CommunicationRouter
 
     private static IReadOnlyDictionary<string, BoundTarget> BuildBindings(
         CommunicationHandlerCatalog handlers,
-        IEnumerable<FrameworkMessageTargetBinding> frameworkSignals)
+        IEnumerable<FrameworkMessageTargetBinding> frameworkSignals,
+        IReadOnlyList<CommunicationRouteDecision> routes)
     {
         var result = new Dictionary<string, BoundTarget>(StringComparer.Ordinal);
+        var transportChannels = routes
+            .Where(static route => route.Lane == CommunicationLane.Transport)
+            .Select(static route => route.Channel)
+            .ToArray();
+        var eventChannels = routes
+            .Where(static route => route.Lane == CommunicationLane.Events)
+            .Select(static route => route.Channel)
+            .ToArray();
         foreach (var target in handlers.TransportReceivers)
         {
             var contract = CommunicationContractIdentity.Transport(target.EntityType);
-            Add(result, target, CommunicationLane.Transport, contract);
+            foreach (var channel in transportChannels)
+                Add(result, target, CommunicationLane.Transport, channel, contract);
         }
 
         foreach (var target in handlers.EventSubscriptions)
         {
             var contract = CommunicationContractIdentity.Events(target.EntityType, target.EventType);
-            Add(result, target, CommunicationLane.Events, contract);
+            foreach (var channel in eventChannels)
+                Add(result, target, CommunicationLane.Events, channel, contract);
         }
 
         foreach (var target in frameworkSignals
                      .OrderBy(static target => target.Lane)
                      .ThenBy(static target => target.ContractId, StringComparer.Ordinal))
         {
-            Add(result, target, target.Lane, target.ContractId, target.Scope);
+            Add(result, target, target.Lane, Constants.Channels.Default, target.ContractId, target.Scope);
         }
 
         return result;
@@ -428,14 +546,15 @@ internal sealed class CommunicationRouter
         IDictionary<string, BoundTarget> result,
         CommunicationTargetBinding target,
         CommunicationLane lane,
+        string channel,
         string contract,
         CommunicationBindingScope scope = CommunicationBindingScope.ConsumerGroup)
     {
-        var id = $"{lane.ToString().ToLowerInvariant()}|{contract}|{target.GroupIdentity}";
+        var id = $"{lane.ToString().ToLowerInvariant()}|{channel}|{contract}|{target.GroupIdentity}";
         var declaration = new CommunicationAdapterBinding(
             id,
             lane,
-            Constants.Transport.DefaultChannel,
+            channel,
             contract,
             target.GroupIdentity,
             scope);
@@ -464,4 +583,9 @@ internal sealed class CommunicationRouter
     private sealed record BoundTarget(
         CommunicationAdapterBinding Declaration,
         CommunicationTargetBinding Target);
+
+    private sealed record ChannelProviders(
+        string Name,
+        string? TransportProvider,
+        string? EventsProvider);
 }

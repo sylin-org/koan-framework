@@ -11,11 +11,18 @@ internal static class Constants
         public const string EventsProvider = Section + ":EventsProvider";
         public const string FrameworkSignalsProvider = Section + ":FrameworkSignalsProvider";
         public const string FrameworkBroadcastsProvider = Section + ":FrameworkBroadcastsProvider";
+        public const string Channels = Section + ":Channels";
+    }
+
+    internal static class Channels
+    {
+        public const string Default = "default";
+        public const int MaximumNameLength = 64;
     }
 
     internal static class Transport
     {
-        public const string DefaultChannel = "default";
+        public const string DefaultChannel = Channels.Default;
         public const string InProcessAdapter = "in-process";
         public const string ProcessMemoryAssurance = "process-memory";
         public const string BuiltInProviderId = "in-process";
@@ -23,7 +30,7 @@ internal static class Constants
 
     internal static class Events
     {
-        public const string DefaultChannel = "default";
+        public const string DefaultChannel = Channels.Default;
         public const string InProcessAdapter = "in-process";
         public const string ProcessMemoryAssurance = "process-memory";
     }
@@ -82,6 +89,24 @@ internal static class Constants
             public const string FrameworkSignalGroups = "communication:framework-signals:groups";
             public const string FrameworkBroadcasts = "communication:framework-broadcasts:default";
             public const string FrameworkBroadcastNodes = "communication:framework-broadcasts:nodes";
+
+            public static string TransportFor(string channel)
+                => channel == Channels.Default ? Transport : $"communication:transport:{channel}";
+
+            public static string EventsFor(string channel)
+                => channel == Channels.Default ? Events : $"communication:events:{channel}";
+
+            public static string TransportBoundsFor(string channel)
+                => channel == Channels.Default ? TransportBounds : $"communication:transport:{channel}:bounds";
+
+            public static string EventsBoundsFor(string channel)
+                => channel == Channels.Default ? EventsBounds : $"communication:events:{channel}:bounds";
+
+            public static string ReceiverFor(string channel, string group)
+                => channel == Channels.Default ? ReceiverPrefix + group : $"{ReceiverPrefix}{channel}:{group}";
+
+            public static string SubscriptionFor(string channel, string group)
+                => channel == Channels.Default ? SubscriptionPrefix + group : $"{SubscriptionPrefix}{channel}:{group}";
         }
 
         internal static class Reasons

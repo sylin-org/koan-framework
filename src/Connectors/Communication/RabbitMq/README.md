@@ -28,6 +28,32 @@ Entity Events remain on Koan's
 built-in process-local provider. A transitive reference does not change network reach. No bus registration, queue names,
 handler registration, or provider-selection code is required.
 
+The default may remain process-local while a named business channel uses RabbitMQ by pinning the
+channel at startup:
+
+```json
+{
+  "Koan": {
+    "Communication": {
+      "TransportProvider": "in-process",
+      "Channels": {
+        "priority": {
+          "TransportProvider": "rabbitmq"
+        }
+      }
+    }
+  }
+}
+```
+
+```csharp
+await urgentOrders.Transport.Send(ct, channel: "priority");
+```
+
+The channel name is business policy; RabbitMQ owns exchange, route, and queue realization. Participants
+that publish or receive the same flow must declare the same normalized channel name; this generation
+does not negotiate channel declarations between heterogeneous applications.
+
 ## Connection
 
 With Koan orchestration, the direct reference can provision and discover RabbitMQ with no
@@ -79,9 +105,9 @@ All options live under `Koan:Communication:RabbitMq`:
 - `Prefetch` — maximum unacknowledged consumer deliveries; default `32`.
 - `PublishTimeout` — confirmed-publication timeout; default `00:00:15`.
 
-Startup facts report RabbitMQ as the elected Transport/internal-route provider, why it won, its assurance, and the
-fact that remote settlement is unobservable. Health `communication.rabbitmq` becomes critical only
-when RabbitMQ is elected.
+Startup facts report each RabbitMQ-elected lane/channel, why it won, its assurance, its bound receiver
+groups, and the fact that remote settlement is unobservable. Health `communication.rabbitmq` becomes
+critical only when RabbitMQ is elected.
 
 ## Deliberate limits
 
@@ -89,6 +115,10 @@ This connector does not currently provide Entity Events, retries, inbox/outbox, 
 dead-letter policy, replay, ordering guarantees beyond RabbitMQ's queue behavior, remote handler
 settlement, transactional coupling to Data, schema aliases/migrations, or exactly-once side effects.
 The application mesh and CLR contract identities must match across participants.
+
+Named-channel support changes the exchange/topology suffix from `v2` to `v3`. Pre-release `v2`
+exchanges and durable queues are not consumed or removed automatically; operators upgrading a
+non-disposable broker must retire them explicitly after all participants move together.
 
 Framework signals are reserved for Koan modules. Applications do not receive a generic publish or
 subscribe API. Jobs wake uses competing groups; Cache peer invalidation uses every-node delivery.
