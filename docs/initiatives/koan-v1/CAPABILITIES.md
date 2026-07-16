@@ -230,7 +230,7 @@ boundaries remain pre-V1 work.
   reference elects RabbitMQ for Transport and internal framework routes without changing application
   code; Events stay local. Jobs wake uses competing groups; Cache peer invalidation uses every-node delivery.
 - **Executable evidence:** Communication passes 33/33 local semantic/election tests; Jobs passes
-  77/77 including local signal/coalescing/submission behavior. The connector's real RabbitMQ container
+  82/82 including local signal/coalescing and current pointwise submission behavior. The connector's real RabbitMQ container
   passes 7/7 for direct-intent election, confirmed persistent publication,
   two-group isolated fan-out, authenticated tenant restoration, mandatory no-route failure, boot
   facts, elected health, and zero-configuration orchestration intent.
@@ -253,19 +253,26 @@ boundaries remain pre-V1 work.
 - **Entry point and owner:** [`IKoanJob`](../../../src/Koan.Jobs/IKoanJob.cs) and
   [`JobsServiceCollectionExtensions`](../../../src/Koan.Jobs/JobsServiceCollectionExtensions.cs) in
   `Sylin.Koan.Jobs`.
-- **Executable evidence:** [77/77 core jobs tests](../../../tests/Suites/Jobs/Koan.Jobs.Tests/Koan.Jobs.Tests.csproj)
-  and 79/79 SQLite ledger tests pass. [`S14.AdapterBench`](../../../samples/S14.AdapterBench/Jobs/BenchmarkJob.cs) demonstrates a
-  business-facing job. The shared terminal-progress contract additionally passes against the
-  in-memory and SQLite ledgers, and [`GoldenJourney`](../../../samples/GoldenJourney/README.md)
-  observes the completed business priority and 100% progress from a running source application.
-- **Inspection and failure:** health snapshots/contributors, metrics, state transitions, and explicit
-  ledgers/transports exist. Failures are recorded in job state rather than hidden in application glue.
+- **Executable evidence:** the current core/in-process Jobs project passes 82/82. Its pointwise source
+  cells prove async one-pass backpressure and multiplicity, explicit coalescing, typed source-failure
+  and cancellation prefixes, and the shared finite behavior. Entity Language passes 25/25 for
+  scalar/set/stream presence, absence, removal, and invalid receivers. The last complete SQLite
+  baseline remains 79/79; R07-14 adds a focused 2/2 SQLite transaction/shared-source proof and a
+  focused 1/1 tenant-context seal. [`S14.AdapterBench`](../../../samples/S14.AdapterBench/Jobs/BenchmarkJob.cs)
+  demonstrates a business-facing job, while [`S6.SnapVault`](../../../samples/S6.SnapVault/README.md)
+  now consumes the ledger-confirmed source summary. [`GoldenJourney`](../../../samples/GoldenJourney/README.md)
+  observes completed business priority and 100% progress from a running source application.
+- **Inspection and failure:** health snapshots/contributors, metrics, state transitions, explicit
+  ledgers, and Communication-owned wake facts exist. Source submission returns a fixed-size
+  acceptance summary; typed failure/cancellation preserve the confirmed prefix. Handler failures are
+  recorded in job state rather than hidden in application glue.
 - **Unsupported / compatibility:** R02 did not certify distributed competing consumers, messaging
   transport, every durable ledger, clock-skew behavior, or upgrade compatibility.
 - **Maturity / safe claim:** `verified`. In-process/core job semantics are automated; distributed and
   provider-specific tiers must be claimed separately.
-- **Open risks:** distributed transport/ledger tiers still need their own composition and behavior
-  evidence; lane and scheduling elections are not yet part of the common fact envelope.
+- **Open risks:** distributed ledger tiers still need their own current composition and behavior
+  evidence; source submission is intentionally sequential/non-atomic, and streaming bounds producer
+  memory rather than the cost of one ledger row per Entity.
 
 ### Cache and distributed state
 

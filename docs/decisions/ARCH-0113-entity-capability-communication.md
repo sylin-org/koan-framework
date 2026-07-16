@@ -71,6 +71,14 @@
 > Cache coherence SPI, catch-up placeholders, coalescer, separate InMemory package, and Messaging bridge
 > are deleted. Jobs remains on its distinct competing-group lane.
 
+> **Implementation update (R07-14, 2026-07-16):** constrained Jobs submission now follows the
+> pointwise lifting law without joining Communication's public runtime. Scalar and finite/async
+> sources share one Jobs-owned ledger acceptance operation; the source terminal captures/restores
+> logical context once, preserves order/multiplicity, applies sequential backpressure, emits bounded
+> wake hints, and returns a fixed-size accepted-prefix summary. The duplicate type-level list submit,
+> batch materialization, and opaque count are deleted. The result does not claim collection atomicity,
+> handler completion, or bounded ledger growth.
+
 ## Context
 
 Koan's Entity-first language has the right center but the wrong boundaries around communication.

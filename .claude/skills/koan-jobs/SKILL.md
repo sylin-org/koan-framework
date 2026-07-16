@@ -8,7 +8,7 @@ description: Entity-first background jobs, IKoanJob<TSelf>, .Job/.Jobs accessors
 ## Trigger this skill when you see
 
 - `IKoanJob<T>` / a `static Execute(MyJob job, JobContext ctx, CancellationToken ct)` handler
-- `.Job.Submit(...)` / `.Jobs.Trigger(...)` / `.Job.Status()` accessors, or `list.Submit(...)`
+- `.Job.Submit(...)` / `.Jobs.Trigger(...)` / `.Job.Status()` accessors, or Entity-source `Submit(...)`
 - `[JobAction]`, `[JobChain]`, `[JobIdempotent]`, `[JobGate]`, `[JobPersistence]`, `[ParallelSafe]`
 - `JobContext` verbs — `ctx.Progress`, `ctx.ContinueWith`, `ctx.StopChain`, `ctx.Reschedule`, `ctx.Backoff`
 - References to `Koan.Jobs` or its Communication-backed work-ready signaling
@@ -46,6 +46,20 @@ var status = await job.Job.Status();     // latest JobStatus for this work-item
 ```
 
 Koan persists the entity, claims the job on a worker, runs `Execute`, and — if you changed it — saves the reference it handed you. When `Execute` returns, the job is **Completed**.
+
+For bounded pointwise fan-out, submit a finite selection or provider-bounded Entity stream directly:
+
+```csharp
+IEnumerable<ThumbnailJob> ready = new[] { job };
+JobSubmission selected = await ready.Submit();
+JobSubmission streamed = await ThumbnailJob.QueryStream(job => job.ThumbUrl == null).Submit();
+```
+
+`JobSubmission` is a fixed-size ledger-acceptance summary, not execution completion. `Accepted` is
+`Submitted + Coalesced`; `PendingCommit` means new rows are contingent on the ambient transaction.
+`JobSubmissionException` and `JobSubmissionCanceledException` retain the confirmed prefix. Source
+submission is ordered and sequentially backpressured, but it is not collection-atomic and does not
+retain one handle per item.
 
 ## The capability ladder (Reference = Intent)
 
@@ -105,7 +119,10 @@ public static async Task Execute(Crawl job, JobContext ctx, CancellationToken ct
 
 ## Draining a large source: window, don't multiply
 
-`list.Submit(action)` mints one job *per item* — right for hundreds or a few thousand, **wrong** for "import a million rows". The ledger is a lifecycle/audit store; minting a million rows means a million writes and a saturated active set. The fix is a coarser **unit of work**: make the **window** the job, not the row.
+`source.Submit(action)` mints one job *per item*—right for hundreds or a few thousand, **wrong** for
+"import a million rows". Its async form bounds producer memory, not ledger growth. The ledger is a
+lifecycle/audit store; minting a million rows means a million writes and a saturated active set. The
+fix is a coarser **unit of work**: make the **window** the job, not the row.
 
 ```csharp
 public sealed class ImportWindow : Entity<ImportWindow>, IKoanJob<ImportWindow>
@@ -154,7 +171,7 @@ o.QueueAgeWarning = TimeSpan.FromMinutes(5);          // oldest-queued-age tripw
 | A hand-rolled `IHostedService` + `Channel<T>` / `BlockingCollection` worker loop | `IKoanJob<T>` — the ledger is the queue; claim/retry/dispatch are framework concerns. |
 | Injecting `IJobQueue` / a repository to enqueue work | `myJob.Job.Submit()` / `MyJob.Jobs.Trigger(action)` — the accessors are the surface. |
 | Reloading the work-item inside `Execute` and calling `.Save()` yourself | Mutate the `job` parameter; Koan `save-if-changed`'s it. Your own save races the orchestrator. |
-| `list.Submit()` over a huge/external feed (a job per row) | A **conveyor** — make the window the job (`ctx.ContinueWith` self-loop). |
+| `source.Submit()` over a huge/external feed (a job per row) | A **conveyor** — make the window the job (`ctx.ContinueWith` self-loop). |
 | Manual `Task.Delay` + re-submit to retry/throttle | `ctx.Reschedule(after)` / `ctx.Backoff(after, key)` — defers without burning a retry. |
 | A bespoke cron `Timer` / `BackgroundService` for cadence | `[JobAction(Schedule="…")]` — interval / cron / `@boot` / `@continuous`. |
 | Registering the jobs worker in `Program.cs` | Reference `Koan.Jobs`; the registrar wires everything (Reference = Intent). |

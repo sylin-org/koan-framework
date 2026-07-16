@@ -40,6 +40,45 @@ public sealed class DurableCarrierSpec
     }
 
     [Fact]
+    public async Task Async_source_submission_seals_one_tenant_context_for_every_item()
+    {
+        await using var host = await JobsHarness.StartSqliteAsync();
+        var first = new TenantObservingJob();
+        var second = new TenantObservingJob();
+
+        async IAsyncEnumerable<TenantObservingJob> Source()
+        {
+            yield return first;
+            using (Tenant.Use("globex"))
+            {
+                yield return second;
+            }
+            await Task.CompletedTask;
+        }
+
+        JobSubmission submission;
+        using (Tenant.Use("acme"))
+        {
+            submission = await Source().Submit();
+        }
+
+        submission.Accepted.Should().Be(2);
+        var firstRecord = await host.JobFor<TenantObservingJob>(first.Id);
+        var secondRecord = await host.JobFor<TenantObservingJob>(second.Id);
+        firstRecord!.AmbientCarrier!["koan:tenant"].Should().Be("v1:id:acme");
+        secondRecord!.AmbientCarrier!["koan:tenant"].Should().Be("v1:id:acme");
+        using (Tenant.Use("acme"))
+        {
+            (await TenantObservingJob.Get(first.Id)).Should().NotBeNull();
+            (await TenantObservingJob.Get(second.Id)).Should().NotBeNull();
+        }
+        using (Tenant.Use("globex"))
+        {
+            (await TenantObservingJob.Get(second.Id)).Should().BeNull();
+        }
+    }
+
+    [Fact]
     public async Task Unscoped_submit_persists_a_null_bag()
     {
         TenantGatedProbe.Reset();   // exempt work-item → an unscoped submit is allowed under Closed posture

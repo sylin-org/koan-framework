@@ -90,4 +90,29 @@ public sealed class DurableSqliteSpec
         GreetJob.Executions.Should().Be(1);
         (await host.StatusOf<GreetJob>(id)).Should().Be(JobStatus.Completed);
     }
+
+    [Fact]
+    public async Task collection_submission_reports_transaction_enlistment_until_commit()
+    {
+        await using var host = await JobsHarness.StartSqliteAsync();
+        var jobs = new[]
+        {
+            new GreetJob { Name = "one" },
+            new GreetJob { Name = "two" }
+        };
+
+        using (EntityContext.Transaction("collection-commit"))
+        {
+            var submission = await jobs.Submit();
+
+            submission.Accepted.Should().Be(2);
+            submission.Submitted.Should().Be(2);
+            submission.PendingCommit.Should().BeTrue();
+            (await host.StatusOf<GreetJob>(jobs[0].Id)).Should().BeNull("the ledger rows are not visible before commit");
+            await EntityContext.Commit();
+        }
+
+        (await host.StatusOf<GreetJob>(jobs[0].Id)).Should().Be(JobStatus.Queued);
+        (await host.StatusOf<GreetJob>(jobs[1].Id)).Should().Be(JobStatus.Queued);
+    }
 }

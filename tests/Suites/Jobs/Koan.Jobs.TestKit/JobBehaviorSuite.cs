@@ -58,12 +58,19 @@ public abstract class JobBehaviorSuite
     }
 
     [Fact]
-    public async Task batch_submit_runs_every_work_item()
+    public async Task finite_source_submit_runs_every_work_item()
     {
         GreetJob.Reset();
         await using var host = await CreateHostAsync();
         var jobs = Enumerable.Range(0, 25).Select(i => new GreetJob { Name = $"n{i}" }).ToList();
-        await jobs.Submit();
+        var submission = await jobs.Submit();
+        submission.Enumerated.Should().Be(25);
+        submission.Accepted.Should().Be(25);
+        submission.Submitted.Should().Be(25);
+        submission.Coalesced.Should().Be(0);
+        submission.Failed.Should().Be(0);
+        submission.SourceCompleted.Should().BeTrue();
+        submission.PendingCommit.Should().BeFalse();
         await host.Drain();
         GreetJob.Executions.Should().Be(25);
     }
@@ -531,7 +538,7 @@ public abstract class JobBehaviorSuite
         await TickJob.Jobs.Trigger("sweep");
         await host.Drain();
         TickJob.Executions.Should().Be(1);
-        (await TickJob.Get(JobCoordinator.SingletonWorkId)).Should().BeNull(
+        (await TickJob.Get(Koan.Jobs.Infrastructure.Constants.Work.SingletonId)).Should().BeNull(
             "the scheduler singleton must not be persisted to the consumer's entity collection");
     }
 

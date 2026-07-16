@@ -1,3 +1,5 @@
+using Koan.Data.Core.Model;
+
 namespace Koan.Jobs;
 
 /// <summary>
@@ -9,8 +11,15 @@ public interface IJobCoordinator
     /// <summary>Submit one action on a work-item. Persists the work-item, coalesces duplicates, appends the job.</summary>
     Task<JobHandle> SubmitAsync(object workItem, string action, TimeSpan? after, CancellationToken ct);
 
-    /// <summary>Submit one action across many work-items in a single bulk enqueue.</summary>
-    Task<int> SubmitManyAsync(IEnumerable<object> workItems, string action, TimeSpan? after, CancellationToken ct);
+    /// <summary>
+    /// Submit one action pointwise across a lazy job-Entity source. The returned fixed-size summary
+    /// describes ledger acceptance, not handler completion.
+    /// </summary>
+    Task<JobSubmission> SubmitSourceAsync<T>(
+        IAsyncEnumerable<T> workItems,
+        string action,
+        CancellationToken ct)
+        where T : Entity<T>, IKoanJob<T>;
 
     /// <summary>Submit an action at the type level (no caller instance) against an auto-provisioned singleton
     /// work-item — the on-demand twin of a scheduled tick. Overlap is coalesced when the type declares an

@@ -78,7 +78,7 @@ A single sparse bag keeps `Koan.Jobs` axis-agnostic (one tenant column would cou
 
 ### 5. Capture-at-submit; restore-at-execute wrapping load-through-settle; fail-closed **composed** with the §1b guard
 
-**Capture** in `JobCoordinator`, the same way and at the same place `Correlation()` is captured — on the submitting async context, before any scope change — threaded into `JobRecordFactory.Create`, symmetric with the correlation id. Covers all three submit paths (`SubmitAsync`, `SubmitManyAsync`, `TriggerAsync`). Capture is one registry call over already-snapshotted ambient state (no per-axis branching in the coordinator).
+**Capture** in `JobCoordinator`, the same way and at the same place `Correlation()` is captured — on the submitting async context, before any scope change — threaded into `JobRecordFactory.Create`, symmetric with the correlation id. Covers all three submit paths (`SubmitAsync`, `SubmitSourceAsync`, `TriggerAsync`). Capture is one registry call over already-snapshotted ambient state (no per-axis branching in the coordinator).
 
 **Restore** in `JobOrchestrator.ExecuteClaimedAsync`, **at the top, before `binding.Load`**, as an `IDisposable` that stays open across load + execute + settle:
 

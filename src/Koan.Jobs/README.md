@@ -19,6 +19,24 @@ await review.Job.Submit();
 var status = await review.Job.Status();
 ```
 
+The same pointwise intent applies to a business selection or a provider-bounded Entity stream:
+
+```csharp
+JobSubmission selected = await reviews
+    .Where(review => review.Priority == ReviewPriority.High)
+    .Submit();
+
+JobSubmission streamed = await ReviewRequest
+    .QueryStream(review => review.Priority == ReviewPriority.High)
+    .Submit();
+```
+
+`JobSubmission` is a fixed-size summary of ledger acceptance, not handler completion. `Accepted`
+counts new ledger records plus declared-idempotency coalesces; `PendingCommit` says those records are
+still contingent on the ambient transaction. A source or submission failure throws
+`JobSubmissionException`, and cancellation throws `JobSubmissionCanceledException`; both preserve the
+confirmed accepted prefix without retaining per-item handles.
+
 The package registers its coordinator, worker, ledger, health contributor, and Communication-backed
 wake hint through `AddKoan()` discovery. Application registration code is not required.
 
@@ -48,6 +66,8 @@ are available through `entity.Job` and `Entity.Jobs`.
 - Execution is at-least-once; handlers must be idempotent.
 - The in-memory tier is development/test convenience, not durability.
 - Durable SQLite behavior does not prove every distributed provider or topology.
+- Source submission is pointwise, sequential, and not collection-atomic. A provider call that throws
+  is not reported as confirmed acceptance; retry that item under the job's declared idempotency policy.
 - A custom MCP or HTTP action that submits work remains responsible for its business authorization.
 - Use a window or batch as the job for large sources; do not create an unbounded job per input row.
 

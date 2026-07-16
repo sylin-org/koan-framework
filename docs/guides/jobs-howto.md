@@ -4,12 +4,12 @@ domain: jobs
 title: "Background Jobs How-To"
 audience: [developers, architects]
 status: current
-last_updated: 2026-06-04
-framework_version: v0.6.3
+last_updated: 2026-07-16
+framework_version: v0.19.0
 validation:
-  date_last_tested: 2026-06-04
+  date_last_tested: 2026-07-16
   status: verified
-  scope: In-memory and SQLite tiers
+  scope: in-memory Jobs; focused SQLite submission transaction
 related_guides:
   - data-modeling.md
   - building-apis.md
@@ -33,13 +33,15 @@ Each section follows a gentle rhythm: **Concept** (what is this?), **Recipe** (h
 
 ## 0. Prerequisites
 
-Add the Jobs package alongside the Koan baseline:
+Koan is currently supported from a source checkout. Reference the Jobs project alongside the Koan
+application baseline (repository samples use the equivalent relative path):
 
 ```xml
-<PackageReference Include="Koan.Core" Version="0.6.3" />
-<PackageReference Include="Koan.Data.Core" Version="0.6.3" />
-<PackageReference Include="Koan.Jobs" Version="0.6.3" />
+<ProjectReference Include="path/to/koan-framework/src/Koan.Jobs/Koan.Jobs.csproj" />
 ```
+
+The intended package identity is `Sylin.Koan.Jobs`, but the repository does not yet claim a coherent
+public-package installation path. Do not copy old fixed-version package recipes.
 
 That's all the wiring there is. **Reference = Intent**: adding `Koan.Jobs` and implementing the job interface is enough—`AddKoan()` discovers your jobs and starts the orchestrator automatically.
 
@@ -320,11 +322,14 @@ Pair a scheduled action with `[JobIdempotent]` (a stable key) so an overlapping 
 
 ---
 
-## 8. Batches and the type-level facade
+## 8. Pointwise sources and the type-level control plane
 
-**Concept.** `model.Job.X` operates on one instance; `MyModel.Jobs.X` is the **whole job subsystem** for the type—batch submit, trigger a type-level action, query, cancel by id.
+**Concept.** `model.Job.X` operates on one instance; `source.Submit(...)` repeats that same ledger
+acceptance pointwise for a finite selection or provider-bounded stream. `MyModel.Jobs.X` is the
+type-level **control plane**—trigger a singleton action, query, cancel, or inspect status by id.
 
-**Recipe.** Use the instance accessor for one item, the static facade for many (or for no instance at all).
+**Recipe.** Submit directly from the source. Use the static facade only for type-wide operations that
+do not have an ordinary source instance.
 
 **Sample.**
 
@@ -332,9 +337,14 @@ Pair a scheduled action with `[JobIdempotent]` (a stable key) so an overlapping 
 // one instance
 await pkg.Job.Submit(Stage.Fetch);
 
-// a thousand instances, one bulk enqueue
+// a thousand instances, pointwise ledger acceptance with a fixed-size summary
 List<PresetPackage> packages = …;
-await packages.Submit(Stage.Fetch);
+JobSubmission selected = await packages.Submit(Stage.Fetch);
+
+// the same intent over a lazy, provider-bounded Entity source
+JobSubmission streamed = await PresetPackage
+    .QueryStream(pkg => pkg.Ready)
+    .Submit(Stage.Fetch);
 
 // run a type-level action now, with no instance (the on-demand twin of a schedule)
 await PresetPackage.Jobs.Trigger(Stage.Discover);
@@ -345,13 +355,30 @@ var running = await PresetPackage.Jobs.WithStatus(JobStatus.Running);
 var mine    = await PresetPackage.Jobs.Query(new JobQuery(Action: Stage.Fetch));
 ```
 
-**`Trigger` vs `Submit`.** `instance.Job.Submit(action)` runs the action for *that* instance; `MyModel.Jobs.Trigger(action)` runs it at the **type level** against an auto-provisioned singleton—the manual counterpart to a `Schedule`. Both return a `JobHandle`, so you can `await (await …).Completion(timeout)` to run-and-wait.
+**What the result means.** Scalar `Submit` and type-level `Trigger` return a `JobHandle`, so you can
+`await (await …).Completion(timeout)` to run-and-wait. Source `Submit` returns a fixed-size
+`JobSubmission`: `Submitted` is new ledger acceptance, `Coalesced` is explicit declared-idempotency
+acceptance, and `Accepted` is their sum. It reports acceptance, not handler completion, and never
+retains one handle per source item. `PendingCommit` means new records are still contingent on the
+ambient transaction.
 
-**When to use it.** `list.Submit(action)` for fan-out; `Jobs.Trigger(action)` for "run the nightly sweep now" admin actions; `MyModel.Jobs` for dashboards and operating on jobs by id.
+If enumeration or an item submission fails, `JobSubmissionException` carries the confirmed prefix;
+cancellation uses `JobSubmissionCanceledException`, which is still an `OperationCanceledException`.
+There is no collection-atomicity claim. A provider call that throws is not counted as confirmed
+acceptance, so retry the failing item under the job's declared idempotency policy.
+
+**When to use it.** `source.Submit(action)` for bounded pointwise fan-out; `Jobs.Trigger(action)` for
+"run the nightly sweep now" admin actions; `MyModel.Jobs` for dashboards and operating on jobs by id.
 
 ### 8.1 Draining a large source: window, don't multiply
 
-**Concept.** `list.Submit(action)` mints one job *per item*. That's exactly right for hundreds or a few thousand. But reach for it on "import a million rows from an external feed" and you mint a million ledger rows — millions of writes, a saturated active set, and slow dashboards. The ledger is a **lifecycle/audit store** (durable claim, retry, per-row history); that machinery is worth paying for a *job* and pure overhead a million times over for homogeneous rows. The fix isn't a faster engine — it's a coarser **unit of work**: make the **window** the job, not the row.
+**Concept.** `source.Submit(action)` mints one job *per item*. Its async form keeps producer memory
+bounded and applies sequential backpressure, but it deliberately does not bound ledger growth. That's
+exactly right for hundreds or a few thousand. Reach for it on "import a million rows from an external
+feed" and you still mint a million ledger rows—millions of writes, a saturated active set, and slow
+dashboards. The ledger is a **lifecycle/audit store** (durable claim, retry, per-row history); that
+machinery is worth paying for a *job* and pure overhead a million times over for homogeneous rows. The
+fix isn't a faster engine—it's a coarser **unit of work**: make the **window** the job, not the row.
 
 **Recipe.** Model a *window* over the source as the work-item. Each run processes one window (a bulk `Save`), advances its own cursor, and re-queues itself at the next window with `ctx.ContinueWith`. At most one window is in flight, so the source drains through a handful of ledger rows instead of a million.
 
@@ -451,7 +478,8 @@ correctness.
 using (EntityContext.Transaction("publish"))
 {
     await order.Save();
-    await order.Job.Submit(Stage.Notify);   // enqueued only if the transaction commits
+    var submission = await new[] { order }.Submit(Stage.Notify);
+    Debug.Assert(submission.PendingCommit); // accepted, but visible only if the transaction commits
     await EntityContext.Commit();
 }
 ```

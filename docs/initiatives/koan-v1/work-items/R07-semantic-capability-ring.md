@@ -196,6 +196,7 @@ cardinality and copy semantics. Neither is a compatibility base for Events or Tr
 | 11 | [Jobs wake convergence](r07/R07-11-jobs-wake-convergence.md) | **Passed.** Jobs emits one internal bounded Communication signal; local and RabbitMQ providers preserve the ledger-backed latency contract | public `IJobTransport`, the Jobs Messaging bridge, service-location, and unmanaged fire-and-forget publication |
 | 12 | [Cache coherence convergence](r07/R07-12-cache-coherence-convergence.md) | **Passed.** Cache owns one key invalidation meaning over a distinct every-node Communication route; Redis layered activation and local/Redis/RabbitMQ proofs replace the generic channel model | public generic coherence SPI, no-op catch-up/coalescing, Cache InMemory/Messaging packages, and legacy adapter resolver |
 | 13 | [Pointwise Relationships](r07/R07-13-pointwise-relationships.md) | **Passed.** `Relatives` is one inferred scalar/set/stream Data operation with bounded execution facts | public batch loader, explicit key arguments, and duplicate graph orchestration |
+| 14 | [Pointwise Jobs submission](r07/R07-14-pointwise-job-submission.md) | **Passed.** Scalar and finite/async sources share one context-sealed ledger-acceptance operation with fixed-size partial outcomes | duplicate type-level list submit, record materialization, opaque count, and split scalar/source preparation |
 
 Only the next slice receives a child card. Later rows remain outcomes rather than speculative API
 backlogs until their prerequisites pass.
@@ -243,6 +244,8 @@ backlogs until their prerequisites pass.
     speculative channels, catch-up/coalescing, and legacy bridges are deleted.
 16. Open each later implementation slice only after its lower boundary passes.
 17. Prove in-process semantics before any broker migration or public maturity change.
+18. Inventory AI pointwise `Embed`/`Index`; admit no child until one business-proven meaning and its
+    backend-negotiation boundary are elected.
 
 R07-02 was intentionally additive and preceded the Lifecycle source break. R07-03 removed the package-
 lineage stop condition: once R07-04 restores the release floor, public 0.17's lifecycle `Events`
@@ -306,6 +309,10 @@ identity automatically.
   owner packs and the inventory remains 112. Docs, stale-source, diff, and privacy gates pass without
   release certification. The complete Data.Core project is not re-claimed by this child: one aggregate
   attempt exceeded its four-minute slice bound and was terminated.
+- R07-14 passes Jobs core 82/82 and Entity Language 25/25. Focused SQLite transaction/shared-source
+  evidence passes 2/2 and focused tenancy context sealing passes 1/1. Jobs builds warning-as-error;
+  its independent package, docs, stale-surface, diff, and privacy gates close without release
+  certification. See the child card for exact claims and non-claims.
 
 ## Acceptance additions
 

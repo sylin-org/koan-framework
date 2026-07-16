@@ -175,11 +175,15 @@ public sealed class PhotosController : EntityController<PhotoAsset>
             }
         }
 
+        long totalQueued = 0;
         if (jobs.Count > 0)
-            await jobs.Submit(PhotoProcessingJob.Ingest, ct);
+        {
+            var submission = await jobs.Submit(PhotoProcessingJob.Ingest, ct);
+            totalQueued = submission.Accepted;
+        }
 
         // Shape honored by upload.js: { jobId, totalQueued } (totalFailed is additive).
-        return Ok(new { jobId = batchId, totalQueued = jobs.Count, totalFailed = failed.Count });
+        return Ok(new { jobId = batchId, totalQueued, totalFailed = failed.Count });
     }
 
     // ------------------------------------------------------------------------------------------------------------

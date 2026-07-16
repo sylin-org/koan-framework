@@ -4,10 +4,10 @@ domain: data
 title: "Entity Semantics Contract"
 audience: [architects, developers, framework-authors, ai-agents]
 status: current
-last_updated: 2026-07-15
-framework_version: v0.17.0
+last_updated: 2026-07-16
+framework_version: v0.19.0
 validation:
-  date_last_tested: 2026-07-15
+  date_last_tested: 2026-07-16
   status: reviewed
   scope: normative Entity language, capability lifting, context, Lifecycle, Events, Transport, and inspectability rules
 ---
@@ -23,6 +23,13 @@ The contract is normative for new APIs and changes to existing APIs. It does not
 surface already conforms. The [R03 inventory](../initiatives/koan-v1/R03-ENTITY-INVENTORY.md) identifies
 the original deltas. [ARCH-0113](../decisions/ARCH-0113-entity-capability-communication.md) supersedes
 the earlier lifecycle/event/messaging split and records the greenfield rebuild order.
+
+R07-14 applies the same lifting law to Jobs without pretending Jobs is Communication: scalar
+`entity.Job.Submit()` and direct finite/async source `Submit()` converge only at the Jobs-owned ledger
+acceptance chokepoint. The source terminal captures context once, preserves order and multiplicity,
+uses bounded backpressure, and returns a fixed-size accepted-prefix summary. The static `.Jobs` facet
+remains the type-level control plane. No collection atomicity, handler completion, or bounded ledger
+growth is implied.
 
 ## Product outcome
 

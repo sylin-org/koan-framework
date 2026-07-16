@@ -9,7 +9,7 @@ framework_version: v0.19.0
 validation:
   date_last_tested: 2026-07-15
   status: in-progress
-  scope: R07-01 through R07-13 passed; constrained Jobs submission is the next candidate
+  scope: R07-01 through R07-14 passed; AI Embed/Index inventory is the next candidate
 ---
 
 # Koan V1 Reorganization Progress
@@ -36,7 +36,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R04 | [Harden the framework foundation](work-items/R04-foundation-hardening.md) | T4 | passed | R03 | Codex · 2026-07-14 | R04-01 through R04-08 pass; FirstUse now proves one source/package/operator/agent contract. |
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 | R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
-| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-16 | R07-01 through [R07-13](work-items/r07/R07-13-pointwise-relationships.md) pass. Constrained Jobs submission is the next candidate and remains gated by one concrete business proof. |
+| R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | in-progress | R06 | Codex · 2026-07-16 | R07-01 through [R07-14](work-items/r07/R07-14-pointwise-job-submission.md) pass. Inventory AI Embed/Index next; open no child until one business-proven pointwise meaning is elected. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -52,12 +52,13 @@ item should normally be `in-progress`.
 | R04 | passed | All eight dependency-ordered children pass with bounded exceptions recorded. |
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 | R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
-| R07 | in progress | R07-01 through R07-13 passed. Open only the constrained Jobs submission candidate next. |
+| R07 | in progress | R07-01 through R07-14 passed. Inventory AI Embed/Index next; open a child only after semantic election. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-16 | R07-14 | Jobs exposed scalar `.Job.Submit`, a duplicate type-level list submit, and a direct finite extension whose coordinator materialized every `JobRecord` and returned only an opaque count. Async Entity sources had no natural terminal; deferred enumeration could drift from the logical context captured for ledger rows. | Keep `.Job` scalar and `.Jobs` control-plane intent distinct. Converge scalar/set/stream only at one Jobs-owned acceptance operation; seal context once around enumeration and persistence, accept sequentially, wake at bounded intervals, return a fixed-size accepted-prefix summary, and delete the duplicate batch path/materialization without claiming collection atomicity or bounded ledger growth. |
 | 2026-07-16 | R07-13 | The advertised finite/stream `Relatives<TEntity,TKey>` API cannot infer `TKey`, so S1 teaches explicit framework generics; graph loading is split between the Entity base, a public one-consumer batch loader, reflection, and a fixed literal. | Lift only `Relatives`: use a receiver shape that infers custom keys, reuse `EntityCardinality` and the bounded child executor, centralize graph batching in one internal owner, batch parents with `GetMany`, and delete `GetRelatives` plus the public loader without aliases. |
 | 2026-07-15 | R07-12 | Deleting obsolete package projects made the active inventory truthful but the automatic lineage compiler rejected the next `dev` event, including a first projection spanning the deletion. Compatibility tombstone projects would preserve dead architecture indefinitely. | Treat complete owner deletion as permanent retirement intent: retain final ID/path/version in additive lineage state, plan no artifact, forbid reuse/rename, and calculate the predecessor inventory during bootstrap. Focused compiler/real-Git retirement proofs pass 28/28; no publish, push, tag, or release occurs. |
 | 2026-07-15 | R07-12 | Cache's generic public channel SPI claimed selection, catch-up, coalescing, and multiple wire operations that no provider actually guaranteed. Jobs' competing-group signal topology could not satisfy peer L1 invalidation. | Give Communication a distinct every-node internal route and layered-candidate election; keep invalidation meaning and TTL safety in Cache; rebuild Redis and RabbitMQ carriage; delete 2 packages and the speculative SPI. Communication 33/33, topology 49/49, real RabbitMQ 7/7, real Redis 5/5, 7 focused packs, and a 112-owner inventory pass. |

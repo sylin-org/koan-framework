@@ -2,6 +2,22 @@ namespace Koan.Jobs.Infrastructure;
 
 internal static class Constants
 {
+    internal static class Operations
+    {
+        public const string Submit = "job submission";
+    }
+
+    internal static class Submission
+    {
+        // Bounds wake-signal churn for long or infinite sources without delaying work until source completion.
+        public const int WakeInterval = 64;
+    }
+
+    internal static class Work
+    {
+        public const string SingletonId = "__koan_job_singleton__";
+    }
+
     internal static class Diagnostics
     {
         internal static class Codes

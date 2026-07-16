@@ -99,6 +99,29 @@ public sealed class EntityLanguageConsumerSpec
     }
 
     [Fact]
+    public void Referencing_jobs_adds_scalar_set_and_stream_submission_for_job_entities()
+    {
+        var result = Compile("JobsSubmissionAccess", includeCache: false, includeJobs: true);
+        result.Succeeded.Should().BeTrue(result.Output);
+    }
+
+    [Fact]
+    public void Removing_jobs_removes_submission_from_the_same_consumer_source()
+    {
+        var result = Compile("JobsSubmissionAccess", includeCache: false, includeJobs: false);
+        result.Succeeded.Should().BeFalse();
+        result.Output.Should().Contain("Jobs");
+    }
+
+    [Fact]
+    public void Jobs_submission_rejects_entities_without_the_job_contract()
+    {
+        var result = Compile("InvalidJobsSubmissionReceiver", includeCache: false, includeJobs: true);
+        result.Succeeded.Should().BeFalse();
+        result.Output.Should().Contain("IKoanJob");
+    }
+
+    [Fact]
     public void Removing_cache_makes_the_same_consumer_source_fail_at_the_facet()
     {
         var present = Compile("CacheAccess", includeCache: true);
@@ -173,7 +196,8 @@ public sealed class EntityLanguageConsumerSpec
         string cell,
         bool includeCache,
         bool includeAllModules = false,
-        bool includeCommunication = false)
+        bool includeCommunication = false,
+        bool includeJobs = false)
     {
         var root = FindRepositoryRoot();
         var fixture = Path.Combine(root, "tests", "Fixtures", "EntityLanguage");
@@ -202,9 +226,13 @@ public sealed class EntityLanguageConsumerSpec
             AddAssembly(typeof(global::Koan.Cache.Cache), assemblyPaths);
         }
 
-        if (includeAllModules)
+        if (includeAllModules || includeJobs)
         {
             AddAssembly(typeof(JobAccessorExtensions), assemblyPaths);
+        }
+
+        if (includeAllModules)
+        {
             AddAssembly(typeof(SoftDeleteExtensions), assemblyPaths);
             AddAssembly(typeof(IReceiveEntity), assemblyPaths);
         }

@@ -12,6 +12,14 @@
 > a directly referenced Communication connector transparently changes reach. The signal remains a
 > lossy latency hint, carries neither work nor business context, and never replaces ledger polling.
 
+> **Implementation update (R07-14, 2026-07-16):** finite and asynchronous Entity sources now submit
+> pointwise through the same coordinator acceptance operation as scalar `.Job.Submit()`. One terminal
+> captures/restores logical context, accepts items sequentially, emits bounded wake hints, and returns
+> a fixed-size `JobSubmission`. Typed failure/cancellation preserve the confirmed accepted prefix.
+> The duplicate type-level list submit, unbounded record materialization, and opaque `int` result are
+> removed. This is ordered fan-out, not collection atomicity; streaming bounds producer memory, not
+> ledger growth.
+
 ---
 
 ## 1. Context
@@ -104,7 +112,7 @@ public sealed record JobState(
 
 ### 4.3 Submit ergonomics (edge-triggered)
 
-Job operations live under a `.Job` (instance) / `.Jobs` (static) accessor so they never pollute the model's domain surface or the data verbs (`Save`/`Get`/`Query`/`Delete`). `model.Job` = "this instance's job ops"; `MyModel.Jobs` = "the job subsystem for this type" (by-id, ledger queries, batch). See Open Q §12.14 for the accessor mechanics and the static-vs-instance constraint.
+Job operations live under a `.Job` (instance) / `.Jobs` (static) accessor so they never pollute the model's domain surface or the data verbs (`Save`/`Get`/`Query`/`Delete`). `model.Job` = "this instance's job ops"; `MyModel.Jobs` = "the job control plane for this type" (trigger, by-id status/cancel, ledger queries). Direct Entity sources own pointwise submission. See Open Q §12.14 for the accessor mechanics and the static-vs-instance constraint.
 
 ```csharp
 // single — instance accessor
@@ -112,12 +120,12 @@ await new ThumbnailJob { SourceUrl = url }.Job.Submit();          // single-acti
 await pkg.Job.Submit(Stage.Fetch);                               // multi-action
 await pkg.Job.Submit(Stage.Fetch, after: TimeSpan.FromMinutes(5)); // delayed
 
-// batch — 1000 instances, one bulk enqueue (constrained IEnumerable<T> extension; collision-free)
-await packages.Submit(Stage.Fetch);
+// source — pointwise ledger acceptance with one fixed-size result
+JobSubmission submitted = await packages.Submit(Stage.Fetch);
 
 // type-level facade — by-id, ledger queries
 await PresetPackage.Jobs.Status(id);
-var running = await PresetPackage.Jobs.Where(j => j.Status == JobStatus.Running);
+var running = await PresetPackage.Jobs.WithStatus(JobStatus.Running);
 ```
 
 ### 4.4 Cancellation (durable, cross-process)
@@ -298,7 +306,7 @@ public static Task Execute(PresetPackage pkg, JobContext ctx, CancellationToken 
 };
 
 await pkg.Job.Submit(Stage.Fetch);      // edge: kick one (instance accessor)
-await packages.Submit(Stage.Fetch);     // edge: bulk-enqueue 1000 (constrained collection extension)
+await packages.Submit(Stage.Fetch);     // edge: pointwise source submission (constrained Entity extension)
 // level: [JobAction(Stage.PrepareToFetch, Schedule="00:10:00")] sweeps every 10m — nothing to call
 ```
 

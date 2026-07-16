@@ -4,10 +4,10 @@ domain: jobs
 title: "Jobs — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-06-18
-framework_version: v0.17.0
+last_updated: 2026-07-16
+framework_version: v0.19.0
 validation:
-  date_last_tested: 2026-06-18
+  date_last_tested: 2026-07-16
   status: verified
   scope: docs/reference/cards/jobs.md
 ---
@@ -40,7 +40,18 @@ await job.Job.Submit("retry", after: TimeSpan.FromMinutes(5)); // deferred actio
 var status = await job.Job.Status();                   // latest JobStatus for this work-item
 ```
 
-Trigger a scheduled/type-level job with `SendDigest.Jobs.Trigger("action")`; bulk-enqueue with `list.Submit()`.
+Trigger a scheduled/type-level job with `SendDigest.Jobs.Trigger("action")`. Submit a finite selection
+or provider-bounded stream with the same pointwise intent:
+
+```csharp
+JobSubmission selected = await digests.Where(digest => digest.Ready).Submit();
+JobSubmission streamed = await SendDigest.QueryStream(digest => digest.Ready).Submit();
+```
+
+The fixed-size summary reports confirmed ledger acceptance (`Submitted + Coalesced`), not execution.
+Typed failure and cancellation exceptions preserve the accepted prefix; source submission is ordered,
+one-pass, sequentially backpressured, and not collection-atomic. Streaming bounds producer memory,
+not ledger growth—model a window/conveyor as the job for very large sources.
 
 ## ≤5 attributes you'll use
 

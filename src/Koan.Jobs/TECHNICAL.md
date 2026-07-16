@@ -32,11 +32,26 @@ after handler mutation. The ledger stores orchestration state separately as `Job
 Use:
 
 - `item.Job.Submit/Status/Cancel` for one work item;
-- `Entity.Jobs.Trigger/Query/WithStatus/Cancel` for the type-wide subsystem;
+- `items.Submit` or `Entity.QueryStream(...).Submit` for pointwise source acceptance;
+- `Entity.Jobs.Trigger/Query/WithStatus/Cancel` for the type-wide control plane;
 - `ctx.Progress` for durable progress;
 - one of `ContinueWith`, `StopChain`, `Reschedule`, or `Backoff` to alter the normal settle result.
 
 Calling more than one control signal in a handler fails immediately.
+
+Scalar and source submission converge on one coordinator acceptance operation: resolve policy and
+coalescing, persist the work Entity, append the ledger record, then emit a bounded wake hint. A source
+captures logical context once at the terminal and restores it around deferred enumeration and every
+item save. Items are accepted sequentially, preserving source order, multiplicity, one-pass behavior,
+and bounded producer memory. Long-running sources wake at bounded intervals; inline mode drains after
+each new record.
+
+`JobSubmission` retains counters only. It distinguishes newly submitted records from explicit
+idempotency coalesces, reports whether the source ended naturally, and exposes ambient-transaction
+enlistment through `PendingCommit`. `JobSubmissionException` and
+`JobSubmissionCanceledException` carry that same confirmed prefix. Submission does not promise
+collection atomicity, retain per-item handles, or count a provider call that throws as confirmed—even
+though a provider-specific side effect at that failing boundary can be intrinsically unknowable.
 
 ## Delivery and recovery
 
@@ -53,7 +68,7 @@ context-bearing truth.
 ## Logical-flow context
 
 - `JobCoordinator` captures the host's `KoanContextCarrierRegistry` exactly once before the first
-  await. Batch items share that submission snapshot, and coalescing folds the opaque bag so work from
+  await. Source items share that submission snapshot, and coalescing folds the opaque bag so work from
   distinct context axes cannot collapse together accidentally.
 - `JobOrchestrator` restores with `ContextIngressTrust.HostTrusted` before loading the work item or
   invoking its handler. This states that the durable ledger is inside the application's administrative
@@ -90,3 +105,6 @@ Current focused evidence covers the core/in-process suite and SQLite-backed dura
 not certify every database adapter, clock-skew envelope, multi-region topology, every Communication connector,
 upgrade path, or exactly-once external effect. See the V1 capability ledger before making broader
 support claims.
+
+Streaming bounds application memory, not ledger size or lifecycle cost. Very large or unbounded
+sources should model a cursor/window/conveyor as the job rather than minting one job per row.

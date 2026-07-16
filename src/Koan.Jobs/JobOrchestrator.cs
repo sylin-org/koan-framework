@@ -181,7 +181,7 @@ public sealed class JobOrchestrator
         try { workItem = await binding.Load(rec.WorkId, workerCt); }
         catch (Exception ex) { await SettleFailureAsync(rec, binding, policy, ex); return null; }
         // Type-level triggers (TriggerAsync) use an ephemeral singleton that is never persisted; re-create it here.
-        workItem ??= rec.WorkId == JobCoordinator.SingletonWorkId ? binding.NewSingleton(rec.WorkId) : null;
+        workItem ??= rec.WorkId == Infrastructure.Constants.Work.SingletonId ? binding.NewSingleton(rec.WorkId) : null;
         if (workItem is null) { await SettleFailureAsync(rec, binding, policy, new InvalidOperationException($"Work-item {rec.WorkType}/{rec.WorkId} not found.")); return null; }
 
         var snapshot = Snapshot(workItem);   // for conditional auto-save (§17.1): only persist if the handler mutates it
@@ -422,7 +422,7 @@ public sealed class JobOrchestrator
                 if (active > _options.JobPerRowWarnThreshold)
                     _logger.LogWarning(
                         "[Koan.Jobs] WorkType '{WorkType}' has {Active:N0} active rows (> {Threshold:N0}) — this looks " +
-                        "like job-per-row. Window the source with a cursor-conveyor (jobs-howto §bulk; JOBS-0005 §19.4).",
+                        "like job-per-row. Window the source with a cursor-conveyor (jobs-howto §8.1; JOBS-0005 §19.4).",
                         binding.WorkType, active, _options.JobPerRowWarnThreshold);
             }
         return purged;

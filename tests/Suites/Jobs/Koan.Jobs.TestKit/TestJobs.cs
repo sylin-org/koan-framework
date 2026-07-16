@@ -477,6 +477,21 @@ public sealed class RemoteFetch : Entity<RemoteFetch>, IKoanJob<RemoteFetch>
     public static void Reset() { Ran.Clear(); Executed = 0; Throttled = null; }
 }
 
+/// <summary>Submission-only probe whose gate resolver can fail inside the Jobs acceptance boundary.</summary>
+[JobGate(nameof(ResolveGate))]
+public sealed class SubmissionGateJob : Entity<SubmissionGateJob>, IKoanJob<SubmissionGateJob>
+{
+    public bool Reject { get; set; }
+
+    public Task<string?> ResolveGate(IServiceProvider services, CancellationToken ct)
+        => Reject
+            ? Task.FromException<string?>(new InvalidOperationException("acceptance failed deliberately"))
+            : Task.FromResult<string?>("submission-probe");
+
+    public static Task Execute(SubmissionGateJob job, JobContext ctx, CancellationToken ct)
+        => Task.CompletedTask;
+}
+
 /// <summary>Dispatch-time pool job (JOBS-0007): claims a slot from the registered <see cref="TestPoolResolver"/>
 /// at claim time, not at submit. GateKey is null at submit and stamped by the ledger on claim.</summary>
 [JobPool("test-ai-servers")]

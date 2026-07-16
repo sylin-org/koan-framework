@@ -233,14 +233,17 @@ Durable, tenant-carrying background work via `Koan.Jobs` — no in-memory queue,
 ```csharp
 // 1. Submit one durable job per file, sharing a batch id (the ambient tenant rides across the async hop).
 var jobs = files.Select(f => new PhotoProcessingJob { BatchJobId = batchId, OriginalFileName = f.Name });
-await jobs.Submit(PhotoProcessingJob.Ingest);
+var submission = await jobs.Submit(PhotoProcessingJob.Ingest);
 
 // 2. Return the batch id immediately; the browser opens an EventSource on it.
-return Ok(new { jobId = batchId, totalQueued = files.Count });
+return Ok(new { jobId = batchId, totalQueued = submission.Accepted });
 
 // 3. The job's handler runs the pipeline and reports progress durably (read by the SSE projection).
 public static async Task Execute(PhotoProcessingJob job, JobContext ctx, CancellationToken ct) { /* ctx.Progress(...) */ }
 ```
+
+`JobSubmission` is a fixed-size ledger-acceptance summary, so the response stays truthful without
+retaining one handle per file. Handler progress and completion remain inspectable in the Jobs ledger.
 
 ---
 

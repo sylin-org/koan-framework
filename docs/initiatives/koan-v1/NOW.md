@@ -9,7 +9,7 @@ framework_version: v0.19.0
 validation:
   date_last_tested: 2026-07-16
   status: reviewed
-  scope: R07-01 through R07-13 passed; direct Relationships now lift pointwise without public loader machinery
+  scope: R07-01 through R07-14 passed; Jobs sources share one bounded, inspectable ledger-acceptance path
 ---
 
 # Koan V1 reorganization current handoff
@@ -100,6 +100,12 @@ Replace this file at every handoff. It is a restart point, not a diary.
   graph loader batches parents through `GetMany` and child edges through the existing bounded executor;
   the public batch loader, `GetRelatives`, explicit key arguments, and duplicate orchestration are gone.
   Relationships pass 10/10 and Entity Language 22/22.
+- [R07-14](work-items/r07/R07-14-pointwise-job-submission.md) passed. Scalar and finite/async Jobs
+  submission now share one coordinator acceptance operation. A source captures/restores logical
+  context once, preserves order/multiplicity, accepts sequentially, wakes in bounded intervals, and
+  returns a fixed-size `JobSubmission`; typed failure/cancellation retain the confirmed prefix. The
+  duplicate type-level list path, record materialization, and opaque count are gone. Jobs passes
+  82/82, Entity Language 25/25, focused SQLite 2/2, and focused tenancy 1/1.
 - Public Messaging guidance is reduced to the truthful legacy v0.17 generation. The former long reference
   described absent attributes, routes, batches, inbox/outbox, retries, and topology guarantees.
 - No package was published and no branch was pushed, tagged, or released.
@@ -208,8 +214,11 @@ separate InMemory connector, and obsolete bridge packages as their replacements 
 10. Provider-neutral election and RabbitMQ Transport. **Passed as R07-10.**
 11. Jobs wake migration onto the Communication-owned internal mechanism. **Passed as R07-11.**
 12. Cache coherence convergence only after preserving its node-broadcast and layered semantics.
-13. Secondary pointwise lifts: Relationships, constrained Jobs streams, AI Embed/Index, Cache eviction,
-   then Media if a real derivative operation earns it.
+    **Passed as R07-12.**
+13. Pointwise Relationships. **Passed as R07-13.**
+14. Constrained pointwise Jobs submission. **Passed as R07-14.**
+15. Inventory AI pointwise `Embed`/`Index` next; admit only a business-proven operation that preserves
+    provider negotiation and does not revive a generic flow abstraction.
 
 Only completed/current slices have detailed child cards. Do not open broker breadth before Event
 semantics pass over the local boundary.
@@ -299,13 +308,16 @@ semantics pass over the local boundary.
   S1 compiles the scalar/set/provider-stream grammar, Data.Core 0.19 packs, inventory remains 112,
   and docs lint has 0 errors. No release-certification suite was run; one non-gating complete Data.Core
   attempt exceeded the four-minute slice bound and was terminated without a new full-suite claim.
+- R07-14 passes Jobs core 82/82 and Entity Language 25/25. Focused SQLite submission/transaction
+  evidence passes 2/2 and the tenant-context source seal passes 1/1. Jobs builds warning-as-error; the
+  source dogfood compiles against the fixed-size acceptance summary. Packaging and documentation
+  closure are recorded in the child card. No release-certification suite was run.
 
 ## Next safe action
 
-Inventory constrained Jobs submission as the first R07-14 candidate. Admit a pointwise lift only for
-`IKoanJob` Entities when scalar/set/stream submission preserves ledger truth, bounded acceptance,
-ordering/multiplicity, cancellation, and explicit partial outcomes. Do not add a Jobs facet to ordinary
-Entities or turn the cardinality substrate into a public flow container.
+Inventory AI pointwise `Embed`/`Index`. Start from real application meaning and existing provider
+negotiation; do not open a child card until one scalar/set/stream operation proves it can stay
+business-readable without reviving generic flow machinery or moving AI policy into Data.
 
 ## Repository boundary
 

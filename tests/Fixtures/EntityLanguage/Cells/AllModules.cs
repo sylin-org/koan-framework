@@ -25,4 +25,6 @@ public static class AllModuleConsumer
     public static Task<bool> HardDelete(AllModuleTodo todo) => todo.HardDelete();
     public static void ConfigureLifecycle() => AllModuleTodo.Lifecycle.AfterUpsert(_ => { });
     public static Task<TransportAcceptance> Send(AllModuleTodo todo) => todo.Transport.Send();
+    public static Task<JobSubmission> Submit(IEnumerable<AllModuleTodo> todos) => todos.Submit();
+    public static Task<JobSubmission> Submit(IAsyncEnumerable<AllModuleTodo> todos) => todos.Submit();
 }
