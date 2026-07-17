@@ -82,6 +82,8 @@ public sealed class TemplatePackageCompilerTests
         Assert.Contains("[0.17.23, 0.18.0)", console, StringComparison.Ordinal);
         Assert.DoesNotContain("__KOAN_", web, StringComparison.Ordinal);
         Assert.DoesNotContain("__KOAN_", console, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(prepared.Root, "koan-web", "appsettings.json")));
+        Assert.False(File.Exists(Path.Combine(prepared.Root, "koan-console", "appsettings.json")));
         Assert.Empty(Directory.EnumerateDirectories(prepared.Root, "obj", SearchOption.AllDirectories));
         Assert.Empty(Directory.EnumerateDirectories(prepared.Root, "bin", SearchOption.AllDirectories));
     }
@@ -133,6 +135,7 @@ public sealed class TemplatePackageCompilerTests
             var entries = archive.Entries.Select(entry => entry.FullName).ToArray();
             Assert.Contains("content/koan-web/.template.config/template.json", entries);
             Assert.Contains("content/koan-console/.template.config/template.json", entries);
+            Assert.DoesNotContain(entries, entry => entry.EndsWith("appsettings.json", StringComparison.OrdinalIgnoreCase));
             Assert.Contains("README.md", entries);
             Assert.Contains(PackagingConstants.PackageQuality.CanonicalIcon, entries);
             Assert.DoesNotContain(entries, entry => entry.Contains("/bin/", StringComparison.OrdinalIgnoreCase));

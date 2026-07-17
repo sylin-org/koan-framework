@@ -133,7 +133,8 @@ internal sealed class TemplatePackageProbe(ProcessRunner processRunner)
         await using var host = ApplicationProbeHost.Start(
             applicationDirectory,
             projectFile,
-            "template-web");
+            "template-web",
+            configureIsolatedSqliteTarget: false);
         try
         {
             await host.WaitUntilReadyAsync(cancellationToken);

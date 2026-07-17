@@ -1,35 +1,35 @@
 # KoanConsoleApp
 
-A minimal [Koan](https://github.com/sylin-org/Koan-framework) console app: entity CRUD over Sqlite, no boilerplate.
+A persisted Todo console application: start Koan, save an Entity, load it, and query business state.
 
-## Run it
+## Run
 
-```bash
+```powershell
 dotnet run
 ```
 
-```
+The result includes the saved identity, the loaded title, and the open-Todo query:
+
+```text
 saved: 01J...
 loaded: buy milk
 open todos:
   - buy milk
 ```
 
-## What's in here
+## Read the application
 
-| File | What it is |
+| File | Business meaning |
 |---|---|
-| `Program.cs` | `using var app = new ServiceCollection().StartKoan()` starts and owns Koan's standard Generic Host lifecycle (configuration, discovery, local capabilities, health, graceful shutdown), then `Save` / `Get` / `Query` over the `Todo` entity. |
-| `Todo.cs` | `Entity<Todo>` — GUID v7 id auto-generated on `Save()`; static `Get`/`Query`/`All` + instance `Save`/`Remove` come from the base. |
-| `appsettings.json` | Sqlite is the default data source (`Data Source=./app.db`). |
+| `Todo.cs` | the state the application owns |
+| `Program.cs` | host lifecycle plus save/get/query intent |
+| `KoanConsoleApp.csproj` | choose the Koan foundation and durable embedded SQLite provider |
 
-## Serialization defaults
+SQLite is elected from the package reference and defaults to `.koan/data/Koan.sqlite`. No provider registration,
+connection setting, schema script, or repository is required. Startup output explains the resulting composition.
 
-JSON uses **Newtonsoft.Json** (the framework canon), **camelCase**, **nulls omitted** — global, no setup.
+Add a property or another Entity and run again. To move backends, reference the intended provider and configure only
+the endpoint or credentials it cannot derive; the business code does not change.
 
-## Next steps
-
-- Add a property to `Todo`, `dotnet run` again — the store follows.
-- Move to Postgres/Mongo/etc.: reference that connector and point `appsettings.json` at it; the entity code doesn't change.
-- Want HTTP? `dotnet new koan-web` gives you the same entity behind an auto-mapped REST API.
-- Pillar maps (one screen each): [`docs/reference/cards`](https://github.com/sylin-org/Koan-framework/tree/main/docs/reference/cards).
+SQLite is durable embedded storage, not a multi-node service or complete production backup strategy. Application
+policy, security, validation, and deployment remain explicit decisions.

@@ -28,7 +28,8 @@ internal sealed class ApplicationProbeHost : IAsyncDisposable
         string applicationDirectory,
         string projectFile,
         string stateName,
-        IReadOnlyDictionary<string, string?>? environment = null)
+        IReadOnlyDictionary<string, string?>? environment = null,
+        bool configureIsolatedSqliteTarget = true)
     {
         var port = GrabFreePort();
         var stateRoot = Path.Combine(Path.GetTempPath(), $"koan-{stateName}-{Guid.NewGuid():N}");
@@ -48,8 +49,11 @@ internal sealed class ApplicationProbeHost : IAsyncDisposable
         }) startInfo.ArgumentList.Add(argument);
 
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
-        startInfo.Environment["Koan__Data__Sqlite__ConnectionString"] =
-            $"Data Source={Path.Combine(stateRoot, stateName + ".db")}";
+        if (configureIsolatedSqliteTarget)
+        {
+            startInfo.Environment["Koan__Data__Sqlite__ConnectionString"] =
+                $"Data Source={Path.Combine(stateRoot, stateName + ".db")}";
+        }
         if (environment is not null)
         {
             foreach (var pair in environment) startInfo.Environment[pair.Key] = pair.Value;

@@ -1,52 +1,35 @@
 # KoanWebApp
 
-A minimal [Koan](https://github.com/sylin-org/Koan-framework) web API. One entity, one controller, a full REST surface — over Sqlite.
+A persisted Todo API whose application code states three Koan intents: bootstrap, Entity, and controller.
 
-## Run it
+## Run
 
-```bash
+```powershell
 dotnet run
 ```
 
-Then:
+Use the URL ASP.NET Core prints:
 
-```bash
-curl http://localhost:5000/api/todos                                   # []
-curl -X POST http://localhost:5000/api/todos -H "content-type: application/json" -d '{"title":"buy milk"}'
-curl http://localhost:5000/api/todos                                   # [{ "id": "01J...", "title": "buy milk", "done": false }]
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/todos -ContentType application/json -Body '{"title":"buy milk"}'
+Invoke-RestMethod http://localhost:5000/api/todos
 ```
 
-## The boot report is the demo
+## Read the application
 
-On startup Koan prints a self-describing boot report — it *is* your confirmation that everything wired up. You'll see your data adapter, the auto-mapped controllers, and health at a glance (illustrative):
-
-```
-Koan  <resolved package version>
-  Data         sqlite (Default)                         [OK]
-  Web          controllers auto-mapped                  [OK]
-               EntityController<Todo> -> /api/todos
-  Health       probes pending (registered=...)
-```
-
-If a piece is missing or misconfigured, the report says so loudly — that's the framework's character: self-describing honesty, not a green badge.
-
-## What's in here
-
-| File | What it is |
+| File | Business meaning |
 |---|---|
-| `Program.cs` | The canonical 4 lines: `CreateBuilder` -> `AddKoan()` -> `Build()` -> `Run()`. `AddKoan()` discovers the referenced packages and wires them (Reference = Intent). |
-| `Todo.cs` | `Entity<Todo>` — GUID v7 id auto-generated on `Save()`; static `Get`/`Query`/`All` + instance `Save`/`Remove` come from the base. |
-| `TodosController.cs` | `EntityController<Todo>` — the full REST surface (list/get/create/update/patch/delete + `POST /query`). |
-| `appsettings.json` | Sqlite is the default data source (`Data Source=./app.db`). Swap the adapter here to move stores. |
+| `Todo.cs` | the state the application owns |
+| `TodosController.cs` | expose Todos through the standard Entity API |
+| `Program.cs` | compose referenced Koan capabilities |
+| `KoanWebApp.csproj` | choose the Koan web entry and durable embedded SQLite provider |
 
-## Serialization defaults (so they're not a surprise)
+SQLite is elected from the package reference and defaults to `.koan/data/Koan.sqlite`. No provider registration,
+connection setting, schema script, repository, or endpoint mapping is required. Startup output and
+`/.well-known/Koan/facts` explain the resulting composition.
 
-JSON uses **Newtonsoft.Json** (the framework canon), configured **camelCase** with **nulls omitted**. So `Title` serializes as `title`, and a null property simply isn't emitted. This is deliberate and global — no per-endpoint setup.
+Add a property to `Todo` or another Entity/controller pair and run again. To move backends, reference the intended
+provider and configure only the endpoint or credentials it cannot derive; the business code does not change.
 
-## Next steps
-
-- Add a property to `Todo`, `dotnet run`, POST again — the store and API follow automatically.
-- Add a second entity + controller the same way (two files).
-- Query from the API: `GET /api/todos?filter={"done":false}&sort=-title&page=1&size=20`.
-- Move to Postgres/Mongo/etc.: reference that connector package and point `appsettings.json` at it — the entity code doesn't change.
-- Pillar maps (one screen each): the framework's [`docs/reference/cards`](https://github.com/sylin-org/Koan-framework/tree/main/docs/reference/cards).
+This is not a production security template. Authorization, validation, tenancy, backup, public API design, and the
+chosen provider's deployment guarantees remain application decisions.

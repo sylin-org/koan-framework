@@ -46,10 +46,11 @@ generated package-quality and product-surface references.
 
 R11-01 opened with 109 packages: 37 required an objective repair, 72 required review, and none was inferred
 graduated. The first terminal coalescence retired `Sylin.Koan.Core.Adapters`; the current evaluated graph contains 108
-packages. R11-03 removed the shared presentation noise, leaving 36 repair-required, 65 review-required, 7
-structurally ready for human review, 72 owned READMEs, 62 technical companions, and 247 findings. The 36 missing
+packages. R11-03 removed the shared presentation noise and R11-04 graduated the two entry bundles and Templates,
+leaving 36 repair-required, 62 review-required, 10 structurally ready for human review, 72 owned READMEs, 62
+technical companions, and 240 findings. The 36 missing
 package owners are now reported honestly rather than falling back to the root README. These are repair inputs, not
-247 independent work items.
+240 independent work items.
 
 ## Exact active matrix
 

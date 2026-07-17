@@ -1,21 +1,32 @@
 # Sylin.Koan.Templates technical contract
 
-The template pack is a content-only standard NuGet `Template` package. Its three suppressed
-ProjectReferences express release impact for the two bundles and SQLite connector used by generated
-projects; they must not appear as dependencies in the template nupkg.
+## Responsibility
 
-Template source contains package-range tokens rather than version judgment. `Koan.Packaging` resolves
-each floor from the selected release manifest or the latest public stable package, compiles Koan's
-closed-open compatibility band, copies only source content to a temporary root, and supplies that root
-to `dotnet pack`. Direct packing fails before emitting a package because it cannot prove those release
-facts.
+This is a content-only standard NuGet `Template` package. `koan-web` expresses the App bundle plus SQLite;
+`koan-console` expresses the foundation bundle plus SQLite. Generated source contains no Koan configuration because
+the provider reference and SQLite's autonomous local target are sufficient intent.
 
-The packed artifact must contain both `.template.config/template.json` files at their canonical paths,
-contain no `bin`, `obj`, unresolved token, or NuGet dependency, and generate projects whose only setup
-is ordinary PackageReference restore.
+The package's three suppressed `ProjectReference` items express release impact for the two bundles and SQLite. They
+must never appear as runtime dependencies in the template nupkg.
 
-The release clean room installs the exact template nupkg into an isolated `DOTNET_CLI_HOME`, creates
-both projects using their public short names, discovers the project name chosen by `dotnet new`, and
-restores/builds/runs only against the staged package feed. Console proof requires visible Entity
-save/load/query results; web proof requires a healthy host and a persisted Todo through the generated
-`EntityController<Todo>`. A failure blocks the package wave before publication.
+## Preparation and packing
+
+Template source contains compatibility-range tokens, not a version registry or user prompt. `Koan.Packaging` resolves
+each floor from the selected release manifest, compiles Koan's closed-open compatibility band, copies only template
+source to a temporary root, and supplies that root to `dotnet pack`. Direct packing fails before artifact emission
+because the unprepared source cannot prove those release facts.
+
+The packed artifact must contain both canonical `.template.config/template.json` files, `README.md`, and the exact
+repository `icon.png`. It must contain no `bin`, `obj`, generated `appsettings.json`, unresolved token, runtime
+dependency, or build output.
+
+## Clean-consumer proof
+
+The release clean room installs the exact template nupkg into an isolated `DOTNET_CLI_HOME`, creates both projects by
+public short name, and restores/builds them only against the staged Koan feed plus NuGet.org dependencies. The console
+proof requires visible Entity save/load/query results. The web proof starts without an injected provider setting and
+requires a persisted Todo through `EntityController<Todo>`, proving SQLite's zero-configuration local election.
+
+Template package, entry-bundle, SQLite, and generated-application failures block the wave before publication. The
+templates do not own provider guarantees, host security, or application policy; they prove only the shortest honest
+composition and business-visible result.

@@ -4,11 +4,11 @@
   "summary": {
     "packages": 108,
     "repairRequired": 36,
-    "reviewRequired": 65,
-    "structurallyReady": 7,
+    "reviewRequired": 62,
+    "structurallyReady": 10,
     "ownedReadmes": 72,
     "technicalCompanions": 62,
-    "findings": 247
+    "findings": 240
   },
   "findingDefinitions": [
     {
@@ -60,7 +60,7 @@
       "projectPath": "packaging/Sylin.Koan/Sylin.Koan.csproj",
       "shape": "bundle",
       "role": "entry",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Tested Koan foundation bundle: core runtime, Entity data, local Communication, and the JSON connector.",
       "targetFrameworks": [
         "net10.0"
@@ -75,11 +75,7 @@
       "readme": "packaging/Sylin.Koan/README.md",
       "technicalDocumentation": "packaging/Sylin.Koan/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI",
@@ -499,7 +495,7 @@
       "projectPath": "packaging/Sylin.Koan.App/Sylin.Koan.App.csproj",
       "shape": "bundle",
       "role": "entry",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Tested Koan application bundle: the Koan foundation plus controller-based ASP.NET Core integration.",
       "targetFrameworks": [
         "net10.0"
@@ -511,11 +507,7 @@
       "readme": "packaging/Sylin.Koan.App/README.md",
       "technicalDocumentation": "packaging/Sylin.Koan.App/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Cache",
@@ -1993,7 +1985,7 @@
       "projectPath": "templates/Sylin.Koan.Templates.csproj",
       "shape": "template",
       "role": "template",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "\u0060dotnet new\u0060 templates for the Koan Framework: koan-web (minimal Entity \u002B EntityController web API) and koan-console (Entity CRUD console app), both over Sqlite and ready to run.",
       "targetFrameworks": [
         "net10.0"
@@ -2002,9 +1994,7 @@
       "readme": "templates/README.md",
       "technicalDocumentation": "templates/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Tenancy",

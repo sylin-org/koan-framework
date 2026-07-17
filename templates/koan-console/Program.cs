@@ -2,17 +2,16 @@ using Koan.Data.Core;
 using Microsoft.Extensions.DependencyInjection;
 using KoanConsoleApp;
 
-// One line boots and owns Koan's standard host lifecycle. Reference = Intent.
 using var app = new ServiceCollection().StartKoan();
 
-var todo = await new Todo { Title = "buy milk" }.Save();   // create (GUID v7 id, auto)
+var todo = await new Todo { Title = "buy milk" }.Save();
 Console.WriteLine($"saved: {todo.Id}");
 
-var loaded = await Todo.Get(todo.Id);                       // read by id
+var loaded = await Todo.Get(todo.Id);
 Console.WriteLine($"loaded: {loaded?.Title}");
 
 await new Todo { Title = "walk the dog", Done = true }.Save();
 
 Console.WriteLine("open todos:");
-foreach (var t in await Todo.Query(t => !t.Done))          // query by predicate
+foreach (var t in await Todo.Query(t => !t.Done))
     Console.WriteLine($"  - {t.Title}");

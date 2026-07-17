@@ -8,14 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Sylin.Koan = core + data + JSON; we add Sqlite as the store. Reference = Intent. -->
     <PackageReference Include="Sylin.Koan" Version="__KOAN_FOUNDATION_RANGE__" />
     <PackageReference Include="Sylin.Koan.Data.Connector.Sqlite" Version="__KOAN_SQLITE_RANGE__" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- StartKoan() reads appsettings.json from the working directory; copy it next to the app. -->
-    <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
