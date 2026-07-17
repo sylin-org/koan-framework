@@ -15,13 +15,13 @@ public static class ZenGarden
 
     /// <summary>
     /// Returns the recommended model for an AI capability using orchestrator recommendations.
-    /// Pass <see cref="Koan.Core.AI.AiCapability"/> constants: Chat, Embed, Vision, Ocr, Quick, Synthesis, Thinking, Tools.
+    /// Pass <see cref="Koan.AI.Contracts.AiCapability"/> constants: Chat, Embed, Vision, Ocr, Quick, Synthesis, Thinking, Tools.
     /// Returns null if the orchestrator is unreachable or no recommendations are available.
     /// </summary>
     public static string? RecommendedModel(string capability)
     {
-        var advisor = Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(Koan.Core.AI.IAiModelAdvisor))
-            as Koan.Core.AI.IAiModelAdvisor;
+        var advisor = Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(Koan.AI.Contracts.IAiModelAdvisor))
+            as Koan.AI.Contracts.IAiModelAdvisor;
         return advisor?.GetRecommendedModel(capability);
     }
 

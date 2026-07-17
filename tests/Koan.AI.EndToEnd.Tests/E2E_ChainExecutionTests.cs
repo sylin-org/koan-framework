@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Orchestration;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Xunit;
 
 namespace Koan.AI.EndToEnd.Tests;

@@ -12,7 +12,7 @@ using Newtonsoft.Json.Linq;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.Core.Adapters;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Koan.AI.Connector.Ollama.Options;
 
 namespace Koan.AI.Connector.Ollama;

@@ -71,8 +71,8 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.AI.Connector.Ollama` | `provider` | `assess` |
 | `Sylin.Koan.AI.Connector.Onnx` | `provider` | `assess` |
 | `Sylin.Koan.AI.Connector.ZenGarden` | `provider` | `assess` |
-| `Sylin.Koan.AI.Contracts` | `contracts` | `assess` |
-| `Sylin.Koan.AI.Contracts.Shared` | `contracts` | `assess` |
+| `Sylin.Koan.AI.Contracts` | `contracts` | `keep` |
+| `Sylin.Koan.AI.Contracts.Shared` | `contracts` | `keep` |
 | `Sylin.Koan.AI.Eval` | `capability` | `assess` |
 | `Sylin.Koan.AI.Models` | `capability` | `assess` |
 | `Sylin.Koan.AI.Orchestration` | `capability` | `assess` |
@@ -199,6 +199,8 @@ terminal package decisions; the listed boundary repairs happen before graduation
 | `Sylin.Koan.Core.Adapters` | `merge` (implemented) | It did not state an application capability or provider choice. Generic readiness/lifecycle now belongs to Core; data paging and schema behavior belong to Data; discovery reporting belongs to the Core discovery owner. Dead orchestration bridge types and the public package were removed. |
 | `Sylin.Koan.Orchestration.Abstractions` | `keep` | Inert DevHost vocabulary for CLI hosting providers, exporters, plans, and renderers. Slim it to that contract and keep functional activation in CLI/provider packages; application Core must not depend on it. |
 | `Sylin.Koan.Orchestration.Cli.Core` | `merge` (implemented) | Every implementation type was internal and visible only to the CLI, despite package prose claiming a reusable public surface. Planning, discovery, endpoint formatting, and launch-manifest behavior now have one honest owner: the CLI executable. |
+| `Sylin.Koan.AI.Contracts` | `keep` | Inert inference/provider boundary used independently by adapters and layered modules. AI-only capability and model-selection SPIs moved here from mandatory Core; the false Core dependency was removed. |
+| `Sylin.Koan.AI.Contracts.Shared` | `keep` | Dependency-free lifecycle exchange vocabulary retained for model, dataset, compute, job, evaluation, and lineage extensions, including the accepted cross-repository transition boundary. It activates no runtime. |
 | `Sylin.Koan.Data.Abstractions` | `keep` | Entity and repository vocabulary independently consumed by providers, projections, and modules without selecting a data runtime or backend. Its legacy ASP.NET JSON Patch dependency and duplicate object-shaped patch path were removed; the boundary now exposes one provider-neutral `PatchPayload`. |
 | `Sylin.Koan.Data.Core` | `keep` | Entity data runtime and provider election. It owns data-specific adapter policy after the `Core.Adapters` redistribution. |
 | `Sylin.Koan.Data.Connector.Json` | `keep` | Bounded, file-backed local provider that gives the foundation bundle an immediate meaningful result. Its package page must state its concurrency and deployment limits plainly. |

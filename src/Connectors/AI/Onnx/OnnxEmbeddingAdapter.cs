@@ -1,7 +1,7 @@
 using FastBertTokenizer;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 

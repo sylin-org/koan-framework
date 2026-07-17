@@ -8,7 +8,7 @@ using Koan.AI.Contracts.Options;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
 using Koan.AI.Context;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

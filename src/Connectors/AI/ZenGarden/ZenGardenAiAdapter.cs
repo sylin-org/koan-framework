@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.AI.Connector.ZenGarden;

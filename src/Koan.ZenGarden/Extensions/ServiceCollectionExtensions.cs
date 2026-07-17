@@ -1,4 +1,4 @@
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Koan.Core.Modules;
 using Koan.ZenGarden.AI;
 using Koan.ZenGarden;

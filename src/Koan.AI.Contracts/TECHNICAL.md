@@ -1,43 +1,41 @@
-Koan.AI.Contracts - Technical reference
+# Sylin.Koan.AI.Contracts — technical contract
 
-Contract
+## Responsibility
 
-- Inputs: Prompt/Message objects, Tool specifications, Embedding requests.
-- Outputs: Model responses (text/JSON), Streaming tokens, Embedding vectors + metadata, Error/result envelopes.
-- Options: Provider name/alias, Model id, Temperature/topP, MaxTokens, Timeouts, Retries, Telemetry correlation.
-- Error modes: ProviderUnavailable, RateLimited, InvalidRequest (schema/size), Timeout, Canceled.
+This assembly is the inert compile-time boundary between the Koan AI runtime, optional providers, projections, and
+libraries. It owns no `KoanModule`, service registration, hosted service, client, transport, or provider election.
+Its only external dependency is Newtonsoft.Json for the existing `AiPromptOptions` extension-data contract.
 
-Scope and responsibilities
+## Contract groups
 
-- Defines stable interfaces, records, and enums used by AI providers and application code.
-- No network calls; no provider logic. Backwards-compatible by default; version only when required.
-- Favor small, intent-revealing contracts with sealed records and explicit required members.
+- `Koan.AI.Contracts`: `IAiPipeline`, `AiCapability`, `IAiRecipeProvider`, and `IAiModelAdvisor`.
+- `.Adapters`: the base adapter identity, operation-specific adapter interfaces, model management, contributor SPI,
+  and adapter election metadata.
+- `.Routing` and `.Sources`: registry, source/member, health-state, and capability-configuration vocabulary.
+- `.Models`: prompt, conversation, request/response, streaming, provenance, route-hint, and result shapes.
+- `.Options` and `.Categories`: typed operation and category configuration.
 
-Design notes
+The AI-specific capability catalog and model-selection SPIs live here rather than in `Sylin.Koan.Core`; applications
+that do not reference AI therefore do not carry AI vocabulary in their mandatory framework substrate.
 
-- Separation of concern: providers implement these contracts; web/controllers orchestrate usage.
-- Streaming first: expose both buffered and streaming shapes where applicable.
-- Tool-call safety: explicit inputs/outputs, avoid magic strings; centralize literals in Constants.
+## Runtime handoff
 
-Options and configuration
+Functional provider modules register `IAiAdapterContributor` implementations. `Sylin.Koan.AI` owns when those
+contributors execute, compiles the adapter/source registries, and consumes optional `IAiRecipeProvider` and
+`IAiModelAdvisor` implementations. A module may reference and register one of these contracts without activating AI;
+the behavior appears only when the AI runtime resolves it.
 
-- Provider selection via option keys; callers should pass explicit provider and model identifiers.
-- Tunables (temperature, topP, penalties) must have safe defaults; set via typed options not scattered literals (ARCH-0040).
-- Timeouts and retry policies must be caller-controlled; contracts should carry correlation ids.
+`IAiAdapter.Capabilities` is string-based by design. `AiCapability` supplies interoperable in-box identifiers while
+allowing providers to declare additional capabilities without changing this package.
 
-Edge cases
+## Failure and compatibility boundaries
 
-- Empty/oversized prompts; token budget exceeded; unsupported model capabilities.
-- Provider transient failures; streaming aborted mid-flight; partial tool output.
-- Concurrency: parallel tool calls; cancellation tokens honored throughout.
-
-Security
-
-- Treat prompts and outputs as sensitive. No PII logging by default; redact in diagnostics.
-- Disallow arbitrary tool execution; require allow-lists and typed parameters.
-
-References
-
-- ./README.md
-- /docs/architecture/principles.md
-- /docs/engineering/index.md
+- Contracts do not convert provider failures into a universal error taxonomy; functional layers own corrective
+  exceptions and observable health.
+- Request and option shapes do not imply universal provider support. A provider must reject or explicitly ignore
+  unsupported options according to its documented contract.
+- Streaming implementations must propagate cancellation and may produce partial output before a provider failure.
+- Prompts, media, tool arguments, and model output can contain sensitive data; contracts provide no automatic
+  redaction or policy enforcement.
+- `AiPromptOptions.VendorOptions` exposes Newtonsoft `JToken` values. New operation-specific options use ordinary
+  object dictionaries; consumers must not assume the two bags are interchangeable.

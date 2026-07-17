@@ -1,4 +1,4 @@
-﻿namespace Koan.Core.AI;
+namespace Koan.AI.Contracts;
 
 /// <summary>
 /// Service Provider Interface for dynamic AI model recommendations.

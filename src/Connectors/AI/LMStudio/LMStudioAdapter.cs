@@ -13,7 +13,7 @@ using Newtonsoft.Json;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.Core.Adapters;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Koan.AI.Connector.LMStudio.Options;
 using Koan.AI.Connector.LMStudio.Infrastructure;
 

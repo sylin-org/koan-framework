@@ -10,7 +10,7 @@ using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
 using Koan.Core;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Koan.Core.Hosting.App;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;

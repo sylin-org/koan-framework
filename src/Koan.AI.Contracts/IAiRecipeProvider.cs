@@ -1,4 +1,4 @@
-namespace Koan.Core.AI;
+namespace Koan.AI.Contracts;
 
 /// <summary>
 /// Provides model bindings from a named recipe configuration.

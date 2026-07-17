@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Resolution;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 

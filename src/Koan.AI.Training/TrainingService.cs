@@ -2,7 +2,7 @@ using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Shared;
 using Koan.AI.Resolution;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 
 namespace Koan.AI.Training;
 

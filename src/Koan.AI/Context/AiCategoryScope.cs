@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using System.Threading;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 
 namespace Koan.AI.Context;
 

@@ -3,7 +3,7 @@ using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Shared;
 using Koan.AI.Resolution;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Koan.Data.Core;
 
 namespace Koan.AI.Models;

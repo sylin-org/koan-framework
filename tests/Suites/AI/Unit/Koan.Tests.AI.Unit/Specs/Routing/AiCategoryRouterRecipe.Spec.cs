@@ -13,7 +13,7 @@ using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
 using Koan.AI.Context;
 using Koan.AI.Pipeline;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Microsoft.Extensions.Options;
 using Xunit;
 

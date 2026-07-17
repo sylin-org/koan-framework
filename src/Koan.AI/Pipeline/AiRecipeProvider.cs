@@ -1,5 +1,5 @@
 using Koan.AI.Infrastructure;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 

@@ -13,7 +13,6 @@ using Koan.AI.Infrastructure;
 using Koan.AI.Pipeline;
 using Koan.AI.Sources;
 using Koan.Core;
-using Koan.Core.AI;
 using Koan.Core.Modules;
 
 namespace Koan.AI;

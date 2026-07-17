@@ -3,12 +3,12 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 107,
-    "repairRequired": 34,
-    "reviewRequired": 56,
-    "structurallyReady": 17,
-    "ownedReadmes": 73,
-    "technicalCompanions": 63,
-    "findings": 223
+    "repairRequired": 33,
+    "reviewRequired": 55,
+    "structurallyReady": 19,
+    "ownedReadmes": 74,
+    "technicalCompanions": 64,
+    "findings": 220
   },
   "findingDefinitions": [
     {
@@ -274,39 +274,32 @@
       "projectPath": "src/Koan.AI.Contracts/Koan.AI.Contracts.csproj",
       "shape": "library",
       "role": "contracts",
-      "status": "review-required",
-      "description": "Contracts for Koan AI: prompts, request/response shapes, and standard token accounting models.",
+      "status": "structurally-ready",
+      "description": "Inert Koan AI contracts for provider adapters, routing, model selection, prompts, and multimodal request and result shapes.",
       "targetFrameworks": [
         "net10.0"
       ],
-      "dependencies": [
-        "Sylin.Koan.Core"
-      ],
+      "dependencies": [],
       "readme": "src/Koan.AI.Contracts/README.md",
       "technicalDocumentation": "src/Koan.AI.Contracts/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI.Contracts.Shared",
       "projectPath": "src/Koan.AI.Contracts.Shared/Koan.AI.Contracts.Shared.csproj",
       "shape": "library",
       "role": "contracts",
-      "status": "repair-required",
-      "description": "Shared boundary models for the Koan AI lifecycle: ModelRef, DatasetRef, ComputeRequirement, JobRef, EvalScore, Lineage, Accelerator, ModelFormat.",
+      "status": "structurally-ready",
+      "description": "Dependency-free identities and result vocabulary shared across Koan-compatible model, dataset, compute, job, evaluation, and lineage workflows.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.AI.Contracts.Shared/README.md",
+      "technicalDocumentation": "src/Koan.AI.Contracts.Shared/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI.Eval",
@@ -2451,6 +2444,7 @@
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
         "Sylin.Koan.ZenGarden.Contracts"
       ],

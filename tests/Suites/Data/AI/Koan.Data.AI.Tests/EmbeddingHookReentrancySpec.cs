@@ -9,7 +9,7 @@ using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
 using Koan.Core;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Koan.Data.AI.Attributes;
 using Koan.Data.AI.Migration;
 using Koan.Data.Core;

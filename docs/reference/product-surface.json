@@ -422,13 +422,11 @@
     {
       "packageId": "Sylin.Koan.AI.Contracts",
       "shape": "library",
-      "description": "Contracts for Koan AI: prompts, request/response shapes, and standard token accounting models.",
+      "description": "Inert Koan AI contracts for provider adapters, routing, model selection, prompts, and multimodal request and result shapes.",
       "targetFrameworks": [
         "net10.0"
       ],
-      "dependencies": [
-        "Sylin.Koan.Core"
-      ],
+      "dependencies": [],
       "readme": "src/Koan.AI.Contracts/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.AI.Contracts/TECHNICAL.md",
@@ -437,14 +435,14 @@
     {
       "packageId": "Sylin.Koan.AI.Contracts.Shared",
       "shape": "library",
-      "description": "Shared boundary models for the Koan AI lifecycle: ModelRef, DatasetRef, ComputeRequirement, JobRef, EvalScore, Lineage, Accelerator, ModelFormat.",
+      "description": "Dependency-free identities and result vocabulary shared across Koan-compatible model, dataset, compute, job, evaluation, and lineage workflows.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.AI.Contracts.Shared/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.AI.Contracts.Shared/TECHNICAL.md",
       "claims": []
     },
     {
@@ -2075,6 +2073,7 @@
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
         "Sylin.Koan.ZenGarden.Contracts"
       ],

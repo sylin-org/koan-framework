@@ -1,4 +1,4 @@
-namespace Koan.Core.AI;
+namespace Koan.AI.Contracts;
 
 /// <summary>
 /// Well-known AI capability identifiers. Adapters declare these to signal what they support.

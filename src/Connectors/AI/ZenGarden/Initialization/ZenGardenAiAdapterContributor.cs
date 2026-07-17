@@ -4,7 +4,7 @@ using Koan.AI.Connector.ZenGarden.Infrastructure;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Koan.Core.Logging;
 using Koan.ZenGarden;
 using Microsoft.Extensions.DependencyInjection;

@@ -2,7 +2,7 @@ using AwesomeAssertions;
 using Koan.AI.Contracts.Shared;
 using Koan.AI.Eval;
 using Koan.AI.Integration.Tests.Fixtures;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Xunit;
 
 namespace Koan.AI.Integration.Tests;

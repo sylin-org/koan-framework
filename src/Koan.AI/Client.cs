@@ -11,7 +11,6 @@ using Koan.AI.Contracts.Options;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Context;
 using Koan.Core;
-using Koan.Core.AI;
 using Koan.Core.Hosting.App;
 
 namespace Koan.AI;

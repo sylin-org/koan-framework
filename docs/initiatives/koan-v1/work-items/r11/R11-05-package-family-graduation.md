@@ -90,7 +90,17 @@ into a support claim.
 - generated truth after the CLI merge: 107 packages, 34 repair-required, 56 review-required, 17 structurally ready,
   and 223 findings. The dissolved false boundary removes one package and its two findings; the retained CLI advances
   to structurally ready.
-- AI, Vector, Storage, and Media boundaries remain under assessment; none is graduated merely because its name says
+- `Sylin.Koan.AI.Contracts` and `.Contracts.Shared` both earn `keep`: the former is the inert provider/inference
+  boundary and the latter is a dependency-free lifecycle exchange boundary retained by accepted cross-repository
+  architecture. `AiCapability`, `IAiRecipeProvider`, and `IAiModelAdvisor` moved out of mandatory Core into the AI
+  contract they describe; AI Contracts no longer has a false Core dependency. ZenGarden can describe its optional
+  advisor through that inert boundary, while only an active AI runtime resolves and uses it.
+- focused AI proof: Core, AI Contracts, AI runtime, ZenGarden, Ollama, and LM Studio build warning-free; AI unit
+  160/160, integration 49/49, end-to-end 31/31, and ZenGarden 86/86 pass. Both contract packages pack with owned
+  README and canonical icon.
+- generated truth after AI contract graduation: 107 packages, 33 repair-required, 55 review-required, 19
+  structurally ready, and 220 findings. Both retained contract packages now have zero structural findings.
+- Vector, Storage, and Media boundaries remain under assessment; none is graduated merely because its name says
   `Contracts` or `Abstractions`.
 
 ## Acceptance
