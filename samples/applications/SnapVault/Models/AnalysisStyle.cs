@@ -5,19 +5,10 @@ using Koan.Tenancy;
 namespace SnapVault.Models;
 
 /// <summary>
-/// Analysis style configuration for AI photo analysis
-/// Stores PARAMETERS for prompt customization, not full prompts (factory pattern)
-/// System styles are seeded on startup, users can create custom styles
+/// Shared prompt parameters for the system analysis-style library seeded at startup.
 /// </summary>
 /// <remarks>
-/// [HostScoped]: the system analysis styles are platform-shared reference data — the boot-time seeder writes
-/// them once (un-scoped) and every studio sees the same library.
-///
-/// KNOWN LIMITATION (deliberate Phase-1 scope, not a partial isolation): because the WHOLE entity is
-/// [HostScoped], user-created custom styles (<see cref="IsUserCreated"/>) are ALSO platform-visible — they are
-/// not isolated per studio. Per-studio custom styles are a later phase (split the system seed from per-tenant
-/// styles, or drop [HostScoped] and host-scope only the seed). Until then, treat AnalysisStyle as shared
-/// configuration, never as per-studio user data.
+/// <c>[HostScoped]</c> makes the library common to every studio. It is system configuration, not studio-owned data.
 /// </remarks>
 [HostScoped]
 public class AnalysisStyle : Entity<AnalysisStyle>

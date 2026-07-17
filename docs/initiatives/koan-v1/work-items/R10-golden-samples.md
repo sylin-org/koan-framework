@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: semantic portfolio and eight graduated outcomes passed; CustomerCanon and SnapVault remain explicit graduation work
+  scope: semantic portfolio and nine graduated outcomes passed; CustomerCanon remains explicit graduation work
 ---
 
 # R10 — Graduate the golden sample portfolio
@@ -119,6 +119,7 @@ R10 passes only when:
 | [R10-07](r10/R10-07-s14-workload-lab.md) | OrderIntake | passed | bounded order intake → named source → verified durable receipt → capabilities/facts/correction proof |
 | [R10-08](r10/R10-08-public-documentation.md) | public documentation | passed | greenfield front door/TOC → current product/package companions → enforced truth gate → FirstUse/product-surface proof |
 | [R10-09](r10/R10-09-semantic-sample-portfolio.md) | semantic sample portfolio | passed | intent-based taxonomy → accepted culls → cumulative GardenCoop → OpenGraph absorbed by DevPortal → focused retained evidence |
+| [R10-10](r10/R10-10-snapvault.md) | SnapVault | passed | local photo upload → durable ingest → event/media → scoped client sharing → readiness/facts proof |
 
 Open later children only after the GardenCoop slice establishes the evidence template and a focused inventory
 selects the next highest-value maintained sample.

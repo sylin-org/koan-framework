@@ -9,16 +9,11 @@ using System.Text.Json;
 namespace SnapVault.Controllers;
 
 /// <summary>
-/// Maintenance surface (SnapVault step 5d) — trimmed to the two operations that survive the greenfield: storage
-/// <b>stats</b> and the destructive <b>wipe</b>. The legacy controller's rebuild-index / clear-cache / optimize-db /
-/// export-metadata / backup-config endpoints are dropped: they targeted the deleted architecture (the file-based
-/// AI-introspection cache, the eager derivative tiers, a no-op DB "optimize"). Stats + wipe are scoped to the
-/// ambient tenant — a studio sees and wipes only its own repository (isolation inherited from the tenant axis, the
-/// established SnapVault pattern; no per-endpoint auth).
+/// Operator-only storage statistics and destructive studio wipe. Both inherit ambient tenant isolation.
 /// </summary>
 [ApiController]
 [Route("api/maintenance")]
-[OperatorOnly]   // stats + wipe are operator-only — a guest must never reach the destructive/aggregate surface
+[OperatorOnly]
 public sealed class MaintenanceController : ControllerBase
 {
     private const double BytesPerGB = 1024.0 * 1024 * 1024;
@@ -31,10 +26,9 @@ public sealed class MaintenanceController : ControllerBase
     /// <summary>
     /// Storage stats for the settings page. Computed from the entities' own <c>Size</c> (the stored byte count),
     /// tenant-scoped and provider-agnostic — no filesystem walk, no assumption of the Local connector's on-disk
-    /// layout. The greenfield collapsed the legacy hot/warm/cold tiers to a single stored-original tier plus the
-    /// on-demand render cache, so the response maps honestly: <c>coldTierGB</c> = the stored originals,
+    /// layout. The response maps <c>coldTierGB</c> to stored originals,
     /// <c>warmTierGB</c> = the <see cref="MediaDerivation"/> render cache, <c>hotTierGB</c> = 0. <c>cacheEntries</c>
-    /// / <c>cacheSizeMB</c> report that render cache (the closest analog to the legacy AI cache).
+    /// / <c>cacheSizeMB</c> report that render cache.
     /// </summary>
     [HttpGet("stats")]
     public async Task<ActionResult<StorageStats>> GetStats(CancellationToken ct = default)
@@ -47,7 +41,7 @@ public sealed class MaintenanceController : ControllerBase
 
         return Ok(new StorageStats
         {
-            HotTierGB = 0,                                                   // greenfield has no separate hot tier
+            HotTierGB = 0,
             WarmTierGB = Math.Round(derivationBytes / BytesPerGB, 2),        // the on-demand render cache
             ColdTierGB = Math.Round(originalBytes / BytesPerGB, 2),          // the stored originals
             TotalGB = Math.Round((originalBytes + derivationBytes) / BytesPerGB, 2),
@@ -142,7 +136,7 @@ public sealed class MaintenanceController : ControllerBase
             }
             await Progress(92, "Cleared sessions and render cache");
 
-            // 6. Studio guest-lifecycle rows (92→100%, 5e). These are [HostScoped] (platform-shared) keyed by
+            // Studio guest-lifecycle rows are [HostScoped] and keyed by
             // StudioTenantId, NOT the ambient tenant axis, so they need the resolved studio id — cleared when a
             // studio tenant is resolved (the operator carrier / a test's Tenant.Use); skipped for the tenant-less
             // dev-trust operator. Memberships (the operator's own seat) and the tamper-evident

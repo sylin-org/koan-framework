@@ -8,8 +8,7 @@ using SnapVault.Services;
 namespace SnapVault.Controllers;
 
 /// <summary>
-/// The studio↔client gallery lifecycle over HTTP (SnapVault step 5f) — the two verbs that were service-only until
-/// now. <b>Invite</b> is operator-only (the studio issues a per-event guest link with a role). <b>Accept</b> is the
+/// The studio-to-client gallery lifecycle. <b>Invite</b> is operator-only; <b>Accept</b> is the
 /// signed-in guest binding the invite to their identity (verified-email ownership enforced by the shipped
 /// <c>InviteAcceptanceService</c>); it reads the authenticated principal directly (a not-yet-accepted guest holds no
 /// grant, so the subject middleware left them subject-less — which is correct, and the accept path touches only

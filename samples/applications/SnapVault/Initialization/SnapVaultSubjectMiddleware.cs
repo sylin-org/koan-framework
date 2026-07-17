@@ -13,16 +13,15 @@ using SnapVault.Services;
 namespace SnapVault.Initialization;
 
 /// <summary>
-/// SnapVault step 5e — the operator+guest subject-resolution middleware. Runs at the <c>AfterAuthentication</c> stage
-/// (after <see cref="Koan.Identity.Tenancy"/>'s tenant resolver, Order 100) and sets the ambient SEC-0008
+/// Resolves the operator or guest subject after authentication and tenant resolution, then sets the ambient
 /// <see cref="Subject"/> for the rest of the request, so the fail-closed access axis has a subject to read. Precedence:
 /// <list type="number">
 /// <item><b>Guest</b> — an authenticated person holding active <see cref="Models.GalleryGrant"/>s is scoped to their
 /// granted events (<c>Subject.Use(scopes)</c>) within their studio (<c>Tenant.Use</c>, derived server-side from the
 /// grants — never a client hint). A scope-resolution throw fails closed (no subject), NEVER an operator.</item>
-/// <item><b>Operator via carrier</b> — the tenant middleware resolved + membership-authorized a studio (the 5f
-/// studio-picker), so an authorized member reads unconstrained within it.</item>
-/// <item><b>Dev-trust operator</b> — Development + ANONYMOUS only (the SPA has no login yet): an anonymous dev request
+/// <item><b>Operator via carrier</b> — the tenant middleware resolved and membership-authorized a studio, so an
+/// authorized member reads unconstrained within it.</item>
+/// <item><b>Dev-trust operator</b> — Development and anonymous only: an anonymous local request
 /// reads unconstrained in its default tenant. Restricted to anonymous so an authenticated-but-grantless principal (a
 /// revoked client) still fails closed. Production has NO fallback.</item>
 /// <item>otherwise — no ambient subject ⇒ fail-closed downstream.</item>
@@ -76,7 +75,7 @@ public sealed class SnapVaultSubjectMiddleware
             // carrier check; a revoked client (grants gone) with no carrier therefore fails closed below.
         }
 
-        // 2. OPERATOR via carrier — the tenant middleware resolved + membership-authorized a studio (5f picker).
+        // Operator via carrier: tenant resolution already authorized this studio membership.
         if (Tenant.Current is { Id: { Length: > 0 } tenantId })
         {
             using (Subject.Unconstrained(personId ?? ("operator:" + tenantId)))
@@ -84,7 +83,7 @@ public sealed class SnapVaultSubjectMiddleware
             return;
         }
 
-        // 3. DEV-TRUST operator fallback — Development + ANONYMOUS only (until the 5f studio-picker carrier).
+        // Development-only anonymous operator fallback.
         if (_env.IsDevelopment() && string.IsNullOrEmpty(personId))
         {
             using (Subject.Unconstrained("dev-operator"))

@@ -12,33 +12,29 @@ using SnapVault.Services;
 namespace SnapVault.Controllers;
 
 /// <summary>
-/// The studio photo surface. An <see cref="EntityController{PhotoAsset}"/> so the framework provides the list (#2 —
-/// filter/sort/pagination + <c>X-Total-Count</c>) and get-by-id (#3) for free (Reference = Intent); the custom
-/// actions add upload (#8), stats (#1), index (#4), by-event (#6), and filter facets (#7). Isolation is inherited
-/// from the ambient access + tenancy axes (no per-endpoint auth ceremony — see UploadProgressController); a studio
-/// operator is unconstrained within their tenant.
+/// Studio photo API. <see cref="EntityController{PhotoAsset}"/> supplies ordinary reads; custom actions express
+/// upload, navigation, facets, studio mutations, and durable reanalysis. Tenant and access axes apply throughout.
 /// </summary>
 [Route("api/photos")]
 [Pagination(Mode = PaginationMode.On, DefaultSize = 30, MaxSize = 200, DefaultSort = "-id")]
-[OperatorOnly]   // 5e: the studio photo surface (upload + writes + operator reads) is operator-only — a guest browses
-                 // their gallery via the access-scoped PhotoSetsController + media serving, and proofs via /proofing;
-                 // it never reaches the studio's write verbs (which the access axis, a READ axis, would not gate).
+[OperatorOnly]
 public sealed class PhotosController : EntityController<PhotoAsset>
 {
-    private const long MaxFileBytes = 25L * 1024 * 1024;                 // 25 MB per file
+    private const int MaxFilesPerBatch = 10;
+    private const long MaxFileBytes = 25L * 1024 * 1024;
     private static readonly HashSet<string> AllowedExtensions =
-        new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".heic", ".heif" };
+        new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png" };
 
     private readonly PhotoSetService _photoSets;
-    private readonly IPhotoProcessingService _processing;
+    private readonly PhotoProcessingService _processing;
 
-    public PhotosController(PhotoSetService photoSets, IPhotoProcessingService processing)
+    public PhotosController(PhotoSetService photoSets, PhotoProcessingService processing)
     {
         _photoSets = photoSets;
         _processing = processing;
     }
 
-    /// <summary>#1 — library stats for the sidebar badges (accurate regardless of pagination).</summary>
+    /// <summary>Library totals independent of the current page.</summary>
     [HttpGet("stats")]
     public async Task<ActionResult<PhotoStats>> GetStats(CancellationToken ct = default)
     {
@@ -48,9 +44,7 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         return Ok(new PhotoStats { TotalPhotos = (int)total.TotalCount, Favorites = (int)favorites.TotalCount });
     }
 
-    /// <summary>#4 — a photo's position within a browsing context (lightbox jump-to-index). Reuses the same context
-    /// routing/sort as the grid (#5) so index and grid never disagree. Defaults sort to <c>capturedAt</c> to match
-    /// what the UI browses by.</summary>
+    /// <summary>A photo's position within the same sorted context used by the gallery.</summary>
     [HttpGet("{id}/index")]
     public async Task<ActionResult<PhotoIndexResponse>> GetPhotoIndex(
         string id,
@@ -85,7 +79,7 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         });
     }
 
-    /// <summary>#6 — one event's photos (sidebar event click), newest-capture first, paginated.</summary>
+    /// <summary>One event's photos, newest capture first and paginated.</summary>
     [HttpGet("by-event/{eventId}")]
     public async Task<ActionResult<EventPhotosResponse>> GetByEvent(
         string eventId, [FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
@@ -108,7 +102,7 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         });
     }
 
-    /// <summary>#7 — filter facets: distinct cameras (alpha), years (desc), and the top-50 tags by frequency.</summary>
+    /// <summary>Distinct camera/year facets and the 50 most frequent tags.</summary>
     [HttpGet("filter-metadata")]
     public async Task<ActionResult<FilterMetadata>> GetFilterMetadata(CancellationToken ct = default)
     {
@@ -123,10 +117,10 @@ public sealed class PhotosController : EntityController<PhotoAsset>
     }
 
     /// <summary>
-    /// #8 — Batch upload. Streams each raw file to crash-safe staging (never onto the job ledger), then submits one
+    /// Streams each raw file to crash-safe staging, then submits one
     /// durable, tenant-carried <see cref="PhotoProcessingJob"/> per file sharing a <c>batchId</c>. Returns immediately
     /// with that batch id; the browser opens the SSE progress stream on it. The ambient studio tenant is captured at
-    /// submit and rehydrated when each job runs (ARCH-0100).
+    /// submission and restored when each job runs.
     /// </summary>
     [HttpPost("upload")]
     [RequestSizeLimit(260L * 1024 * 1024)]                                  // UI max batch = 10 files × 25 MB + headroom
@@ -136,6 +130,8 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         var form = await Request.ReadFormAsync(ct);
         if (form.Files.Count == 0)
             return BadRequest(new { error = "No files provided." });
+        if (form.Files.Count > MaxFilesPerBatch)
+            return BadRequest(new { error = $"Upload at most {MaxFilesPerBatch} files per batch." });
 
         // "auto" (or omitted) means auto-organize by EXIF capture date; the pipeline mints the daily event.
         var eventIdRaw = form["eventId"].ToString();
@@ -187,12 +183,12 @@ public sealed class PhotosController : EntityController<PhotoAsset>
     }
 
     // ------------------------------------------------------------------------------------------------------------
-    // Studio mutations (#9–#19). Thin actions over the entity: the interesting behaviour is elsewhere — deletes
+    // Studio mutations remain thin actions over the entity: deletes
     // fire the structural AfterRemove cleanup (PhotoAssetCleanup), regeneration rides the durable tenant-carrying
     // job, and lock keys honour INV-1 (lowercase). Isolation is inherited from the ambient axes (no [Authorize]).
     // ------------------------------------------------------------------------------------------------------------
 
-    /// <summary>#9 — toggle favorite (POST, no body). Returns the new state as { isFavorite }.</summary>
+    /// <summary>Toggle favorite and return the new state.</summary>
     [HttpPost("{id}/favorite")]
     public async Task<IActionResult> ToggleFavorite(string id, CancellationToken ct = default)
     {
@@ -203,7 +199,7 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         return Ok(new { photo.IsFavorite });
     }
 
-    /// <summary>#10 — set rating (0..5). Returns { rating }.</summary>
+    /// <summary>Set a zero-to-five studio rating.</summary>
     [HttpPost("{id}/rate")]
     public async Task<IActionResult> Rate(string id, [FromBody] RateRequest request, CancellationToken ct = default)
     {
@@ -217,7 +213,7 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         return Ok(new { photo.Rating });
     }
 
-    /// <summary>#11 — bulk favorite/unfavorite. Per-item failures are collected, never fatal.</summary>
+    /// <summary>Favorite or unfavorite a set; collect per-item failures.</summary>
     [HttpPost("bulk/favorite")]
     public async Task<IActionResult> BulkFavorite([FromBody] BulkPhotoRequest request, CancellationToken ct = default)
     {
@@ -243,7 +239,7 @@ public sealed class PhotosController : EntityController<PhotoAsset>
     }
 
     /// <summary>
-    /// #12 — bulk delete (the ONLY delete path; the raw EntityController delete verbs are sealed). Each
+    /// Bulk delete is the only delete path; raw EntityController write verbs are sealed. Each
     /// <c>Remove</c> fires the structural AfterRemove hook (cached-render eviction + collection dead-id pruning),
     /// so the controller stays a thin loop. Returns { deleted, errors } — the SPA reads <c>deleted</c> and
     /// <c>errors[0]</c>.
@@ -271,7 +267,7 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         return Ok(new { deleted, failed = errors.Count, errors });
     }
 
-    /// <summary>#13 — download the full-resolution original as an attachment (SPA opens it via window.open).</summary>
+    /// <summary>Download the full-resolution original as an attachment.</summary>
     [HttpGet("{id}/download")]
     public async Task<IActionResult> Download(string id, CancellationToken ct = default)
     {
@@ -285,7 +281,7 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         return File(stream, contentType, fileName);   // Content-Disposition: attachment
     }
 
-    /// <summary>#14 — regenerate AI (fire-and-forget). Submits the durable, tenant-carrying Reanalyze job.</summary>
+    /// <summary>Submit durable reanalysis for a photo.</summary>
     [HttpPost("{id}/regenerate-ai")]
     public async Task<IActionResult> RegenerateAI(string id, CancellationToken ct = default)
     {
@@ -293,12 +289,12 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         if (photo is null) return NotFound();
 
         // A durable job (not a fire-and-forget Task.Run) so regeneration runs in this studio's rehydrated tenant
-        // (ARCH-0100) and survives a restart. The Reanalyze handler calls RegenerateAIAnalysis (reroll-with-holds).
+        // Jobs carries the studio context and survives a restart.
         await new PhotoProcessingJob { PhotoId = id }.Job.Submit(PhotoProcessingJob.Reanalyze);
         return Ok(new { message = "AI regeneration queued", photoId = id });
     }
 
-    /// <summary>#15 — regenerate AI analysis synchronously, preserving locked facts + summary ("reroll with holds").</summary>
+    /// <summary>Regenerate analysis synchronously while preserving locked facts and summary.</summary>
     [HttpPost("{id}/regenerate-ai-analysis")]
     public async Task<IActionResult> RegenerateAIAnalysis(string id, [FromBody] RegenerateAIAnalysisRequest? request = null, CancellationToken ct = default)
     {
@@ -313,7 +309,7 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         }
     }
 
-    /// <summary>#16 — toggle a fact's lock. INV-1: fact keys are lowercase. Returns { isLocked, lockedFactKeys }.</summary>
+    /// <summary>Toggle a lowercase fact key's lock.</summary>
     [HttpPost("{id}/facts/{factKey}/toggle-lock")]
     public async Task<IActionResult> ToggleFactLock(string id, string factKey, CancellationToken ct = default)
     {
@@ -333,7 +329,7 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         return Ok(new { factKey = key, isLocked, lockedFactKeys = photo.AiAnalysis.LockedFactKeys.ToList() });
     }
 
-    /// <summary>#17 — toggle the summary lock. Returns { summaryLocked }.</summary>
+    /// <summary>Toggle the summary lock.</summary>
     [HttpPost("{id}/summary/toggle-lock")]
     public async Task<IActionResult> ToggleSummaryLock(string id, CancellationToken ct = default)
     {
@@ -346,7 +342,7 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         return Ok(new { photo.AiAnalysis.SummaryLocked });
     }
 
-    /// <summary>#18 — lock the summary and every fact.</summary>
+    /// <summary>Lock the summary and every fact.</summary>
     [HttpPost("{id}/facts/lock-all")]
     public async Task<IActionResult> LockAllFacts(string id, CancellationToken ct = default)
     {
@@ -366,7 +362,7 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         });
     }
 
-    /// <summary>#19 — unlock the summary and every fact.</summary>
+    /// <summary>Unlock the summary and every fact.</summary>
     [HttpPost("{id}/facts/unlock-all")]
     public async Task<IActionResult> UnlockAllFacts(string id, CancellationToken ct = default)
     {

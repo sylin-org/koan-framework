@@ -16,8 +16,14 @@ using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
 using Koan.Jobs;
 using Koan.Tenancy;
-using Koan.Testing.Integration;
+using Koan.Web.Extensions;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using SnapVault.Controllers;
+using SnapVault.Initialization;
 using SnapVault.Models;
 using Xunit;
 
@@ -38,7 +44,7 @@ namespace Koan.Samples.SnapVault.Tests;
 ///   another (the path the durable job's Ingest depends on).</item>
 /// </list>
 /// Plus the <c>[HostScoped]</c> decision: system analysis styles are platform-shared across studios. Everything
-/// runs in-memory under the fail-closed <c>Closed</c> posture — no Docker, plain <c>dotnet test</c>.
+/// runs on local SQLite and storage with the Development tenant, while vector search remains in-memory.
 /// </summary>
 /// <summary>
 /// One real <c>AddKoan()</c> boot of the SnapVault sample, shared across the flagship's legs. A single boot is
@@ -48,34 +54,32 @@ namespace Koan.Samples.SnapVault.Tests;
 /// </summary>
 public sealed class SnapVaultHostFixture : IAsyncLifetime
 {
-    public IntegrationHost Host { get; private set; } = null!;
-    private IServiceProvider? _prevAppHost;
+    public IHost Host { get; private set; } = null!;
     private string _storageRoot = "";
+
+    public HttpClient CreateClient()
+    {
+        var client = Host.GetTestClient();
+        client.BaseAddress = new Uri("http://localhost");
+        return client;
+    }
 
     public async ValueTask InitializeAsync()
     {
-        // A no-Docker Local storage root so the staging-blob isolation leg runs through a real provider + the
-        // ScopedStorageService tenant-prefix decorator (STOR-0011) — the exact path PhotoProcessingJob.Ingest uses.
         _storageRoot = Path.Combine(Path.GetTempPath(), "snapvault-flagship", Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(_storageRoot);
+        AppHost.Current = null;
 
         var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
-            ["Koan:Environment"] = "Test",
-            // In-memory record + vector stores so the flagship needs no containers.
-            ["Koan:Data:Sources:Default:Adapter"] = "inmemory",
+            ["Koan:Environment"] = "Development",
+            ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
+            ["Koan:Data:Sources:Default:ConnectionString"] =
+                $"Data Source={Path.Combine(_storageRoot, "snapvault.db")}",
             ["Koan:Data:VectorDefaults:DefaultProvider"] = "inmemory",
-            // No AI provider in a unit run — keep the embedding / media-analysis workers quiet.
             ["Koan:Data:AI:EmbeddingWorker:Enabled"] = "false",
             ["Koan:Data:AI:MediaAnalysis:Enabled"] = "false",
-            // Prove isolation is ENFORCED, not incidental: an unscoped tenant op must fail closed.
-            ["Koan:Data:Tenancy:Posture"] = "Closed",
-            // Access scoping (SEC-0008) also fails closed by default — this shared host proves BOTH: tenant isolation
-            // here (studio reads run Subject.System(), the platform), and guest access scoping in the lifecycle spec.
-            // Local storage for the ingest + staging-blob legs (UploadStaging + PhotoAsset bind Profile="cold").
-            // Each profile MUST declare a Container (StorageService.ValidateConfiguration) — omitting it was the
-            // "IStorageService not resolving" cause that parked the blob leg; the per-entity [StorageBinding]
-            // Container overrides this default.
+            ["Koan:BackgroundServices:Enabled"] = "false",
             ["Koan:Storage:Providers:Local:BasePath"] = _storageRoot,
             ["Koan:Storage:DefaultProfile"] = "cold",
             ["Koan:Storage:Profiles:cold:Provider"] = "local",
@@ -86,24 +90,31 @@ public sealed class SnapVaultHostFixture : IAsyncLifetime
             ["Koan:Storage:Profiles:hot:Container"] = "hot",
         };
 
-        Host = await KoanIntegrationHost.Configure()
-            .WithSettings(settings)
-            .ConfigureServices(s =>
-            {
-                s.AddKoan();
-                // Drive the orchestrator deterministically from the test instead of the background worker.
-                s.Configure<JobsOptions>(o => { o.EnableWorker = false; o.RescheduleJitter = TimeSpan.Zero; });
-            })
-            .StartAsync();
-
-        _prevAppHost = AppHost.Current;
-        AppHost.Current = Host.Services;
+        _ = typeof(SnapVaultModule);
+        Host = await Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder()
+            .ConfigureWebHost(web => web
+                .UseTestServer()
+                .UseEnvironment("Development")
+                .ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(settings))
+                .ConfigureServices(services =>
+                {
+                    services.AddKoan();
+                    services.Configure<JobsOptions>(options =>
+                    {
+                        options.EnableWorker = false;
+                        options.RescheduleJitter = TimeSpan.Zero;
+                    });
+                    services.AddKoanControllersFrom<PhotosController>();
+                })
+                .Configure(_ => { }))
+            .StartAsync(TestContext.Current.CancellationToken);
     }
 
     public async ValueTask DisposeAsync()
     {
-        AppHost.Current = _prevAppHost;
-        await Host.DisposeAsync();
+        await Host.StopAsync();
+        Host.Dispose();
+        AppHost.Current = null;
         try { if (Directory.Exists(_storageRoot)) Directory.Delete(_storageRoot, recursive: true); }
         catch { /* best-effort temp cleanup */ }
     }

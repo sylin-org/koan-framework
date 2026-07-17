@@ -8,7 +8,7 @@ namespace SnapVault.Services.AI;
 /// Base prompt template is version-controlled in code
 /// Style customizations applied via field collections (stored in database)
 /// </summary>
-public class AnalysisPromptFactory : IAnalysisPromptFactory
+public sealed class AnalysisPromptFactory
 {
     private readonly ILogger<AnalysisPromptFactory> _logger;
 

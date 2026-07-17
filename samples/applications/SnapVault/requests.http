@@ -1,0 +1,24 @@
+@host = http://localhost:5086
+
+### Runtime readiness
+GET {{host}}/health/ready
+
+### Elected providers, capabilities, guarantees, and corrections
+GET {{host}}/.well-known/Koan/facts
+
+### Local studio totals
+GET {{host}}/api/photos/stats
+
+### First page of the photo library
+POST {{host}}/api/photosets/query
+Content-Type: application/json
+
+{
+  "definition": {
+    "context": "all-photos",
+    "sortBy": "capturedAt",
+    "sortOrder": "desc"
+  },
+  "startIndex": 0,
+  "count": 50
+}

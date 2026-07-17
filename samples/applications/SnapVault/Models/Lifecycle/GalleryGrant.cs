@@ -10,8 +10,8 @@ namespace SnapVault.Models;
 
 /// <summary>
 /// The fail-closed source of a guest's scoped access to one shareable SET (an <see cref="Event"/>). Minted when a
-/// guest accepts a <see cref="GalleryInvite"/>; consumed by the guest read-path hook to narrow every PhotoAsset read
-/// to the granted event(s) — the SEC-0004 "the grant IS the filter" model, realized on the WEB-0068 predicate rail.
+/// guest accepts a <see cref="GalleryInvite"/>; consumed by the guest read path to narrow every PhotoAsset read
+/// to the granted events. The grant itself is the filter.
 /// <para>
 /// [HostScoped] (like <c>Invite</c>/<c>Membership</c>) so it is resolvable from the read-path hook without an ambient
 /// studio tenant; <see cref="StudioTenantId"/> carries the scope explicitly. Revocation is immediate — the hook
@@ -53,6 +53,6 @@ public sealed class GalleryGrant : Entity<GalleryGrant>
     /// <summary>Deterministic id — one grant per (guest, event) so a re-accept converges instead of duplicating.
     /// INVARIANT: <paramref name="eventId"/> MUST be a globally-unique, delimiter-free id (a GUID) — it becomes the
     /// <c>"event:&lt;id&gt;"</c> access-scope token, so a slug/email would break both the (guest,event) uniqueness and
-    /// the SEC-0008 scope-token contract (U+001F carrier join + the <c>"event:"</c> prefix; a GUID contains neither).</summary>
+    /// access-scope token contract (U+001F carrier join plus the <c>"event:"</c> prefix; a GUID contains neither).</summary>
     public static string KeyFor(string identityId, string eventId) => DeterministicId.From(identityId, eventId);
 }

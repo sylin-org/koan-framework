@@ -20,23 +20,16 @@ using SixLabors.ImageSharp.Metadata.Profiles.Exif;
 namespace SnapVault.Services;
 
 /// <summary>
-/// The greenfield ingest + AI pipeline (SnapVault step 5a). A thin service driven by the durable, tenant-carrying
-/// <c>PhotoProcessingJob</c>: storage → EXIF → daily-event → AI vision analysis → embedding, all in the studio
-/// that submitted the upload (ARCH-0100). Progress is reported through the <paramref name="reportProgress"/>
-/// callback the job wires to <c>ctx.Progress</c> — persisted to the jobs ledger, streamed to the browser by the
-/// step-4 SSE projection. No SignalR, no separate batch-tracker entity.
-///
-/// <para>Two deliberate changes from the legacy pipeline: (1) the 4 eager derivative entities are gone (step 3
-/// replaced them with on-demand <c>[MediaRecipe]</c>s), so the AI vision source is <b>re-sourced</b> by rendering
-/// the <c>gallery</c> recipe in-process from the single stored original; (2) embedding is attribute-driven
-/// (<c>[Embedding]</c> on <see cref="PhotoAsset"/>) — saving the enriched photo queues it.</para>
+/// Processes one studio upload through storage, EXIF extraction, daily-event organization, optional AI vision,
+/// and attribute-driven embedding. <see cref="PhotoProcessingJob"/> carries the studio context and persists
+/// progress; media recipes render from the single stored original when analysis needs a normalized image.
 /// </summary>
-internal sealed class PhotoProcessingService : IPhotoProcessingService
+public sealed class PhotoProcessingService
 {
     private readonly ILogger<PhotoProcessingService> _logger;
-    private readonly IAnalysisPromptFactory _promptFactory;
+    private readonly AnalysisPromptFactory _promptFactory;
 
-    public PhotoProcessingService(ILogger<PhotoProcessingService> logger, IAnalysisPromptFactory promptFactory)
+    public PhotoProcessingService(ILogger<PhotoProcessingService> logger, AnalysisPromptFactory promptFactory)
     {
         _logger = logger;
         _promptFactory = promptFactory;
@@ -203,7 +196,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             // Push the optional event narrowing DOWN into the vector query instead of post-filtering in memory:
             // EventId is stamped as filterable vector metadata at embed-write (VectorFilterableMetadata), so the
             // store returns a topK whose members ALL belong to the event — better recall than fetching a global
-            // topK and discarding the off-event ones. The SEC-0008 access scope is applied separately by the
+            // topK and discarding the off-event ones. The access scope is applied separately by the
             // scoped vector repository; this filter is operator narrowing, not the security boundary. An adapter
             // that can't push the filter throws, and the outer catch falls back to keyword search (which also
             // honors eventId), so the push-down never widens results. (Production-only: the unit harness has no
@@ -430,10 +423,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     }
 
     /// <summary>
-    /// Generate structured AI analysis for a photo using the vision model. The vision byte source is RE-SOURCED
-    /// (step-5 / spec §8-6): the legacy read a <c>PhotoGallery</c> derivative entity (now deleted) — here the
-    /// gallery recipe is rendered in-process from the single stored original, so the model sees the same 1200px
-    /// downscale without materializing a derivative.
+    /// Generate structured AI analysis from the gallery recipe rendered against the single stored original.
     /// </summary>
     private async Task GenerateDetailedDescription(PhotoAsset photo, string? analysisStyleId = null, CancellationToken ct = default)
     {
@@ -581,7 +571,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// Get or create the daily auto-event for the given date. Uses a DETERMINISTIC per-(tenant, day) id so that
     /// several ingest jobs racing on the same day (a bulk upload) CONVERGE on one row instead of each winning a
     /// check-then-create and minting a duplicate daily event. The id stays a globally-unique GUID (the tenant is
-    /// folded into the derivation) — required because <c>EventId</c> doubles as the SEC-0008 <c>event:&lt;id&gt;</c>
+    /// folded into the derivation) — required because <c>EventId</c> doubles as the <c>event:&lt;id&gt;</c>
     /// scope token, so a slug or a cross-studio-shared value would break isolation.
     /// </summary>
     private async Task<Event> GetOrCreateDailyEvent(DateTime date, CancellationToken ct)
@@ -675,7 +665,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
                 }
             }
 
-            // 2. Regenerate (replaces photo.AiAnalysis).
+            // Regenerate the unlocked portion of the analysis.
             await GenerateDetailedDescription(photo, analysisStyle, ct);
 
             // 3. Restore locked content.

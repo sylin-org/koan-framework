@@ -11,9 +11,8 @@ namespace SnapVault.Models;
 /// megabytes of image data must never land there. Staging to storage is also what a real pipeline does: the
 /// HTTP request returns fast and the bytes survive a process restart before processing completes.
 ///
-/// Tenant isolation is automatic: the data row is scoped by the ambient tenant and the blob key is prefixed
-/// with the tenant by the ScopedStorageService decorator (SnapVault Phase 1 / GAP C 0.4). The job runs in the
-/// submitter's rehydrated tenant (ARCH-0100), so it reads back its own studio's staged blob and no other's.
+/// Tenant isolation is automatic: Data scopes the row, Storage prefixes the blob, and Jobs restores the submitting
+/// studio before reading it.
 /// </summary>
 [StorageBinding(Profile = "cold", Container = "staging")]
 public sealed class UploadStaging : StorageEntity<UploadStaging>

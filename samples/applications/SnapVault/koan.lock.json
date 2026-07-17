@@ -11,10 +11,6 @@
       "version": "0.18"
     },
     {
-      "id": "Koan.AI.Connector.Ollama",
-      "version": "0.17"
-    },
-    {
       "id": "Koan.AI.Contracts",
       "version": "0.17"
     },
@@ -51,7 +47,7 @@
       "version": "0.17"
     },
     {
-      "id": "Koan.Data.Connector.Mongo",
+      "id": "Koan.Data.Connector.Sqlite",
       "version": "0.17"
     },
     {
@@ -59,15 +55,15 @@
       "version": "0.19"
     },
     {
+      "id": "Koan.Data.Relational",
+      "version": "0.17"
+    },
+    {
       "id": "Koan.Data.Vector",
       "version": "0.18"
     },
     {
       "id": "Koan.Data.Vector.Abstractions",
-      "version": "0.17"
-    },
-    {
-      "id": "Koan.Data.Vector.Connector.Weaviate",
       "version": "0.17"
     },
     {
@@ -111,10 +107,6 @@
       "version": "0.17"
     },
     {
-      "id": "Koan.Storage.Connector.S3",
-      "version": "0.17"
-    },
-    {
       "id": "Koan.Tenancy",
       "version": "0.17"
     },
@@ -124,10 +116,6 @@
     },
     {
       "id": "Koan.Web.Auth",
-      "version": "0.17"
-    },
-    {
-      "id": "Koan.Web.Auth.Connector.Google",
       "version": "0.17"
     },
     {
@@ -141,24 +129,12 @@
     {
       "id": "Koan.Web.Sse",
       "version": "0.17"
-    },
-    {
-      "id": "Koan.ZenGarden",
-      "version": "0.17"
-    },
-    {
-      "id": "Koan.ZenGarden.Core",
-      "version": "0.17"
     }
   ],
   "directReferences": [
     {
       "kind": "project",
       "id": "Koan.AI"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.AI.Connector.Ollama"
     },
     {
       "kind": "project",
@@ -174,7 +150,7 @@
     },
     {
       "kind": "project",
-      "id": "Koan.Data.Connector.Mongo"
+      "id": "Koan.Data.Connector.Sqlite"
     },
     {
       "kind": "project",
@@ -187,10 +163,6 @@
     {
       "kind": "project",
       "id": "Koan.Data.Vector.Abstractions"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Data.Vector.Connector.Weaviate"
     },
     {
       "kind": "project",
@@ -226,10 +198,6 @@
     },
     {
       "kind": "project",
-      "id": "Koan.Storage.Connector.S3"
-    },
-    {
-      "kind": "project",
       "id": "Koan.Tenancy"
     },
     {
@@ -242,10 +210,6 @@
     },
     {
       "kind": "project",
-      "id": "Koan.Web.Auth.Connector.Google"
-    },
-    {
-      "kind": "project",
       "id": "Koan.Web.Auth.Connector.Test"
     },
     {
@@ -255,10 +219,6 @@
     {
       "kind": "project",
       "id": "Koan.Web.Sse"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.ZenGarden"
     }
   ]
 }

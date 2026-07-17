@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: semantic portfolio and eight graduated outcomes passed; SnapVault graduation active; CustomerCanon remains; R08-05 paused
+  scope: semantic portfolio and nine graduated outcomes passed; CustomerCanon assessment next; R08-05 paused
 ---
 
 # Koan V1 reorganization current handoff
@@ -91,13 +91,12 @@ Replace this file at every handoff. It is a restart point, not a diary.
   gone. GardenCoop Chapter 2 is a strict runnable superset of Chapter 1, while OpenGraph's automatic web-pipeline
   contribution lets DevPortal own the Article social-card story without changing its four-line host.
 - Focused retained evidence is green: OpenGraph 39/39, DevPortal 1/1, GardenCoop C1 1/1, GardenCoop C2 1/1,
-  LocalChecklist 1/1, TaskGraph 5 pass plus 2 intentional skips, OrderIntake 1/1, and SnapVault 33/33. CustomerCanon
+  LocalChecklist 1/1, TaskGraph 5 pass plus 2 intentional skips, OrderIntake 1/1, and SnapVault 34/34. CustomerCanon
   retains a zero-warning build. The public truth gate passes across 174 current files and 36 navigation targets.
-- `OrderIntake` is now graduated curriculum: one bounded named-source workload, durable receipt, exact cleanup,
-  corrective optional infrastructure, and participation-owned readiness. [R10-10](work-items/r10/R10-10-snapvault.md)
-  is active: SnapVault's 33/33 domain suite earns preservation, while its perimeter is being rebuilt around a
-  zero-infrastructure SQLite/local-storage path and participation-owned optional Vector readiness. `CustomerCanon`
-  remains visible application dogfood and must still graduate or be removed.
+- [R10-10](work-items/r10/R10-10-snapvault.md) passes. SnapVault is a local-first photo studio with SQLite/local
+  storage, durable HTTP ingest, media serving, scoped client sharing, optional AI/vector enrichment, and
+  participation-owned readiness. Its strict build, 34/34 focused suite, manual startup, facts, docs, and clean stop
+  agree. `CustomerCanon` remains visible application dogfood and must still graduate or be removed.
 - No package, tag, GitHub Release, branch, or remote configuration was published or mutated. Initial coherent
   public observation and a later real public-to-candidate upgrade/rollback remain separate gates.
 
@@ -120,13 +119,13 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Complete the active SnapVault graduation:
+Assess `CustomerCanon` using the same evidence-first graduate-or-remove standard:
 
-1. make Vector connector readiness follow actual provider participation rather than package presence;
-2. make SnapVault's default Development composition SQLite/local-storage and prove one real HTTP photo ingest;
-3. align code comments, errors, facts, README, requests, and optional-provider boundaries as greenfield truth;
-4. graduate SnapVault only when its command, business result, focused suite, readiness, and clean stop agree;
-5. assess `CustomerCanon` afterward using the same graduate-or-remove standard;
+1. state its one business result and inspect the shortest checked-in path, providers, facts, and focused proof;
+2. identify framework defects and coalescence opportunities before changing application code;
+3. preserve only business surfaces that earn their complexity; rebuild or remove unsupported perimeter claims;
+4. graduate it only when code, command, result, proof, documentation, readiness, and clean stop agree;
+5. then run the single appropriate R10 portfolio boundary and decide whether R10 can pass;
 6. keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared but do not mutate remote settings,
    push, tag, release, or publish until R10 reaches its portfolio boundary and authorization is renewed.
 

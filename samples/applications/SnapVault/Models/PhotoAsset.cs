@@ -8,12 +8,10 @@ using Koan.Data.Access;
 namespace SnapVault.Models;
 
 /// <summary>
-/// Full-resolution photo asset with complete metadata (stored in cold tier for cost optimization)
+/// One stored photo original plus its capture, organization, enrichment, and studio-interaction metadata.
 /// </summary>
 [StorageBinding(Profile = "cold", Container = "photos")]
-// Model MUST match the query-side embed model in PhotoProcessingService.SemanticSearch (same model = same vector
-// space). nomic-embed-text is a dedicated embedding model — distinct from the vision chat model (Ollama DefaultModel),
-// since one Ollama model can't both see images and embed text.
+// Stored and query embeddings must use the same vector space.
 [Embedding(
     Policy = EmbeddingPolicy.AllStrings,
     Async = true,
@@ -21,11 +19,7 @@ namespace SnapVault.Models;
     Version = 2,
     Model = "nomic-embed-text",
     Exclude = ["EventId", "InferredStyleId"])]
-// SEC-0008 data-layer access scoping: a CONSTRAINED subject (an invited guest) sees only photos whose EventId is in
-// their "event:<id>" scope tokens — fail-closed on an absent subject. Studio operators run Subject.Unconstrained,
-// ingest/AI jobs Subject.System(). Enforced on EVERY read (controller, service, job, SSE), not just the endpoint.
-// INVARIANT: EventId must be a delimiter-free, globally-unique id (a GUID) — it is BOTH the scoped field and (as
-// "event:<id>") the scope token; a slug/email would reintroduce cross-studio collisions and token-splits.
+// A constrained client sees only photos whose globally unique EventId appears in an "event:<id>" grant.
 [AccessScoped("EventId", "event:")]
 public class PhotoAsset : MediaEntity<PhotoAsset>
 {
@@ -55,16 +49,12 @@ public class PhotoAsset : MediaEntity<PhotoAsset>
     public List<string> AutoTags { get; set; } = new();
     public AiAnalysis? AiAnalysis { get; set; } // Structured AI analysis (tags, summary, facts)
 
-    // Smart mode classification cache (avoids repeated classification API calls).
-    // [Parent] makes this a navigable relationship for Relatives. Two caveats for the step-5 relatives surface:
-    // PhotoAsset now has TWO parents (Event + AnalysisStyle), so callers must use GetParent<AnalysisStyle>() (the
-    // non-generic GetParent() throws on multiple parents); and AnalysisStyle is [HostScoped] while PhotoAsset is
-    // tenant-scoped — validate cross-scope resolution + nullable (no inference yet) handling when that nav lands.
+    // Smart-mode classification cache. Callers name the parent type because PhotoAsset has two parents.
     [Parent(typeof(AnalysisStyle))]
     public string? InferredStyleId { get; set; } // FK to AnalysisStyle (detected style)
     public DateTime? InferredAt { get; set; } // When classification was performed
 
-    // Vector for semantic search (no attribute needed - framework detects float[] automatically)
+    // Koan recognizes float[] as the semantic-search vector.
     public float[]? Embedding { get; set; }
 
     // User interactions
@@ -75,9 +65,6 @@ public class PhotoAsset : MediaEntity<PhotoAsset>
     // Processing
     public ProcessingStatus ProcessingStatus { get; set; } = ProcessingStatus.Pending;
 
-    // Embedding text extraction handled by framework via [Embedding(Policy=AllStrings)].
-    // All public string properties (excluding Id, EventId, InferredStyleId) are included by convention.
-    // AiAnalysis, AutoTags, DetectedObjects contribute via their string representations.
 }
 
 public class GpsCoordinates

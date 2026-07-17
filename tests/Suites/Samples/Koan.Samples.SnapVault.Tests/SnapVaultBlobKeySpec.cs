@@ -51,7 +51,7 @@ public sealed class SnapVaultBlobKeySpec
     [Fact(DisplayName = "blob-key: two same-named uploads land on distinct blobs, each serving its own bytes; a partial delete is sibling-safe")]
     public async Task Same_named_uploads_do_not_collide()
     {
-        var processing = _fx.Host.Services.GetRequiredService<IPhotoProcessingService>();
+        var processing = _fx.Host.Services.GetRequiredService<PhotoProcessingService>();
         var studio = "studio-" + Stamp();
         const string sharedName = "IMG_1234.jpg";
 

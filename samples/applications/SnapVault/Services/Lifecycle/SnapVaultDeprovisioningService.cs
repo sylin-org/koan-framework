@@ -15,7 +15,7 @@ namespace SnapVault.Services;
 /// removes the studio <c>Membership</c>, emits a verifiable receipt) with the SnapVault domain purge (all the client's
 /// <see cref="GalleryGrant"/>s + <see cref="ProofSelection"/>s in the studio) and emits a chained
 /// <see cref="ClientErasureCertificate"/>. The guest's PhotoAsset reads fail closed the instant the grants are gone
-/// (the SEC-0008 access axis) — request-path enforcement + the proof, never a write-only flag.
+/// through the access axis: request-path enforcement plus proof, never a write-only flag.
 /// </summary>
 public sealed class SnapVaultDeprovisioningService
 {

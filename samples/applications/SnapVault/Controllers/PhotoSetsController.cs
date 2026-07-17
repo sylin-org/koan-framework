@@ -5,7 +5,7 @@ using SnapVault.Services;
 namespace SnapVault.Controllers;
 
 /// <summary>
-/// PhotoSet session API (UI endpoint #5) — the one endpoint behind the windowed grid + lightbox navigation. First
+/// PhotoSet session API behind the windowed grid and lightbox navigation. The first
 /// call sends a definition and gets a sessionId; later calls reuse it to window on demand. Reads inherit the ambient
 /// access + tenancy axes (a studio operator is unconstrained within their tenant).
 /// </summary>

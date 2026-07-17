@@ -36,7 +36,7 @@ public sealed class SnapVaultMutationSpec
     private T Svc<T>() where T : notnull => _fx.Host.Services.GetRequiredService<T>();
     private static string Stamp() => Guid.NewGuid().ToString("n").Substring(0, 8);
 
-    private PhotosController Photos() => new(Svc<PhotoSetService>(), Svc<IPhotoProcessingService>());
+    private PhotosController Photos() => new(Svc<PhotoSetService>(), Svc<PhotoProcessingService>());
 
     [Fact(DisplayName = "delete cleanup: removing a photo evicts its cached renders and prunes it from collections")]
     public async Task Delete_evicts_renders_and_prunes_collections()

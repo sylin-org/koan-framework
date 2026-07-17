@@ -6,17 +6,15 @@ using SnapVault.Models;
 namespace SnapVault.Services;
 
 /// <summary>
-/// PhotoSet session management — on-demand query execution, no id snapshots (scales to millions of photos). A
-/// session stores the query definition; each range request re-materializes just that window. Ported verbatim from
-/// the legacy service; reads inherit the SEC-0008 access axis + tenant isolation (a studio operator is
-/// unconstrained within their tenant; a guest would be event-scoped).
+/// On-demand photo-set sessions store a query definition rather than an id snapshot. Reads inherit tenant and
+/// access isolation: an operator is unconstrained within one studio, while a guest is event-scoped.
 /// </summary>
 public sealed class PhotoSetService
 {
-    private readonly IPhotoProcessingService _processingService;
+    private readonly PhotoProcessingService _processingService;
     private readonly ILogger<PhotoSetService> _logger;
 
-    public PhotoSetService(IPhotoProcessingService processingService, ILogger<PhotoSetService> logger)
+    public PhotoSetService(PhotoProcessingService processingService, ILogger<PhotoSetService> logger)
     {
         _processingService = processingService;
         _logger = logger;
@@ -48,8 +46,7 @@ public sealed class PhotoSetService
         => ExecuteQueryWithPagination(session.Context, session.CollectionId, session.EventId, session.SearchQuery,
             session.SearchAlpha ?? 0.5, session.SortBy, session.SortOrder, startIndex, count, ct);
 
-    /// <summary>Materialize the FULL ordered set for a definition (no windowing) — used to locate a photo's index
-    /// within a browsing context (#4). Reuses the same context routing/sort, so index and grid stay consistent.</summary>
+    /// <summary>Materialize the full ordered context used to locate a photo for lightbox navigation.</summary>
     public Task<List<PhotoAsset>> MaterializeContext(PhotoSetDefinition def, CancellationToken ct = default)
         => ExecuteQueryWithPagination(def.Context, def.CollectionId, def.EventId, def.SearchQuery,
             def.SearchAlpha ?? 0.5, def.SortBy, def.SortOrder, 0, int.MaxValue, ct);
@@ -99,9 +96,8 @@ public sealed class PhotoSetService
     {
         switch (context)
         {
-            // Fetch the (tenant + access-scoped) set, sort GLOBALLY, then window. The legacy paginated in provider
-            // order then sorted only the fetched page — a per-page sort that isn't a global sort. Sample-scale
-            // fetch-then-sort is correct + simple; a production version would push the sort into the query (the
+            // Fetch the tenant- and access-scoped set, sort globally, then window. Sample-scale fetch-then-sort is
+            // correct and simple; a production version would push the sort into the query (the
             // default capturedAt??createdAt coalesce is what makes that non-trivial).
             case "all-photos":
                 var allItems = (await PhotoAsset.All(ct)).ToList();

@@ -21,7 +21,7 @@ public sealed record GalleryAcceptResult(InviteAcceptOutcome Outcome, GalleryGra
 /// The studio↔client gallery lifecycle. A studio invites a client (by email) to ONE event's gallery; the client
 /// accepts while signed in — proving verified-email ownership via the shipped invite-binds-to-identity primitive
 /// (<see cref="InviteAcceptanceService"/>) — which mints a <see cref="GalleryGrant"/>, the fail-closed source the
-/// SEC-0008 access axis reads to scope the guest's photo reads to that event. Nothing bespoke: the identity binding is
+/// access axis reads to scope the guest's photo reads to that event. The identity binding is
 /// the framework primitive; the read scoping is the data-layer access axis.
 /// </summary>
 public sealed class GalleryInviteService

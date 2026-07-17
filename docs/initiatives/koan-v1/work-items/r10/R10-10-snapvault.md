@@ -8,14 +8,14 @@ last_updated: 2026-07-17
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
-  status: in-progress
+  status: passed
   scope: local-first composition, participation-owned vector readiness, studio-to-client proof, public sample truth
 ---
 
 # R10-10 — Graduate SnapVault as the local-first studio proof
 
 - Tranche: `T7B — active-sample graduation`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R10-09 semantic sample portfolio; R10-07 participation-owned Data readiness
 - Unlocks: final active-application assessment (`CustomerCanon`)
 - Owner: one local-first photo-studio result with optional AI/vector enrichment and fail-closed client access
@@ -218,15 +218,46 @@ one visible runtime decision; it does not change the application grammar.
 6. Run the focused Vector owner tests, SnapVault 33-test suite plus the new cumulative cell, strict sample build,
    docs/public truth gates, diff/privacy checks, then add SnapVault to the public complete-application table.
 
+## Outcome
+
+SnapVault is graduated public curriculum. Its checked-in Development composition boots in about one second with
+SQLite and local storage, requires no external service, and presents one meaningful browser path from upload to a
+durably processed and served photo. AI and vector semantics remain in the business code while provider mechanisms
+are opt-in by reference; an unavailable enrichment never invalidates the photo-studio result.
+
+The application perimeter is smaller and more truthful: external-first provider references, Docker launchers,
+production-shaped configuration, duplicate host ceremony, unsupported HEIC claims, three stale request fragments,
+and two one-implementation service interfaces are gone. One current README and `requests.http` explain the local
+result, optional enrichment, runtime inspection, and production boundary. Current source comments describe domain
+contracts rather than the rebuild sequence.
+
+The cumulative TestServer proof uses the same SQLite/local-storage shape as the application, uploads a generated
+JPEG over real multipart HTTP, drains its durable Job, verifies the resulting event and photo, serves original and
+gallery media, and checks readiness and facts. The existing tenant, guest, proofing, mutation, progress, blob, media,
+AI/vector-degradation, and cleanup contracts remain green under that consolidated host.
+
 ## Verification
 
 - Focused tests: Vector participation/health owner cells; SnapVault cumulative default-host cell; existing SnapVault
-  suite (currently 33/33, zero skips).
+  suite (34/34 including the new cell, zero skips).
 - Broader regression: only connector builds/tests directly affected by the shared Vector health base.
 - Documentation: public-doc truth gate, docs lint with zero new errors, sample README/request/source agreement.
 - Manual/observable proof: one `dotnet run` to local ready state and one photo ingest; optional browser proofing only
   if it adds evidence not already covered by the HTTP/contract suite.
 - Privacy: no private dogfood name, machine path, credential, personal identity, or external application reference.
+
+## Verification result
+
+- Vector participation/readiness proof passed 4/4; Qdrant, Weaviate, and Milvus strict connector builds passed.
+- SnapVault strict Release build passed with zero warnings and zero errors.
+- SnapVault passed 34/34 in one consolidated real Koan host with SQLite and in-memory vector isolation.
+- Manual default startup reached healthy readiness and complete facts in about one second; the actual process stopped
+  cleanly after the local path was exercised.
+- Public documentation truth passed across 174 current files and 36 navigation targets. Structural docs lint reports
+  zero errors; the repository's existing warning backlog remains non-gating.
+- `git diff --check` and the privacy boundary passed; no ADR, package, tag, release, branch, or remote setting changed.
+
+R10-10 therefore passes. Assess `CustomerCanon` next using the same graduate-or-remove standard.
 
 ## Stop conditions
 
@@ -237,4 +268,3 @@ one visible runtime decision; it does not change the application grammar.
 - If the client flow requires external identity infrastructure in Development, narrow the public first result to
   local ingest and keep the already-proved lifecycle as an advanced contract; do not invent a fake production claim.
 - Do not publish, push, tag, release, or mutate remote configuration in this card.
-

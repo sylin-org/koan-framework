@@ -7,13 +7,13 @@ using Koan.Data.Core.Model;
 namespace SnapVault.Models;
 
 /// <summary>
-/// SEC-0007 P5 / SEC-0008 — the studio↔client engagement bookend: a tamper-evident, verifiable proof that a client's
+/// The studio-to-client engagement bookend: tamper-evident, verifiable proof that a client's
 /// gallery access was atomically removed. It CHAINS the shipped tenancy <c>DeprovisioningReceipt</c> (id + its content
 /// hash) and records the domain purge (grants + proof selections). "Atomic" = complete-or-fail-closed: the guest's
-/// PhotoAsset reads fail closed the instant the <c>GalleryGrant</c> rows are gone (the SEC-0008 axis re-reads grants
+/// PhotoAsset reads fail closed the instant the <c>GalleryGrant</c> rows are gone because the access axis re-reads grants
 /// per request) — this cert is the PROOF, not the enforcement. <c>IAmbientExempt</c>: a global artifact that survives
-/// the tenant/relationship it concerns. Tamper-evident via a SHA-256 content hash; a future asymmetric signature
-/// (SEC-0001 Phase 3) is a non-breaking upgrade of <see cref="SignatureAlgorithm"/>.
+/// the tenant/relationship it concerns. A SHA-256 content hash makes the certificate tamper-evident; a future
+/// asymmetric signature can extend <see cref="SignatureAlgorithm"/>.
 /// </summary>
 public sealed class ClientErasureCertificate : Entity<ClientErasureCertificate>, IAmbientExempt
 {

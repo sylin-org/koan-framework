@@ -6,11 +6,7 @@ using SnapVault.Services.AI;
 namespace SnapVault.Controllers;
 
 /// <summary>
-/// #20 — the active analysis-style library that populates the reroll split-button. A read-only projection of the
-/// seeded (<c>[HostScoped]</c>, platform-shared) styles ordered by priority; the SPA reads <c>id</c>/<c>label</c>/
-/// <c>icon</c> (falling back to <c>name</c>, which the projection maps to <c>label</c>). Deliberately minimal —
-/// SnapVault seeds the styles at boot and there is no studio-facing style CRUD in this phase (custom per-studio
-/// styles are a later scope; see <see cref="AnalysisStyle"/>'s remarks).
+/// Read-only projection of the shared, seeded analysis-style library ordered for the application UI.
 /// </summary>
 [ApiController]
 [Route("api/analysis-styles")]

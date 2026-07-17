@@ -10,26 +10,21 @@ using SnapVault.Models;
 namespace SnapVault.Controllers;
 
 /// <summary>
-/// Collections surface. An <see cref="EntityController{Collection}"/> gives list (#23), get (#24), create (#25 —
-/// the inherited <c>Upsert</c>) and delete (#27) for free; rename (#26) and add/remove membership (#28/#29) are
-/// custom because the SPA uses <c>PUT</c> for rename and dedicated <c>{id}/photos</c> routes. Pagination is
-/// <b>Off</b> so the sidebar reads the full list as a bare array. Membership is the ordered <c>PhotoIds</c> list
-/// (Active Record, no junction table). Isolation rides the ambient tenant axis (a studio sees only its own
-/// collections — proven by the tenancy spec).
+/// Operator-managed photo collections. EntityController supplies ordinary CRUD; custom actions rename a collection
+/// and maintain its ordered photo membership. Pagination is off because the sidebar consumes the complete list.
 ///
-/// <para>#28's capacity error message MUST contain the word "limit": the SPA greps the error text to raise its
-/// "collection full" toast (a UI contract, verified by the mutation spec).</para>
+/// <para>The capacity error includes <c>limit</c>, which is part of the UI error contract.</para>
 /// </summary>
 [Route("api/collections")]
 [Pagination(Mode = PaginationMode.Off)]
-[OperatorOnly]   // Collections are only tenant-scoped (not [AccessScoped]); the whole surface is operator-managed
+[OperatorOnly]
 public sealed class CollectionsController : EntityController<Collection>
 {
     private readonly CollectionOptions _options;
 
     public CollectionsController(IOptions<CollectionOptions> options) => _options = options.Value;
 
-    /// <summary>#26 — rename. EntityController exposes no <c>{id}</c> PUT, so this is purely additive.</summary>
+    /// <summary>Rename a collection.</summary>
     [HttpPut("{id}")]
     public async Task<IActionResult> Rename(string id, [FromBody] RenameCollectionRequest request, CancellationToken ct = default)
     {
@@ -46,7 +41,7 @@ public sealed class CollectionsController : EntityController<Collection>
         return Ok(new { collection.Id, collection.Name, photoCount = collection.PhotoCount });
     }
 
-    /// <summary>#28 — add photos (deduped against current membership, capped, existence-verified).</summary>
+    /// <summary>Add existing photos, deduplicated and bounded by collection capacity.</summary>
     [HttpPost("{id}/photos")]
     public async Task<IActionResult> AddPhotos(string id, [FromBody] CollectionPhotosRequest request, CancellationToken ct = default)
     {
@@ -84,7 +79,7 @@ public sealed class CollectionsController : EntityController<Collection>
         return Ok(new { collectionId = collection.Id, added = toAdd.Count, totalPhotos = collection.PhotoCount, limit = _options.MaxPhotosPerCollection });
     }
 
-    /// <summary>#29 — remove photo references (the photos themselves are untouched).</summary>
+    /// <summary>Remove photo references without deleting the photos.</summary>
     [HttpPost("{id}/photos/remove")]
     public async Task<IActionResult> RemovePhotos(string id, [FromBody] CollectionPhotosRequest request, CancellationToken ct = default)
     {

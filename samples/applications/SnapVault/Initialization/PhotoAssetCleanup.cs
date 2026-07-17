@@ -7,16 +7,15 @@ using SnapVault.Models;
 namespace SnapVault.Initialization;
 
 /// <summary>
-/// Structural delete-cleanup for <see cref="PhotoAsset"/> (SnapVault §9.7 tripwire). Registered ONCE at boot as a
+/// Structural delete cleanup for <see cref="PhotoAsset"/>. Registered once at boot as a
 /// data-layer <c>AfterRemove</c> lifecycle hook, so it fires on EVERY delete path — bulk delete today, client
 /// deprovisioning tomorrow — instead of being remembered per-controller (conformity-by-design). Two best-effort
-/// cleanups, both "storage-cleanliness, never a serving leak": the SEC-0008 access gate precedes the derivation
+/// cleanups, both "storage cleanliness, never a serving leak": the access gate precedes the derivation
 /// cache (<see cref="MediaEntitySource{TEntity}"/> resolves the source before any cached render), so an
 /// un-evicted render is already unreachable.
 /// <list type="number">
 /// <item>Reclaim this photo's own stored original blob. Only safe because ingest keys each blob by a fresh
-/// <c>StringId</c> (not the fileName), so no sibling can share the key — the fix that turned a per-controller
-/// "whole-tenant wipe only" caveat into a structural, every-path reclaim (§9.7).</item>
+/// <c>StringId</c> rather than the file name, so no sibling can share the key.</item>
 /// <item>Evict this source's cached recipe renders (<see cref="MediaDerivation"/>) — record <b>and</b> blob.
 /// Targeted by <c>SourceMediaId</c>, not the framework's probe-if-orphaned sweep (which the default
 /// <c>MediaEntitySource</c> leaves a no-op); targeting also cannot false-positive a still-live but access-gated

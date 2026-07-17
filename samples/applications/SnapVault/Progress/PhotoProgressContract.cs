@@ -1,15 +1,12 @@
 namespace SnapVault.Progress;
 
 /// <summary>
-/// The upload-progress wire contract (SnapVault D4). These are the two Server-Sent Event payloads the browser's
-/// <c>EventSource</c> consumes on <c>GET /api/photos/progress/{batchId}</c> — the SSE replacement for the old
-/// SignalR <c>PhotoProgress</c> / <c>JobCompleted</c> hub messages. Field names are the same the legacy client
-/// read (serialized camelCase), so the visual monitor is unchanged; only the transport moved from a stateful hub
-/// to a stateless read-projection of the durable jobs ledger.
+/// Server-Sent Event payloads projected from the durable Jobs ledger for
+/// <c>GET /api/photos/progress/{batchId}</c>.
 /// </summary>
 public sealed record PhotoProgressEvent
 {
-    /// <summary>The upload batch id (what the browser subscribed to) — the legacy <c>job:{jobId}</c> group key.</summary>
+    /// <summary>The upload batch to which the browser subscribed.</summary>
     public string JobId { get; init; } = "";
 
     /// <summary>The processing work-item id (the <c>PhotoProcessingJob</c> id) — the STABLE per-file key. Distinct
@@ -28,7 +25,7 @@ public sealed record PhotoProgressEvent
     public string Status { get; init; } = "";
 
     /// <summary>The fine-grained stage (see <see cref="PhotoProcessingStage"/>) carried by the ledger's
-    /// <c>ProgressMessage</c>; the rebuilt ingest pipeline emits it via <c>ctx.Progress(fraction, stage)</c> (step 5).</summary>
+    /// <c>ProgressMessage</c>, emitted by the ingest job through <c>ctx.Progress(fraction, stage)</c>.</summary>
     public string Stage { get; init; } = "";
 
     /// <summary>The ledger's <c>LastError</c> when the job failed; null otherwise.</summary>
@@ -50,10 +47,7 @@ public sealed record JobCompletionEvent
 }
 
 /// <summary>
-/// The stage vocabulary the ingest pipeline reports through <c>ctx.Progress(fraction, stage)</c> — the durable,
-/// tenant-scoped progress the SSE projection reads straight off the ledger. Named here in step 4 as the contract;
-/// the rebuilt <c>ProcessUpload</c> emits these in step 5 (the emit points live inside the pipeline, which is why
-/// they can't run before the ingest service is registered). The UI maps each to a friendly label.
+/// The stage vocabulary emitted by the ingest job and projected from its tenant-scoped durable ledger.
 /// </summary>
 public static class PhotoProcessingStage
 {

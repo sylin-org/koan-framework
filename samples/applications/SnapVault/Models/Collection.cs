@@ -18,8 +18,7 @@ public class Collection : Entity<Collection>
     public string Name { get; set; } = "";
 
     /// <summary>
-    /// Active Record pattern: Array of photo IDs (replaces junction table)
-    /// Photos can belong to multiple collections (many-to-many)
+    /// Ordered photo IDs. A photo may belong to multiple collections.
     ///
     /// IMPORTANT: List index = display position for photos
     /// To reorder: PhotoIds.RemoveAt(oldIndex); PhotoIds.Insert(newIndex, photoId);

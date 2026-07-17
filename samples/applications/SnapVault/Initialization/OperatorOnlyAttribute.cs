@@ -6,14 +6,14 @@ using Microsoft.AspNetCore.Mvc.Filters;
 namespace SnapVault.Initialization;
 
 /// <summary>
-/// SnapVault step 5e — the STUDIO-OPERATOR floor. Once the guest subject is live (an invited client with a
-/// constrained <see cref="Subject"/>), the studio's management surface must refuse them: writes are not gated by the
-/// SEC-0008 access axis (it is a read axis), and Event/Collection are only tenant-scoped (not <c>[AccessScoped]</c>),
+/// The studio-operator floor. Once the guest subject is live (an invited client with a constrained
+/// <see cref="Subject"/>), the studio's management surface must refuse them: Event and Collection are tenant-scoped,
+/// not <c>[AccessScoped]</c>,
 /// so the ambient tenant alone would let a guest list every event or DELETE the studio's photos. This filter admits
 /// only an <b>unconstrained</b> subject (a studio operator; the tenant axis still isolates them) and refuses a guest
 /// (constrained) or a subject-less request with 403. Applied to the operator controllers wholesale, and to the
-/// studio write/aggregate actions on the mixed <c>PhotosController</c>; the guest's own surface (proofing writes,
-/// access-scoped gallery reads) is deliberately NOT gated by it.
+/// studio write and aggregate actions on the mixed <c>PhotosController</c>. Guest proofing writes and access-scoped
+/// gallery reads deliberately do not carry this filter.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public sealed class OperatorOnlyAttribute : Attribute, IAuthorizationFilter

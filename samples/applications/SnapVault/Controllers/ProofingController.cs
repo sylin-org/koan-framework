@@ -10,12 +10,10 @@ using SnapVault.Services;
 namespace SnapVault.Controllers;
 
 /// <summary>
-/// The invited-guest proofing surface (SnapVault step 5e) + the studio's client-selections read. The GUEST-WRITE
-/// FLOOR is the security-critical piece: a mark is authorized against the guest's own <see cref="GalleryGrant"/>,
+/// Invited-client proofing and the studio's client-selection read. A mark is authorized against the client's own <see cref="GalleryGrant"/>,
 /// and every scope id (event, studio) is derived SERVER-SIDE from the ambient subject + the photo — never from the
 /// caller. The photo is loaded under the guest's constrained subject, so a cross-set photo id resolves to null (the
-/// SEC-0008 access axis) and is refused before any write. This is the "granted-but-not-enforced" defect the §9.7
-/// tripwire named: the grant's permissions and the read scope must BOTH gate the write, not just the read.
+/// access axis) and is refused before any write. Grant permissions and read scope both gate the write.
 /// </summary>
 [ApiController]
 [Route("api/proofing")]

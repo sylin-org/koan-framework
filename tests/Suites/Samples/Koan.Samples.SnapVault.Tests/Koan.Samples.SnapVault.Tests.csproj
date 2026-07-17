@@ -7,7 +7,9 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.8" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <PrivateAssets>all</PrivateAssets>
@@ -16,14 +18,12 @@
     <PackageReference Include="AwesomeAssertions" Version="9.4.0" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The Phase-1 isolation flagship: a real AddKoan() boot of the SnapVault sample (ARCH-0079) proving
-         tenant isolation across data, the async job, and vector search — all in-memory (no Docker). -->
+    <!-- One real web-capable AddKoan() boot proves the local SQLite application plus in-memory vector isolation. -->
     <ProjectReference Include="..\..\..\..\samples\applications\SnapVault\SnapVault.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Tenancy\Koan.Tenancy.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Jobs\Koan.Jobs.csproj" />
-    <!-- In-memory adapters so the flagship runs in plain `dotnet test` with no containers. -->
-    <ProjectReference Include="..\..\..\..\src\Connectors\Data\InMemory\Koan.Data.Connector.InMemory.csproj" />
+    <!-- In-memory vector search keeps semantic-isolation proof local; application records use SQLite. -->
     <ProjectReference Include="..\..\..\..\src\Connectors\Data\Vector\InMemory\Koan.Data.Vector.Connector.InMemory.csproj" />
   </ItemGroup>
 </Project>

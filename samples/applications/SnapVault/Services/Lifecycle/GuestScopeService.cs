@@ -12,8 +12,8 @@ namespace SnapVault.Services;
 public sealed record GuestAccess(IReadOnlyList<string> Scopes, string StudioTenantId);
 
 /// <summary>
-/// Resolves an invited guest's ambient access scope from their active <see cref="GalleryGrant"/>s — the SEC-0008
-/// snapshot-at-the-edge. The grant table is read UN-constrained (grants aren't <c>[AccessScoped]</c> — that is the
+/// Resolves an invited guest's ambient access scope from active <see cref="GalleryGrant"/>s at the request edge.
+/// The grant table is read unconstrained (grants aren't <c>[AccessScoped]</c> — that is the
 /// recursion guard), and the resulting <c>"event:&lt;id&gt;"</c> tokens become the constrained <see cref="Subject"/>
 /// the access axis reads to scope every PhotoAsset read to the guest's granted events (in services, jobs, and SSE).
 /// In the HTTP path an <c>AfterAuthentication</c> middleware calls this once per guest request; the lifecycle spec
@@ -38,7 +38,7 @@ public sealed class GuestScopeService
     /// grants (i.e. they are not a guest — a revoked client resolves to null and fails closed, never an operator).
     /// A guest with galleries across multiple studios resolves to ONE studio deterministically (their earliest grant)
     /// and ONLY that studio's scope tokens — so no cross-studio token rides in the ambient Subject; the tenant axis
-    /// isolates cleanly and a per-studio selection is a 5f concern.
+    /// isolates cleanly. A future studio picker may make that selection explicit.
     /// </summary>
     public async Task<GuestAccess?> ResolveGuestAsync(string personId, CancellationToken ct = default)
     {
