@@ -83,6 +83,17 @@ Inventory the package surface:
 dotnet run --project tools/Koan.Packaging -- inventory --output artifacts/release/inventory.json
 ```
 
+Compile the current package-product assessment without changing release state:
+
+```powershell
+dotnet run --project tools/Koan.Packaging -- quality `
+  --output docs/reference/package-quality.json `
+  --markdown docs/reference/package-quality.md
+```
+
+The generated status reports structural repairs and review signals; it does not infer product maturity
+or replace the R11 keep/merge/split/rename/retire decision.
+
 The normal release instruction is only:
 
 ```text

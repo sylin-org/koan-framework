@@ -59,6 +59,53 @@ internal static class PackagingConstants
         };
     }
 
+    public static class PackageQuality
+    {
+        public const int Schema = 1;
+        public const string Source = "evaluated-msbuild-package-graph";
+        public const string AssessmentDate = "2026-07-17";
+        public const string RepairRequiredStatus = "repair-required";
+        public const string ReviewRequiredStatus = "review-required";
+        public const string StructurallyReadyStatus = "structurally-ready";
+        public const string ErrorSeverity = "error";
+        public const string WarningSeverity = "warning";
+        public const string EntryRole = "entry";
+        public const string FoundationRole = "foundation";
+        public const string ContractsRole = "contracts";
+        public const string ProviderRole = "provider";
+        public const string ProjectionRole = "projection";
+        public const string CapabilityRole = "capability";
+        public const int TerseDescriptionCharacters = 60;
+        public const string CanonicalIcon = "icon.png";
+
+        public static readonly IReadOnlySet<string> HistoricalUniversalTags = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase)
+        {
+            "aspnetcore", "cqrs", "ddd", "messaging", "data", "opentelemetry"
+        };
+
+        public static class Findings
+        {
+            public const string MissingDescription = "metadata.description.missing";
+            public const string TerseDescription = "metadata.description.terse";
+            public const string MissingTags = "metadata.tags.missing";
+            public const string GenericTags = "metadata.tags.generic";
+            public const string MissingProjectUrl = "metadata.project-url.missing";
+            public const string MissingRepository = "metadata.repository.missing";
+            public const string MissingLicense = "metadata.license.missing";
+            public const string MissingTargetFramework = "metadata.target-framework.missing";
+            public const string GenericReleaseNotes = "metadata.release-notes.generic";
+            public const string MissingIcon = "identity.icon.missing";
+            public const string NonCanonicalIcon = "identity.icon.noncanonical";
+            public const string MissingOwnedReadme = "docs.readme.owned.missing";
+            public const string MissingPackageTitle = "docs.readme.package-title.missing";
+            public const string MissingInstall = "docs.readme.install.missing";
+            public const string MissingMeaningfulUse = "docs.readme.meaningful-use.missing";
+            public const string MissingBoundaries = "docs.readme.boundaries.missing";
+            public const string MissingTechnical = "docs.technical.missing";
+        }
+    }
+
     public static class TemplatePackage
     {
         public const string PackageId = "Sylin.Koan.Templates";

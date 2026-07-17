@@ -12,6 +12,19 @@ The safe read-only diagnostic is:
 dotnet run --project tools/Koan.Packaging -- inventory
 ```
 
+Package-product structure and review signals are compiled from that same evaluated graph:
+
+```powershell
+dotnet run --project tools/Koan.Packaging -- quality `
+  --output docs/reference/package-quality.json `
+  --markdown docs/reference/package-quality.md
+```
+
+`quality` is read-only. It derives artifact shape and presentation role from standard project facts,
+checks package-owned orientation and shared metadata, and emits stable corrective findings. Its
+`structurally-ready` state is not a graduation, maturity, or support claim; R11 architecture, prose,
+and clean-consumer evidence remain separate acceptance cells.
+
 The canonical public product surface is compiled from evaluated .NET/NuGet project facts and the
 irreducible maturity judgments in `product/claims.json`:
 

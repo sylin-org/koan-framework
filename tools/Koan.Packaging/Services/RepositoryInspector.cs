@@ -157,7 +157,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             "dotnet",
             [
                 "msbuild", project, "-nologo",
-                "-getProperty:IsPackable,PackageId,PackageType,TargetFramework,TargetFrameworks,PackAsTool,IsRoslynComponent,IncludeBuildOutput,SuppressDependenciesWhenPacking,IncludeSymbols,PackageReadmeFile,Description,PackageTags",
+                "-getProperty:IsPackable,PackageId,PackageType,TargetFramework,TargetFrameworks,PackAsTool,IsRoslynComponent,IncludeBuildOutput,SuppressDependenciesWhenPacking,IncludeSymbols,PackageReadmeFile,Description,PackageTags,PackageIcon,PackageProjectUrl,RepositoryUrl,PackageLicenseExpression,PackageReleaseNotes",
                 $"-getItem:ProjectReference,None,{PackagingConstants.PackageInputItemName}", "-p:PublicRelease=true"
             ],
             repositoryRoot,
@@ -298,12 +298,18 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             ReadString(properties, "Description") ?? string.Empty,
             ReadString(properties, "PackageTags") ?? string.Empty,
             references,
-            sharedInputs.Order(StringComparer.OrdinalIgnoreCase).ToArray());
+            sharedInputs.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
+            ReadString(properties, "PackageIcon"),
+            ReadString(properties, "PackageProjectUrl"),
+            ReadString(properties, "RepositoryUrl"),
+            ReadString(properties, "PackageLicenseExpression"),
+            ReadString(properties, "PackageReleaseNotes"));
     }
 
     private static IReadOnlyList<string> ReadFrameworks(JsonElement properties)
     {
-        var value = ReadString(properties, "TargetFrameworks") ?? ReadString(properties, "TargetFramework");
+        var value = ReadString(properties, "TargetFrameworks");
+        if (string.IsNullOrWhiteSpace(value)) value = ReadString(properties, "TargetFramework");
         return string.IsNullOrWhiteSpace(value)
             ? []
             : value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

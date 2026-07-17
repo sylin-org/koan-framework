@@ -120,6 +120,7 @@ claim.
 - [Product constitution](docs/architecture/product-constitution.md)
 - [Entity semantics contract](docs/architecture/entity-semantics-contract.md)
 - [Current capability and package surface](docs/reference/product-surface.md)
+- [Current package-quality assessment](docs/reference/package-quality.md)
 - [Troubleshooting](docs/support/troubleshooting.md)
 
 Architecture decision records are retained as dated decisions. For current product behavior, prefer

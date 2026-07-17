@@ -66,7 +66,7 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
             .OrderBy(project => project.PackageId, StringComparer.OrdinalIgnoreCase)
             .Select(project => new ProductPackage(
                 project.PackageId,
-                ShapeOf(project, graph),
+                PackageClassifier.ShapeOf(project, graph),
                 project.Description,
                 project.TargetFrameworks,
                 graph.PackageDependenciesOf(project.PackageId),
@@ -211,17 +211,6 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
         string.IsNullOrWhiteSpace(value)
             ? throw new InvalidOperationException($"Product {field} is required.")
             : value.Trim();
-
-    private static string ShapeOf(PackageProject project, PackageGraph graph)
-    {
-        var packageTypes = project.PackageType.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (packageTypes.Contains("Template", StringComparer.OrdinalIgnoreCase)) return "template";
-        if (project.PackAsTool) return "tool";
-        if (project.IsRoslynComponent) return "analyzer";
-        if (!project.IncludeBuildOutput && graph.PackageDependenciesOf(project.PackageId).Count > 0) return "bundle";
-        if (!project.IncludeBuildOutput) return "content";
-        return "library";
-    }
 
     private bool IsWithinRepository(string path)
     {

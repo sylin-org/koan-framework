@@ -18,6 +18,19 @@ inventory, so local build history cannot change release intent.
 The human signal is a compatibility-tier change in `version.json`. Before 1.0, a minor advance is
 breaking; from 1.0 onward, a major advance is breaking.
 
+## Package-product quality projection
+
+`PackageQualityCompiler` consumes the same `PackageProject` inventory and `PackageGraph`; it owns no
+package list or release state. Standard artifact shape is centralized in `PackageClassifier` and
+shared with `ProductSurfaceCompiler`. Semantic presentation roles derive from ordinary package names,
+shape, and graph facts. An ambiguous role is an R11 package-boundary finding, not permission to add a
+parallel role attribute.
+
+The compiler reads only evaluated metadata and package-owned companion files. Its findings distinguish
+objective errors from human-review signals; heading detection cannot promote prose quality, maturity,
+or support. JSON and Markdown order are deterministic. The `quality` command performs no lineage,
+version, pack, registry, release, or remote operation.
+
 ## Durable lineage
 
 Release events serialize before version calculation. The compiler starts at the previous durable

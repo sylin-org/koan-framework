@@ -41,6 +41,8 @@
   items:
     - name: Product and package surface
       href: reference/product-surface.md
+    - name: Package quality
+      href: reference/package-quality.md
     - name: Core and composition
       href: reference/core/index.md
     - name: Entity data

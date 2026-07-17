@@ -52,9 +52,11 @@ completed composition architecture in the [parent](work-items/R09-semantic-compo
 [backlog](R09-BACKLOG.md), [coalescence inventory](R09-COALESCENCE-INVENTORY.md), and closing
 [single-module handoff](work-items/r09/R09-09-one-bootstrap-language-and-release-handoff.md).
 R08-01 preserves the completed Git-driven exact release-wave baseline; R08-01 through R08-04 pass locally and
-R08-05's public-observation contract is prepared. The active
-[R10 golden-sample graduation](work-items/R10-golden-samples.md) now ensures the maintained curriculum teaches
-and executes the rebuilt architecture before that first public wave. See [NOW.md](NOW.md).
+R08-05's public-observation contract is prepared. The completed
+[R10 golden-sample graduation](work-items/R10-golden-samples.md) ensures the maintained curriculum teaches
+and executes the rebuilt architecture. The active
+[R11 package-product graduation](work-items/R11-package-product-quality.md) now ensures every surviving NuGet
+package earns and proves a distinct reference intent before that first public wave. See [NOW.md](NOW.md).
 Small design and polish debts deliberately kept out of the active acceptance path live in the
 [`POST-CYCLE-TODO.md`](POST-CYCLE-TODO.md) register with their required decisions and evidence.
 
@@ -95,7 +97,8 @@ R00 privacy boundary
                                   -> R09 semantic composition kernel
                                       -> remaining R08 release readiness
                                           -> R10 golden sample graduation
-                                              -> R08 public observation and V1 decision
+                                              -> R11 package-product graduation
+                                                  -> R08 public observation and V1 decision
 ```
 
 Later implementation cards are created only when the active parent and preceding evidence establish

@@ -159,4 +159,6 @@ describe the same framework.
 - public claims are generated from or linked to repository evidence;
 - experimental surfaces cannot be mistaken for foundation;
 - every maintained sample has graduated golden-example evidence or an explicit non-maintained disposition;
+- every active NuGet package earns a distinct reference intent, package-owned orientation, truthful metadata,
+  and role-proportional consumer evidence or has a terminal merge/split/rename/retire disposition;
 - the architect makes an explicit V1 release decision.

@@ -17,4 +17,9 @@ internal sealed record PackageProject(
     string Description,
     string PackageTags,
     IReadOnlyList<string> ProjectReferences,
-    IReadOnlyList<string> SharedInputs);
+    IReadOnlyList<string> SharedInputs,
+    string? PackageIcon = null,
+    string? PackageProjectUrl = null,
+    string? RepositoryUrl = null,
+    string? PackageLicenseExpression = null,
+    string? PackageReleaseNotes = null);

@@ -19,6 +19,7 @@ internal static class PackagingProgram
             var registry = new NuGetRegistry(http);
             var repository = new RepositoryInspector(root, process);
             var productSurfaceCompiler = new ProductSurfaceCompiler(root);
+            var packageQualityCompiler = new PackageQualityCompiler(root);
             var lineageCompiler = new ReleaseLineageCompiler(root, process, repository);
             var planner = new ReleasePlanner(repository, registry, productSurfaceCompiler);
             var pipeline = new PackagePipeline(root, process, registry);
@@ -27,6 +28,30 @@ internal static class PackagingProgram
 
             switch (command)
             {
+                case "quality":
+                {
+                    var packages = await repository.DiscoverPackagesAsync(cancellationToken);
+                    var report = packageQualityCompiler.Compile(packages);
+                    var output = options.Value("output");
+                    await WriteOutputAsync(
+                        output,
+                        PackageQualityCompiler.ToJson(report).TrimEnd(),
+                        cancellationToken);
+                    var markdown = options.Value("markdown");
+                    if (markdown is not null)
+                    {
+                        await WriteOutputAsync(
+                            markdown,
+                            PackageQualityCompiler.ToMarkdown(report).TrimEnd(),
+                            cancellationToken);
+                    }
+                    var status = $"quality    {report.Summary.Packages} package(s), " +
+                                 $"{report.Summary.RepairRequired} repair, " +
+                                 $"{report.Summary.ReviewRequired} review, " +
+                                 $"{report.Summary.StructurallyReady} structurally ready";
+                    if (output is null) Console.Error.WriteLine(status); else Console.WriteLine(status);
+                    return 0;
+                }
                 case "product-surface":
                 {
                     var packages = await repository.DiscoverPackagesAsync(cancellationToken);
@@ -215,6 +240,7 @@ internal static class PackagingProgram
         Koan package release compiler
 
           inventory [--output PATH]
+          quality   [--output PATH] [--markdown PATH]
           product-surface [--output PATH] [--markdown PATH]
           lineage   [--source GIT] [--previous-source GIT] [--previous-lineage GIT] [--branch NAME] [--output PATH]
           materialize-lineage --version-commit GIT [--output PATH]

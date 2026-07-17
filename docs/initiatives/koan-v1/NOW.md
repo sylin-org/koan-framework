@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: R10 portfolio passed; package polish requested before exact R08-05 candidate
+  scope: R11-01 passed; R11-02 exact package topology dispositions
 ---
 
 # Koan V1 reorganization current handoff
@@ -104,6 +104,20 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - The final R10 boundary builds all ten published applications with zero warnings/errors. Eight sample-owned suites
   pass 45 tests with 2 intentional TaskGraph skips and no failures. Public truth passes across 178 current files and
   36 navigation targets; the product surface contains 15 claims and 109 packages.
+- [R11 — Graduate the NuGet product surface](work-items/R11-package-product-quality.md) is active by architect
+  approval. A package is now treated as a product promise: every survivor must earn a distinct reference intent,
+  explain its smallest meaningful result, and pass role-proportional artifact, documentation, consumer, operator,
+  and agent evidence before the exact R08-05 candidate.
+- [R11-01](work-items/r11/R11-01-quality-contract-and-compiler.md) is passed. `Koan.Packaging` remains the one
+  evaluated package owner; the new read-only quality projection derives roles and objective repair signals without
+  project attributes, a maintained package list, release mutation, or a support promotion. R11-02 will hold only
+  irreducible keep/merge/split/rename/retire judgments.
+- The real baseline contains all 109 packages exactly once: 37 require objective repair, 72 require review, none is
+  inferred graduated, 73 own a README, and 63 have technical companions. JSON/Markdown regenerate byte-for-byte;
+  11 focused compiler cells and the warning-clean packaging-tool Release build pass. R11-02's opening matrix contains
+  the same 109 identities exactly once in temporary `assess` state.
+- R11-01 also corrected one shared evaluated-facts defect: empty `TargetFrameworks` previously hid every normal
+  project's single `TargetFramework`. Both generated references now report the actual target for all 109 packages.
 - No package, tag, GitHub Release, branch, or remote configuration was published or mutated. Initial coherent
   public observation and a later real public-to-candidate upgrade/rollback remain separate gates.
 
@@ -126,10 +140,9 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Perform the architect-requested package-polish review before creating the exact R08-05 candidate. Assess package
-names, responsibility boundaries, descriptions, tags, dependency graphs, owned README/TECHNICAL pairs, installation
-paths, generated product-surface presentation, and retirement/rename consequences. Make any approved corrections
-before the one final release-certification run so certified artifacts are not invalidated afterward.
+Execute [R11-02](work-items/r11/R11-02-package-topology-inventory.md) in dependency/user-value order. Begin with the
+foundation and entry package family; replace temporary `assess` rows with evidenced keep/merge/split/rename/retire
+decisions before changing shared metadata or writing package prose.
 
 Keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared. Do not mutate remote settings, push,
 tag, release, or publish until package polish is accepted and separate remote-operation authorization is renewed.
@@ -138,7 +151,7 @@ Do not call the proven local feed a public upgrade. It is exact candidate eviden
 
 ## Validation economy
 
-- Start every R08 slice with focused exploration and coalescence assessment.
+- Start every R11 family slice with focused exploration and coalescence assessment.
 - Run only the named owner/consumer, package, documentation, and security cells during implementation.
 - Run the complete public-release ratchet only at an explicit release-certification boundary.
 
