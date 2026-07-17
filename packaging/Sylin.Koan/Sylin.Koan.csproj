@@ -2,7 +2,6 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <PackageId>Sylin.Koan</PackageId>
-    <KoanPackageKind>Bundle</KoanPackageKind>
     <PackageType>Dependency</PackageType>
     <Description>Tested Koan foundation bundle: core runtime, Entity data, local Communication, and the JSON connector.</Description>
     <PackageTags>$(CommonPackageTags);bundle;data;communication;transport;json</PackageTags>

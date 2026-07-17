@@ -21,7 +21,7 @@ curl http://localhost:5000/api/todos                                   # [{ "id"
 On startup Koan prints a self-describing boot report — it *is* your confirmation that everything wired up. You'll see your data adapter, the auto-mapped controllers, and health at a glance (illustrative):
 
 ```
-Koan  v0.17.x  (pre-1.0)
+Koan  <resolved package version>
   Data         sqlite (Default)                         [OK]
   Web          controllers auto-mapped                  [OK]
                EntityController<Todo> -> /api/todos

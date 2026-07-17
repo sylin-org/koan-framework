@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "bootstrap-startup-reporting",
+      "title": "Bootstrap, discovery, and startup reporting",
+      "summary": "AddKoan composes referenced capabilities and reports the resulting runtime decisions.",
+      "maturity": "demonstrated",
+      "packages": ["Sylin.Koan.App"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "samples/FirstUse"]
+    },
+    {
+      "id": "entity-data-semantics",
+      "title": "Entity<T> data semantics and context",
+      "summary": "Entities expose provider-bounded persistence, query, paging, streaming, and ambient context semantics.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Data.Abstractions", "Sylin.Koan.Data.Core"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "tests/Suites/Data"]
+    },
+    {
+      "id": "backend-negotiation",
+      "title": "Backend discovery and negotiation",
+      "summary": "Referenced adapters participate in capability-aware selection with inspectable decisions and corrective rejection.",
+      "maturity": "demonstrated",
+      "packages": ["Sylin.Koan.Data.Core"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "tests/Suites/Data"]
+    },
+    {
+      "id": "web-api-conventions",
+      "title": "Web/API conventions",
+      "summary": "Entity controllers expose business-readable HTTP APIs through framework conventions.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Web"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "tests/Suites/Web"]
+    },
+    {
+      "id": "entity-communication",
+      "title": "Entity Events and Transport",
+      "summary": "Entities and entity sequences express local-first events and transport intent with pluggable routing.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Communication", "Sylin.Koan.Communication.Connector.RabbitMq"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "tests/Suites/Communication"]
+    },
+    {
+      "id": "jobs-scheduling",
+      "title": "Jobs and scheduling",
+      "summary": "Applications declare and observe in-process work and schedules through Koan job semantics.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Jobs"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Jobs"]
+    },
+    {
+      "id": "cache-distributed-state",
+      "title": "Cache and distributed state",
+      "summary": "Typed cache semantics work across local and external engines within their stated topology limits.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Cache"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Cache"]
+    },
+    {
+      "id": "media-processing",
+      "title": "Media processing and serving",
+      "summary": "Media recipes describe transformation and HTTP-serving behavior over storage-backed assets.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Media.Core", "Sylin.Koan.Media.Web"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Media.Core"]
+    },
+    {
+      "id": "ai-vector-semantics",
+      "title": "AI, vector, and semantic capabilities",
+      "summary": "AI and vector modules add semantic model capabilities while external provider lifecycles remain experimental.",
+      "maturity": "experimental",
+      "packages": ["Sylin.Koan.AI", "Sylin.Koan.Data.Vector"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.AI", "src/Koan.Data.Vector"]
+    },
+    {
+      "id": "mcp-agent-surface",
+      "title": "MCP and agent-facing surfaces",
+      "summary": "Koan exposes application tools and self-description to coding and runtime agents through MCP.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Mcp"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Mcp"]
+    },
+    {
+      "id": "authentication-authorization",
+      "title": "Authentication and authorization",
+      "summary": "Identity and web authorization compose through referenced modules while external providers require separate proof.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Identity", "Sylin.Koan.Web.Auth"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Identity", "src/Koan.Web.Auth"]
+    },
+    {
+      "id": "testing-local-infrastructure",
+      "title": "Testing and local infrastructure",
+      "summary": "Koan supplies bounded test hosts and container-backed local infrastructure for focused conformance.",
+      "maturity": "demonstrated",
+      "packages": ["Sylin.Koan.Testing", "Sylin.Koan.Testing.Containers", "Sylin.Koan.Testing.Hosting"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "tests/Suites"]
+    },
+    {
+      "id": "packaging-installation-upgrades",
+      "title": "Packaging, installation, and upgrades",
+      "summary": "Independent package versioning and templates are specified, but public installation coherence is not yet certified.",
+      "maturity": "specified",
+      "packages": ["Sylin.Koan.Templates"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md", "tools/Koan.Packaging/README.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "tests/Koan.Packaging.Tests"]
+    },
+    {
+      "id": "operations-diagnostics",
+      "title": "Operations, health, and diagnostics",
+      "summary": "Runtime facts, health, startup reporting, and observability expose bounded operational decisions.",
+      "maturity": "demonstrated",
+      "packages": ["Sylin.Koan.Observability"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Observability"]
+    }
+  ]
+}

@@ -313,7 +313,6 @@ public sealed class ReleaseWaveBundleTests
                         PackageId = "Sylin.Koan.Test",
                         Version = "1.2.3",
                         ProjectPath = "src/Koan.Test/Koan.Test.csproj",
-                        Kind = "Package",
                         Reason = PackagingConstants.VersionChangedReason,
                         IncludeSymbols = true,
                         PackageFile = PackageFileName,

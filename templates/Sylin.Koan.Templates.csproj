@@ -21,6 +21,7 @@
     <IncludeContentInPack>true</IncludeContentInPack>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <IncludeSymbols>false</IncludeSymbols>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <ContentTargetFolders>content</ContentTargetFolders>
     <NoDefaultExcludes>true</NoDefaultExcludes>
     <!-- NU5128: content-only package has no lib/ or dependencies — expected for a template pack. -->
@@ -28,10 +29,32 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="koan-web\**\*;koan-console\**\*" Exclude="**\bin\**;**\obj\**" />
+    <Content Include="koan-web\**\*;koan-console\**\*"
+             Exclude="**\bin\**;**\obj\**"
+             Condition="'$(KoanPreparedTemplateRoot)' == ''" />
+    <Content Include="$(KoanPreparedTemplateRoot)\koan-web\**\*"
+             Exclude="**\bin\**;**\obj\**"
+             PackagePath="content\koan-web"
+             Condition="'$(KoanPreparedTemplateRoot)' != ''" />
+    <Content Include="$(KoanPreparedTemplateRoot)\koan-console\**\*"
+             Exclude="**\bin\**;**\obj\**"
+             PackagePath="content\koan-console"
+             Condition="'$(KoanPreparedTemplateRoot)' != ''" />
     <Compile Remove="**\*" />
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="TECHNICAL.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\packaging\Sylin.Koan\Sylin.Koan.csproj" />
+    <ProjectReference Include="..\packaging\Sylin.Koan.App\Sylin.Koan.App.csproj" />
+    <ProjectReference Include="..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
+  </ItemGroup>
+
+  <Target Name="KoanRequirePreparedTemplateContent" BeforeTargets="GenerateNuspec">
+    <Error Condition="'$(KoanPreparedTemplateRoot)' == ''"
+           Text="Koan template packaging requires release-compiled package ranges. Use Koan.Packaging pack; direct dotnet pack would ship unresolved package intent." />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Nerdbank.GitVersioning" Version="3.9.50" PrivateAssets="all" />

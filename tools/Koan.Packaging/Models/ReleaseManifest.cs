@@ -25,7 +25,6 @@ internal sealed class ReleasePackage
     public required string Version { get; init; }
     public string? PreviousVersion { get; init; }
     public required string ProjectPath { get; init; }
-    public required string Kind { get; init; }
     public required string Reason { get; init; }
     public List<string> BreakingRoots { get; init; } = [];
     public bool LineageMarkerGenerated { get; init; }

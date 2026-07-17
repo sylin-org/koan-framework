@@ -1,6 +1,6 @@
 # Sylin.Koan.Templates
 
-`dotnet new` templates for the [Koan Framework](https://github.com/sylin-org/Koan-framework) — go from zero to a running app in one command.
+`dotnet new` templates for the [Koan Framework](https://github.com/sylin-org/Koan-framework) — create a running, durable Entity application without choosing or aligning package versions.
 
 ## Install
 
@@ -24,4 +24,4 @@ dotnet run
 # -> GET http://localhost:5000/api/todos
 ```
 
-The generated project references the `Sylin.Koan.*` meta-packages (`Sylin.Koan.App` for web, `Sylin.Koan` for console) — adding a package reference is the only "wiring"; the framework auto-registers everything (Reference = Intent).
+The generated project references the `Sylin.Koan.*` meta-packages (`Sylin.Koan.App` for web, `Sylin.Koan` for console) — adding a package reference is the only "wiring"; the framework auto-registers everything (Reference = Intent). Each template release carries compatibility ranges compiled from the package family it was proved against; there is no version prompt or repair step.

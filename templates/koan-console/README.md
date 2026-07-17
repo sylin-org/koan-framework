@@ -19,7 +19,7 @@ open todos:
 
 | File | What it is |
 |---|---|
-| `Program.cs` | `new ServiceCollection().StartKoan()` boots the framework (loads `appsettings.json`, runs discovery, sets the ambient host), then `Save` / `Get` / `Query` over the `Todo` entity. |
+| `Program.cs` | `using var app = new ServiceCollection().StartKoan()` starts and owns Koan's standard Generic Host lifecycle (configuration, discovery, local capabilities, health, graceful shutdown), then `Save` / `Get` / `Query` over the `Todo` entity. |
 | `Todo.cs` | `Entity<Todo>` — GUID v7 id auto-generated on `Save()`; static `Get`/`Query`/`All` + instance `Save`/`Remove` come from the base. |
 | `appsettings.json` | Sqlite is the default data source (`Data Source=./app.db`). |
 

@@ -15,6 +15,13 @@ internal sealed class PackagePipeline(
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     private static readonly Guid SourceLinkKind = new("CC110556-A091-4D38-9FEC-25AB9A351A6A");
+    private readonly CleanRoomApplicationCompiler applicationCompiler = new(processRunner);
+    private static readonly string[] RequiredCoreBuildAssetPackagePaths =
+    [
+        PackagingConstants.CoreCompositionTargetPackagePath,
+        PackagingConstants.CoreSemanticActivationTargetPackagePath,
+        PackagingConstants.CoreRegistryGeneratorPackagePath
+    ];
 
     public async Task PackAndVerifyAsync(
         ReleaseManifest manifest,
@@ -38,17 +45,37 @@ internal sealed class PackagePipeline(
             if (artifact is null)
             {
                 Console.WriteLine($"pack   {package.PackageId} {package.Version}");
-                await processRunner.RequireAsync(
-                    "dotnet",
-                    [
+                PreparedTemplatePackage? preparedTemplate = null;
+                try
+                {
+                    var arguments = new List<string>
+                    {
                         "pack", package.ProjectPath, "-c", "Release", "--nologo",
                         "-p:PublicRelease=true", "-p:NuGetAudit=true", "-p:NuGetAuditMode=all",
                         "-p:NuGetAuditLevel=high", "-p:WarningsAsErrors=NU1903%3BNU1904",
                         "-o", outputDirectory
-                    ],
-                    repositoryRoot,
-                    cancellationToken,
-                    echo: true);
+                    };
+                    if (string.Equals(
+                            package.PackageId,
+                            PackagingConstants.TemplatePackage.PackageId,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        preparedTemplate = await new TemplatePackageCompiler(repositoryRoot).PrepareAsync(
+                            await ResolveTemplateVersionsAsync(manifest, cancellationToken),
+                            cancellationToken);
+                        arguments.Add($"-p:KoanPreparedTemplateRoot={preparedTemplate.Root}");
+                    }
+                    await processRunner.RequireAsync(
+                        "dotnet",
+                        arguments,
+                        repositoryRoot,
+                        cancellationToken,
+                        echo: true);
+                }
+                finally
+                {
+                    preparedTemplate?.Dispose();
+                }
 
                 artifact = FindPackage(outputDirectory, package.PackageId, package.Version)
                     ?? throw new InvalidOperationException($"Pack succeeded but {package.Identity} was not produced.");
@@ -80,6 +107,21 @@ internal sealed class PackagePipeline(
         await VerifyClosureAsync(manifest, cancellationToken);
         if (cleanRoom) await VerifyCleanRoomAsync(manifest, outputDirectory, cancellationToken);
         await RequireCleanPackageInputsAsync(cancellationToken);
+    }
+
+    private async Task<IReadOnlyDictionary<string, string>> ResolveTemplateVersionsAsync(
+        ReleaseManifest manifest,
+        CancellationToken cancellationToken)
+    {
+        var versions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var packageId in PackagingConstants.TemplatePackage.RequiredPackageIds)
+        {
+            versions[packageId] = manifest.Packages.FirstOrDefault(package =>
+                                      string.Equals(package.PackageId, packageId, StringComparison.OrdinalIgnoreCase))
+                                  ?.Version
+                              ?? await registry.GetLatestStableVersionAsync(packageId, cancellationToken);
+        }
+        return versions;
     }
 
     public static async Task SaveManifestAsync(ReleaseManifest manifest, string path, CancellationToken cancellationToken)
@@ -116,36 +158,23 @@ internal sealed class PackagePipeline(
     }
 
     internal static bool IsExpectedCompatibilityBand(string range)
-    {
-        var value = range.Replace(" ", string.Empty, StringComparison.Ordinal);
-        if (!value.StartsWith("[", StringComparison.Ordinal) ||
-            !value.EndsWith(")", StringComparison.Ordinal)) return false;
-        var parts = value[1..^1].Split(',', StringSplitOptions.TrimEntries);
-        if (parts.Length != 2 ||
-            !Version.TryParse(parts[0], out var minimum) ||
-            !Version.TryParse(parts[1], out var maximum) ||
-            minimum.Build < 0 || maximum.Build < 0) return false;
-        var expectedMaximum = minimum.Major == 0
-            ? new Version(0, minimum.Minor + 1, 0)
-            : new Version(minimum.Major + 1, 0, 0);
-        return maximum == expectedMaximum;
-    }
+        => PackageCompatibility.TryParseRange(range, out _);
 
     internal static void ValidateRequiredBuildAssets(string packageId, string packagePath)
     {
         if (!string.Equals(packageId, PackagingConstants.CorePackageId, StringComparison.OrdinalIgnoreCase)) return;
 
         using var archive = ZipFile.OpenRead(packagePath);
-        if (archive.Entries.Any(entry => string.Equals(
-                entry.FullName,
-                PackagingConstants.CoreCompositionTargetPackagePath,
-                StringComparison.OrdinalIgnoreCase)))
+        var packageEntries = archive.Entries
+            .Select(entry => entry.FullName)
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var requiredPath in RequiredCoreBuildAssetPackagePaths)
         {
-            return;
-        }
+            if (packageEntries.Contains(requiredPath)) continue;
 
-        throw new InvalidOperationException(
-            $"{packageId} is missing required transitive build asset '{PackagingConstants.CoreCompositionTargetPackagePath}'.");
+            throw new InvalidOperationException(
+                $"{packageId} is missing required transitive build asset '{requiredPath}'.");
+        }
     }
 
     internal async Task VerifyClosureAsync(ReleaseManifest manifest, CancellationToken cancellationToken)
@@ -219,7 +248,14 @@ internal sealed class PackagePipeline(
         var sqliteVersion = await EnsureRootPackageAsync(manifest, "Sylin.Koan.Data.Connector.Sqlite", feed, cancellationToken);
         var mcpVersion = await EnsureRootPackageAsync(manifest, "Sylin.Koan.Mcp", feed, cancellationToken);
         var jobsVersion = await EnsureRootPackageAsync(manifest, "Sylin.Koan.Jobs", feed, cancellationToken);
-        Console.WriteLine($"prove   application packages app={appVersion} sqlite={sqliteVersion} jobs={jobsVersion} mcp={mcpVersion}");
+        var templateVersion = await EnsureRootPackageAsync(
+            manifest,
+            PackagingConstants.TemplatePackage.PackageId,
+            feed,
+            cancellationToken);
+        Console.WriteLine(
+            $"prove   application packages app={appVersion} sqlite={sqliteVersion} jobs={jobsVersion} " +
+            $"mcp={mcpVersion} templates={templateVersion}");
         await HydrateClosureAsync(feed, cancellationToken);
         var nugetConfig = Path.Combine(root, "NuGet.Config");
         await File.WriteAllTextAsync(nugetConfig, NuGetConfig(feed, globalPackages), cancellationToken);
@@ -234,23 +270,35 @@ internal sealed class PackagePipeline(
 
         try
         {
-            await RestoreAndBuildCleanRoomApplicationAsync(
+            var templatePackage = FindPackage(feed, PackagingConstants.TemplatePackage.PackageId, templateVersion)
+                ?? throw new InvalidOperationException(
+                    $"Clean-room feed does not contain {PackagingConstants.TemplatePackage.PackageId}/{templateVersion}.");
+            await new TemplatePackageProbe(processRunner).VerifyAsync(
+                templatePackage,
+                root,
+                nugetConfig,
+                cancellationToken);
+            Console.WriteLine($"proved  package-first web and console templates from {Path.GetFileName(templatePackage)}");
+
+            await applicationCompiler.RestoreAndBuildAsync(
                 firstUseApp,
                 PackagingConstants.FirstUse.ProjectFile,
                 nugetConfig,
                 packageProperties,
-                cancellationToken);
+                environment: null,
+                cancellationToken: cancellationToken);
             var firstUseEvidence = await new FirstUseApplicationProbe().RunBuiltAsync(firstUseApp, "package", cancellationToken);
             var firstUseEvidencePath = EvidencePath(artifactDirectory, PackagingConstants.FirstUse.EvidenceFileName);
             await WriteEvidenceAsync(firstUseEvidencePath, firstUseEvidence, cancellationToken);
             Console.WriteLine($"proved  FirstUse package path in {firstUseEvidence.TotalSeconds:0.000}s; evidence={firstUseEvidencePath}");
 
-            await RestoreAndBuildCleanRoomApplicationAsync(
+            await applicationCompiler.RestoreAndBuildAsync(
                 goldenJourneyApp,
                 PackagingConstants.GoldenJourney.ProjectFile,
                 nugetConfig,
                 packageProperties,
-                cancellationToken);
+                environment: null,
+                cancellationToken: cancellationToken);
             var goldenJourneyEvidence = await new GoldenJourneyApplicationProbe().RunBuiltAsync(
                 goldenJourneyApp,
                 "package",
@@ -265,34 +313,6 @@ internal sealed class PackagePipeline(
         {
             try { Directory.Delete(root, recursive: true); } catch { }
         }
-    }
-
-    private async Task RestoreAndBuildCleanRoomApplicationAsync(
-        string applicationDirectory,
-        string projectFile,
-        string nugetConfig,
-        IReadOnlyCollection<string> packageProperties,
-        CancellationToken cancellationToken)
-    {
-        await processRunner.RequireAsync(
-            "dotnet",
-            new[]
-            {
-                "restore", projectFile, "--configfile", nugetConfig, "--no-cache", "--force-evaluate"
-            }.Concat(packageProperties).Concat(new[]
-            {
-                "-p:NuGetAuditMode=all", "-p:NuGetAuditLevel=high", "-p:WarningsAsErrors=NU1903%3BNU1904"
-            }),
-            applicationDirectory,
-            cancellationToken,
-            echo: true);
-        await processRunner.RequireAsync(
-            "dotnet",
-            new[] { "build", projectFile, "-c", "Release", "--no-restore", "--nologo" }
-                .Concat(packageProperties),
-            applicationDirectory,
-            cancellationToken,
-            echo: true);
     }
 
     private static string EvidencePath(string artifactDirectory, string fileName) =>

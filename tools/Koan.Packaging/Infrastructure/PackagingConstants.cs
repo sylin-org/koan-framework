@@ -13,6 +13,7 @@ internal static class PackagingConstants
     public const string BreakingRootReason = "breaking-root";
     public const string BreakingDependentReason = "breaking-dependent";
     public const string SharedPackageInputReason = "shared-package-input";
+    public const string PackageInputItemName = "KoanPackageInput";
     public const string LineageBootstrapReason = "lineage-bootstrap";
     public const string RegistryRepairReason = "unpublished-current-version";
     public const string NuGetSource = "https://api.nuget.org/v3/index.json";
@@ -20,6 +21,10 @@ internal static class PackagingConstants
     public const string PackagePrefix = "Sylin.Koan";
     public const string CorePackageId = "Sylin.Koan.Core";
     public const string CoreCompositionTargetPackagePath = "buildTransitive/Sylin.Koan.Core.targets";
+    public const string CoreSemanticActivationTargetPackagePath =
+        "buildTransitive/tools/Sylin.Koan.SemanticActivation.targets";
+    public const string CoreRegistryGeneratorPackagePath =
+        "buildTransitive/tools/Koan.Core.Registry.Generators.dll";
     public const string DefaultBeforeRevision = "HEAD~1";
     public const string DefaultAfterRevision = "HEAD";
     public const string MsBuildDisableNodeReuseEnvironmentVariable = "MSBUILDDISABLENODEREUSE";
@@ -28,8 +33,58 @@ internal static class PackagingConstants
     public const int PublishAttempts = 5;
     public const int RegistryAttempts = 20;
     public const int RegistryHttpAttempts = 5;
-    public const int ReleaseManifestSchema = 3;
+    public const int ReleaseManifestSchema = 4;
     public const int ReleaseLineageSchema = 3;
+
+    public static class ProductSurface
+    {
+        public const int Schema = 1;
+        public const string ClaimsPath = "product/claims.json";
+        public const string UnassessedMaturity = "unassessed";
+        public static readonly IReadOnlySet<string> Maturities = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "specified",
+            "demonstrated",
+            "experimental",
+            "verified",
+            "supported-extension",
+            "supported-foundation",
+            "deprecated",
+            "retired"
+        };
+        public static readonly IReadOnlySet<string> PromotedMaturities = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "supported-extension",
+            "supported-foundation"
+        };
+    }
+
+    public static class TemplatePackage
+    {
+        public const string PackageId = "Sylin.Koan.Templates";
+        public const string FoundationPackageId = "Sylin.Koan";
+        public const string AppPackageId = "Sylin.Koan.App";
+        public const string SqlitePackageId = "Sylin.Koan.Data.Connector.Sqlite";
+        public const string FoundationRangeToken = "__KOAN_FOUNDATION_RANGE__";
+        public const string AppRangeToken = "__KOAN_APP_RANGE__";
+        public const string SqliteRangeToken = "__KOAN_SQLITE_RANGE__";
+        public const string WebShortName = "koan-web";
+        public const string ConsoleShortName = "koan-console";
+        public const string WebProjectFile = "KoanWebApp.csproj";
+        public const string ConsoleProjectFile = "KoanConsoleApp.csproj";
+        public const string TodosPath = "api/todos";
+        public const string TodoTitle = "package-first works";
+        public const string TodoIdProperty = "id";
+        public const string TodoTitleProperty = "title";
+        public const string ConsoleLoadedResult = "loaded: buy milk";
+        public const string ConsoleQueryResult = "- buy milk";
+        public const string DotNetCliHomeEnvironmentVariable = "DOTNET_CLI_HOME";
+        public const string DotNetSkipFirstTimeExperienceEnvironmentVariable = "DOTNET_SKIP_FIRST_TIME_EXPERIENCE";
+        public const string DotNetTelemetryOptOutEnvironmentVariable = "DOTNET_CLI_TELEMETRY_OPTOUT";
+        public static readonly IReadOnlyList<string> SourceDirectories = ["koan-web", "koan-console"];
+        public static readonly IReadOnlyList<string> RequiredPackageIds =
+            [FoundationPackageId, AppPackageId, SqlitePackageId];
+    }
 
     public static class ReleaseWave
     {

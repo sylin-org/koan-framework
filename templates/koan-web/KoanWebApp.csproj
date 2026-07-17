@@ -9,8 +9,8 @@
   <ItemGroup>
     <!-- One reference brings the framework: Sylin.Koan.App = Koan core + Koan.Web.
          Sqlite is the data store for this template. Reference = Intent — no AddX() calls. -->
-    <PackageReference Include="Sylin.Koan.App" Version="0.17.*" />
-    <PackageReference Include="Sylin.Koan.Data.Connector.Sqlite" Version="0.17.*" />
+    <PackageReference Include="Sylin.Koan.App" Version="__KOAN_APP_RANGE__" />
+    <PackageReference Include="Sylin.Koan.Data.Connector.Sqlite" Version="__KOAN_SQLITE_RANGE__" />
   </ItemGroup>
 
 </Project>

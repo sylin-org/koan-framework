@@ -3,7 +3,10 @@ using Koan.Packaging.Infrastructure;
 
 namespace Koan.Packaging.Services;
 
-internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegistry registry)
+internal sealed class ReleasePlanner(
+    RepositoryInspector repository,
+    NuGetRegistry registry,
+    ProductSurfaceCompiler? productSurfaceCompiler = null)
 {
     public async Task<ReleaseManifest> CreateAsync(
         ReleaseLineage lineage,
@@ -25,6 +28,10 @@ internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegist
                 $"Release planning requires version commit {versionCommit}, but the checkout is {headCommit}.");
         }
         var projects = await repository.DiscoverPackagesAsync(cancellationToken);
+        if (productSurfaceCompiler is not null)
+        {
+            _ = await productSurfaceCompiler.CompileAsync(projects, cancellationToken);
+        }
         var graph = new PackageGraph(projects);
         var previousLineage = lineage.IsBootstrap
             ? null
@@ -147,7 +154,6 @@ internal sealed class ReleasePlanner(RepositoryInspector repository, NuGetRegist
                         Version = current,
                         PreviousVersion = previous,
                         ProjectPath = project.ProjectPath,
-                        Kind = project.Kind,
                         Reason = reason,
                         BreakingRoots = trigger?.BreakingRoots.ToList() ?? [],
                         LineageMarkerGenerated = markers.Contains(project.PackageId),

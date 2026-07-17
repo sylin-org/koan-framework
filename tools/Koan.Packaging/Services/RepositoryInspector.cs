@@ -9,6 +9,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
 {
     public async Task<IReadOnlyList<PackageProject>> DiscoverPackagesAsync(CancellationToken cancellationToken)
     {
+        var snapshot = new PackageDiscoverySnapshot(ReadTrackedRepositoryFilesAsync(cancellationToken));
         var roots = new[] { "src", "packaging" }
             .Select(path => Path.Combine(repositoryRoot, path))
             .Where(Directory.Exists);
@@ -32,7 +33,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             },
             async (project, ct) =>
             {
-                var package = await EvaluateProjectAsync(project, ct);
+                var package = await EvaluateProjectAsync(project, snapshot, ct);
                 if (package is not null) results.Add(package);
             });
 
@@ -147,14 +148,17 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
         return result.ExitCode == 0 ? result.StandardOutput : null;
     }
 
-    private async Task<PackageProject?> EvaluateProjectAsync(string project, CancellationToken cancellationToken)
+    private async Task<PackageProject?> EvaluateProjectAsync(
+        string project,
+        PackageDiscoverySnapshot snapshot,
+        CancellationToken cancellationToken)
     {
         var output = await processRunner.RequireAsync(
             "dotnet",
             [
                 "msbuild", project, "-nologo",
-                "-getProperty:IsPackable,PackageId,KoanPackageKind,SuppressDependenciesWhenPacking,IncludeSymbols,PackageReadmeFile,Description,PackageTags",
-                "-getItem:ProjectReference,None", "-p:PublicRelease=true"
+                "-getProperty:IsPackable,PackageId,PackageType,TargetFramework,TargetFrameworks,PackAsTool,IsRoslynComponent,IncludeBuildOutput,SuppressDependenciesWhenPacking,IncludeSymbols,PackageReadmeFile,Description,PackageTags",
+                $"-getItem:ProjectReference,None,{PackagingConstants.PackageInputItemName}", "-p:PublicRelease=true"
             ],
             repositoryRoot,
             cancellationToken);
@@ -174,13 +178,29 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
 
         var references = new List<string>();
         var sharedInputs = SharedBuildInputs(projectDirectory).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var externalPayloadsWithoutSourceOwnership = new List<string>();
         if (document.RootElement.TryGetProperty("Items", out var items) &&
             items.TryGetProperty("ProjectReference", out var projectReferences))
         {
             foreach (var reference in projectReferences.EnumerateArray())
             {
-                if (string.Equals(ReadString(reference, "ReferenceOutputAssembly"), "false", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(ReadString(reference, "OutputItemType"), "Analyzer", StringComparison.OrdinalIgnoreCase))
+                var isAnalyzer = string.Equals(
+                    ReadString(reference, "OutputItemType"),
+                    "Analyzer",
+                    StringComparison.OrdinalIgnoreCase);
+                if (isAnalyzer)
+                {
+                    var analyzerProject = ReadString(reference, "FullPath");
+                    foreach (var input in await SourceProjectInputsAsync(
+                                 snapshot,
+                                 analyzerProject,
+                                 packageId,
+                                 cancellationToken))
+                        sharedInputs.Add(input);
+                    continue;
+                }
+
+                if (string.Equals(ReadString(reference, "ReferenceOutputAssembly"), "false", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
@@ -197,23 +217,105 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
                 if (!ReadBoolean(item, "Pack", defaultValue: false)) continue;
                 var fullPath = ReadString(item, "FullPath");
                 if (string.IsNullOrWhiteSpace(fullPath) || IsWithin(fullPath, projectDirectory)) continue;
-                if (TryRelative(fullPath, out var relative)) sharedInputs.Add(relative);
+                if (!TryRelative(fullPath, out var relative))
+                {
+                    throw new InvalidOperationException(
+                        $"Package '{packageId}' packs external file '{fullPath}' from outside the versioned " +
+                        "repository. Package payloads must be reproducible from repository-owned inputs; move " +
+                        "the file into the repository and declare its tracked source ownership.");
+                }
+                if (IsBuildOutput(fullPath))
+                {
+                    externalPayloadsWithoutSourceOwnership.Add(relative);
+                    continue;
+                }
+
+                var repositoryFiles = await snapshot.TrackedRepositoryFiles;
+                if (repositoryFiles.Contains(relative))
+                {
+                    sharedInputs.Add(relative);
+                    continue;
+                }
+
+                externalPayloadsWithoutSourceOwnership.Add(relative);
             }
+        }
+        var declaredPackageInputCount = 0;
+        if (document.RootElement.TryGetProperty("Items", out items) &&
+            items.TryGetProperty(PackagingConstants.PackageInputItemName, out var packageInputs))
+        {
+            foreach (var item in packageInputs.EnumerateArray())
+            {
+                var fullPath = ReadString(item, "FullPath");
+                if (string.IsNullOrWhiteSpace(fullPath) ||
+                    !File.Exists(fullPath) ||
+                    IsWithin(fullPath, projectDirectory) ||
+                    !TryRelative(fullPath, out var relative) ||
+                    IsBuildOutput(fullPath))
+                {
+                    throw new InvalidOperationException(
+                        $"Package '{packageId}' has an invalid {PackagingConstants.PackageInputItemName} " +
+                        $"'{ReadString(item, "Identity") ?? fullPath ?? "<empty>"}'. Declare a tracked source file " +
+                        "outside the owning project and inside the repository; local files already belong to the " +
+                        "owner, and generated bin/obj output cannot own package version impact.");
+                }
+                var repositoryFiles = await snapshot.TrackedRepositoryFiles;
+                if (!repositoryFiles.Contains(relative))
+                {
+                    throw new InvalidOperationException(
+                        $"Package '{packageId}' declares {PackagingConstants.PackageInputItemName} '{relative}', " +
+                        "but that source is not tracked by Git. Commit the real source input; ignored or local " +
+                        "artifacts cannot own package version impact.");
+                }
+
+                sharedInputs.Add(relative);
+                declaredPackageInputCount++;
+            }
+        }
+        if (externalPayloadsWithoutSourceOwnership.Count > 0 && declaredPackageInputCount == 0)
+        {
+            throw new InvalidOperationException(
+                $"Package '{packageId}' packs generated, ignored, or untracked external payload " +
+                $"'{externalPayloadsWithoutSourceOwnership[0]}' but declares no " +
+                $"{PackagingConstants.PackageInputItemName}. Declare the payload's tracked source inputs so every " +
+                "payload change mints a fresh owning package version.");
         }
 
         return new PackageProject(
             Relative(project),
             projectDirectory,
             packageId,
-            ReadString(properties, "KoanPackageKind") ?? "Package",
+            ReadString(properties, "PackageType") ?? "Dependency",
+            ReadFrameworks(properties),
+            ReadBoolean(properties, "PackAsTool", defaultValue: false),
+            ReadBoolean(properties, "IsRoslynComponent", defaultValue: false),
+            ReadBoolean(properties, "IncludeBuildOutput", defaultValue: true),
             ReadBoolean(properties, "SuppressDependenciesWhenPacking", defaultValue: false),
             ReadBoolean(properties, "IncludeSymbols", defaultValue: true),
             ReadString(properties, "PackageReadmeFile"),
+            HasOwnedReadme(projectDirectory, ReadString(properties, "PackageReadmeFile")),
+            RelativeIfExists(Path.Combine(projectDirectory, "TECHNICAL.md")),
             ReadString(properties, "Description") ?? string.Empty,
             ReadString(properties, "PackageTags") ?? string.Empty,
             references,
             sharedInputs.Order(StringComparer.OrdinalIgnoreCase).ToArray());
     }
+
+    private static IReadOnlyList<string> ReadFrameworks(JsonElement properties)
+    {
+        var value = ReadString(properties, "TargetFrameworks") ?? ReadString(properties, "TargetFramework");
+        return string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+    }
+
+    private static bool HasOwnedReadme(string projectDirectory, string? readme) =>
+        !string.IsNullOrWhiteSpace(readme) && File.Exists(Path.Combine(projectDirectory, readme));
+
+    private string? RelativeIfExists(string path) => File.Exists(path) ? Relative(path) : null;
 
     private void ValidateVersionIntent(string project, string projectDirectory, string packageId)
     {
@@ -280,6 +382,69 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
         }
     }
 
+    private Task<IReadOnlyList<string>> SourceProjectInputsAsync(
+        PackageDiscoverySnapshot snapshot,
+        string? project,
+        string packageId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(project) ||
+            !File.Exists(project) ||
+            !TryRelative(project, out _))
+        {
+            throw new InvalidOperationException(
+                $"Package '{packageId}' references an analyzer project outside the versioned repository. " +
+                "Keep source-generating build inputs inside the repository so package impact remains automatic.");
+        }
+
+        var fullProject = Path.GetFullPath(project);
+        return snapshot.AnalyzerSourceInputs.GetOrAdd(
+            fullProject,
+            _ => ReadTrackedProjectInputsAsync(snapshot, fullProject, packageId, cancellationToken));
+    }
+
+    private async Task<IReadOnlyList<string>> ReadTrackedProjectInputsAsync(
+        PackageDiscoverySnapshot snapshot,
+        string project,
+        string packageId,
+        CancellationToken cancellationToken)
+    {
+        var projectDirectory = Relative(Path.GetDirectoryName(project)!).TrimEnd('/') + "/";
+        var repositoryFiles = await snapshot.TrackedRepositoryFiles;
+        var inputs = repositoryFiles
+            .Where(path => path.StartsWith(projectDirectory, StringComparison.OrdinalIgnoreCase))
+            .Where(path => !IsBuildOutput(Path.Combine(repositoryRoot, path)))
+            .Where(path => !string.Equals(
+                Path.GetFileName(path),
+                PackagingConstants.LineageMarkerFileName,
+                StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var projectPath = Relative(project);
+        if (!inputs.Contains(projectPath, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Package '{packageId}' references analyzer project '{projectPath}', but that project is not " +
+                "tracked by Git. Commit the analyzer source so package impact can be calculated deterministically.");
+        }
+
+        return inputs;
+    }
+
+    private async Task<IReadOnlySet<string>> ReadTrackedRepositoryFilesAsync(CancellationToken cancellationToken)
+    {
+        var output = await processRunner.RequireAsync(
+            "git",
+            ["ls-files"],
+            repositoryRoot,
+            cancellationToken);
+        return output
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(static path => path.Replace('\\', '/'))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
     private bool TryRelative(string path, out string relative)
     {
         relative = string.Empty;
@@ -307,4 +472,11 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
 
     private static bool ReadBoolean(JsonElement element, string propertyName, bool defaultValue) =>
         bool.TryParse(ReadString(element, propertyName), out var value) ? value : defaultValue;
+
+    private sealed class PackageDiscoverySnapshot(Task<IReadOnlySet<string>> trackedRepositoryFiles)
+    {
+        public Task<IReadOnlySet<string>> TrackedRepositoryFiles { get; } = trackedRepositoryFiles;
+        public ConcurrentDictionary<string, Task<IReadOnlyList<string>>> AnalyzerSourceInputs { get; } =
+            new(StringComparer.OrdinalIgnoreCase);
+    }
 }

@@ -10,7 +10,8 @@ internal sealed class ProcessRunner
         IEnumerable<string> arguments,
         string workingDirectory,
         CancellationToken cancellationToken,
-        bool echo = false)
+        bool echo = false,
+        IReadOnlyDictionary<string, string?>? environment = null)
     {
         var startInfo = new ProcessStartInfo(fileName)
         {
@@ -30,6 +31,10 @@ internal sealed class ProcessRunner
         // redirected pipe handles. Packaging favors deterministic child completion over node reuse.
         startInfo.Environment[PackagingConstants.MsBuildDisableNodeReuseEnvironmentVariable] =
             PackagingConstants.MsBuildDisableNodeReuseEnvironmentValue;
+        if (environment is not null)
+        {
+            foreach (var pair in environment) startInfo.Environment[pair.Key] = pair.Value;
+        }
 
         using var process = new Process { StartInfo = startInfo };
         process.Start();
@@ -45,9 +50,10 @@ internal sealed class ProcessRunner
         IEnumerable<string> arguments,
         string workingDirectory,
         CancellationToken cancellationToken,
-        bool echo = false)
+        bool echo = false,
+        IReadOnlyDictionary<string, string?>? environment = null)
     {
-        var result = await RunAsync(fileName, arguments, workingDirectory, cancellationToken, echo);
+        var result = await RunAsync(fileName, arguments, workingDirectory, cancellationToken, echo, environment);
         if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(

@@ -2,7 +2,6 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <PackageId>Sylin.Koan.App</PackageId>
-    <KoanPackageKind>Bundle</KoanPackageKind>
     <PackageType>Dependency</PackageType>
     <Description>Tested Koan application bundle: the Koan foundation plus controller-based ASP.NET Core integration.</Description>
     <PackageTags>$(CommonPackageTags);bundle;web;aspnetcore</PackageTags>

@@ -18,14 +18,36 @@ internal static class PackagingProgram
             http.DefaultRequestHeaders.UserAgent.ParseAdd("Koan.Packaging/1.0");
             var registry = new NuGetRegistry(http);
             var repository = new RepositoryInspector(root, process);
+            var productSurfaceCompiler = new ProductSurfaceCompiler(root);
             var lineageCompiler = new ReleaseLineageCompiler(root, process, repository);
-            var planner = new ReleasePlanner(repository, registry);
+            var planner = new ReleasePlanner(repository, registry, productSurfaceCompiler);
             var pipeline = new PackagePipeline(root, process, registry);
             var command = args.FirstOrDefault()?.ToLowerInvariant() ?? "help";
             var options = CommandOptions.Parse(args.Skip(1));
 
             switch (command)
             {
+                case "product-surface":
+                {
+                    var packages = await repository.DiscoverPackagesAsync(cancellationToken);
+                    var surface = await productSurfaceCompiler.CompileAsync(packages, cancellationToken);
+                    var output = options.Value("output");
+                    await WriteOutputAsync(
+                        output,
+                        ProductSurfaceCompiler.ToJson(surface).TrimEnd(),
+                        cancellationToken);
+                    var markdown = options.Value("markdown");
+                    if (markdown is not null)
+                    {
+                        await WriteOutputAsync(
+                            markdown,
+                            ProductSurfaceCompiler.ToMarkdown(surface).TrimEnd(),
+                            cancellationToken);
+                    }
+                    var status = $"surface    {surface.Claims.Count} claim(s), {surface.Packages.Count} package(s)";
+                    if (output is null) Console.Error.WriteLine(status); else Console.WriteLine(status);
+                    return 0;
+                }
                 case "inventory":
                 {
                     var packages = await repository.DiscoverPackagesAsync(cancellationToken);
@@ -193,6 +215,7 @@ internal static class PackagingProgram
         Koan package release compiler
 
           inventory [--output PATH]
+          product-surface [--output PATH] [--markdown PATH]
           lineage   [--source GIT] [--previous-source GIT] [--previous-lineage GIT] [--branch NAME] [--output PATH]
           materialize-lineage --version-commit GIT [--output PATH]
           plan      [--lineage PATH] [--output PATH] [--offline]

@@ -188,7 +188,6 @@ public sealed class ReleasePlannerTests
         PackageId = id,
         Version = version,
         ProjectPath = $"src/{id}/{id}.csproj",
-        Kind = "Package",
         Reason = PackagingConstants.VersionChangedReason,
         IncludeSymbols = true,
         ProjectDependencies = projectDependencies?.ToList() ?? [],
