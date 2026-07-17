@@ -130,34 +130,29 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
         if (!string.IsNullOrWhiteSpace(filter))
         {
             // filter is the JSON filter DSL; Data.Query(string) parses it for every adapter.
+            if (!string.IsNullOrWhiteSpace(from))
             {
-                if (!string.IsNullOrWhiteSpace(from))
+                using var _from = Data<TEntity, TKey>.WithPartition(from);
+                var items = await Data<TEntity, TKey>.Query(filter!, ct);
+                var idList = items.Select(i => i.Id).ToArray();
+                if (idList.Length > 0)
                 {
-                    using var _from = Data<TEntity, TKey>.WithPartition(from);
-                    var items = await Data<TEntity, TKey>.Query(filter!, ct);
-                    var idList = items.Select(i => i.Id).ToArray();
-                    if (idList.Length > 0)
-                    {
-                        _ = await Data<TEntity, TKey>.MovePartition(from!, DeletedSet, e => idList.Contains(e.Id), null, 500, ct);
-                    }
-                    return NoContent();
+                    _ = await Data<TEntity, TKey>.MovePartition(from!, DeletedSet, e => idList.Contains(e.Id), null, 500, ct);
                 }
-                else
-                {
-                    var items = await Data<TEntity, TKey>.Query(filter!, ct);
-                    var list = items.ToList();
-                    if (list.Count > 0)
-                    {
-                        using (var _to = Data<TEntity, TKey>.WithPartition(DeletedSet))
-                        {
-                            await Data<TEntity, TKey>.UpsertMany(list, ct);
-                        }
-                        await Data<TEntity, TKey>.DeleteMany(list.Select(x => x.Id), ct);
-                    }
-                    return NoContent();
-                }
+                return NoContent();
             }
-            return BadRequest(new { error = "Filter-based soft delete requires a string-query repository." });
+
+            var matches = await Data<TEntity, TKey>.Query(filter!, ct);
+            var list = matches.ToList();
+            if (list.Count > 0)
+            {
+                using (var _to = Data<TEntity, TKey>.WithPartition(DeletedSet))
+                {
+                    await Data<TEntity, TKey>.UpsertMany(list, ct);
+                }
+                await Data<TEntity, TKey>.DeleteMany(list.Select(x => x.Id), ct);
+            }
+            return NoContent();
         }
 
         return BadRequest(new { error = "Provide ids or filter." });

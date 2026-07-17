@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -21,7 +20,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Koan.Cache\Koan.Cache.csproj" />
+    <ProjectReference Include="..\Koan.Cache\Koan.Cache.csproj"
+                      />
     <ProjectReference Include="..\Koan.Cache.Abstractions\Koan.Cache.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <!-- Analyzer-only reference (KOAN0001): flags bare TryAddEnumerable on cache interfaces. -->

@@ -20,6 +20,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <CompilerVisibleProperty Include="PackageId" />
+    <CompilerVisibleProperty Include="IsTestProject" />
     <Content Include="$(MSBuildThisFileDirectory)SeedPacks\**\*.*">
       <Link>SeedPacks\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

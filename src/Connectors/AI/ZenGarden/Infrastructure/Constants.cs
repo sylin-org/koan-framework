@@ -36,4 +36,9 @@ internal static class Constants
         public const string Models = "/v1/models";
         public const string Health = "/";
     }
+
+    internal static class Logging
+    {
+        public const string Discovery = "ai.zengarden.discovery";
+    }
 }

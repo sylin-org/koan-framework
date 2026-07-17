@@ -19,8 +19,6 @@ namespace Koan.Identity.Mfa.Initialization;
 [After(typeof(Koan.Identity.Credentials.Initialization.CredentialsModule))]
 public sealed class MfaModule : KoanModule
 {
-    public override string Id => "Koan.Identity.Mfa";
-
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<MfaOptions>(MfaOptions.SectionPath);

@@ -2,12 +2,14 @@ using Koan.Cache.Abstractions.Stores;
 using Koan.Core.Context;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Cache.Stores;
+using Koan.Cache.Identity;
 
 namespace Koan.Cache.Entity;
 
 /// <summary>Executes one bounded, context-stable Entity cache eviction source.</summary>
 internal sealed class EntityCacheEvictionCoordinator(
-    ICacheWriter writer,
+    ICacheIdentityWriter writer,
     EntityCachePlan plans,
     KoanContextCarrierRegistry contextCarriers)
 {
@@ -63,7 +65,7 @@ internal sealed class EntityCacheEvictionCoordinator(
                 bool existed;
                 using (EnterContext(capturedDataContext, capturedCarriers))
                 {
-                    existed = await writer.Remove(key, ct).ConfigureAwait(false);
+                    existed = await writer.Remove(key, typeof(TEntity), ct).ConfigureAwait(false);
                 }
 
                 if (existed)

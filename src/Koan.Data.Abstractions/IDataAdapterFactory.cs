@@ -3,7 +3,7 @@ namespace Koan.Data.Abstractions;
 /// <summary>
 /// Complete data adapter contract: record-repository creation. Discovery, naming and source-routing come from
 /// <see cref="IAdapterFactory"/> (the marker base — <see cref="Naming.INamingProvider.Provider"/> +
-/// <see cref="IAdapterFactory.CanHandle"/>); this adds the record <see cref="Create{TEntity,TKey}"/>.
+/// declarative aliases/reference identities); this adds the record <see cref="Create{TEntity,TKey}"/>.
 /// </summary>
 public interface IDataAdapterFactory : IAdapterFactory
 {

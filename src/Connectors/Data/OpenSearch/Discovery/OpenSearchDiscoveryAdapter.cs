@@ -28,35 +28,17 @@ internal sealed class OpenSearchDiscoveryAdapter : ServiceDiscoveryAdapterBase
     /// <summary>OpenSearch-specific health validation using cluster health API</summary>
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        try
-        {
-            using var httpClient = new HttpClient { Timeout = context.HealthCheckTimeout };
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(context.HealthCheckTimeout);
+        using var httpClient = new HttpClient { Timeout = context.HealthCheckTimeout };
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(context.HealthCheckTimeout);
 
-            // OpenSearch cluster health endpoint (same as ElasticSearch)
-            var healthUrl = new Uri(new Uri(serviceUrl), "/_cluster/health").ToString();
-            var response = await httpClient.GetAsync(healthUrl, cts.Token);
+        var healthUrl = new Uri(new Uri(serviceUrl), "/_cluster/health").ToString();
+        var response = await httpClient.GetAsync(healthUrl, cts.Token);
 
-            if (response.IsSuccessStatusCode)
-            {
-                _logger.LogDebug("OpenSearch health check passed using /_cluster/health for {Url}", serviceUrl);
-                return true;
-            }
+        if (response.IsSuccessStatusCode) return true;
 
-            // Fallback to basic root endpoint check
-            var rootResponse = await httpClient.GetAsync(serviceUrl, cts.Token);
-            var isHealthy = rootResponse.IsSuccessStatusCode;
-
-            _logger.LogDebug("OpenSearch health check {Result} using root endpoint for {Url}",
-                isHealthy ? "passed" : "failed", serviceUrl);
-            return isHealthy;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug("OpenSearch health check failed for {Url}: {Error}", serviceUrl, ex.Message);
-            return false;
-        }
+        var rootResponse = await httpClient.GetAsync(serviceUrl, cts.Token);
+        return rootResponse.IsSuccessStatusCode;
     }
 
     /// <summary>OpenSearch adapter reads its own configuration sections</summary>
@@ -117,7 +99,7 @@ internal sealed class OpenSearchDiscoveryAdapter : ServiceDiscoveryAdapterBase
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Failed to build OpenSearch connection string from {BaseUrl}: {Error}", baseUrl, ex.Message);
+            ReportNormalizationFailure(baseUrl, ex);
             return baseUrl; // Return original URL if parsing fails
         }
     }

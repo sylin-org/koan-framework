@@ -9,9 +9,9 @@ namespace Koan.Tenancy;
 /// was submitted. The opaque wire form is versioned and restoration requires authenticated ingress provenance.
 /// Malformed or unsupported data fails with a safe typed error before any tenant scope is pushed.
 ///
-/// <para>Capture reads only the <i>explicit</i> context value: an unset scope captures nothing (the bag is absent),
-/// so the request-path dev-fallback is not made portable. At execute, an absent bag explicitly suppresses tenant
-/// context and the request-path guard (ARCH-0099 §1b) owns the refusal (Closed) / dev-fallback (Open).</para>
+/// <para>Ordinary capture preserves the explicit tri-state context. When a typed hard-segmentation operation binds
+/// the Development fallback, Core asks this carrier to materialize that resolved tenant so a remote receiver cannot
+/// silently adopt its own fallback. Host-scoped work with no explicit tenant remains unscoped.</para>
 /// </summary>
 public sealed class TenantContextCarrier : IKoanContextCarrier
 {
@@ -21,14 +21,23 @@ public sealed class TenantContextCarrier : IKoanContextCarrier
     /// <inheritdoc />
     public ContextIngressTrust MinimumIngressTrust => ContextIngressTrust.Authenticated;
 
+    /// <inheritdoc />
+    public IReadOnlyCollection<string> SegmentationDimensions => [Constants.Segmentation.DimensionId];
+
     public string? Capture()
     {
         var slice = Tenant.Current;
-        if (slice is null) return null;                          // unset → nothing to carry
+        if (slice is null) return null;
         return slice.IsHost
             ? Constants.ContextCarriage.HostToken
             : Constants.ContextCarriage.IdPrefix + slice.Id;   // explicit host vs concrete tenant
     }
+
+    /// <inheritdoc />
+    public string? CaptureRequired(string dimensionId, string value)
+        => string.Equals(dimensionId, Constants.Segmentation.DimensionId, StringComparison.OrdinalIgnoreCase)
+            ? Constants.ContextCarriage.IdPrefix + value
+            : Capture();
 
     /// <inheritdoc />
     public IDisposable Restore(string captured)

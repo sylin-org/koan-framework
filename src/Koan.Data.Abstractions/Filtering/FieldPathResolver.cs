@@ -25,7 +25,7 @@ public static class FieldPathResolver
     // FieldPath itself is not value-equal (its Segments list compares by reference), so the key is the
     // joined path string — allocation-free for the common single-segment case. Only successful resolutions
     // are cached; an unresolvable path keeps throwing (the strict contract callers depend on).
-    private static readonly ConcurrentDictionary<(Type Root, string Path), ResolvedField> _cache = new();
+    private static readonly ConcurrentDictionary<(Type Root, string Path, Type? Managed), ResolvedField> _cache = new();
 
     public static ResolvedField Resolve(Type rootType, FieldPath path)
     {
@@ -33,7 +33,10 @@ public static class FieldPathResolver
         if (path is null || path.Segments.Count == 0)
             throw new InvalidFilterFieldException(path?.ToString() ?? string.Empty, rootType!, string.Empty, "Field path is empty.");
 
-        var key = (rootType, path.Segments.Count == 1 ? path.Segments[0] : string.Join('.', path.Segments));
+        var key = (
+            rootType,
+            path.Segments.Count == 1 ? path.Segments[0] : string.Join('.', path.Segments),
+            path.ManagedClrType);
         if (_cache.TryGetValue(key, out var cached)) return cached;
 
         var resolved = ResolveCore(rootType, path);
@@ -43,6 +46,22 @@ public static class FieldPathResolver
 
     private static ResolvedField ResolveCore(Type rootType, FieldPath path)
     {
+        if (path.ManagedClrType is { } declaredManagedType && path.Segments.Count == 1)
+        {
+            var storageName = path.Segments[0];
+            var managedComparable = Nullable.GetUnderlyingType(declaredManagedType) ?? declaredManagedType;
+            return new ResolvedField(
+                rootType,
+                Array.Empty<MemberInfo>(),
+                declaredManagedType,
+                managedComparable,
+                TargetsCollection: false,
+                ElementType: null,
+                IsManaged: true,
+                StorageName: storageName,
+                CanonicalPath: FieldPath.Managed(storageName, declaredManagedType));
+        }
+
         // Managed-field resolution (DATA-0105 §3b, Seam 3) — a single segment that matches a registered managed
         // field for this entity type resolves to a managed ResolvedField (no CLR member). Gated on registry
         // non-emptiness so the throw-path and success-only memoization below are byte-identical when no module
@@ -58,7 +77,7 @@ public static class FieldPathResolver
                 var managedComparable = Nullable.GetUnderlyingType(managed.ClrType) ?? managed.ClrType;
                 return new ResolvedField(rootType, Array.Empty<MemberInfo>(), managed.ClrType, managedComparable,
                     TargetsCollection: false, ElementType: null, IsManaged: true, StorageName: managed.StorageName,
-                    CanonicalPath: FieldPath.Of(managed.StorageName));
+                    CanonicalPath: FieldPath.Managed(managed.StorageName, managed.ClrType));
             }
         }
 

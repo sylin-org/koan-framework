@@ -25,7 +25,7 @@ public sealed class ProviderOptions
     /// <summary>
     /// The single canonical merge: <paramref name="overlay"/> (e.g. user config) over
     /// <paramref name="baseline"/> (e.g. a contributor default), field-wins-if-set. Replaces the three
-    /// hand-copied merge bodies that previously lived in ProviderRegistry + KoanAutoRegistrar (E5).
+    /// hand-copied merge bodies that previously lived across provider discovery and bootstrap (E5).
     /// </summary>
     public static ProviderOptions Merge(ProviderOptions baseline, ProviderOptions overlay) => new()
     {

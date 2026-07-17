@@ -10,7 +10,7 @@ namespace Koan.Observability.Tests;
 
 /// <summary>
 /// (ARCH-0088 / ARCH-0079) Reference = Intent for the extracted observability package: this test project
-/// references <c>Koan.Observability</c>, so its <c>KoanAutoRegistrar</c> runs during real <c>AddKoan()</c>
+/// references <c>Koan.Observability</c>, so its <c>ObservabilityModule</c> runs during real <c>AddKoan()</c>
 /// reflective discovery and wires OpenTelemetry — WITHOUT an explicit <c>AddKoanObservability()</c> call.
 /// The proof is a live <see cref="TracerProvider"/> in the booted container (the OTel SDK only registers one
 /// when <c>AddOpenTelemetry().WithTracing(...)</c> ran). The integration host's default "Test" environment

@@ -9,12 +9,14 @@ using Microsoft.Extensions.Hosting;
 using Koan.Core.Hosting.Registry;
 using Koan.Core.Diagnostics;
 using Koan.Core.Infrastructure;
+using Koan.Core.Semantics;
+using Koan.Core.Semantics.Segmentation;
 
 namespace Koan.Core.Composition;
 
 /// <summary>
 /// Builds the boot-time resolved composition twin from a live host: the kernel-knowable sections
-/// (app, modules, Koan config keys) plus whatever <see cref="IKoanCompositionContributor"/>s enrich
+/// (app, modules, Koan config keys) plus evidence projected by Core and active retained modules
 /// (elections, capabilities, entities). Module versions are normalized to major.minor to match the
 /// build-time <c>koan.lock.json</c> so the two compare cleanly.
 /// </summary>
@@ -38,7 +40,9 @@ internal static class KoanCompositionSnapshot
 
         var builder = new KoanCompositionBuilder();
         if (config is not null) AddConfigKeys(builder, config);
-        RunContributors(builder, services);
+        SegmentationCompositionFacts.Project(builder, services);
+        (services.GetService(typeof(SemanticModuleRuntime)) as SemanticModuleRuntime)
+            ?.ReportComposition(builder, services);
 
         builder.ApplyTo(out var elections, out var capabilities, out var configKeys, out var entities, out var facts);
         var referenceManifest = services.GetService(typeof(KoanApplicationReferenceManifest))
@@ -47,7 +51,7 @@ internal static class KoanCompositionSnapshot
             ? referenceManifest.DirectReferences
                 .Select(reference => new KoanLockReference(
                     reference.Kind == KoanReferenceKind.Package ? "package" : "project",
-                    reference.Identity))
+                    reference.RawIdentity))
                 .ToArray()
             : null;
         var lockfile = new KoanLockfile(
@@ -136,36 +140,6 @@ internal static class KoanCompositionSnapshot
             if (kv.Key is null || kv.Value is null) continue;
             if (kv.Key.StartsWith("Koan:", StringComparison.OrdinalIgnoreCase))
                 builder.AddConfigKey(kv.Key);
-        }
-    }
-
-    private static void RunContributors(KoanCompositionBuilder builder, IServiceProvider services)
-    {
-        Type[] contributors;
-        try { contributors = KoanRegistry.GetDiscoveredImplementors(typeof(IKoanCompositionContributor)); }
-        catch { return; }
-
-        foreach (var type in contributors)
-        {
-            try
-            {
-                if (type.IsAbstract) continue;
-                if (Activator.CreateInstance(type) is IKoanCompositionContributor contributor)
-                    contributor.Contribute(builder, services);
-            }
-            catch (Exception ex)
-            {
-                builder.AddFact(KoanFact.Create(
-                    Constants.Diagnostics.Codes.CollectionFailed,
-                    KoanFactKind.Degradation,
-                    KoanFactState.CollectionFailed,
-                    type.FullName ?? type.Name,
-                    "A composition contributor could not report its runtime facts.",
-                    Constants.Diagnostics.Reasons.ReporterFailed,
-                    "Inspect the named contributor and retry startup after correcting its reporting failure.",
-                    type.Assembly.GetName().Name ?? "composition",
-                    $"composition:{type.FullName ?? type.Name}:{ex.GetType().Name}"));
-            }
         }
     }
 

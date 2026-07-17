@@ -34,4 +34,11 @@ public static class S3StorageConstants
         /// </summary>
         public const string DefaultOffering = "storage";
     }
+
+    internal static class Logging
+    {
+        public const string Configuration = "storage.s3.config";
+        public const string Discovery = "storage.s3.discovery";
+        public const string Request = "storage.s3.request";
+    }
 }

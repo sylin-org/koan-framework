@@ -1,5 +1,6 @@
 using System.Text;
 using Koan.Communication.Adapters;
+using Koan.Communication.Semantics;
 using Koan.Core.Context;
 using Koan.Core.Json;
 using Koan.Data.Abstractions;
@@ -8,7 +9,7 @@ using Microsoft.Extensions.Options;
 namespace Koan.Communication.Runtime;
 
 internal sealed class EventCoordinator(
-    KoanContextCarrierRegistry contextCarriers,
+    CommunicationContextPlan contextPlan,
     CommunicationRouter router,
     IOptions<CommunicationOptions> options)
 {
@@ -57,7 +58,7 @@ internal sealed class EventCoordinator(
             }
         }
 
-        var capturedContext = contextCarriers.Capture();
+        var capturedContext = contextPlan.Capture(typeof(TEntity), CommunicationLane.Events);
         var ordinal = 0L;
         try
         {

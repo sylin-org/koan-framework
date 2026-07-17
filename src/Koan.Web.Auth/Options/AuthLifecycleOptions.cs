@@ -16,7 +16,7 @@ public sealed class AuthLifecycleOptions
     public RoleListFileOptions RoleListFile { get; set; } = new();
 
     /// <summary>
-    /// Options for <see cref="Contributors.Builtin.AdminBootstrapContributor"/>. Controls one-shot
+    /// Options for the optional <c>AdminBootstrapContributor</c>. Controls one-shot
     /// admin elevation modes (<c>FirstUser</c> / <c>ClaimMatch</c>). Default <c>Mode=None</c>
     /// disables the contributor.
     /// </summary>

@@ -66,7 +66,8 @@ internal static class KvFilterEvaluator
 
     private static bool IsManaged<TEntity>(FieldPath field) where TEntity : class
     {
-        if (ManagedFieldRegistry.IsEmpty || field.Segments.Count != 1) return false;
+        if (field.Segments.Count != 1) return false;
+        if (field.ManagedClrType is null && ManagedFieldRegistry.IsEmpty) return false;
         return FieldPathResolver.Resolve(typeof(TEntity), field).IsManaged;
     }
 }

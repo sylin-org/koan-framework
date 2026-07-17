@@ -7,6 +7,7 @@ public enum KoanFactKind
     Dependency,
     Election,
     Capability,
+    Guarantee,
     Default,
     Degradation,
     Rejection,

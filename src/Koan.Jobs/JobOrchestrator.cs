@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
-using Koan.Core.Context;
 using Koan.Data.Core;
+using Koan.Jobs.Semantics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -23,34 +23,17 @@ public sealed class JobOrchestrator
     private readonly ILogger<JobOrchestrator> _logger;
     private readonly IServiceScopeFactory _scopes;
     private readonly IReadOnlyList<IJobPoolResolver> _poolResolvers;
-    private readonly KoanContextCarrierRegistry _contextCarriers;
+    private readonly JobsContextPlan _contextPlan;
 
     private readonly string _owner = Guid.CreateVersion7().ToString("N");
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _lanes = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _running = new(StringComparer.Ordinal);
     private readonly JobMetricsRecorder _metrics;
 
-    /// <summary>Compatibility constructor for the public 0.17.0 infrastructure shape.</summary>
-    [Obsolete("Direct JobOrchestrator construction is compatibility-only; let AddKoan compose pools and Core context.")]
-    public JobOrchestrator(
-        IJobLedger ledger, JobTypeRegistry registry, IOptions<JobsOptions> options,
-        TimeProvider clock, ILogger<JobOrchestrator> logger, IServiceScopeFactory scopes)
-        : this(
-            ledger,
-            registry,
-            options,
-            clock,
-            logger,
-            scopes,
-            [],
-            new KoanContextCarrierRegistry([]))
-    {
-    }
-
     public JobOrchestrator(
         IJobLedger ledger, JobTypeRegistry registry, IOptions<JobsOptions> options,
         TimeProvider clock, ILogger<JobOrchestrator> logger, IServiceScopeFactory scopes,
-        IEnumerable<IJobPoolResolver> poolResolvers, KoanContextCarrierRegistry contextCarriers)
+        IEnumerable<IJobPoolResolver> poolResolvers, JobsContextPlan contextPlan)
     {
         _ledger = ledger;
         _registry = registry;
@@ -59,7 +42,7 @@ public sealed class JobOrchestrator
         _logger = logger;
         _scopes = scopes;
         _poolResolvers = poolResolvers.ToList();
-        _contextCarriers = contextCarriers;
+        _contextPlan = contextPlan;
         _metrics = new JobMetricsRecorder(_options.MetricsEnabled, _owner, _clock);
     }
 
@@ -172,7 +155,7 @@ public sealed class JobOrchestrator
         IDisposable ambientScope;
         try
         {
-            ambientScope = _contextCarriers.Restore(rec.AmbientCarrier, ContextIngressTrust.HostTrusted);
+            ambientScope = _contextPlan.RestoreForExecution(binding.ClrType, rec.AmbientCarrier);
         }
         catch (Exception ex) { await SettleCarrierFailureAsync(rec, ex); return null; }
         using var _ambient = ambientScope;

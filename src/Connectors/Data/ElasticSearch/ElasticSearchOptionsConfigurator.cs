@@ -43,11 +43,11 @@ internal sealed class ElasticSearchOptionsConfigurator : AdapterOptionsConfigura
 
     protected override void ConfigureProviderSpecific(ElasticSearchOptions options)
     {
-        Logger?.LogInformation("ElasticSearch Orchestration-Aware Configuration Started");
-        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
-            KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
-        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}', Endpoint: '{Endpoint}'",
-            options.ConnectionString, options.Endpoint);
+        LogConfiguration(LogLevel.Debug, "initial",
+            ("environment", KoanEnv.EnvironmentName),
+            ("orchestrationMode", KoanEnv.OrchestrationMode),
+            ("connection", options.ConnectionString),
+            ("endpoint", options.Endpoint));
 
         // Read ElasticSearch-specific configuration
         var endpoint = ReadProviderConfiguration(options.Endpoint,
@@ -71,20 +71,20 @@ internal sealed class ElasticSearchOptionsConfigurator : AdapterOptionsConfigura
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            Logger?.LogInformation("Using explicit connection string from configuration");
+            LogConfiguration(LogLevel.Information, "explicit");
             options.ConnectionString = explicitConnectionString;
             options.Endpoint = explicitConnectionString; // For backward compatibility
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            Logger?.LogInformation("Auto-detection mode - using autonomous service discovery");
-            options.ConnectionString = ResolveAutonomousConnection(Logger);
+            LogConfiguration(LogLevel.Information, "auto");
+            options.ConnectionString = ResolveAutonomousConnection();
             options.Endpoint = options.ConnectionString; // For backward compatibility
         }
         else
         {
-            Logger?.LogInformation("Using pre-configured connection string");
+            LogConfiguration(LogLevel.Information, "preconfigured");
             options.Endpoint = options.ConnectionString; // For backward compatibility
         }
 
@@ -129,25 +129,24 @@ internal sealed class ElasticSearchOptionsConfigurator : AdapterOptionsConfigura
             options.DisableIndexAutoCreate,
             Infrastructure.Constants.Configuration.Keys.DisableIndexAutoCreate);
 
-        Logger?.LogInformation("Final ElasticSearch Configuration");
-        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
-        Logger?.LogInformation("Endpoint: {Endpoint}", options.Endpoint);
-        Logger?.LogInformation("ElasticSearch Orchestration-Aware Configuration Complete");
+        LogConfiguration(LogLevel.Information, "final",
+            ("connection", options.ConnectionString),
+            ("endpoint", options.Endpoint));
     }
 
-    private string ResolveAutonomousConnection(ILogger? logger)
+    private string ResolveAutonomousConnection()
     {
         try
         {
             if (IsAutoDetectionDisabled())
             {
-                logger?.LogInformation("Auto-detection disabled via configuration - using localhost");
+                LogDiscovery(LogLevel.Information, "disabled", ("fallback", "http://localhost:9200"));
                 return "http://localhost:9200";
             }
 
             if (_discoveryCoordinator == null)
             {
-                logger?.LogWarning("Service discovery coordinator not available, falling back to localhost");
+                LogDiscovery(LogLevel.Warning, "coordinator-missing", ("fallback", "http://localhost:9200"));
                 return "http://localhost:9200";
             }
 
@@ -165,18 +164,18 @@ internal sealed class ElasticSearchOptionsConfigurator : AdapterOptionsConfigura
 
             if (result.IsSuccessful)
             {
-                logger?.LogInformation("ElasticSearch discovered via autonomous discovery: {ServiceUrl}", result.ServiceUrl);
+                LogDiscovery(LogLevel.Information, "success", ("url", result.ServiceUrl));
                 return result.ServiceUrl;
             }
             else
             {
-                logger?.LogWarning("Autonomous ElasticSearch discovery failed, falling back to localhost");
+                LogDiscovery(LogLevel.Warning, "fallback", ("reason", result.ErrorMessage), ("fallback", "http://localhost:9200"));
                 return "http://localhost:9200";
             }
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Error in autonomous ElasticSearch discovery, falling back to localhost");
+            LogDiscovery(LogLevel.Error, "exception", ("error", ex), ("fallback", "http://localhost:9200"));
             return "http://localhost:9200";
         }
     }

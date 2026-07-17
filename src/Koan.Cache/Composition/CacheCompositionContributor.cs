@@ -12,9 +12,9 @@ using Microsoft.Extensions.Options;
 namespace Koan.Cache.Composition;
 
 /// <summary>Projects Cache topology, peer invalidation, and policy posture into shared runtime facts.</summary>
-internal sealed class CacheCompositionContributor : IKoanCompositionContributor
+internal static class CacheCompositionFacts
 {
-    public void Contribute(KoanCompositionBuilder builder, IServiceProvider services)
+    public static void Project(KoanCompositionBuilder builder, IServiceProvider services, string source)
     {
         services.GetService<CachePolicyBootstrapper>()?.EnsureInitialized();
 
@@ -36,21 +36,31 @@ internal sealed class CacheCompositionContributor : IKoanCompositionContributor
             "cache:topology",
             topologySelection,
             "store-capability-resolution",
-            source: typeof(CacheCompositionContributor).FullName,
+            source: source,
             factCode: "koan.cache.topology.selected");
+        if (topology.LocalReceipt is not null)
+            builder.AddElection(
+                topology.LocalReceipt,
+                source: source,
+                factCode: "koan.cache.local.selected");
+        if (topology.RemoteReceipt is not null)
+            builder.AddElection(
+                topology.RemoteReceipt,
+                source: source,
+                factCode: "koan.cache.remote.selected");
         builder.AddObservation(
             "koan.cache.topology.bounds",
             "cache:topology:bounds",
             $"Cache topology is {topologySelection}: L1={topology.Local?.Name ?? "none"}, " +
             $"L2={topology.Remote?.Name ?? "none"}.",
             "resolved-cache-stores",
-            typeof(CacheCompositionContributor).FullName);
+            source);
 
         builder.AddElection(
             "cache:coherence",
             coordinator.ProviderId,
             coordinator.IsActive ? "layered-peer-invalidation" : "inactive-for-topology-or-policy",
-            source: typeof(CacheCompositionContributor).FullName,
+            source: source,
             factCode: "koan.cache.coherence.selected");
         builder.AddCapability(
             "cache:coherence",
@@ -67,7 +77,7 @@ internal sealed class CacheCompositionContributor : IKoanCompositionContributor
             $"mode={options.CoherenceMode}, provider={coordinator.ProviderId}, assurance={coordinator.Assurance}; " +
             "receivers evict L1 only and lost signals remain bounded by L1 TTL.",
             options.CoherenceMode == CoherenceMode.Required ? "required" : "configured-posture",
-            typeof(CacheCompositionContributor).FullName);
+            source);
 
         builder.AddConfigKey(CacheConstants.Configuration.LocalProvider);
         builder.AddConfigKey(CacheConstants.Configuration.RemoteProvider);
@@ -81,7 +91,7 @@ internal sealed class CacheCompositionContributor : IKoanCompositionContributor
             $"{entityPlans.Count(static plan => plan.ExclusionReason is null)} active, " +
             $"{entityPlans.Count(static plan => plan.ExclusionReason is not null)} safety-excluded.",
             "typed-policy-discovery",
-            typeof(CacheCompositionContributor).FullName);
+            source);
 
         foreach (var plan in entityPlans)
         {
@@ -93,9 +103,9 @@ internal sealed class CacheCompositionContributor : IKoanCompositionContributor
                     "koan.cache.entity-plan.resolved",
                     subject,
                     $"{typeName} uses {plan.Policy.Strategy} Entity entry caching with key template " +
-                    $"'{plan.Policy.KeyTemplate}'; managed equality axes are appended to the rendered key.",
+                    $"'{plan.Policy.KeyTemplate}'; hard segmentation is applied by CacheIdentityPlan.",
                     "entity-cache-plan",
-                    typeof(CacheCompositionContributor).FullName);
+                    source);
             }
             else
             {
@@ -104,7 +114,7 @@ internal sealed class CacheCompositionContributor : IKoanCompositionContributor
                     subject,
                     $"{typeName} is excluded from Entity entry caching because {plan.ExclusionReason}.",
                     "cache-safety-exclusion",
-                    typeof(CacheCompositionContributor).FullName);
+                    source);
             }
         }
     }

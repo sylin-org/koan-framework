@@ -12,6 +12,7 @@ using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Pipeline;
+using Koan.Data.Core.Semantics;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,7 +45,8 @@ namespace Koan.Data.Vector;
 /// <c>ExportAll</c>/<c>Flush</c> admin ops; non-dictionary metadata cannot be stamped and is excluded on read (safe).</para>
 /// </summary>
 internal sealed class ScopedVectorRepository<TEntity, TKey> :
-    IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities, IInstructionExecutor<TEntity>, IDecoratedVectorRepository
+    IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities, IInstructionExecutor<TEntity>,
+    IDecoratedVectorRepository, IDisposable, IAsyncDisposable
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -53,8 +55,10 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
     private readonly IVectorSearchRepository<TEntity, TKey> _inner;
     private readonly IReadFilterContributor[] _readContributors;
     private readonly IStorageGuard[] _guards;
+    private readonly DataSegmentationPlan.DataSegmentationScope _segmentation;
     private readonly bool _canFilter;
     private readonly OverlayNamingRule? _overlayNaming;
+    private int _disposed;
 
     public ScopedVectorRepository(IVectorSearchRepository<TEntity, TKey> inner, IServiceProvider sp)
     {
@@ -62,31 +66,60 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
         // Resolve the SAME registered contributor seams the data path consumes (boot-stable singletons).
         _readContributors = sp.GetServices<IReadFilterContributor>().ToArray();
         _guards = sp.GetServices<IStorageGuard>().ToArray();
+        _segmentation = sp.GetRequiredService<DataSegmentationPlan>().For(typeof(TEntity));
         _canFilter = VectorCaps.Describe(inner, inner.GetType().Name).Has(VectorCaps.Filters);
         // ARCH-0102 §5: the adapter DECLARES how to spell overlay (__-marked) fields in its store; the framework
         // applies it at write-stamp AND read-filter from this one declaration. null ⇒ the __ default (no rename).
         _overlayNaming = (inner as IOverlayNamingAware)?.OverlayNaming;
     }
 
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+
+        if (_inner is IDisposable disposable)
+            disposable.Dispose();
+        else if (_inner is IAsyncDisposable asyncDisposable)
+            asyncDisposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+
+        if (_inner is IAsyncDisposable asyncDisposable)
+            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+        else if (_inner is IDisposable disposable)
+            disposable.Dispose();
+    }
+
     public Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
     {
+        var segmented = _segmentation.Bind("vector write").Values;
         RunGuards();
-        return _inner.Upsert(id, embedding, StampScope(metadata), ct);
+        return _inner.Upsert(id, embedding, StampScope(metadata, segmented), ct);
     }
 
     public Task<int> UpsertMany(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
     {
+        var segmented = _segmentation.Bind("vector batch write").Values;
         RunGuards();
-        return _inner.UpsertMany(items.Select(x => (x.Id, x.Embedding, StampScope(x.Metadata))), ct);
+        return _inner.UpsertMany(items.Select(x => (x.Id, x.Embedding, StampScope(x.Metadata, segmented))), ct);
     }
 
     public Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
+        var segmented = _segmentation.Bind("vector search").ReadFilter;
         RunGuards();
         // ARCH-0102 §3: the vector index write-stamps ambient fields but never runs an operation (e.g. soft-delete),
         // so it pushes only the write-stamped, non-operation-sourced slice of the composed Aodb — the one composer
         // tags provenance, the decorator just realizes its store's slice (the former bespoke FilterMentions fork is gone).
-        var scope = ReadScopeFold.Compose(_readContributors, typeof(TEntity)).CombineWriteStamped();
+        var contributed = ReadScopeFold.Compose(_readContributors, typeof(TEntity)).CombineWriteStamped();
+        var scope = contributed is null
+            ? segmented
+            : segmented is null
+                ? contributed
+                : Filter.All(contributed, segmented);
         if (scope is null) return _inner.Search(options, ct);                 // no enforceable axis scopes this type ⇒ unchanged
         if (!_canFilter)
             throw new NotSupportedException(
@@ -98,14 +131,43 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
         return _inner.Search(options with { Filter = combined }, ct);
     }
 
-    // Pass-through (v1 follow-ons noted in the type summary).
-    public Task<bool> Delete(TKey id, CancellationToken ct = default) => _inner.Delete(id, ct);
-    public Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default) => _inner.DeleteMany(ids, ct);
-    public Task<float[]?> GetEmbedding(TKey id, CancellationToken ct = default) => _inner.GetEmbedding(id, ct);
-    public Task<Dictionary<TKey, float[]>> GetEmbeddings(IEnumerable<TKey> ids, CancellationToken ct = default) => _inner.GetEmbeddings(ids, ct);
+    // These adapter contracts carry no metadata predicate. Reject rather than turn a tenant-qualified identity into
+    // an unqualified by-id/admin operation. A future capability may earn a faithful native realization.
+    public Task<bool> Delete(TKey id, CancellationToken ct = default)
+    {
+        RejectUnscoped("vector delete");
+        return _inner.Delete(id, ct);
+    }
+
+    public Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        RejectUnscoped("vector batch delete");
+        return _inner.DeleteMany(ids, ct);
+    }
+
+    public Task<float[]?> GetEmbedding(TKey id, CancellationToken ct = default)
+    {
+        RejectUnscoped("vector embedding read");
+        return _inner.GetEmbedding(id, ct);
+    }
+
+    public Task<Dictionary<TKey, float[]>> GetEmbeddings(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        RejectUnscoped("vector batch embedding read");
+        return _inner.GetEmbeddings(ids, ct);
+    }
     public Task VectorEnsureCreated(CancellationToken ct = default) => _inner.VectorEnsureCreated(ct);
-    public Task Flush(CancellationToken ct = default) => _inner.Flush(ct);
-    public IAsyncEnumerable<VectorExportBatch<TKey>> ExportAll(int? batchSize = null, CancellationToken ct = default) => _inner.ExportAll(batchSize, ct);
+    public Task Flush(CancellationToken ct = default)
+    {
+        RejectUnscoped("vector flush");
+        return _inner.Flush(ct);
+    }
+
+    public IAsyncEnumerable<VectorExportBatch<TKey>> ExportAll(int? batchSize = null, CancellationToken ct = default)
+    {
+        RejectUnscoped("vector export");
+        return _inner.ExportAll(batchSize, ct);
+    }
 
     public void Describe(ICapabilities caps)
     {
@@ -127,12 +189,15 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
     }
 
     public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
-        => _inner is IInstructionExecutor<TEntity> exec
+    {
+        RejectUnscoped("vector instruction");
+        return _inner is IInstructionExecutor<TEntity> exec
             ? exec.ExecuteAsync<TResult>(instruction, ct)
             : throw new NotSupportedException($"Vector adapter '{_inner.GetType().Name}' does not support instructions.");
+    }
 
-    // Run the SAME fail-closed guards the data + storage paths use (IStorageGuard / TenantStorageGuard): [HostScoped]
-    // is exempt, no-scope under Closed throws, dev-Open warns. Off (no guard) ⇒ no-op ⇒ byte-identical.
+    // Retain the legacy Data-specific guards for non-segmentation contributors. Hard segmentation has already bound
+    // once at each operation entry and is not rediscovered through this enumerable.
     private void RunGuards()
     {
         for (var i = 0; i < _guards.Length; i++) _guards[i].Guard(typeof(TEntity));
@@ -141,13 +206,22 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
     // Stamp EVERY applicable managed field's value into the metadata (the registered ManagedFieldDescriptor seam —
     // equality and non-equality alike, so a read-filter predicate has its fields to match). Off / non-dict metadata ⇒
     // unchanged (a non-dict cannot be stamped and is excluded by the read-filter on read — safe, not a leak).
-    private object? StampScope(object? metadata)
+    private object? StampScope(
+        object? metadata,
+        IReadOnlyDictionary<string, object?>? segmented)
     {
-        if (ManagedFieldRegistry.IsEmpty) return metadata;
         var managed = ManagedFieldRegistry.ForType(typeof(TEntity));
-        if (managed.Count == 0) return metadata;
+        if (managed.Count == 0 && segmented is null) return metadata;
         if (!TryGetMutableDict(metadata, out var dict)) return metadata;
         var stamped = false;
+        if (segmented is not null)
+        {
+            foreach (var value in segmented)
+            {
+                dict[Rename(value.Key)] = value.Value;
+                stamped = true;
+            }
+        }
         for (var i = 0; i < managed.Count; i++)
         {
             var v = managed[i].ValueProvider();
@@ -169,12 +243,27 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
         if (_overlayNaming is null) return f;
         return f switch
         {
-            FieldFilter ff => ff with { Field = new FieldPath(ff.Field.Segments.Select(_overlayNaming.Apply).ToArray()) },
+            FieldFilter ff => ff with
+            {
+                Field = new FieldPath(
+                    ff.Field.Segments.Select(_overlayNaming.Apply).ToArray(),
+                    ff.Field.ManagedClrType)
+            },
             AllOf a => new AllOf(a.Operands.Select(RenameOverlayFields).ToArray()),
             AnyOf a => new AnyOf(a.Operands.Select(RenameOverlayFields).ToArray()),
             Not n => new Not(RenameOverlayFields(n.Operand)),
             _ => f,                                                   // ClrFilter: opaque, never pushed to a vector store
         };
+    }
+
+    private void RejectUnscoped(string operation)
+    {
+        if (_segmentation.IsEmpty) return;
+        _ = _segmentation.Bind(operation);
+        throw new NotSupportedException(
+            $"{operation} cannot preserve the compiled segmentation guarantee for vector entity " +
+            $"'{typeof(TEntity).Name}' because this adapter operation has no metadata predicate. Use a scoped " +
+            "vector search or a provider capability that explicitly guarantees segmented by-id/admin operations.");
     }
 
     private static bool TryGetMutableDict(object? metadata, out Dictionary<string, object?> dict)

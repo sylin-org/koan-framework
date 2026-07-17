@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Koan.Core.Logging;
 using Koan.Core;
 using Koan.Core.Observability.Health;
 
@@ -18,23 +19,28 @@ public sealed class WeaviateHealthContributor(IHttpClientFactory httpFactory, IO
             http.BaseAddress = new Uri(options.Value.Endpoint);
             var readyPath = "/.well-known/ready";
             var full = new Uri(http.BaseAddress!, readyPath).AbsoluteUri;
-            logger?.LogDebug("Weaviate health: GET {Url}", full);
+            KoanLog.HealthDebug(logger, Infrastructure.Constants.Logging.Health, "probe",
+                ("url", full));
             var resp = await http.GetAsync(readyPath, ct);
             if (!resp.IsSuccessStatusCode)
             {
                 var fallbackPath = "/v1/.well-known/ready";
                 var fallbackUrl = new Uri(http.BaseAddress!, fallbackPath).AbsoluteUri;
-                logger?.LogDebug("Weaviate health: fallback GET {Url} (prior {Status})", fallbackUrl, (int)resp.StatusCode);
+                KoanLog.HealthDebug(logger, Infrastructure.Constants.Logging.Health, "fallback",
+                    ("url", fallbackUrl),
+                    ("priorStatus", (int)resp.StatusCode));
                 resp = await http.GetAsync(fallbackPath, ct);
             }
             if (resp.IsSuccessStatusCode)
             {
-                logger?.LogDebug("Weaviate health: ready ({Status})", (int)resp.StatusCode);
+                KoanLog.HealthDebug(logger, Infrastructure.Constants.Logging.Health, "healthy",
+                    ("status", (int)resp.StatusCode));
                 return new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Healthy, null, null, null);
             }
             else
             {
-                logger?.LogDebug("Weaviate health: not ready ({Status})", (int)resp.StatusCode);
+                KoanLog.HealthDebug(logger, Infrastructure.Constants.Logging.Health, "unhealthy",
+                    ("status", (int)resp.StatusCode));
                 return new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Unhealthy, $"HTTP {(int)resp.StatusCode}", null, null);
             }
         }

@@ -1,6 +1,7 @@
 ﻿using System;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Entity;
+using Koan.Cache.Stores;
 using Koan.Core;
 using Koan.Data.Core.Decorators;
 using Microsoft.Extensions.DependencyInjection;
@@ -48,7 +49,7 @@ internal sealed class CacheRepositoryDecorator : IDataRepositoryDecorator
             return null;
         }
 
-        if (services.GetService(typeof(ICacheClient)) is not ICacheClient cacheClient)
+        if (services.GetService(typeof(CacheClient)) is not CacheClient cacheClient)
         {
             _logger.LogWarning("Cache policy detected for entity {EntityType} but no ICacheClient is registered. Skipping cache decoration.", entityType);
             return null;

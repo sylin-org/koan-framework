@@ -11,6 +11,8 @@ using Newtonsoft.Json;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core.Configuration;
 using Koan.Data.Abstractions;
+using Koan.Data.Core.Routing;
+using Koan.Core.Semantics.Segmentation;
 
 namespace Koan.Data.Core.Direct;
 
@@ -20,6 +22,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
     private readonly IConfiguration _cfg = cfg;
     private readonly string? _source = source;
     private readonly string? _adapter = adapter;
+    private readonly SegmentationPlan _segmentation = sp.GetRequiredService<SegmentationPlan>();
     private string? _connectionString;
     private TimeSpan _timeout = TimeSpan.FromSeconds(
         (sp.GetService<Microsoft.Extensions.Options.IOptions<Options.DirectOptions>>()?.Value?.TimeoutSeconds) ?? 30);
@@ -49,6 +52,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     public IDirectTransaction Begin(CancellationToken ct = default)
     {
+        GuardDirect();
         var route = Resolve();
         var conn = CreateConnection(_sp, route.Provider, route.ConnectionString, route.Source);
         conn.Open();
@@ -58,6 +62,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     public async Task<int> Execute(string sql, object? parameters = null, CancellationToken ct = default)
     {
+        GuardDirect();
         // Prefer instruction executor path when source points to an entity and no explicit connection override is set
         if (_connectionString is null && TryGetEntityType(out var entityType) && TryInvokeExecutor<int>(entityType!, InstructionSql.NonQuery(sql, parameters), out var execTask))
         {
@@ -71,6 +76,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     public async Task<T?> Scalar<T>(string sql, object? parameters = null, CancellationToken ct = default)
     {
+        GuardDirect();
         if (_connectionString is null && TryGetEntityType(out var entityType) && TryInvokeExecutor<T?>(entityType!, InstructionSql.Scalar(sql, parameters), out var execTask))
         {
             return await execTask;
@@ -85,6 +91,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     public async Task<IReadOnlyList<object>> Query(string sql, object? parameters = null, CancellationToken ct = default)
     {
+        GuardDirect();
         if (_connectionString is null && TryGetEntityType(out var entityType))
         {
             var data = _sp.GetService(typeof(IDataService)) as IDataService;
@@ -153,6 +160,18 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             })
             .FirstOrDefault(t => string.Equals(t.FullName, token, StringComparison.OrdinalIgnoreCase) || string.Equals(t.Name, token, StringComparison.Ordinal));
         return entityType is not null;
+    }
+
+    private void GuardDirect()
+    {
+        if (_segmentation.IsEmpty) return;
+        var binding = _segmentation.Untyped.Bind("direct data operation");
+        if (binding.IsEmpty) return; // an explicit host scope is a deliberate control-plane operation
+
+        throw new NotSupportedException(
+            "Direct data operations cannot preserve the application's compiled segmentation guarantee because " +
+            "opaque provider commands carry no framework predicate. Use the Entity surface, or establish an " +
+            "explicit host scope for a genuine control-plane operation.");
     }
 
     private bool TryInvokeExecutor<TResult>(Type entityType, Instruction instruction, out Task<TResult> task)
@@ -329,8 +348,8 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             throw new NotSupportedException($"No IDataProviderConnectionFactory registered for provider '{provider}'. Make sure the corresponding adapter package is referenced and registered.");
         }
         var connection = factory.Create(connectionString, source);
-        var canonicalProvider = sp.GetServices<IDataAdapterFactory>()
-            .FirstOrDefault(candidate => candidate.CanHandle(provider))
+        var canonicalProvider = sp.GetService<DataProviderCatalog>()
+            ?.Find(provider)
             ?.Provider ?? provider;
         sp.GetService<DataDiagnostics>()?.ObserveParticipation(canonicalProvider, source);
         return connection;

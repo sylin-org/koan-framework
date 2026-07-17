@@ -7,6 +7,7 @@ using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Entity;
+using Koan.Cache.Stores;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
@@ -30,7 +31,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
     private readonly IQueryRepository<TEntity, TKey>? _query;
     private readonly IRawQueryRepository<TEntity, TKey>? _rawQuery;
     private readonly IInstructionExecutor<TEntity>? _instructionExecutor;
-    private readonly ICacheClient _cacheClient;
+    private readonly CacheClient _cacheClient;
     private readonly CachePolicyDescriptor _entityPolicy;
     private readonly EntityCachePlan.Resolution _plan;
     private readonly ILogger<CachedRepository<TEntity, TKey>> _logger;
@@ -38,7 +39,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     public CachedRepository(
         IDataRepository<TEntity, TKey> inner,
-        ICacheClient cacheClient,
+        CacheClient cacheClient,
         EntityCachePlan.Resolution plan,
         ILogger<CachedRepository<TEntity, TKey>> logger)
     {
@@ -82,11 +83,11 @@ internal sealed class CachedRepository<TEntity, TKey> :
                 {
                     var value = await _inner.Get(id, innerCt);
                     return value;
-                }, options, ct);
+                }, options, typeof(TEntity), ct);
 
             case CacheStrategy.GetOnly:
                 {
-                    var cached = await _cacheClient.GetAsync<TEntity>(key, options, ct);
+                    var cached = await _cacheClient.GetAsync<TEntity>(key, options, typeof(TEntity), ct);
                     if (cached is not null)
                     {
                         return cached;
@@ -282,11 +283,11 @@ internal sealed class CachedRepository<TEntity, TKey> :
             case CacheStrategy.GetOrSet:
             case CacheStrategy.SetOnly:
                 var options = _entityPolicy.ToOptions();
-                await _cacheClient.SetAsync(key.Value, entity, options, ct);
+                await _cacheClient.SetAsync(key.Value, entity, options, typeof(TEntity), ct);
                 break;
             case CacheStrategy.GetOnly:
             case CacheStrategy.Invalidate:
-                await _cacheClient.Remove(key.Value, ct);
+                await _cacheClient.Remove(key.Value, typeof(TEntity), ct);
                 break;
         }
     }
@@ -303,7 +304,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
             return;
         }
 
-        await _cacheClient.Remove(key, ct);
+        await _cacheClient.Remove(key, typeof(TEntity), ct);
     }
 
     private CacheKey? ResolveKey(TEntity entity)

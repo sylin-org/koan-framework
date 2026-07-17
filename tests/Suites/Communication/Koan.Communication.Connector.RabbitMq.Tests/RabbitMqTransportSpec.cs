@@ -43,6 +43,16 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
         var bounds = facts.Single(fact => fact.Code == "koan.communication.transport.bounds");
         bounds.Summary.Should().Contain("durably-acknowledged");
         bounds.Summary.Should().Contain("not observable");
+        facts.Should().Contain(fact =>
+            fact.Code == "koan.communication.context.guarantees"
+            && fact.Subject == "communication:transport:default:context"
+            && fact.Summary.Contains("authenticated", StringComparison.Ordinal)
+            && fact.Summary.Contains("provider-shared", StringComparison.Ordinal)
+            && fact.Summary.Contains("does not provide payload confidentiality", StringComparison.Ordinal));
+        facts.Should().Contain(fact =>
+            fact.Code == "koan.segmentation.realization.active"
+            && fact.Subject == "segmentation:communication"
+            && fact.Summary.Contains("typed-context-carriage", StringComparison.Ordinal));
 
         var health = host.Services.GetServices<IHealthContributor>()
             .Single(contributor => contributor.Name == "communication.rabbitmq");
@@ -277,7 +287,7 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
             })
             .StartAsync(ct);
 
-    public sealed class FanoutOrder : Entity<FanoutOrder>
+    public sealed class FanoutOrder : Entity<FanoutOrder>, IAmbientExempt
     {
         public string Name { get; set; } = "";
     }
@@ -312,7 +322,7 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
         }
     }
 
-    public sealed class NoReceiverOrder : Entity<NoReceiverOrder>;
+    public sealed class NoReceiverOrder : Entity<NoReceiverOrder>, IAmbientExempt;
 
     internal readonly record struct ProbeSignal : IFrameworkSignal<ProbeSignal>
     {

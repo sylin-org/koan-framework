@@ -5,7 +5,7 @@ namespace Koan.Data.Abstractions.Pipeline;
 
 /// <summary>
 /// The boot-time index of <see cref="ManagedFieldDescriptor"/>s (DATA-0105 §4). A cross-cutting module
-/// registers its descriptors from its <c>KoanAutoRegistrar.Initialize</c> (Reference = Intent); the data core,
+/// registers its descriptors from its <c>KoanModule.Register</c> (Reference = Intent); the data core,
 /// the relational serializer, and the cache key read them generically.
 ///
 /// <para>Deliberate static index (not DI): the relational Serialize-stage contract resolver needs static reach

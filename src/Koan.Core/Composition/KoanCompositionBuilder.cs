@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using Koan.Core.Diagnostics;
 using Koan.Core.Infrastructure;
+using Koan.Core.Providers;
 
 namespace Koan.Core.Composition;
 
 /// <summary>
-/// Accumulator handed to <see cref="IKoanCompositionContributor"/>s so they can enrich the resolved
-/// composition twin without depending on the internal <see cref="KoanLockfile"/> shape. Koan.Core
-/// seeds app/modules/config-keys; pillars add elections, capabilities and entities. Last write wins
-/// per key, so a later contributor can refine an earlier one.
+/// Safe projection writer used by Core and active retained modules to enrich the resolved composition
+/// twin without depending on the internal <see cref="KoanLockfile"/> shape. Koan.Core seeds
+/// app/modules/config-keys; pillars add elections, capabilities and entities. Last write wins per key.
 /// </summary>
 public sealed class KoanCompositionBuilder
 {
@@ -41,6 +41,22 @@ public sealed class KoanCompositionBuilder
             null,
             source ?? "composition",
             key));
+    }
+
+    /// <summary>Project one canonical provider-selection receipt without reconstructing its decision.</summary>
+    public void AddElection(
+        ProviderSelectionReceipt receipt,
+        string? source = null,
+        string? factCode = null)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        AddElection(
+            receipt.Subject,
+            receipt.ProviderId,
+            receipt.Reason,
+            receipt.Priority,
+            source,
+            factCode);
     }
 
     /// <summary>Record a rejected composition decision without accepting provider-specific payloads.</summary>
@@ -87,6 +103,27 @@ public sealed class KoanCompositionBuilder
         AddFact(KoanFact.Create(
             code,
             KoanFactKind.Discovery,
+            KoanFactState.Observed,
+            subject,
+            summary,
+            reasonCode,
+            null,
+            source ?? "composition",
+            subject));
+    }
+
+    /// <summary>Project one active, value-free guarantee from its concern-owned plan or realization receipt.</summary>
+    public void AddGuarantee(
+        string code,
+        string subject,
+        string summary,
+        string reasonCode,
+        string? source = null)
+    {
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(subject)) return;
+        AddFact(KoanFact.Create(
+            code,
+            KoanFactKind.Guarantee,
             KoanFactState.Observed,
             subject,
             summary,

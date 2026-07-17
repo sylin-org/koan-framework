@@ -6,6 +6,7 @@ using System.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
@@ -19,7 +20,7 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        // Initialize modules (adapters, etc.) that opt-in via IKoanInitializer
+        // Compile and activate referenced Koan modules (adapters, etc.).
         AppBootstrapper.InitializeModules(services);
         RegisterKoanDataCoreServices(services);
         return services;
@@ -42,6 +43,7 @@ public static class ServiceCollectionExtensions
         // Vector defaults now live in Koan.Data.Vector; apps should call AddKoanDataVector() to enable vector features.
         services.AddKoanOptions<DataRuntimeOptions>();
         services.AddSingleton<IAggregateIdentityManager, AggregateIdentityManager>();
+        services.TryAddSingleton(Koan.Core.Semantics.Segmentation.SegmentationPlan.Empty);
 
         // The data core is tenancy-agnostic: it exposes the generic Pipeline.IStorageGuard seam (DATA-0105 §0).
         // Tenancy registers its gate from the Koan.Tenancy module's auto-registrar (Reference = Intent); no
@@ -72,6 +74,17 @@ public static class ServiceCollectionExtensions
             return registry;
         });
 
+        services.AddSingleton<Routing.DataProviderCatalog>(sp => new Routing.DataProviderCatalog(
+            sp.GetServices<IDataAdapterFactory>(),
+            sp.GetService<Koan.Core.Composition.KoanApplicationReferenceManifest>()));
+        services.AddSingleton<Routing.DataDefaultProviderPlan>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<
+            Koan.Core.Semantics.Segmentation.ISegmentationRealization,
+            Semantics.DataSegmentationPlan>());
+        services.TryAddSingleton(sp => sp
+            .GetServices<Koan.Core.Semantics.Segmentation.ISegmentationRealization>()
+            .OfType<Semantics.DataSegmentationPlan>()
+            .Single());
         services.AddSingleton<IDataService, DataService>();
         // Direct data access (DATA-0053 / ARCH-0090 §1): folded in from the former Koan.Data.Direct package.
         // Registered by default so DataService.Direct(...) works out-of-box — no separate AddKoanDataDirect().
@@ -93,48 +106,54 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Builds a provider and starts Koan runtime discovery for a synchronous, non-hosted process.
+    /// Builds and starts a Koan generic host for a synchronous console process.
     /// </summary>
     /// <remarks>
-    /// The caller owns the returned provider and must dispose it. This path does not run a generic
-    /// host or its hosted-service lifecycle; web applications and workers should use <c>AddKoan()</c>
-    /// with the generic host instead.
+    /// The caller owns the returned host and must dispose it. The synchronous facade starts the
+    /// same standard hosted-service lifecycle used by worker and web hosts; it does not block waiting
+    /// for application shutdown.
     /// </remarks>
-    /// <returns>
-    /// The active provider. The returned object implements both <see cref="IDisposable"/> and
-    /// <see cref="IAsyncDisposable"/>.
-    /// </returns>
-    public static IServiceProvider StartKoan(this IServiceCollection services)
+    /// <returns>The active standard host. Dispose it to stop hosted capabilities and release the ambient owner.</returns>
+    public static IHost StartKoan(this IServiceCollection services)
     {
-        // Avoid duplicate registration if already configured
-        if (!services.Any(d => d.ServiceType == typeof(Koan.Core.Hosting.Runtime.IAppRuntime)))
-            services.AddKoan();
-
-        // Provide a default IConfiguration only if the host hasn't already registered one
-        if (!services.Any(d => d.ServiceType == typeof(IConfiguration)))
+        ArgumentNullException.ThrowIfNull(services);
+        var suppliedConfiguration = services.Any(d => d.ServiceType == typeof(IConfiguration));
+        var builder = Host.CreateApplicationBuilder();
+        foreach (var descriptor in services)
         {
-            var cb = new ConfigurationBuilder()
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
-                .AddEnvironmentVariables();
-            // If Koan.Secrets.Core is referenced, auto-add the secrets configuration wrapper
-            TryInvokeSecretsBootstrap("AddSecretsReferenceConfiguration", cb, null);
-
-            var cfg = cb.Build();
-            services.AddSingleton<IConfiguration>(cfg);
+            builder.Services.Add(descriptor);
         }
 
-        var sp = services.BuildServiceProvider();
-        var owner = new NonHostedServiceProvider(sp);
-        owner.Own(Koan.Core.Hosting.App.AppHost.Attach(owner));
+        // The standard host already owns appsettings, environment configuration, logging,
+        // IHostEnvironment, IHostApplicationLifetime, and hosted-service shutdown. Preserve an
+        // explicitly supplied IConfiguration as the last DI registration; otherwise let optional
+        // Secrets extend the standard configuration pipeline before Koan composes.
+        if (!suppliedConfiguration)
+        {
+            TryInvokeSecretsBootstrap("AddSecretsReferenceConfiguration", builder.Configuration, null);
+        }
+
+        if (!builder.Services.Any(d => d.ServiceType == typeof(Koan.Core.Hosting.Runtime.IAppRuntime)))
+        {
+            builder.Services.AddKoan();
+        }
+
+        var owner = new StartedKoanHost(builder.Build());
 
         try
         {
-            // If secrets configuration is present, upgrade from bootstrap to DI-backed resolver and emit reload
+            // Complete the optional DI-backed configuration upgrade before IHost starts services.
+            // Koan's host binder owns the inner provider during startup; after startup the facade
+            // returned to the caller deliberately becomes the ambient owner.
             TryInvokeSecretsBootstrap("UpgradeSecretsConfiguration", owner);
-            try { KoanEnv.TryInitialize(owner); } catch { }
+            owner.StartOwnedHost();
+
+            // Custom runtimes supplied by a caller may not have the standard hosted bridge. The
+            // built-in runtime is idempotent, so the common host path remains one lifecycle.
             var rt = owner.GetService<Koan.Core.Hosting.Runtime.IAppRuntime>();
             rt?.Discover();
             rt?.Start();
+            owner.Own(Koan.Core.Hosting.App.AppHost.Attach(owner));
             return owner;
         }
         catch
@@ -156,10 +175,12 @@ public static class ServiceCollectionExtensions
         catch { /* optional */ }
     }
 
-    private sealed class NonHostedServiceProvider(ServiceProvider provider) : IServiceProvider, IDisposable, IAsyncDisposable
+    private sealed class StartedKoanHost(IHost host) : IHost, IServiceProvider, IAsyncDisposable
     {
-        private ServiceProvider? _provider = provider;
+        private IHost? _host = host;
         private IDisposable? _lease;
+
+        public IServiceProvider Services => this;
 
         public void Own(IDisposable lease)
         {
@@ -167,27 +188,57 @@ public static class ServiceCollectionExtensions
             Interlocked.Exchange(ref _lease, lease)?.Dispose();
         }
 
+        public void StartOwnedHost()
+        {
+            var current = Volatile.Read(ref _host)
+                ?? throw new ObjectDisposedException(nameof(StartedKoanHost));
+            current.Start();
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken = default)
+        {
+            var current = Volatile.Read(ref _host)
+                ?? throw new ObjectDisposedException(nameof(StartedKoanHost));
+            return current.StartAsync(cancellationToken);
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken = default)
+        {
+            var current = Volatile.Read(ref _host)
+                ?? throw new ObjectDisposedException(nameof(StartedKoanHost));
+            return current.StopAsync(cancellationToken);
+        }
+
         public object? GetService(Type serviceType)
         {
             ArgumentNullException.ThrowIfNull(serviceType);
-            var current = Volatile.Read(ref _provider)
-                ?? throw new ObjectDisposedException(nameof(NonHostedServiceProvider));
-            return current.GetService(serviceType);
+            var current = Volatile.Read(ref _host)
+                ?? throw new ObjectDisposedException(nameof(StartedKoanHost));
+            return current.Services.GetService(serviceType);
         }
 
-        public void Dispose()
-        {
-            Interlocked.Exchange(ref _lease, null)?.Dispose();
-            Interlocked.Exchange(ref _provider, null)?.Dispose();
-        }
+        public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();
 
         public async ValueTask DisposeAsync()
         {
             Interlocked.Exchange(ref _lease, null)?.Dispose();
-            var current = Interlocked.Exchange(ref _provider, null);
-            if (current is not null)
+            var current = Interlocked.Exchange(ref _host, null);
+            if (current is null) return;
+
+            try
             {
-                await current.DisposeAsync().ConfigureAwait(false);
+                await current.StopAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                if (current is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                }
+                else
+                {
+                    current.Dispose();
+                }
             }
         }
     }

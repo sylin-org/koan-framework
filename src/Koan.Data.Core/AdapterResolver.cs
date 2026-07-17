@@ -1,186 +1,137 @@
-using System;
-using System.Linq;
 using System.Reflection;
-using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
-using Koan.Core;
-using Koan.Data.Core.Routing;
 using Koan.Data.Core.Infrastructure;
+using Koan.Data.Core.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Core;
 
 /// <summary>
-/// Resolves adapter and source for an entity according to priority rules.
-///
-/// Priority chain (first match wins):
-/// 1. EntityContext.Current.Source → use source's configured adapter
-/// 1.5. Database-mode [DataAxis] route (ARCH-0102 §3) → source derived from the ambient (auto-routing), gated by
-///      DatabaseRouteRegistry.IsEmpty so off = byte-identical
-/// 2. EntityContext.Current.Adapter → explicit adapter override
-/// 3. [DataAdapter] or [SourceAdapter] attribute → entity-level configuration
-/// 4. "Default" source (if configured) → framework-level default
-/// 5. [ProviderPriority] ranking → fallback to highest priority factory
+/// Owns Data's typed source/provider precedence. Exact user intent is resolved through the host catalog
+/// and never weakens to an unrelated provider.
 /// </summary>
 internal static class AdapterResolver
 {
-    /// <summary>
-    /// Resolve adapter and source for an entity.
-    /// </summary>
-    /// <param name="sp">Service provider for factory resolution</param>
-    /// <param name="sourceRegistry">Source registry for source lookup</param>
-    /// <returns>Tuple of (Adapter, Source)</returns>
-    /// <exception cref="InvalidOperationException">Thrown when resolution fails</exception>
     public static (string Adapter, string Source) ResolveForEntity<TEntity>(
-        IServiceProvider sp,
+        IServiceProvider services,
         DataSourceRegistry sourceRegistry)
-        where TEntity : class
-        => ResolveDecisionForEntity<TEntity>(sp, sourceRegistry).ToTuple();
+        where TEntity : class =>
+        ResolveDecisionForEntity<TEntity>(services, sourceRegistry).ToTuple();
 
     internal static AdapterResolutionDecision ResolveDecisionForEntity<TEntity>(
-        IServiceProvider sp,
+        IServiceProvider services,
         DataSourceRegistry sourceRegistry)
         where TEntity : class
     {
-        var ctx = EntityContext.Current;
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(sourceRegistry);
 
-        // Priority 1 + 1.5 (one decision, ARCH-0103 §4.1): the shared RoutedSource resolves an explicit
-        // EntityContext.Source (always wins) else a Database-mode [DataAxis] route — the SAME primitive VectorService
-        // routes through, so a Database-mode axis routes the record and vector planes to one source (no split-brain).
-        // ctx is reused (read once) so the off path stays a single ambient read (FC-5: off = byte-identical).
-        var routed = RoutedSource.Resolve(typeof(TEntity), ctx);
+        var providers = services.GetRequiredService<DataProviderCatalog>();
+        var context = EntityContext.Current;
+        var routed = RoutedSource.Resolve(typeof(TEntity), context);
 
-        // Priority 1: Source specified in context → use source's adapter
         if (routed.Kind == RouteKind.Explicit)
         {
-            var sourceDefinition = sourceRegistry.GetSource(routed.Source!);
-            if (sourceDefinition == null)
+            var source = sourceRegistry.GetSource(routed.Source!);
+            if (source is null)
+            {
                 throw new InvalidOperationException(
-                    $"Source '{routed.Source}' is not configured. " +
-                    $"Check Koan:Data:Sources:{routed.Source} configuration.");
+                    $"Source '{routed.Source}' is not configured. Check Koan:Data:Sources:{routed.Source} configuration.");
+            }
 
-            if (string.IsNullOrWhiteSpace(sourceDefinition.Adapter))
+            if (string.IsNullOrWhiteSpace(source.Adapter))
+            {
                 throw new InvalidOperationException(
                     $"Source '{routed.Source}' does not specify an adapter. " +
-                    $"Add 'Adapter' key to Koan:Data:Sources:{routed.Source} configuration.");
+                    $"Add 'Adapter' to Koan:Data:Sources:{routed.Source}.");
+            }
 
-            return new AdapterResolutionDecision(
-                sourceDefinition.Adapter,
+            return Required(
+                providers,
+                source.Adapter,
                 routed.Source!,
-                Constants.Diagnostics.Reasons.ContextSource);
+                Constants.Diagnostics.Reasons.ContextSource,
+                $"Correct Koan:Data:Sources:{routed.Source}:Adapter or reference the requested connector.");
         }
 
-        // Priority 1.5 (ARCH-0102 §3 — Database-mode auto-routing): a Database-mode axis derives the data source from
-        // the ambient (e.g. tenant → that tenant's DB) with no explicit EntityContext.Source.
         if (routed.Kind == RouteKind.DatabaseAxis)
         {
             var routedKey = routed.Source!;
-            var routedDefinition = sourceRegistry.GetSource(routedKey);
-
-            // Provisioning is a posture (ARCH-0102 §3), not a mechanism: external-only (the realized Phase-2 default)
-            // fails closed on an absent keyspace rather than silently mis-routing — self-explaining (FC-7). Lazy
-            // derivation (Tier-0 zero-config) and eager pre-provisioning are the P6 broker; until then, configure it.
-            if (routedDefinition == null)
+            var source = sourceRegistry.GetSource(routedKey);
+            if (source is null)
+            {
                 throw new InvalidOperationException(
                     $"Database-mode axis routed entity '{typeof(TEntity).Name}' to data source '{routedKey}', which is " +
                     $"not configured (provisioning posture: {nameof(ProvisioningPosture.ExternalOnly)}). " +
                     $"Add Koan:Data:Sources:{routedKey}:{{Adapter,ConnectionString}}, or pre-provision the source. (ARCH-0102 §3)");
+            }
 
-            if (string.IsNullOrWhiteSpace(routedDefinition.Adapter))
+            if (string.IsNullOrWhiteSpace(source.Adapter))
+            {
                 throw new InvalidOperationException(
                     $"Database-mode axis routed entity '{typeof(TEntity).Name}' to data source '{routedKey}', which does " +
                     $"not specify an adapter. Add 'Adapter' to Koan:Data:Sources:{routedKey}.");
-
-            return new AdapterResolutionDecision(
-                routedDefinition.Adapter,
-                routedKey,
-                Constants.Diagnostics.Reasons.DatabaseAxis);
-        }
-
-        // Priority 2: Adapter specified in context → use with implicit "Default" source
-        if (!string.IsNullOrWhiteSpace(ctx?.Adapter))
-        {
-            return new AdapterResolutionDecision(
-                ctx.Adapter,
-                "Default",
-                Constants.Diagnostics.Reasons.ContextAdapter);
-        }
-
-        // Priority 3: Entity [SourceAdapter] or [DataAdapter] attribute
-        var entityAdapter = ResolveFromAttribute<TEntity>();
-        if (entityAdapter != null)
-        {
-            // Attribute specified → MUST honor or fail
-            return new AdapterResolutionDecision(
-                entityAdapter,
-                "Default",
-                Constants.Diagnostics.Reasons.EntityAttribute);
-        }
-
-        // Priority 4: "Default" source configuration
-        return ResolveDefault(sp, sourceRegistry);
-    }
-
-    internal static AdapterResolutionDecision ResolveDefault(
-        IServiceProvider sp,
-        DataSourceRegistry sourceRegistry)
-    {
-        var factories = sp.GetServices<IDataAdapterFactory>().ToList();
-        var defaultSource = sourceRegistry.GetSource("Default");
-        if (defaultSource != null && !string.IsNullOrWhiteSpace(defaultSource.Adapter))
-        {
-            if (!factories.Any(factory => factory.CanHandle(defaultSource.Adapter)))
-            {
-                var available = factories
-                    .Select(FactoryResolver.ProviderName)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                    .ToArray();
-                var choices = available.Length == 0 ? "no referenced adapters" : string.Join(", ", available);
-                throw new AdapterResolutionException(
-                    defaultSource.Adapter,
-                    Constants.Diagnostics.Reasons.AdapterUnavailable,
-                    $"Set Koan:Data:Sources:Default:Adapter to a referenced adapter ({choices}), " +
-                    "or reference the connector package that owns the requested adapter.");
             }
 
-            return new AdapterResolutionDecision(
-                defaultSource.Adapter,
-                "Default",
-                Constants.Diagnostics.Reasons.DefaultSource);
+            return Required(
+                providers,
+                source.Adapter,
+                routedKey,
+                Constants.Diagnostics.Reasons.DatabaseAxis,
+                $"Correct Koan:Data:Sources:{routedKey}:Adapter or reference the requested connector.");
         }
 
-        // Priority 5: Highest priority adapter factory (the shared [ProviderPriority]+CanHandle ranking, ARCH-0103 §4.1).
-        if (factories.Count == 0)
-            throw new InvalidOperationException(
-                "No IDataAdapterFactory instances registered. " +
-                "Ensure adapter packages are referenced and AddKoan() has been called.");
+        if (!string.IsNullOrWhiteSpace(context?.Adapter))
+        {
+            return Required(
+                providers,
+                context.Adapter,
+                "Default",
+                Constants.Diagnostics.Reasons.ContextAdapter,
+                "Correct EntityContext.Adapter or reference the requested connector.");
+        }
 
-        // No desired provider here → highest priority overall; non-null because the list is non-empty (checked above).
-        var chosen = FactoryResolver.Resolve(factories, desired: null)!;
-        return new AdapterResolutionDecision(
-            FactoryResolver.ProviderName(chosen),
-            "Default",
-            Constants.Diagnostics.Reasons.ReferencePriority,
-            FactoryResolver.Priority(chosen));
+        var entityAdapter = ResolveFromAttribute<TEntity>();
+        if (entityAdapter is not null)
+        {
+            return Required(
+                providers,
+                entityAdapter,
+                "Default",
+                Constants.Diagnostics.Reasons.EntityAttribute,
+                $"Correct the provider decoration on '{typeof(TEntity).Name}' or reference the requested connector.");
+        }
+
+        return ResolveDefault(services);
     }
 
-    /// <summary>
-    /// Resolve adapter from entity attributes.
-    /// Prefers [SourceAdapter] over legacy [DataAdapter].
-    /// </summary>
+    internal static AdapterResolutionDecision ResolveDefault(IServiceProvider services)
+        => services.GetRequiredService<DataDefaultProviderPlan>().Decision;
+
+    private static AdapterResolutionDecision Required(
+        DataProviderCatalog providers,
+        string requested,
+        string source,
+        string via,
+        string correction)
+    {
+        var selected = providers.Require(
+            requested,
+            string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase)
+                ? "data:default"
+                : "data:source",
+            via,
+            correction);
+        return new AdapterResolutionDecision(selected.Factory, source, selected.Receipt);
+    }
+
     private static string? ResolveFromAttribute<TEntity>() where TEntity : class
     {
         var type = typeof(TEntity);
+        var source = type.GetCustomAttribute<SourceAdapterAttribute>();
+        if (source is not null && !string.IsNullOrWhiteSpace(source.Provider)) return source.Provider;
 
-        // Prefer SourceAdapter over legacy DataAdapter
-        var srcAttr = type.GetCustomAttribute<SourceAdapterAttribute>();
-        if (srcAttr != null && !string.IsNullOrWhiteSpace(srcAttr.Provider))
-            return srcAttr.Provider;
-
-        var dataAttr = type.GetCustomAttribute<DataAdapterAttribute>();
-        if (dataAttr != null && !string.IsNullOrWhiteSpace(dataAttr.Provider))
-            return dataAttr.Provider;
-
-        return null;
+        var data = type.GetCustomAttribute<DataAdapterAttribute>();
+        return data is not null && !string.IsNullOrWhiteSpace(data.Provider) ? data.Provider : null;
     }
 }

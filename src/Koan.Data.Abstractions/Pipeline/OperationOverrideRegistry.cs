@@ -5,7 +5,7 @@ namespace Koan.Data.Abstractions.Pipeline;
 /// <summary>
 /// The boot-time index of <see cref="OperationOverrideDescriptor"/>s (ARCH-0101 §4 — the operation-semantics override
 /// plane). A cross-cutting module (e.g. <c>Koan.Data.SoftDelete</c>) registers its override from its
-/// <c>KoanAutoRegistrar</c> (Reference = Intent); the data core's <c>RepositoryFacade</c> reads it generically at the
+/// <c>KoanModule</c> (Reference = Intent); the data core's <c>RepositoryFacade</c> reads it generically at the
 /// delete chokepoint and never names the axis.
 ///
 /// <para>Deliberate static index (not DI) — the same declared deviation as <c>ManagedFieldRegistry</c> / DATA-0105 §4.

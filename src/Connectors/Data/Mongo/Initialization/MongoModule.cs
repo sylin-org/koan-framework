@@ -18,7 +18,6 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Mongo.Discovery;
 using Koan.Data.Connector.Mongo.Orchestration;
-using Koan.ZenGarden.Core;
 using MongoItems = Koan.Data.Connector.Mongo.Infrastructure.MongoProvenanceItems;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
@@ -26,8 +25,8 @@ namespace Koan.Data.Connector.Mongo.Initialization;
 
 /// <summary>
 /// The MongoDB connector boot module (ARCH-0086 / ARCH-0103 §L). Folds the former split between the
-/// hand-written <c>KoanAutoRegistrar</c> (DI + boot report, with its in-line static BSON config and a
-/// bespoke connection re-discovery) and the independently-discovered <c>MongoOptimizationAutoRegistrar</c>
+/// previous DI/boot-report owner (with inline static BSON config and bespoke connection re-discovery) and
+/// the independently discovered optimization owner
 /// into ONE <see cref="KoanModule"/>: <see cref="Register"/> wires the services and applies the
 /// once-guarded driver configuration (<see cref="MongoDriverConfiguration"/>); <see cref="Report"/>
 /// publishes provenance, reusing the fleet-shared <see cref="AdapterBootReporting.ResolveConnectionString"/>
@@ -36,8 +35,6 @@ namespace Koan.Data.Connector.Mongo.Initialization;
 /// </summary>
 public sealed class MongoModule : KoanModule
 {
-    public override string Id => "Koan.Data.Connector.Mongo";
-
     public override void Register(IServiceCollection services)
     {
         // The Mongo-family global driver configuration must exist before any Mongo op during bootstrap
@@ -60,10 +57,6 @@ public sealed class MongoModule : KoanModule
         // Register MongoDB discovery adapter (maintains "Reference = Intent")
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, MongoDiscoveryAdapter>());
 
-        // Optional Zen Garden binding metadata (used only when Koan.ZenGarden is referenced). One binding:
-        // the offering lookup keys on the adapter id "mongo" (MongoOptionsConfigurator), so the former
-        // "mongodb"-aliased binding was dead — dropped (ARCH-0103 §L ZenGarden dedup).
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IZenGardenOfferingBinding, MongoZenGardenOfferingBinding>());
     }
 
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
@@ -72,7 +65,7 @@ public sealed class MongoModule : KoanModule
         // Autonomous discovery adapter handles all connection string resolution; the boot report shows
         // the discovery result via the fleet-shared AdapterBootReporting.ResolveConnectionString.
         module.AddNote("MongoDB discovery handled by autonomous MongoDiscoveryAdapter");
-        module.AddNote("Layered discovery: Zen Garden compatibility declared; activation is owned by Koan.ZenGarden");
+        module.AddNote("Layered discovery: accepts compiled automatic sources through the shared Mongo discovery pipeline");
         module.AddNote("AODB isolation: RowScoped + ContainerScoped + DatabaseScoped (conformance: AodbConformanceSpecsBase)");
 
         var defaultOptions = new MongoOptions();

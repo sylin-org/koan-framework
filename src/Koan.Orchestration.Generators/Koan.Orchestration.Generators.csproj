@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>netstandard2.0</TargetFramework>
     <Nullable>enable</Nullable>
     <OutputType>Library</OutputType>
@@ -37,7 +36,6 @@
     <None Include="$(OutputPath)$(AssemblyName).xml" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" Condition="Exists('$(OutputPath)$(AssemblyName).xml')" />
   </ItemGroup>
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <!-- Mark this assembly as an analyzer for consumers -->
     <IsRoslynComponent>true</IsRoslynComponent>
     <!-- See Koan.Cache.Analyzers.csproj for the rationale on these symbol/pack settings. -->

@@ -1,84 +1,59 @@
-using System;
 using System.Collections.Concurrent;
-using System.Linq;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
-using Koan.Core;
 
 namespace Koan.Data.Vector.Abstractions;
 
-/// <summary>
-/// Configuration resolution for vector entities.
-/// Parallel to AggregateConfigs but for vector layer.
-/// Caches provider selection per (entity, key) combination.
-/// </summary>
+/// <summary>Host-owned vector configuration resolution for Entity types.</summary>
 public static class VectorConfigs
 {
-    private static readonly ConcurrentDictionary<(Type, Type), object> Cache = new();
+    private static ConditionalWeakTable<
+        IServiceProvider,
+        ConcurrentDictionary<(Type EntityType, Type KeyType), object>> _configsByProvider = new();
 
-    /// <summary>
-    /// Get vector configuration for entity type.
-    /// Resolves vector provider via [VectorAdapter] attribute or highest-priority factory.
-    /// </summary>
-    public static VectorConfig<TEntity, TKey> Get<TEntity, TKey>(IServiceProvider sp)
+    public static VectorConfig<TEntity, TKey> Get<TEntity, TKey>(IServiceProvider services)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var key = (typeof(TEntity), typeof(TKey));
-        if (Cache.TryGetValue(key, out var existing))
-            return (VectorConfig<TEntity, TKey>)existing;
-
-        var provider = ResolveProvider(typeof(TEntity), sp);
-        var cfg = new VectorConfig<TEntity, TKey>(provider, sp);
-        Cache[key] = cfg;
-        return cfg;
+        ArgumentNullException.ThrowIfNull(services);
+        var cache = Volatile.Read(ref _configsByProvider).GetValue(
+            services,
+            static _ => new ConcurrentDictionary<(Type, Type), object>());
+        return (VectorConfig<TEntity, TKey>)cache.GetOrAdd(
+            (typeof(TEntity), typeof(TKey)),
+            _ => new VectorConfig<TEntity, TKey>(ResolveProvider(typeof(TEntity), services), services));
     }
 
-    /// <summary>
-    /// Clear cached configurations. Used for testing/host reset.
-    /// </summary>
-    internal static void Reset() => Cache.Clear();
+    internal static void Reset() => Interlocked.Exchange(
+        ref _configsByProvider,
+        new ConditionalWeakTable<
+            IServiceProvider,
+            ConcurrentDictionary<(Type EntityType, Type KeyType), object>>());
 
-    private static string ResolveProvider(Type entityType, IServiceProvider sp)
+    private static string ResolveProvider(Type entityType, IServiceProvider services)
     {
-        // Check for explicit [VectorAdapter("provider")] attribute
-        var attr = (VectorAdapterAttribute?)Attribute.GetCustomAttribute(
+        var providers = services.GetRequiredService<IVectorProviderResolver>();
+        var attribute = (VectorAdapterAttribute?)Attribute.GetCustomAttribute(
             entityType,
             typeof(VectorAdapterAttribute));
+        if (!string.IsNullOrWhiteSpace(attribute?.Provider))
+        {
+            return providers.Find(attribute.Provider)?.Provider
+                ?? throw Unavailable(entityType, attribute.Provider, providers);
+        }
 
-        if (attr is not null && !string.IsNullOrWhiteSpace(attr.Provider))
-            return attr.Provider;
-
-        // Fallback: Highest-priority vector adapter factory
-        return DefaultVectorProvider(sp);
+        return providers.SelectAutomatic()?.Provider
+            ?? throw new InvalidOperationException(
+                $"No automatic vector provider is available for Entity '{entityType.Name}'. " +
+                "Reference a vector connector or add an exact VectorAdapter decoration.");
     }
 
-    private static string DefaultVectorProvider(IServiceProvider sp)
-    {
-        var factories = sp.GetServices<IVectorAdapterFactory>().ToList();
-
-        if (factories.Count == 0)
-            throw new InvalidOperationException(
-                "No IVectorAdapterFactory registered. Ensure vector connector package is referenced.");
-
-        // Rank by ProviderPriorityAttribute (higher wins), then by name for stability
-        var ranked = factories
-            .Select(f => new
-            {
-                Factory = f,
-                Priority = (f.GetType().GetCustomAttributes(typeof(ProviderPriorityAttribute), false)
-                    .FirstOrDefault() as ProviderPriorityAttribute)?.Priority ?? 0,
-                Name = f.GetType().Name
-            })
-            .OrderByDescending(x => x.Priority)
-            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        var chosen = ranked.First().Factory.Provider;
-
-        // TODO: Add ILogger injection for diagnostics
-        // Log warning about implicit provider selection
-
-        return chosen;
-    }
+    private static InvalidOperationException Unavailable(
+        Type entityType,
+        string requested,
+        IVectorProviderResolver providers) => new(
+        $"Entity '{entityType.Name}' requires vector provider '{requested}', but it is unavailable. " +
+        $"Referenced vector providers: {(providers.AvailableProviderIds.Count == 0 ? "none" : string.Join(", ", providers.AvailableProviderIds))}. " +
+        "Correct the VectorAdapter decoration or reference the intended connector; Koan will not substitute an unrelated provider.");
 }

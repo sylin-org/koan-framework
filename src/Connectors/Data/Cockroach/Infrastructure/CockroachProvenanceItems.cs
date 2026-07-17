@@ -13,7 +13,7 @@ internal static class CockroachProvenanceItems
     {
         "Koan.Data.Connector.Cockroach.CockroachOptionsConfigurator",
         "Koan.Data.Connector.Cockroach.CockroachAdapterFactory",
-        "Koan.Data.Connector.Cockroach.Initialization.KoanAutoRegistrar"
+        "Koan.Data.Connector.Cockroach.Initialization.CockroachDataModule"
     };
 
     private static readonly IReadOnlyCollection<string> NamingConsumers = new[]

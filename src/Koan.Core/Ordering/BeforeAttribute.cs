@@ -1,10 +1,8 @@
 namespace Koan.Core.Ordering;
 
 /// <summary>
-/// Declares that the annotated <see cref="IKoanInitializer"/> (typically an
-/// <see cref="IKoanAutoRegistrar"/>) must have its
-/// <see cref="IKoanInitializer.Initialize"/> invoked BEFORE every type listed in
-/// <see cref="Targets"/>. See CORE-0091.
+/// Declares that the annotated <see cref="KoanModule"/> must be registered and started BEFORE every
+/// type listed in <see cref="Targets"/>. See CORE-0091.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -19,7 +17,7 @@ namespace Koan.Core.Ordering;
 /// is the union.
 /// </para>
 /// <para>
-/// Targets that are not assignable to <see cref="IKoanInitializer"/> throw at
+/// Targets that are not assignable to <see cref="KoanModule"/> throw at
 /// sort time with the offending pair named. Targets that resolve to a type
 /// not present in the registry (e.g., the referenced assembly was not loaded)
 /// are silently skipped — that preserves "reference = intent": if you want

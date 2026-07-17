@@ -4,7 +4,7 @@ namespace Koan.Communication.Tests.Support;
 
 public static class TransportReceiverFixtures
 {
-    public sealed class CopyOrder : Entity<CopyOrder>
+    public sealed class CopyOrder : Entity<CopyOrder>, IAmbientExempt
     {
         public string Name { get; set; } = "";
     }
@@ -28,7 +28,7 @@ public static class TransportReceiverFixtures
         }
     }
 
-    public sealed class BlockingOrder : Entity<BlockingOrder>
+    public sealed class BlockingOrder : Entity<BlockingOrder>, IAmbientExempt
     {
         public string Name { get; set; } = "";
     }
@@ -43,7 +43,7 @@ public static class TransportReceiverFixtures
         }
     }
 
-    public sealed class SequenceOrder : Entity<SequenceOrder>
+    public sealed class SequenceOrder : Entity<SequenceOrder>, IAmbientExempt
     {
         public int Value { get; set; }
     }
@@ -57,7 +57,7 @@ public static class TransportReceiverFixtures
         }
     }
 
-    public sealed class FilterOrder : Entity<FilterOrder>
+    public sealed class FilterOrder : Entity<FilterOrder>, IAmbientExempt
     {
         public bool Accepted { get; set; }
     }
@@ -84,7 +84,7 @@ public static class TransportReceiverFixtures
         }
     }
 
-    public sealed class FailureOrder : Entity<FailureOrder>;
+    public sealed class FailureOrder : Entity<FailureOrder>, IAmbientExempt;
 
     public sealed class FailureReceiver : IReceiveEntity<FailureOrder>
     {
@@ -92,7 +92,7 @@ public static class TransportReceiverFixtures
             => throw new InvalidOperationException("expected receiver failure");
     }
 
-    public sealed class CancellationOrder : Entity<CancellationOrder>
+    public sealed class CancellationOrder : Entity<CancellationOrder>, IAmbientExempt
     {
         public int Value { get; set; }
     }
@@ -109,7 +109,7 @@ public static class TransportReceiverFixtures
         }
     }
 
-    public sealed class DrainOrder : Entity<DrainOrder>;
+    public sealed class DrainOrder : Entity<DrainOrder>, IAmbientExempt;
 
     public sealed class DrainReceiver(TransportTestState state) : IReceiveEntity<DrainOrder>
     {
@@ -121,7 +121,7 @@ public static class TransportReceiverFixtures
         }
     }
 
-    public sealed class IsolationOrder : Entity<IsolationOrder>;
+    public sealed class IsolationOrder : Entity<IsolationOrder>, IAmbientExempt;
 
     public sealed class IsolationReceiver(TransportTestState state) : IReceiveEntity<IsolationOrder>
     {
@@ -132,5 +132,5 @@ public static class TransportReceiverFixtures
         }
     }
 
-    public sealed class NoReceiverOrder : Entity<NoReceiverOrder>;
+    public sealed class NoReceiverOrder : Entity<NoReceiverOrder>, IAmbientExempt;
 }

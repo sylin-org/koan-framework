@@ -1,8 +1,8 @@
 # Koan.Orchestration.Aspire
 
-> ✅ Validated against discovery pipeline, initialization registrar, and self-orchestration services on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for detailed lifecycle diagrams and edge-case coverage.
+> Focused against the module discovery pipeline and self-orchestration build on **2026-07-17**. See [`TECHNICAL.md`](./TECHNICAL.md) for implementation boundaries and validation notes.
 
-Distributed Aspire resource registration for Koan Framework modules via the KoanAutoRegistrar pattern.
+Distributed Aspire resource registration contributed by ordinary Koan modules.
 
 ## Overview
 
@@ -62,13 +62,12 @@ Your Koan modules will automatically register their required infrastructure reso
 
 ### Module Self-Registration
 
-Koan modules implement the `IKoanAspireRegistrar` interface alongside their existing `IKoanAutoRegistrar`:
+The functional assembly keeps one module. It implements `IKoanAspireResources` when the same capability also owns Aspire resources:
 
 ```csharp
-public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
+public sealed class PostgresDataModule : KoanModule, IKoanAspireResources
 {
-    // Existing DI registration
-    public void Initialize(IServiceCollection services)
+    public override void Register(IServiceCollection services)
     {
         services.AddSingleton<IDataAdapterFactory, PostgresAdapterFactory>();
     }
@@ -92,7 +91,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
 The `AddKoanDiscoveredResources()` method:
 
 1. Scans loaded assemblies for Koan modules
-2. Finds modules implementing `IKoanAspireRegistrar`
+2. Finds concrete Koan modules implementing `IKoanAspireResources`
 3. Registers resources in priority order
 4. Handles configuration mapping and error scenarios
 
@@ -188,8 +187,8 @@ Both approaches can coexist, allowing gradual migration.
 For fine-grained control:
 
 ```csharp
-builder.AddKoanModule<PostgresKoanAutoRegistrar>()
-       .AddKoanModule<RedisKoanAutoRegistrar>();
+builder.AddKoanModule<PostgresDataModule>()
+       .AddKoanModule<RedisDataModule>();
 ```
 
 ### Custom Resource Configuration
@@ -231,7 +230,7 @@ public void RegisterAspireResources(IDistributedApplicationBuilder builder, ICon
 ### Common Issues
 
 **Resources not appearing in Aspire dashboard**:
-- Check that modules implement `IKoanAspireRegistrar`
+- Check that the assembly's Koan module implements `IKoanAspireResources`
 - Verify `ShouldRegister()` returns true for your environment
 - Check logs for registration errors
 
@@ -246,7 +245,7 @@ public void RegisterAspireResources(IDistributedApplicationBuilder builder, ICon
 - Use logging to debug configuration values
 
 ## Documentation
-- [`TECHNICAL.md`](./TECHNICAL.md) – discovery flow, registrar contract, orchestration modes, self-orchestration, and validation notes.
+- [`TECHNICAL.md`](./TECHNICAL.md) – discovery flow, Aspire resource contract, orchestration modes, self-orchestration, and validation notes.
 
 ### Diagnostic Information
 

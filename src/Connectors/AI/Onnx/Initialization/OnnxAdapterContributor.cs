@@ -4,6 +4,7 @@ using FastBertTokenizer;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
+using Koan.Core.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -29,7 +30,8 @@ internal sealed class OnnxAdapterContributor : IAiAdapterContributor
 
         if (string.IsNullOrWhiteSpace(options.ModelPath))
         {
-            logger.LogInformation("[ONNX] No model configured (Koan:Ai:Onnx:ModelPath); in-process embeddings inactive.");
+            KoanLog.BootInfo(logger, LogAction, "inactive",
+                ("reason", "model-not-configured"));
             return;
         }
 
@@ -59,8 +61,10 @@ internal sealed class OnnxAdapterContributor : IAiAdapterContributor
 
         RegisterSource(sourceRegistry, adapter);
 
-        logger.LogInformation("[ONNX] In-process embedding adapter registered: {Model} (dim {Dimension}) from {Path}.",
-            options.ModelName, adapter.Dimension, modelPath);
+        KoanLog.BootInfo(logger, LogAction, "registered",
+            ("model", options.ModelName),
+            ("dimension", adapter.Dimension),
+            ("path", modelPath));
     }
 
     /// <summary>
@@ -111,4 +115,6 @@ internal sealed class OnnxAdapterContributor : IAiAdapterContributor
 
     private static string Resolve(string path)
         => Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path);
+
+    private const string LogAction = "onnx.activation";
 }

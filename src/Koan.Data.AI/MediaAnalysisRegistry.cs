@@ -30,7 +30,7 @@ public static class MediaAnalysisRegistry
 
     /// <summary>
     /// Registers a single entity type with <c>[MediaAnalysis]</c> attribute.
-    /// Used by loaded-assembly discovery in <see cref="Initialization.KoanAutoRegistrar"/>; this records
+    /// Used by loaded-assembly discovery in <see cref="Initialization.DataAiModule"/>; this records
     /// a process-lifetime type fact and does not activate host-owned behavior.
     /// </summary>
     public static void Register(Type type, bool async)

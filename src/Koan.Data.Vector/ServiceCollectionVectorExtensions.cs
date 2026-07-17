@@ -13,6 +13,10 @@ public static class ServiceCollectionVectorExtensions
     public static IServiceCollection AddKoanDataVector(this IServiceCollection services)
     {
         services.TryAddSingleton<IVectorService, VectorService>();
+        services.TryAddSingleton<VectorProviderCatalog>(sp => new VectorProviderCatalog(
+            sp.GetServices<IVectorAdapterFactory>(),
+            sp.GetService<Koan.Core.Composition.KoanApplicationReferenceManifest>()));
+        services.TryAddSingleton<IVectorProviderResolver>(sp => sp.GetRequiredService<VectorProviderCatalog>());
         services.AddKoanOptions<VectorDefaultsOptions>(Constants.Configuration.DefaultsSection);
         services.TryAddSingleton<VectorSchemaRegistry>();
         return services;

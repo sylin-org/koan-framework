@@ -4,6 +4,7 @@ using Koan.Core.Context;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Jobs.Infrastructure;
+using Koan.Jobs.Semantics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -19,11 +20,11 @@ internal sealed class JobCoordinator : IJobCoordinator
     private readonly IServiceProvider _services;
     private readonly JobsOptions _options;
     private readonly TimeProvider _clock;
-    private readonly KoanContextCarrierRegistry _contextCarriers;
+    private readonly JobsContextPlan _contextPlan;
 
     public JobCoordinator(IJobLedger ledger, JobTypeRegistry registry, JobOrchestrator orchestrator,
         JobWakeCoordinator wake, IServiceProvider services, IOptions<JobsOptions> options, TimeProvider clock,
-        KoanContextCarrierRegistry contextCarriers)
+        JobsContextPlan contextPlan)
     {
         _ledger = ledger;
         _registry = registry;
@@ -32,7 +33,7 @@ internal sealed class JobCoordinator : IJobCoordinator
         _services = services;
         _options = options.Value;
         _clock = clock;
-        _contextCarriers = contextCarriers;
+        _contextPlan = contextPlan;
     }
 
     /// <summary>Resolve a job's gate key at submit. A property-based <c>[JobGate]</c> is read inline; a method-based
@@ -47,7 +48,7 @@ internal sealed class JobCoordinator : IJobCoordinator
     public async Task<JobHandle> SubmitAsync(object workItem, string action, TimeSpan? after, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(workItem);
-        var scope = CaptureSubmission();
+        var scope = CaptureSubmission(workItem.GetType());
         var accepted = await Accept(workItem, action, after, scope, ct).ConfigureAwait(false);
         if (!accepted.Coalesced)
         {
@@ -67,7 +68,7 @@ internal sealed class JobCoordinator : IJobCoordinator
 
         // One immutable operation snapshot for the complete source. Context is captured before the first await and
         // never rediscovered per item, so a logical submission cannot drift between tenants/subjects mid-stream.
-        var scope = CaptureSubmission();
+        var scope = CaptureSubmission(typeof(T));
         var enumerated = 0L;
         var submitted = 0L;
         var coalesced = 0L;
@@ -114,7 +115,7 @@ internal sealed class JobCoordinator : IJobCoordinator
         {
             // Re-establish the terminal's captured logical context for deferred source enumeration and every
             // work-item save. A source cannot accidentally make one submission drift onto the worker flow's axes.
-            using var contextScope = _contextCarriers.Restore(scope.Carrier, ContextIngressTrust.HostTrusted);
+            using var contextScope = _contextPlan.RestoreForSubmit(typeof(T), scope.Carrier);
             await foreach (var workItem in workItems.WithCancellation(ct).ConfigureAwait(false))
             {
                 enumerating = false;
@@ -194,7 +195,7 @@ internal sealed class JobCoordinator : IJobCoordinator
         // The singleton is ephemeral — it must NOT be persisted into the consumer's entity collection. The orchestrator
         // creates a fresh instance via binding.NewSingleton at execution time (no store round-trip on the hot path).
         var workItem = binding.NewSingleton(Constants.Work.SingletonId);
-        var carrier = Carrier();
+        var carrier = _contextPlan.Capture(binding.ClrType);
 
         var coalesceKey = JobCoalesce.FoldAmbient(binding.CoalesceKey(workItem, action), carrier);
         if (coalesceKey is not null)
@@ -259,11 +260,11 @@ internal sealed class JobCoordinator : IJobCoordinator
 
     private static string? Correlation() => Activity.Current?.TraceId.ToString();
 
-    private SubmissionScope CaptureSubmission()
+    private SubmissionScope CaptureSubmission(Type workType)
         => new(
             _clock.GetUtcNow(),
             Correlation(),
-            Carrier(),
+            _contextPlan.Capture(workType),
             EntityContext.InTransaction);
 
     private async Task<AcceptedSubmission> Accept(
@@ -331,10 +332,6 @@ internal sealed class JobCoordinator : IJobCoordinator
             await _orchestrator.DrainAsync(ct).ConfigureAwait(false);
         }
     }
-
-    // Snapshot the Koan context axes on the submitting flow (symmetric with Correlation()). Null in the common case
-    // (no cross-cutting axis) — zero allocation, absent on the row.
-    private IReadOnlyDictionary<string, string>? Carrier() => _contextCarriers.Capture();
 
     private static string? Snapshot(object workItem)
     {

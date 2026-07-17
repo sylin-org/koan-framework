@@ -25,11 +25,7 @@ namespace Koan.Data.Connector.SqlServer;
 public sealed class SqlServerAdapterFactory : IDataAdapterFactory
 {
     public string Provider => "mssql";
-
-    public bool CanHandle(string provider)
-        => string.Equals(provider, "mssql", StringComparison.OrdinalIgnoreCase)
-           || string.Equals(provider, "sqlserver", StringComparison.OrdinalIgnoreCase)
-           || string.Equals(provider, "microsoft.sqlserver", StringComparison.OrdinalIgnoreCase);
+    public IReadOnlyCollection<string> Aliases => ["sqlserver", "microsoft.sqlserver"];
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,
@@ -46,7 +42,7 @@ public sealed class SqlServerAdapterFactory : IDataAdapterFactory
         // relies on discovery and resolves to "auto") collapses onto the discovery-resolved base connection, so a
         // routed source never keys its store on the unresolved sentinel (ARCH-0103 P5 fleet hoist).
         var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "SqlServer", source, baseOpts.ConnectionString, CanHandle);
+            config, sourceRegistry, "SqlServer", source, baseOpts.ConnectionString, this);
 
         // Create source-specific options
         var sourceOpts = new SqlServerOptions

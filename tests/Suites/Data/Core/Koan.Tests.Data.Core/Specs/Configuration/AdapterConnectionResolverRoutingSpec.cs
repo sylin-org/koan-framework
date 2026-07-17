@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using AwesomeAssertions;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -26,7 +28,7 @@ public sealed class AdapterConnectionResolverRoutingSpec
 
         var resolved = AdapterConnectionResolver.ResolveRoutedConnection(
             new ConfigurationBuilder().Build(), registry, Provider, "Default", Discovered,
-            candidate => string.Equals(candidate, Provider, StringComparison.OrdinalIgnoreCase));
+            Owner());
 
         resolved.Should().Be(Explicit);
     }
@@ -55,7 +57,7 @@ public sealed class AdapterConnectionResolverRoutingSpec
             "Default", "json", "data.json", new Dictionary<string, string>()));
 
         var resolved = AdapterConnectionResolver.ResolveRoutedConnection(
-            new ConfigurationBuilder().Build(), registry, Provider, "Default", Discovered, OwnsProvider);
+            new ConfigurationBuilder().Build(), registry, Provider, "Default", Discovered, Owner());
 
         resolved.Should().Be(Discovered);
     }
@@ -75,7 +77,7 @@ public sealed class AdapterConnectionResolverRoutingSpec
             .Build();
 
         var resolved = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, registry, Provider, "Archive", Discovered, OwnsProvider);
+            config, registry, Provider, "Archive", Discovered, Owner());
 
         resolved.Should().Be(Explicit);
     }
@@ -96,9 +98,7 @@ public sealed class AdapterConnectionResolverRoutingSpec
             "Postgres",
             "Archive",
             Discovered,
-            candidate => candidate.Equals("postgres", StringComparison.OrdinalIgnoreCase) ||
-                         candidate.Equals("postgresql", StringComparison.OrdinalIgnoreCase) ||
-                         candidate.Equals("npgsql", StringComparison.OrdinalIgnoreCase));
+            Owner("postgres", "postgresql", "npgsql"));
 
         resolved.Should().Be(Explicit);
     }
@@ -118,7 +118,7 @@ public sealed class AdapterConnectionResolverRoutingSpec
 
         var resolved = AdapterConnectionResolver.ResolveRoutedConnection(
             config, registry, Provider, "Default", Discovered,
-            candidate => string.Equals(candidate, Provider, StringComparison.OrdinalIgnoreCase));
+            Owner());
 
         resolved.Should().Be(Explicit);
     }
@@ -202,7 +202,7 @@ public sealed class AdapterConnectionResolverRoutingSpec
             .Build();
 
         var resolved = AdapterConnectionResolver.GetSourceSetting(
-            config, registry, Provider, "Archive", "Database", 0, OwnsProvider);
+            config, registry, Provider, "Archive", "Database", 0, Owner());
 
         resolved.Should().Be(4);
     }
@@ -230,6 +230,13 @@ public sealed class AdapterConnectionResolverRoutingSpec
             .WithMessage("*No connection string found*");
     }
 
-    private static bool OwnsProvider(string candidate)
-        => string.Equals(candidate, Provider, StringComparison.OrdinalIgnoreCase);
+    private static IAdapterFactory Owner(string provider = Provider, params string[] aliases)
+        => new TestAdapterIdentity(provider, aliases);
+
+    private sealed class TestAdapterIdentity(string provider, IReadOnlyCollection<string> aliases) : IAdapterFactory
+    {
+        public string Provider { get; } = provider;
+        public IReadOnlyCollection<string> Aliases { get; } = aliases;
+        public StorageNamingCapability GetNamingCapability(IServiceProvider services) => throw new NotSupportedException();
+    }
 }

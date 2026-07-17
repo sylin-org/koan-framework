@@ -6,7 +6,7 @@ namespace Koan.Core;
 
 /// <summary>
 /// Scan-based DI registration for "many implementations of one service contract" shapes
-/// (adapters, plug-ins, scheduled tasks, etc.). Lets an <see cref="IKoanAutoRegistrar"/>
+/// (adapters, plug-ins, scheduled tasks, etc.). Lets a <see cref="KoanModule"/>
 /// register an entire family of implementations without listing each concrete type by hand —
 /// adding a new implementation becomes a zero-config drop.
 /// </summary>
@@ -37,9 +37,9 @@ public static class ServiceCollectionScanExtensions
     /// <returns>The same <paramref name="services"/> for chaining.</returns>
     /// <example>
     /// <code>
-    /// // Inside an IKoanAutoRegistrar.Initialize(services) implementation:
-    /// services.AddAllOf&lt;IPackageSource&gt;(typeof(KoanAutoRegistrar).Assembly);
-    /// services.AddAllOf&lt;IDownloadProxy&gt;(typeof(KoanAutoRegistrar).Assembly);
+    /// // Inside a KoanModule.Register(services) implementation:
+    /// services.AddAllOf&lt;IPackageSource&gt;(typeof(MyModule).Assembly);
+    /// services.AddAllOf&lt;IDownloadProxy&gt;(typeof(MyModule).Assembly);
     /// </code>
     /// </example>
     public static IServiceCollection AddAllOf<TService>(

@@ -23,9 +23,8 @@ public class KoanDiscoveryResult
 public static class KoanAspireExtensions
 {
     /// <summary>
-    /// Automatically discover and register all Koan modules that implement IKoanAspireRegistrar.
-    /// This method scans loaded assemblies for KoanAutoRegistrar classes that also implement
-    /// IKoanAspireRegistrar and calls their RegisterAspireResources method in priority order.
+    /// Automatically discover and register all Koan modules that implement <see cref="IKoanAspireResources"/>.
+    /// Discovery follows the capability interface rather than a class-name convention.
     /// </summary>
     /// <param name="builder">The Aspire distributed application builder</param>
     /// <returns>Collection of discovered resource names for application wiring</returns>
@@ -63,7 +62,7 @@ public static class KoanAspireExtensions
         ForceLoadKoanAssemblies(logger);
 
         var assemblies = KoanAssemblyDiscovery.GetKoanAssemblies();
-        var registrars = new List<(IKoanAspireRegistrar Registrar, Type RegistrarType, int Priority)>();
+        var contributors = new List<(IKoanAspireResources Contributor, Type ModuleType, int Priority)>();
 
         logger?.LogInformation("Koan-Aspire: Starting resource discovery across {AssemblyCount} assemblies", assemblies.Count());
 
@@ -71,35 +70,44 @@ public static class KoanAspireExtensions
         logger?.LogInformation("Koan-Aspire: Discovered assemblies: {AssemblyNames}",
             string.Join(", ", assemblies.Select(a => a.GetName().Name)));
 
-        // Discovery phase: find all implementing registrars
+        // Discovery phase: find the one module in each assembly that contributes Aspire resources.
         foreach (var assembly in assemblies)
         {
             try
             {
-                var registrarType = assembly.GetTypes()
-                    .FirstOrDefault(t => t.Name == "KoanAutoRegistrar" &&
-                                   t.GetInterface(nameof(IKoanAspireRegistrar)) != null);
+                var moduleTypes = KoanAssemblyDiscovery.GetAspireResourceModuleTypes(assembly);
 
-                if (registrarType != null)
+                if (moduleTypes.Length > 1)
                 {
-                    logger?.LogDebug("Koan-Aspire: Found IKoanAspireRegistrar in {AssemblyName}: {RegistrarType}",
-                        assembly.GetName().Name, registrarType.FullName);
+                    throw new InvalidOperationException(
+                        $"Assembly '{assembly.GetName().Name}' contains multiple Koan modules that contribute Aspire resources: " +
+                        string.Join(", ", moduleTypes.Select(static type => type.FullName)));
+                }
 
-                    var registrar = (IKoanAspireRegistrar)Activator.CreateInstance(registrarType)!;
+                var moduleType = moduleTypes.SingleOrDefault();
+                if (moduleType != null)
+                {
+                    logger?.LogDebug("Koan-Aspire: Found Aspire resource contributor in {AssemblyName}: {ModuleType}",
+                        assembly.GetName().Name, moduleType.FullName);
 
-                    // Check if this registrar should register in current environment
-                    if (registrar.ShouldRegister(builder.Configuration, builder.Environment))
+                    var contributor = (IKoanAspireResources)Activator.CreateInstance(moduleType)!;
+
+                    if (contributor.ShouldRegister(builder.Configuration, builder.Environment))
                     {
-                        registrars.Add((registrar, registrarType, registrar.Priority));
-                        logger?.LogInformation("Koan-Aspire: Queued registrar {RegistrarType} with priority {Priority}",
-                            registrarType.FullName, registrar.Priority);
+                        contributors.Add((contributor, moduleType, contributor.Priority));
+                        logger?.LogInformation("Koan-Aspire: Queued module {ModuleType} with priority {Priority}",
+                            moduleType.FullName, contributor.Priority);
                     }
                     else
                     {
-                        logger?.LogDebug("Koan-Aspire: Skipped registrar {RegistrarType} - ShouldRegister returned false",
-                            registrarType.FullName);
+                        logger?.LogDebug("Koan-Aspire: Skipped module {ModuleType} - ShouldRegister returned false",
+                            moduleType.FullName);
                     }
                 }
+            }
+            catch (InvalidOperationException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -108,26 +116,26 @@ public static class KoanAspireExtensions
             }
         }
 
-        logger?.LogInformation("Koan-Aspire: Discovered {RegistrarCount} resource registrars", registrars.Count);
+        logger?.LogInformation("Koan-Aspire: Discovered {ContributorCount} resource contributors", contributors.Count);
 
         // Registration phase: register in priority order
         var registeredCount = 0;
-        foreach (var (registrar, registrarType, priority) in registrars.OrderBy(r => r.Priority))
+        foreach (var (contributor, moduleType, priority) in contributors.OrderBy(item => item.Priority))
         {
             try
             {
-                logger?.LogDebug("Koan-Aspire: Registering resources for {RegistrarType}", registrarType.FullName);
+                logger?.LogDebug("Koan-Aspire: Registering resources for {ModuleType}", moduleType.FullName);
 
-                registrar.RegisterAspireResources(builder, builder.Configuration, builder.Environment);
+                contributor.RegisterAspireResources(builder, builder.Configuration, builder.Environment);
                 registeredCount++;
 
-                logger?.LogDebug("Koan-Aspire: Successfully registered resources for {RegistrarType}", registrarType.FullName);
+                logger?.LogDebug("Koan-Aspire: Successfully registered resources for {ModuleType}", moduleType.FullName);
             }
             catch (Exception ex)
             {
-                logger?.LogError(ex, "Koan-Aspire: Failed to register Aspire resources for {RegistrarType}", registrarType.FullName);
+                logger?.LogError(ex, "Koan-Aspire: Failed to register Aspire resources for {ModuleType}", moduleType.FullName);
                 throw new InvalidOperationException(
-                    $"Failed to register Aspire resources for {registrarType.FullName}. " +
+                    $"Failed to register Aspire resources for {moduleType.FullName}. " +
                     $"Check the module's RegisterAspireResources implementation and configuration. " +
                     $"Inner exception: {ex.Message}", ex);
             }
@@ -142,7 +150,7 @@ public static class KoanAspireExtensions
     /// Use this method when you want explicit control over which modules are registered
     /// or when you need to register modules that aren't automatically discovered.
     /// </summary>
-    /// <typeparam name="TRegistrar">The KoanAutoRegistrar type that implements IKoanAspireRegistrar</typeparam>
+    /// <typeparam name="TModule">The Koan module that implements <see cref="IKoanAspireResources"/>.</typeparam>
     /// <param name="builder">The Aspire distributed application builder</param>
     /// <returns>The builder for method chaining</returns>
     /// <remarks>
@@ -154,40 +162,40 @@ public static class KoanAspireExtensions
     /// <example>
     /// Explicit module registration:
     /// <code>
-    /// builder.AddKoanModule&lt;PostgresKoanAutoRegistrar&gt;()
-    ///        .AddKoanModule&lt;RedisKoanAutoRegistrar&gt;();
+    /// builder.AddKoanModule&lt;PostgresDataModule&gt;()
+    ///        .AddKoanModule&lt;RedisDataModule&gt;();
     /// </code>
     /// </example>
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the registrar type cannot be instantiated or fails during registration.
     /// </exception>
-    public static IDistributedApplicationBuilder AddKoanModule<TRegistrar>(
+    public static IDistributedApplicationBuilder AddKoanModule<TModule>(
         this IDistributedApplicationBuilder builder)
-        where TRegistrar : IKoanAspireRegistrar, new()
+        where TModule : Koan.Core.KoanModule, IKoanAspireResources, new()
     {
         var logger = CreateLogger(builder);
-        var registrar = new TRegistrar();
+        var module = new TModule();
 
-        if (registrar.ShouldRegister(builder.Configuration, builder.Environment))
+        if (module.ShouldRegister(builder.Configuration, builder.Environment))
         {
             try
             {
-                logger?.LogDebug("Koan-Aspire: Explicitly registering module {ModuleType}", typeof(TRegistrar).FullName);
-                registrar.RegisterAspireResources(builder, builder.Configuration, builder.Environment);
-                logger?.LogDebug("Koan-Aspire: Successfully registered module {ModuleType}", typeof(TRegistrar).FullName);
+                logger?.LogDebug("Koan-Aspire: Explicitly registering module {ModuleType}", typeof(TModule).FullName);
+                module.RegisterAspireResources(builder, builder.Configuration, builder.Environment);
+                logger?.LogDebug("Koan-Aspire: Successfully registered module {ModuleType}", typeof(TModule).FullName);
             }
             catch (Exception ex)
             {
-                logger?.LogError(ex, "Koan-Aspire: Failed to register module {ModuleType}", typeof(TRegistrar).FullName);
+                logger?.LogError(ex, "Koan-Aspire: Failed to register module {ModuleType}", typeof(TModule).FullName);
                 throw new InvalidOperationException(
-                    $"Failed to register Aspire resources for {typeof(TRegistrar).FullName}. " +
+                    $"Failed to register Aspire resources for {typeof(TModule).FullName}. " +
                     $"Check the module's RegisterAspireResources implementation. Inner exception: {ex.Message}", ex);
             }
         }
         else
         {
-            logger?.LogDebug("Koan-Aspire: Skipped module {ModuleType} - ShouldRegister returned false", typeof(TRegistrar).FullName);
+            logger?.LogDebug("Koan-Aspire: Skipped module {ModuleType} - ShouldRegister returned false", typeof(TModule).FullName);
         }
 
         return builder;
@@ -307,7 +315,7 @@ public static class KoanAspireExtensions
     /// <summary>
     /// Force load Koan assemblies to ensure they're available for discovery.
     /// This addresses the chicken-and-egg problem where assemblies containing
-    /// IKoanAspireRegistrar implementations might not be loaded yet.
+    /// IKoanAspireResources implementations might not be loaded yet.
     /// </summary>
     private static void ForceLoadKoanAssemblies(ILogger? logger)
     {

@@ -95,9 +95,8 @@ public sealed class BootHealthLineRenderSpec
 
     private static RegistrySummarySnapshot NoFailures()
         => new RegistrySummarySnapshot(
-            Initializers: 0,
-            InitializerBreakdown: Array.Empty<(string, int)>(),
-            AutoRegistrars: 0,
+            Modules: 0,
+            ModuleBreakdown: Array.Empty<(string, int)>(),
             BackgroundServices: 0,
             StartupBackgroundServices: 0,
             PeriodicBackgroundServices: 0,

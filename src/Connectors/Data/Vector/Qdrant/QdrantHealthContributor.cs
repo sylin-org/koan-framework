@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Logging;
 using Koan.Core.Observability.Health;
 
 namespace Koan.Data.Vector.Connector.Qdrant;
@@ -27,7 +28,8 @@ public sealed class QdrantHealthContributor(
                 return new HealthReport(Name, HealthState.Unhealthy, $"HTTP {(int)response.StatusCode}: {body}", null, null);
             }
 
-            logger?.LogDebug("Qdrant health: {Body}", body);
+            KoanLog.HealthDebug(logger, Infrastructure.Constants.Logging.Health, "healthy",
+                ("status", (int)response.StatusCode));
             return new HealthReport(Name, HealthState.Healthy, "qdrant reachable", null, null);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -36,7 +38,8 @@ public sealed class QdrantHealthContributor(
         }
         catch (Exception ex)
         {
-            logger?.LogWarning(ex, "Qdrant health check failed");
+            KoanLog.HealthWarning(logger, Infrastructure.Constants.Logging.Health, "failed",
+                ("error", ex));
             return new HealthReport(Name, HealthState.Unhealthy, ex.Message, null, null);
         }
     }

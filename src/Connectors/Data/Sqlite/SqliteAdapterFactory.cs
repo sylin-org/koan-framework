@@ -28,8 +28,6 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory
     internal static bool HandlesProvider(string provider)
         => string.Equals(provider, "sqlite", StringComparison.OrdinalIgnoreCase);
 
-    public bool CanHandle(string provider) => HandlesProvider(provider);
-
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,
         string source = "Default")
@@ -46,7 +44,7 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory
         // relies on discovery and resolves to "auto") collapses onto the discovery-resolved base connection, so a
         // routed source never keys its store on the unresolved sentinel (ARCH-0103 P5 fleet hoist).
         var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "Sqlite", source, baseOpts.ConnectionString, CanHandle);
+            config, sourceRegistry, "Sqlite", source, baseOpts.ConnectionString, this);
 
         // Create source-specific options
         var sourceOpts = new SqliteOptions

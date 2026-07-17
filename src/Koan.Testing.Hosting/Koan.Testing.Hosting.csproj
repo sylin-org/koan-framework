@@ -7,7 +7,6 @@
     reflective host their app uses — the foundation the conformance kit (Sylin.Koan.Testing) builds on.
   -->
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

@@ -2,15 +2,59 @@ using System.Collections.Concurrent;
 using Koan.Core;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Core.Orchestration.Composition;
+using Koan.Core.Logging;
 using Koan.Orchestration;
 using Koan.Orchestration.Attributes;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Tests.Core.Unit.Specs.Redaction;
 
 public sealed class RedactionSpec
 {
+    [Fact]
+    public void Structured_Koan_log_context_is_deidentified_at_the_shared_sink()
+    {
+        const string action = "redaction.structured-sink";
+        const string connectionSecret = "SinkConnectionSecret";
+        const string uriSecret = "SinkUriSecret";
+        const string exceptionSecret = "SinkExceptionSecret";
+        (string Key, object? Value)[]? captured = null;
+
+        KoanLog.TestSink = (_, _, candidateAction, _, context) =>
+        {
+            if (candidateAction == action) captured = context;
+        };
+
+        try
+        {
+            KoanLog.ConfigInfo(
+                logger: null,
+                action,
+                "probe",
+                ("connection", $"Server=db;Password={connectionSecret};Database=app"),
+                ("endpoint", new Uri($"https://agent:{uriSecret}@example.test/path?view=full")),
+                ("failure", new InvalidOperationException($"Request failed (Password={exceptionSecret})")),
+                ("count", 7));
+        }
+        finally
+        {
+            KoanLog.TestSink = null;
+        }
+
+        captured.Should().NotBeNull();
+        var rendered = string.Join(" | ", captured!.Select(item => $"{item.Key}={item.Value}"));
+        rendered.Should().NotContain(connectionSecret);
+        rendered.Should().NotContain(uriSecret);
+        rendered.Should().NotContain(exceptionSecret);
+        rendered.ToLowerInvariant().Should().Contain("password=***");
+        rendered.Should().Contain("https://***@example.test/path?view=full");
+        captured.Single(item => item.Key == "count").Value.Should().Be(7,
+            "non-string structured values must retain their type and value");
+    }
+
     [Theory]
     [InlineData("Server=db;Password=plain-secret;Database=app", "plain-secret")]
     [InlineData("Server=db;Password=\"Super Secret\";Database=app", "Super Secret")]
@@ -108,9 +152,10 @@ public sealed class RedactionSpec
     {
         var capture = new LogCapture();
         var adapter = new SensitiveCandidateAdapter(new CapturingLogger<SensitiveCandidateAdapter>(capture));
+        using var services = new ServiceCollection().BuildServiceProvider();
         var coordinator = new ServiceDiscoveryCoordinator(
             [adapter],
-            [],
+            new ServiceDiscoveryRuntime(services, ServiceDiscoveryPlan.Empty),
             new CapturingLogger<ServiceDiscoveryCoordinator>(capture));
 
         var result = await coordinator.DiscoverService("redaction-test", new DiscoveryContext
@@ -124,6 +169,30 @@ public sealed class RedactionSpec
         capture.Messages.Should().NotContain(message => message.Contains("QuerySecret", StringComparison.Ordinal));
         capture.Messages.Should().Contain(message => message.Contains("***@", StringComparison.Ordinal));
         capture.Messages.Should().Contain(message => message.Contains("api_key=***", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Shared_discovery_health_failures_never_emit_raw_exception_credentials()
+    {
+        var capture = new LogCapture();
+        var adapter = new FailingSensitiveCandidateAdapter(
+            new CapturingLogger<FailingSensitiveCandidateAdapter>(capture));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var coordinator = new ServiceDiscoveryCoordinator(
+            [adapter],
+            new ServiceDiscoveryRuntime(services, ServiceDiscoveryPlan.Empty),
+            new CapturingLogger<ServiceDiscoveryCoordinator>(capture));
+
+        var result = await coordinator.DiscoverService("redaction-test", new DiscoveryContext
+        {
+            RequireHealthValidation = true
+        });
+
+        result.IsSuccessful.Should().BeFalse();
+        capture.Messages.Should().NotContain(message => message.Contains("CandidateSecret", StringComparison.Ordinal));
+        capture.Messages.Should().NotContain(message => message.Contains("QuerySecret", StringComparison.Ordinal));
+        capture.Messages.Should().NotContain(message => message.Contains("HealthSecret", StringComparison.Ordinal));
+        capture.Messages.Should().Contain(message => message.Contains("error=(masked)", StringComparison.OrdinalIgnoreCase));
     }
 
     [KoanService(ServiceKind.Database, shortCode: "redaction-test", name: "Redaction Test",
@@ -148,6 +217,26 @@ public sealed class RedactionSpec
             string serviceUrl,
             DiscoveryContext context,
             CancellationToken cancellationToken) => Task.FromResult(true);
+    }
+
+    private sealed class FailingSensitiveCandidateAdapter(ILogger<FailingSensitiveCandidateAdapter> logger)
+        : ServiceDiscoveryAdapterBase(new ConfigurationBuilder().Build(), logger)
+    {
+        private const string SensitiveCandidate =
+            "amqp://agent:CandidateSecret@broker.example:5672/app?api_key=QuerySecret";
+
+        public override string ServiceName => "redaction-test";
+
+        protected override Type GetFactoryType() => typeof(SensitiveCandidateFactory);
+
+        protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates() =>
+            [new DiscoveryCandidate(SensitiveCandidate, "environment", 0)];
+
+        protected override Task<bool> ValidateServiceHealth(
+            string serviceUrl,
+            DiscoveryContext context,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Health probe failed (Password=HealthSecret)");
     }
 
     private sealed class LogCapture

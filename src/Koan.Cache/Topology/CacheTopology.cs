@@ -1,4 +1,5 @@
 using Koan.Cache.Abstractions.Stores;
+using Koan.Core.Providers;
 
 namespace Koan.Cache.Topology;
 
@@ -6,7 +7,11 @@ namespace Koan.Cache.Topology;
 /// Resolved tier assignment for the layered cache. Either side may be null in single-tier
 /// deployments — the layered cache degrades gracefully.
 /// </summary>
-internal sealed record CacheTopology(ICacheStore? Local, ICacheStore? Remote)
+internal sealed record CacheTopology(
+    ICacheStore? Local,
+    ICacheStore? Remote,
+    ProviderSelectionReceipt? LocalReceipt = null,
+    ProviderSelectionReceipt? RemoteReceipt = null)
 {
     /// <summary>Empty topology — no tiers wired. Layered cache no-ops.</summary>
     public static CacheTopology Empty { get; } = new(null, null);

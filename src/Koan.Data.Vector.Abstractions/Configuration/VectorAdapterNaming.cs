@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core.Logging;
 using Koan.Data.Abstractions;
@@ -30,7 +29,7 @@ public static class VectorAdapterNaming
         where TKey : notnull
     {
         var cfg = VectorConfigs.Get<TEntity, TKey>(sp);
-        var factory = sp.GetServices<IVectorAdapterFactory>().FirstOrDefault(f => f.CanHandle(cfg.Provider))
+        var factory = sp.GetRequiredService<IVectorProviderResolver>().Find(cfg.Provider)
             ?? throw new InvalidOperationException($"No vector adapter factory for provider '{cfg.Provider}'.");
         // ARCH-0103: the SAME routed source the record plane + VectorService resolve (explicit EntityContext.Source >
         // Database-mode axis route > null). Folded into the name so the vector plane physically isolates per source.

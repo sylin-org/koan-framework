@@ -24,7 +24,6 @@ namespace Koan.Data.Vector.Connector.Weaviate;
 internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<WeaviateOptions>
 {
     private readonly IServiceDiscoveryCoordinator? _discoveryCoordinator;
-    private readonly IZenGardenInitializationProvider? _zenGardenInitializationProvider;
 
     protected override string ProviderName => "Weaviate";
 
@@ -32,12 +31,10 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         IConfiguration config,
         ILogger<WeaviateOptionsConfigurator>? logger,
         IOptions<AdaptersReadinessOptions> readinessOptions,
-        IServiceDiscoveryCoordinator? discoveryCoordinator = null,
-        IZenGardenInitializationProvider? zenGardenInitializationProvider = null)
+        IServiceDiscoveryCoordinator? discoveryCoordinator = null)
         : base(config, logger, readinessOptions)
     {
         _discoveryCoordinator = discoveryCoordinator;
-        _zenGardenInitializationProvider = zenGardenInitializationProvider;
     }
 
     // Simplified constructor for orchestration scenarios without DI
@@ -46,7 +43,6 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
                Microsoft.Extensions.Options.Options.Create(new AdaptersReadinessOptions()))
     {
         _discoveryCoordinator = null;
-        _zenGardenInitializationProvider = null;
     }
 
     protected override void ConfigureProviderSpecific(WeaviateOptions options)
@@ -77,20 +73,11 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
 
         if (ZenGardenConnectionIntent.TryParse(requestedConnection, out var zenGardenIntent))
         {
-            if (TryResolveZenGardenConnection(zenGardenIntent!, out var resolved))
-            {
-                options.ConnectionString = resolved;
-                if (!hasUserExplicitEndpoint)
-                    options.Endpoint = resolved;
-                KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "intent-resolved", ("intent", requestedConnection));
-            }
-            else
-            {
-                options.ConnectionString = ResolveAutonomousConnection();
-                if (!hasUserExplicitEndpoint)
-                    options.Endpoint = options.ConnectionString;
-                KoanLog.ConfigWarning(Logger, LogActions.ZenGarden, "intent-fallback-autonomous", ("intent", requestedConnection));
-            }
+            var resolved = ResolveRequiredConnection(requestedConnection!, zenGardenIntent!);
+            options.ConnectionString = resolved;
+            if (!hasUserExplicitEndpoint) options.Endpoint = resolved;
+            KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "intent-resolved",
+                ("offering", zenGardenIntent!.ToOfferingSelector()));
         }
         else if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
@@ -209,67 +196,32 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Flags.DisableAutoDetection, false);
     }
 
-    private bool TryResolveZenGardenConnection(
-        ZenGardenConnectionIntent intent,
-        out string connectionString)
+    private string ResolveRequiredConnection(
+        string rawIntent,
+        ZenGardenConnectionIntent intent)
     {
-        connectionString = "";
-        if (_zenGardenInitializationProvider is null)
+        if (_discoveryCoordinator is null)
         {
-            KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "provider-missing");
-            return false;
+            throw ExplicitIntentFailure(
+                intent,
+                "Koan's service-discovery coordinator is unavailable.");
         }
 
-        try
+        var context = new DiscoveryContext
         {
-            var resolved = _zenGardenInitializationProvider
-                .Resolve(intent)
-                .GetAwaiter()
-                .GetResult();
-
-            if (resolved is null)
-            {
-                KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "offering-not-ready",
-                    ("offering", intent.ToOfferingSelector()));
-                return false;
-            }
-
-            var directUri = resolved.GetUri("http", "https");
-            if (!string.IsNullOrWhiteSpace(directUri) &&
-                Uri.TryCreate(directUri, UriKind.Absolute, out var parsedUri))
-            {
-                connectionString = NormalizeEndpoint(parsedUri);
-                KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "resolved",
-                    ("offering", resolved.ToolFqid),
-                    ("connection", connectionString));
-                return true;
-            }
-
-            var host = !string.IsNullOrWhiteSpace(resolved.Hostname)
-                ? resolved.Hostname
-                : resolved.Ip;
-            if (string.IsNullOrWhiteSpace(host))
-            {
-                KoanLog.ConfigWarning(Logger, LogActions.ZenGarden, "missing-endpoint",
-                    ("offering", resolved.ToolFqid));
-                return false;
-            }
-
-            var port = resolved.Port ?? 8080;
-            connectionString = $"http://{host}:{port}";
-            KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "resolved",
-                ("offering", resolved.ToolFqid),
-                ("connection", connectionString));
-            return true;
-        }
-        catch (Exception ex)
+            OrchestrationMode = KoanEnv.OrchestrationMode,
+            HealthCheckTimeout = TimeSpan.FromMilliseconds(500),
+            Parameters = new Dictionary<string, object>()
+        };
+        var result = _discoveryCoordinator.ResolveServiceIntent("weaviate", rawIntent, context)
+            .GetAwaiter()
+            .GetResult();
+        if (!result.IsSuccessful)
         {
-            KoanLog.ConfigWarning(Logger, LogActions.ZenGarden, "exception",
-                ("offering", intent.ToOfferingSelector()),
-                ("reason", ex.Message));
-            KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "exception-detail", ("exception", ex.ToString()));
-            return false;
+            throw ExplicitIntentFailure(intent, result.ErrorMessage);
         }
+
+        return result.ServiceUrl;
     }
 
     private static bool IsAutoConnection(string? connectionString)
@@ -278,11 +230,13 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
             || string.Equals(connectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string NormalizeEndpoint(Uri uri)
-    {
-        var port = uri.IsDefaultPort ? "" : $":{uri.Port}";
-        return $"{uri.Scheme}://{uri.Host}{port}";
-    }
+    private static InvalidOperationException ExplicitIntentFailure(
+        ZenGardenConnectionIntent intent,
+        string? reason) =>
+        new(
+            $"Weaviate explicit Zen Garden intent for '{intent.ToOfferingSelector()}' could not be satisfied. " +
+            $"{reason ?? "No ready Weaviate offering was found."} " +
+            "Reference and enable Koan.ZenGarden with a ready 'weaviate' offering, choose 'auto', or provide a native Weaviate endpoint.");
 
     private static class LogActions
     {

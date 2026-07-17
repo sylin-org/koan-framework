@@ -22,19 +22,9 @@ public sealed class RabbitMqDiscoveryAdapter(
         DiscoveryContext context,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var factory = new ConnectionFactory { Uri = new Uri(serviceUrl) };
-            await using var connection = await factory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
-            return connection.IsOpen;
-        }
-        catch (Exception error)
-        {
-            _logger.LogDebug(
-                "RabbitMQ discovery rejected an unreachable candidate: {Error}",
-                Koan.Core.Redaction.DeIdentify(error.Message));
-            return false;
-        }
+        var factory = new ConnectionFactory { Uri = new Uri(serviceUrl) };
+        await using var connection = await factory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
+        return connection.IsOpen;
     }
 
     protected override string? ReadExplicitConfiguration()

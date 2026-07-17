@@ -18,6 +18,7 @@ using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Core.Semantics;
 using Koan.Data.Relational;
 using Koan.Data.Relational.Ado;
 using Koan.Data.Relational.Linq;
@@ -72,6 +73,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private readonly string _source;
     private readonly ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, bool> _visibilityCache = new(StringComparer.Ordinal);
+    private readonly JsonSerializerSettings _json;
 
     // Immutable reflection metadata is safe to share across repositories and host lifetimes.
     private static readonly ConcurrentDictionary<string, System.Reflection.PropertyInfo?> _propertyInfoCache = new(StringComparer.Ordinal);
@@ -131,6 +133,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
         // Get storage optimization info from AggregateBag
         _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
+        var segmentation = sp.GetRequiredService<DataSegmentationPlan>().For(typeof(TEntity));
+        _json = ComparableScalarEncoding.Apply(
+            new JsonSerializerSettings(),
+            segmentation.Fields);
 
         KoanLog.DataDebug(_logger, LogActions.RepositoryInit, "ready",
             ("entity", typeof(TEntity).FullName),
@@ -325,11 +331,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     // text), TimeSpan (ticks), DateOnly/TimeOnly (fixed text) persist in an order-preserving form that
     // matches the filter comparand. Default (PascalCase) naming is preserved — ResolveColumnSql reads
     // json_extract($.{prop}) with the PascalCase property name.
-    private static readonly JsonSerializerSettings _json =
-        ComparableScalarEncoding.Apply(new JsonSerializerSettings());
-
     // Basic serialization helpers
-    private static TEntity FromRow((string Id, string Json) row)
+    private TEntity FromRow((string Id, string Json) row)
         => JsonConvert.DeserializeObject<TEntity>(row.Json, _json)!;
     private (string Id, string Json) ToRow(TEntity e)
     {
@@ -1408,7 +1411,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return msg.IndexOf("no such table", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
-    private static List<TEntity> MapRowsToEntities(IEnumerable<IReadOnlyDictionary<string, object?>> rows)
+    private List<TEntity> MapRowsToEntities(IEnumerable<IReadOnlyDictionary<string, object?>> rows)
     {
         var list = new List<TEntity>();
         var t = typeof(TEntity);

@@ -218,6 +218,10 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
             KoanLog.BootWarning(logger, LogActions.Discovery, "cancelled", ("reason", "startup-cancelled"));
             throw;
         }
+        catch (ExplicitZenGardenIntentException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             KoanLog.BootWarning(logger, LogActions.Discovery, "unexpected-error", ("reason", ex.Message));
@@ -239,7 +243,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
             return null;
         }
 
-        var offering = ResolveZenGardenOffering(ollamaConfig, zenGardenProvider);
+        var offering = ResolveZenGardenOffering(ollamaConfig);
         var instance = ResolveZenGardenInstance(ollamaConfig);
         var resolveIntent = ZenGardenConnectionIntent.ForOffering(offering, instance, requiredCapabilities);
 
@@ -247,6 +251,10 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         try
         {
             resolved = await zenGardenProvider.Resolve(resolveIntent, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -311,12 +319,13 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         {
             if (zenGardenProvider is null)
             {
-                KoanLog.BootWarning(logger, LogActions.ZenGarden, "provider-missing-for-intent", ("intent", rawConnection));
-                return null;
+                throw ExplicitIntentFailure(
+                    intent!,
+                    "The Zen Garden runtime is not active.");
             }
 
             intent ??= ZenGardenConnectionIntent.ForOffering(
-                ResolveZenGardenOffering(ollamaConfig, zenGardenProvider),
+                ResolveZenGardenOffering(ollamaConfig),
                 ResolveZenGardenInstance(ollamaConfig),
                 fallbackCapabilities);
 
@@ -325,23 +334,26 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
             {
                 resolved = await zenGardenProvider.Resolve(intent, ct).ConfigureAwait(false);
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                KoanLog.BootWarning(logger, LogActions.ZenGarden, "intent-resolution-failed", ("intent", rawConnection), ("reason", ex.Message));
-                return null;
+                throw ExplicitIntentFailure(
+                    intent,
+                    $"The Zen Garden provider failed with {ex.GetType().Name}.");
             }
 
             if (resolved is null)
             {
-                KoanLog.BootWarning(logger, LogActions.ZenGarden, "intent-not-ready", ("intent", rawConnection));
-                return null;
+                throw ExplicitIntentFailure(intent, "No ready offering matched the requested intent.");
             }
 
             endpoint = resolved.GetUri("http", "https") ?? "";
             if (string.IsNullOrWhiteSpace(endpoint))
             {
-                KoanLog.BootWarning(logger, LogActions.ZenGarden, "intent-missing-endpoint", ("intent", rawConnection));
-                return null;
+                throw ExplicitIntentFailure(intent, "The resolved offering did not publish an HTTP endpoint.");
             }
 
             modelHint = ResolveModelHint(defaultModel, intent.Capabilities, resolved);
@@ -358,6 +370,13 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
             IsAutoDiscovered = autoDiscovered
         };
     }
+
+    private static ExplicitZenGardenIntentException ExplicitIntentFailure(
+        ZenGardenConnectionIntent intent,
+        string reason) =>
+        new(
+            $"Ollama explicit Zen Garden intent for '{intent.ToOfferingSelector()}' could not be satisfied. " +
+            $"{reason} Reference and enable Koan.ZenGarden with a ready Ollama offering, choose automatic discovery, or provide a native Ollama URL.");
 
     private static bool ShouldPerformDiscovery(IOptions<AiOptions>? aiOptions, ILogger logger)
     {
@@ -404,12 +423,14 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
     {
         if (!string.IsNullOrWhiteSpace(configuredConnectionString) && explicitUrls?.Length > 0)
         {
-            logger.LogWarning("Ollama: both 'ConnectionString' and 'Urls' are configured; both sets will be evaluated in explicit mode.");
+            KoanLog.BootWarning(logger, LogActions.Discovery, "overlapping-explicit-configuration",
+                ("settings", "ConnectionString,Urls"));
         }
 
         if (explicitUrls?.Length > 0 && additionalUrls?.Length > 0)
         {
-            logger.LogWarning("Ollama: both 'Urls' and 'AdditionalUrls' specified; AdditionalUrls are only considered in fallback auto-discovery mode.");
+            KoanLog.BootWarning(logger, LogActions.Discovery, "overlapping-fallback-configuration",
+                ("settings", "Urls,AdditionalUrls"));
         }
 
         if (explicitUrls is { Length: 0 })
@@ -463,20 +484,12 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         }
     }
 
-    private static string ResolveZenGardenOffering(
-        IConfigurationSection section,
-        IZenGardenInitializationProvider? provider)
+    private static string ResolveZenGardenOffering(IConfigurationSection section)
     {
         var configured = section["ZenGarden:Offering"];
         if (!string.IsNullOrWhiteSpace(configured))
         {
             return configured.Trim().ToLowerInvariant();
-        }
-
-        if (provider?.TryGetDefaultOffering("ollama", out var mapped) == true &&
-            !string.IsNullOrWhiteSpace(mapped))
-        {
-            return mapped;
         }
 
         return Constants.Discovery.WellKnownServiceName;
@@ -777,6 +790,9 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
 
         return map;
     }
+
+    private sealed class ExplicitZenGardenIntentException(string message)
+        : InvalidOperationException(message);
 }
 
 internal static class LogActions

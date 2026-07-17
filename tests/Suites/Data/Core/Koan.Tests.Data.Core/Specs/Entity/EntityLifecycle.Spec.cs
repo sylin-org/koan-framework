@@ -55,7 +55,7 @@ public sealed class EntityLifecycleSpec
         await using var runtime = await DataCoreRuntimeFixture.CreateAsync(configureServices: _ =>
             LifecycleEntity.Lifecycle.BeforeUpsert(async ctx =>
             {
-                observedPrior = (await ctx.Prior.Get())?.Title;
+                observedPrior = ctx.Prior?.Title;
                 ctx.Protect(nameof(LifecycleEntity.Title));
                 ctx.Current.Revision++;
                 return ctx.Proceed();
@@ -67,6 +67,22 @@ public sealed class EntityLifecycleSpec
 
         await LifecycleEntity.Upsert(new LifecycleEntity { Id = first.Id, Title = "v2" });
         observedPrior.Should().Be("v1");
+    }
+
+    [Fact]
+    public async Task After_upsert_observes_the_snapshot_from_before_persistence()
+    {
+        string? observedPrior = null;
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(configureServices: _ =>
+            LifecycleEntity.Lifecycle.AfterUpsert(ctx =>
+                observedPrior = ctx.Prior?.Title));
+
+        using var partition = runtime.UsePartition(NewPartition());
+        var first = await LifecycleEntity.Upsert(new LifecycleEntity { Title = "before" });
+        observedPrior.Should().BeNull();
+
+        await LifecycleEntity.Upsert(new LifecycleEntity { Id = first.Id, Title = "after" });
+        observedPrior.Should().Be("before", "Prior is the persisted value preceding the operation, independent of handler phase");
     }
 
     [Fact]

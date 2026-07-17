@@ -145,103 +145,41 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
         if (!Directory.Exists(containerPath))
             yield break;
 
-        var searchPath = containerPath;
-        var searchPattern = "*";
-
-        // Handle prefix filtering
-        if (!string.IsNullOrEmpty(prefix))
+        // Physical files live under an opaque shard directory. Enumerate below each shard, reconstruct the
+        // provider key relative to that shard, then apply the logical prefix. Prefixes therefore work for both
+        // flat and nested keys without exposing or depending on the sharding scheme.
+        foreach (var shardPath in Directory.EnumerateDirectories(containerPath))
         {
-            // Convert storage prefix to file system path
-            var prefixPath = prefix.Replace('/', Path.DirectorySeparatorChar);
-            var prefixDir = Path.GetDirectoryName(prefixPath);
-            var prefixFile = Path.GetFileName(prefixPath);
-
-            if (!string.IsNullOrEmpty(prefixDir))
-            {
-                searchPath = Path.Combine(containerPath, prefixDir);
-                if (!Directory.Exists(searchPath))
-                    yield break;
-            }
-
-            if (!string.IsNullOrEmpty(prefixFile))
-            {
-                searchPattern = prefixFile.Contains('*') ? prefixFile : $"{prefixFile}*";
-            }
-        }
-
-        // Enumerate files recursively
-        await foreach (var filePath in EnumerateFiles(searchPath, searchPattern, prefix, containerPath, ct))
-        {
-            ct.ThrowIfCancellationRequested();
-
-            StorageObjectInfo? objectInfo = null;
-            try
-            {
-                var fileInfo = new FileInfo(filePath);
-                if (!fileInfo.Exists) continue;
-
-                // Convert absolute file path back to storage key
-                var relativePath = Path.GetRelativePath(containerPath, filePath);
-                var storageKey = relativePath.Replace(Path.DirectorySeparatorChar, '/');
-
-                objectInfo = new StorageObjectInfo(
-                    Key: storageKey,
-                    Size: fileInfo.Length,
-                    LastModified: fileInfo.LastWriteTimeUtc,
-                    ContentType: null, // Could be determined from extension if needed
-                    ETag: $"\"{fileInfo.LastWriteTimeUtc.Ticks:X}-{fileInfo.Length:X}\""
-                );
-            }
-            catch (Exception)
-            {
-                // Log warning but continue enumeration
-                // Note: In production, you might want to inject ILogger here
-                continue;
-            }
-
-            if (objectInfo != null)
-            {
-                yield return objectInfo;
-            }
-        }
-    }
-
-    private async IAsyncEnumerable<string> EnumerateFiles(
-        string searchPath,
-        string searchPattern,
-        string? prefix,
-        string containerPath,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
-    {
-        if (!Directory.Exists(searchPath))
-            yield break;
-
-        // Get all subdirectories (shard directories)
-        var directories = Directory.GetDirectories(searchPath);
-
-        foreach (var directory in directories)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var files = Directory.GetFiles(directory, searchPattern, SearchOption.TopDirectoryOnly);
-
-            foreach (var file in files)
+            foreach (var filePath in Directory.EnumerateFiles(shardPath, "*", SearchOption.AllDirectories))
             {
                 ct.ThrowIfCancellationRequested();
 
-                // Additional prefix validation if needed
-                if (!string.IsNullOrEmpty(prefix))
+                StorageObjectInfo? objectInfo = null;
+                try
                 {
-                    var relativePath = Path.GetRelativePath(containerPath, file);
-                    var storageKey = relativePath.Replace(Path.DirectorySeparatorChar, '/');
+                    var fileInfo = new FileInfo(filePath);
+                    if (!fileInfo.Exists || fileInfo.Name.Contains(".tmp-", StringComparison.Ordinal)) continue;
 
-                    if (!storageKey.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    var relativePath = Path.GetRelativePath(shardPath, filePath);
+                    var storageKey = relativePath.Replace(Path.DirectorySeparatorChar, '/');
+                    if (!string.IsNullOrEmpty(prefix) &&
+                        !storageKey.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                         continue;
+
+                    objectInfo = new StorageObjectInfo(
+                        Key: storageKey,
+                        Size: fileInfo.Length,
+                        LastModified: fileInfo.LastWriteTimeUtc,
+                        ContentType: null,
+                        ETag: $"\"{fileInfo.LastWriteTimeUtc.Ticks:X}-{fileInfo.Length:X}\"");
+                }
+                catch (IOException)
+                {
+                    // A concurrently removed or moved object is simply absent from this listing snapshot.
+                    continue;
                 }
 
-                yield return file;
-
-                // Yield control periodically for cancellation and other async operations
+                if (objectInfo is not null) yield return objectInfo;
                 await Task.Yield();
             }
         }

@@ -12,7 +12,7 @@ namespace Koan.Tests.Data.Core.Specs.Composition;
 /// <summary>
 /// P1.1 — ARCH-0079 integration: a real <c>AddKoan()</c> host produces a resolved composition twin
 /// that names a known module and the resolved <c>data:default</c> election. The data pillar enriches
-/// the twin through the <c>IKoanCompositionContributor</c> seam (Reference = Intent).
+/// the twin through the retained Data module's evidence projection (Reference = Intent).
 /// </summary>
 public class CompositionLockfileSpec
 {
@@ -36,19 +36,20 @@ public class CompositionLockfileSpec
 
             var resolved = KoanCompositionSnapshot.BuildFromServices(host.Services);
 
-            resolved.Schema.Should().Be(1);
+            resolved.Schema.Should().Be(2);
             resolved.Modules.Select(m => m.Id).Should().Contain("Koan.Data.Core");
 
             resolved.Elections.Should().NotBeNull();
             resolved.Elections!.Should().ContainKey("data:default");
 
-            // Highest [ProviderPriority] among the referenced adapters wins: Sqlite(10) > Json(0) > InMemory(-100).
+            // This low-level test host has no generated reference manifest, so Data reports the deterministic
+            // degraded fallback honestly instead of inventing direct-reference evidence.
             var election = resolved.Elections["data:default"];
             election.Adapter.Should().Be("sqlite");
-            election.Via.Should().Be("reference-priority");
+            election.Via.Should().Be("unknown-provenance-priority");
 
             var registry = host.Services.GetRequiredService<DataSourceRegistry>();
-            var runtimeDecision = AdapterResolver.ResolveDefault(host.Services, registry);
+            var runtimeDecision = AdapterResolver.ResolveDefault(host.Services);
             runtimeDecision.Adapter.Should().Be(election.Adapter);
             runtimeDecision.Via.Should().Be(election.Via);
 

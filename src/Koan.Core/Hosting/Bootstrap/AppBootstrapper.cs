@@ -1,5 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Koan.Core;
+using Koan.Core.Hosting.Modules;
 using Koan.Core.Hosting.Registry;
 using System.Linq;
 using System.Reflection;
@@ -8,25 +11,23 @@ using System.Text.Json;
 using Koan.Core.Diagnostics;
 using Koan.Core.Composition;
 using Koan.Core.Infrastructure;
+using Koan.Core.Semantics;
 
 namespace Koan.Core.Hosting.Bootstrap;
 
-// Greenfield bootstrapper: wires up IKoanInitializer instances already registered or discoverable via DI.
+// Greenfield bootstrapper: compiles and activates the modules present in the host constitution.
 public static class AppBootstrapper
 {
     /// <summary>
-    /// Degraded-boot opt-out (fail-fast.json). When <c>KOAN_BOOT_LENIENT=1</c>, a broken module no
-    /// longer crashes the host — it is still written to <see cref="Console.Error"/> and recorded in
-    /// the registry summary's MODULES-FAILED channel, but boot continues. Read here (env var) because
-    /// <c>InitializeModules</c> runs on <c>IServiceCollection</c> before any <c>IConfiguration</c>
-    /// exists — the same constraint that gates <c>KOAN_VERBOSE_ASSEMBLIES</c>.
+    /// Degraded-boot opt-out for an escaping reflection-manifest failure. Semantic module activation
+    /// always remains fail-closed because a partially registered constitution is not a valid host.
     /// </summary>
     private const string LenientBootEnvVar = "KOAN_BOOT_LENIENT";
 
     private static RegistrySummarySnapshot? _registrySummary;
 
-    // Boot-time module failures (TIER B) accumulated across the manifest-invoker swallow and the
-    // initializer loop, surfaced via RegistrySummarySnapshot → boot report MODULES-FAILED block.
+    // Boot-time failures accumulated by the manifest-invoker fallback and surfaced through the
+    // registry snapshot's MODULES-FAILED block.
     [ThreadStatic]
     private static List<ModuleFailure>? _bootFailures;
 
@@ -54,7 +55,7 @@ public static class AppBootstrapper
             KoanFactState.Rejected,
             module.FullName ?? module.Name,
             "Koan rejected a module during activation.",
-            Constants.Diagnostics.Reasons.InitializerFailed,
+            Constants.Diagnostics.Reasons.ModuleActivationFailed,
             "Fix the module activation failure or remove the module reference. Use lenient boot only for diagnosis.",
             assembly,
             $"bootstrap:{module.FullName ?? module.Name}:{phase}");
@@ -64,12 +65,28 @@ public static class AppBootstrapper
 
     public static void InitializeModules(IServiceCollection services)
     {
+        var semanticSession = SemanticCompositionSession.GetOrCreate(services);
+        if (!semanticSession.TryBeginModuleInitialization()) return;
+
+        try
+        {
+            InitializeModulesCore(services, semanticSession);
+        }
+        catch (Exception exception)
+        {
+            semanticSession.FailModuleInitialization(exception);
+            throw;
+        }
+    }
+
+    private static void InitializeModulesCore(
+        IServiceCollection services,
+        SemanticCompositionSession semanticSession)
+    {
         using var composition = Composition.KoanCompositionScope.Enter(services);
         KoanStartupTimeline.Mark(KoanStartupStage.BootstrapStart);
         _bootFailures = new List<ModuleFailure>();
         _bootFacts = new List<KoanFact>();
-        var lenientBoot = IsLenientBoot();
-
         // Build a closure of loaded + referenced assemblies and populate AssemblyCache
         var set = new Dictionary<string, Assembly>(StringComparer.OrdinalIgnoreCase);
         var cache = AssemblyCache.Instance;
@@ -164,70 +181,58 @@ public static class AppBootstrapper
         EmitAssemblySummary(assemblyLog, discoveredAssemblies, verboseAssemblies, lenientAssemblySkips);
 
         // Build provenance is host-owned application composition, not assembly discovery. Register it
-        // before pillar initializers so future provider elections can distinguish direct intent from
+        // before pillar modules so provider elections can distinguish direct intent from
         // transitive module presence without probing the load graph.
-        services.AddSingleton(KoanApplicationReferenceManifest.Load(Assembly.GetEntryAssembly()));
+        var applicationAssembly = Assembly.GetEntryAssembly();
+        var referenceManifest = KoanApplicationReferenceManifest.Load(applicationAssembly);
 
-        var initializerTypes = KoanRegistry.GetInitializerTypes();
-        var autoRegistrarTypes = KoanRegistry.GetAutoRegistrarTypes();
         var backgroundServices = KoanRegistry.GetBackgroundServices();
         var serviceDiscoveryAdapters = KoanRegistry.GetServiceDiscoveryAdapters();
+        var semanticDescriptors = KoanRegistry.GetSemanticModuleDescriptors();
+
+        // Filter and validate every descriptor before invoking any factory, then complete the entire
+        // construction barrier before registration begins.
+        var constitution = SemanticActivationCompiler.Compile(referenceManifest, semanticDescriptors, applicationAssembly);
+        _bootFacts.AddRange(constitution.ToFacts());
+        var semanticModules = SemanticModuleRuntime.Create(constitution);
+        semanticSession.CompleteModuleInitialization(referenceManifest, constitution, semanticModules);
+        if (semanticModules.Modules.Count > 0)
+        {
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, KoanModuleHost>());
+        }
 
         // Publish an early snapshot (no failures yet) so a fail-fast crash still leaves the registry
         // summary populated for any best-effort boot-report rendering up the stack.
-        _registrySummary = BuildRegistrySummary(initializerTypes, autoRegistrarTypes, backgroundServices, serviceDiscoveryAdapters);
+        _registrySummary = BuildRegistrySummary(semanticModules, backgroundServices, serviceDiscoveryAdapters);
 
-        // CORE-0003: Always run initializers for every ServiceCollection.
-        // Initializers are responsible for their own idempotency (AppDomain-scoped guards for static state).
-        // Source-generated registries track eligible types deterministically.
-        //
-        // TIER B (fail-fast.json refinedRecommendation): an exception escaping initializer construction
-        // or Initialize() is NO LONGER swallowed. It is written to Console.Error, recorded into the
-        // registry summary (MODULES-FAILED channel), and rethrown wrapped in KoanBootException — unless
-        // KOAN_BOOT_LENIENT=1, in which case the host boots degraded with the failure left visible in the
-        // boot report. Mirrors KoanBackgroundServiceOrchestrator.FailFastOnStartupFailure=true (the policy
-        // the framework already ships for startup services) and .NET 6's BackgroundService StopHost move.
-        foreach (var initializerType in initializerTypes)
+        // One retained instance owns registration, startup, composition evidence, and provenance.
+        // A registration failure rejects the compiled constitution; there is no partial/legacy lane.
+        try
         {
-            try
-            {
-                if (initializerType.IsAbstract) continue;
-                if (Activator.CreateInstance(initializerType) is IKoanInitializer init)
-                {
-                    init.Initialize(services);
-                    var assembly = initializerType.Assembly.GetName().Name ?? "unknown";
-                    _bootFacts.Add(KoanFact.Create(
-                        Constants.Diagnostics.Codes.ModuleActivated,
-                        KoanFactKind.Discovery,
-                        KoanFactState.Observed,
-                        initializerType.FullName ?? initializerType.Name,
-                        "Koan activated a referenced module.",
-                        Constants.Diagnostics.Reasons.InitializerCompleted,
-                        null,
-                        assembly,
-                        $"bootstrap:{initializerType.FullName ?? initializerType.Name}"));
-                }
-            }
-            catch (Exception ex)
-            {
-                var asmName = initializerType.Assembly.GetName();
-                var fact = RecordFailure(initializerType, asmName.Name ?? "<unknown>", "initializer", ex);
-                if (!lenientBoot)
-                {
-                    throw new KoanBootException(
-                        initializerType,
-                        asmName.Name ?? "<unknown>",
-                        asmName.Version?.ToString() ?? "unknown",
-                        "initializer",
-                        ex,
-                        fact);
-                }
-            }
+            semanticModules.Register(services);
+        }
+        catch (SemanticModuleRuntime.SemanticRuntimeException exception)
+        {
+            var moduleType = semanticModules.GetModule(exception.Problem.Owner).GetType();
+            var assembly = moduleType.Assembly.GetName();
+            var fact = RecordFailure(
+                moduleType,
+                assembly.Name ?? "<unknown>",
+                "register",
+                exception);
+            _registrySummary = BuildRegistrySummary(semanticModules, backgroundServices, serviceDiscoveryAdapters);
+            throw new KoanBootException(
+                moduleType,
+                assembly.Name ?? "<unknown>",
+                assembly.Version?.ToString() ?? "unknown",
+                "register",
+                exception.InnerException ?? exception,
+                fact);
         }
 
         // Re-publish the registry summary now that the failures list is fully populated so the boot
         // report (AppRuntime → KoanConsoleBlocks) can render a MODULES-FAILED block in lenient mode.
-        var registrySummary = BuildRegistrySummary(initializerTypes, autoRegistrarTypes, backgroundServices, serviceDiscoveryAdapters);
+        var registrySummary = BuildRegistrySummary(semanticModules, backgroundServices, serviceDiscoveryAdapters);
         _registrySummary = registrySummary;
         services.AddSingleton(new KoanBootstrapSnapshot(registrySummary, (_bootFacts ?? []).ToArray()));
 
@@ -327,13 +332,12 @@ public static class AppBootstrapper
         foreach (var entry in assemblyLog.OrderBy(a => a.Assembly.GetName().Name, StringComparer.OrdinalIgnoreCase))
         {
             var name = entry.Assembly.GetName();
-            Console.WriteLine($"ASSEMBLY|{name.Name} {name.Version} :: {entry.Assembly.Location} :: ALC={entry.LoadContext}");
+            Console.WriteLine($"ASSEMBLY|{name.Name} {name.Version} :: ALC={entry.LoadContext}");
         }
     }
 
     private static RegistrySummarySnapshot BuildRegistrySummary(
-        IReadOnlyCollection<Type> initializerTypes,
-        IReadOnlyCollection<Type> autoRegistrarTypes,
+        SemanticModuleRuntime modules,
         IReadOnlyCollection<KoanRegistry.BackgroundServiceDescriptor> backgroundServices,
         IReadOnlyCollection<KoanRegistry.ServiceDiscoveryAdapterDescriptor> serviceDiscoveryAdapters)
     {
@@ -349,7 +353,8 @@ public static class AppBootstrapper
             return parts[0];
         }
 
-        var initializerBreakdown = initializerTypes
+        var moduleTypes = modules.ImplementationTypes;
+        var moduleBreakdown = moduleTypes
             .GroupBy(ClassifyNamespace)
             .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
             .Select(g => (Namespace: g.Key, Count: g.Count()))
@@ -365,9 +370,8 @@ public static class AppBootstrapper
             : Array.Empty<ModuleFailure>();
 
         return new RegistrySummarySnapshot(
-            initializerTypes.Count,
-            initializerBreakdown,
-            autoRegistrarTypes.Count,
+            moduleTypes.Count,
+            moduleBreakdown,
             backgroundServices.Count,
             startupServices,
             periodicServices,
@@ -448,9 +452,8 @@ public static class AppBootstrapper
 }
 
 internal readonly record struct RegistrySummarySnapshot(
-    int Initializers,
-    IReadOnlyList<(string Namespace, int Count)> InitializerBreakdown,
-    int AutoRegistrars,
+    int Modules,
+    IReadOnlyList<(string Namespace, int Count)> ModuleBreakdown,
     int BackgroundServices,
     int StartupBackgroundServices,
     int PeriodicBackgroundServices,

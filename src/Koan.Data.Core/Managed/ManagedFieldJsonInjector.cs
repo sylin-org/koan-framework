@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Koan.Data.Abstractions.Pipeline;
+using Koan.Data.Core.Semantics;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
@@ -31,6 +32,16 @@ namespace Koan.Data.Core;
 /// </summary>
 public sealed class ManagedFieldJsonInjector : DefaultContractResolver
 {
+    private readonly IReadOnlyList<DataSegmentationField> _segmentationFields;
+
+    public ManagedFieldJsonInjector(IEnumerable<DataSegmentationField>? segmentationFields = null)
+    {
+        _segmentationFields = (segmentationFields ?? [])
+            .GroupBy(static field => field.StorageName, StringComparer.Ordinal)
+            .Select(static group => group.First())
+            .ToArray();
+    }
+
     // ==================== Relational face (the Serialize-stage contract-resolver hook) ====================
 
     /// <summary>
@@ -42,31 +53,37 @@ public sealed class ManagedFieldJsonInjector : DefaultContractResolver
     protected override IList<JsonProperty> CreateProperties(Type type, MemberSerialization memberSerialization)
     {
         var props = base.CreateProperties(type, memberSerialization);
-        if (ManagedFieldRegistry.IsEmpty) return props;          // off ⇒ byte-identical
-
         var managed = ManagedFieldRegistry.ForType(type);
-        if (managed.Count == 0) return props;
+        if (managed.Count == 0 && _segmentationFields.Count == 0) return props;
 
         foreach (var d in managed)
-        {
-            var name = d.StorageName;
-            if (props.Any(p => string.Equals(p.PropertyName, name, StringComparison.Ordinal)))
-                continue;   // a real property already owns the name (managed names lead with '_', so this is defensive)
-
-            props.Add(new JsonProperty
-            {
-                PropertyName = name,
-                UnderlyingName = name,
-                PropertyType = typeof(object),
-                DeclaringType = type,
-                Readable = true,
-                Writable = false,            // serialize-only; on read the stored key is ignored
-                ValueProvider = new ScopeValueProvider(name),
-                ShouldSerialize = _ =>
-                    ManagedFieldWriteScope.Effective is { } s && s.TryGetValue(name, out var v) && v is not null,
-            });
-        }
+            AddSyntheticProperty(props, type, d.StorageName, d.ClrType);
+        foreach (var field in _segmentationFields)
+            AddSyntheticProperty(props, type, field.StorageName, field.ClrType);
         return props;
+    }
+
+    private static void AddSyntheticProperty(
+        IList<JsonProperty> props,
+        Type type,
+        string name,
+        Type clrType)
+    {
+        if (props.Any(p => string.Equals(p.PropertyName, name, StringComparison.Ordinal)))
+            return;
+
+        props.Add(new JsonProperty
+        {
+            PropertyName = name,
+            UnderlyingName = name,
+            PropertyType = clrType,
+            DeclaringType = type,
+            Readable = true,
+            Writable = false,
+            ValueProvider = new ScopeValueProvider(name),
+            ShouldSerialize = _ =>
+                ManagedFieldWriteScope.Effective is { } s && s.TryGetValue(name, out var v) && v is not null,
+        });
     }
 
     /// <summary>
@@ -106,11 +123,16 @@ public sealed class ManagedFieldJsonInjector : DefaultContractResolver
     /// byte-identical path. The unknown keys are left on the <see cref="JObject"/>; the entity deserialization ignores
     /// them (they are not POCO members), exactly as the relational read does.
     /// </summary>
-    public static IReadOnlyDictionary<string, object?>? ExtractManaged(JObject json, Type entityType)
+    public static IReadOnlyDictionary<string, object?>? ExtractManaged(
+        JObject json,
+        Type entityType,
+        IEnumerable<DataSegmentationField>? segmentationFields = null)
     {
-        if (ManagedFieldRegistry.IsEmpty) return null;
         var managed = ManagedFieldRegistry.ForType(entityType);
-        if (managed.Count == 0) return null;
+        var segmented = segmentationFields as IReadOnlyCollection<DataSegmentationField>
+            ?? segmentationFields?.ToArray()
+            ?? [];
+        if (managed.Count == 0 && segmented.Count == 0) return null;
 
         Dictionary<string, object?>? dict = null;
         foreach (var d in managed)
@@ -118,6 +140,13 @@ public sealed class ManagedFieldJsonInjector : DefaultContractResolver
             if (!json.TryGetValue(d.StorageName, out var tok)) continue;
             dict ??= new Dictionary<string, object?>(StringComparer.Ordinal);
             dict[d.StorageName] = tok.Type == JTokenType.Null ? null : tok.ToObject(d.ClrType);
+        }
+        foreach (var field in segmented)
+        {
+            if (dict?.ContainsKey(field.StorageName) == true) continue;
+            if (!json.TryGetValue(field.StorageName, out var tok)) continue;
+            dict ??= new Dictionary<string, object?>(StringComparer.Ordinal);
+            dict[field.StorageName] = tok.Type == JTokenType.Null ? null : tok.ToObject(field.ClrType);
         }
         return dict;
     }

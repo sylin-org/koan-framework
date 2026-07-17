@@ -19,7 +19,7 @@ Role-management surface for Koan: first-class `Role` / `RoleAlias` / `RolePolicy
 
 ## Quick start
 
-Reference the package; auto-registration wires everything via `IKoanAutoRegistrar`. No DI code required for the defaults.
+Reference the package; `AuthRolesModule` wires everything. No DI code is required for the defaults.
 
 ```csharp
 // Program.cs

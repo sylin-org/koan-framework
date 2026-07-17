@@ -65,7 +65,9 @@ public sealed record CommunicationAdapterDescriptor(
     IReadOnlyList<string> DirectReferenceIdentities,
     bool IsBuiltIn = false,
     bool IsLayered = false,
-    bool SettlementObservable = false);
+    bool SettlementObservable = false,
+    IReadOnlyList<string>? Aliases = null,
+    ContextIngressTrust IngressTrust = ContextIngressTrust.Unverified);
 
 /// <summary>One stable local receiver/subscription group that an elected adapter must bind once.</summary>
 public sealed record CommunicationAdapterBinding(
@@ -119,13 +121,13 @@ public enum CommunicationDeliveryOutcome
 /// <summary>Host services made available to an elected adapter without exposing business handlers.</summary>
 public sealed class CommunicationAdapterHost
 {
-    private readonly Func<string, ReadOnlyMemory<byte>, ContextIngressTrust, CancellationToken,
+    private readonly Func<string, ReadOnlyMemory<byte>, CancellationToken,
         Task<CommunicationDeliveryOutcome>> _dispatch;
 
     internal CommunicationAdapterHost(
         string meshId,
         IReadOnlyList<CommunicationAdapterBinding> bindings,
-        Func<string, ReadOnlyMemory<byte>, ContextIngressTrust, CancellationToken,
+        Func<string, ReadOnlyMemory<byte>, CancellationToken,
             Task<CommunicationDeliveryOutcome>> dispatch)
     {
         MeshId = meshId;
@@ -139,9 +141,8 @@ public sealed class CommunicationAdapterHost
     public Task<CommunicationDeliveryOutcome> Dispatch(
         string bindingId,
         ReadOnlyMemory<byte> payload,
-        ContextIngressTrust ingressTrust,
         CancellationToken ct = default)
-        => _dispatch(bindingId, payload, ingressTrust, ct);
+        => _dispatch(bindingId, payload, ct);
 }
 
 /// <summary>Infrastructure-facing connector seam. Business applications use Entity Events and Transport instead.</summary>

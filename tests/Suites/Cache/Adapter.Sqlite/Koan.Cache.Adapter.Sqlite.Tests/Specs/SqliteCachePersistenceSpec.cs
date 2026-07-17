@@ -110,7 +110,7 @@ public sealed class SqliteCachePersistenceSpec : IDisposable
             {
                 services.AddLogging();
                 services.AddKoanCache();
-                new Koan.Cache.Adapter.Sqlite.Initialization.KoanAutoRegistrar().Initialize(services);
+                new Koan.Cache.Adapter.Sqlite.Initialization.SqliteCacheModule().Register(services);
             })
             .StartAsync(ct);
 }

@@ -12,7 +12,7 @@ namespace Koan.Data.Abstractions.Naming;
 /// byte-identical name (structural absence; Reference = Intent).
 ///
 /// <para>Registered into the static <see cref="StorageNameParticleRegistry"/> from a module's
-/// <c>KoanAutoRegistrar</c>, not DI-enumerable — the same declared deviation <c>ManagedFieldRegistry</c> uses
+/// <c>KoanModule.Register</c>, not DI-enumerable — the same declared deviation <c>ManagedFieldRegistry</c> uses
 /// (DATA-0105 §4): <see cref="StorageNameGenerator"/> is a static, cached composer reached deep in adapter naming
 /// (data <i>and</i> vector) where no DI scope exists, and changing its signature would break every caller and miss
 /// the cache key. <see cref="GetParticle"/> reads the current ambient axis value ONCE per name resolve and returns an

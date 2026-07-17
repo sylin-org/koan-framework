@@ -4,18 +4,16 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
+using Koan.Core.Semantics.Segmentation;
 using Koan.Tenancy.Tests.Support;
 using Xunit;
 
 namespace Koan.Tenancy.Tests;
 
 /// <summary>
-/// ARCH-0095 P1 / ARCH-0099 §1 — the fail-closed chokepoint gate, proven through a real <c>AddKoan()</c> boot
-/// (ARCH-0079) with the <c>Koan.Tenancy</c> module referenced (so its registrar discovers and wires the
-/// <c>TenantStorageGuard</c> as a generic <c>IStorageGuard</c>). Exercises the posture (Open / Closed) against
-/// tenant-scoped and <c>[HostScoped]</c> entities — proving the data core's generic guard seam carries tenancy
-/// purely by registration, and that there is no <c>Off</c> state: the default (no config) in a non-dev host is
-/// <b>Closed</b>, secure-by-default.
+/// The hard tenant dimension proven through a real <c>AddKoan()</c> boot. Tenancy contributes meaning once and Data
+/// compiles it at its repository chokepoint; no Tenancy-owned Data guard participates. Exercises dev fallback,
+/// missing-context refusal, concrete tenant binding, and the <c>[HostScoped]</c> control-plane exemption.
 /// </summary>
 public sealed class TenantEnforcementSpec
 {
@@ -30,7 +28,8 @@ public sealed class TenantEnforcementSpec
 
         var act = async () => await ScopedThing.Upsert(new ScopedThing { Title = "x" });
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*No tenant in scope*");
+        await act.Should().ThrowAsync<SegmentationRequiredException>()
+            .WithMessage("*requires isolation context 'tenant'*Tenant.Use*ITenantResolver*[HostScoped]*");
     }
 
     [Fact]
@@ -41,7 +40,8 @@ public sealed class TenantEnforcementSpec
 
         var act = async () => await ScopedThing.All();
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*No tenant in scope*");
+        await act.Should().ThrowAsync<SegmentationRequiredException>()
+            .WithMessage("*requires isolation context 'tenant'*Tenant.Use*ITenantResolver*[HostScoped]*");
     }
 
     [Fact]
@@ -93,7 +93,8 @@ public sealed class TenantEnforcementSpec
 
         var act = async () => await ScopedThing.Upsert(new ScopedThing { Title = "x" });
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*No tenant in scope*");
+        await act.Should().ThrowAsync<SegmentationRequiredException>()
+            .WithMessage("*requires isolation context 'tenant'*Tenant.Use*ITenantResolver*[HostScoped]*");
     }
 
     private sealed class ScopedThing : Entity<ScopedThing, string>

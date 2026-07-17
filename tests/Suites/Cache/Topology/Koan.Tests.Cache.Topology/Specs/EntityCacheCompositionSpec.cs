@@ -27,6 +27,10 @@ public sealed class EntityCacheCompositionSpec
             fact.Code == "koan.cache.entity-plan.resolved"
             && fact.Subject.EndsWith(typeof(ReportedCacheEntity).FullName!, StringComparison.Ordinal)
             && fact.Summary.Contains(CacheableAttribute.DefaultKeyTemplate, StringComparison.Ordinal));
+        facts.Should().Contain(fact =>
+            fact.Code == "koan.cache.local.selected"
+            && fact.Subject == "cache:local"
+            && fact.ReasonCode == "priority-selection");
     }
 }
 

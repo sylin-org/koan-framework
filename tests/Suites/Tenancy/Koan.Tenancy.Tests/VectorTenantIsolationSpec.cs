@@ -69,7 +69,7 @@ public sealed class VectorTenantIsolationSpec
         runtime.ResetEntityCaches();
 
         // No tenant in scope under Closed: a tenant-scoped vector write/search must FAIL CLOSED via the reused
-        // IStorageGuard (the convergence fix) — previously Search fell through to an UNFILTERED KNN (a cross-tenant
+        // the compiled hard-segmentation gate — previously Search fell through to an UNFILTERED KNN (a cross-tenant
         // leak, since writes are now stamped) and the write landed unscoped.
         var write = async () => await Vector<VecDoc>.Save("x", AcmePoint);
         await write.Should().ThrowAsync<InvalidOperationException>();

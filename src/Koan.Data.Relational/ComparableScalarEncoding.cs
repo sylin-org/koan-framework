@@ -1,5 +1,6 @@
 using System.Globalization;
 using Koan.Data.Core;
+using Koan.Data.Core.Semantics;
 using Newtonsoft.Json;
 
 namespace Koan.Data.Relational;
@@ -64,7 +65,9 @@ public static class ComparableScalarEncoding
 
     /// <summary>Registers the canonical converters onto an adapter's <see cref="JsonSerializerSettings"/>
     /// (used for both serialize and deserialize), leaving the naming strategy and other settings intact.</summary>
-    public static JsonSerializerSettings Apply(JsonSerializerSettings settings)
+    public static JsonSerializerSettings Apply(
+        JsonSerializerSettings settings,
+        IEnumerable<DataSegmentationField>? segmentationFields = null)
     {
         // Stop Newtonsoft from pre-parsing ISO strings to DateTime BEFORE our converters run. Its default
         // (DateParseHandling.DateTime) would (a) make DateTimeOffset round-trip depend on the ambient
@@ -84,7 +87,7 @@ public static class ComparableScalarEncoding
         // pass-through, so real-property serialization stays byte-identical. One shared wiring point for the
         // whole relational trio (all three call Apply).
         var naming = (settings.ContractResolver as Newtonsoft.Json.Serialization.DefaultContractResolver)?.NamingStrategy;
-        settings.ContractResolver = new ManagedFieldJsonInjector { NamingStrategy = naming };
+        settings.ContractResolver = new ManagedFieldJsonInjector(segmentationFields) { NamingStrategy = naming };
         return settings;
     }
 

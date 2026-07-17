@@ -10,16 +10,16 @@ namespace Koan.Tests.Integration.Bootstrap.Pillars.Specs;
 
 /// <summary>
 /// Boot-smoke for the Canon pillar (per ARCH-0079). Proves <c>ICanonRuntime</c> resolves
-/// through real <c>AddKoan()</c> reflective discovery.
+/// through real <c>AddKoan()</c> semantic activation.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Architectural note:</b> Canon currently has no auto-registrar in
-/// <c>Koan.Canon.Core</c> or <c>Koan.Canon.Domain</c> — the only <c>KoanAutoRegistrar</c>
-/// lives in <c>Koan.Canon.Web</c>. This is asymmetric with Data/Storage which wire through
+/// <b>Architectural note:</b> Canon currently has no functional module in
+/// <c>Koan.Canon.Core</c> or <c>Koan.Canon.Domain</c>; activation lives in <c>Koan.Canon.Web</c>.
+/// This is asymmetric with Data/Storage which wire through
 /// their core packages, and forces apps that don't want the Web surface to wire Canon
 /// manually. This spec therefore references <c>Koan.Canon.Web</c>. Worth raising as a
-/// follow-up: a Domain-level auto-registrar would let non-Web hosts adopt Canon via
+/// follow-up: a Domain-level module would let non-Web hosts adopt Canon via
 /// Reference = Intent.
 /// </para>
 /// </remarks>

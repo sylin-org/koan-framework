@@ -25,16 +25,18 @@ eviction is not automatically projected as an agent mutation.
    safely represented by an id-keyed cache;
 3. parses the selected key template;
 4. supplies canonical Entity type identity and partition/source template values; and
-5. folds managed equality axes through `ScopedEntityCacheKey` and `AmbientAxisComposer`.
+5. produces the business/base key only; `CacheIdentityPlan` applies Core hard-segmentation dimensions
+   once at the `CacheClient` boundary for keys, tags, singleflight, eviction, and coherence.
 
 Repository reads, writes, deletes, batch mutations, and explicit eviction therefore cannot select a
 different policy or independently reconstruct a key. A custom Entity key template must remain
 derivable for every operation that uses it; templates needed by id-based reads normally use
 `{TypeName}`, `{Partition}`, `{Source}`, `{Id}`, and `{Key}`.
 
-Types with storage field transforms or non-equality read predicates are not decorated because caching
-their provider representation or equality-keying a visibility predicate would be unsafe. Explicit
-entry eviction rejects such a type before enumerating because no entry can validly exist.
+Types with storage field transforms, non-equality read predicates, or Data-local managed fields that
+have not joined Core hard segmentation are not decorated. Caching their provider representation or
+omitting a Data-only scope from Cache identity would be unsafe. Explicit entry eviction rejects such a
+type before enumerating because no entry can validly exist.
 
 ## Eviction execution
 
@@ -56,6 +58,9 @@ commit; the current item may be partly removed when a failure is reported.
 
 The built-in Memory store is the minimum-priority local floor. `CacheTopologyResolver` independently
 elects local and remote stores from explicit pins, provider priority, then stable identity.
+Core's immutable provider catalog owns exact name lookup, duplicate rejection, memoized priority, and
+the final stable tie; Cache alone owns Local/Remote placement and whether a missing tier is valid. Each
+selected tier carries one safe receipt that startup facts and the resolved lock project directly.
 `LayeredCache` reads L1 then L2, backfills L1, writes selected tiers, and evicts both selected tiers.
 
 Successful removals publish one Cache-owned key invalidation through Communication's every-node

@@ -164,11 +164,64 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         }
     }
 
+    /// <summary>
+    /// Report a provider-owned configuration decision through Koan's safe structured logging boundary.
+    /// </summary>
+    protected void LogConfiguration(
+        LogLevel level,
+        string outcome,
+        params (string Key, object? Value)[] context)
+        => Log(level, LogActions.ConfigurationDecision, outcome, context);
+
+    /// <summary>
+    /// Report a provider-owned discovery decision through Koan's safe structured logging boundary.
+    /// </summary>
+    protected void LogDiscovery(
+        LogLevel level,
+        string outcome,
+        params (string Key, object? Value)[] context)
+        => Log(level, LogActions.DiscoveryDecision, outcome, context);
+
+    private void Log(
+        LogLevel level,
+        string action,
+        string outcome,
+        (string Key, object? Value)[] context)
+    {
+        var withProvider = new (string Key, object? Value)[context.Length + 1];
+        withProvider[0] = ("provider", ProviderName);
+        context.CopyTo(withProvider, 1);
+
+        switch (level)
+        {
+            case LogLevel.Trace:
+            case LogLevel.Debug:
+                KoanLog.ConfigDebug(Logger, action, outcome, withProvider);
+                break;
+            case LogLevel.Information:
+                KoanLog.ConfigInfo(Logger, action, outcome, withProvider);
+                break;
+            case LogLevel.Warning:
+                KoanLog.ConfigWarning(Logger, action, outcome, withProvider);
+                break;
+            case LogLevel.Error:
+            case LogLevel.Critical:
+                KoanLog.ConfigError(Logger, action, outcome, withProvider);
+                break;
+            case LogLevel.None:
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(level), level, "Unsupported adapter log level.");
+        }
+    }
+
     private static class LogActions
     {
         public const string ConfigurationLifecycle = "adapter.config.lifecycle";
         public const string ReadinessConfiguration = "adapter.config.readiness";
         public const string PagingConfiguration = "adapter.config.paging";
+        public const string ConfigurationDecision = "adapter.config.decision";
+        public const string DiscoveryDecision = "adapter.discovery.decision";
     }
 
     protected static class LogOutcomes

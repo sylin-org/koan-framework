@@ -5,7 +5,7 @@ namespace Koan.Tests.Cache.CrossEngine.Specs;
 /// </summary>
 /// <remarks>
 /// No extra settings — the Memory store is bundled with <c>Koan.Cache</c> and registers
-/// itself via <c>MemoryAutoRegistrar</c>. <c>Koan:Cache:LocalProvider=memory</c> tells the
+/// itself as the Cache pillar's built-in provider. <c>Koan:Cache:LocalProvider=memory</c> tells the
 /// topology resolver to pick it even though the higher-priority SQLite adapter is also
 /// referenced by this project (Reference = Intent: both are discovered; configuration
 /// chooses).

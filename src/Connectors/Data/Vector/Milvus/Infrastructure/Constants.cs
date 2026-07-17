@@ -36,5 +36,10 @@ internal static class Constants
             public const string DisableAutoDetection = Section + ":DisableAutoDetection";
         }
     }
+
+    internal static class Logging
+    {
+        public const string Health = "data.milvus.health";
+    }
 }
 

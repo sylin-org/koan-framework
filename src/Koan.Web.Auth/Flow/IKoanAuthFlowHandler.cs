@@ -11,13 +11,6 @@ namespace Koan.Web.Auth.Flow;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Broadens the surface of the older <see cref="IKoanAuthEventContributor"/>. Existing
-/// implementations of the old interface continue to work — the framework registers a
-/// <c>LegacyAuthContributorAdapter</c> that re-projects each contributor as a flow handler so the
-/// dispatcher has a single contract to drive. New code should implement
-/// <see cref="IKoanAuthFlowHandler"/> directly.
-/// </para>
-/// <para>
 /// Default-implemented members let handlers override only the events they care about. The full
 /// set covers:
 /// </para>

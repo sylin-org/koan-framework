@@ -4,6 +4,7 @@ using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Data.Core.KeyValue;
+using Koan.Data.Core.Semantics;
 using StackExchange.Redis;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
@@ -30,11 +31,13 @@ internal sealed class RedisRepository<TEntity, TKey> : KeyValueStore<TEntity, TK
 {
     private readonly IConnectionMultiplexer _muxer;
     private readonly int _database;
+    private readonly IReadOnlyList<DataSegmentationField> _segmentationFields;
 
-    public RedisRepository(IConnectionMultiplexer muxer, int database)
+    public RedisRepository(IConnectionMultiplexer muxer, int database, DataSegmentationPlan segmentation)
     {
         _muxer = muxer;
         _database = database;
+        _segmentationFields = segmentation.For(typeof(TEntity)).Fields;
     }
 
     // Database mode: the routed source selects the Redis logical database (a distinct physical keyspace on the shared
@@ -151,10 +154,10 @@ internal sealed class RedisRepository<TEntity, TKey> : KeyValueStore<TEntity, TK
         return jo.ToString(Newtonsoft.Json.Formatting.None);
     }
 
-    private static KvRecord<TEntity> Deserialize(string json)
+    private KvRecord<TEntity> Deserialize(string json)
     {
         var jo = JObject.Parse(json);
-        var managed = ManagedFieldJsonInjector.ExtractManaged(jo, typeof(TEntity));   // null off-axis
+        var managed = ManagedFieldJsonInjector.ExtractManaged(jo, typeof(TEntity), _segmentationFields);   // null off-axis
         var entity = jo.ToObject<TEntity>()!;
         return new KvRecord<TEntity>(entity, managed);
     }

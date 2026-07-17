@@ -28,26 +28,15 @@ internal sealed class CockroachDiscoveryAdapter : ServiceDiscoveryAdapterBase
     /// <summary>CockroachDB-specific health validation using connection test</summary>
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        try
-        {
-            // Build connection string from discovered URL and context parameters
-            var connectionString = BuildCockroachConnectionString(serviceUrl, context.Parameters);
+        var connectionString = BuildCockroachConnectionString(serviceUrl, context.Parameters);
 
-            using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync(cancellationToken);
+        using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
 
-            // Simple query to test connectivity
-            using var command = new NpgsqlCommand("SELECT 1", connection);
-            await command.ExecuteScalarAsync(cancellationToken);
+        using var command = new NpgsqlCommand("SELECT 1", connection);
+        await command.ExecuteScalarAsync(cancellationToken);
 
-            _logger.LogDebug("CockroachDB health check passed for {Url}", serviceUrl);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug("CockroachDB health check failed for {Url}: {Error}", serviceUrl, ex.Message);
-            return false;
-        }
+        return true;
     }
 
     /// <summary>CockroachDB adapter reads its own configuration sections</summary>
@@ -113,7 +102,7 @@ internal sealed class CockroachDiscoveryAdapter : ServiceDiscoveryAdapterBase
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Failed to build CockroachDB connection string from {BaseUrl}: {Error}", baseUrl, ex.Message);
+            ReportNormalizationFailure(baseUrl, ex);
             return baseUrl; // Return original URL if parsing fails
         }
     }

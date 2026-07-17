@@ -43,8 +43,7 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
     internal int SourceProviderCount => _sourceProviders.Count;
 
     public string Provider => "mongo";
-
-    public bool CanHandle(string provider) => string.Equals(provider, "mongo", StringComparison.OrdinalIgnoreCase) || string.Equals(provider, "mongodb", StringComparison.OrdinalIgnoreCase);
+    public IReadOnlyCollection<string> Aliases => ["mongodb"];
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,
@@ -70,9 +69,9 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
         // (so the per-source pool never keys on the unresolved literal) — the fleet hoist of the local
         // MongoConnectionString.ResolveRoutedConnection, which stays as the test-pinned pure 2-arg helper.
         var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "Mongo", source, baseOptions.ConnectionString, CanHandle);
+            config, sourceRegistry, "Mongo", source, baseOptions.ConnectionString, this);
         var database = AdapterConnectionResolver.GetSourceSetting(
-            config, sourceRegistry, "Mongo", source, "Database", baseOptions.Database, CanHandle);
+            config, sourceRegistry, "Mongo", source, "Database", baseOptions.Database, this);
 
         // Dedup (ARCH-0103 §9.15): a routed source whose resolved physical placement (connection + database) coincides
         // with Default — e.g. a source that relies on discovery, so ResolveRoutedConnection collapsed its sentinel onto

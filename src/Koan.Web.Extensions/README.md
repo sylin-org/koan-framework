@@ -11,27 +11,11 @@
 ## Quick start
 
 ```csharp
-using Koan.Web.Extensions;
-
-public sealed class WebExtensionsAutoRegistrar : IKoanAutoRegistrar
-{
-    public string ModuleName => "WebExtensions";
-
-    public void Initialize(IServiceCollection services)
-    {
-        services.AddKoanWebExtensions(options =>
-        {
-            options.EnableModeration = true;
-            options.EnableSoftDelete = true;
-        });
-    }
-
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
-        => report.AddNote("Web extensions enabled (moderation + soft delete)");
-}
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
 ```
 
-- Register the extensions in your auto-registrar; they hook into Koan Web controllers without manual endpoint wiring.
+- Reference the package; `WebExtensionsModule` hooks the capability controllers into Koan Web without manual endpoint wiring.
 - Use capability attributes to expose moderation and audit features in generated clients.
 
 ## Configuration

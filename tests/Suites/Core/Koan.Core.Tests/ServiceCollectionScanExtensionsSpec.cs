@@ -62,7 +62,7 @@ public class ServiceCollectionScanExtensionsSpec
     [Fact]
     public void AddAllOf_called_twice_does_not_duplicate_registrations()
     {
-        // Same assembly scanned twice (the scenario where two IKoanAutoRegistrar implementations
+        // Same assembly scanned twice (the scenario where two module concerns
         // happen to scan the same assembly for the same contract). TryAddEnumerable inside the
         // helper keeps the count stable instead of producing two FakeA instances on resolve.
         var services = new ServiceCollection();

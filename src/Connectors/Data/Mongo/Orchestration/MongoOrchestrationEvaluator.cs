@@ -72,7 +72,7 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         try
         {
-            Logger?.LogDebug("[MongoDB] Validating credentials for host: {Host}", hostResult.HostEndpoint);
+            ReportCredentialValidation("start", ("host", hostResult.HostEndpoint));
 
             // Get configured credentials
             var databaseName = GetDatabaseName(configuration);
@@ -89,12 +89,12 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
             // Try to connect with the configured credentials
             var isValid = await Task.Run(() => TryMongoPing(connectionString, TimeSpan.FromMilliseconds(1000)));
 
-            Logger?.LogDebug("[MongoDB] Credential validation result: {IsValid}", isValid);
+            ReportCredentialValidation(isValid ? "accepted" : "rejected");
             return isValid;
         }
         catch (Exception ex)
         {
-            Logger?.LogDebug(ex, "[MongoDB] Error validating host credentials");
+            ReportCredentialValidation("failed", ("error", ex));
             return false;
         }
     }

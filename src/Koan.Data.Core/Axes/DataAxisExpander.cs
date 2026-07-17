@@ -25,7 +25,7 @@ namespace Koan.Data.Core.Axes;
 ///
 /// <para><b>Fail-loud collision detection (ARCH-0101 §8).</b> The within-batch checks name two colliding axes; a
 /// <b>cross-source</b> field collision — a <c>[DataAxis]</c> reusing a managed-field name a hand-written module
-/// (e.g. <c>Koan.Data.SoftDelete</c>'s <c>__deleted</c>, <c>Koan.Tenancy</c>'s <c>__koan_tenant</c>) already registered
+/// (e.g. <c>Koan.Data.SoftDelete</c>'s <c>__deleted</c>) already registered
 /// — would otherwise be silently first-wins-dropped by the registry's idempotent dedup (a nondeterministic, boot-order
 /// dependent half-axis / isolation hole). The expander owns a per-field ledger (<see cref="_fieldOwners"/>) so it can
 /// tell <i>its own re-entrant re-expansion</i> (same axis, another host) from a genuine cross-source clash, and throws
@@ -188,7 +188,7 @@ public static class DataAxisExpander
             if (ManagedFieldRegistry.All.Any(d => string.Equals(d.StorageName, fieldName, StringComparison.Ordinal)))
                 throw new InvalidOperationException(
                     $"Data axis '{axisId}' declares the managed field '{fieldName}', already registered by another source " +
-                    "(a framework module's registrar, e.g. Koan.Data.SoftDelete '__deleted' or Koan.Tenancy '__koan_tenant'). " +
+                    "(a framework module's registrar, e.g. Koan.Data.SoftDelete '__deleted'). " +
                     "Choose a distinct field name — a managed field must be owned by exactly one source.");
 
             _fieldOwners[fieldName] = axisId;

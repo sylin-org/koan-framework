@@ -4,7 +4,7 @@ namespace Koan.Data.Abstractions.Naming;
 
 /// <summary>
 /// The boot-time index of <see cref="IStorageNameParticleContributor"/>s (ARCH-0101 §3 — the container-name particle
-/// plane). A cross-cutting module registers its contributor from its <c>KoanAutoRegistrar</c> (Reference = Intent);
+/// plane). A cross-cutting module registers its contributor from <c>KoanModule.Register</c> (Reference = Intent);
 /// <see cref="StorageNameGenerator"/> reads them generically and never names the axis.
 ///
 /// <para>Deliberate static index (not DI) — the <b>same declared deviation as <c>ManagedFieldRegistry</c></b>

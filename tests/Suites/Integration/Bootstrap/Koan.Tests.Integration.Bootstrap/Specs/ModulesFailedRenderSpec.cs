@@ -78,11 +78,11 @@ public sealed class ModulesFailedRenderSpec
             KoanFactState.Rejected,
             FailingModule,
             "Koan rejected a module during activation.",
-            Constants.Diagnostics.Reasons.InitializerFailed,
+            Constants.Diagnostics.Reasons.ModuleActivationFailed,
             "Fix the module activation failure or remove the module reference.",
             "Demo.Failing",
             "bootstrap:demo");
-        var envelope = new KoanFactEnvelope(1, 1, "test", DateTimeOffset.UtcNow, true, [fact]);
+        var envelope = new KoanFactEnvelope(Constants.Diagnostics.FactSchemaVersion, 1, "test", DateTimeOffset.UtcNow, true, [fact]);
 
         var block = KoanConsoleBlocks.BuildStartupOverviewBlock(
             SampleEnvironment(),
@@ -103,9 +103,8 @@ public sealed class ModulesFailedRenderSpec
 
     private static RegistrySummarySnapshot RegistryWithFailures(params ModuleFailure[] failures)
         => new RegistrySummarySnapshot(
-            Initializers: 0,
-            InitializerBreakdown: Array.Empty<(string, int)>(),
-            AutoRegistrars: 0,
+            Modules: 0,
+            ModuleBreakdown: Array.Empty<(string, int)>(),
             BackgroundServices: 0,
             StartupBackgroundServices: 0,
             PeriodicBackgroundServices: 0,

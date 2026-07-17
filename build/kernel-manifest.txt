@@ -10,7 +10,6 @@
 
 src/Koan.Core/Koan.Core.csproj
 src/Koan.Core.Adapters/Koan.Core.Adapters.csproj
-src/Koan.Core.Registry.Generators/Koan.Core.Registry.Generators.csproj
 src/Koan.Cache.Abstractions/Koan.Cache.Abstractions.csproj
 src/Koan.Data.Abstractions/Koan.Data.Abstractions.csproj
 src/Koan.Data.Vector.Abstractions/Koan.Data.Vector.Abstractions.csproj

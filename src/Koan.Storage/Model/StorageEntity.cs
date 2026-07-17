@@ -41,8 +41,8 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     => (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IStorageService)) as IStorageService)
            ?? throw new InvalidOperationException("IStorageService not available. Ensure AppBootstrapper.InitializeModules() ran and AppHost.Current is set (greenfield boot).");
 
-    // STOR-0011: declare the entity type for the lifetime of a blob op so the ScopedStorageService decorator can
-    // apply this type's data axes (the leading particle) + the [HostScoped] exemption + the typed guard.
+    // Carry the entity type through the type-erased storage boundary so Storage can compile the applicable
+    // segmentation dimensions once and honor [HostScoped] subjects.
     private static IDisposable Scope() => StorageScope.For(typeof(TEntity));
 
     // Static creators

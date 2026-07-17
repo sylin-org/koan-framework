@@ -15,7 +15,13 @@ internal node broadcast. Shared mechanisms do not become a public generic pipeli
 
 ## Composition and provider election
 
-`KoanCommunicationModule` is discovered through normal `KoanModule` registration. One immutable
+`KoanCommunicationModule` contributes construction-free descriptor availability. On the supported
+composition path, the host constitution activates it only from direct or explicit bundle intent, then
+one retained module instance performs registration and startup; the constitution projects the
+activation fact. It is excluded from the framework's legacy initializer, auto-registrar,
+DI-construction, and provenance-reconstruction paths. An unmarked legacy host may activate discovered
+descriptors only through Core's explicitly degraded compatibility fallback; that mode is not
+declaration evidence. One immutable
 `CommunicationHandlerCatalog` discovers closed `IHandleEntityEvent<TEntity,TEvent>` subscriptions and
 `IReceiveEntity<TEntity>` receivers from the generated registry. Concrete handler classes are scoped;
 each dispatch creates a fresh DI and host/context scope.
@@ -24,6 +30,14 @@ One host-owned `CommunicationRouter` builds the complete immutable route plan. I
 inferred `default` plus startup-declared business channels, elects a provider independently for each
 public lane/channel and each internal route, creates channel-qualified bindings, scopes each adapter
 host to only its elected bindings, and owns the shared wire/dispatch contract.
+The router compiles adapters through Core's immutable provider catalog for ID/alias validation,
+direct-reference matching, memoized priority, and stable ties. Communication still owns lane eligibility,
+assurance ordering, layered/built-in admission, failure policy, binding construction, and startup. Each
+route carries one safe selection receipt, and composition facts project that receipt rather than re-electing.
+The adapter descriptor also declares immutable context-ingress provenance. Public Transport and Events
+routes are eligible only when that provenance meets every composed carrier requirement; unknown trust
+values and explicitly selected under-trusted providers fail before adapter startup. Framework signals
+and broadcasts are context-free and therefore retain the unverified floor.
 `InProcessCommunicationRuntime` implements the same
 `ICommunicationAdapter` seam as external connectors and remains the minimum-priority built-in floor.
 Direct application reference provenance admits external candidates. A layered candidate may also participate when
@@ -50,7 +64,7 @@ unknown terminal channel fails before source enumeration.
 The Entity facets normalize scalar, `IEnumerable<TEntity>`, and `IAsyncEnumerable<TEntity>` sources
 to one lazy async source. Each coordinator then:
 
-1. resolves the lane route and captures all composed context carriers once;
+1. resolves the lane route, binds every hard segmentation obligation, and captures the composed context once;
 2. validates policy knowable at the selected boundary before enumeration;
 3. serializes each yielded Entity, plus Event details when present, with shared JSON settings;
 4. applies the configured combined UTF-8 payload bound;
@@ -70,6 +84,12 @@ the same stable target declarations and return host-owned wire bytes to the same
 target group, ingress creates a scope, pushes it as the current `AppHost`, restores carriers using the
 adapter's declared trust provenance, deserializes fresh Entity state and Event details, evaluates
 `Where`, and invokes the typed handler.
+
+`CommunicationContextPlan` is the pillar-owned wrapper over Core's memoized
+`SegmentationContextPlan`. It requires every applicable hard axis before restore and re-binds the
+segmentation scope under the restored carrier before filters or handlers. A deterministic Development
+fallback is materialized into the outgoing opaque bag only for a hard typed operation; it is not ambient
+global state and cannot be re-resolved differently by a peer.
 
 Filtering, successful handling, and failure each settle one target counter. Handler exceptions are
 logged without payload contents and do not prevent later groups from receiving their copies. Graceful
@@ -98,10 +118,15 @@ receivers filter their own origin, evict only L1, and rely on L1 TTL as the loss
 
 ## Inspection
 
-The boot module and `CommunicationCompositionContributor` report each lane/channel's elected provider,
+The retained boot module and its `CommunicationCompositionFacts` projector report each lane/channel's elected provider,
 reason, priority, assurance, settlement observability, handler-group bindings, applicable local
 bounds, payload limits, and composed context-carrier count. Stable constants feed the same startup,
 operator, and authorized-agent fact projections.
+
+When hard segmentation is active, the same fact envelope reports the Communication realization and a
+per-route guarantee statement. Logical context is `enforced-or-rejected`; typed contract/group routing
+is named separately; local/RabbitMQ physical topology remains shared; RabbitMQ does not imply payload
+confidentiality; and remote settlement remains unavailable unless an adapter explicitly proves it.
 
 ## Unsupported scenarios
 

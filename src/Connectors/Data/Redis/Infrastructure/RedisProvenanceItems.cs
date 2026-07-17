@@ -18,7 +18,7 @@ internal static class RedisProvenanceItems
     {
         "Koan.Data.Connector.Redis.RedisOptionsConfigurator",
         "Koan.Data.Connector.Redis.RedisAdapterFactory",
-        "Koan.Data.Connector.Redis.Initialization.KoanAutoRegistrar"
+        "Koan.Data.Connector.Redis.Initialization.RedisDataModule"
     };
 
     private static readonly IReadOnlyCollection<string> DatabaseConsumers = new[]

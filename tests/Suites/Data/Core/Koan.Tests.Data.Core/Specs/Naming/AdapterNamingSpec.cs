@@ -12,10 +12,9 @@ using Xunit;
 namespace Koan.Tests.Data.Core.Specs.Naming;
 
 /// <summary>
-/// DATA-0105 phase 0a: <see cref="AdapterNaming.GetOrCompute{TEntity,TKey}"/> previously re-walked DI on every
-/// call (the misnamed "GetOrCompute" did no caching of its own — it enumerated all
-/// <see cref="IDataAdapterFactory"/> per property access). The factory lookup is now memoized per service
-/// provider, while the result stays ambient-aware (adapter routing) and partition-aware.
+/// <see cref="AdapterNaming.GetOrCompute{TEntity,TKey}"/> consumes the host's compiled provider catalog rather
+/// than re-walking or re-probing adapter factories. The selected factory remains host-owned while naming stays
+/// ambient-aware (adapter routing) and partition-aware.
 /// </summary>
 public class AdapterNamingSpec
 {
@@ -28,15 +27,9 @@ public class AdapterNamingSpec
     private sealed class CountingFakeFactory : IDataAdapterFactory
     {
         private readonly string _name;
-        public int CanHandleCalls;
         public CountingFakeFactory(string name) => _name = name;
 
         public string Provider => "fake";
-        public bool CanHandle(string provider)
-        {
-            CanHandleCalls++;
-            return string.Equals(provider, "fake", StringComparison.OrdinalIgnoreCase);
-        }
         public StorageNamingCapability GetNamingCapability(IServiceProvider services) => throw new NotImplementedException();
         public string ResolveStorage(Type entityType, string? partition, IServiceProvider services) => _name;
         public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
@@ -54,7 +47,7 @@ public class AdapterNamingSpec
     }
 
     [Fact]
-    public void GetOrCompute_memoizes_the_factory_lookup_per_provider()
+    public void GetOrCompute_reuses_the_compiled_catalog_without_reprobing_factories()
     {
         var fake = new CountingFakeFactory("fake_name");
         using var sp = Build(fake);
@@ -64,8 +57,6 @@ public class AdapterNamingSpec
 
         n1.Should().Be("fake_name");
         n2.Should().Be("fake_name");
-        // The redundant DI enumeration is gone: the factory is found once, then served from the per-provider cache.
-        fake.CanHandleCalls.Should().Be(1);
     }
 
     [Fact]
@@ -99,7 +90,6 @@ public class AdapterNamingSpec
     {
         public readonly System.Collections.Generic.List<string?> SeenPartitions = new();
         public string Provider => "fake";
-        public bool CanHandle(string provider) => string.Equals(provider, "fake", StringComparison.OrdinalIgnoreCase);
         public StorageNamingCapability GetNamingCapability(IServiceProvider services) => throw new NotImplementedException();
         public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
         {

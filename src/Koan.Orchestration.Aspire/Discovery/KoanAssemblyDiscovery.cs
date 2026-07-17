@@ -3,20 +3,21 @@ using System.Reflection;
 namespace Koan.Orchestration.Aspire.Extensions;
 
 /// <summary>
-/// Helper class for discovering assemblies that contain Koan modules with KoanAutoRegistrar implementations.
+/// Helper class for discovering assemblies that contain Koan modules with Aspire resource contributions.
 /// This discovery mechanism enables Koan's "Reference = Intent" philosophy by automatically finding
 /// and registering resources from all referenced Koan modules.
 /// </summary>
 internal static class KoanAssemblyDiscovery
 {
     /// <summary>
-    /// Discover all assemblies that contain Koan modules with KoanAutoRegistrar classes.
+    /// Discover all assemblies that may contain Koan modules.
     /// </summary>
     /// <returns>A collection of assemblies that may contain Koan module registrars</returns>
     /// <remarks>
     /// The discovery process searches for assemblies using these criteria:
     /// 1. Assembly name starts with "Koan." (official Koan modules)
-    /// 2. Assembly contains a type named "KoanAutoRegistrar" that implements IKoanAutoRegistrar
+    /// 2. Assembly contains a concrete <see cref="Koan.Core.KoanModule"/> implementing
+    ///    <see cref="IKoanAspireResources"/>
     /// 3. Assembly is currently loaded in the AppDomain
     ///
     /// This approach ensures that:
@@ -77,13 +78,11 @@ internal static class KoanAssemblyDiscovery
             return true;
         }
 
-        // Slower path: Check if assembly contains KoanAutoRegistrar type
-        // This allows discovery of custom modules that follow Koan patterns
+        // Slower path: custom packages are admitted by the capability they implement,
+        // not by a prescribed class name.
         try
         {
-            var types = assembly.GetTypes();
-            return types.Any(t => t.Name == "KoanAutoRegistrar" &&
-                                 HasInterface(t, "IKoanAutoRegistrar"));
+            return GetAspireResourceModuleTypes(assembly).Length > 0;
         }
         catch (ReflectionTypeLoadException)
         {
@@ -93,24 +92,6 @@ internal static class KoanAssemblyDiscovery
         catch (Exception)
         {
             // Other exceptions also suggest this isn't a Koan assembly
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Check if a type implements a specific interface by name.
-    /// </summary>
-    /// <param name="type">The type to check</param>
-    /// <param name="interfaceName">The interface name to look for</param>
-    /// <returns>True if the type implements the interface</returns>
-    private static bool HasInterface(Type type, string interfaceName)
-    {
-        try
-        {
-            return type.GetInterfaces().Any(i => i.Name == interfaceName);
-        }
-        catch
-        {
             return false;
         }
     }
@@ -141,9 +122,9 @@ internal static class KoanAssemblyDiscovery
                     Name = assemblyName.Name ?? "Unknown",
                     Version = assemblyName.Version?.ToString() ?? "Unknown",
                     Location = assembly.Location,
-                    HasKoanAutoRegistrar = HasKoanAutoRegistrar(assembly),
+                    HasKoanModule = HasKoanModule(assembly),
                     HasAspireRegistrar = hasAspireRegistrar,
-                    RegistrarTypeName = GetRegistrarTypeName(assembly)
+                    AspireResourceModuleTypeName = GetAspireResourceModuleTypes(assembly).SingleOrDefault()?.FullName
                 });
             }
             catch (Exception)
@@ -154,9 +135,9 @@ internal static class KoanAssemblyDiscovery
                     Name = assembly.GetName().Name ?? "Unknown",
                     Version = "Error",
                     Location = "Error loading assembly info",
-                    HasKoanAutoRegistrar = false,
+                    HasKoanModule = false,
                     HasAspireRegistrar = false,
-                    RegistrarTypeName = null
+                    AspireResourceModuleTypeName = null
                 });
             }
         }
@@ -165,16 +146,13 @@ internal static class KoanAssemblyDiscovery
     }
 
     /// <summary>
-    /// Check if an assembly contains a KoanAutoRegistrar that implements IKoanAspireRegistrar.
+    /// Check if an assembly contains a module that contributes Aspire resources.
     /// </summary>
     private static bool HasAspireRegistrar(Assembly assembly)
     {
         try
         {
-            var registrarType = assembly.GetTypes()
-                .FirstOrDefault(t => t.Name == "KoanAutoRegistrar");
-
-            return registrarType?.GetInterface("IKoanAspireRegistrar") != null;
+            return GetAspireResourceModuleTypes(assembly).Length > 0;
         }
         catch
         {
@@ -183,13 +161,16 @@ internal static class KoanAssemblyDiscovery
     }
 
     /// <summary>
-    /// Check if an assembly contains a KoanAutoRegistrar.
+    /// Check if an assembly contains a concrete Koan module.
     /// </summary>
-    private static bool HasKoanAutoRegistrar(Assembly assembly)
+    private static bool HasKoanModule(Assembly assembly)
     {
         try
         {
-            return assembly.GetTypes().Any(t => t.Name == "KoanAutoRegistrar");
+            return assembly.GetTypes().Any(static type =>
+                !type.IsAbstract
+                && !type.ContainsGenericParameters
+                && typeof(Koan.Core.KoanModule).IsAssignableFrom(type));
         }
         catch
         {
@@ -198,22 +179,16 @@ internal static class KoanAssemblyDiscovery
     }
 
     /// <summary>
-    /// Get the full type name of the KoanAutoRegistrar in an assembly.
+    /// Get the module that contributes Aspire resources, when present.
     /// </summary>
-    private static string? GetRegistrarTypeName(Assembly assembly)
-    {
-        try
-        {
-            var registrarType = assembly.GetTypes()
-                .FirstOrDefault(t => t.Name == "KoanAutoRegistrar");
-
-            return registrarType?.FullName;
-        }
-        catch
-        {
-            return null;
-        }
-    }
+    internal static Type[] GetAspireResourceModuleTypes(Assembly assembly)
+        => assembly.GetTypes()
+            .Where(static type =>
+                !type.IsAbstract
+                && !type.ContainsGenericParameters
+                && typeof(Koan.Core.KoanModule).IsAssignableFrom(type)
+                && typeof(IKoanAspireResources).IsAssignableFrom(type))
+            .ToArray();
 }
 
 /// <summary>
@@ -230,12 +205,12 @@ public class KoanAssemblyInfo
     /// <summary>The assembly file location</summary>
     public required string Location { get; init; }
 
-    /// <summary>Whether the assembly contains a KoanAutoRegistrar</summary>
-    public required bool HasKoanAutoRegistrar { get; init; }
+    /// <summary>Whether the assembly contains a concrete Koan module.</summary>
+    public required bool HasKoanModule { get; init; }
 
-    /// <summary>Whether the KoanAutoRegistrar implements IKoanAspireRegistrar</summary>
+    /// <summary>Whether a module contributes Aspire resources.</summary>
     public required bool HasAspireRegistrar { get; init; }
 
-    /// <summary>The full type name of the registrar</summary>
-    public required string? RegistrarTypeName { get; init; }
+    /// <summary>The full type name of the Aspire resource module.</summary>
+    public required string? AspireResourceModuleTypeName { get; init; }
 }

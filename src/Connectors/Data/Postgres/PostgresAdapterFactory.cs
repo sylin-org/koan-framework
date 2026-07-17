@@ -25,11 +25,7 @@ namespace Koan.Data.Connector.Postgres;
 public sealed class PostgresAdapterFactory : IDataAdapterFactory
 {
     public string Provider => "postgres";
-
-    public bool CanHandle(string provider)
-        => string.Equals(provider, "postgres", StringComparison.OrdinalIgnoreCase)
-           || string.Equals(provider, "postgresql", StringComparison.OrdinalIgnoreCase)
-           || string.Equals(provider, "npgsql", StringComparison.OrdinalIgnoreCase);
+    public IReadOnlyCollection<string> Aliases => ["postgresql", "npgsql"];
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,
@@ -46,7 +42,7 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory
         // relies on discovery and resolves to "auto") collapses onto the discovery-resolved base connection, so a
         // routed source never keys its store on the unresolved sentinel (ARCH-0103 P5 fleet hoist).
         var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "Postgres", source, baseOpts.ConnectionString, CanHandle);
+            config, sourceRegistry, "Postgres", source, baseOpts.ConnectionString, this);
 
         // Create source-specific options
         var sourceOpts = new PostgresOptions

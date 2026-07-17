@@ -4,10 +4,9 @@
 
   <!--
     Services are operational runtime apps (containerized daemons, MCP servers),
-    not consumer-facing NuGet libraries. They get KoanPackageKind=Periphery via
-    the ARCH-0082 migration so their internal versions track, but they should
-    NOT be published to nuget.org. Adopting an IsPackable=false default here
-    mirrors the samples/ Directory.Build.props pattern.
+    not consumer-facing NuGet libraries. They should not be published to
+    nuget.org. Adopting an IsPackable=false default here mirrors the samples/
+    Directory.Build.props pattern.
 
     If a specific service is genuinely meant for distribution (contracts, SDKs),
     that csproj can explicitly opt back in with <IsPackable>true</IsPackable>.

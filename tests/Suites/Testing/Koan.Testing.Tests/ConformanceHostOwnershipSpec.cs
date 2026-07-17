@@ -21,11 +21,11 @@ public sealed class ConformanceHostOwnershipSpec
         try
         {
             await older.InitializeAsync();
-            var olderMarker = ConformanceOwnershipProbeRegistrar.GetRequiredMarker(olderOwner);
+            var olderMarker = ConformanceOwnershipProbeModule.GetRequiredMarker(olderOwner);
             AppHost.Current.Should().BeSameAs(olderMarker);
 
             await newer.InitializeAsync();
-            var newerMarker = ConformanceOwnershipProbeRegistrar.GetRequiredMarker(newerOwner);
+            var newerMarker = ConformanceOwnershipProbeModule.GetRequiredMarker(newerOwner);
             AppHost.Current.Should().BeSameAs(newerMarker);
 
             await older.DisposeAsync();
@@ -38,8 +38,8 @@ public sealed class ConformanceHostOwnershipSpec
         }
 
         AppHost.Current.Should().BeNull();
-        ConformanceOwnershipProbeRegistrar.HasMarker(olderOwner).Should().BeFalse();
-        ConformanceOwnershipProbeRegistrar.HasMarker(newerOwner).Should().BeFalse();
+        ConformanceOwnershipProbeModule.HasMarker(olderOwner).Should().BeFalse();
+        ConformanceOwnershipProbeModule.HasMarker(newerOwner).Should().BeFalse();
     }
 
     [Fact]
@@ -65,8 +65,8 @@ public sealed class ConformanceHostOwnershipSpec
             await first.DisposeAsync();
         }
 
-        ConformanceOwnershipProbeRegistrar.HasMarker(firstOwner).Should().BeFalse();
-        ConformanceOwnershipProbeRegistrar.HasMarker(secondOwner).Should().BeFalse();
+        ConformanceOwnershipProbeModule.HasMarker(firstOwner).Should().BeFalse();
+        ConformanceOwnershipProbeModule.HasMarker(secondOwner).Should().BeFalse();
     }
 
     private sealed class OwnershipProbeConformance(string owner)
@@ -78,13 +78,13 @@ public sealed class ConformanceHostOwnershipSpec
             current.Should().NotBeNull();
             var configuration = current!.GetService(typeof(IConfiguration))
                 .Should().BeAssignableTo<IConfiguration>().Subject!;
-            configuration[ConformanceOwnershipProbeRegistrar.OwnerConfigurationKey]
+            configuration[ConformanceOwnershipProbeModule.OwnerConfigurationKey]
                 .Should().Be(owner, "each battery must remain bound to the host it created");
             return new() { Name = owner };
         }
 
         protected override void Configure(IDictionary<string, string?> settings)
-            => settings[ConformanceOwnershipProbeRegistrar.OwnerConfigurationKey] = owner;
+            => settings[ConformanceOwnershipProbeModule.OwnerConfigurationKey] = owner;
     }
 }
 

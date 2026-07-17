@@ -7,6 +7,7 @@ using MongoDB.Bson.Serialization.Serializers;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Koan.Core.Hosting.App;
+using Koan.Core.Logging;
 
 namespace Koan.Data.Connector.Mongo.Initialization;
 
@@ -85,8 +86,6 @@ public class JObjectSerializer : SerializerBase<JObject>, IBsonSerializer<object
         }
 
         var json = value.ToString(Formatting.None);
-        // _logger?.LogDebug("[JObjectSerializer] Serializing JObject: {Json}", json);
-
         try
         {
             var document = BsonSerializer.Deserialize<BsonDocument>(json);
@@ -94,10 +93,10 @@ public class JObjectSerializer : SerializerBase<JObject>, IBsonSerializer<object
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(ex, "[JObjectSerializer] Failed to serialize JObject as BsonDocument. JObject value: {Json}. Falling back to writing as string.", json);
+            KoanLog.DataWarning(_logger, "mongo.jobject.serialize", "string-fallback",
+                ("errorType", ex.GetType().FullName));
             // Fallback for simple JObject like { "value": "some_string" }
             context.Writer.WriteString(value.ToString());
         }
     }
 }
-

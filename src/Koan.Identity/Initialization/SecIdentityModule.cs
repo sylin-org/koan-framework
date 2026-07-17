@@ -24,11 +24,9 @@ namespace Koan.Identity.Initialization;
 /// <see cref="IdentityAuthFlowHandler"/> (cookie sign-in) — no manual wiring. Ordered <c>[After]</c> the auth
 /// registrar so the store replacement wins.
 /// </summary>
-[After(typeof(Koan.Web.Auth.Initialization.KoanAutoRegistrar))]
+[After(typeof(Koan.Web.Auth.Initialization.AuthModule))]
 public sealed class SecIdentityModule : KoanModule
 {
-    public override string Id => "Koan.Identity";
-
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<IdentityOptions>(IdentityOptions.SectionPath);

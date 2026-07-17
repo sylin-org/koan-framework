@@ -165,7 +165,7 @@ public sealed class SubjectContextCarrierSpec
     {
         var services = new ServiceCollection();
         services.AddKoanCore();
-        new Koan.Data.Access.Initialization.KoanAutoRegistrar().Register(services);
+        new Koan.Data.Access.Initialization.DataAccessModule().Register(services);
         using var provider = services.BuildServiceProvider();
 
         provider.GetServices<IKoanContextCarrier>()

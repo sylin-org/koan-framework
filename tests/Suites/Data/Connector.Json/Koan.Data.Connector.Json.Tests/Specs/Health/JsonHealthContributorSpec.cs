@@ -197,9 +197,6 @@ public sealed class JsonHealthContributorSpec
     {
         public string Provider => "sqlite";
 
-        public bool CanHandle(string provider) =>
-            string.Equals(provider, Provider, StringComparison.OrdinalIgnoreCase);
-
         public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
             IServiceProvider sp,
             string source = "Default")

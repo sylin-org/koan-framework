@@ -101,5 +101,5 @@ public static class ZenGarden
         _client
         ?? (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IZenGardenClient)) as IZenGardenClient)
         ?? throw new InvalidOperationException(
-            "IZenGardenClient is not configured. Ensure builder.Services.AddKoan() runs with Koan.ZenGarden referenced, or call AddKoanZenGarden(...), or configure ZenGarden manually.");
+            "IZenGardenClient is not configured. Reference Koan.ZenGarden and call builder.Services.AddKoan().");
 }

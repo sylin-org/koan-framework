@@ -14,10 +14,7 @@ namespace Koan.Data.Connector.InMemory;
 public sealed class InMemoryAdapterFactory : IDataAdapterFactory
 {
     public string Provider => "inmemory";
-
-    public bool CanHandle(string provider) =>
-        string.Equals(provider, "inmemory", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(provider, "memory", StringComparison.OrdinalIgnoreCase);
+    public IReadOnlyCollection<string> Aliases => ["memory"];
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,

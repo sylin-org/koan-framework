@@ -45,6 +45,52 @@ public sealed class ProviderElectionSpec
     }
 
     [Fact]
+    public async Task Unverified_provider_is_ineligible_for_composed_authenticated_context()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var fake = new FakeExternalAdapter(
+            failStart: false,
+            ingressTrust: Koan.Core.Context.ContextIngressTrust.Unverified);
+        var state = new TransportTestState();
+        var start = () => CommunicationTestHost.Start(
+            state,
+            ct,
+            services =>
+            {
+                services.AddSingleton<ICommunicationAdapter>(fake);
+                services.Configure<CommunicationOptions>(options => options.TransportProvider = "fake-external");
+            });
+
+        var failure = (await start.Should().ThrowAsync<InvalidOperationException>()).Which;
+
+        failure.Message.Should().Contain("requires Authenticated");
+        fake.StartCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Provider_with_an_unknown_ingress_trust_declaration_is_refused_before_start()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var fake = new FakeExternalAdapter(
+            failStart: false,
+            ingressTrust: (Koan.Core.Context.ContextIngressTrust)99);
+        var state = new TransportTestState();
+        var start = () => CommunicationTestHost.Start(
+            state,
+            ct,
+            services =>
+            {
+                services.AddSingleton<ICommunicationAdapter>(fake);
+                services.Configure<CommunicationOptions>(options => options.TransportProvider = "fake-external");
+            });
+
+        var failure = (await start.Should().ThrowAsync<InvalidOperationException>()).Which;
+
+        failure.Message.Should().Contain("ingress trust is unknown");
+        fake.StartCount.Should().Be(0);
+    }
+
+    [Fact]
     public async Task External_transport_cannot_accept_a_known_zero_receiver_route()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -105,7 +151,52 @@ public sealed class ProviderElectionSpec
             binding.Lane == CommunicationLane.Transport && binding.Channel == "external");
     }
 
-    private sealed class FakeExternalAdapter(bool failStart, int? targetGroups = null) : ICommunicationAdapter
+    [Fact]
+    public async Task Communication_assurance_outranks_generic_provider_priority()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var state = new TransportTestState();
+        await using var host = await CommunicationTestHost.Start(
+            state,
+            ct,
+            services =>
+            {
+                services.AddSingleton<ICommunicationAdapter>(new HighPriorityBestEffortAdapter());
+                services.AddSingleton<ICommunicationAdapter>(new LowPriorityAcknowledgedAdapter());
+            });
+        using var hostScope = AppHost.PushScope(host.Services);
+
+        var acceptance = await new TransportReceiverFixtures.IsolationOrder().Transport.Send(ct);
+
+        acceptance.Adapter.Should().Be("acknowledged");
+    }
+
+    [Fact]
+    public async Task Explicit_provider_alias_resolves_to_the_canonical_adapter()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var fake = new FakeExternalAdapter(failStart: false, targetGroups: 1);
+        var state = new TransportTestState();
+        await using var host = await CommunicationTestHost.Start(
+            state,
+            ct,
+            services =>
+            {
+                services.AddSingleton<ICommunicationAdapter>(fake);
+                services.Configure<CommunicationOptions>(options => options.TransportProvider = "external-alias");
+            });
+        using var hostScope = AppHost.PushScope(host.Services);
+
+        var acceptance = await new TransportReceiverFixtures.IsolationOrder().Transport.Send(ct);
+
+        acceptance.Adapter.Should().Be("fake-external");
+    }
+
+    private sealed class FakeExternalAdapter(
+        bool failStart,
+        int? targetGroups = null,
+        Koan.Core.Context.ContextIngressTrust ingressTrust = Koan.Core.Context.ContextIngressTrust.Authenticated)
+        : ICommunicationAdapter
     {
         public CommunicationAdapterDescriptor Descriptor { get; } = new(
             "fake-external",
@@ -118,7 +209,9 @@ public sealed class ProviderElectionSpec
             | CommunicationAdapterCapabilities.GroupFanOut
             | CommunicationAdapterCapabilities.MessageIdentity
             | CommunicationAdapterCapabilities.BoundedAcceptance,
-            ["Sylin.Koan.Communication.Connector.Fake"]);
+            ["Sylin.Koan.Communication.Connector.Fake"],
+            Aliases: ["external-alias"],
+            IngressTrust: ingressTrust);
 
         public int StartCount { get; private set; }
         public int PublishCount { get; private set; }
@@ -152,4 +245,53 @@ public sealed class ProviderElectionSpec
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
+
+    private abstract class RankedLayeredAdapter(
+        string id,
+        CommunicationDeliveryAssurance assurance) : ICommunicationAdapter
+    {
+        public CommunicationAdapterDescriptor Descriptor { get; } = new(
+            id,
+            [CommunicationLane.Transport],
+            assurance,
+            CommunicationAdapterCapabilities.ContractIdentity
+            | CommunicationAdapterCapabilities.SnapshotCopy
+            | CommunicationAdapterCapabilities.ContextCarriage
+            | CommunicationAdapterCapabilities.TypedGroups
+            | CommunicationAdapterCapabilities.GroupFanOut
+            | CommunicationAdapterCapabilities.MessageIdentity
+            | CommunicationAdapterCapabilities.BoundedAcceptance,
+            [],
+            IsLayered: true,
+            IngressTrust: Koan.Core.Context.ContextIngressTrust.Authenticated);
+
+        public bool IsReady { get; private set; }
+
+        public Task Start(CommunicationAdapterHost host, CancellationToken ct)
+        {
+            IsReady = true;
+            return Task.CompletedTask;
+        }
+
+        public ValueTask<CommunicationAdapterAcceptance> Publish(
+            CommunicationAdapterPublication publication,
+            CancellationToken ct)
+            => ValueTask.FromResult(new CommunicationAdapterAcceptance(1, false));
+
+        public Task Stop(CancellationToken ct)
+        {
+            IsReady = false;
+            return Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    [ProviderPriority(int.MaxValue)]
+    private sealed class HighPriorityBestEffortAdapter()
+        : RankedLayeredAdapter("best-effort", CommunicationDeliveryAssurance.BestEffort);
+
+    [ProviderPriority(int.MinValue + 1)]
+    private sealed class LowPriorityAcknowledgedAdapter()
+        : RankedLayeredAdapter("acknowledged", CommunicationDeliveryAssurance.Acknowledged);
 }

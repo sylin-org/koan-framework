@@ -8,7 +8,7 @@ What it does
 - Does not support presigned URLs.
 
 Register
-- Auto-registers via KoanAutoRegistrar. Ensure AppBootstrapper.InitializeModules(services) is called at startup.
+- Reference the package; `LocalStorageModule` activates through `AddKoan()` with no manual provider wiring.
 - Required option: Koan:Storage:Providers:Local:BasePath → an absolute directory path.
 
 Profile example

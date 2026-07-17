@@ -1,6 +1,8 @@
 using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Runtime;
+using Koan.Core.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Koan.Tests.Data.Core.Specs.Hosting;
 
@@ -24,11 +26,12 @@ public sealed class StartKoanHostOwnershipSpec : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton<OwnedDisposable>();
         var provider = services.StartKoan();
-        var owned = provider.GetRequiredService<OwnedDisposable>();
+        var providerServices = provider.Services;
+        var owned = providerServices.GetRequiredService<OwnedDisposable>();
 
         try
         {
-            AppHost.Current.Should().BeSameAs(provider);
+            AppHost.Current.Should().BeSameAs(providerServices);
 
             Dispose(provider);
 
@@ -39,7 +42,7 @@ public sealed class StartKoanHostOwnershipSpec : IDisposable
         finally
         {
             Dispose(provider);
-            if (ReferenceEquals(AppHost.Current, provider))
+            if (ReferenceEquals(AppHost.Current, providerServices))
             {
                 AppHost.Current = null;
             }
@@ -54,11 +57,11 @@ public sealed class StartKoanHostOwnershipSpec : IDisposable
 
         try
         {
-            AppHost.Current.Should().BeSameAs(newer);
+            AppHost.Current.Should().BeSameAs(newer.Services);
 
             Dispose(older);
 
-            AppHost.Current.Should().BeSameAs(newer);
+            AppHost.Current.Should().BeSameAs(newer.Services);
 
             Dispose(newer);
 
@@ -80,9 +83,9 @@ public sealed class StartKoanHostOwnershipSpec : IDisposable
 
         try
         {
-            static async Task<string> ResolveOwner(IServiceProvider provider)
+            static async Task<string> ResolveOwner(IHost host)
             {
-                using var scope = AppHost.PushScope(provider);
+                using var scope = AppHost.PushScope(host.Services);
                 await Task.Yield();
                 return AppHost.Current!.GetRequiredService<HostMarker>().Owner;
             }
@@ -139,16 +142,42 @@ public sealed class StartKoanHostOwnershipSpec : IDisposable
         }
     }
 
-    private static IServiceProvider Start(string owner)
+    [Fact]
+    public async Task Console_bootstrap_uses_the_standard_host_lifecycle_without_false_health_diagnostics()
+    {
+        var services = new ServiceCollection();
+        var lifecycle = new LifecycleProbe();
+        services.AddSingleton(lifecycle);
+        services.AddSingleton<IHostedService>(lifecycle);
+        var provider = services.StartKoan();
+
+        try
+        {
+            provider.Services.GetRequiredService<IHostEnvironment>().Should().NotBeNull();
+            provider.Services.GetRequiredService<IHostApplicationLifetime>().Should().NotBeNull();
+            lifecycle.Started.Should().BeTrue();
+            provider.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts.Should().NotContain(fact =>
+                fact.State == KoanFactState.CollectionFailed
+                && fact.Subject == "health-registry");
+        }
+        finally
+        {
+            await ((IAsyncDisposable)provider).DisposeAsync();
+        }
+
+        lifecycle.Stopped.Should().BeTrue();
+    }
+
+    private static IHost Start(string owner)
     {
         var services = new ServiceCollection();
         services.AddSingleton(new HostMarker(owner));
         return services.StartKoan();
     }
 
-    private static void Dispose(IServiceProvider provider)
+    private static void Dispose(IHost provider)
     {
-        ((IDisposable)provider).Dispose();
+        provider.Dispose();
     }
 
     private sealed record HostMarker(string Owner);
@@ -174,6 +203,24 @@ public sealed class StartKoanHostOwnershipSpec : IDisposable
 
         public void Start()
         {
+        }
+    }
+
+    private sealed class LifecycleProbe : IHostedService
+    {
+        public bool Started { get; private set; }
+        public bool Stopped { get; private set; }
+
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            Started = true;
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            Stopped = true;
+            return Task.CompletedTask;
         }
     }
 }

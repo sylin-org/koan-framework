@@ -6,7 +6,7 @@ public static class EventHandlerFixtures
 {
     public sealed record OrderApproved;
 
-    public sealed class BlockingEventOrder : Entity<BlockingEventOrder>
+    public sealed class BlockingEventOrder : Entity<BlockingEventOrder>, IAmbientExempt
     {
         public string Name { get; set; } = "";
     }
@@ -25,7 +25,7 @@ public static class EventHandlerFixtures
         }
     }
 
-    public sealed class CopyEventOrder : Entity<CopyEventOrder>
+    public sealed class CopyEventOrder : Entity<CopyEventOrder>, IAmbientExempt
     {
         public string Name { get; set; } = "";
     }
@@ -70,7 +70,7 @@ public static class EventHandlerFixtures
 
     public sealed record SequenceEvent;
 
-    public sealed class SequenceEventOrder : Entity<SequenceEventOrder>
+    public sealed class SequenceEventOrder : Entity<SequenceEventOrder>, IAmbientExempt
     {
         public int Value { get; set; }
     }
@@ -93,7 +93,7 @@ public static class EventHandlerFixtures
     [EventDetailsRequired]
     public sealed record RejectionDetails(string Reason);
 
-    public sealed class RequiredDetailsOrder : Entity<RequiredDetailsOrder>;
+    public sealed class RequiredDetailsOrder : Entity<RequiredDetailsOrder>, IAmbientExempt;
 
     public sealed class RequiredDetailsHandler(EventTestState state)
         : IHandleEntityEvent<RequiredDetailsOrder, RejectionDetails>
@@ -110,7 +110,7 @@ public static class EventHandlerFixtures
 
     public sealed record OptionalDetails(string Note);
 
-    public sealed class OptionalDetailsOrder : Entity<OptionalDetailsOrder>;
+    public sealed class OptionalDetailsOrder : Entity<OptionalDetailsOrder>, IAmbientExempt;
 
     public sealed class OptionalDetailsHandler(EventTestState state)
         : IHandleEntityEvent<OptionalDetailsOrder, OptionalDetails>
@@ -128,7 +128,7 @@ public static class EventHandlerFixtures
 
     public sealed record FilterEvent;
 
-    public sealed class FilterEventOrder : Entity<FilterEventOrder>
+    public sealed class FilterEventOrder : Entity<FilterEventOrder>, IAmbientExempt
     {
         public bool Accepted { get; set; }
     }
@@ -151,7 +151,7 @@ public static class EventHandlerFixtures
 
     public sealed record FailureEvent;
 
-    public sealed class FailureEventOrder : Entity<FailureEventOrder>;
+    public sealed class FailureEventOrder : Entity<FailureEventOrder>, IAmbientExempt;
 
     public sealed class FailureAThrowingHandler : IHandleEntityEvent<FailureEventOrder, FailureEvent>
     {
@@ -193,7 +193,7 @@ public static class EventHandlerFixtures
 
     public sealed record CancellationEvent;
 
-    public sealed class CancellationEventOrder : Entity<CancellationEventOrder>
+    public sealed class CancellationEventOrder : Entity<CancellationEventOrder>, IAmbientExempt
     {
         public int Value { get; set; }
     }
@@ -216,7 +216,7 @@ public static class EventHandlerFixtures
 
     public sealed record DrainEvent;
 
-    public sealed class DrainEventOrder : Entity<DrainEventOrder>;
+    public sealed class DrainEventOrder : Entity<DrainEventOrder>, IAmbientExempt;
 
     public sealed class DrainEventHandler(EventTestState state)
         : IHandleEntityEvent<DrainEventOrder, DrainEvent>
@@ -234,7 +234,7 @@ public static class EventHandlerFixtures
 
     public sealed record IsolationEvent;
 
-    public sealed class IsolationEventOrder : Entity<IsolationEventOrder>;
+    public sealed class IsolationEventOrder : Entity<IsolationEventOrder>, IAmbientExempt;
 
     public sealed class IsolationEventHandler(EventTestState state)
         : IHandleEntityEvent<IsolationEventOrder, IsolationEvent>
@@ -251,5 +251,5 @@ public static class EventHandlerFixtures
 
     public sealed record NoSubscriberEvent;
 
-    public sealed class NoSubscriberEventOrder : Entity<NoSubscriberEventOrder>;
+    public sealed class NoSubscriberEventOrder : Entity<NoSubscriberEventOrder>, IAmbientExempt;
 }

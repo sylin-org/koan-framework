@@ -5,6 +5,12 @@ namespace Koan.ZenGarden;
 /// </summary>
 public static class Constants
 {
+    internal static class Composition
+    {
+        public const string SourceId = "zengarden-offering";
+        public const string IntentScheme = "zen-garden";
+    }
+
     public static class Discovery
     {
         public const int DefaultTimeoutSeconds = 3;

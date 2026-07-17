@@ -25,49 +25,25 @@ internal sealed class MilvusDiscoveryAdapter : ServiceDiscoveryAdapterBase
     /// <summary>Milvus-specific health validation using HTTP management API</summary>
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        try
-        {
-            using var httpClient = new HttpClient { Timeout = context.HealthCheckTimeout };
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(context.HealthCheckTimeout);
+        using var httpClient = new HttpClient { Timeout = context.HealthCheckTimeout };
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(context.HealthCheckTimeout);
 
-            // Try Milvus HTTP management API health endpoint (port 9091 by default)
-            var managementUri = ConvertToManagementEndpoint(serviceUrl);
-            var healthUrl = new Uri(managementUri, "/healthz").ToString();
-            var response = await httpClient.GetAsync(healthUrl, cts.Token);
+        var managementUri = ConvertToManagementEndpoint(serviceUrl);
+        var healthUrl = new Uri(managementUri, "/healthz").ToString();
+        var response = await httpClient.GetAsync(healthUrl, cts.Token);
 
-            if (response.IsSuccessStatusCode)
-            {
-                _logger.LogDebug("Milvus health check passed using /healthz for {Url}", serviceUrl);
-                return true;
-            }
+        if (response.IsSuccessStatusCode) return true;
 
-            // Fallback to metrics endpoint on management port
-            var metricsUrl = new Uri(managementUri, "/metrics").ToString();
-            var metricsResponse = await httpClient.GetAsync(metricsUrl, cts.Token);
+        var metricsUrl = new Uri(managementUri, "/metrics").ToString();
+        var metricsResponse = await httpClient.GetAsync(metricsUrl, cts.Token);
 
-            if (metricsResponse.IsSuccessStatusCode)
-            {
-                _logger.LogDebug("Milvus health check passed using /metrics for {Url}", serviceUrl);
-                return true;
-            }
+        if (metricsResponse.IsSuccessStatusCode) return true;
 
-            // Final fallback - just try to connect to the gRPC port (basic TCP connectivity)
-            // This is less reliable but better than nothing
-            var uri = new Uri(serviceUrl);
-            using var tcpClient = new System.Net.Sockets.TcpClient();
-            await tcpClient.ConnectAsync(uri.Host, uri.Port, cts.Token);
-            var isConnected = tcpClient.Connected;
-
-            _logger.LogDebug("Milvus health check {Result} using TCP connectivity for {Url}",
-                isConnected ? "passed" : "failed", serviceUrl);
-            return isConnected;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug("Milvus health check failed for {Url}: {Error}", serviceUrl, ex.Message);
-            return false;
-        }
+        var uri = new Uri(serviceUrl);
+        using var tcpClient = new System.Net.Sockets.TcpClient();
+        await tcpClient.ConnectAsync(uri.Host, uri.Port, cts.Token);
+        return tcpClient.Connected;
     }
 
     /// <summary>Milvus adapter reads its own configuration sections</summary>
@@ -126,7 +102,7 @@ internal sealed class MilvusDiscoveryAdapter : ServiceDiscoveryAdapterBase
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Failed to build Milvus connection string from {BaseUrl}: {Error}", baseUrl, ex.Message);
+            ReportNormalizationFailure(baseUrl, ex);
             return baseUrl; // Return original URL if parsing fails
         }
     }

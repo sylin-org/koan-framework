@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Koan.Core.Logging;
 using Koan.Storage.Connector.S3.Infrastructure;
 
 namespace Koan.Storage.Connector.S3;
@@ -31,8 +32,9 @@ internal sealed class S3StorageOptionsConfigurator : IConfigureOptions<S3Storage
         _config.GetSection(S3StorageConstants.Configuration.Section).Bind(options);
 
         if (!string.IsNullOrWhiteSpace(options.Endpoint))
-            _logger?.LogInformation("S3 endpoint configured explicitly: {Endpoint}", options.Endpoint);
+            KoanLog.ConfigInfo(_logger, S3StorageConstants.Logging.Configuration, "explicit",
+                ("endpoint", options.Endpoint));
         else
-            _logger?.LogDebug("S3: endpoint, credentials, and bucket prefix resolve lazily at first use");
+            KoanLog.ConfigDebug(_logger, S3StorageConstants.Logging.Configuration, "lazy");
     }
 }

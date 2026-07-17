@@ -4,6 +4,8 @@ using Koan.Core.Observability.Health;
 using Koan.Data.Connector.Json.Infrastructure;
 using Koan.Data.Core;
 using Koan.Data.Core.Diagnostics;
+using Koan.Data.Core.Routing;
+using Koan.Data.Abstractions;
 
 namespace Koan.Data.Connector.Json;
 
@@ -12,18 +14,22 @@ internal sealed class JsonHealthContributor : DataAdapterHealthContributorBase
     private readonly IConfiguration _configuration;
     private readonly DataSourceRegistry _sourceRegistry;
     private readonly IOptions<JsonDataOptions> _options;
+    private readonly IAdapterFactory _sourceOwner;
 
     public JsonHealthContributor(
         IServiceProvider services,
         IConfiguration configuration,
         DataSourceRegistry sourceRegistry,
         IDataDiagnostics diagnostics,
-        IOptions<JsonDataOptions> options)
+        IOptions<JsonDataOptions> options,
+        DataProviderCatalog providers)
         : base(Constants.Provider.Name, services, sourceRegistry, diagnostics)
     {
         _configuration = configuration;
         _sourceRegistry = sourceRegistry;
         _options = options;
+        _sourceOwner = providers.Find(Constants.Provider.Name)
+            ?? throw new InvalidOperationException("The JSON provider is absent from the host Data catalog.");
     }
 
     protected override Task<HealthReport> CheckActive(
@@ -40,10 +46,7 @@ internal sealed class JsonHealthContributor : DataAdapterHealthContributorBase
                 source,
                 Constants.Configuration.Keys.DirectoryPath,
                 _options.Value.DirectoryPath,
-                static provider => string.Equals(
-                    provider,
-                    Constants.Provider.Name,
-                    StringComparison.OrdinalIgnoreCase));
+                _sourceOwner);
 
             if (string.IsNullOrWhiteSpace(path))
             {

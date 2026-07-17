@@ -1,5 +1,4 @@
 using Koan.Data.Backup.Abstractions;
-using Koan.Data.Backup.Initialization;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 
@@ -23,15 +22,7 @@ public class BackupInventoryHealthCheck(
     {
         try
         {
-            // Try to get cached inventory first (populated during startup)
-            var inventory = KoanAutoRegistrar.GetCachedInventory();
-
-            // If not cached, build it now
-            if (inventory == null)
-            {
-                logger.LogDebug("Backup inventory not cached, building now...");
-                inventory = await discoveryService.BuildInventory(cancellationToken);
-            }
+            var inventory = await discoveryService.BuildInventory(cancellationToken);
 
             var data = new Dictionary<string, object>
             {

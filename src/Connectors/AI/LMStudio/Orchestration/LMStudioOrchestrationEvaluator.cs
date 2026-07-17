@@ -72,13 +72,13 @@ public sealed class LMStudioOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         try
         {
-            Logger?.LogDebug("[LMStudio] Validating host {Host}", hostResult.HostEndpoint);
+            ReportCredentialValidation("start", ("host", hostResult.HostEndpoint));
             var baseUrl = EnsureHttpUrl(hostResult.HostEndpoint!);
             return await TryLmStudioConnection(baseUrl);
         }
         catch (Exception ex)
         {
-            Logger?.LogDebug(ex, "[LMStudio] Credential validation failure");
+            ReportCredentialValidation("failed", ("error", ex));
             return false;
         }
     }

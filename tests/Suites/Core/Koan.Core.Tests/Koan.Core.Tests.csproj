@@ -19,5 +19,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Core.Registry.Generators\Koan.Core.Registry.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

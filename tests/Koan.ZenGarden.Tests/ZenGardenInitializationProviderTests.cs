@@ -18,9 +18,7 @@ public sealed class ZenGardenInitializationProviderTests
             CreateSnapshot("mongodb", ready: true, "mongodb://primary:27018")
         };
 
-        await using var provider = BuildScope(
-            new StubZenGardenClient(snapshots),
-            new StubBinding("mongo", "mongodb"));
+        await using var provider = BuildScope(new StubZenGardenClient(snapshots));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
         var intent = ZenGardenConnectionIntent.ForOffering("mongodb");
@@ -41,9 +39,7 @@ public sealed class ZenGardenInitializationProviderTests
             CreateSnapshot("mongodb", ready: false, "mongodb://standby:27017")
         };
 
-        await using var provider = BuildScope(
-            new StubZenGardenClient(snapshots),
-            new StubBinding("mongo", "mongodb"));
+        await using var provider = BuildScope(new StubZenGardenClient(snapshots));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
         var resolved = await initializationProvider.Resolve(ZenGardenConnectionIntent.ForOffering("mongodb"));
@@ -59,9 +55,7 @@ public sealed class ZenGardenInitializationProviderTests
             CreateSnapshot("mongodb:dev", ready: true, "mongodb://dev-primary:27019")
         };
 
-        await using var provider = BuildScope(
-            new StubZenGardenClient(snapshots),
-            new StubBinding("mongo", "mongodb"));
+        await using var provider = BuildScope(new StubZenGardenClient(snapshots));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
         var resolved = await initializationProvider.Resolve(ZenGardenConnectionIntent.ForOffering("mongodb"));
@@ -85,9 +79,7 @@ public sealed class ZenGardenInitializationProviderTests
                 "ollama")
         };
 
-        await using var provider = BuildScope(
-            new StubZenGardenClient(snapshots),
-            new StubBinding("ollama", "ollama"));
+        await using var provider = BuildScope(new StubZenGardenClient(snapshots));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
         var resolved = await initializationProvider.Resolve(ZenGardenConnectionIntent.ForOffering("ollama"));
@@ -121,9 +113,7 @@ public sealed class ZenGardenInitializationProviderTests
             }
         };
 
-        await using var provider = BuildScope(
-            new StubZenGardenClient(snapshots),
-            new StubBinding("mongo", "mongodb"));
+        await using var provider = BuildScope(new StubZenGardenClient(snapshots));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
         var resolved = await initializationProvider.Resolve(ZenGardenConnectionIntent.ForOffering("mongodb"));
@@ -141,9 +131,7 @@ public sealed class ZenGardenInitializationProviderTests
             CreateSnapshot("mongodb", ready: true, "mongodb://primary:27018")
         };
 
-        await using var provider = BuildScope(
-            new StubZenGardenClient(snapshots),
-            new StubBinding("mongo", "mongodb"));
+        await using var provider = BuildScope(new StubZenGardenClient(snapshots));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
         var resolved = await initializationProvider.Resolve(ZenGardenConnectionIntent.ForOffering("mongodb"));
@@ -155,25 +143,10 @@ public sealed class ZenGardenInitializationProviderTests
     }
 
     [Fact]
-    public void TryGetDefaultOffering_uses_registered_bindings()
-    {
-        using var provider = BuildScope(
-            new StubZenGardenClient([]),
-            new StubBinding("mongo", "mongodb"));
-
-        var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
-
-        initializationProvider.TryGetDefaultOffering("mongo", out var offering).Should().BeTrue();
-        offering.Should().Be("mongodb");
-    }
-
-    [Fact]
     public async Task WishCapabilitiesAsync_returns_receipt()
     {
         var client = new StubZenGardenClient([]);
-        await using var provider = BuildScope(
-            client,
-            new StubBinding("ollama", "ollama"));
+        await using var provider = BuildScope(client);
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
         var receipt = await initializationProvider.WishCapabilities(
@@ -210,9 +183,7 @@ public sealed class ZenGardenInitializationProviderTests
         };
 
         var client = new StubZenGardenClient(snapshots);
-        await using var provider = BuildScope(
-            client,
-            new StubBinding("ollama", "ollama"));
+        await using var provider = BuildScope(client);
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
         var resolved = await initializationProvider.Resolve(
@@ -249,9 +220,7 @@ public sealed class ZenGardenInitializationProviderTests
         };
 
         var client = new StubZenGardenClient(snapshots);
-        await using var provider = BuildScope(
-            client,
-            new StubBinding("ollama", "ollama"));
+        await using var provider = BuildScope(client);
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
         var resolved = await initializationProvider.Resolve(
@@ -261,19 +230,12 @@ public sealed class ZenGardenInitializationProviderTests
         client.WishCalls.Should().BeEmpty();
     }
 
-    private static ServiceProvider BuildScope(
-        IZenGardenClient client,
-        params IZenGardenOfferingBinding[] bindings)
+    private static ServiceProvider BuildScope(IZenGardenClient client)
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton(client);
-        foreach (var binding in bindings)
-        {
-            services.AddSingleton<IZenGardenOfferingBinding>(binding);
-        }
-
-        services.AddKoanZenGarden();
+        services.AddZenGardenRuntime();
         return services.BuildServiceProvider();
     }
 
@@ -292,12 +254,6 @@ public sealed class ZenGardenInitializationProviderTests
                 Uris = new[] { uri }
             }
         };
-    }
-
-    private sealed class StubBinding(string adapterId, string offering) : IZenGardenOfferingBinding
-    {
-        public string AdapterId { get; } = adapterId;
-        public string Offering { get; } = offering;
     }
 
     private sealed class StubZenGardenClient : IZenGardenClient

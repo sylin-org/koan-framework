@@ -532,9 +532,6 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
 
         public string Provider => ProviderId;
 
-        public bool CanHandle(string provider)
-            => string.Equals(provider, ProviderId, StringComparison.OrdinalIgnoreCase);
-
         public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider services, string source = "Default")
             where TEntity : class, IEntity<TKey>
             where TKey : notnull

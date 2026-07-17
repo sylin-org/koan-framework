@@ -45,10 +45,15 @@ source: src/Koan.Core/
   `ILoggerFactory` from the current `AppHost` provider, so host leases and flow scopes also govern
   logging without a second ambient owner.
 - `IKoanRuntimeFacts`: read-only access to the current host's schema-versioned runtime fact envelope.
+- `KoanFactKind.Guarantee`: schema-2 meaning for a value-free guarantee projected from a canonical
+  concern plan or realization receipt. Startup selects by kind; Web and MCP serialize the same envelope.
 - `KoanApplicationReferenceManifest`: immutable host-owned direct `PackageReference`/
   `ProjectReference` provenance. `IsPresent=false` means unknown provenance; it must never be replaced
   by inference from loaded assemblies.
 - `KoanFactJson`: the canonical deterministic JSON projection used by Web and MCP.
+- `KoanModule.ReportComposition`: optional fail-soft evidence projection invoked only on constitution-active
+  retained module instances. It reads canonical plans/receipts after host construction; it is not a
+  provider-election or structural-contribution lifecycle.
 - `ServiceDiscoveryAdapterBase`: the concern-owned discovery template. Adapters supply environment,
   runtime-topology, normalization, and health hooks but cannot replace activation or precedence.
 - `DiscoveryCandidatePriority`: the canonical explicit → legacy environment → automatic → host-gateway →
@@ -69,8 +74,8 @@ source: src/Koan.Core/
 - Let `AddKoan()` and the generic host manage the default provider. Use `PushScope` for concurrent
   integration hosts, jobs, or other explicit execution contexts.
 - Custom hosting integrations that call `Attach` must keep its lease for exactly the provider's active
-  lifetime and dispose the lease no later than the provider. Prefer `StartKoan()` for synchronous,
-  non-hosted startup.
+  lifetime and dispose the lease no later than the provider. Prefer `StartKoan()` for synchronous
+  console startup; it owns a standard Generic Host internally.
 - Resolve host-specific application identity through `AppHost.Identity` or an explicitly supplied
   provider. Do not retain configuration-derived identity in another process static.
 - Do not cache services obtained from `AppHost.Current` in process-static fields. Immutable reflection
@@ -82,6 +87,11 @@ source: src/Koan.Core/
   selected provider without `ILoggerFactory` emits nothing and never falls back to another host.
 - Read fact `Code`/`ReasonCode`/`State` for automation. Do not parse startup prose or treat
   `Complete=false` as healthy.
+- Treat `Guarantee` as explanation, not health or provider-fleet certification. Read its explicit
+  bounds and never infer topology, confidentiality, durability, or exactly-once semantics.
+- Framework/capability packages that need runtime evidence override `ReportComposition` on their
+  descriptor-backed module. Do not create a reporter service, discoverable contributor, or second module
+  object; never include configuration values, ambient dimensions, credentials, or business payloads.
 - Layer optional engines through the concern-owned contributor seam. Compatibility metadata is inert;
   the engine's Reference = Intent registration activates contribution; adapters never probe assemblies.
 - Keep the checked-in `koan.lock.json` under review. It contains static app/module identity and direct

@@ -1,5 +1,4 @@
 using Koan.Data.Backup.Abstractions;
-using Koan.Data.Backup.Initialization;
 using Koan.Data.Backup.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -29,11 +28,7 @@ public static class EndpointRouteBuilderExtensions
         // GET /backup/inventory - Get current backup inventory
         group.MapGet("/inventory", async (IEntityDiscoveryService discoveryService) =>
         {
-            // Try to get cached inventory first
-            var inventory = KoanAutoRegistrar.GetCachedInventory();
-
-            // If not cached, build it now
-            inventory ??= await discoveryService.BuildInventory();
+            var inventory = await discoveryService.BuildInventory();
 
             return Results.Ok(new
             {
@@ -69,8 +64,7 @@ public static class EndpointRouteBuilderExtensions
         // GET /backup/inventory/health - Get inventory health status
         group.MapGet("/inventory/health", async (IEntityDiscoveryService discoveryService) =>
         {
-            var inventory = KoanAutoRegistrar.GetCachedInventory()
-                ?? await discoveryService.BuildInventory();
+            var inventory = await discoveryService.BuildInventory();
 
             if (inventory.IsHealthy)
             {

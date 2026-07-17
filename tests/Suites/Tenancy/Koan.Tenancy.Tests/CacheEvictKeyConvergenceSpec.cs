@@ -22,17 +22,13 @@ namespace Koan.Tenancy.Tests;
 /// <c>AddKoan()</c> boot (ARCH-0079) on SQLite with <c>Koan.Tenancy</c> referenced — prove the evict path now
 /// consumes the SAME host-owned plan as the read path: a same-tenant <c>entity.Cache.Evict()</c> removes the scoped
 /// entry, a cross-tenant evict leaves the other tenant's entry intact, and a <c>[HostScoped]</c> non-axis entity
-/// is evicted via the partition-aware key (the universal <c>{Partition}</c> fix). The expected keys are
-/// constructed here from the documented contract string, independent of the production builder.
+/// is evicted via the partition-aware key. Proofs use the same business key under different tenant contexts; the
+/// Cache pillar owns its physical identity encoding and does not expose that implementation detail to applications.
 /// </summary>
 public sealed class CacheEvictKeyConvergenceSpec
 {
     private static IReadOnlyDictionary<string, string?> Posture(string posture)
         => new Dictionary<string, string?> { ["Koan:Data:Tenancy:Posture"] = posture };
-
-    // The read-path cache-key contract: {TypeName}:{Partition}:{Id}[::__koan_tenant={tenant}].
-    private static CacheKey ScopedKey<T>(string partition, object id, string tenant)
-        => new($"{CacheKey.EntityTypeName(typeof(T))}:{partition}:{id}::__koan_tenant={tenant}");
 
     private static CacheKey BaseKey<T>(string partition, object id)
         => new($"{CacheKey.EntityTypeName(typeof(T))}:{partition}:{id}");
@@ -69,14 +65,16 @@ public sealed class CacheEvictKeyConvergenceSpec
             await EvictNote.Get(n.Id);                          // belt-and-suspenders prime
         }
 
-        var key = ScopedKey<EvictNote>(partition, n.Id, "acme");
-        (await client.Exists(key, opts, default)).Should().BeTrue("the scoped entry is cached after a write+read under acme");
+        var key = BaseKey<EvictNote>(partition, n.Id);
+        using (Tenant.Use("acme"))
+            (await client.Exists(key, opts, default)).Should().BeTrue("the scoped entry is cached after a write+read under acme");
 
         EntityCacheEviction eviction;
         using (Tenant.Use("acme")) eviction = await n.Cache.Evict();
 
         eviction.Removed.Should().Be(1);
-        (await client.Exists(key, opts, default)).Should().BeFalse("entry eviction under the same tenant must remove the scoped entry");
+        using (Tenant.Use("acme"))
+            (await client.Exists(key, opts, default)).Should().BeFalse("entry eviction under the same tenant must remove the scoped entry");
     }
 
     [Fact(DisplayName = "cache evict convergence: Entity Cache eviction under one tenant does not touch another tenant's cached entry")]
@@ -93,15 +91,17 @@ public sealed class CacheEvictKeyConvergenceSpec
         using (Tenant.Use("acme")) { a = await new EvictNote { Title = "a" }.Save(); await EvictNote.Get(a.Id); }
         using (Tenant.Use("globex")) { b = await new EvictNote { Title = "b" }.Save(); await EvictNote.Get(b.Id); }
 
-        var acmeKey = ScopedKey<EvictNote>(partition, a.Id, "acme");
-        var globexKey = ScopedKey<EvictNote>(partition, b.Id, "globex");
-        (await client.Exists(acmeKey, opts, default)).Should().BeTrue();
-        (await client.Exists(globexKey, opts, default)).Should().BeTrue();
+        var acmeKey = BaseKey<EvictNote>(partition, a.Id);
+        var globexKey = BaseKey<EvictNote>(partition, b.Id);
+        using (Tenant.Use("acme")) (await client.Exists(acmeKey, opts, default)).Should().BeTrue();
+        using (Tenant.Use("globex")) (await client.Exists(globexKey, opts, default)).Should().BeTrue();
 
         using (Tenant.Use("acme")) await a.Cache.Evict();
 
-        (await client.Exists(acmeKey, opts, default)).Should().BeFalse("acme's entry is evicted under acme's scope");
-        (await client.Exists(globexKey, opts, default)).Should().BeTrue("globex's entry is untouched by acme's eviction");
+        using (Tenant.Use("acme"))
+            (await client.Exists(acmeKey, opts, default)).Should().BeFalse("acme's entry is evicted under acme's scope");
+        using (Tenant.Use("globex"))
+            (await client.Exists(globexKey, opts, default)).Should().BeTrue("globex's entry is untouched by acme's eviction");
     }
 
     [Fact(DisplayName = "cache evict convergence: finite Entity Cache eviction removes each scoped entry")]
@@ -124,17 +124,23 @@ public sealed class CacheEvictKeyConvergenceSpec
             await EvictNote.Get(second.Id);
         }
 
-        var firstKey = ScopedKey<EvictNote>(partition, first.Id, "acme");
-        var secondKey = ScopedKey<EvictNote>(partition, second.Id, "acme");
-        (await client.Exists(firstKey, opts, default)).Should().BeTrue();
-        (await client.Exists(secondKey, opts, default)).Should().BeTrue();
+        var firstKey = BaseKey<EvictNote>(partition, first.Id);
+        var secondKey = BaseKey<EvictNote>(partition, second.Id);
+        using (Tenant.Use("acme"))
+        {
+            (await client.Exists(firstKey, opts, default)).Should().BeTrue();
+            (await client.Exists(secondKey, opts, default)).Should().BeTrue();
+        }
 
         EntityCacheEviction eviction;
         using (Tenant.Use("acme")) eviction = await new[] { first, second }.Cache.Evict();
 
         eviction.Removed.Should().Be(2);
-        (await client.Exists(firstKey, opts, default)).Should().BeFalse();
-        (await client.Exists(secondKey, opts, default)).Should().BeFalse();
+        using (Tenant.Use("acme"))
+        {
+            (await client.Exists(firstKey, opts, default)).Should().BeFalse();
+            (await client.Exists(secondKey, opts, default)).Should().BeFalse();
+        }
     }
 
     [Fact(DisplayName = "cache evict convergence: an unset id is an explicit skip, not a throw")]
@@ -166,11 +172,12 @@ public sealed class CacheEvictKeyConvergenceSpec
         await HostEvictNote.Get(n.Id);
 
         var key = BaseKey<HostEvictNote>(partition, n.Id);
-        (await client.Exists(key, opts, default)).Should().BeTrue();
+        using (Tenant.None()) (await client.Exists(key, opts, default)).Should().BeTrue();
 
         await n.Cache.Evict();
 
-        (await client.Exists(key, opts, default)).Should().BeFalse("the partition-aware evict key now matches the cached key (the universal {Partition} fix)");
+        using (Tenant.None())
+            (await client.Exists(key, opts, default)).Should().BeFalse("the partition-aware evict key now matches the cached key");
     }
 
     [Fact(DisplayName = "cache evict convergence: a custom Entity key template is shared by repository writes and explicit eviction")]
@@ -190,13 +197,13 @@ public sealed class CacheEvictKeyConvergenceSpec
         }
 
         var key = new CacheKey(
-            $"custom:{CacheKey.EntityTypeName(typeof(CustomEvictNote))}:{partition}:{note.Id}::__koan_tenant=acme");
-        (await client.Exists(key, opts, default)).Should().BeTrue();
+            $"custom:{CacheKey.EntityTypeName(typeof(CustomEvictNote))}:{partition}:{note.Id}");
+        using (Tenant.Use("acme")) (await client.Exists(key, opts, default)).Should().BeTrue();
 
         EntityCacheEviction eviction;
         using (Tenant.Use("acme")) eviction = await note.Cache.Evict();
 
         eviction.Removed.Should().Be(1);
-        (await client.Exists(key, opts, default)).Should().BeFalse();
+        using (Tenant.Use("acme")) (await client.Exists(key, opts, default)).Should().BeFalse();
     }
 }

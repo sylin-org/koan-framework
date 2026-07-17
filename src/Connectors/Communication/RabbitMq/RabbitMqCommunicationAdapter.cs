@@ -37,7 +37,8 @@ internal sealed class RabbitMqCommunicationAdapter(
         | CommunicationAdapterCapabilities.NodeFanOut
         | CommunicationAdapterCapabilities.MessageIdentity
         | CommunicationAdapterCapabilities.BoundedAcceptance,
-        [Constants.ProjectReference, Constants.PackageReference]);
+        [Constants.ProjectReference, Constants.PackageReference],
+        IngressTrust: ContextIngressTrust.Authenticated);
 
     private readonly SemaphoreSlim _publisherGate = new(1, 1);
     private IConnection? _connection;
@@ -266,8 +267,7 @@ internal sealed class RabbitMqCommunicationAdapter(
 
                 var outcome = await host.Dispatch(
                         binding.Id,
-                        body,
-                        ContextIngressTrust.Authenticated)
+                        body)
                     .ConfigureAwait(false);
                 if (outcome is CommunicationDeliveryOutcome.Delivered or CommunicationDeliveryOutcome.Filtered)
                     await _consumer.BasicAckAsync(delivery.DeliveryTag, multiple: false).ConfigureAwait(false);

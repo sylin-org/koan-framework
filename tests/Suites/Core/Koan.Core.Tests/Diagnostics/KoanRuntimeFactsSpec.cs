@@ -22,7 +22,7 @@ public sealed class KoanRuntimeFactsSpec
     public void Snapshot_is_deterministic_versioned_and_round_trippable()
     {
         var store = new KoanRuntimeFactStore();
-        var later = Fact("z.code", KoanFactKind.Election, "z-subject");
+        var later = Fact("z.code", KoanFactKind.Guarantee, "z-subject");
         var earlier = Fact("a.code", KoanFactKind.Discovery, "a-subject");
 
         var snapshot = store.Replace([later, earlier, later], complete: true);
@@ -36,6 +36,7 @@ public sealed class KoanRuntimeFactsSpec
         roundTrip.Should().NotBeNull();
         roundTrip!.Schema.Should().Be(snapshot.Schema);
         roundTrip.Facts.Select(fact => fact.Id).Should().Equal(snapshot.Facts.Select(fact => fact.Id));
+        roundTrip.Facts.Should().Contain(fact => fact.Kind == KoanFactKind.Guarantee);
         roundTrip.Facts.Select(fact => fact.CorrelationId)
             .Should().Equal(snapshot.Facts.Select(fact => fact.CorrelationId));
     }
@@ -54,7 +55,7 @@ public sealed class KoanRuntimeFactsSpec
             "spec",
             "redaction");
 
-        var json = KoanFactJson.Serialize(new KoanFactEnvelope(1, 1, "test", DateTimeOffset.UtcNow, true, [fact]));
+        var json = KoanFactJson.Serialize(new KoanFactEnvelope(Constants.Diagnostics.FactSchemaVersion, 1, "test", DateTimeOffset.UtcNow, true, [fact]));
 
         json.Should().NotContain("super-secret");
         json.Should().NotContain("another-secret");

@@ -26,8 +26,6 @@ public sealed class RedisAdapterFactory : IDataAdapterFactory
 {
     public string Provider => "redis";
 
-    public bool CanHandle(string provider) => string.Equals(provider, "redis", StringComparison.OrdinalIgnoreCase);
-
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,
         string source = "Default")
@@ -51,9 +49,12 @@ public sealed class RedisAdapterFactory : IDataAdapterFactory
         // Configure a distinct 'Database' index per Redis source. A boot-time cross-source collision check (the analogue
         // of the overlapping-Database-predicate detection ARCH-0102 §3 pins) is the durable fix.
         var database = AdapterConnectionResolver.GetSourceSetting(
-            config, sourceRegistry, "redis", source, "Database", baseOpts.Database, CanHandle);
+            config, sourceRegistry, "redis", source, "Database", baseOpts.Database, this);
 
-        return new RedisRepository<TEntity, TKey>(muxer, database);
+        return new RedisRepository<TEntity, TKey>(
+            muxer,
+            database,
+            sp.GetRequiredService<Koan.Data.Core.Semantics.DataSegmentationPlan>());
     }
 
     // The partition separator must NOT be ':' — Redis key delimiter is ':', and the keyspace scan pattern

@@ -34,11 +34,10 @@ internal static class IdentityAuditHooks
     {
         var verb = entityName.ToLowerInvariant();
 
-        // Capture the pre-write image BEFORE persist (the Prior loader re-reads the store, which after persist would
-        // return the new row — so create/update can only be distinguished here). Before/After share one context.
-        Entity<TEntity>.Lifecycle.BeforeUpsert(async ctx =>
+        // Before/After share one context whose Prior value is the stable pre-write snapshot.
+        Entity<TEntity>.Lifecycle.BeforeUpsert(ctx =>
         {
-            ctx.Items[BeforeKey] = await ctx.Prior.Get(ctx.CancellationToken).ConfigureAwait(false);
+            ctx.Items[BeforeKey] = ctx.Prior;
             return ctx.Proceed();
         });
 
@@ -51,7 +50,7 @@ internal static class IdentityAuditHooks
 
         Entity<TEntity>.Lifecycle.AfterRemove(async ctx =>
         {
-            var before = await ctx.Prior.Get(ctx.CancellationToken).ConfigureAwait(false);
+            var before = ctx.Prior;
             await EmitAsync($"{verb}.deleted",
                 entityName, ctx.Current.Id, subjectOf(ctx.Current), before ?? ctx.Current, null, ctx.CancellationToken).ConfigureAwait(false);
         });

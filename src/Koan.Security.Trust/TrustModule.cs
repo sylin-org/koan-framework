@@ -29,8 +29,6 @@ namespace Koan.Security.Trust;
 /// </summary>
 public sealed class TrustModule : KoanModule
 {
-    public override string Id => "security.trust";
-
     public override void Register(IServiceCollection services)
     {
         // SEC-0003 — the shared-secret (HS256) issuer behind the IIssuer seam. Singleton. Signs with

@@ -1,4 +1,3 @@
-using System.Reflection;
 using Koan.Communication.Adapters;
 using Koan.Communication.Infrastructure;
 using Koan.Communication.Signals;
@@ -6,6 +5,8 @@ using Koan.Core;
 using Koan.Core.Composition;
 using Koan.Core.Context;
 using Koan.Core.Hosting.App;
+using Koan.Core.Providers;
+using Koan.Communication.Semantics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -49,6 +50,7 @@ internal sealed class CommunicationRouter
     private readonly ILogger<CommunicationRouter> _logger;
     private readonly ICommunicationAdapter[] _selectedAdapters;
     private readonly string _meshId;
+    private readonly ProviderCatalog<ICommunicationAdapter> _providers;
     private int _state;
 
     public CommunicationRouter(
@@ -58,15 +60,21 @@ internal sealed class CommunicationRouter
         CommunicationHandlerCatalog handlers,
         IEnumerable<FrameworkMessageTargetBinding> frameworkSignals,
         CommunicationIngress ingress,
+        CommunicationContextPlan contextPlan,
         IOptions<CommunicationOptions> options,
         ILogger<CommunicationRouter> logger)
     {
         _ingress = ingress;
         _logger = logger;
-        var candidates = adapters
-            .OrderBy(static adapter => adapter.Descriptor.Id, StringComparer.Ordinal)
+        _providers = ProviderCatalog<ICommunicationAdapter>.Compile(adapters, DescribeAdapter);
+        var candidates = _providers.Candidates
+            .Select(static candidate => candidate.Value)
             .ToArray();
-        EnsureValidCandidates(candidates);
+        IReadOnlySet<ICommunicationAdapter> directCandidates = references.IsPresent
+            ? new HashSet<ICommunicationAdapter>(
+                _providers.Direct(references),
+                ReferenceEqualityComparer.Instance)
+            : [];
 
         var routeList = new List<CommunicationRouteDecision>();
         foreach (var channel in PublicChannels(options.Value))
@@ -76,30 +84,38 @@ internal sealed class CommunicationRouter
                 channel.Name,
                 channel.TransportProvider,
                 TransportRequirements,
+                contextPlan.MinimumIngressTrust,
                 candidates,
-                references));
+                directCandidates,
+                _providers));
             routeList.Add(Elect(
                 CommunicationLane.Events,
                 channel.Name,
                 channel.EventsProvider,
                 EventRequirements,
+                contextPlan.MinimumIngressTrust,
                 candidates,
-                references));
+                directCandidates,
+                _providers));
         }
         routeList.Add(Elect(
             CommunicationLane.FrameworkSignals,
             Constants.Channels.Default,
             options.Value.FrameworkSignalsProvider,
             FrameworkSignalRequirements,
+            ContextIngressTrust.Unverified,
             candidates,
-            references));
+            directCandidates,
+            _providers));
         routeList.Add(Elect(
             CommunicationLane.FrameworkBroadcasts,
             Constants.Channels.Default,
             options.Value.FrameworkBroadcastsProvider,
             FrameworkBroadcastRequirements,
+            ContextIngressTrust.Unverified,
             candidates,
-            references));
+            directCandidates,
+            _providers));
 
         _orderedRoutes = routeList
             .OrderBy(static route => route.Lane)
@@ -124,7 +140,11 @@ internal sealed class CommunicationRouter
                     .Select(static binding => binding.Declaration)
                     .OrderBy(static binding => binding.Id, StringComparer.Ordinal)
                     .ToArray(),
-                Dispatch));
+                (bindingId, payload, ct) => Dispatch(
+                    bindingId,
+                    payload,
+                    adapter.Descriptor.IngressTrust,
+                    ct)));
     }
 
     public IReadOnlyList<CommunicationRouteDecision> Routes => _orderedRoutes;
@@ -323,8 +343,10 @@ internal sealed class CommunicationRouter
         string channel,
         string? explicitProvider,
         CommunicationAdapterCapabilities requirements,
+        ContextIngressTrust minimumIngressTrust,
         IReadOnlyList<ICommunicationAdapter> candidates,
-        KoanApplicationReferenceManifest references)
+        IReadOnlySet<ICommunicationAdapter> directCandidates,
+        ProviderCatalog<ICommunicationAdapter> providers)
     {
         var laneCandidates = candidates
             .Where(candidate => candidate.Descriptor.Lanes.Contains(lane))
@@ -332,36 +354,34 @@ internal sealed class CommunicationRouter
 
         if (!string.IsNullOrWhiteSpace(explicitProvider))
         {
-            var pinned = laneCandidates.FirstOrDefault(candidate =>
-                string.Equals(candidate.Descriptor.Id, explicitProvider.Trim(), StringComparison.OrdinalIgnoreCase));
+            var pinned = providers.Find(explicitProvider);
+            if (pinned is not null && !laneCandidates.Contains(pinned)) pinned = null;
             if (pinned is null)
                 throw ElectionFailure(
                     lane,
                     channel,
                     $"explicit provider '{explicitProvider}' is not registered",
                     laneCandidates);
-            EnsureEligible(lane, pinned, requirements);
+            EnsureEligible(lane, pinned, requirements, minimumIngressTrust);
             return Decision(
                 lane,
                 channel,
                 pinned,
                 "explicit-binding",
-                directIntent: IsDirect(pinned, references));
+                directIntent: directCandidates.Contains(pinned),
+                intent: ProviderIntentPosture.Required,
+                providers: providers);
         }
 
-        var direct = references.IsPresent
-            ? laneCandidates.Where(candidate => IsDirect(candidate, references)).ToArray()
-            : [];
+        var direct = directCandidates.Where(laneCandidates.Contains).ToArray();
         var automatic = direct.Length > 0
             ? direct
             : laneCandidates
                 .Where(static candidate => candidate.Descriptor.IsBuiltIn || candidate.Descriptor.IsLayered)
                 .ToArray();
         var eligible = automatic
-            .Where(candidate => (candidate.Descriptor.Capabilities & requirements) == requirements)
-            .OrderByDescending(static candidate => candidate.Descriptor.Assurance)
-            .ThenByDescending(Priority)
-            .ThenBy(static candidate => candidate.Descriptor.Id, StringComparer.Ordinal)
+            .Where(candidate => IsEligible(candidate, requirements, minimumIngressTrust))
+            .Select(providers.Describe)
             .ToArray();
 
         if (eligible.Length == 0)
@@ -372,7 +392,8 @@ internal sealed class CommunicationRouter
             throw ElectionFailure(lane, channel, reason, automatic);
         }
 
-        var selected = eligible[0];
+        var selected = providers.Best(eligible, CompareCandidates)
+            ?? throw ElectionFailure(lane, channel, "no eligible provider remained after ranking", automatic);
         return Decision(
             lane,
             channel,
@@ -382,7 +403,9 @@ internal sealed class CommunicationRouter
                 : selected.Descriptor.IsLayered
                     ? "layered-capability"
                     : "built-in-floor",
-            directIntent: direct.Length > 0);
+            directIntent: direct.Length > 0,
+            intent: ProviderIntentPosture.Automatic,
+            providers: providers);
     }
 
     private static CommunicationRouteDecision Decision(
@@ -390,30 +413,90 @@ internal sealed class CommunicationRouter
         string channel,
         ICommunicationAdapter adapter,
         string reason,
-        bool directIntent)
-        => new(lane, channel, adapter, reason, directIntent, Priority(adapter));
+        bool directIntent,
+        ProviderIntentPosture intent,
+        ProviderCatalog<ICommunicationAdapter> providers)
+    {
+        var candidate = providers.Describe(adapter);
+        return new CommunicationRouteDecision(
+            lane,
+            channel,
+            adapter,
+            new ProviderSelectionReceipt(
+                RouteSubject(lane, channel),
+                candidate.Id,
+                intent,
+                candidate.Priority,
+                reason,
+                directIntent));
+    }
 
-    private static int Priority(ICommunicationAdapter adapter)
-        => adapter.GetType().GetCustomAttribute<ProviderPriorityAttribute>()?.Priority ?? 0;
+    private static string RouteSubject(CommunicationLane lane, string channel) => lane switch
+    {
+        CommunicationLane.Transport => Constants.Diagnostics.Subjects.TransportFor(channel),
+        CommunicationLane.Events => Constants.Diagnostics.Subjects.EventsFor(channel),
+        CommunicationLane.FrameworkSignals => Constants.Diagnostics.Subjects.FrameworkSignals,
+        CommunicationLane.FrameworkBroadcasts => Constants.Diagnostics.Subjects.FrameworkBroadcasts,
+        _ => throw new ArgumentOutOfRangeException(nameof(lane), lane, null)
+    };
 
-    private static bool IsDirect(
-        ICommunicationAdapter adapter,
-        KoanApplicationReferenceManifest references)
-        => references.IsPresent && references.DirectReferences.Any(reference =>
-            adapter.Descriptor.DirectReferenceIdentities.Any(identity =>
-                string.Equals(identity, reference.Identity, StringComparison.OrdinalIgnoreCase)));
+    private static ProviderCandidateDescriptor DescribeAdapter(ICommunicationAdapter adapter)
+        => new(
+            adapter.Descriptor.Id,
+            adapter.Descriptor.Aliases,
+            adapter.Descriptor.DirectReferenceIdentities
+                .Concat(ProviderMetadata.References(adapter.GetType()))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            ProviderMetadata.Priority(adapter.GetType()));
+
+    private static int CompareCandidates(
+        ProviderCandidate<ICommunicationAdapter> left,
+        ProviderCandidate<ICommunicationAdapter> right)
+    {
+        var assurance = right.Value.Descriptor.Assurance.CompareTo(left.Value.Descriptor.Assurance);
+        return assurance != 0 ? assurance : right.Priority.CompareTo(left.Priority);
+    }
 
     private static void EnsureEligible(
         CommunicationLane lane,
         ICommunicationAdapter adapter,
-        CommunicationAdapterCapabilities requirements)
+        CommunicationAdapterCapabilities requirements,
+        ContextIngressTrust minimumIngressTrust)
     {
+        if (!Enum.IsDefined(adapter.Descriptor.IngressTrust))
+            throw new InvalidOperationException(
+                $"Communication provider '{adapter.Descriptor.Id}' cannot carry {lane}: its declared ingress trust " +
+                "is unknown. Declare one of Koan's supported context-ingress trust levels.");
+
         var missing = requirements & ~adapter.Descriptor.Capabilities;
         if (missing != CommunicationAdapterCapabilities.None)
             throw new InvalidOperationException(
                 $"Communication provider '{adapter.Descriptor.Id}' cannot carry {lane}: missing {missing}. " +
                 "Choose a provider that preserves the lane's semantic contract.");
+        if (!Meets(adapter.Descriptor.IngressTrust, minimumIngressTrust))
+            throw new InvalidOperationException(
+                $"Communication provider '{adapter.Descriptor.Id}' cannot carry {lane}: its declared ingress trust " +
+                $"is {adapter.Descriptor.IngressTrust}, but the composed context requires {minimumIngressTrust}. " +
+                "Choose a provider that authenticates the required application context.");
     }
+
+    private static bool IsEligible(
+        ICommunicationAdapter adapter,
+        CommunicationAdapterCapabilities requirements,
+        ContextIngressTrust minimumIngressTrust)
+        => (adapter.Descriptor.Capabilities & requirements) == requirements
+           && Enum.IsDefined(adapter.Descriptor.IngressTrust)
+           && Meets(adapter.Descriptor.IngressTrust, minimumIngressTrust);
+
+    private static bool Meets(ContextIngressTrust provided, ContextIngressTrust required)
+        => required switch
+        {
+            ContextIngressTrust.Unverified => true,
+            ContextIngressTrust.Authenticated => provided is ContextIngressTrust.Authenticated or ContextIngressTrust.HostTrusted,
+            ContextIngressTrust.HostTrusted => provided is ContextIngressTrust.HostTrusted,
+            _ => false
+        };
 
     private static InvalidOperationException ElectionFailure(
         CommunicationLane lane,
@@ -484,24 +567,6 @@ internal sealed class CommunicationRouter
         }
 
         return name;
-    }
-
-    private static void EnsureValidCandidates(IReadOnlyCollection<ICommunicationAdapter> candidates)
-    {
-        var duplicate = candidates
-            .GroupBy(static adapter => adapter.Descriptor.Id, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(static group => group.Count() > 1);
-        if (duplicate is not null)
-            throw new InvalidOperationException(
-                $"Multiple Communication adapters declare provider identity '{duplicate.Key}'. Provider identities must be unique.");
-
-        foreach (var candidate in candidates)
-        {
-            if (string.IsNullOrWhiteSpace(candidate.Descriptor.Id))
-                throw new InvalidOperationException("A Communication adapter declares an empty provider identity.");
-            // A layered adapter may deliberately declare zero active lanes when the corresponding engine is
-            // present but not selected. Dormant candidates remain inert and are never started or elected.
-        }
     }
 
     private static IReadOnlyDictionary<string, BoundTarget> BuildBindings(

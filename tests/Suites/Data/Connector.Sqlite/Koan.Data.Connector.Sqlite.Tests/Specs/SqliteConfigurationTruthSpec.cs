@@ -153,9 +153,6 @@ public sealed class SqliteConfigurationTruthSpec
     {
         public string Provider => "configuration-test";
 
-        public bool CanHandle(string provider)
-            => string.Equals(provider, Provider, StringComparison.OrdinalIgnoreCase);
-
         public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
             IServiceProvider sp,
             string source = "Default")

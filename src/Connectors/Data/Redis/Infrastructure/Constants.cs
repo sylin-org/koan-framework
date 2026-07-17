@@ -40,5 +40,10 @@ public static class Constants
         public const string HostDocker = "host.docker.internal";
         public const string Localhost = "localhost";
     }
+
+    internal static class Logging
+    {
+        public const string Connection = "data.redis.connection";
+    }
 }
 

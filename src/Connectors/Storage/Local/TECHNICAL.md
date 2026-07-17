@@ -22,5 +22,5 @@ Tests
 - Covered by Koan.Storage.Tests with Local provider scenarios including range reads, exists/head, transfer, onboarding, and copy/move.
 
 Auto-registration
-- This assembly exposes Initialization/KoanAutoRegistrar which binds Koan:Storage:Providers:Local and registers LocalStorageProvider with DI.
+- `Initialization/LocalStorageModule` binds `Koan:Storage:Providers:Local` and registers `LocalStorageProvider` with DI.
 

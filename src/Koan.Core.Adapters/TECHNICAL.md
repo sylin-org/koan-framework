@@ -125,8 +125,7 @@ and fluent `WithMetadata(...)`. `BootstrapState` is `Success` / `Failed` / `Skip
 
 ## Auto-registration
 
-`Koan.Core.Adapters.Initialization.KoanAutoRegistrar` (module name
-`Koan.Core.Adapters.Readiness`) wires the package on reference:
+`Koan.Core.Adapters.Initialization.CoreAdaptersModule` wires the package on reference:
 
 - `services.AddKoanOptions<AdaptersReadinessOptions>(SectionPath)`;
 - `services.TryAddSingleton<IRetryPolicyProvider, DefaultRetryPolicyProvider>()`;
@@ -135,5 +134,5 @@ and fluent `WithMetadata(...)`. `BootstrapState` is `Success` / `Failed` / `Skip
 - `Describe(...)` reads the four readiness settings with source tracking and publishes them to
   the boot report via `ProvenanceModuleWriter` / `AdaptersReadinessProvenanceItems`.
 
-Adapters register their own `IAsyncAdapterInitializer` and `IConfigureOptions<TOptions>` in
-their own registrars; this package only provides the shared infrastructure they bind to.
+Adapters register their own `IAsyncAdapterInitializer` and `IConfigureOptions<TOptions>` from
+their own `KoanModule.Register`; this package only provides the shared infrastructure they bind to.

@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Kernel</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -29,6 +28,21 @@
   <ItemGroup>
     <None Remove="build/Sylin.Koan.Core.targets" />
     <None Include="build/Sylin.Koan.Core.targets" Pack="true" PackagePath="buildTransitive/Sylin.Koan.Core.targets" />
+    <None Remove="build/tools/Sylin.Koan.SemanticActivation.targets" />
+    <None Include="build/tools/Sylin.Koan.SemanticActivation.targets"
+          Pack="true"
+          PackagePath="buildTransitive/tools/Sylin.Koan.SemanticActivation.targets" />
+    <None Include="$(MSBuildProjectDirectory)\..\Koan.Core.Registry.Generators\bin\$(Configuration)\netstandard2.0\Koan.Core.Registry.Generators.dll"
+          Pack="true"
+          PackagePath="buildTransitive/tools/Koan.Core.Registry.Generators.dll"
+          Visible="false" />
+    <!-- Core owns the generator as package payload. These evaluated source inputs feed the release
+         lineage compiler, so any generator change mints a fresh Core identity automatically. -->
+    <KoanPackageInput Include="$(MSBuildProjectDirectory)\..\Koan.Core.Registry.Generators\Koan.Core.Registry.Generators.csproj;
+                               $(MSBuildProjectDirectory)\..\Koan.Core.Registry.Generators\**\*.cs;
+                               $(MSBuildProjectDirectory)\..\Koan.Core.Registry.Generators\version.json"
+                      Exclude="$(MSBuildProjectDirectory)\..\Koan.Core.Registry.Generators\bin\**;
+                               $(MSBuildProjectDirectory)\..\Koan.Core.Registry.Generators\obj\**" />
   </ItemGroup>
   <!-- Explicitly exclude adapter files to prevent Docker build conflicts -->
   <ItemGroup>

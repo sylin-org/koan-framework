@@ -27,23 +27,14 @@ internal sealed class MongoDiscoveryAdapter : ServiceDiscoveryAdapterBase
     /// <summary>MongoDB-specific health validation using MongoDB ping command</summary>
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        try
-        {
-            var settings = MongoClientSettings.FromConnectionString(serviceUrl);
-            settings.ServerSelectionTimeout = context.HealthCheckTimeout;
+        var settings = MongoClientSettings.FromConnectionString(serviceUrl);
+        settings.ServerSelectionTimeout = context.HealthCheckTimeout;
 
-            var client = new MongoClient(settings);
-            await client.GetDatabase("admin").RunCommandAsync<BsonDocument>(
-                new BsonDocument("ping", 1), cancellationToken: cancellationToken);
+        var client = new MongoClient(settings);
+        await client.GetDatabase("admin").RunCommandAsync<BsonDocument>(
+            new BsonDocument("ping", 1), cancellationToken: cancellationToken);
 
-            _logger.LogDebug("MongoDB health check passed for {Url}", serviceUrl);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug("MongoDB health check failed for {Url}: {Error}", serviceUrl, ex.Message);
-            return false;
-        }
+        return true;
     }
 
     /// <summary>MongoDB adapter reads its own configuration sections</summary>
@@ -91,7 +82,7 @@ internal sealed class MongoDiscoveryAdapter : ServiceDiscoveryAdapterBase
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Failed to apply MongoDB parameters to {BaseUrl}: {Error}", baseUrl, ex.Message);
+            ReportNormalizationFailure(baseUrl, ex);
             return baseUrl;
         }
     }

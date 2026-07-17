@@ -86,13 +86,11 @@ public sealed class VectorAdapterResolutionSpec
     }
 
     [Fact]
-    public async Task Default_fallback_picks_highest_priority_when_desired_matches_no_vector_factory()
+    public async Task Preferred_record_provider_hint_falls_through_to_vector_automatic_policy()
     {
-        // ARCH-0103 §4.1 — the vector factory pick now uses the shared [ProviderPriority]+CanHandle ranking
-        // (FactoryResolver), converging onto the same rule the record plane already used. When the desired provider
-        // matches NO registered vector factory, the fallback resolves the HIGHEST-PRIORITY adapter, NOT the
-        // first-registered. Registered low-then-high so DI order != priority order; the entity's [SourceAdapter] names a
-        // provider no vector factory handles, forcing the no-match fallback. (Pre-ARCH-0103 this returned "low".)
+        // Record-provider correlation is advisory for the distinct vector role. When the record provider has no vector
+        // counterpart, the vector pillar may continue through its own automatic policy. Registered low-then-high so
+        // DI order differs from the vector catalog's deterministic priority order.
         var services = NewServices();
         services.AddKoanDataCore();
         services.AddKoanDataVector();
@@ -105,6 +103,45 @@ public sealed class VectorAdapterResolutionSpec
         repo.Should().NotBeNull();
         (((IDecoratedVectorRepository)repo!).InnerRepository as FakeVectorRepo<EntityWithUnmatchedSource, string>)!
             .ProviderName.Should().Be("high");
+    }
+
+    [Fact]
+    public async Task Explicit_vector_attribute_never_falls_through_to_an_unrelated_provider()
+    {
+        var services = NewServices();
+        services.AddKoanDataCore();
+        services.AddKoanDataVector();
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("available"));
+        await using var provider = services.BuildServiceProvider();
+
+        var act = () => provider.GetRequiredService<IVectorService>()
+            .TryGetRepository<EntityWithMissingVectorAdapter, string>();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*requires vector provider 'missing'*will not substitute an unrelated provider*");
+    }
+
+    [Fact]
+    public async Task Configured_vector_default_never_falls_through_to_an_unrelated_provider()
+    {
+        var services = NewServices();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Koan:Data:VectorDefaults:DefaultProvider"] = "missing"
+            })
+            .Build();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddKoanDataCore();
+        services.AddKoanDataVector();
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("available"));
+        await using var provider = services.BuildServiceProvider();
+
+        var act = () => provider.GetRequiredService<IVectorService>()
+            .TryGetRepository<EntityWithSourceOnly, string>();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*requires vector provider 'missing'*will not substitute an unrelated provider*");
     }
 
     // Mirrors the bespoke ServiceProviderFixture base wiring (logging + a no-op application lifetime)
@@ -167,8 +204,6 @@ public sealed class VectorAdapterResolutionSpec
 
         public string Provider => _provider;
 
-        public bool CanHandle(string candidate) => string.Equals(candidate, _provider, StringComparison.OrdinalIgnoreCase);
-
         public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
             where TEntity : class, IEntity<TKey>
             where TKey : notnull
@@ -188,7 +223,6 @@ public sealed class VectorAdapterResolutionSpec
     private sealed class LowPriorityVectorFactory : IVectorAdapterFactory
     {
         public string Provider => "low";
-        public bool CanHandle(string candidate) => string.Equals(candidate, "low", StringComparison.OrdinalIgnoreCase);
         public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
             where TEntity : class, IEntity<TKey> where TKey : notnull => new FakeVectorRepo<TEntity, TKey>("low");
         public Koan.Data.Abstractions.Naming.StorageNamingCapability GetNamingCapability(IServiceProvider services)
@@ -199,7 +233,6 @@ public sealed class VectorAdapterResolutionSpec
     private sealed class HighPriorityVectorFactory : IVectorAdapterFactory
     {
         public string Provider => "high";
-        public bool CanHandle(string candidate) => string.Equals(candidate, "high", StringComparison.OrdinalIgnoreCase);
         public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
             where TEntity : class, IEntity<TKey> where TKey : notnull => new FakeVectorRepo<TEntity, TKey>("high");
         public Koan.Data.Abstractions.Naming.StorageNamingCapability GetNamingCapability(IServiceProvider services)
@@ -223,6 +256,13 @@ public sealed class VectorAdapterResolutionSpec
     [VectorAdapter("foo")]
     [SourceAdapter("json")]
     private sealed class EntityWithVectorAdapter : Entity<EntityWithVectorAdapter, string>
+    {
+        [Identifier]
+        public override string Id { get; set; } = default!;
+    }
+
+    [VectorAdapter("missing")]
+    private sealed class EntityWithMissingVectorAdapter : Entity<EntityWithMissingVectorAdapter, string>
     {
         [Identifier]
         public override string Id { get; set; } = default!;

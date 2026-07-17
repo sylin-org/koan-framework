@@ -61,6 +61,18 @@ validation:
 
 ## Aggregate configuration ownership
 
+- One immutable `DataProviderCatalog` per host owns canonical IDs, aliases, direct-reference evidence,
+  collision rejection, and memoized priority metadata. Provider factories no longer implement a second
+  `CanHandle` identity authority.
+- `DataDefaultProviderPlan` compiles the default choice once. Repository construction, aggregate metadata,
+  vector role correlation, diagnostics, startup facts, and the resolved lock consume that same provider ID
+  or receipt; they do not independently rank DI registrations.
+- Context/source/Entity/default precedence remains Data-owned. A named choice is required and fails closed;
+  only record-to-vector correlation is preferred and may continue through Vector's own automatic policy.
+- Known build provenance admits directly referenced connectors plus the deliberate JSON floor. A transitive
+  factory cannot become persistence accidentally. Low-level hosts without a generated manifest use a
+  deterministic priority fallback explicitly reported as `unknown-provenance-priority`.
+
 - `AggregateConfigs.Get<TEntity,TKey>(services)` memoizes configuration and its lazy repository per
   `IServiceProvider`. Sequential or simultaneous hosts using the same closed Entity type do not share
   adapter factories, guards, read contributors, configurations, or repositories.
@@ -104,19 +116,20 @@ validation:
 - Centralize constants per project (see ARCH-0040)
 - Structured query planning follows DATA-0096; bounded Entity streaming follows DATA-0107
 
-## Non-hosted startup ownership
+## Synchronous console-host ownership
 
-- `IServiceCollection.StartKoan()` is the short synchronous path for processes that do not need a
-  generic-host lifecycle. It composes Koan when needed, builds a provider, runs runtime discovery and
-  startup, and returns that provider.
+- `IServiceCollection.StartKoan()` is the short synchronous facade over the standard .NET Generic
+  Host. It composes Koan when needed, starts every hosted capability, and returns a provider facade
+  without blocking for shutdown.
 - The returned provider is caller-owned and implements `IDisposable` and `IAsyncDisposable`.
   Disposing it releases its process-default `AppHost` lease before owned services are torn down.
 - If discovery or startup throws, `StartKoan()` releases the host lease and disposes the provider
   before rethrowing. A failed start does not leave a selectable ambient host.
 - Overlapping providers are safe at the binding boundary: disposing an older provider cannot clear a
   newer owner. Use `AppHost.PushScope(provider)` when concurrent flows must select different providers.
-- `StartKoan()` does not run the generic host or its `IHostedService` lifecycle. Use `AddKoan()` with a
-  generic host for web apps, workers, graceful stop, and hosted background services.
+- `StartKoan()` supplies the same `IHostEnvironment`, `IHostApplicationLifetime`, configuration,
+  validation, and `IHostedService` lifecycle as other Generic Host applications. Web apps and workers
+  use their native builders with `AddKoan()` rather than nesting a second host.
 
 ## Usage guidance
 

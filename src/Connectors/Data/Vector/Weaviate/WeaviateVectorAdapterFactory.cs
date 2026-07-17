@@ -36,8 +36,6 @@ public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
 {
     public string Provider => "weaviate";
 
-    public bool CanHandle(string provider) => string.Equals(provider, "weaviate", StringComparison.OrdinalIgnoreCase);
-
     // ARCH-0103 §4.1: accepts the routed source for contract alignment; per-source physical placement (native
     // multi-tenancy / per-cluster) is realized in P4. Until then a Database-mode route resolves but is not yet honored here.
     public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")

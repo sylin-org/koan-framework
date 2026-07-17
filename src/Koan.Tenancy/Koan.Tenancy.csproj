@@ -1,13 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Koan.Tenancy</AssemblyName>
     <RootNamespace>Koan.Tenancy</RootNamespace>
-    <Description>First-class multi-tenancy for Koan (ARCH-0095): the Tenant ambient surface (Tenant.Use/.WithTenant/None), [HostScoped], and the fail-closed tenant gate — registered as contributors to the Koan.Data.Core storage pipeline (DATA-0105) under Reference = Intent. The data core stays tenancy-agnostic.</Description>
+    <Description>First-class multi-tenancy for Koan: Tenant.Use/.WithTenant/None, [HostScoped], trusted context carriage, and one hard tenant segmentation contribution compiled independently by active framework pillars under Reference = Intent.</Description>
     <PackageTags>$(CommonPackageTags);tenancy;multitenant;isolation;saas</PackageTags>
   </PropertyGroup>
   <ItemGroup>

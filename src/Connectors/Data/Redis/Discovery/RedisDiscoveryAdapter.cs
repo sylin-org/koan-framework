@@ -26,24 +26,15 @@ public sealed class RedisDiscoveryAdapter : ServiceDiscoveryAdapterBase
     /// <summary>Redis-specific health validation using Redis ping command</summary>
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        try
-        {
-            var options = ConfigurationOptions.Parse(serviceUrl);
-            options.ConnectTimeout = (int)context.HealthCheckTimeout.TotalMilliseconds;
-            options.SyncTimeout = (int)context.HealthCheckTimeout.TotalMilliseconds;
+        var options = ConfigurationOptions.Parse(serviceUrl);
+        options.ConnectTimeout = (int)context.HealthCheckTimeout.TotalMilliseconds;
+        options.SyncTimeout = (int)context.HealthCheckTimeout.TotalMilliseconds;
 
-            using var muxer = await ConnectionMultiplexer.ConnectAsync(options);
-            var database = muxer.GetDatabase();
-            await database.PingAsync();
+        using var muxer = await ConnectionMultiplexer.ConnectAsync(options);
+        var database = muxer.GetDatabase();
+        await database.PingAsync();
 
-            _logger.LogDebug("Redis health check passed for {Url}", serviceUrl);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug("Redis health check failed for {Url}: {Error}", serviceUrl, ex.Message);
-            return false;
-        }
+        return true;
     }
 
     /// <summary>Redis adapter reads its own configuration sections</summary>
@@ -112,7 +103,7 @@ public sealed class RedisDiscoveryAdapter : ServiceDiscoveryAdapterBase
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Failed to apply Redis parameters to {BaseUrl}: {Error}", baseUrl, ex.Message);
+            ReportNormalizationFailure(baseUrl, ex);
             return baseUrl; // Return original URL if parameter application fails
         }
     }

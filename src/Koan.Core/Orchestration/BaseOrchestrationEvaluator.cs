@@ -4,6 +4,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading;
 using System.Linq;
+using Koan.Core.Logging;
 
 namespace Koan.Core.Orchestration;
 
@@ -13,12 +14,20 @@ namespace Koan.Core.Orchestration;
 /// </summary>
 public abstract class BaseOrchestrationEvaluator : IKoanOrchestrationEvaluator
 {
+    private const string CredentialValidationLogAction = "orchestration.credentials";
     protected readonly ILogger? Logger;
 
     protected BaseOrchestrationEvaluator(ILogger? logger = null)
     {
         Logger = logger;
     }
+
+    /// <summary>Report credential-probe decisions through Koan's safe structured boundary.</summary>
+    protected void ReportCredentialValidation(
+        string outcome,
+        params (string Key, object? Value)[] context)
+        => KoanLog.ConfigDebug(Logger, CredentialValidationLogAction, outcome,
+            [("service", ServiceName), .. context]);
 
     public abstract string ServiceName { get; }
     public abstract int StartupPriority { get; }

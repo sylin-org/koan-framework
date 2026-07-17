@@ -152,10 +152,40 @@ public static class KoanLog
 
     internal static void Write(ILogger? logger, KoanLogStage stage, LogLevel level, string action, string? outcome, (string Key, object? Value)[] context)
     {
-        TestSink?.Invoke(stage, level, action, outcome, context);
-        if (logger is null) return;
-        logger.LogKoanStage(stage, level, action, outcome, context);
+        var testSink = TestSink;
+        if (testSink is null && (logger is null || !logger.IsEnabled(level))) return;
+
+        var safeContext = DeIdentify(context);
+        testSink?.Invoke(stage, level, action, outcome, safeContext);
+        if (logger is not null && logger.IsEnabled(level))
+        {
+            logger.LogKoanStage(stage, level, action, outcome, safeContext);
+        }
     }
+
+    private static (string Key, object? Value)[] DeIdentify((string Key, object? Value)[] context)
+    {
+        (string Key, object? Value)[]? safe = null;
+        for (var index = 0; index < context.Length; index++)
+        {
+            var value = DeIdentify(context[index].Value);
+            if (ReferenceEquals(value, context[index].Value)) continue;
+
+            safe ??= context.ToArray();
+            safe[index] = (context[index].Key, value);
+        }
+
+        return safe ?? context;
+    }
+
+    private static object? DeIdentify(object? value)
+        => value switch
+        {
+            string text when !string.IsNullOrWhiteSpace(text) => Redaction.DeIdentify(text),
+            Uri uri => Redaction.DeIdentify(uri.OriginalString),
+            Exception exception => Redaction.DeIdentify(exception.ToString()),
+            _ => value
+        };
 
     private static string GetCategoryName(Type type)
     {

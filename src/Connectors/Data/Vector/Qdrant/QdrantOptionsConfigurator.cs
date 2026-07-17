@@ -43,11 +43,11 @@ internal sealed class QdrantOptionsConfigurator : AdapterOptionsConfigurator<Qdr
 
     protected override void ConfigureProviderSpecific(QdrantOptions options)
     {
-        Logger?.LogInformation("Qdrant Orchestration-Aware Configuration Started");
-        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
-            KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
-        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}', Endpoint: '{Endpoint}'",
-            options.ConnectionString, options.Endpoint);
+        LogConfiguration(LogLevel.Debug, "initial",
+            ("environment", KoanEnv.EnvironmentName),
+            ("orchestrationMode", KoanEnv.OrchestrationMode),
+            ("connection", options.ConnectionString),
+            ("endpoint", options.Endpoint));
 
         var endpoint = ReadProviderConfiguration(options.Endpoint,
             Infrastructure.Constants.Configuration.Keys.Endpoint);
@@ -63,20 +63,20 @@ internal sealed class QdrantOptionsConfigurator : AdapterOptionsConfigurator<Qdr
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            Logger?.LogInformation("Using explicit connection string from configuration");
+            LogConfiguration(LogLevel.Information, "explicit");
             options.ConnectionString = explicitConnectionString;
             options.Endpoint = explicitConnectionString;
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            Logger?.LogInformation("Auto-detection mode - using autonomous service discovery");
-            options.ConnectionString = ResolveAutonomousConnection(apiKey, Logger);
+            LogConfiguration(LogLevel.Information, "auto");
+            options.ConnectionString = ResolveAutonomousConnection(apiKey);
             options.Endpoint = options.ConnectionString;
         }
         else
         {
-            Logger?.LogInformation("Using pre-configured connection string");
+            LogConfiguration(LogLevel.Information, "preconfigured");
             options.Endpoint = options.ConnectionString;
         }
 
@@ -127,27 +127,27 @@ internal sealed class QdrantOptionsConfigurator : AdapterOptionsConfigurator<Qdr
             options.OnDisk,
             Infrastructure.Constants.Configuration.Keys.OnDisk);
 
-        Logger?.LogInformation("Final Qdrant Configuration");
-        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
-        Logger?.LogInformation("Endpoint: {Endpoint}", options.Endpoint);
-        Logger?.LogInformation("Distance: {Distance}, Dimension: {Dimension}, WaitForResult: {Wait}",
-            options.Distance, options.Dimension, options.WaitForResult);
-        Logger?.LogInformation("Qdrant Orchestration-Aware Configuration Complete");
+        LogConfiguration(LogLevel.Information, "final",
+            ("connection", options.ConnectionString),
+            ("endpoint", options.Endpoint),
+            ("distance", options.Distance),
+            ("dimension", options.Dimension),
+            ("waitForResult", options.WaitForResult));
     }
 
-    private string ResolveAutonomousConnection(string? apiKey, ILogger? logger)
+    private string ResolveAutonomousConnection(string? apiKey)
     {
         try
         {
             if (IsAutoDetectionDisabled())
             {
-                logger?.LogInformation("Auto-detection disabled via configuration - using localhost");
+                LogDiscovery(LogLevel.Information, "disabled", ("fallback", "http://localhost:6333"));
                 return "http://localhost:6333";
             }
 
             if (_discoveryCoordinator == null)
             {
-                logger?.LogWarning("Service discovery coordinator not available, falling back to localhost");
+                LogDiscovery(LogLevel.Warning, "coordinator-missing", ("fallback", "http://localhost:6333"));
                 return "http://localhost:6333";
             }
 
@@ -166,16 +166,16 @@ internal sealed class QdrantOptionsConfigurator : AdapterOptionsConfigurator<Qdr
 
             if (result.IsSuccessful)
             {
-                logger?.LogInformation("Qdrant discovered via autonomous discovery: {ServiceUrl}", result.ServiceUrl);
+                LogDiscovery(LogLevel.Information, "success", ("url", result.ServiceUrl));
                 return result.ServiceUrl;
             }
 
-            logger?.LogWarning("Autonomous Qdrant discovery failed, falling back to localhost");
+            LogDiscovery(LogLevel.Warning, "fallback", ("reason", result.ErrorMessage), ("fallback", "http://localhost:6333"));
             return "http://localhost:6333";
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Error in autonomous Qdrant discovery, falling back to localhost");
+            LogDiscovery(LogLevel.Error, "exception", ("error", ex), ("fallback", "http://localhost:6333"));
             return "http://localhost:6333";
         }
     }

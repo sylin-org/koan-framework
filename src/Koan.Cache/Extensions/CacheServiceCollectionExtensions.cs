@@ -9,6 +9,7 @@ using Koan.Cache.Coherence;
 using Koan.Cache.Decorators;
 using Koan.Cache.Diagnostics;
 using Koan.Cache.Entity;
+using Koan.Cache.Identity;
 using Koan.Cache.Options;
 using Koan.Cache.Policies;
 using Koan.Cache.Scope;
@@ -59,6 +60,13 @@ public static class CacheServiceCollectionExtensions
         services.AddKoanKeyedLeaseGate();
         services.TryAddSingleton<ICacheScopeAccessor, CacheScopeAccessor>();
         services.TryAddSingleton<CacheInstrumentation>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<
+            Koan.Core.Semantics.Segmentation.ISegmentationRealization,
+            CacheIdentityPlan>());
+        services.TryAddSingleton(sp => sp
+            .GetServices<Koan.Core.Semantics.Segmentation.ISegmentationRealization>()
+            .OfType<CacheIdentityPlan>()
+            .Single());
 
         // Serializers (registered as enumerable; resolved by content kind + type at runtime)
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheSerializer, JsonCacheSerializer>());
@@ -93,6 +101,7 @@ public static class CacheServiceCollectionExtensions
 
         // Client (consumes LayeredCache; ICacheClient = ICacheReader + ICacheWriter)
         services.TryAddSingleton<CacheClient>();
+        services.TryAddSingleton<ICacheIdentityWriter>(sp => sp.GetRequiredService<CacheClient>());
         services.TryAddSingleton<ICacheClient>(sp => sp.GetRequiredService<CacheClient>());
         services.TryAddSingleton<ICacheReader>(sp => sp.GetRequiredService<CacheClient>());
         services.TryAddSingleton<ICacheWriter>(sp => sp.GetRequiredService<CacheClient>());

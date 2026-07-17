@@ -5,6 +5,7 @@ using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Entity;
+using Koan.Cache.Identity;
 using Koan.Core.Context;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
@@ -202,9 +203,15 @@ public sealed class EntityCacheEvictionSpec
             new StubPolicyRegistry(policies),
             Array.Empty<IReadFilterContributor>());
         return new EntityCacheEvictionCoordinator(
-            writer,
+            new IdentityWriter(writer),
             plan,
             new KoanContextCarrierRegistry(Array.Empty<IKoanContextCarrier>()));
+    }
+
+    private sealed class IdentityWriter(ICacheWriter inner) : ICacheIdentityWriter
+    {
+        public ValueTask<bool> Remove(CacheKey key, Type? subject, CancellationToken ct)
+            => inner.Remove(key, ct);
     }
 
     private static CachePolicyDescriptor Policy(string template, Type? entityType = null)

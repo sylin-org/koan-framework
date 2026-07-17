@@ -31,6 +31,7 @@ public sealed class WellKnownFactsSpec : IClassFixture<WellKnownWebApplicationFa
         json.Should().Be(expected);
         var envelope = KoanFactJson.Deserialize(json);
         envelope.Should().NotBeNull();
+        envelope!.Schema.Should().Be(2);
         envelope!.Complete.Should().BeTrue();
         envelope.Facts.Should().Contain(fact => fact.Kind == KoanFactKind.Election);
     }

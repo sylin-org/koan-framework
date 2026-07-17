@@ -12,22 +12,20 @@ namespace Koan.Data.Core.Composition;
 /// <summary>
 /// Enriches the resolved composition twin (P1.1) with the data pillar's runtime-resolved state:
 /// the <c>data:default</c> adapter election (and any configured named sources) plus the entities
-/// resolved so far. Discovered automatically via <see cref="IKoanCompositionContributor"/> —
-/// referencing a data adapter is what makes the lockfile describe the data composition.
+/// resolved so far. The active retained Data module invokes this projector; it owns no lifecycle.
 /// </summary>
-internal sealed class DataCompositionContributor : IKoanCompositionContributor
+internal static class DataCompositionFacts
 {
-    public void Contribute(KoanCompositionBuilder builder, IServiceProvider services)
+    public static void Project(KoanCompositionBuilder builder, IServiceProvider services, string source)
     {
-        ContributeElections(builder, services);
+        ContributeElections(builder, services, source);
         ContributeEntities(builder, services);
-        ContributeLifecycle(builder, services);
+        ContributeLifecycle(builder, services, source);
     }
 
-    // Mirrors AdapterResolver's framework-default chain (Priority 4 → 5): a configured "Default"
-    // source wins ("default-source"); otherwise the highest-[ProviderPriority] factory does
-    // ("reference-priority"). Named configured sources are reported as data:{name}.
-    private static void ContributeElections(KoanCompositionBuilder builder, IServiceProvider services)
+    // Projects the canonical host-owned default decision. Named configured sources remain
+    // separate explicit elections; this contributor never re-ranks providers.
+    private static void ContributeElections(KoanCompositionBuilder builder, IServiceProvider services, string source)
     {
         var registry = services.GetService<DataSourceRegistry>();
 
@@ -35,13 +33,10 @@ internal sealed class DataCompositionContributor : IKoanCompositionContributor
         {
             try
             {
-                var decision = AdapterResolver.ResolveDefault(services, registry);
+                var decision = AdapterResolver.ResolveDefault(services);
                 builder.AddElection(
-                    "data:default",
-                    decision.Adapter,
-                    decision.Via,
-                    decision.Priority,
-                    typeof(DataCompositionContributor).FullName,
+                    decision.Receipt,
+                    source,
                     Constants.Diagnostics.Codes.AdapterSelected);
             }
             catch (AdapterResolutionException exception)
@@ -50,7 +45,7 @@ internal sealed class DataCompositionContributor : IKoanCompositionContributor
                     "data:default",
                     exception.ReasonCode,
                     exception.Correction,
-                    typeof(DataCompositionContributor).FullName,
+                    source,
                     Constants.Diagnostics.Codes.AdapterRejected);
             }
             catch (InvalidOperationException)
@@ -59,7 +54,7 @@ internal sealed class DataCompositionContributor : IKoanCompositionContributor
                     "data:default",
                     Constants.Diagnostics.Reasons.NoFactory,
                     "Reference a Koan data adapter or configure Koan:Data:Sources:Default:Adapter.",
-                    typeof(DataCompositionContributor).FullName,
+                    source,
                     Constants.Diagnostics.Codes.AdapterRejected);
             }
         }
@@ -91,7 +86,7 @@ internal sealed class DataCompositionContributor : IKoanCompositionContributor
         }
     }
 
-    private static void ContributeLifecycle(KoanCompositionBuilder builder, IServiceProvider services)
+    private static void ContributeLifecycle(KoanCompositionBuilder builder, IServiceProvider services, string source)
     {
         var diagnostics = services.GetService<IDataDiagnostics>();
         if (diagnostics is null) return;
@@ -111,7 +106,7 @@ internal sealed class DataCompositionContributor : IKoanCompositionContributor
                 subject,
                 $"Koan composed {lifecycle.TotalHandlers} persistence lifecycle handler(s) for '{shortName}'.",
                 "host-composition",
-                typeof(DataCompositionContributor).FullName);
+                source);
         }
     }
 

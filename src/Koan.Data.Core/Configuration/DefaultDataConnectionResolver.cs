@@ -6,16 +6,21 @@ namespace Koan.Data.Core.Configuration;
 internal sealed class DefaultDataConnectionResolver(
     IConfiguration config,
     DataSourceRegistry sourceRegistry,
-    IEnumerable<IDataAdapterFactory> factories) : IDataConnectionResolver
+    Routing.DataProviderCatalog providers) : IDataConnectionResolver
 {
     public string? Resolve(string providerId, string name)
     {
-        var owner = factories.FirstOrDefault(factory => factory.CanHandle(providerId));
+        var owner = providers.Find(providerId);
         try
         {
             return owner is null
                 ? AdapterConnectionResolver.ResolveConnectionString(config, sourceRegistry, providerId, name)
-                : AdapterConnectionResolver.ResolveConnectionString(config, sourceRegistry, providerId, name, owner.CanHandle);
+                : AdapterConnectionResolver.ResolveConnectionString(
+                    config,
+                    sourceRegistry,
+                    providerId,
+                    name,
+                    owner);
         }
         catch (InvalidOperationException)
         {

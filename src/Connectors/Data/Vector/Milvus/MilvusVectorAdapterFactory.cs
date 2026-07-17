@@ -32,9 +32,6 @@ public sealed class MilvusVectorAdapterFactory : IVectorAdapterFactory
 {
     public string Provider => "milvus";
 
-    public bool CanHandle(string provider)
-        => string.Equals(provider, "milvus", StringComparison.OrdinalIgnoreCase);
-
     // ARCH-0103 §4.1: accepts the routed source for contract alignment; per-source physical placement (native
     // partitions / per-collection) is realized in P4.
     public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")

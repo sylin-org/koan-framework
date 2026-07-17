@@ -44,9 +44,6 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IAsyncDisposa
 
     public string Provider => "couchbase";
 
-    public bool CanHandle(string provider)
-        => string.Equals(provider, "couchbase", StringComparison.OrdinalIgnoreCase);
-
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,
         string source = "Default")
@@ -70,15 +67,15 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IAsyncDisposa
         // collapses a non-Default source's "auto"/blank discovery sentinel onto the discovery-resolved Default (so the
         // per-source pool never keys on the unresolved literal) — the fleet form of the local helper this replaces.
         var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "Couchbase", source, baseOptions.ConnectionString, CanHandle);
+            config, sourceRegistry, "Couchbase", source, baseOptions.ConnectionString, this);
         var bucket = AdapterConnectionResolver.GetSourceSetting(
-            config, sourceRegistry, "Couchbase", source, "Bucket", baseOptions.Bucket, CanHandle);
+            config, sourceRegistry, "Couchbase", source, "Bucket", baseOptions.Bucket, this);
         var username = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(
-            config, sourceRegistry, "Couchbase", source, "Username", baseOptions.Username ?? "", CanHandle));
+            config, sourceRegistry, "Couchbase", source, "Username", baseOptions.Username ?? "", this));
         var password = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(
-            config, sourceRegistry, "Couchbase", source, "Password", baseOptions.Password ?? "", CanHandle));
+            config, sourceRegistry, "Couchbase", source, "Password", baseOptions.Password ?? "", this));
         var managementUrl = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(
-            config, sourceRegistry, "Couchbase", source, "ManagementUrl", baseOptions.ManagementUrl ?? "", CanHandle));
+            config, sourceRegistry, "Couchbase", source, "ManagementUrl", baseOptions.ManagementUrl ?? "", this));
 
         // Dedup (ARCH-0103 §9.15): a routed source whose resolved physical placement coincides with Default — same
         // connection, bucket, AND credentials/management endpoint (so reusing Default's provider can't cross to a

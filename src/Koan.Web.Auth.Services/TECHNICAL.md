@@ -46,8 +46,8 @@ Features:
 - JSON serialization/deserialization
 - Comprehensive error handling and logging
 
-#### 4. Auto-Registration System
-**Location:** `Initialization/KoanAutoRegistrar.cs`
+#### 4. Module activation
+**Location:** `Initialization/AuthServicesModule.cs`
 **Responsibility:** Discovers and registers services automatically
 
 Process:

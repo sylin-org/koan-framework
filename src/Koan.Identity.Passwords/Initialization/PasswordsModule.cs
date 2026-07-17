@@ -29,8 +29,6 @@ public sealed class PasswordHashingOptions
 [After(typeof(Koan.Identity.Credentials.Initialization.CredentialsModule))]
 public sealed class PasswordsModule : KoanModule
 {
-    public override string Id => "Koan.Identity.Passwords";
-
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<PasswordHashingOptions>(PasswordHashingOptions.SectionPath);

@@ -28,6 +28,13 @@ public sealed class TenantContextCarrierSpec
         => Carrier.Capture().Should().BeNull();
 
     [Fact]
+    public void Required_capture_materializes_the_Core_resolved_tenant_without_changing_ambient_state()
+    {
+        Carrier.CaptureRequired("tenant", "dev-local").Should().Be("v1:id:dev-local");
+        Tenant.Current.Should().BeNull();
+    }
+
+    [Fact]
     public void Capture_then_Restore_round_trips_a_concrete_tenant_across_a_hop()
     {
         string? bag;
@@ -93,7 +100,7 @@ public sealed class TenantContextCarrierSpec
     {
         var services = new ServiceCollection();
         services.AddKoanCore();
-        new Initialization.KoanAutoRegistrar().Register(services);
+        new Initialization.TenancyModule().Register(services);
         using var provider = services.BuildServiceProvider();
 
         provider.GetServices<IKoanContextCarrier>()

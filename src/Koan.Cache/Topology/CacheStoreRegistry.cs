@@ -37,8 +37,17 @@ internal sealed class CacheStoreRegistry : ICacheStoreRegistry
 
         lock (_lock)
         {
-            if (_stores.Any(s => s.Name.Equals(store.Name, StringComparison.OrdinalIgnoreCase)))
-                return;  // idempotent
+            var existing = _stores.FirstOrDefault(
+                candidate => candidate.Name.Equals(store.Name, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+            {
+                if (ReferenceEquals(existing, store))
+                    return;
+
+                throw new InvalidOperationException(
+                    $"Cache store identity '{store.Name}' was registered more than once. " +
+                    "Give each cache provider a unique identity or remove the duplicate registration.");
+            }
 
             _stores.Add(store);
         }

@@ -28,6 +28,7 @@ internal static class KoanConsoleBlocks
     {
         var identity = snapshot.Application;
         var uniqueModules = DeduplicateModules(modules);
+        var factView = KoanStartupFactView.Compile(runtimeFacts);
 
         var builder = new KoanConsoleBlockBuilder(KoanLogStage.Boot, "Application", DefaultWidth, "[KOAN]")
             .AddLine(FormatKeyValue("Name", identity.Name))
@@ -62,8 +63,7 @@ internal static class KoanConsoleBlocks
         {
             builder.AddLine("");
             builder.AddLine(FormatSectionDivider("Registry"));
-            builder.AddLine(FormatKeyValue("Initializers", FormatInitializerSummary(registry.Value)));
-            builder.AddLine(FormatKeyValue("AutoReg", registry.Value.AutoRegistrars.ToString()));
+            builder.AddLine(FormatKeyValue("Modules", FormatModuleSummary(registry.Value)));
             builder.AddLine(FormatKeyValue("Background", FormatBackgroundSummary(registry.Value)));
             builder.AddLine(FormatKeyValue("Adapters", registry.Value.ServiceDiscoveryAdapters.ToString()));
 
@@ -75,9 +75,7 @@ internal static class KoanConsoleBlocks
 
             // MODULES-FAILED block (Track F · fail-fast.json): in lenient boot a broken module no longer
             // vanishes — it is rendered here so the operator can see it in the boot report.
-            var factFailures = runtimeFacts?.Facts
-                .Where(fact => fact.Code == Constants.Diagnostics.Codes.ModuleRejected)
-                .ToArray() ?? [];
+            var factFailures = factView.ModuleFailures;
             var failures = registry.Value.ModuleFailures;
             if (factFailures.Length > 0 || failures is { Count: > 0 })
             {
@@ -102,9 +100,7 @@ internal static class KoanConsoleBlocks
             }
         }
 
-        var elections = runtimeFacts?.Facts
-            .Where(fact => fact.Kind == KoanFactKind.Election && fact.State == KoanFactState.Selected)
-            .ToArray() ?? [];
+        var elections = factView.Decisions;
         if (elections.Length > 0)
         {
             builder.AddLine("");
@@ -113,10 +109,16 @@ internal static class KoanConsoleBlocks
                 builder.AddLine(FormatKeyValue(election.Subject, election.Summary));
         }
 
-        var diagnosticIssues = runtimeFacts?.Facts
-            .Where(fact => fact.Code != Constants.Diagnostics.Codes.ModuleRejected
-                && (fact.State is KoanFactState.Degraded or KoanFactState.Rejected or KoanFactState.CollectionFailed))
-            .ToArray() ?? [];
+        var guarantees = factView.Guarantees;
+        if (guarantees.Length > 0)
+        {
+            builder.AddLine("");
+            builder.AddLine(FormatSectionDivider("Guarantees"));
+            foreach (var guarantee in guarantees)
+                builder.AddLine(FormatKeyValue(guarantee.Subject, guarantee.Summary));
+        }
+
+        var diagnosticIssues = factView.Diagnostics;
         if (diagnosticIssues.Length > 0)
         {
             builder.AddLine("");
@@ -232,14 +234,14 @@ internal static class KoanConsoleBlocks
         return string.Join(" → ", segments.Select(s => $"{s.Label}({FormatDuration(s.Duration)})"));
     }
 
-    private static string FormatInitializerSummary(RegistrySummarySnapshot summary)
+    private static string FormatModuleSummary(RegistrySummarySnapshot summary)
     {
         var builder = new StringBuilder();
-        builder.Append(summary.Initializers);
+        builder.Append(summary.Modules);
 
-        if (summary.Initializers > 0 && summary.InitializerBreakdown.Count > 0)
+        if (summary.Modules > 0 && summary.ModuleBreakdown.Count > 0)
         {
-            var ordered = summary.InitializerBreakdown
+            var ordered = summary.ModuleBreakdown
                 .OrderByDescending(item => item.Count)
                 .ThenBy(item => item.Namespace, StringComparer.OrdinalIgnoreCase)
                 .Take(4)
@@ -253,9 +255,9 @@ internal static class KoanConsoleBlocks
             {
                 builder.Append(" (");
                 builder.Append(string.Join(", ", breakdown));
-                if (summary.InitializerBreakdown.Count > breakdown.Length)
+                if (summary.ModuleBreakdown.Count > breakdown.Length)
                 {
-                    builder.Append($", +{summary.InitializerBreakdown.Count - breakdown.Length}");
+                    builder.Append($", +{summary.ModuleBreakdown.Count - breakdown.Length}");
                 }
                 builder.Append(')');
             }

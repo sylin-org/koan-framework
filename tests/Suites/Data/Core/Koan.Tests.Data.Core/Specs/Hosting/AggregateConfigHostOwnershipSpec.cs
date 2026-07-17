@@ -138,9 +138,6 @@ public sealed class AggregateConfigHostOwnershipSpec
 
         public IServiceProvider? LastServices => Volatile.Read(ref _lastServices);
 
-        public bool CanHandle(string provider)
-            => string.Equals(provider, ProviderId, StringComparison.OrdinalIgnoreCase);
-
         public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
             where TEntity : class, IEntity<TKey>
             where TKey : notnull

@@ -14,7 +14,7 @@ using Swashbuckle.AspNetCore.SwaggerUI;
 namespace Koan.Web.Connector.Swagger.Hosting;
 
 // Auto-register Swagger when the assembly is referenced
-// Startup filter remains; auto-registration is provided via Initialization/KoanAutoRegistrar.
+// Startup filter remains; OpenApiModule owns its registration.
 
 internal sealed class KoanSwaggerStartupFilter : IStartupFilter
 {

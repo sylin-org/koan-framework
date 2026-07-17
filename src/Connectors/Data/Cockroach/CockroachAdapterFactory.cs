@@ -13,7 +13,7 @@ namespace Koan.Data.Connector.Cockroach;
 
 // CockroachDB speaks the PostgreSQL wire protocol (Npgsql) + nearly the same SQL dialect, so this adapter REUSES
 // the Postgres connector's repository/dialect/DDL (ARCH-0094 §2.4). Priority 13 is distinct from Postgres (14);
-// CanHandle answers only cockroach/cockroachdb (the `npgsql` alias stays with the Postgres factory, so an app that
+// Its identities are only cockroach/cockroachdb (the `npgsql` alias stays with the Postgres factory, so an app that
 // references both connectors resolves each engine unambiguously). pg-wire default port is 26257 on Cockroach.
 [ProviderPriority(13)]
 [KoanService(ServiceKind.Database, shortCode: "cockroach", name: "CockroachDB",
@@ -28,10 +28,7 @@ namespace Koan.Data.Connector.Cockroach;
 public sealed class CockroachAdapterFactory : IDataAdapterFactory
 {
     public string Provider => "cockroach";
-
-    public bool CanHandle(string provider)
-        => string.Equals(provider, "cockroach", StringComparison.OrdinalIgnoreCase)
-           || string.Equals(provider, "cockroachdb", StringComparison.OrdinalIgnoreCase);
+    public IReadOnlyCollection<string> Aliases => ["cockroachdb"];
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,
@@ -48,7 +45,7 @@ public sealed class CockroachAdapterFactory : IDataAdapterFactory
         // relies on discovery and resolves to "auto") collapses onto the discovery-resolved base connection, so a
         // routed source never keys its store on the unresolved sentinel (ARCH-0103 P5 fleet hoist).
         var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "Cockroach", source, baseOpts.ConnectionString, CanHandle);
+            config, sourceRegistry, "Cockroach", source, baseOpts.ConnectionString, this);
 
         // Create source-specific options
         var sourceOpts = new CockroachOptions

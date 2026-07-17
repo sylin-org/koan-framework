@@ -26,8 +26,6 @@
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Vector\InMemory\Koan.Data.Vector.Connector.InMemory.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Storage\Koan.Storage.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Connectors\Messaging\InMemory\Koan.Messaging.Connector.InMemory.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Web\Koan.Web.csproj" />

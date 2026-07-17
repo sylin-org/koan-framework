@@ -5,12 +5,15 @@ using System.Threading.Tasks;
 using Koan.AI.Contracts.Adapters;
 using Koan.Core.Logging;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.AI.Initialization;
 
-internal sealed class AiAdapterContributorInitializer : IHostedService
+/// <summary>
+/// Compiles every referenced AI connector contribution into this host's adapter and source registries.
+/// The AI module owns when this runs; connectors only describe their contribution.
+/// </summary>
+internal sealed class AiAdapterContributorInitializer
 {
     private readonly IEnumerable<IAiAdapterContributor> _contributors;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -26,7 +29,7 @@ internal sealed class AiAdapterContributorInitializer : IHostedService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public async Task Initialize(CancellationToken cancellationToken)
     {
         foreach (var contributor in _contributors)
         {
@@ -53,9 +56,8 @@ internal sealed class AiAdapterContributorInitializer : IHostedService
             {
                 KoanLog.BootWarning(_logger, "ai.contributors", "failed", ("contributor", contributorName), ("reason", ex.Message));
                 KoanLog.BootDebug(_logger, "ai.contributors", "failed-detail", ("contributor", contributorName), ("exception", ex.ToString()));
+                throw;
             }
         }
     }
-
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

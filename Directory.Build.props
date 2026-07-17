@@ -25,6 +25,10 @@
     yet at props-evaluation time. MSBuildProjectName is always defined.
   -->
   <PackageId Condition="'$(IsPackable)' != 'false' and '$(PackageId)' == ''">Sylin.$(MSBuildProjectName)</PackageId>
+  <!-- R09-08: the standard package identity is also the module identity. Non-packable projects
+       fall back to the SDK's ordinary project/assembly name; module authors declare no Koan ID. -->
+  <KoanModuleIdentity Condition="'$(PackageId)' != ''">$(PackageId)</KoanModuleIdentity>
+  <KoanModuleIdentity Condition="'$(KoanModuleIdentity)' == ''">$(MSBuildProjectName)</KoanModuleIdentity>
   <!-- Common NuGet package metadata -->
   <Authors>Sylin Labs</Authors>
   <Company>Sylin Labs</Company>
@@ -49,6 +53,9 @@
   <LangVersion Condition="'$(LangVersion)' == ''">latestMajor</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+  <CompilerVisibleProperty Include="PackageId" />
+  <CompilerVisibleProperty Include="IsTestProject" />
+  <AssemblyMetadata Include="KoanModuleIdentity" Value="$(KoanModuleIdentity)" />
   <!-- SourceLink for better debugging experience on NuGet -->
   <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   <!-- ARCH-0085: Nerdbank.GitVersioning is the single version source — Version / AssemblyVersion /

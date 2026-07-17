@@ -17,6 +17,7 @@ using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Core.Semantics;
 using Koan.Data.Relational;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
@@ -137,7 +138,9 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         // Comparable-encoding contract (DATA-0100): DateTimeOffset -> UTC-ISO text, TimeSpan -> ticks,
         // DateOnly/TimeOnly -> fixed text, so stored values are order-preserving and match the filter
         // comparand (which SqlFilterTranslator encodes identically).
-        ComparableScalarEncoding.Apply(_json);
+        ComparableScalarEncoding.Apply(
+            _json,
+            sp.GetRequiredService<DataSegmentationPlan>().For(typeof(TEntity)).Fields);
 
         // Log optimization strategy for diagnostics
         if (_optimizationInfo.IsOptimized)

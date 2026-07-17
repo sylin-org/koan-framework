@@ -44,11 +44,11 @@ internal sealed class MilvusOptionsConfigurator : AdapterOptionsConfigurator<Mil
 
     protected override void ConfigureProviderSpecific(MilvusOptions options)
     {
-        Logger?.LogInformation("Milvus Orchestration-Aware Configuration Started");
-        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
-            KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
-        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}', Endpoint: '{Endpoint}'",
-            options.ConnectionString, options.Endpoint);
+        LogConfiguration(LogLevel.Debug, "initial",
+            ("environment", KoanEnv.EnvironmentName),
+            ("orchestrationMode", KoanEnv.OrchestrationMode),
+            ("connection", options.ConnectionString),
+            ("endpoint", options.Endpoint));
 
         // Read Milvus-specific configuration
         var endpoint = ReadProviderConfiguration(options.Endpoint,
@@ -75,20 +75,20 @@ internal sealed class MilvusOptionsConfigurator : AdapterOptionsConfigurator<Mil
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            Logger?.LogInformation("Using explicit connection string from configuration");
+            LogConfiguration(LogLevel.Information, "explicit");
             options.ConnectionString = explicitConnectionString;
             options.Endpoint = explicitConnectionString; // For backward compatibility
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            Logger?.LogInformation("Auto-detection mode - using autonomous service discovery");
-            options.ConnectionString = ResolveAutonomousConnection(databaseName, username, password, token, Logger);
+            LogConfiguration(LogLevel.Information, "auto");
+            options.ConnectionString = ResolveAutonomousConnection(databaseName, username, password, token);
             options.Endpoint = options.ConnectionString; // For backward compatibility
         }
         else
         {
-            Logger?.LogInformation("Using pre-configured connection string");
+            LogConfiguration(LogLevel.Information, "preconfigured");
             options.Endpoint = options.ConnectionString; // For backward compatibility
         }
 
@@ -138,31 +138,29 @@ internal sealed class MilvusOptionsConfigurator : AdapterOptionsConfigurator<Mil
             Infrastructure.Constants.Configuration.Keys.AutoCreate,
             Infrastructure.Constants.Configuration.Keys.AutoCreateCollection);
 
-        Logger?.LogInformation("Final Milvus Configuration");
-        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
-        Logger?.LogInformation("Endpoint: {Endpoint}", options.Endpoint);
-        Logger?.LogInformation("Database: {Database}", options.DatabaseName);
-        Logger?.LogInformation("Milvus Orchestration-Aware Configuration Complete");
+        LogConfiguration(LogLevel.Information, "final",
+            ("connection", options.ConnectionString),
+            ("endpoint", options.Endpoint),
+            ("database", options.DatabaseName));
     }
 
     private string ResolveAutonomousConnection(
         string? databaseName,
         string? username,
         string? password,
-        string? token,
-        ILogger? logger)
+        string? token)
     {
         try
         {
             if (IsAutoDetectionDisabled())
             {
-                logger?.LogInformation("Auto-detection disabled via configuration - using localhost");
+                LogDiscovery(LogLevel.Information, "disabled", ("fallback", "http://localhost:19530"));
                 return "http://localhost:19530";
             }
 
             if (_discoveryCoordinator == null)
             {
-                logger?.LogWarning("Service discovery coordinator not available, falling back to localhost");
+                LogDiscovery(LogLevel.Warning, "coordinator-missing", ("fallback", "http://localhost:19530"));
                 return "http://localhost:19530";
             }
 
@@ -189,18 +187,18 @@ internal sealed class MilvusOptionsConfigurator : AdapterOptionsConfigurator<Mil
 
             if (result.IsSuccessful)
             {
-                logger?.LogInformation("Milvus discovered via autonomous discovery: {ServiceUrl}", result.ServiceUrl);
+                LogDiscovery(LogLevel.Information, "success", ("url", result.ServiceUrl));
                 return result.ServiceUrl;
             }
             else
             {
-                logger?.LogWarning("Autonomous Milvus discovery failed, falling back to localhost");
+                LogDiscovery(LogLevel.Warning, "fallback", ("reason", result.ErrorMessage), ("fallback", "http://localhost:19530"));
                 return "http://localhost:19530";
             }
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Error in autonomous Milvus discovery, falling back to localhost");
+            LogDiscovery(LogLevel.Error, "exception", ("error", ex), ("fallback", "http://localhost:19530"));
             return "http://localhost:19530";
         }
     }

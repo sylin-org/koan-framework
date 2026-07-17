@@ -208,7 +208,7 @@ internal sealed class RedisCacheCommunicationAdapter : ICommunicationAdapter
                 if (payload is null) continue;
                 foreach (var binding in bindings)
                 {
-                    await host.Dispatch(binding.Id, payload, ContextIngressTrust.Authenticated, ct)
+                    await host.Dispatch(binding.Id, payload, ct)
                         .ConfigureAwait(false);
                 }
             }

@@ -3,7 +3,7 @@ namespace Koan.Data.Core.Pipeline;
 /// <summary>
 /// The boot-time index of external <see cref="WriteStampContributor"/>s (DATA-0105 §0 / ARCH-0098 §0) — the "open
 /// slot" on the write-stamp stage. A cross-cutting module registers its contributor from its
-/// <c>KoanAutoRegistrar.Initialize</c> (Reference = Intent); <see cref="StorageWritePlan.Build"/> reads them
+/// <c>KoanModule.Register</c> (Reference = Intent); <see cref="StorageWritePlan.Build"/> reads them
 /// generically and never names the axis. Mirrors <c>ManagedFieldRegistry</c>'s mechanics (static boot index,
 /// <see cref="IsEmpty"/> volatile off-gate making the off path byte-identical, idempotent registration).
 ///

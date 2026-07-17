@@ -26,6 +26,18 @@ public sealed class TransportCompositionAndLifetimeSpec
             fact.Code == "koan.communication.context.carriage"
             && fact.Subject == "communication:context");
         facts.Facts.Should().Contain(fact =>
+            fact.Code == "koan.communication.context.guarantees"
+            && fact.Subject == "communication:transport:default:context"
+            && fact.Kind == KoanFactKind.Guarantee
+            && fact.Summary.Contains("host-trusted", StringComparison.Ordinal)
+            && fact.Summary.Contains("provider-shared", StringComparison.Ordinal)
+            && fact.Summary.Contains("does not provide payload confidentiality", StringComparison.Ordinal));
+        facts.Facts.Should().Contain(fact =>
+            fact.Code == "koan.segmentation.realization.active"
+            && fact.Subject == "segmentation:communication"
+            && fact.Kind == KoanFactKind.Guarantee
+            && fact.Summary.Contains("typed-context-carriage", StringComparison.Ordinal));
+        facts.Facts.Should().Contain(fact =>
             fact.Code == "koan.communication.transport.bounds"
             && fact.Subject == "communication:transport:bounds"
             && fact.Summary.Contains("process-memory", StringComparison.Ordinal)

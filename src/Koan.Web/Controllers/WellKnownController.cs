@@ -102,8 +102,6 @@ public sealed class WellKnownController(
 
         var items = aggregates.Select(x =>
         {
-            var provider = KoanWebHelpers.ResolveProvider(x.Type, sp);
-
             string[] query = [], write = [];
 
             if (data is not null)
@@ -126,6 +124,10 @@ public sealed class WellKnownController(
                         .LogDebug(ex, "Capability self-report failed for {AggregateType}; reporting empty query/write tokens.", x.Type.FullName);
                 }
             }
+
+            // Report the provider observed by Data's canonical runtime path. Diagnostics must never
+            // independently elect a provider or imply that an unavailable decoration succeeded.
+            var provider = KoanWebHelpers.ResolveObservedProvider(x.Type, x.KeyType, sp);
 
             return new
             {

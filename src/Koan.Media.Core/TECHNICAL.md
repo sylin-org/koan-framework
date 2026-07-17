@@ -2,10 +2,10 @@
 
 ## Startup
 
-`Koan.Media.Core.Initialization.KoanAutoRegistrar` is a `KoanModule`. Registration binds the
+`Koan.Media.Core.Initialization.MediaCoreModule` is the package's `KoanModule`. Registration binds the
 `Koan:Media` options root and installs one `IMediaRecipeRegistry`. `Start()` resolves and materializes the
-catalog so recipe binding errors fail host startup. `MediaCompositionContributor` separately reports the
-valid catalog through the fail-soft runtime-facts seam.
+catalog so recipe binding errors fail host startup. The same retained module invokes
+`MediaCompositionFacts` to report the valid catalog through the fail-soft runtime-facts seam.
 
 ## Recipe resolution
 

@@ -10,6 +10,7 @@ using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Data.Core.KeyValue;
+using Koan.Data.Core.Semantics;
 using System.Collections.Concurrent;
 
 namespace Koan.Data.Connector.Json;
@@ -37,6 +38,7 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
         NullValueHandling = NullValueHandling.Include,
     };
     private readonly JsonSerializer _serializer;
+    private readonly IReadOnlyList<DataSegmentationField> _segmentationFields;
     private readonly string _baseDir;
     // Per-physical-name (partition) stores + file paths so different partitions are isolated within this source's dir.
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<TKey, KvRecord<TEntity>>> _stores = new();
@@ -46,11 +48,12 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
     // in-memory store stays the read source of truth; this just serializes the write-through snapshots per file.
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _writeGates = new();
 
-    public JsonRepository(IOptions<JsonDataOptions> options)
+    public JsonRepository(IOptions<JsonDataOptions> options, DataSegmentationPlan segmentation)
     {
         _baseDir = options.Value.DirectoryPath;
         Directory.CreateDirectory(_baseDir);
         _serializer = JsonSerializer.Create(_json);
+        _segmentationFields = segmentation.For(typeof(TEntity)).Fields;
     }
 
     // ==================== Backend primitives ====================
@@ -167,7 +170,7 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
                 if (token is not JObject jo) continue;
                 // Extract the managed __-keys back into the envelope's sidecar (null off-axis), then deserialize the
                 // entity (it ignores the unknown __-keys, exactly as the relational read does).
-                var managed = ManagedFieldJsonInjector.ExtractManaged(jo, typeof(TEntity));
+                var managed = ManagedFieldJsonInjector.ExtractManaged(jo, typeof(TEntity), _segmentationFields);
                 var entity = jo.ToObject<TEntity>(_serializer);
                 if (entity is null) continue;
                 store[entity.Id] = new KvRecord<TEntity>(entity, managed);

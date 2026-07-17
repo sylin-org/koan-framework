@@ -5,11 +5,13 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
 using Koan.Data.Core.Axes;
 using Koan.Data.Core.Model;
 using Koan.Tenancy.Tests.Support;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Tenancy.Tests;
 
@@ -167,6 +169,39 @@ public sealed class AssertNoTenantLeakSpec
         {
             var act = async () => await Note.QueryRaw("SELECT Id, Json FROM Note");
             await act.Should().ThrowAsync<NotSupportedException>();
+        }
+    }
+
+    [Fact(DisplayName = "no tenant leak: opaque instructions fail before they can clear another tenant's rows")]
+    public async Task Opaque_instruction_fails_closed_under_a_tenant_scope()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"));
+        runtime.ResetEntityCaches();
+        using var _iso = Isolate();
+
+        Note row;
+        using (Tenant.Use("globex")) row = await new Note { Title = "keep" }.Save();
+
+        using (Tenant.Use("acme"))
+        {
+            var act = async () => await Data<Note, string>.Execute<int>(new Instruction(DataInstructions.Clear));
+            await act.Should().ThrowAsync<NotSupportedException>().WithMessage("*compiled segmentation guarantee*");
+        }
+
+        using (Tenant.Use("globex")) (await Note.Get(row.Id)).Should().NotBeNull();
+    }
+
+    [Fact(DisplayName = "no tenant leak: Direct rejects a segmented operation before opening a provider connection")]
+    public async Task Direct_fails_closed_under_a_tenant_scope()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"));
+        runtime.ResetEntityCaches();
+
+        using (Tenant.Use("acme"))
+        {
+            var direct = runtime.Services.GetRequiredService<IDataService>().Direct(adapter: "sqlite");
+            var act = async () => await direct.Scalar<long>("SELECT 1");
+            await act.Should().ThrowAsync<NotSupportedException>().WithMessage("*Direct data operations*compiled segmentation guarantee*");
         }
     }
 

@@ -195,7 +195,7 @@ internal static class MongoConnectionString
     /// <summary>
     /// Resolves the effective connection string for a routed (non-Default) source. A blank or
     /// <c>"auto"</c> resolved value means the source carries no usable connection of its own and relies on
-    /// runtime discovery — but <see cref="AdapterConnectionResolver"/> works from raw configuration and
+    /// runtime discovery — but <see cref="Koan.Data.Core.AdapterConnectionResolver"/> works from raw configuration and
     /// cannot return the discovery-resolved string, so it yields the literal <c>"auto"</c>. In that case
     /// fall back to <paramref name="resolvedDefault"/> (the Default options' already-discovery-resolved
     /// connection) rather than keying a per-source client pool on an unusable string. Otherwise the

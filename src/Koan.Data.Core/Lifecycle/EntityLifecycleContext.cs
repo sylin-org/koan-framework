@@ -15,7 +15,7 @@ public sealed class EntityLifecycleContext<TEntity> where TEntity : class
     internal EntityLifecycleContext(
         TEntity current,
         EntityLifecycleOperation operation,
-        EntityLifecyclePrior<TEntity> prior,
+        TEntity? prior,
         CancellationToken cancellationToken)
     {
         Current = current ?? throw new ArgumentNullException(nameof(current));
@@ -26,7 +26,8 @@ public sealed class EntityLifecycleContext<TEntity> where TEntity : class
 
     public TEntity Current { get; internal set; }
     public EntityLifecycleOperation Operation { get; }
-    public EntityLifecyclePrior<TEntity> Prior { get; }
+    /// <summary>The persisted value captured before this operation began, or null for a new entity.</summary>
+    public TEntity? Prior { get; }
     public CancellationToken CancellationToken { get; }
     public IDictionary<string, object?> Items => _items;
 

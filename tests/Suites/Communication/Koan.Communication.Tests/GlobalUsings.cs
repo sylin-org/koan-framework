@@ -4,6 +4,7 @@ global using Koan.Communication.Adapters;
 global using Koan.Core;
 global using Koan.Core.Hosting.App;
 global using Koan.Data.Core.Model;
+global using Koan.Data.Abstractions;
 global using Koan.Testing.Integration;
 global using Microsoft.Extensions.DependencyInjection;
 global using Xunit;

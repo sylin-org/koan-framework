@@ -131,7 +131,7 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddKoanZenGarden(configure: options =>
+        services.AddZenGardenRuntime(configure: options =>
         {
             options.Endpoint = _fixture.Endpoint;
             options.EnableDiscovery = true;

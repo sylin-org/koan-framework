@@ -8,14 +8,9 @@ Greenfield Zen Garden tools-domain runtime for Koan applications.
 
 ```csharp
 using Koan.ZenGarden;
-using Koan.ZenGarden.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
-builder.Services.AddKoanZenGarden(configure: options =>
-{
-    options.EnableDiscovery = true;
-});
 
 using var mongodbSub = ZenGarden.Offering.On(
     "mongodb",
@@ -39,6 +34,10 @@ using var storageSub = ZenGarden.Storage.On(
         // React to seed-bank readiness changes.
     });
 ```
+
+Referencing `Koan.ZenGarden` is the activation decision. `AddKoan()` registers the runtime and compiles
+its optional discovery source; no module-specific activation call is required. Configure non-default
+behavior under `Koan:ZenGarden`.
 
 ## API Surface
 
@@ -195,7 +194,7 @@ Flow:
    - subscription (`ZenGarden.Offering.On(...)`)
    - explicit wish (`ZenGarden.Capability.Wish(...)`)
    - initialization URI (`zen-garden://<offering>?cap=...`)
-2. `IZenGardenInitializationProvider.ResolveAsync(intent)` resolves the best ready offering candidate.
+2. `IZenGardenInitializationProvider.Resolve(intent)` resolves the best ready offering candidate.
 3. If requested capabilities are missing, the provider schedules wishful ensures internally (throttled/deduped) and returns immediately.
 4. Startup continues without waiting for fulfillment.
 5. SSE stream updates drive:
@@ -340,7 +339,7 @@ Capability notes:
 Resolution order:
 
 1. Explicit native connection string -> pass-through.
-2. `zen-garden://...` -> resolve via Zen Garden first, then connector autonomous discovery fallback.
+2. Explicit `zen-garden://...` -> resolve through the active Zen Garden source or fail correctively; explicit intent never becomes localhost or another provider.
 3. `auto` or empty without the `Koan.ZenGarden` engine -> the connector's normal discovery path.
 4. `auto` or empty with the engine activated -> Zen Garden contributes an automatic, health-checked
    candidate to the concern-owned coordinator; the connector still elects and may fall through.
@@ -353,16 +352,16 @@ Selector note:
 ### MongoDB adapter behavior
 
 - Default auto path (`ConnectionString` empty or `auto`):
-  - runs the health-checked discovery probe; Zen Garden **contributes** its resolved `mongodb`
-    endpoint as one candidate (`IDiscoveryCandidateContributor`), tried ahead of the
+  - runs the health-checked discovery probe; the compiled Zen Garden source offers its resolved `mongodb`
+    endpoint as one candidate, tried ahead of the
     compose-name / `host.docker.internal` / `localhost` guesses but **health-checked like all of
     them** — so an unreachable ZG answer (e.g. a same-host offering advertised on an interface the
     app can't reach) falls through instead of stranding the app. Zen Garden informs discovery here;
     it no longer short-circuits it.
-- Explicit Zen Garden URI path (unchanged — resolves ZG directly, honoring your explicit offering/instance):
+- Explicit Zen Garden URI path (honors the requested offering/instance through the required discovery path):
   - `Koan:Data:Mongo:ConnectionString = "zen-garden://mongodb"`
   - `Koan:Data:Mongo:ConnectionString = "zen-garden://mongodb:dev"`
-  - unresolved intent falls back to Mongo autonomous discovery
+  - unresolved, unavailable, or unhealthy intent fails with a correction; it never falls back autonomously
 
 To pin a non-default offering or instance for the auto path, use the explicit
 `zen-garden://<offering>:<instance>` connection string above. (The former per-adapter
@@ -375,7 +374,8 @@ removed when Zen Garden became a discovery contributor.)
   - `Koan:Ai:Ollama:ConnectionString = "zen-garden://ollama?cap=llama3.2,nomic-embed-text"`
 - Explicit URL list still works, and each URL can also be a Zen Garden URI:
   - `Koan:Ai:Ollama:Urls:0 = "zen-garden://ollama"`
-- Auto path (no explicit members, or unresolved explicit intent):
+- An explicit Zen Garden member that cannot resolve fails correctively; it is not replaced by local discovery or `AdditionalUrls`.
+- Auto path (no explicit members):
   - resolves `ollama` through Zen Garden first
   - forwards requested capability intent to Zen Garden initialization provider
   - provider handles wishful ensure scheduling centrally and continues startup non-blocking
@@ -395,26 +395,6 @@ Non-blocking behavior:
 - Applications should gate feature activation on progress or on offering capability availability events.
 
 ## Configuration
-
-```csharp
-builder.Services.AddKoanZenGarden(configure: options =>
-{
-    options.Endpoint = "http://stone-01:7185"; // optional explicit override
-    options.EnableDiscovery = true;
-    options.DiscoveryTimeoutSeconds = 3;
-    options.DiscoveryPort = 7184;
-    options.DiscoveryMulticastGroup = "239.255.42.99";
-    options.DiscoveryCacheTtlSeconds = 90;
-    options.DiscoveryEnableBroadcastFallback = true;
-    options.DiscoveryEnableLimitedBroadcast = false;
-    options.HttpTimeoutSeconds = 30;
-    options.StreamReconnectDelaySeconds = 3;
-    options.DedupeWindowSize = 4096;
-    options.RequireHostMossWhenContainerized = true;
-    options.ContainerHost = "host.docker.internal";
-    options.ContainerHostPort = 7185;
-});
-```
 
 Configuration section:
 

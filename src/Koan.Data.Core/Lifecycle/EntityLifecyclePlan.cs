@@ -86,7 +86,7 @@ internal sealed class EntityLifecyclePlan<TEntity, TKey> : IEntityLifecyclePlan
         Freeze();
         if (!HasLoad) return entity;
         var context = new EntityLifecycleContext<TEntity>(
-            entity, EntityLifecycleOperation.Load, EntityLifecyclePrior<TEntity>.Empty, ct);
+            entity, EntityLifecycleOperation.Load, null, ct);
         await RunBefore(_beforeLoad, context).ConfigureAwait(false);
         await RunAfter(_afterLoad, context).ConfigureAwait(false);
         return context.Current;
@@ -98,8 +98,9 @@ internal sealed class EntityLifecyclePlan<TEntity, TKey> : IEntityLifecyclePlan
         CancellationToken ct)
     {
         Freeze();
+        var priorSnapshot = await prior(ct).ConfigureAwait(false);
         var context = new EntityLifecycleContext<TEntity>(
-            entity, EntityLifecycleOperation.Upsert, new EntityLifecyclePrior<TEntity>(prior), ct);
+            entity, EntityLifecycleOperation.Upsert, priorSnapshot, ct);
         await RunBefore(_beforeUpsert, context).ConfigureAwait(false);
         return context;
     }
@@ -113,8 +114,7 @@ internal sealed class EntityLifecyclePlan<TEntity, TKey> : IEntityLifecyclePlan
     internal async ValueTask<EntityLifecycleContext<TEntity>> BeginRemove(TEntity entity, CancellationToken ct)
     {
         Freeze();
-        var prior = new EntityLifecyclePrior<TEntity>(_ => new ValueTask<TEntity?>(entity));
-        var context = new EntityLifecycleContext<TEntity>(entity, EntityLifecycleOperation.Remove, prior, ct);
+        var context = new EntityLifecycleContext<TEntity>(entity, EntityLifecycleOperation.Remove, entity, ct);
         await RunBefore(_beforeRemove, context).ConfigureAwait(false);
         return context;
     }

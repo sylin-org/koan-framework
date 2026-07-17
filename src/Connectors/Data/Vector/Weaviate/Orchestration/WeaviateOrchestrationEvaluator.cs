@@ -85,7 +85,7 @@ public class WeaviateOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         try
         {
-            Logger?.LogDebug("[Weaviate] Validating credentials for host: {Host}", hostResult.HostEndpoint);
+            ReportCredentialValidation("start", ("host", hostResult.HostEndpoint));
 
             // Build Weaviate endpoint URL for validation
             var weaviateUrl = EnsureHttpUrl(hostResult.HostEndpoint!);
@@ -93,12 +93,12 @@ public class WeaviateOrchestrationEvaluator : BaseOrchestrationEvaluator
             // Try to access the Weaviate API
             var isValid = await TryWeaviateConnection(weaviateUrl);
 
-            Logger?.LogDebug("[Weaviate] Credential validation result: {IsValid}", isValid);
+            ReportCredentialValidation(isValid ? "accepted" : "rejected");
             return isValid;
         }
         catch (Exception ex)
         {
-            Logger?.LogDebug(ex, "[Weaviate] Error validating host credentials");
+            ReportCredentialValidation("failed", ("error", ex));
             return false;
         }
     }

@@ -9,9 +9,9 @@ using Microsoft.Extensions.Options;
 
 namespace Koan.Communication.Composition;
 
-internal sealed class CommunicationCompositionContributor : IKoanCompositionContributor
+internal static class CommunicationCompositionFacts
 {
-    public void Contribute(KoanCompositionBuilder builder, IServiceProvider services)
+    public static void Project(KoanCompositionBuilder builder, IServiceProvider services, string source)
     {
         var handlers = services.GetService<CommunicationHandlerCatalog>();
         var carriers = services.GetService<KoanContextCarrierRegistry>();
@@ -30,11 +30,8 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
         {
             var subject = Constants.Diagnostics.Subjects.TransportFor(transport.Channel);
             builder.AddElection(
-                subject,
-                transport.AdapterId,
-                transport.Reason,
-                transport.Priority,
-                source: typeof(CommunicationCompositionContributor).FullName,
+                transport.Receipt,
+                source: source,
                 factCode: Constants.Diagnostics.Codes.TransportSelected);
             var transportCapabilities = new List<string>
             {
@@ -59,17 +56,15 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
                 transportCapabilities.Add(Constants.Diagnostics.Capabilities.RemoteSettlementUnobservable);
             }
             builder.AddCapability(subject, transportCapabilities);
+            AddContextGuarantees(builder, transport, "transport", source);
         }
 
         foreach (var events in eventRoutes)
         {
             var subject = Constants.Diagnostics.Subjects.EventsFor(events.Channel);
             builder.AddElection(
-                subject,
-                events.AdapterId,
-                events.Reason,
-                events.Priority,
-                source: typeof(CommunicationCompositionContributor).FullName,
+                events.Receipt,
+                source: source,
                 factCode: Constants.Diagnostics.Codes.EventsSelected);
             var eventCapabilities = new List<string>
             {
@@ -87,6 +82,7 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
                 eventCapabilities.Add(Constants.Diagnostics.Capabilities.EventBoundedIngress);
             }
             builder.AddCapability(subject, eventCapabilities);
+            AddContextGuarantees(builder, events, "events", source);
         }
         builder.AddConfigKey(Constants.Configuration.InProcessCapacity);
         builder.AddConfigKey(Constants.Configuration.MaxPayloadBytes);
@@ -96,13 +92,11 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
         builder.AddConfigKey(Constants.Configuration.FrameworkBroadcastsProvider);
         builder.AddConfigKey(Constants.Configuration.Channels);
 
-        builder.AddElection(
-            Constants.Diagnostics.Subjects.FrameworkSignals,
-            frameworkSignals?.AdapterId ?? Constants.Transport.InProcessAdapter,
-            frameworkSignals?.Reason ?? Constants.Diagnostics.Reasons.BuiltInFloor,
-            frameworkSignals?.Priority,
-            source: typeof(CommunicationCompositionContributor).FullName,
-            factCode: Constants.Diagnostics.Codes.FrameworkSignalsSelected);
+        if (frameworkSignals is not null)
+            builder.AddElection(
+                frameworkSignals.Receipt,
+                source: source,
+                factCode: Constants.Diagnostics.Codes.FrameworkSignalsSelected);
         builder.AddCapability(
             Constants.Diagnostics.Subjects.FrameworkSignals,
             [
@@ -121,15 +115,13 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
             $"Koan registered {signalBindings.Length} internal framework-signal group(s); " +
             "signals are bounded latency hints and are not an application Messaging API.",
             Constants.Diagnostics.Reasons.TypedDiscovery,
-            typeof(CommunicationCompositionContributor).FullName);
+            source);
 
-        builder.AddElection(
-            Constants.Diagnostics.Subjects.FrameworkBroadcasts,
-            frameworkBroadcasts?.AdapterId ?? Constants.Transport.InProcessAdapter,
-            frameworkBroadcasts?.Reason ?? Constants.Diagnostics.Reasons.BuiltInFloor,
-            frameworkBroadcasts?.Priority,
-            source: typeof(CommunicationCompositionContributor).FullName,
-            factCode: Constants.Diagnostics.Codes.FrameworkBroadcastsSelected);
+        if (frameworkBroadcasts is not null)
+            builder.AddElection(
+                frameworkBroadcasts.Receipt,
+                source: source,
+                factCode: Constants.Diagnostics.Codes.FrameworkBroadcastsSelected);
         builder.AddCapability(
             Constants.Diagnostics.Subjects.FrameworkBroadcasts,
             [
@@ -147,7 +139,7 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
             $"Koan registered {broadcastBindings.Length} node-scoped framework-broadcast binding(s); " +
             "each active node within provider reach receives its own copy.",
             Constants.Diagnostics.Reasons.TypedDiscovery,
-            typeof(CommunicationCompositionContributor).FullName);
+            source);
         if (options is not null)
         {
             foreach (var transport in transportRoutes)
@@ -163,7 +155,7 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
                         $"{options.InProcessCapacity}-snapshot queue, and a " +
                         $"{options.MaxPayloadBytes}-byte publication limit.",
                         Constants.Diagnostics.Reasons.BoundedProcessMemory,
-                        typeof(CommunicationCompositionContributor).FullName);
+                        source);
                 }
                 else
                 {
@@ -175,7 +167,7 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
                         $"{(transport.Adapter.Descriptor.SettlementObservable ? "observable" : "not observable")} " +
                         "by the publisher.",
                         transport.Reason,
-                        typeof(CommunicationCompositionContributor).FullName);
+                        source);
                 }
             }
 
@@ -191,7 +183,7 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
                     events.Adapter.Descriptor.IsBuiltIn
                         ? Constants.Diagnostics.Reasons.BoundedProcessMemory
                         : events.Reason,
-                    typeof(CommunicationCompositionContributor).FullName);
+                    source);
             }
         }
 
@@ -202,7 +194,7 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
             $"Koan discovered {bindings.Count} typed Entity Transport receiver group(s) across " +
             $"{transportRoutes.Length} declared channel(s).",
             Constants.Diagnostics.Reasons.TypedDiscovery,
-            typeof(CommunicationCompositionContributor).FullName);
+            source);
         foreach (var binding in bindings)
         {
             foreach (var route in transportRoutes)
@@ -213,7 +205,7 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
                     $"{binding.GroupIdentity} receives isolated {binding.EntityType.FullName} snapshots on " +
                     $"Transport/{route.Channel} through '{route.AdapterId}'.",
                     Constants.Diagnostics.Reasons.TypedDiscovery,
-                    typeof(CommunicationCompositionContributor).FullName);
+                    source);
             }
         }
 
@@ -225,7 +217,7 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
             $"{eventRoutes.Length} declared channel(s). " +
             "Zero subscriptions remain a valid zero-target occurrence.",
             Constants.Diagnostics.Reasons.TypedDiscovery,
-            typeof(CommunicationCompositionContributor).FullName);
+            source);
         foreach (var subscription in subscriptions)
         {
             var detailsPosture = Attribute.IsDefined(
@@ -243,7 +235,7 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
                     $"{subscription.EntityType.FullName} snapshots on Events/{route.Channel} through " +
                     $"'{route.AdapterId}' and {detailsPosture}.",
                     Constants.Diagnostics.Reasons.TypedDiscovery,
-                    typeof(CommunicationCompositionContributor).FullName);
+                    source);
             }
         }
 
@@ -253,6 +245,31 @@ internal sealed class CommunicationCompositionContributor : IKoanCompositionCont
             $"Entity Events and Transport capture and restore " +
             $"{carriers?.Descriptors.Count ?? 0} host context carrier(s).",
             Constants.Diagnostics.Reasons.HostContextCarriers,
-            typeof(CommunicationCompositionContributor).FullName);
+            source);
+    }
+
+    private static void AddContextGuarantees(
+        KoanCompositionBuilder builder,
+        CommunicationRouteDecision route,
+        string lane,
+        string source)
+    {
+        var subject = Constants.Diagnostics.Subjects.ContextGuaranteesFor(lane, route.Channel);
+        builder.AddCapability(subject,
+        [
+            Constants.Diagnostics.Capabilities.LogicalContextEnforced,
+            Constants.Diagnostics.Capabilities.TypedRouteSegmentation,
+            Constants.Diagnostics.Capabilities.SharedPhysicalTopology,
+            Constants.Diagnostics.Capabilities.ConfidentialityNotProvided,
+            $"context.ingress.{route.IngressTrust}"
+        ]);
+        builder.AddGuarantee(
+            Constants.Diagnostics.Codes.ContextGuarantees,
+            subject,
+            $"{lane}/{route.Channel} restores composed context at {route.IngressTrust} ingress and re-binds hard " +
+            "segmentation before application handlers; routing uses typed contract/groups, physical topology is " +
+            "provider-shared, and Communication does not provide payload confidentiality.",
+            Constants.Diagnostics.Reasons.ProviderTrustDeclaration,
+            source);
     }
 }

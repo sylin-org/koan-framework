@@ -21,11 +21,11 @@ public sealed class TransportContextAndFlowSpec
             tenantAcceptance = await new TenantOrder().Transport.Send(ct);
         }
 
-        var hostAcceptance = await new TenantOrder().Transport.Send(ct);
+        var unscoped = () => new TenantOrder().Transport.Send(ct);
+        await unscoped.Should().ThrowAsync<Koan.Core.Semantics.Segmentation.SegmentationRequiredException>();
         await tenantAcceptance.WaitForSettlement(ct);
-        await hostAcceptance.WaitForSettlement(ct);
 
-        state.TenantObservations.Should().Equal("tenant-a", null);
+        state.TenantObservations.Should().Equal("tenant-a");
         Tenant.Current.Should().BeNull();
     }
 

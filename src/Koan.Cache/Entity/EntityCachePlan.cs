@@ -1,6 +1,5 @@
 using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Primitives;
-using Koan.Cache.Keys;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core;
@@ -85,6 +84,10 @@ internal sealed class EntityCachePlan(
                     return $"read-scope axis '{managed[index].StorageName}' is not an equality key segment";
                 }
             }
+            if (managed.Count > 0)
+            {
+                return "a Data-local managed equality axis is not part of the compiled cross-pillar Cache identity";
+            }
         }
 
         foreach (var contributor in _readContributors)
@@ -136,7 +139,7 @@ internal sealed class EntityCachePlan(
                 return false;
             }
 
-            key = new CacheKey(ScopedEntityCacheKey.AppendScope(formatted, EntityType));
+            key = new CacheKey(formatted);
             return true;
         }
     }

@@ -36,12 +36,6 @@ public sealed class OpenSearchVectorAdapterFactory : IVectorAdapterFactory
 {
     public string Provider => "opensearch";
 
-    // DATA-0103 drift fix: removed the cross-claim on provider "elastic" — that alias belongs to the
-    // Elasticsearch factory (same ProviderPriority(20)), and both claiming it produced ambiguous
-    // provider resolution when both packages were referenced.
-    public bool CanHandle(string provider)
-        => string.Equals(provider, "opensearch", StringComparison.OrdinalIgnoreCase);
-
     // ARCH-0103 §4.1: accepts the routed source for contract alignment; per-source physical placement (per-index /
     // per-cluster) is realized in P4.
     public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")

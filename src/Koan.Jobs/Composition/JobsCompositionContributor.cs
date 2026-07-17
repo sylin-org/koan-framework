@@ -2,6 +2,7 @@ using Koan.Core.Composition;
 using Koan.Communication.Signals;
 using Koan.Jobs.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Koan.Core.Semantics.Segmentation;
 
 namespace Koan.Jobs.Composition;
 
@@ -9,9 +10,9 @@ namespace Koan.Jobs.Composition;
 /// Projects the host's elected Jobs ledger and Communication-backed wake path into Koan's shared composition facts.
 /// It deliberately reports semantic tiers rather than CLR implementation names.
 /// </summary>
-internal sealed class JobsCompositionContributor : IKoanCompositionContributor
+internal static class JobsCompositionFacts
 {
-    public void Contribute(KoanCompositionBuilder builder, IServiceProvider services)
+    public static void Project(KoanCompositionBuilder builder, IServiceProvider services, string source)
     {
         var ledger = services.GetService<IJobLedger>();
         if (ledger is not null)
@@ -21,7 +22,7 @@ internal sealed class JobsCompositionContributor : IKoanCompositionContributor
                 Constants.Diagnostics.Subjects.Ledger,
                 durable ? Constants.Diagnostics.Selections.DurableData : Constants.Diagnostics.Selections.InMemory,
                 durable ? Constants.Diagnostics.Reasons.DurableAdapter : Constants.Diagnostics.Reasons.NoDurableAdapter,
-                source: typeof(JobsCompositionContributor).FullName,
+                source: source,
                 factCode: Constants.Diagnostics.Codes.LedgerSelected);
         }
 
@@ -32,8 +33,30 @@ internal sealed class JobsCompositionContributor : IKoanCompositionContributor
                 Constants.Diagnostics.Subjects.Wake,
                 signals.ProviderId,
                 Constants.Diagnostics.Reasons.CommunicationSignal,
-                source: typeof(JobsCompositionContributor).FullName,
+                source: source,
                 factCode: Constants.Diagnostics.Codes.WakeSelected);
+        }
+
+        var segmentation = services.GetService<SegmentationPlan>();
+        if (segmentation is { IsEmpty: false })
+        {
+            builder.AddCapability(
+                Constants.Diagnostics.Subjects.Context,
+                [
+                    Constants.Diagnostics.Capabilities.LogicalContext,
+                    Constants.Diagnostics.Capabilities.SharedLedger,
+                    Constants.Diagnostics.Capabilities.WorkItemSegmentation,
+                    Constants.Diagnostics.Capabilities.AtLeastOnce,
+                    Constants.Diagnostics.Capabilities.ContextFreeWake
+                ]);
+            builder.AddGuarantee(
+                Constants.Diagnostics.Codes.ContextGuarantees,
+                Constants.Diagnostics.Subjects.Context,
+                "Jobs restores hard context at the host-trusted ledger boundary before work-item load and keeps it " +
+                "through handler and settle. The ledger is shared control-plane state, work-item isolation is Data-owned, " +
+                "execution is at-least-once, and the Communication wake is a context-free latency hint.",
+                Constants.Diagnostics.Reasons.DurableContext,
+                source);
         }
     }
 }

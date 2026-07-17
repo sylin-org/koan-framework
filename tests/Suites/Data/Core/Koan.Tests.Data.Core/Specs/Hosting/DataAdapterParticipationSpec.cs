@@ -96,10 +96,7 @@ public sealed class DataAdapterParticipationSpec
         private readonly NonIsolatingFakeAdapterFactory _inner = new();
 
         public string Provider => ProviderId;
-
-        public bool CanHandle(string provider)
-            => string.Equals(provider, ProviderId, StringComparison.OrdinalIgnoreCase)
-               || string.Equals(provider, Alias, StringComparison.OrdinalIgnoreCase);
+        public IReadOnlyCollection<string> Aliases => [Alias];
 
         public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
             IServiceProvider sp,

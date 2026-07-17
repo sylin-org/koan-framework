@@ -30,7 +30,8 @@ internal sealed class InProcessCommunicationRuntime : ICommunicationAdapter
         | CommunicationAdapterCapabilities.NodeFanOut,
         [],
         IsBuiltIn: true,
-        SettlementObservable: true);
+        SettlementObservable: true,
+        IngressTrust: ContextIngressTrust.HostTrusted);
 
     private readonly IReadOnlyDictionary<CommunicationLane, Channel<LocalPublication>> _channels;
     private readonly Dictionary<CommunicationLane, Task> _workers = [];
@@ -136,7 +137,6 @@ internal sealed class InProcessCommunicationRuntime : ICommunicationAdapter
                     var outcome = await _host!.Dispatch(
                             target.Id,
                             work.Publication.Payload,
-                            ContextIngressTrust.HostTrusted,
                             ct)
                         .ConfigureAwait(false);
                     Mark(work.Publication.Operation, outcome);

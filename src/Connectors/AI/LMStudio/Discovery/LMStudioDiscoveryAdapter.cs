@@ -73,45 +73,32 @@ internal sealed class LMStudioDiscoveryAdapter : ServiceDiscoveryAdapterBase
 
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        try
+        using var httpClient = new HttpClient { Timeout = context.HealthCheckTimeout };
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(context.HealthCheckTimeout);
+
+        var baseUri = new Uri(serviceUrl.TrimEnd('/'));
+        var modelsUri = new Uri(baseUri, Infrastructure.Constants.Discovery.ModelsPath);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, modelsUri);
+        AttachAuthHeader(context, request);
+
+        var response = await httpClient.SendAsync(request, cts.Token);
+        if (!response.IsSuccessStatusCode) return false;
+
+        var payload = await response.Content.ReadAsStringAsync(cts.Token);
+        if (context.Parameters != null &&
+            context.Parameters.TryGetValue("requiredModel", out var requiredModelObj) &&
+            requiredModelObj is string requiredModel &&
+            !string.IsNullOrWhiteSpace(requiredModel))
         {
-            using var httpClient = new HttpClient { Timeout = context.HealthCheckTimeout };
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(context.HealthCheckTimeout);
-
-            var baseUri = new Uri(serviceUrl.TrimEnd('/'));
-            var modelsUri = new Uri(baseUri, Infrastructure.Constants.Discovery.ModelsPath);
-
-            using var request = new HttpRequestMessage(HttpMethod.Get, modelsUri);
-            AttachAuthHeader(context, request);
-
-            var response = await httpClient.SendAsync(request, cts.Token);
-            if (!response.IsSuccessStatusCode)
+            if (!EndpointHasModel(payload, requiredModel))
             {
-                _logger.LogDebug("LM Studio health check failed for {Url}: {Status}", modelsUri, response.StatusCode);
                 return false;
             }
-
-            var payload = await response.Content.ReadAsStringAsync(cts.Token);
-            if (context.Parameters != null &&
-                context.Parameters.TryGetValue("requiredModel", out var requiredModelObj) &&
-                requiredModelObj is string requiredModel &&
-                !string.IsNullOrWhiteSpace(requiredModel))
-            {
-                if (!EndpointHasModel(payload, requiredModel))
-                {
-                    _logger.LogDebug("LM Studio model '{Model}' not reported by {Url}", requiredModel, modelsUri);
-                    return false;
-                }
-            }
-
-            return true;
         }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "LM Studio health check failed for {Url}", serviceUrl);
-            return false;
-        }
+
+        return true;
     }
 
     protected override string? ReadExplicitConfiguration()

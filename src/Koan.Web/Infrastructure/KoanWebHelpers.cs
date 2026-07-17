@@ -1,7 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-using Koan.Data.Abstractions;
-using Koan.Core;
-using Koan.Data.Abstractions.Annotations;
+using Koan.Data.Core;
 using System.Reflection;
 
 namespace Koan.Web.Infrastructure;
@@ -21,25 +19,17 @@ internal static class KoanWebHelpers
         return gm.Invoke(data, null)!;
     }
 
-    public static string ResolveProvider(Type entityType, IServiceProvider sp)
+    public static string ResolveObservedProvider(Type entityType, Type keyType, IServiceProvider sp)
     {
-        var attr = entityType.GetCustomAttribute<DataAdapterAttribute>();
-        if (attr is not null && !string.IsNullOrWhiteSpace(attr.Provider)) return attr.Provider!;
-        var factories = sp.GetServices<IDataAdapterFactory>().ToList();
-        if (factories.Count == 0) return "json";
-        var rankedName = factories
-            .Select(f => new
-            {
-                Factory = f,
-                Priority = (f.GetType().GetCustomAttributes(typeof(ProviderPriorityAttribute), inherit: false).FirstOrDefault() as ProviderPriorityAttribute)?.Priority ?? 0,
-                Name = f.GetType().Name
-            })
-            .OrderByDescending(x => x.Priority)
-            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
-            .First().Factory.GetType().Name;
-        const string suffix = "AdapterFactory";
-        if (rankedName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) rankedName = rankedName[..^suffix.Length];
-        return rankedName.ToLowerInvariant();
+        var entityName = entityType.FullName ?? entityType.Name;
+        var keyName = keyType.FullName ?? keyType.Name;
+        return sp.GetService<IDataDiagnostics>()?
+            .GetEntityConfigsSnapshot()
+            .FirstOrDefault(config =>
+                string.Equals(config.EntityType, entityName, StringComparison.Ordinal)
+                && string.Equals(config.KeyType, keyName, StringComparison.Ordinal))
+            ?.Provider
+            ?? "unresolved";
     }
 
     public static string[] EnumFlags<T>(T value) where T : Enum

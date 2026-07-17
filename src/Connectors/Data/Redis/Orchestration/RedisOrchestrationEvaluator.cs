@@ -76,7 +76,7 @@ public class RedisOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         try
         {
-            Logger?.LogDebug("[Redis] Validating credentials for host: {Host}", hostResult.HostEndpoint);
+            ReportCredentialValidation("start", ("host", hostResult.HostEndpoint));
 
             // Get configured credentials and database
             var options = new RedisOptions();
@@ -88,12 +88,12 @@ public class RedisOrchestrationEvaluator : BaseOrchestrationEvaluator
             // Try to connect with the configured settings
             var isValid = await Task.Run(() => TryRedisConnection(connectionString));
 
-            Logger?.LogDebug("[Redis] Credential validation result: {IsValid}", isValid);
+            ReportCredentialValidation(isValid ? "accepted" : "rejected");
             return isValid;
         }
         catch (Exception ex)
         {
-            Logger?.LogDebug(ex, "[Redis] Error validating host credentials");
+            ReportCredentialValidation("failed", ("error", ex));
             return false;
         }
     }

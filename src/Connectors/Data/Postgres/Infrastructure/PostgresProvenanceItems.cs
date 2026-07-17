@@ -13,7 +13,7 @@ internal static class PostgresProvenanceItems
     {
         "Koan.Data.Connector.Postgres.PostgresOptionsConfigurator",
         "Koan.Data.Connector.Postgres.PostgresAdapterFactory",
-        "Koan.Data.Connector.Postgres.Initialization.KoanAutoRegistrar"
+        "Koan.Data.Connector.Postgres.Initialization.PostgresDataModule"
     };
 
     private static readonly IReadOnlyCollection<string> NamingConsumers = new[]

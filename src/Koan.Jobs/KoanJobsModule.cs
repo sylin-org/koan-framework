@@ -3,6 +3,9 @@ using Koan.Core.Provenance;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Koan.Core.Semantics;
+using Koan.Core.Composition;
+using Koan.Jobs.Composition;
 
 namespace Koan.Jobs;
 
@@ -12,8 +15,6 @@ namespace Koan.Jobs;
 /// </summary>
 public sealed class KoanJobsModule : KoanModule
 {
-    public override string Id => "Koan.Jobs";
-
     public override void Register(IServiceCollection services) => services.AddKoanJobs();
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
@@ -23,4 +24,7 @@ public sealed class KoanJobsModule : KoanModule
             .Label("Discovered job types")
             .Value(JobTypeRegistry.FromDiscovery().Count.ToString()));
     }
+
+    public override void ReportComposition(KoanCompositionBuilder composition, IServiceProvider services)
+        => JobsCompositionFacts.Project(composition, services, GetType().FullName ?? Id);
 }

@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <!-- ARCH-0077 (D2 item 6): do NOT collapse this into Koan.Orchestration.Cli. Despite being referenced only
          by the CLI, this is a PUBLISHED periphery package with a deliberate public API (Planner, LaunchManifest,
          ProjectDependencyAnalyzer, EndpointFormatter, …) — not an all-internal helper. Any merge is a packaging /

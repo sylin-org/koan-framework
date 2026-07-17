@@ -18,7 +18,7 @@ namespace Koan.Web.Auth.Connector.Test.Infrastructure;
 /// SEC-0006 — the ES256 key material + public-JWK projection come from the shared <see cref="EcdsaKeyRing"/>
 /// primitive (one keypair-generation + one public-only JWKS implementation across the framework). This is a
 /// distinct keypair from the framework issuer (the TestProvider simulates a separate external IdP), generated
-/// once for the process lifetime (this service is a singleton; see <c>KoanAutoRegistrar</c>).
+/// once for the process lifetime (this service is a singleton; see <c>TestAuthModule</c>).
 /// </para>
 /// </summary>
 public sealed class JwtTokenService

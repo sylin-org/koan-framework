@@ -5,7 +5,7 @@ namespace Koan.Cache.Abstractions.Stores;
 /// <summary>
 /// Registry of individual cache store providers. Used by the topology resolver to
 /// discover L1 (Local) and L2 (Remote) tier candidates. Individual adapters
-/// self-register here via their <c>KoanAutoRegistrar</c>; the layered cache
+/// self-register here from their <c>KoanModule</c>; the layered cache
 /// receives the resolved (Local, Remote) pair via <c>CacheTopologyResolver</c>.
 /// </summary>
 public interface ICacheStoreRegistry

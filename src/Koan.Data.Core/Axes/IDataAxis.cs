@@ -6,12 +6,12 @@ namespace Koan.Data.Core.Axes;
 /// The <b>premium authoring surface</b> for a data-segmentation axis (ARCH-0101 §7) — the discovered sugar over the
 /// conformant Phase A/B/C seams. An axis author writes one type:
 /// <code>
-/// public sealed class TenantAxis : IDataAxis
+/// public sealed class ClassificationAxis : IDataAxis
 /// {
 ///     public void Declare(Axis axis) => axis
-///         .Named("tenant")
-///         .AppliesTo(t =&gt; !IsHostScoped(t))
-///         .Field("__koan_tenant", () =&gt; TenancyAmbient.EffectiveTenantId()); // stamp + equality read-filter + cache-key + index
+///         .Named("classification")
+///         .AppliesTo(t =&gt; IsClassified(t))
+///         .Field("__classification", () =&gt; ClassificationAmbient.Current); // Data-local stamp + equality read-filter
 /// }
 /// </code>
 /// <see cref="Declare"/> EXPANDS to the exact raw seams — a <c>ManagedFieldDescriptor</c>, an

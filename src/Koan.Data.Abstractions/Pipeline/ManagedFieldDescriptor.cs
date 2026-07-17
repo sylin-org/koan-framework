@@ -35,7 +35,9 @@ namespace Koan.Data.Abstractions.Pipeline;
 /// <param name="AutoReadFilter">
 /// Whether the built-in equality read-filter contributor (DATA-0106) derives a scalar
 /// <c>Filter.Eq(StorageName, ValueProvider())</c> for this field on every read. <c>true</c> (default) preserves every
-/// existing equality axis (tenancy/classification) exactly. <c>false</c> means "stamp + serialize + index me, but I
+/// existing Data-local equality filtering exactly. Cross-pillar caching requires the capability to contribute a
+/// Core hard-segmentation dimension; an applicable Data-only managed field is cache-excluded rather than silently
+/// omitted from cache identity. <c>false</c> means "stamp + serialize + index me, but I
 /// supply my own read predicate via an <c>IReadFilterContributor</c>" — for a <b>non-equality</b> row-visibility axis
 /// (e.g. moderation: <c>visibility IN viewer.clearances</c>). A <c>false</c> field still writes its column and still
 /// fails closed, but contributes no auto-equality (which would wrongly conjoin) and <b>excludes its entity from the

@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using Koan.Core.Diagnostics;
+using Koan.Core.Semantics.Segmentation;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
 using Koan.Jobs;
@@ -25,6 +27,27 @@ namespace Koan.Jobs.Tenancy.Tests;
 public sealed class DurableCarrierSpec
 {
     [Fact]
+    public async Task Active_host_reports_jobs_logical_context_without_overstating_ledger_or_delivery()
+    {
+        await using var host = await JobsHarness.StartSqliteAsync();
+        var facts = host.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts;
+
+        facts.Should().Contain(fact =>
+            fact.Code == "koan.segmentation.realization.active"
+            && fact.Subject == "segmentation:jobs"
+            && fact.Kind == KoanFactKind.Guarantee
+            && fact.Summary.Contains("durable-context-carriage", StringComparison.Ordinal));
+        facts.Should().Contain(fact =>
+            fact.Code == "koan.jobs.context.guarantees"
+            && fact.Subject == "jobs:context"
+            && fact.Kind == KoanFactKind.Guarantee
+            && fact.Summary.Contains("host-trusted", StringComparison.Ordinal)
+            && fact.Summary.Contains("shared control-plane", StringComparison.Ordinal)
+            && fact.Summary.Contains("at-least-once", StringComparison.Ordinal)
+            && fact.Summary.Contains("context-free latency hint", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Submit_under_a_tenant_captures_the_tenant_bag_on_the_job_record()
     {
         await using var host = await JobsHarness.StartSqliteAsync();
@@ -37,6 +60,21 @@ public sealed class DurableCarrierSpec
         rec.Should().NotBeNull();
         rec!.AmbientCarrier.Should().NotBeNull();
         rec.AmbientCarrier!.Should().ContainKey("koan:tenant").WhoseValue.Should().Be("v1:id:acme");
+    }
+
+    [Fact]
+    public async Task Unscoped_tenant_job_is_refused_before_work_or_ledger_persistence()
+    {
+        await using var host = await JobsHarness.StartSqliteAsync();
+        var work = new TenantObservingJob();
+
+        var submit = () => work.Job.Submit();
+
+        var failure = (await submit.Should().ThrowAsync<SegmentationRequiredException>()).Which;
+        failure.DimensionId.Should().Be("tenant");
+        using (Tenant.Use("acme"))
+            (await TenantObservingJob.Get(work.Id)).Should().BeNull();
+        (await host.JobFor<TenantObservingJob>(work.Id)).Should().BeNull();
     }
 
     [Fact]

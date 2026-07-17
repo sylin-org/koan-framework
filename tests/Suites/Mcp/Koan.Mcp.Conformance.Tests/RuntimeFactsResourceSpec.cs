@@ -28,6 +28,7 @@ public sealed class RuntimeFactsResourceSpec : IClassFixture<ConformanceFixture>
 
         var envelope = KoanFactJson.Deserialize(actual!);
         envelope.Should().NotBeNull();
+        envelope!.Schema.Should().Be(2);
         envelope!.Complete.Should().BeTrue();
     }
 }

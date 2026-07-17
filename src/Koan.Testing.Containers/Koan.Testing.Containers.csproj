@@ -7,7 +7,6 @@
     conformance kit's container-gated batteries (and consumers) reuse the same real fixtures.
   -->
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

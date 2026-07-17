@@ -84,7 +84,7 @@ public class CockroachOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         try
         {
-            Logger?.LogDebug("[CockroachDB] Validating credentials for host: {Host}", hostResult.HostEndpoint);
+            ReportCredentialValidation("start", ("host", hostResult.HostEndpoint));
 
             // Get configured connection settings
             var connectionString = BuildCockroachConnectionString(hostResult.HostEndpoint!, configuration);
@@ -92,12 +92,12 @@ public class CockroachOrchestrationEvaluator : BaseOrchestrationEvaluator
             // Try to connect with the configured credentials
             var isValid = await TryCockroachConnection(connectionString);
 
-            Logger?.LogDebug("[CockroachDB] Credential validation result: {IsValid}", isValid);
+            ReportCredentialValidation(isValid ? "accepted" : "rejected");
             return isValid;
         }
         catch (Exception ex)
         {
-            Logger?.LogDebug(ex, "[CockroachDB] Error validating host credentials");
+            ReportCredentialValidation("failed", ("error", ex));
             return false;
         }
     }

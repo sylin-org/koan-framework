@@ -3,30 +3,32 @@ using Microsoft.Extensions.Logging;
 using Koan.Core.Diagnostics;
 using Koan.Core.Logging;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Core.Orchestration.Composition;
+using Koan.Core.Semantics;
 using CoreConstants = Koan.Core.Infrastructure.Constants;
 
 namespace Koan.Core.Orchestration;
 
 /// <summary>
-/// Pure delegation coordinator - routes to adapters, aggregates results.
-/// Zero provider-specific knowledge.
+/// Routes discovery through the selected adapter and the host's immutable optional-source plan.
 /// </summary>
 internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
 {
     private readonly ConcurrentDictionary<string, IServiceDiscoveryAdapter> _adapters = new();
-    private readonly IDiscoveryCandidateContributor[] _contributors;
+    private readonly ServiceDiscoveryRuntime _runtime;
     private readonly ILogger<ServiceDiscoveryCoordinator> _logger;
     private readonly IKoanRuntimeFactRecorder? _facts;
 
     public ServiceDiscoveryCoordinator(
         IEnumerable<IServiceDiscoveryAdapter> adapters,
-        IEnumerable<IDiscoveryCandidateContributor> contributors,
+        ServiceDiscoveryRuntime runtime,
         ILogger<ServiceDiscoveryCoordinator> logger,
         IKoanRuntimeFactRecorder? facts = null)
     {
-        _logger = logger;
+        ArgumentNullException.ThrowIfNull(adapters);
+        _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _facts = facts;
-        _contributors = contributors?.ToArray() ?? [];
         RegisterAdapters(adapters);
     }
 
@@ -35,133 +37,214 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
         DiscoveryContext? context = null,
         CancellationToken cancellationToken = default)
     {
-        if (!_adapters.TryGetValue(serviceName.ToLowerInvariant(), out var adapter))
+        if (!TryGetAdapter(serviceName, out var adapter, out var failure)) return failure;
+
+        context ??= new DiscoveryContext();
+        var request = CreateRequest(adapter, context, intent: null);
+        var query = await _runtime.QueryAutomatic(request, cancellationToken).ConfigureAwait(false);
+        LogSourceFailures(adapter.ServiceName, query.Failures);
+
+        var plannedContext = context with
         {
-            KoanLog.ConfigWarning(_logger, LogActions.Lookup, "no-adapter", ("service", serviceName));
-            RecordDiscovery(
-                serviceName,
-                KoanFactState.Rejected,
-                "No discovery adapter is active for the requested service.",
-                CoreConstants.Diagnostics.Reasons.DiscoveryAdapterMissing,
-                "Reference and enable an adapter that handles this service.",
-                "none");
-            return AdapterDiscoveryResult.NoAdapter(serviceName);
+            PlannedCandidates = query.Candidates,
+            PlannedCandidateMode = DiscoveryCandidateMode.Automatic
+        };
+        return await DiscoverThroughAdapter(adapter, plannedContext, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<AdapterDiscoveryResult> ResolveServiceIntent(
+        string serviceName,
+        string intent,
+        DiscoveryContext? context = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAdapter(serviceName, out var adapter, out var failure)) return failure;
+
+        if (!TryReadIntentScheme(intent, out var scheme))
+        {
+            return RejectRequiredIntent(
+                adapter.ServiceName,
+                "The explicit discovery intent is not a valid absolute URI.",
+                "Use a registered source URI such as 'provider://offering'.",
+                "invalid-intent");
         }
 
         context ??= new DiscoveryContext();
+        var request = CreateRequest(adapter, context, intent);
+        var query = await _runtime.QueryRequired(scheme, request, cancellationToken).ConfigureAwait(false);
 
-        // Gather candidates from external discovery contributors (Zen Garden / Koi, if present) and fold them
-        // into the context so the adapter's health-checked probe treats them as candidates — not authoritative
-        // short-circuits. A contributor failure must never break discovery, so each is guarded.
-        context = await ApplyContributedCandidates(serviceName, context, cancellationToken);
+        if (!query.IsMatched)
+        {
+            return RejectRequiredIntent(
+                adapter.ServiceName,
+                $"No active discovery source handles the '{scheme}' intent scheme.",
+                "Reference and enable the requested source, or choose automatic discovery.",
+                scheme);
+        }
 
+        if (query.Failure is not null)
+        {
+            LogSourceFailure(adapter.ServiceName, query.Failure);
+            return RejectRequiredIntent(
+                adapter.ServiceName,
+                $"The active '{scheme}' discovery source could not resolve the explicit intent.",
+                "Make the requested source available, or choose automatic discovery.",
+                query.Failure.Id);
+        }
+
+        if (query.Candidates.Length == 0)
+        {
+            return RejectRequiredIntent(
+                adapter.ServiceName,
+                $"The active '{scheme}' discovery source returned no candidates for the explicit intent.",
+                "Correct the requested offering, or choose automatic discovery.",
+                scheme);
+        }
+
+        var requiredContext = context with
+        {
+            PlannedCandidates = query.Candidates,
+            PlannedCandidateMode = DiscoveryCandidateMode.Required
+        };
+        return await DiscoverThroughAdapter(adapter, requiredContext, cancellationToken).ConfigureAwait(false);
+    }
+
+    public IServiceDiscoveryAdapter[] GetRegisteredAdapters() => _adapters.Values.ToArray();
+
+    private async Task<AdapterDiscoveryResult> DiscoverThroughAdapter(
+        IServiceDiscoveryAdapter adapter,
+        DiscoveryContext context,
+        CancellationToken cancellationToken)
+    {
         KoanLog.ConfigDebug(_logger, LogActions.Delegate, null,
-            ("service", serviceName),
+            ("service", adapter.ServiceName),
             ("adapter", adapter.GetType().Name));
 
         try
         {
-            // Pure delegation - "Adapter, discover yourself"
-            var result = await adapter.Discover(context, cancellationToken);
-
-            var outcome = result.IsSuccessful ? LogOutcomes.Success : LogOutcomes.Failure;
-            KoanLog.ConfigInfo(_logger, LogActions.Result, outcome,
-                ("service", serviceName),
-                ("url", Redaction.DeIdentify(result.ServiceUrl)));
+            var result = await adapter.Discover(context, cancellationToken).ConfigureAwait(false);
+            var method = SafeIdentity(result.DiscoveryMethod, "unknown");
+            KoanLog.ConfigInfo(_logger, LogActions.Result,
+                result.IsSuccessful ? LogOutcomes.Success : LogOutcomes.Failure,
+                ("service", adapter.ServiceName),
+                ("method", method));
             RecordDiscovery(
-                serviceName,
+                adapter.ServiceName,
                 result.IsSuccessful ? KoanFactState.Selected : KoanFactState.Rejected,
                 result.IsSuccessful
-                    ? $"Selected service discovery through '{result.DiscoveryMethod}'."
+                    ? $"Selected service discovery through '{method}'."
                     : "Service discovery exhausted its eligible candidates.",
                 result.IsSuccessful
                     ? CoreConstants.Diagnostics.Reasons.DiscoverySelected
                     : CoreConstants.Diagnostics.Reasons.DiscoveryFailed,
                 result.IsSuccessful ? null : "Correct the configured endpoint or activate a reachable provider.",
-                result.IsSuccessful ? result.DiscoveryMethod : adapter.GetType().Name);
-
+                result.IsSuccessful ? method : adapter.GetType().Name);
             return result;
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
         {
             KoanLog.ConfigError(_logger, LogActions.Result, "exception",
-                ("service", serviceName),
+                ("service", adapter.ServiceName),
                 ("adapter", adapter.GetType().Name),
-                ("error", Redaction.DeIdentify(ex.Message)));
+                ("error", exception.GetType().Name));
             RecordDiscovery(
-                serviceName,
+                adapter.ServiceName,
                 KoanFactState.Rejected,
                 "The selected discovery adapter failed before it could elect an endpoint.",
                 CoreConstants.Diagnostics.Reasons.DiscoveryFailed,
                 "Inspect the adapter health and configuration facts.",
                 adapter.GetType().Name);
-            return AdapterDiscoveryResult.Failed(serviceName, $"Adapter exception: {ex.Message}");
+            return AdapterDiscoveryResult.Failed(
+                adapter.ServiceName,
+                "The discovery adapter failed. Inspect adapter health and configuration facts.");
         }
     }
 
-    public IServiceDiscoveryAdapter[] GetRegisteredAdapters() =>
-        _adapters.Values.ToArray();
-
-    private async Task<DiscoveryContext> ApplyContributedCandidates(
-        string serviceName, DiscoveryContext context, CancellationToken cancellationToken)
+    private AdapterDiscoveryResult RejectRequiredIntent(
+        string serviceName,
+        string summary,
+        string correction,
+        string correlation)
     {
-        if (_contributors.Length == 0) return context;
+        KoanLog.ConfigWarning(_logger, LogActions.Result, "required-intent-rejected",
+            ("service", serviceName),
+            ("reason", SafeIdentity(correlation, "unavailable")));
+        RecordDiscovery(
+            serviceName,
+            KoanFactState.Rejected,
+            summary,
+            CoreConstants.Diagnostics.Reasons.DiscoveryFailed,
+            correction,
+            SafeIdentity(correlation, "unavailable"));
+        return AdapterDiscoveryResult.Failed(serviceName, $"{summary} {correction}");
+    }
 
-        var contributed = new List<DiscoveryCandidate>();
-        foreach (var contributor in _contributors)
+    private bool TryGetAdapter(
+        string serviceName,
+        out IServiceDiscoveryAdapter adapter,
+        out AdapterDiscoveryResult failure)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
+        if (_adapters.TryGetValue(serviceName.Trim().ToLowerInvariant(), out adapter!))
         {
-            try
-            {
-                var items = await contributor.ContributeCandidates(serviceName, context, cancellationToken);
-                if (items is { Count: > 0 })
-                {
-                    contributed.AddRange(items.Where(c => c is not null && !string.IsNullOrWhiteSpace(c.Url)));
-                }
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                // A genuine caller cancellation must propagate — it is not a contributor failure to swallow.
-                throw;
-            }
-            catch (Exception ex)
-            {
-                // Best-effort: a contributor is an aid to discovery, never a gate. Log and carry on.
-                KoanLog.ConfigDebug(_logger, LogActions.Delegate, "contributor-failed",
-                    ("service", serviceName),
-                    ("contributor", contributor.GetType().Name),
-                    ("error", Redaction.DeIdentify(ex.Message)));
-            }
+            failure = null!;
+            return true;
         }
 
-        // Preserve any pre-existing contributed candidates the caller set explicitly.
-        if (context.ContributedCandidates is { Count: > 0 })
-            contributed.InsertRange(0, context.ContributedCandidates);
+        KoanLog.ConfigWarning(_logger, LogActions.Lookup, "no-adapter", ("service", serviceName));
+        RecordDiscovery(
+            serviceName,
+            KoanFactState.Rejected,
+            "No discovery adapter is active for the requested service.",
+            CoreConstants.Diagnostics.Reasons.DiscoveryAdapterMissing,
+            "Reference and enable an adapter that handles this service.",
+            "none");
+        failure = AdapterDiscoveryResult.NoAdapter(serviceName);
+        return false;
+    }
 
-        return contributed.Count > 0 ? context with { ContributedCandidates = contributed } : context;
+    private static DiscoveryCandidateRequest CreateRequest(
+        IServiceDiscoveryAdapter adapter,
+        DiscoveryContext context,
+        string? intent) =>
+        new(adapter.ServiceName, adapter.Aliases ?? [], context, intent);
+
+    private void LogSourceFailures(
+        string serviceName,
+        IEnumerable<DiscoverySourceFailure> failures)
+    {
+        foreach (var failure in failures) LogSourceFailure(serviceName, failure);
+    }
+
+    private void LogSourceFailure(string serviceName, DiscoverySourceFailure failure)
+    {
+        KoanLog.ConfigDebug(_logger, LogActions.Delegate, "source-failed",
+            ("service", serviceName),
+            ("owner", failure.Owner),
+            ("source", failure.Id),
+            ("error", failure.ErrorType));
     }
 
     private void RegisterAdapters(IEnumerable<IServiceDiscoveryAdapter> adapters)
     {
-        foreach (var adapter in adapters.OrderByDescending(a => a.Priority))
+        foreach (var adapter in adapters.OrderByDescending(static adapter => adapter.Priority))
         {
-            RegisterAdapter(adapter);
-        }
-    }
+            foreach (var serviceName in new[] { adapter.ServiceName }.Concat(adapter.Aliases ?? []))
+            {
+                if (string.IsNullOrWhiteSpace(serviceName)) continue;
+                var key = serviceName.Trim().ToLowerInvariant();
+                _adapters.AddOrUpdate(key, adapter, (_, existing) =>
+                    adapter.Priority > existing.Priority ? adapter : existing);
 
-    private void RegisterAdapter(IServiceDiscoveryAdapter adapter)
-    {
-        var serviceNames = new[] { adapter.ServiceName }.Concat(adapter.Aliases);
-
-        foreach (var serviceName in serviceNames)
-        {
-            var key = serviceName.ToLowerInvariant();
-            _adapters.AddOrUpdate(key, adapter, (_, existing) =>
-                adapter.Priority > existing.Priority ? adapter : existing);
-
-            KoanLog.BootInfo(_logger, LogActions.Register, "adapter",
-                ("service", serviceName),
-                ("adapter", adapter.GetType().Name),
-                ("priority", adapter.Priority));
+                KoanLog.BootInfo(_logger, LogActions.Register, "adapter",
+                    ("service", serviceName),
+                    ("adapter", adapter.GetType().Name),
+                    ("priority", adapter.Priority));
+            }
         }
     }
 
@@ -183,6 +266,33 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
             correction,
             "Koan.Core.Orchestration",
             correlation));
+    }
+
+    private static bool TryReadIntentScheme(string? intent, out string scheme)
+    {
+        scheme = string.Empty;
+        if (string.IsNullOrWhiteSpace(intent)
+            || !Uri.TryCreate(intent.Trim(), UriKind.Absolute, out var uri)
+            || string.IsNullOrWhiteSpace(uri.Scheme))
+        {
+            return false;
+        }
+
+        scheme = uri.Scheme.ToLowerInvariant();
+        return true;
+    }
+
+    private static string SafeIdentity(string? value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return fallback;
+        try
+        {
+            return new SemanticId(value).Value;
+        }
+        catch (ArgumentException)
+        {
+            return fallback;
+        }
     }
 
     private static class LogActions

@@ -15,6 +15,8 @@ using Koan.Core.Modules.Pillars;
 using Microsoft.Extensions.Options;
 using Koan.Core.Hosting.App;
 using Koan.Core.Context;
+using Koan.Core.Semantics;
+using Koan.Core.Semantics.Segmentation;
 
 namespace Koan.Core;
 
@@ -24,10 +26,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddKoan(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-
-        services.AddKoanCore();
-        AppBootstrapper.InitializeModules(services);
-        return services;
+        return Compose(services, configure: null);
     }
 
     /// <summary>
@@ -43,18 +42,48 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
 
-        services.AddKoan();
-        using (Composition.KoanCompositionScope.Enter(services))
+        return Compose(services, configure);
+    }
+
+    private static IServiceCollection Compose(IServiceCollection services, Action? configure)
+    {
+        var session = SemanticCompositionSession.GetOrCreate(services);
+        if (session.IsFrozen)
         {
-            configure();
+            if (configure is null) return services;
+            throw new InvalidOperationException(
+                "This Koan application is already composed. Put business declarations in the initial AddKoan(() => ...) call.");
         }
 
-        return services;
+        using var lease = session.Enter();
+        try
+        {
+            using var declarationScope = Composition.KoanCompositionScope.Enter(services);
+            if (session.TryConfigureCore()) services.AddKoanCore();
+            AppBootstrapper.InitializeModules(services);
+            configure?.Invoke();
+            lease.Complete();
+            return services;
+        }
+        catch (Exception exception)
+        {
+            session.FailComposition(exception);
+            throw;
+        }
     }
 
     public static IServiceCollection AddKoanCore(this IServiceCollection services)
     {
         CorePillarManifest.EnsureRegistered();
+
+        var segmentation = new SegmentationPlanBuilder();
+        SemanticCompositionSession.GetOrCreate(services).ScheduleContributions<
+            SegmentationContributionTarget,
+            SegmentationPlan>(
+            segmentation.ForOwner,
+            segmentation.Build,
+            static (collection, plan) => collection.Replace(ServiceDescriptor.Singleton(plan)));
+        services.TryAddSingleton(SegmentationPlan.Empty);
 
         // Default logging: simple console with concise output and sane category levels.
         services.AddLogging(logging =>
@@ -92,6 +121,7 @@ public static class ServiceCollectionExtensions
         // R07-01: one host-owned registry carries module-owned logical-flow context across durable boundaries.
         // The ambient KoanContext itself is flow-local and static; carrier instances and their composition stay in DI.
         services.TryAddSingleton<KoanContextCarrierRegistry>();
+        services.TryAddSingleton<SegmentationContextPlan>();
 
         // Establish the canonical ambient host before other hosted services start. KoanLog and other
         // terse framework surfaces resolve host-owned services through this same owner.
@@ -122,6 +152,8 @@ public static class ServiceCollectionExtensions
         // orchestrator is its sole execution owner and preserves its pokeable + health aliases.
         // Kick a startup probe so readiness is populated early
         services.AddHostedService<StartupProbeService>();
+        Orchestration.ServiceDiscoveryBootstrap.Register(services);
+        BackgroundServices.KoanBackgroundServicesBootstrap.Register(services);
         return services;
     }
 }

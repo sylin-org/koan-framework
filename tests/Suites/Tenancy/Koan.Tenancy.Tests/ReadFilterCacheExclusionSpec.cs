@@ -31,17 +31,19 @@ public sealed class ReadFilterCacheExclusionSpec : IDisposable
 {
     private static readonly AsyncLocal<string?> _writeStatus = new();
     private static readonly AsyncLocal<bool> _moderator = new();
+    private static readonly AsyncLocal<string?> _region = new();
 
     public void Dispose()
     {
         _writeStatus.Value = null;
         _moderator.Value = false;
-        // The tenancy registrar re-registers __koan_tenant on the next boot (idempotent); the suite is sequential.
+        _region.Value = null;
         ManagedFieldRegistry.Reset();
     }
 
     private static IDisposable Writing(string status) => Set(_writeStatus, status, () => _writeStatus.Value);
     private static IDisposable AsModerator() => Set(_moderator, true, () => _moderator.Value);
+    private static IDisposable InRegion(string region) => Set(_region, region, () => _region.Value);
 
     private static IDisposable Set<T>(AsyncLocal<T> slot, T value, Func<T> read)
     {
@@ -85,6 +87,17 @@ public sealed class ReadFilterCacheExclusionSpec : IDisposable
     [HostScoped]
     [Cacheable(300)]
     public sealed class PredVisDoc : Entity<PredVisDoc> { public string Title { get; set; } = ""; public string Status { get; set; } = ""; }
+
+    [HostScoped]
+    [Cacheable(300)]
+    public sealed class RegionDoc : Entity<RegionDoc> { public string Title { get; set; } = ""; }
+
+    private static void RegisterDataLocalEqualityAxis() => ManagedFieldRegistry.Register(new ManagedFieldDescriptor(
+        StorageName: "__region",
+        ClrType: typeof(string),
+        ValueProvider: () => _region.Value,
+        AppliesTo: type => type == typeof(RegionDoc),
+        RequiredCapability: DataCaps.Isolation.RowScoped));
 
     private sealed class PredVisReadContributor : IReadFilterContributor
     {
@@ -141,5 +154,24 @@ public sealed class ReadFilterCacheExclusionSpec : IDisposable
         // HIT and leaks the hidden row; the contributor's ExcludesFromCache excludes it, so the viewer hits the store →
         // the Status predicate hides it.
         (await PredVisDoc.Get(hidden.Id)).Should().BeNull();
+    }
+
+    [Fact(DisplayName = "no leak: a Data-only equality axis is cache-excluded until it joins cross-pillar segmentation")]
+    public async Task Cacheable_with_a_data_only_equality_axis_is_excluded()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync();
+        RegisterDataLocalEqualityAxis();
+        runtime.ResetEntityCaches();
+        using var _iso = Isolate();
+
+        RegionDoc regional;
+        using (InRegion("north"))
+        {
+            regional = await new RegionDoc { Title = "north-only" }.Save();
+            (await RegionDoc.Get(regional.Id))!.Title.Should().Be("north-only");
+        }
+
+        using (InRegion("south"))
+            (await RegionDoc.Get(regional.Id)).Should().BeNull();
     }
 }

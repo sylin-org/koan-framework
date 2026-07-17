@@ -82,10 +82,11 @@ transaction routing. It stores that state in Core's logical-flow `KoanContext`, 
 generic API for tenancy, subjects, or other module-owned axes. Those modules own their business-facing
 facades and register durable carriage independently through `Koan.Core.Context`.
 
-For a synchronous, non-hosted process, `new ServiceCollection().StartKoan()` returns the active
-provider. The caller owns it; use `using var app = (IDisposable)services.StartKoan()` so disposal also
-releases the ambient Koan host binding. ASP.NET Core, workers, and applications that need
-hosted-service lifecycles should use the generic host with `AddKoan()` instead.
+For a synchronous console process, `new ServiceCollection().StartKoan()` starts a standard .NET
+Generic Host and returns its active provider facade. The caller owns it; use
+`using var app = (IDisposable)services.StartKoan()` so disposal stops hosted capabilities and releases
+the ambient Koan host binding. ASP.NET Core and workers continue to use their native host builder with
+`AddKoan()`.
 
 See TECHNICAL.md for contracts, options, and extension points.
 

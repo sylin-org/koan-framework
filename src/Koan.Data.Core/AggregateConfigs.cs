@@ -27,7 +27,16 @@ public static class AggregateConfigs
 
         var config = (AggregateConfig<TEntity, TKey>)cache.GetOrAdd(key, _ =>
         {
-            var provider = ResolveProvider(typeof(TEntity)) ?? DefaultProvider(sp);
+            var providers = sp.GetRequiredService<Routing.DataProviderCatalog>();
+            var requested = ResolveProvider(typeof(TEntity));
+            var provider = requested is null
+                ? sp.GetRequiredService<Routing.DataDefaultProviderPlan>().ProviderId
+                : providers.Require(
+                    requested,
+                    "data:entity",
+                    Infrastructure.Constants.Diagnostics.Reasons.EntityAttribute,
+                    $"Correct the provider decoration on '{typeof(TEntity).Name}' or reference the requested connector.")
+                    .ProviderId;
             var idSpec = AggregateMetadata.GetIdSpec(typeof(TEntity));
             return new AggregateConfig<TEntity, TKey>(provider, idSpec, sp);
         });
@@ -75,29 +84,6 @@ public static class AggregateConfigs
         if (src is not null && !string.IsNullOrWhiteSpace(src.Provider)) return src.Provider;
         var data = (DataAdapterAttribute?)Attribute.GetCustomAttribute(aggregateType, typeof(DataAdapterAttribute));
         return data?.Provider;
-    }
-
-    private static string DefaultProvider(IServiceProvider sp)
-    {
-        var factories = sp.GetServices<IDataAdapterFactory>().ToList();
-        if (factories.Count == 0) throw new InvalidOperationException("No IDataAdapterFactory instances registered. Ensure services.AddKoanDataCore() has been called and a data adapter module is referenced.");
-
-        // Rank by ProviderPriorityAttribute (higher wins), then by type name for stability
-        var ranked = factories
-            .Select(f => new
-            {
-                Factory = f,
-                Priority = (f.GetType().GetCustomAttributes(typeof(ProviderPriorityAttribute), inherit: false).FirstOrDefault() as ProviderPriorityAttribute)?.Priority ?? 0,
-                Name = f.GetType().Name
-            })
-            .OrderByDescending(x => x.Priority)
-            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        var chosen = ranked.First().Factory.GetType().Name;
-        const string suffix = "AdapterFactory";
-        if (chosen.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) chosen = chosen[..^suffix.Length];
-        return chosen.ToLowerInvariant();
     }
 }
 

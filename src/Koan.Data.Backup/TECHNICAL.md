@@ -23,7 +23,7 @@ validation:
 
 | Area                  | Types                                                                                          | Notes                                                                                                                                            |
 | --------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Registration & DI     | `Initialization.KoanAutoRegistrar`, `Extensions.ServiceCollectionExtensions`                   | Auto-wires services via `AddKoanBackupRestore*`, binds `BackupRestoreOptions`, and contributes capability notes to the boot report.              |
+| Registration & DI     | `Initialization.DataBackupModule`, `Extensions.ServiceCollectionExtensions`                    | Auto-wires services via `AddKoanBackupRestore*`, binds `BackupRestoreOptions`, and contributes capability notes to the boot report.              |
 | Backup pipeline       | `StreamingBackupService`, `IBackupService`, `EntityDiscoveryService`, `BackupDiscoveryService` | Discovers entity metadata, streams records with `Data<TEntity, TKey>.AllStream`, builds manifests, and tracks progress in-memory.                |
 | Restore pipeline      | `OptimizedRestoreService`, `IRestoreService`, `IRestoreOptimizedRepository`                    | Restores entities with optional adapter-specific preparation/cleanup, reflection fallbacks, and batch `UpsertManyAsync` calls.                   |
 | Storage integration   | `BackupStorageService`, models under `Models/*`                                                | Writes JSON Lines payloads into ZIP archives, stores manifests & verification metadata, uploads via `IStorageService`, and reads during restore. |
@@ -126,7 +126,7 @@ Per-operation options (`BackupOptions`, `GlobalBackupOptions`, `RestoreOptions`,
 - Host-ownership proof: registered-type fallback discovery resolves provider metadata against an
   explicitly supplied host through the supported Data Core inspection surface.
 - Source review: `StreamingBackupService`, `OptimizedRestoreService`, `BackupStorageService`,
-  `BackupMaintenanceService`, `Initialization/KoanAutoRegistrar`, and related models as of 2026-07-14.
+  `BackupMaintenanceService`, `Initialization/DataBackupModule`, and related models as of 2026-07-17.
 - Maturity boundary: the SQLite/local export lane is not a restore drill or a certification of the
   wider data-adapter/storage matrix, schema evolution, or production recovery.
 - DocFX strict build executed via `pwsh -File scripts/build-docs.ps1 -ConfigPath docs/api/docfx.json -LogLevel Warning -Strict`.

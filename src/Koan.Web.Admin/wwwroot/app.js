@@ -585,7 +585,7 @@ function renderAutoRegistrationReport(modules) {
 
   if (!summary || !tableBody || !modules) return;
 
-  summary.textContent = `✓ Scan completed • ${modules.length} modules registered via IKoanAutoRegistrar`;
+  summary.textContent = `✓ Composition inspected • ${modules.length} Koan modules active`;
 
   const pillars = groupByPillar(modules);
   tableBody.innerHTML = '';

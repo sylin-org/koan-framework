@@ -53,12 +53,6 @@ public static class KoanLogger
         LogKoanEvent(logger, LogLevel.Information, "Koan:init", message);
     }
 
-    public static void LogKoanDiscover(ILogger logger, string providerType, string connectionString, bool success)
-    {
-        var status = success ? "OK" : "FAIL";
-        LogKoanEvent(logger, LogLevel.Information, "Koan:discover", $"{providerType}: {connectionString} {status}");
-    }
-
     public static void LogKoanModules(ILogger logger, string message)
     {
         LogKoanEvent(logger, LogLevel.Information, "Koan:modules", message);

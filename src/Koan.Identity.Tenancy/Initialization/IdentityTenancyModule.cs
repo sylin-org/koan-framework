@@ -26,11 +26,9 @@ namespace Koan.Identity.Tenancy.Initialization;
 /// deprovisioning. Ordered <c>[After]</c> both pillars so their registrations exist first.
 /// </summary>
 [After(typeof(Koan.Identity.Initialization.SecIdentityModule))]
-[After(typeof(Koan.Tenancy.Initialization.KoanAutoRegistrar))]
+[After(typeof(Koan.Tenancy.Initialization.TenancyModule))]
 public sealed class IdentityTenancyModule : KoanModule
 {
-    public override string Id => "Koan.Identity.Tenancy";
-
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<TenancyResolutionOptions>(TenancyResolutionOptions.SectionPath);

@@ -10,20 +10,16 @@ using Koan.Data.Vector.Abstractions;
 namespace Koan.Data.Vector.Connector.SqliteVec;
 
 /// <summary>
-/// Vector adapter factory for sqlite-vec. <see cref="CanHandle"/> answers to <c>sqlite</c> so it auto-pairs
+/// Vector adapter factory for sqlite-vec. The declarative <c>sqlite</c> alias lets it auto-pair
 /// with the SQLite data adapter (the standard vector election derives the desired provider from the data
-/// provider) — referencing both gives you durable, co-located vectors with zero config. Also answers to
+/// provider) — referencing both gives you durable, co-located vectors with zero config. Additional identities
 /// <c>sqlitevec</c>/<c>sqlite-vec</c> for an explicit <c>[VectorAdapter]</c> choice.
 /// </summary>
 [ProviderPriority(40)]
 public sealed class SqliteVecAdapterFactory : IVectorAdapterFactory
 {
     public string Provider => "sqlitevec";
-
-    public bool CanHandle(string provider)
-        => string.Equals(provider, "sqlite", StringComparison.OrdinalIgnoreCase)
-           || string.Equals(provider, "sqlitevec", StringComparison.OrdinalIgnoreCase)
-           || string.Equals(provider, "sqlite-vec", StringComparison.OrdinalIgnoreCase);
+    public IReadOnlyCollection<string> Aliases => ["sqlite", "sqlite-vec"];
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)
         => new()
@@ -47,7 +43,7 @@ public sealed class SqliteVecAdapterFactory : IVectorAdapterFactory
         var config = sp.GetRequiredService<IConfiguration>();
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
         var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "SqliteVec", source, baseOpts.ConnectionString, CanHandle);
+            config, sourceRegistry, "SqliteVec", source, baseOpts.ConnectionString, this);
 
         var sourceOpts = new SqliteVecOptions { ConnectionString = connectionString, DistanceMetric = baseOpts.DistanceMetric };
         return new SqliteVecVectorRepository<TEntity, TKey>(this, sp, sourceOpts);

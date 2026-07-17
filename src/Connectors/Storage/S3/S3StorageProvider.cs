@@ -1,5 +1,6 @@
 using Koan.Storage.Abstractions;
-using Koan.ZenGarden; // IZenGardenClient.BoundEndpoint only
+using Koan.Core.Logging;
+using Koan.ZenGarden;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Minio;
@@ -275,7 +276,8 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
             var primaryEndpoint = FindPrimaryEndpoint(hop1.Value);
             if (primaryEndpoint is null || primaryEndpoint == mossEndpoint.TrimEnd('/'))
             {
-                _logger?.LogDebug("No reachable primary for replica set '{ReplicaSet}'", replicaSet);
+                KoanLog.ServiceDebug(_logger, Infrastructure.S3StorageConstants.Logging.Discovery, "primary-unreachable",
+                    ("replicaSet", replicaSet));
                 return false;
             }
 
@@ -287,7 +289,8 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         }
         catch (Exception ex)
         {
-            _logger?.LogDebug(ex, "Garden storage resolution failed");
+            KoanLog.ServiceDebug(_logger, Infrastructure.S3StorageConstants.Logging.Discovery, "failed",
+                ("error", ex));
             return false;
         }
     }
@@ -322,7 +325,8 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         if (!string.IsNullOrWhiteSpace(accessKey)) opts.AccessKey = accessKey;
         if (!string.IsNullOrWhiteSpace(secretKey)) opts.SecretKey = secretKey;
 
-        _logger?.LogInformation("S3 resolved: {Endpoint}", s3Endpoint);
+        KoanLog.ServiceInfo(_logger, Infrastructure.S3StorageConstants.Logging.Discovery, "resolved",
+            ("endpoint", s3Endpoint));
         return true;
     }
 
@@ -454,7 +458,10 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
             throw new InvalidOperationException("Moss presign endpoint returned no URL.");
         }
 
-        _logger?.LogDebug("Presigned {Method} URL generated for {Bucket}/{Key}", method, bucket, key);
+        KoanLog.ServiceDebug(_logger, Infrastructure.S3StorageConstants.Logging.Request, "presigned",
+            ("method", method),
+            ("bucket", bucket),
+            ("key", key));
         return new Uri(presignedUrl);
     }
 
@@ -495,19 +502,27 @@ internal sealed class S3DiagnosticHandler : DelegatingHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
-        _logger?.LogDebug("S3 >> {Method} {Uri}", request.Method, request.RequestUri);
+        KoanLog.ServiceDebug(_logger, Infrastructure.S3StorageConstants.Logging.Request, "sending",
+            ("method", request.Method.Method),
+            ("uri", request.RequestUri));
 
         var response = await base.SendAsync(request, ct);
 
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(ct);
-            _logger?.LogWarning("S3 << {Status} {Method} {Uri} Body={Body}",
-                (int)response.StatusCode, request.Method, request.RequestUri, body);
+            KoanLog.ServiceWarning(_logger, Infrastructure.S3StorageConstants.Logging.Request, "failed",
+                ("status", (int)response.StatusCode),
+                ("method", request.Method.Method),
+                ("uri", request.RequestUri),
+                ("body", body));
         }
         else
         {
-            _logger?.LogDebug("S3 << {Status} {Method} {Uri}", (int)response.StatusCode, request.Method, request.RequestUri);
+            KoanLog.ServiceDebug(_logger, Infrastructure.S3StorageConstants.Logging.Request, "complete",
+                ("status", (int)response.StatusCode),
+                ("method", request.Method.Method),
+                ("uri", request.RequestUri));
         }
 
         return response;

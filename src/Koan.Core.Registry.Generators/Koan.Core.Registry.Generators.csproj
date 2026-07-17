@@ -1,29 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Kernel</KoanPackageKind>
     <TargetFramework>netstandard2.0</TargetFramework>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <OutputType>Library</OutputType>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
     <AssemblyName>Koan.Core.Registry.Generators</AssemblyName>
     <RootNamespace>Koan.Core.Registry.Generators</RootNamespace>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <Description>Source generator infrastructure for Koan registries (initializers, auto-registrars, background services, service discovery).</Description>
     <PackageTags>$(CommonPackageTags);analyzer;source-generator;registry</PackageTags>
-    <IsPackable>true</IsPackable>
+    <!-- R09-02: Core owns and ships this implementation detail as a transitive build tool. -->
+    <IsPackable>false</IsPackable>
     <IsRoslynComponent>true</IsRoslynComponent>
-    <!-- See Koan.Cache.Analyzers.csproj for the rationale. -->
-    <IncludeSymbols>false</IncludeSymbols>
-    <IncludeSource>false</IncludeSource>
-    <NoWarn>$(NoWarn);RS2007;NU5017;NU5019;NU5128</NoWarn>
+    <NoWarn>$(NoWarn);RS2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-    <None Include="$(OutputPath)$(AssemblyName).xml" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" Condition="Exists('$(OutputPath)$(AssemblyName).xml')" />
+    <None Remove="AnalyzerReleases.Shipped.md;AnalyzerReleases.Unshipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
   </ItemGroup>
 </Project>

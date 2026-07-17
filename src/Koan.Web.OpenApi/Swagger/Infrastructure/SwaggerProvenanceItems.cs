@@ -15,7 +15,7 @@ internal static class SwaggerProvenanceItems
     private static readonly IReadOnlyCollection<string> Consumers = new[]
     {
         "Koan.Web.Connector.Swagger.Hosting.KoanSwaggerStartupFilter",
-        "Koan.Web.Connector.Swagger.Initialization.KoanAutoRegistrar"
+        "Koan.Web.OpenApi.Initialization.OpenApiModule"
     };
 
     internal static readonly ProvenanceItem Enabled = new(

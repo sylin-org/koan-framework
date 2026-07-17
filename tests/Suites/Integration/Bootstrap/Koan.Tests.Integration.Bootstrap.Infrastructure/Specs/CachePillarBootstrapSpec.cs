@@ -15,10 +15,9 @@ using Xunit;
 namespace Koan.Tests.Integration.Bootstrap.Infrastructure.Specs;
 
 /// <summary>
-/// Full-DI bootstrap smoke for the cache pillar. Unlike unit tests and even the per-adapter
-/// integration tests (which manually invoke <c>new KoanAutoRegistrar().Initialize(services)</c>),
-/// these specs go through <c>services.AddKoan()</c> — the real reflective discovery path that
-/// production code uses. They prove the "Reference = Intent" headline promise end-to-end.
+/// Full-DI bootstrap smoke for the cache pillar. These specs go through
+/// <c>services.AddKoan()</c> — the real compiled activation path that production code uses.
+/// They prove the "Reference = Intent" headline promise end-to-end.
 /// </summary>
 /// <remarks>
 /// <para>

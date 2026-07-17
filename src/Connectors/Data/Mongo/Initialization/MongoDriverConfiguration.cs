@@ -15,8 +15,7 @@ namespace Koan.Data.Connector.Mongo.Initialization;
 
 /// <summary>
 /// The single, once-guarded Mongo-family global driver configuration (ARCH-0103 §L). Folds the two
-/// former static-config sites — <c>KoanAutoRegistrar.ConfigureMongoStaticState</c> and the
-/// independently-discovered <c>MongoOptimizationAutoRegistrar</c> (with its separate lock and the
+/// former static-config sites — the adapter module and the independently discovered optimization path (with its
 /// <c>Initialize(null!)</c> hand-invoke) — into ONE entry point behind ONE guard. The proven config
 /// bodies (conventions, GUID/comparable serializers, per-member identity class maps) are preserved
 /// verbatim; only the call structure changed.

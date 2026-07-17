@@ -84,7 +84,7 @@ public abstract class DataAdapterHealthContributorBase(
 
         try
         {
-            var decision = AdapterResolver.ResolveDefault(services, sourceRegistry);
+            var decision = AdapterResolver.ResolveDefault(services);
             if (Matches(decision.Adapter))
             {
                 sources.Add(decision.Source);

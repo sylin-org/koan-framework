@@ -5,6 +5,7 @@ using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
 using Koan.Core.AI;
+using Koan.Core.Logging;
 using Koan.ZenGarden.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -28,7 +29,8 @@ internal sealed class ZenGardenAiAdapterContributor : IAiAdapterContributor
         // Skip if ZenGarden AI source already registered (explicit config)
         if (sourceRegistry.HasSource(Constants.Discovery.WellKnownServiceName))
         {
-            logger.LogDebug("ZenGarden AI source already registered, skipping discovery");
+            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "skipped",
+                ("reason", "source-already-registered"));
             return;
         }
 
@@ -36,7 +38,8 @@ internal sealed class ZenGardenAiAdapterContributor : IAiAdapterContributor
         var zenGardenProvider = services.GetService<IZenGardenInitializationProvider>();
         if (zenGardenProvider is null)
         {
-            logger.LogDebug("No Zen Garden provider available, skipping AI orchestrator discovery");
+            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "skipped",
+                ("reason", "provider-unavailable"));
             return;
         }
 
@@ -49,12 +52,13 @@ internal sealed class ZenGardenAiAdapterContributor : IAiAdapterContributor
         }
         catch (Exception ex)
         {
-            logger.LogDebug(ex, "Failed to resolve AI orchestrator via Zen Garden");
+            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "resolution-failed",
+                ("error", ex));
         }
 
         if (string.IsNullOrWhiteSpace(endpoint))
         {
-            logger.LogDebug("AI orchestrator not found in Zen Garden topology");
+            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "not-found");
             return;
         }
 
@@ -70,14 +74,17 @@ internal sealed class ZenGardenAiAdapterContributor : IAiAdapterContributor
             var healthResp = await http.GetAsync(Constants.Endpoints.Health, cancellationToken);
             if (!healthResp.IsSuccessStatusCode)
             {
-                logger.LogDebug("AI orchestrator at {Endpoint} is not healthy (HTTP {Status})",
-                    endpoint, healthResp.StatusCode);
+                KoanLog.BootDebug(logger, Constants.Logging.Discovery, "unhealthy",
+                    ("endpoint", endpoint),
+                    ("status", (int)healthResp.StatusCode));
                 return;
             }
         }
         catch (Exception ex)
         {
-            logger.LogDebug(ex, "AI orchestrator at {Endpoint} is not reachable", endpoint);
+            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "unreachable",
+                ("endpoint", endpoint),
+                ("error", ex));
             return;
         }
 
@@ -98,12 +105,15 @@ internal sealed class ZenGardenAiAdapterContributor : IAiAdapterContributor
                 }
             }
 
-            logger.LogInformation("AI orchestrator at {Endpoint}: {Count} capabilities discovered ({Capabilities})",
-                endpoint, capabilities.Count, string.Join(", ", capabilities));
+            KoanLog.BootInfo(logger, Constants.Logging.Discovery, "capabilities-discovered",
+                ("endpoint", endpoint),
+                ("count", capabilities.Count),
+                ("capabilities", string.Join(", ", capabilities)));
         }
         catch (Exception ex)
         {
-            logger.LogDebug(ex, "Failed to query capabilities from AI orchestrator — assuming full capability set");
+            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "capabilities-fallback",
+                ("error", ex));
             // Assume full capability set if query fails (orchestrator may not have /v1/capabilities yet)
             capabilities = [
                 AiCapability.Chat, AiCapability.Embed, AiCapability.Ocr, AiCapability.Vision,
@@ -146,8 +156,8 @@ internal sealed class ZenGardenAiAdapterContributor : IAiAdapterContributor
             ?? NullLogger<ZenGardenAiAdapter>.Instance, capabilities);
         adapterRegistry.Add(adapter);
 
-        logger.LogInformation(
-            "Registered Zen Garden AI Orchestrator at {Endpoint} with {Count} capabilities",
-            endpoint, capabilities.Count);
+        KoanLog.BootInfo(logger, Constants.Logging.Discovery, "registered",
+            ("endpoint", endpoint),
+            ("count", capabilities.Count));
     }
 }

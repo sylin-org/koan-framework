@@ -1,5 +1,7 @@
 ﻿using System.Collections.Concurrent;
-using Koan.Core.Ordering;
+using System.ComponentModel;
+using Koan.Core.Semantics;
+using Koan.Core.Semantics.Contributions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Core.Hosting.Registry;
@@ -9,30 +11,11 @@ namespace Koan.Core.Hosting.Registry;
 /// </summary>
 public static partial class KoanRegistry
 {
-    private static readonly ConcurrentDictionary<Type, byte> _initializerTypes = new(TypeEqualityComparer.Instance);
-    private static readonly ConcurrentDictionary<Type, byte> _autoRegistrarTypes = new(TypeEqualityComparer.Instance);
     private static readonly ConcurrentDictionary<Type, BackgroundServiceDescriptor> _backgroundServices = new(TypeEqualityComparer.Instance);
     private static readonly ConcurrentDictionary<Type, ServiceDiscoveryAdapterDescriptor> _serviceDiscoveryAdapters = new(TypeEqualityComparer.Instance);
+    private static readonly ConcurrentDictionary<Type, SemanticComponentDescriptor> _semanticModules = new(TypeEqualityComparer.Instance);
     // Generic [KoanDiscoverable] discovery: implementer types keyed by the marked interface Type (ARCH-0086).
     private static readonly ConcurrentDictionary<Type, ConcurrentDictionary<Type, byte>> _discoveredImplementors = new(TypeEqualityComparer.Instance);
-
-    public static void RegisterInitializers(IEnumerable<Type> types)
-    {
-        foreach (var type in types)
-        {
-            if (type is null) continue;
-            _initializerTypes.TryAdd(type, 0);
-        }
-    }
-
-    public static void RegisterAutoRegistrars(IEnumerable<Type> types)
-    {
-        foreach (var type in types)
-        {
-            if (type is null) continue;
-            _autoRegistrarTypes.TryAdd(type, 0);
-        }
-    }
 
     public static void RegisterBackgroundServices(IEnumerable<BackgroundServiceDescriptor> descriptors)
     {
@@ -52,20 +35,34 @@ public static partial class KoanRegistry
         }
     }
 
-    /// <summary>
-    /// Returns all initializer types registered for the current AppDomain,
-    /// topologically sorted to satisfy any <see cref="BeforeAttribute"/> /
-    /// <see cref="AfterAttribute"/> declarations and otherwise broken by a
-    /// stable <c>AssemblyQualifiedName</c> tie-break. See CORE-0091.
-    /// </summary>
-    public static Type[] GetInitializerTypes() => RegistrarOrdering.Sort(_initializerTypes.Keys);
+    /// <summary>Generated-code ABI for construction-free semantic module descriptors.</summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static void RegisterSemanticModule(
+        string id,
+        Type implementationType,
+        Func<KoanModule> factory,
+        SemanticContributionBinding[]? contributionBindings = null)
+    {
+        var descriptor = new SemanticComponentDescriptor(
+            id,
+            implementationType,
+            factory,
+            contributionBindings);
 
-    /// <summary>
-    /// Returns all auto-registrar types registered for the current AppDomain,
-    /// sorted by the same rules as <see cref="GetInitializerTypes"/> so that
-    /// provenance / boot-output ordering matches initialization ordering.
-    /// </summary>
-    public static Type[] GetAutoRegistrarTypes() => RegistrarOrdering.Sort(_autoRegistrarTypes.Keys);
+        if (_semanticModules.TryGetValue(implementationType, out var existing))
+        {
+            if (existing.Id != descriptor.Id)
+            {
+                throw new InvalidOperationException(
+                    $"Koan semantic module '{implementationType.FullName}' was registered with both '{existing.Id}' and '{descriptor.Id}'. " +
+                    "Keep one concrete KoanModule as the assembly's activation owner.");
+            }
+
+            return;
+        }
+
+        _semanticModules.TryAdd(implementationType, descriptor);
+    }
 
     /// <summary>
     /// Returns background service descriptors registered for the current AppDomain.
@@ -76,6 +73,11 @@ public static partial class KoanRegistry
     /// Returns service discovery adapter descriptors registered for the current AppDomain.
     /// </summary>
     public static ServiceDiscoveryAdapterDescriptor[] GetServiceDiscoveryAdapters() => _serviceDiscoveryAdapters.Values.ToArray();
+
+    internal static SemanticComponentDescriptor[] GetSemanticModuleDescriptors() =>
+        _semanticModules.Values
+            .OrderBy(static descriptor => descriptor.Id)
+            .ToArray();
 
     /// <summary>
     /// Registers concrete implementers of a <c>[KoanDiscoverable]</c>-marked interface, keyed by that
@@ -107,10 +109,9 @@ public static partial class KoanRegistry
     /// </summary>
     internal static void ResetForTesting()
     {
-        _initializerTypes.Clear();
-        _autoRegistrarTypes.Clear();
         _backgroundServices.Clear();
         _serviceDiscoveryAdapters.Clear();
+        _semanticModules.Clear();
         _discoveredImplementors.Clear();
     }
 

@@ -72,7 +72,7 @@ Review.Create<TEntity>()
 Review events are emitted after each action, enabling downstream consumers (e.g., training dataset pipelines) to capture reviewer decisions:
 
 ```csharp
-// In KoanAutoRegistrar or background service
+// In AiReviewModule or a background service
 services.AddReviewEventHandler<ArticleSummary, SummaryFeedbackHandler>();
 ```
 

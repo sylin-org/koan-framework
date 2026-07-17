@@ -35,10 +35,7 @@ namespace Koan.Data.Connector.ElasticSearch;
 public sealed class ElasticSearchVectorAdapterFactory : IVectorAdapterFactory
 {
     public string Provider => "elasticsearch";
-
-    public bool CanHandle(string provider)
-        => string.Equals(provider, "elasticsearch", StringComparison.OrdinalIgnoreCase) ||
-           string.Equals(provider, "elastic", StringComparison.OrdinalIgnoreCase);
+    public IReadOnlyCollection<string> Aliases => ["elastic"];
 
     // ARCH-0103 §4.1: accepts the routed source for contract alignment; per-source physical placement (per-index /
     // per-cluster) is realized in P4.

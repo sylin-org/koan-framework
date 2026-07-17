@@ -17,7 +17,7 @@ namespace Koan.Web.Extensions.GenericControllers;
 /// registration is skipped.
 /// </summary>
 /// <remarks>
-/// Runs at <c>IKoanAutoRegistrar.Initialize</c> time, which is <i>after</i>
+/// Runs from <c>KoanModule.Register</c>, which is <i>after</i>
 /// <see cref="AssemblyCache"/> is fully populated by the bootstrapper's assembly-closure pass and
 /// <i>before</i> MVC materializes the controller feature — so the registration entries are visible to
 /// <see cref="GenericControllers.FeatureProvider"/>.

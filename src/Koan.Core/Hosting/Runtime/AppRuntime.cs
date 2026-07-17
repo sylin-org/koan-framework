@@ -17,6 +17,8 @@ using Koan.Core.Observability;
 using Koan.Core.Observability.Health;
 using Koan.Core.Diagnostics;
 using Koan.Core.Infrastructure;
+using Koan.Core.Semantics;
+using Koan.Core.Semantics.Contributions;
 
 namespace Koan.Core.Hosting.Runtime;
 
@@ -54,8 +56,12 @@ internal sealed class AppRuntime : IAppRuntime
             IProvenanceRegistry registry = ProvenanceRegistry.Instance;
             var cfg = _sp.GetService<IConfiguration>();
 
-            // Collect module information from all KoanAutoRegistrars
+            // Collect module information from the retained host constitution.
             CollectProvenance(registry, cfg, collectedFacts);
+            if (_sp.GetService<SemanticContributionCompilationSnapshot>() is { } contributionSnapshot)
+            {
+                collectedFacts.AddRange(contributionSnapshot.ToFacts());
+            }
 
             var provenance = registry.CurrentSnapshot;
             var modulePairs = provenance.Pillars
@@ -64,6 +70,17 @@ internal sealed class AppRuntime : IAppRuntime
                 .Select(g => (g.Key, string.IsNullOrWhiteSpace(g.First().Version) ? "unknown" : g.First().Version!))
                 .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            if (_sp.GetService<SemanticHostConstitution>() is { } constitution)
+            {
+                modulePairs.AddRange(constitution.ActiveDescriptors.Select(static descriptor => (
+                    descriptor.Id.ToString(),
+                    string.IsNullOrWhiteSpace(descriptor.Version) ? "unknown" : descriptor.Version!)));
+                modulePairs = modulePairs
+                    .GroupBy(static pair => pair.Item1, StringComparer.OrdinalIgnoreCase)
+                    .Select(static group => group.First())
+                    .OrderBy(static pair => pair.Item1, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
 
             var snapshot = KoanEnv.CurrentSnapshot;
             var runtimeVersion = ResolveRuntimeVersion(modulePairs);
@@ -166,28 +183,41 @@ internal sealed class AppRuntime : IAppRuntime
         if (cfg == null) return;
 
         var env = _sp.GetService<IHostEnvironment>();
-
-        foreach (var registrarType in KoanRegistry.GetAutoRegistrarTypes())
+        var hostEnv = env ?? new DefaultHostEnvironment();
+        var retainedRuntime = _sp.GetService<SemanticModuleRuntime>();
+        foreach (var retained in retainedRuntime?.Modules ?? [])
         {
             try
             {
-                if (registrarType.IsAbstract) continue;
-                if (Activator.CreateInstance(registrarType) is not IKoanAutoRegistrar registrar) continue;
-
-                var hostEnv = env ?? new DefaultHostEnvironment();
-                var module = registry.GetOrCreateModule("", registrar.ModuleName);
-                module.Describe(registrar.ModuleVersion);
-                registrar.Describe(module, cfg, hostEnv);
+                var module = registry.GetOrCreateModule("", retained.Id);
+                retained.Report(module, cfg, hostEnv);
             }
             catch (Exception ex)
             {
                 facts.Add(CollectionFailure(
-                    $"provenance:{registrarType.FullName ?? registrarType.Name}",
-                    registrarType,
+                    $"provenance:{retained.GetType().FullName ?? retained.GetType().Name}",
+                    retained.GetType(),
                     ex,
-                    "A module could not report its configuration provenance."));
+                    "A retained semantic module could not report its configuration provenance."));
             }
         }
+
+        try
+        {
+            var core = registry.GetOrCreateModule("", "Sylin.Koan.Core");
+            core.Describe(typeof(AppRuntime).Assembly.GetName().Version?.ToString());
+            Orchestration.ServiceDiscoveryBootstrap.Report(core);
+            BackgroundServices.KoanBackgroundServicesBootstrap.Report(core);
+        }
+        catch (Exception ex)
+        {
+            facts.Add(CollectionFailure(
+                "provenance:Sylin.Koan.Core",
+                typeof(AppRuntime),
+                ex,
+                "Core could not report its service-discovery or background-service provenance."));
+        }
+
     }
 
     // P1.1: build the one-line composition verdict and write the resolved-twin lockfile. Best-effort

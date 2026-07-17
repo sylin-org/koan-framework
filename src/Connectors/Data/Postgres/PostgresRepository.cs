@@ -16,6 +16,7 @@ using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Core.Semantics;
 using Koan.Data.Relational;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
@@ -67,6 +68,7 @@ internal class PostgresRepository<
     private readonly ILinqSqlDialect _dialect = new PgDialect();
     private readonly int _defaultPageSize;
     private readonly ILogger _logger;
+    private readonly JsonSerializerSettings _json;
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
 
     public PostgresRepository(IServiceProvider sp, PostgresOptions options, IStorageNameResolver resolver)
@@ -94,6 +96,9 @@ internal class PostgresRepository<
                       : NullLogger.Instance);
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
         _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
+        _json = ComparableScalarEncoding.Apply(
+            new JsonSerializerSettings(),
+            sp.GetRequiredService<DataSegmentationPlan>().For(typeof(TEntity)).Fields);
 
         // Log optimization strategy for diagnostics
         if (_optimizationInfo.IsOptimized)
@@ -295,10 +300,7 @@ internal class PostgresRepository<
     // TimeSpan (ticks), DateOnly/TimeOnly (fixed text) persist in an order-preserving form matching the
     // filter comparand. Default (PascalCase) naming is preserved — ResolveColumnSql reads
     // ("Json" #>> '{prop}') with the PascalCase property name.
-    private static readonly JsonSerializerSettings _json =
-        ComparableScalarEncoding.Apply(new JsonSerializerSettings());
-
-    private static TEntity FromRow((string Id, string Json) row)
+    private TEntity FromRow((string Id, string Json) row)
         => JsonConvert.DeserializeObject<TEntity>(row.Json, _json)!;
 
     private (object Id, string Json) ToRowOptimized(TEntity e)
@@ -1120,7 +1122,7 @@ internal class PostgresRepository<
 
     [RequiresUnreferencedCode("Uses reflection-based Json deserialization fallbacks for dynamic rows.")]
     [RequiresDynamicCode("Uses reflection to instantiate entities when JSON payloads are invalid.")]
-    private static List<TEntity> MapRowsToEntities(IEnumerable<dynamic> rows)
+    private List<TEntity> MapRowsToEntities(IEnumerable<dynamic> rows)
     {
         var list = new List<TEntity>();
         foreach (var row in rows)

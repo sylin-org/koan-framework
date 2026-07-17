@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -17,9 +16,12 @@
     <!-- ARCH-0104 — the console references Koan.Web (controllers/authorization) + Koan.Tenancy (the control-plane
          entities) + Koan.Jobs (the resumable/audited lifecycle operation). It does NOT reference Koan.Identity:
          Membership.IdentityId is a string soft-FK, so the layering stays clean (parallel to Koan.Identity.Web). -->
-    <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
-    <ProjectReference Include="..\Koan.Tenancy\Koan.Tenancy.csproj" />
-    <ProjectReference Include="..\Koan.Jobs\Koan.Jobs.csproj" />
+    <ProjectReference Include="..\Koan.Web\Koan.Web.csproj"
+                      />
+    <ProjectReference Include="..\Koan.Tenancy\Koan.Tenancy.csproj"
+                      />
+    <ProjectReference Include="..\Koan.Jobs\Koan.Jobs.csproj"
+                      />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="wwwroot\**\*.*" LogicalName="Koan.Tenancy.Web.wwwroot.%(RecursiveDir)%(Filename)%(Extension)" />

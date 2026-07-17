@@ -13,11 +13,9 @@ public static class StorageObjectExtensions
     => (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IStorageService)) as IStorageService)
            ?? throw new InvalidOperationException("IStorageService not available. Ensure AppBootstrapper.InitializeModules() ran and AppHost.Current is set (greenfield boot).");
 
-    // STOR-0011: declare the instance's runtime type so the ScopedStorageService decorator applies this type's
-    // data-axis isolation (the leading particle) + the [HostScoped] exemption + the typed guard. Without this, an
-    // IStorageObject-typed reference binds these extensions (instead of the scoped StorageEntity<T> instance
-    // methods) and would take the type-less ambient path — over-prefixing a [HostScoped] blob and missing the
-    // typed exemption.
+    // Carry the instance's runtime type through the type-erased storage boundary. Without this, an
+    // IStorageObject-typed reference would take the raw isolation path and lose subject applicability such as
+    // [HostScoped].
     private static IDisposable Scope(IStorageObject obj) => StorageScope.For(obj.GetType());
 
     public static Task<string> ReadAllText(this IStorageObject obj, Encoding? encoding = null, CancellationToken ct = default)

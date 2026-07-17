@@ -83,32 +83,23 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
     {
         var candidates = new List<DiscoveryCandidate>();
 
+        // A required source is a hard promise. Its candidates still receive adapter-owned normalization and
+        // health qualification, but no autonomous, environment, Aspire, or explicit-config candidate may enter.
+        if (context.PlannedCandidateMode == DiscoveryCandidateMode.Required)
+        {
+            AddPlannedCandidates(candidates, context);
+            ApplyCandidateParameters(candidates, context);
+            return candidates.Where(static candidate => !string.IsNullOrWhiteSpace(candidate.Url));
+        }
+
         // 1. Add service-specific environment-variable candidates. These preserve legacy/raw environment
         // conventions that are not already represented by IConfiguration, but never override concrete app intent.
         candidates.AddRange(GetEnvironmentCandidates()
             .Where(static candidate => candidate is not null && !string.IsNullOrWhiteSpace(candidate.Url))
             .Select(static candidate => candidate with { Priority = DiscoveryCandidatePriority.Environment }));
 
-        // 2. Fold in candidates contributed by external discovery sources (Zen Garden / Koi), populated by the
-        // coordinator. These are health-checked like any other candidate — tried ahead of the compose/host/local
-        // guesses but behind explicit env/config — so an unreachable contributed answer (e.g. a same-host offering
-        // advertised on an interface this app can't reach) fails its probe and the loop falls through. The
-        // contributor informs discovery; it never short-circuits it.
-        if (context.ContributedCandidates is { Count: > 0 })
-        {
-            foreach (var contributed in context.ContributedCandidates)
-            {
-                if (contributed is not null && !string.IsNullOrWhiteSpace(contributed.Url))
-                {
-                    var normalized = contributed with { Priority = DiscoveryCandidatePriority.Automatic };
-                    candidates.Add(normalized);
-                    KoanLog.ConfigDebug(_logger, "discovery.candidate", null,
-                        ("service", ServiceName),
-                        ("method", normalized.Method),
-                        ("url", Redaction.DeIdentify(normalized.Url)));
-                }
-            }
-        }
+        // 2. Fold the host plan's live automatic candidates into the shared health-checked election.
+        AddPlannedCandidates(candidates, context);
 
         // 3. Add concrete explicit configuration candidates. The literal "auto" is a declaration that the
         // shared pipeline should decide; it is not itself a usable endpoint.
@@ -149,18 +140,7 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
 
         // 6. Apply service-specific connection parameters and normalization
         // Always call ApplyConnectionParameters to allow adapters to normalize URLs even without parameters
-        var parameters = context.Parameters ?? new Dictionary<string, object>();
-        for (int i = 0; i < candidates.Count; i++)
-        {
-            if (!string.IsNullOrWhiteSpace(candidates[i].Url))
-            {
-                var enhancedUrl = ApplyConnectionParameters(candidates[i].Url, parameters);
-                if (enhancedUrl != candidates[i].Url)
-                {
-                    candidates[i] = candidates[i] with { Url = enhancedUrl };
-                }
-            }
-        }
+        ApplyCandidateParameters(candidates, context);
 
         return candidates.Where(c => !string.IsNullOrWhiteSpace(c.Url));
     }
@@ -262,6 +242,16 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
         return baseUrl; // Default: no parameter application
     }
 
+    /// <summary>
+    /// Report a provider normalization failure through the shared safe discovery boundary.
+    /// Use only when the provider deliberately retains the original candidate as a fallback.
+    /// </summary>
+    protected void ReportNormalizationFailure(string candidate, Exception exception)
+        => KoanLog.ConfigDebug(_logger, LogActions.Normalize, LogOutcomes.Failure,
+            ("service", ServiceName),
+            ("url", candidate),
+            ("error", exception));
+
     private KoanServiceAttribute? GetServiceAttribute() =>
         GetFactoryType().GetCustomAttribute<KoanServiceAttribute>();
 
@@ -279,6 +269,10 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
             cts.CancelAfter(context.HealthCheckTimeout);
 
             return await ValidateServiceHealth(serviceUrl, context, cts.Token);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (OperationCanceledException)
         {
@@ -303,12 +297,43 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
     /// <summary>Override to implement Aspire service discovery</summary>
     protected virtual string? ReadAspireServiceDiscovery() => null;
 
+    private void AddPlannedCandidates(List<DiscoveryCandidate> candidates, DiscoveryContext context)
+    {
+        if (context.PlannedCandidates is not { Count: > 0 }) return;
+
+        foreach (var candidate in context.PlannedCandidates)
+        {
+            if (candidate is null || string.IsNullOrWhiteSpace(candidate.Url)) continue;
+            var normalized = candidate with { Priority = DiscoveryCandidatePriority.Automatic };
+            candidates.Add(normalized);
+            KoanLog.ConfigDebug(_logger, "discovery.candidate", null,
+                ("service", ServiceName),
+                ("method", normalized.Method),
+                ("url", Redaction.DeIdentify(normalized.Url)));
+        }
+    }
+
+    private void ApplyCandidateParameters(List<DiscoveryCandidate> candidates, DiscoveryContext context)
+    {
+        var parameters = context.Parameters ?? new Dictionary<string, object>();
+        for (var index = 0; index < candidates.Count; index++)
+        {
+            if (string.IsNullOrWhiteSpace(candidates[index].Url)) continue;
+            var enhancedUrl = ApplyConnectionParameters(candidates[index].Url, parameters);
+            if (enhancedUrl != candidates[index].Url)
+            {
+                candidates[index] = candidates[index] with { Url = enhancedUrl };
+            }
+        }
+    }
+
     private static class LogActions
     {
         public const string Start = "discovery.start";
         public const string Try = "discovery.try";
         public const string Decide = "discovery.decide";
         public const string Health = "discovery.health";
+        public const string Normalize = "discovery.normalize";
     }
 
     private static class LogOutcomes

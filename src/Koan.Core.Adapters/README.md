@@ -86,13 +86,13 @@ internal sealed class MyAdapterOptionsConfigurator(
 var result = await adapter.WithReadinessAsync(() => adapter.QueryAsync(...), ct);
 ```
 
-Register `IAsyncAdapterInitializer` and your `IConfigureOptions<MyAdapterOptions>` in your
-adapter's own `IKoanAutoRegistrar` (Reference = Intent). This package's own registrar wires the
-readiness hosted services automatically when it is referenced.
+Register `IAsyncAdapterInitializer` and your `IConfigureOptions<MyAdapterOptions>` from your
+adapter's `KoanModule.Register` method. `CoreAdaptersModule` wires the shared readiness services
+automatically when this package is referenced.
 
 ## Auto-registration
 
-`Koan.Core.Adapters.Initialization.KoanAutoRegistrar` (module `Koan.Core.Adapters.Readiness`):
+`Koan.Core.Adapters.Initialization.CoreAdaptersModule`:
 
 - binds `AdaptersReadinessOptions` from `Koan:Adapters:Readiness`;
 - registers `IRetryPolicyProvider` → `DefaultRetryPolicyProvider`;

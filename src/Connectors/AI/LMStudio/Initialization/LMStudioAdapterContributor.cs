@@ -191,7 +191,8 @@ internal sealed class LMStudioAdapterContributor : IAiAdapterContributor
     {
         if (explicitUrls?.Length > 0 && additionalUrls?.Length > 0)
         {
-            logger.LogWarning("LM Studio: both 'Urls' and 'AdditionalUrls' specified; AdditionalUrls ignored in explicit mode.");
+            KoanLog.BootWarning(logger, LogActions.Discovery, "overlapping-fallback-configuration",
+                ("settings", "Urls,AdditionalUrls"));
         }
 
         if (explicitUrls is { Length: 0 })

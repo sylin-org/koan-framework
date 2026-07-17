@@ -2,6 +2,8 @@ using Koan.Core;
 using Koan.Communication;
 using Koan.Communication.Signals;
 using Koan.Data.Abstractions;
+using Koan.Jobs.Semantics;
+using Koan.Core.Semantics.Segmentation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -30,6 +32,13 @@ public static class JobsServiceCollectionExtensions
                 sp.GetRequiredService<JobTypeRegistry>())
             : new InMemoryJobLedger(sp.GetRequiredService<IOptions<JobsOptions>>()));
         services.TryAddSingleton(_ => JobTypeRegistry.FromDiscovery());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<
+            ISegmentationRealization,
+            JobsContextPlan>());
+        services.TryAddSingleton(sp => sp
+            .GetServices<ISegmentationRealization>()
+            .OfType<JobsContextPlan>()
+            .Single());
         services.TryAddSingleton<JobWakeCoordinator>();
         services.AddFrameworkSignal<JobReadySignal, JobWakeCoordinator>();
         services.TryAddSingleton<JobOrchestrator>();

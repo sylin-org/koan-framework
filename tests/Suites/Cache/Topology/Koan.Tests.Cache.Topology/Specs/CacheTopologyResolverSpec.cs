@@ -106,4 +106,51 @@ public sealed class CacheTopologyResolverSpec
         resolve.Should().Throw<InvalidOperationException>()
             .WithMessage("*does-not-exist*Candidates: high-priority, low-priority*");
     }
+
+    [Fact]
+    public void Equal_priority_uses_stable_provider_identity_not_registration_order()
+    {
+        var result = Resolver().Resolve(
+            new ICacheStore[]
+            {
+                new FakeCacheStore("zeta", CacheStorePlacement.Local),
+                new FakeCacheStore("alpha", CacheStorePlacement.Local)
+            },
+            new CacheOptions());
+
+        result.Local!.Name.Should().Be("alpha");
+    }
+
+    [Fact]
+    public void Duplicate_provider_identity_is_rejected_by_the_shared_catalog()
+    {
+        var resolve = () => Resolver().Resolve(
+            new ICacheStore[]
+            {
+                new FakeCacheStore("same", CacheStorePlacement.Local),
+                new FakeCacheStore("SAME", CacheStorePlacement.Remote)
+            },
+            new CacheOptions());
+
+        resolve.Should().Throw<InvalidOperationException>()
+            .WithMessage("*identity 'same'*more than once*");
+    }
+
+    [Fact]
+    public void Registry_allows_idempotent_registration_but_rejects_identity_collisions()
+    {
+        var registry = new CacheStoreRegistry();
+        var first = new FakeCacheStore("memory", CacheStorePlacement.Local);
+
+        registry.Register(first);
+        registry.Register(first);
+
+        registry.Stores.Should().ContainSingle().Which.Should().BeSameAs(first);
+
+        var collide = () => registry.Register(
+            new FakeCacheStore("MEMORY", CacheStorePlacement.Local));
+
+        collide.Should().Throw<InvalidOperationException>()
+            .WithMessage("*identity 'MEMORY'*registered more than once*");
+    }
 }

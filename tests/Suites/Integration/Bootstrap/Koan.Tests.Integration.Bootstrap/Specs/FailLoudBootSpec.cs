@@ -15,14 +15,14 @@ namespace Koan.Tests.Integration.Bootstrap.Specs;
 
 /// <summary>
 /// ARCH-0079 integration spec for the Track F fail-loud boot policy (fail-fast.json).
-/// Proves through real <c>AddKoan()</c> reflective discovery that a broken module initializer:
+/// Proves through real <c>AddKoan()</c> reflective discovery that a broken module registration:
 /// (a) crashes the host with a <see cref="KoanBootException"/> that NAMES the module, and
-/// (b) under <c>KOAN_BOOT_LENIENT=1</c> lets the host boot while recording the failure into the
+/// (b) remains fail-closed under <c>KOAN_BOOT_LENIENT=1</c> while recording the failure into the
 /// registry summary (the MODULES-FAILED channel the boot report renders).
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Why a gated fake:</b> <see cref="ThrowingBootInitializer"/> is a real <see cref="IKoanInitializer"/>
+/// <b>Why a gated fake:</b> <see cref="ThrowingBootModule"/> is a real <see cref="KoanModule"/>
 /// in this test assembly, so <c>RegistryManifestLoader</c> discovers it on the first <c>AddKoan()</c>
 /// in the process and it stays registered in the AppDomain-wide <c>KoanRegistry</c> for every later
 /// boot. It must therefore be a no-op unless explicitly armed, or it would break every other spec's
@@ -42,11 +42,11 @@ public sealed class FailLoudBootSpec
     }
 
     [Fact]
-    public void Throwing_initializer_fails_boot_with_KoanBootException_naming_the_module()
+    public void Throwing_module_fails_boot_with_KoanBootException_naming_the_module()
     {
         Environment.SetEnvironmentVariable(LenientEnvVar, null);
-        ThrowingBootInitializer.ResetForTest();
-        using var arm = ThrowingBootInitializer.Arm();
+        ThrowingBootModule.ResetForTest();
+        using var arm = ThrowingBootModule.Arm();
 
         // AddKoan() drives real reflective discovery; the discovered throwing initializer must abort
         // boot with a KoanBootException — NOT be silently swallowed.
@@ -58,18 +58,18 @@ public sealed class FailLoudBootSpec
             .Which;
 
         // The exception is the boot-time diagnostic channel: it MUST name the failing module.
-        ex.Module.Should().Be<ThrowingBootInitializer>();
-        ex.Message.Should().Contain(typeof(ThrowingBootInitializer).FullName);
-        ex.Phase.Should().Be("initializer");
-        ex.InnerException.Should().BeOfType<ThrowingBootInitializer.BootBoomException>();
+        ex.Module.Should().Be<ThrowingBootModule>();
+        ex.Message.Should().Contain(typeof(ThrowingBootModule).FullName);
+        ex.Phase.Should().Be("register");
+        ex.InnerException.Should().BeOfType<ThrowingBootModule.BootBoomException>();
         ex.Fact.Code.Should().Be(Constants.Diagnostics.Codes.ModuleRejected);
-        ex.Fact.Subject.Should().Be(typeof(ThrowingBootInitializer).FullName);
+        ex.Fact.Subject.Should().Be(typeof(ThrowingBootModule).FullName);
         ex.Fact.Summary.Should().NotContain("intentionally exploded",
             "the machine fact must not copy arbitrary exception text");
 
         // (g) The other diagnostic fields carry the provenance an operator needs: which assembly declared
         // the broken module, its version, and — crucially — how to recover (the lenient-boot escape hatch).
-        var declaringAssembly = typeof(ThrowingBootInitializer).Assembly.GetName();
+        var declaringAssembly = typeof(ThrowingBootModule).Assembly.GetName();
         ex.Assembly.Should().Be(declaringAssembly.Name);
         ex.Version.Should().NotBeNullOrWhiteSpace();
         ex.Version.Should().NotBe("unknown");
@@ -77,7 +77,7 @@ public sealed class FailLoudBootSpec
         ex.Message.Should().Contain("KOAN_BOOT_LENIENT=1");
 
         // The fake actually ran (guards against a vacuous pass where discovery never reached it).
-        ThrowingBootInitializer.WasInvoked.Should().BeTrue();
+        ThrowingBootModule.WasInvoked.Should().BeTrue();
     }
 
     [Fact]
@@ -86,15 +86,15 @@ public sealed class FailLoudBootSpec
         // (l) Pins the no-false-positive direction: a normal boot (the throwing fake left DISARMED) must
         // leave the MODULES-FAILED channel empty — the fail-loud machinery must not invent failures.
         Environment.SetEnvironmentVariable(LenientEnvVar, null);
-        ThrowingBootInitializer.ResetForTest();
-        // Intentionally NOT armed: ThrowingBootInitializer stays dormant for this boot.
+        ThrowingBootModule.ResetForTest();
+        // Intentionally NOT armed: ThrowingBootModule stays dormant for this boot.
 
         await using var host = await KoanIntegrationHost.Configure()
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 
         host.Services.Should().NotBeNull();
-        ThrowingBootInitializer.WasInvoked.Should().BeFalse();
+        ThrowingBootModule.WasInvoked.Should().BeFalse();
 
         var summary = AppBootstrapper.RegistrySummary;
         summary.Should().NotBeNull();
@@ -102,35 +102,28 @@ public sealed class FailLoudBootSpec
     }
 
     [Fact]
-    public async Task Lenient_boot_starts_host_and_records_failure_in_registry_summary()
+    public void Lenient_manifest_policy_cannot_continue_a_rejected_constitution()
     {
         Environment.SetEnvironmentVariable(LenientEnvVar, "1");
-        ThrowingBootInitializer.ResetForTest();
-        using var arm = ThrowingBootInitializer.Arm();
+        ThrowingBootModule.ResetForTest();
+        using var arm = ThrowingBootModule.Arm();
 
         try
         {
-            // With KOAN_BOOT_LENIENT=1 the host must BOOT despite the broken module...
-            await using var host = await KoanIntegrationHost.Configure()
+            var act = () => KoanIntegrationHost.Configure()
                 .ConfigureServices(services => services.AddKoan())
-                .StartAsync();
+                .Build();
 
-            host.Services.Should().NotBeNull();
-            ThrowingBootInitializer.WasInvoked.Should().BeTrue();
+            act.Should().Throw<KoanBootException>().Which.Phase.Should().Be("register");
+            ThrowingBootModule.WasInvoked.Should().BeTrue();
 
             // ...and the failure must be VISIBLE in the registry summary (MODULES-FAILED channel),
             // not vanish. This is the recorded boot-report evidence fail-fast.json requires.
             var summary = AppBootstrapper.RegistrySummary;
             summary.Should().NotBeNull();
             summary!.Value.ModuleFailures.Should()
-                .ContainSingle(f => f.Module == typeof(ThrowingBootInitializer).FullName
-                                    && f.Phase == "initializer");
-
-            var facts = host.Services.GetRequiredService<IKoanRuntimeFacts>().Current;
-            facts.Complete.Should().BeTrue();
-            facts.Facts.Should().ContainSingle(fact =>
-                fact.Code == Constants.Diagnostics.Codes.ModuleRejected
-                && fact.Subject == typeof(ThrowingBootInitializer).FullName);
+                .ContainSingle(f => f.Module == typeof(ThrowingBootModule).FullName
+                                    && f.Phase == "register");
         }
         finally
         {
@@ -140,10 +133,10 @@ public sealed class FailLoudBootSpec
 }
 
 /// <summary>
-/// A discoverable <see cref="IKoanInitializer"/> that throws when armed. Default = no-op so it does
+/// A discoverable <see cref="KoanModule"/> that throws when armed. Default = no-op so it does
 /// not poison every other spec's <c>AddKoan()</c> (it is AppDomain-globally registered once scanned).
 /// </summary>
-public sealed class ThrowingBootInitializer : IKoanInitializer
+public sealed class ThrowingBootModule : KoanModule
 {
     private static readonly AsyncLocal<bool> _armed = new();
     private static int _invoked;
@@ -162,7 +155,7 @@ public sealed class ThrowingBootInitializer : IKoanInitializer
         _armed.Value = false;
     }
 
-    public void Initialize(IServiceCollection services)
+    public override void Register(IServiceCollection services)
     {
         if (!_armed.Value) return; // dormant for every unrelated boot
         Interlocked.Exchange(ref _invoked, 1);

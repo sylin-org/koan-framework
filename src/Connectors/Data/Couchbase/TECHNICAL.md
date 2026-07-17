@@ -30,7 +30,7 @@
   or a public cursor.
 
 ## Initialization
-- `CouchbaseAutoRegistrar` wires options, naming defaults, adapter factory, health contributor, orchestration evaluator, and cluster provider.
+- `CouchbaseDataModule` wires options, naming defaults, adapter factory, health contributor, orchestration evaluator, and cluster provider through `AddKoan()`.
 - `CouchbaseClusterProvider` lazily connects to the cluster, caches scope/collection handles, and is shared across repositories.
 
 ## Observability

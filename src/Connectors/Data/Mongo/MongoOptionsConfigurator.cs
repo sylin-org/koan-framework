@@ -22,7 +22,6 @@ namespace Koan.Data.Connector.Mongo;
 internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<MongoOptions>
 {
     private readonly IServiceDiscoveryCoordinator? _discoveryCoordinator;
-    private readonly IZenGardenInitializationProvider? _zenGardenInitializationProvider;
 
     protected override string ProviderName => "Mongo";
 
@@ -30,12 +29,10 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         IConfiguration config,
         ILogger<MongoOptionsConfigurator>? logger,
         IOptions<AdaptersReadinessOptions> readinessOptions,
-        IServiceDiscoveryCoordinator? discoveryCoordinator = null,
-        IZenGardenInitializationProvider? zenGardenInitializationProvider = null)
+        IServiceDiscoveryCoordinator? discoveryCoordinator = null)
         : base(config, logger, readinessOptions)
     {
         _discoveryCoordinator = discoveryCoordinator;
-        _zenGardenInitializationProvider = zenGardenInitializationProvider;
     }
 
     protected override void ConfigureProviderSpecific(MongoOptions options)
@@ -72,16 +69,14 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
 
         if (ZenGardenConnectionIntent.TryParse(requestedConnection, out var zenGardenIntent))
         {
-            if (TryResolveZenGardenConnection(zenGardenIntent!, databaseName, username, password, out var resolved))
-            {
-                options.ConnectionString = resolved;
-                KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "intent-resolved", ("intent", requestedConnection));
-            }
-            else
-            {
-                options.ConnectionString = ResolveAutonomousConnection(databaseName, username, password);
-                KoanLog.ConfigWarning(Logger, LogActions.ZenGarden, "intent-fallback-autonomous", ("intent", requestedConnection));
-            }
+            options.ConnectionString = ResolveRequiredConnection(
+                requestedConnection!,
+                zenGardenIntent!,
+                databaseName,
+                username,
+                password);
+            KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "intent-resolved",
+                ("offering", zenGardenIntent!.ToOfferingSelector()));
         }
         else if (IsAutoConnection(requestedConnection))
         {
@@ -132,19 +127,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
             }
 
             // Create discovery context with MongoDB-specific parameters
-            var context = new DiscoveryContext
-            {
-                OrchestrationMode = KoanEnv.OrchestrationMode,
-                HealthCheckTimeout = TimeSpan.FromMilliseconds(500),
-                Parameters = new Dictionary<string, object>()
-            };
-
-            if (!string.IsNullOrWhiteSpace(databaseName))
-                context.Parameters["database"] = databaseName;
-            if (!string.IsNullOrWhiteSpace(username))
-                context.Parameters["username"] = username;
-            if (!string.IsNullOrWhiteSpace(password))
-                context.Parameters["password"] = password;
+            var context = CreateDiscoveryContext(databaseName, username, password);
 
             KoanLog.ConfigDebug(Logger, LogActions.DiscoveryRequest, LogOutcomes.Start,
                 ("mode", context.OrchestrationMode.ToString()),
@@ -186,104 +169,58 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         return Koan.Core.Configuration.Read(Configuration, Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.DisableAutoDetection), false);
     }
 
-    private bool TryResolveZenGardenConnection(
+    private string ResolveRequiredConnection(
+        string rawIntent,
         ZenGardenConnectionIntent intent,
         string? databaseName,
         string? username,
-        string? password,
-        out string connectionString)
+        string? password)
     {
-        connectionString = "";
-        if (_zenGardenInitializationProvider is null)
+        if (_discoveryCoordinator is null)
         {
-            KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "provider-missing");
-            return false;
+            throw ExplicitIntentFailure(
+                intent,
+                "Koan's service-discovery coordinator is unavailable.");
         }
 
-        try
+        var result = _discoveryCoordinator.ResolveServiceIntent(
+                "mongo",
+                rawIntent,
+                CreateDiscoveryContext(databaseName, username, password))
+            .GetAwaiter()
+            .GetResult();
+        if (!result.IsSuccessful)
         {
-            var resolved = _zenGardenInitializationProvider
-                .Resolve(intent)
-                .GetAwaiter()
-                .GetResult();
-
-            if (resolved is null)
-            {
-                KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "offering-not-ready",
-                    ("offering", intent.ToOfferingSelector()));
-                return false;
-            }
-
-            if (!TryBuildMongoConnectionString(
-                    resolved,
-                    databaseName,
-                    username,
-                    password,
-                    out connectionString))
-            {
-                KoanLog.ConfigWarning(Logger, LogActions.ZenGarden, "missing-endpoint",
-                    ("offering", resolved.ToolFqid));
-                return false;
-            }
-
-            KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "resolved",
-                ("offering", resolved.ToolFqid),
-                ("connection", connectionString));
-            return true;
+            throw ExplicitIntentFailure(intent, result.ErrorMessage);
         }
-        catch (Exception ex)
-        {
-            KoanLog.ConfigWarning(Logger, LogActions.ZenGarden, "exception",
-                ("offering", intent.ToOfferingSelector()),
-                ("reason", ex.Message));
-            KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "exception-detail", ("exception", ex.ToString()));
-            return false;
-        }
+
+        return result.ServiceUrl;
     }
 
-    private static bool TryBuildMongoConnectionString(
-        ZenGardenOfferingResolution resolved,
+    private static DiscoveryContext CreateDiscoveryContext(
         string? databaseName,
         string? username,
-        string? password,
-        out string connectionString)
+        string? password)
     {
-        connectionString = "";
-
-        // Primary path: native MongoDB connection string (supports replica sets with comma-separated hosts).
-        // Uses GetConnectionString (prefix match) instead of GetUri (Uri.TryCreate) because
-        // System.Uri rejects multi-host MongoDB connection strings as invalid RFC 3986 URIs.
-        var mongoConnectionString = resolved.GetConnectionString("mongodb", "mongodb+srv");
-        if (!string.IsNullOrWhiteSpace(mongoConnectionString) &&
-            mongoConnectionString.StartsWith("mongodb", StringComparison.OrdinalIgnoreCase))
+        var context = new DiscoveryContext
         {
-            connectionString = MongoConnectionString.MergeOverrides(mongoConnectionString, databaseName, username, password);
-            return true;
-        }
-
-        var genericUri = resolved.GetUri("http", "https", "tcp", "udp");
-        if (!string.IsNullOrWhiteSpace(genericUri) &&
-            Uri.TryCreate(genericUri, UriKind.Absolute, out var parsedGeneric) &&
-            !string.IsNullOrWhiteSpace(parsedGeneric.Host))
-        {
-            var port = parsedGeneric.IsDefaultPort || parsedGeneric.Port <= 0
-                ? resolved.Port ?? 27017
-                : parsedGeneric.Port;
-            connectionString = MongoConnectionString.Build(parsedGeneric.Host, port, databaseName, username, password);
-            return true;
-        }
-
-        var host = !string.IsNullOrWhiteSpace(resolved.Hostname)
-            ? resolved.Hostname
-            : resolved.Ip;
-        if (string.IsNullOrWhiteSpace(host))
-        {
-            return false;
-        }
-
-        connectionString = MongoConnectionString.Build(host, resolved.Port ?? 27017, databaseName, username, password);
-        return true;
+            OrchestrationMode = KoanEnv.OrchestrationMode,
+            HealthCheckTimeout = TimeSpan.FromMilliseconds(500),
+            Parameters = new Dictionary<string, object>()
+        };
+        if (!string.IsNullOrWhiteSpace(databaseName)) context.Parameters["database"] = databaseName;
+        if (!string.IsNullOrWhiteSpace(username)) context.Parameters["username"] = username;
+        if (!string.IsNullOrWhiteSpace(password)) context.Parameters["password"] = password;
+        return context;
     }
+
+    private static InvalidOperationException ExplicitIntentFailure(
+        ZenGardenConnectionIntent intent,
+        string? reason) =>
+        new(
+            $"Mongo explicit Zen Garden intent for '{intent.ToOfferingSelector()}' could not be satisfied. " +
+            $"{reason ?? "No ready MongoDB offering was found."} " +
+            "Reference and enable Koan.ZenGarden with a ready 'mongodb' offering, choose 'auto', or provide a native MongoDB connection string.");
 
     private static bool IsAutoConnection(string? connectionString)
     {

@@ -31,8 +31,6 @@ namespace Koan.Web.Auth.Server;
 /// </summary>
 public sealed class AuthServerModule : KoanModule
 {
-    public override string Id => "web.auth.server";
-
     /// <summary>
     /// SEC-0006 addendum (WEB-0072 P3) — the well-known public dev client the MCP Explorer's device-flow exerciser
     /// plays. Seeded Development-only (see <see cref="SeedDevExplorerClientAsync"/>); never present in production.

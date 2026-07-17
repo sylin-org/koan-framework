@@ -28,17 +28,16 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         EntityShapeGuard.EnsureOwnRoot(typeof(TEntity));
 
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
-        var (adapter, source) = AdapterResolver.ResolveForEntity<TEntity>(sp, sourceRegistry);
+        var decision = AdapterResolver.ResolveDecisionForEntity<TEntity>(sp, sourceRegistry);
+        var adapter = decision.Adapter;
+        var source = decision.Source;
 
         var key = new CacheKey(typeof(TEntity), typeof(TKey), adapter, source);
 
         if (_cache.TryGetValue(key, out var existing))
             return (IDataRepository<TEntity, TKey>)existing;
 
-        // Find factory for adapter
-        var factories = sp.GetServices<IDataAdapterFactory>();
-        var factory = factories.FirstOrDefault(f => f.CanHandle(adapter))
-            ?? throw new InvalidOperationException($"No data adapter factory for provider '{adapter}'");
+        var factory = decision.Factory;
 
         // Create repository with source context
         var repo = factory.Create<TEntity, TKey>(sp, source);
@@ -54,7 +53,8 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         var guards = sp.GetServices<Pipeline.IStorageGuard>().ToArray();
         var readContributors = sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
         var lifecycle = sp.GetService<Lifecycle.EntityLifecyclePlan<TEntity, TKey>>();
-        var facade = new RepositoryFacade<TEntity, TKey>(decorated, guards, readContributors, lifecycle);
+        var segmentation = sp.GetRequiredService<Semantics.DataSegmentationPlan>().For(typeof(TEntity));
+        var facade = new RepositoryFacade<TEntity, TKey>(decorated, guards, readContributors, lifecycle, segmentation);
 
         // Repository construction is the activation boundary: inspection and route description remain pure, while
         // any runtime path that actually asks for a repository makes that provider/source visible to readiness.
@@ -79,15 +79,15 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         // holds the raw adapter for the IQueryRepository check). Cheap + connection-free: capability description is
         // static. Not cached — Explain / the boot pre-flight call it rarely, never on a hot path.
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
-        var (adapter, source) = AdapterResolver.ResolveForEntity<TEntity>(sp, sourceRegistry);
-        var factories = sp.GetServices<IDataAdapterFactory>();
-        var factory = factories.FirstOrDefault(f => f.CanHandle(adapter))
-            ?? throw new InvalidOperationException($"No data adapter factory for provider '{adapter}'");
+        var decision = AdapterResolver.ResolveDecisionForEntity<TEntity>(sp, sourceRegistry);
+        var source = decision.Source;
+        var factory = decision.Factory;
         var repo = factory.Create<TEntity, TKey>(sp, source);
         var guards = sp.GetServices<Pipeline.IStorageGuard>().ToArray();
         var readContributors = sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
         var lifecycle = sp.GetService<Lifecycle.EntityLifecyclePlan<TEntity, TKey>>();
-        return new RepositoryFacade<TEntity, TKey>(repo, guards, readContributors, lifecycle);
+        var segmentation = sp.GetRequiredService<Semantics.DataSegmentationPlan>().For(typeof(TEntity));
+        return new RepositoryFacade<TEntity, TKey>(repo, guards, readContributors, lifecycle, segmentation);
     }
 
     /// <inheritdoc />

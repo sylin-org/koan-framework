@@ -6,9 +6,9 @@ namespace Koan.Core.Hosting.Bootstrap;
 
 /// <summary>
 /// The single fail-loud signal for boot-time module failures (Track F · fail-fast.json).
-/// Thrown by <see cref="AppBootstrapper.InitializeModules"/> when an <see cref="IKoanInitializer"/>
-/// construction / <c>Initialize()</c> call throws, or when the manifest-invoker itself fails —
-/// unless degraded boot is requested via the <c>KOAN_BOOT_LENIENT=1</c> environment variable.
+/// Thrown by <see cref="AppBootstrapper.InitializeModules"/> when module registration fails, or when
+/// the manifest-invoker itself fails. Only the degraded reflection fallback honors
+/// <c>KOAN_BOOT_LENIENT=1</c>; a compiled constitution always fails closed.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -36,7 +36,7 @@ public sealed class KoanBootException : Exception
                 KoanFactState.Rejected,
                 module.FullName ?? module.Name,
                 "Koan rejected a module during activation.",
-                Constants.Diagnostics.Reasons.InitializerFailed,
+                Constants.Diagnostics.Reasons.ModuleActivationFailed,
                 "Fix the module activation failure or remove the module reference. Use lenient boot only for diagnosis.",
                 assembly,
                 $"bootstrap:{module.FullName ?? module.Name}:{phase}"))
@@ -61,7 +61,7 @@ public sealed class KoanBootException : Exception
         Fact = fact;
     }
 
-    /// <summary>The module type whose construction / initialization failed.</summary>
+    /// <summary>The module type whose activation failed.</summary>
     public Type Module { get; }
 
     /// <summary>The simple name of the assembly that declares the failing module.</summary>
@@ -70,7 +70,7 @@ public sealed class KoanBootException : Exception
     /// <summary>The version of the assembly that declares the failing module.</summary>
     public string Version { get; }
 
-    /// <summary>The boot phase in which the failure occurred (e.g. <c>initializer</c>, <c>manifest-invoker</c>).</summary>
+    /// <summary>The boot phase in which the failure occurred (e.g. <c>register</c>, <c>manifest-invoker</c>).</summary>
     public string Phase { get; }
 
     /// <summary>The same redacted rejection fact projected by startup, health, and machine diagnostics.</summary>

@@ -90,7 +90,7 @@ Production guardrails on `import`: refuses to run in Production unless `KoanEnv.
 
 ## DI registration
 
-`KoanAutoRegistrar.Initialize` (called by `services.AddKoan()`) wires:
+`AuthRolesModule.Register` (called by `services.AddKoan()`) wires:
 
 ```csharp
 services.AddKoanOptions<RoleAttributionOptions>(RoleAttributionOptions.SectionPath);

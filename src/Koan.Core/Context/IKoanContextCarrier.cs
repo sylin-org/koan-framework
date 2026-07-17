@@ -15,9 +15,23 @@ public interface IKoanContextCarrier
     ContextIngressTrust MinimumIngressTrust { get; }
 
     /// <summary>
+    /// Hard segmentation dimensions faithfully represented by this carrier. Most ambient axes are informative and
+    /// leave this empty; a hard axis declares its stable dimension identity so Core can prove that async work can
+    /// preserve every isolation obligation applicable to its subject.
+    /// </summary>
+    IReadOnlyCollection<string> SegmentationDimensions => [];
+
+    /// <summary>
     /// Captures the current value as an opaque, carrier-versioned string, or <c>null</c> when the axis is absent.
     /// </summary>
     string? Capture();
+
+    /// <summary>
+    /// Materializes a required hard dimension when its resolved operation value does not already have an explicit
+    /// ambient carrier payload. The default retries ordinary capture; capabilities with a development fallback or
+    /// another deterministic resolver may encode <paramref name="value"/> in their own opaque wire format.
+    /// </summary>
+    string? CaptureRequired(string dimensionId, string value) => Capture();
 
     /// <summary>
     /// Validates and restores <paramref name="captured"/> for the lifetime of the returned scope. Reject malformed or

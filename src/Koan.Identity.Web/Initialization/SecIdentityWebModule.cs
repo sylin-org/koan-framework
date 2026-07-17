@@ -16,8 +16,6 @@ namespace Koan.Identity.Web.Initialization;
 /// </summary>
 public sealed class SecIdentityWebModule : KoanModule
 {
-    public override string Id => "Koan.Identity.Web";
-
     public override void Register(IServiceCollection services)
     {
         // Mount the controllers from this assembly.

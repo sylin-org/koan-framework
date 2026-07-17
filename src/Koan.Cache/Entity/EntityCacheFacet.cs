@@ -4,6 +4,7 @@ using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
+using Koan.Cache.Stores;
 
 namespace Koan.Data.Core.Model;
 
@@ -103,7 +104,8 @@ public readonly struct EntityCacheFacet<TEntity, TKey>
             return ValueTask.FromResult(0L);
         }
 
-        return AppHost.GetRequiredService<ICacheClient>(ControlOperation).FlushTags(resolved, ct);
+        return AppHost.GetRequiredService<CacheClient>(ControlOperation)
+            .FlushTags(resolved, typeof(TEntity), ct);
     }
 
     private static ValueTask<long> CountInternal(IEnumerable<string>? tags, CancellationToken ct)
@@ -114,7 +116,8 @@ public readonly struct EntityCacheFacet<TEntity, TKey>
             return ValueTask.FromResult(0L);
         }
 
-        return AppHost.GetRequiredService<ICacheClient>(ControlOperation).CountTags(resolved, ct);
+        return AppHost.GetRequiredService<CacheClient>(ControlOperation)
+            .CountTags(resolved, typeof(TEntity), ct);
     }
 
     private static IReadOnlyCollection<string> ResolveTags(IEnumerable<string>? additionalTags)

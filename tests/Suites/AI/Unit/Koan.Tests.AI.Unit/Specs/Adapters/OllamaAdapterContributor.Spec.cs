@@ -100,7 +100,7 @@ public sealed class OllamaAdapterContributorSpec
     }
 
     [Fact]
-    public async Task ContributeAsync_with_unresolved_zen_garden_connection_uses_additional_url_fallback()
+    public async Task ContributeAsync_with_unresolved_explicit_zen_garden_connection_fails_without_fallback()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
@@ -115,14 +115,13 @@ public sealed class OllamaAdapterContributorSpec
         using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry, zenGardenProvider);
 
         var contributor = new OllamaAdapterContributor();
-        await contributor.Contribute(provider, CancellationToken.None);
+        var contribute = async () => await contributor.Contribute(provider, CancellationToken.None);
 
-        var source = sourceRegistry.RegisteredSources.Single();
-        source.Origin.Should().Be("auto-discovery");
-        source.Members.Should().Contain(member =>
-            member.ConnectionString == "http://localhost:6003" &&
-            member.Origin == "config-additional-urls");
-        adapterRegistry.All.Should().ContainSingle(adapter => adapter.Id == "ollama");
+        await contribute.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Ollama explicit Zen Garden intent*ollama*could not be satisfied*")
+            .WithMessage("*Koan.ZenGarden*ready Ollama offering*automatic discovery*native Ollama URL*");
+        sourceRegistry.RegisteredSources.Should().BeEmpty();
+        adapterRegistry.All.Should().BeEmpty();
     }
 
     [Fact]
@@ -266,12 +265,6 @@ public sealed class OllamaAdapterContributorSpec
         public StubZenGardenProvider(Func<ZenGardenConnectionIntent, ZenGardenOfferingResolution?> resolver)
         {
             _resolver = resolver;
-        }
-
-        public bool TryGetDefaultOffering(string adapterId, out string offering)
-        {
-            offering = "ollama";
-            return string.Equals(adapterId, "ollama", StringComparison.OrdinalIgnoreCase);
         }
 
         public ValueTask<ZenGardenOfferingResolution?> Resolve(

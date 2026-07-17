@@ -26,11 +26,9 @@ namespace Koan.Tenancy.Web.Initialization;
 /// keeps working without it; adding this package lights up the operator surface. Ordered <c>[After]</c> the
 /// tenancy core so <see cref="TenancyRuntime"/> and the control-plane registrations exist first.
 /// </summary>
-[After(typeof(Koan.Tenancy.Initialization.KoanAutoRegistrar))]
+[After(typeof(Koan.Tenancy.Initialization.TenancyModule))]
 public sealed class KoanTenancyWebModule : KoanModule
 {
-    public override string Id => "Koan.Tenancy.Web";
-
     public override void Register(IServiceCollection services)
     {
         // Mount the operator API + UI controllers from this assembly (Reference = Intent).

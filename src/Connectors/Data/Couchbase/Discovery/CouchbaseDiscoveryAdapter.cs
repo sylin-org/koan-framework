@@ -28,61 +28,46 @@ internal sealed class CouchbaseDiscoveryAdapter : ServiceDiscoveryAdapterBase
     /// <summary>Couchbase-specific health validation using cluster test</summary>
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        try
+        var connectionString = NormalizeCouchbaseConnectionString(serviceUrl);
+
+        var options = new ClusterOptions
         {
-            var connectionString = NormalizeCouchbaseConnectionString(serviceUrl);
+            ConnectionString = connectionString
+        };
 
-            // Configure cluster options for health check
-            var options = new ClusterOptions()
+        if (context.Parameters != null)
+        {
+            if (context.Parameters.TryGetValue("username", out var username) &&
+                context.Parameters.TryGetValue("password", out var password))
             {
-                ConnectionString = connectionString
-            };
-
-            // Apply authentication if provided in context
-            if (context.Parameters != null)
-            {
-                if (context.Parameters.TryGetValue("username", out var username) &&
-                    context.Parameters.TryGetValue("password", out var password))
-                {
-                    options.UserName = username.ToString();
-                    options.Password = password.ToString();
-                }
-            }
-
-            // Set default credentials if none provided
-            if (string.IsNullOrEmpty(options.UserName))
-            {
-                options.UserName = "Administrator";
-                options.Password = "password";
-            }
-
-            using var cluster = await Cluster.ConnectAsync(options);
-
-            // Simple health check - try to get bucket info
-            var bucketName = context.Parameters?.TryGetValue("bucket", out var bucket) == true
-                ? bucket.ToString() ?? "Koan"
-                : "Koan";
-
-            try
-            {
-                var testBucket = await cluster.BucketAsync(bucketName);
-                await testBucket.WaitUntilReadyAsync(TimeSpan.FromSeconds(5));
-
-                _logger.LogDebug("Couchbase health check passed for {Url}", serviceUrl);
-                return true;
-            }
-            catch
-            {
-                // If bucket doesn't exist or isn't ready, just check cluster connection
-                var buckets = await cluster.Buckets.GetAllBucketsAsync();
-                _logger.LogDebug("Couchbase cluster health check passed for {Url} (bucket not accessible)", serviceUrl);
-                return true;
+                options.UserName = username.ToString();
+                options.Password = password.ToString();
             }
         }
-        catch (Exception ex)
+
+        if (string.IsNullOrEmpty(options.UserName))
         {
-            _logger.LogDebug("Couchbase health check failed for {Url}: {Error}", serviceUrl, ex.Message);
-            return false;
+            options.UserName = "Administrator";
+            options.Password = "password";
+        }
+
+        using var cluster = await Cluster.ConnectAsync(options);
+
+        var bucketName = context.Parameters?.TryGetValue("bucket", out var bucket) == true
+            ? bucket.ToString() ?? "Koan"
+            : "Koan";
+
+        try
+        {
+            var testBucket = await cluster.BucketAsync(bucketName);
+            await testBucket.WaitUntilReadyAsync(TimeSpan.FromSeconds(5));
+            return true;
+        }
+        catch
+        {
+            // A missing bucket does not make the connected cluster unavailable.
+            await cluster.Buckets.GetAllBucketsAsync();
+            return true;
         }
     }
 
@@ -144,7 +129,7 @@ internal sealed class CouchbaseDiscoveryAdapter : ServiceDiscoveryAdapterBase
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Failed to normalize Couchbase connection string from {Value}: {Error}", value, ex.Message);
+            ReportNormalizationFailure(value, ex);
             return value; // Return original value if normalization fails
         }
     }

@@ -10,6 +10,7 @@ public sealed class KoanContextCarrierRegistry
 {
     private readonly IReadOnlyList<RegisteredCarrier> _carriers;
     private readonly IReadOnlyDictionary<string, RegisteredCarrier> _byKey;
+    private readonly IReadOnlyDictionary<string, RegisteredCarrier> _bySegmentationDimension;
 
     /// <summary>
     /// A value-free description of one composed carrier. This is safe to project into startup diagnostics: it
@@ -22,6 +23,7 @@ public sealed class KoanContextCarrierRegistry
         ArgumentNullException.ThrowIfNull(carriers);
 
         var byKey = new Dictionary<string, RegisteredCarrier>(StringComparer.Ordinal);
+        var bySegmentationDimension = new Dictionary<string, RegisteredCarrier>(StringComparer.OrdinalIgnoreCase);
         foreach (var carrier in carriers)
         {
             if (carrier is null)
@@ -31,19 +33,30 @@ public sealed class KoanContextCarrierRegistry
             // property values; a runtime object cannot change its identity or weaken its trust requirement.
             var axisKey = carrier.AxisKey;
             var minimumIngressTrust = carrier.MinimumIngressTrust;
+            var segmentationDimensions = SnapshotSegmentationDimensions(carrier.SegmentationDimensions);
             if (!KoanContextCarrierException.IsValidAxisKey(axisKey))
                 throw KoanContextCarrierException.InvalidAxis();
             if (!IsDefined(minimumIngressTrust))
                 throw new ArgumentOutOfRangeException(nameof(carriers), "A context carrier declares an unknown ingress-trust value.");
 
-            var registration = new RegisteredCarrier(axisKey, minimumIngressTrust, carrier);
+            var registration = new RegisteredCarrier(axisKey, minimumIngressTrust, segmentationDimensions, carrier);
             if (!byKey.TryAdd(axisKey, registration))
                 throw KoanContextCarrierException.DuplicateAxis(axisKey);
+            foreach (var dimension in segmentationDimensions)
+            {
+                if (!bySegmentationDimension.TryAdd(dimension, registration))
+                {
+                    throw new InvalidOperationException(
+                        $"Segmentation dimension '{dimension}' is represented by more than one context carrier. " +
+                        "One carrier must own each hard async-context mapping.");
+                }
+            }
         }
 
         _carriers = Array.AsReadOnly(
             byKey.Values.OrderBy(static carrier => carrier.AxisKey, StringComparer.Ordinal).ToArray());
         _byKey = new ReadOnlyDictionary<string, RegisteredCarrier>(byKey);
+        _bySegmentationDimension = new ReadOnlyDictionary<string, RegisteredCarrier>(bySegmentationDimension);
         Descriptors = Array.AsReadOnly(
             _carriers.Select(static carrier =>
                     new CarrierDescriptor(carrier.AxisKey, carrier.MinimumIngressTrust))
@@ -54,6 +67,31 @@ public sealed class KoanContextCarrierRegistry
     /// Gets the ordinally ordered, value-free carrier composition for inspection and startup reporting.
     /// </summary>
     public IReadOnlyList<CarrierDescriptor> Descriptors { get; }
+
+    internal bool TryGetSegmentationCarrier(string dimensionId, out CarrierDescriptor descriptor)
+    {
+        if (_bySegmentationDimension.TryGetValue(dimensionId, out var carrier))
+        {
+            descriptor = new CarrierDescriptor(carrier.AxisKey, carrier.MinimumIngressTrust);
+            return true;
+        }
+
+        descriptor = null!;
+        return false;
+    }
+
+    internal string? CaptureRequired(string dimensionId, string value)
+    {
+        if (!_bySegmentationDimension.TryGetValue(dimensionId, out var carrier)) return null;
+        try
+        {
+            return carrier.Instance.CaptureRequired(dimensionId, value);
+        }
+        catch
+        {
+            throw KoanContextCarrierException.CaptureFailed(carrier.AxisKey);
+        }
+    }
 
     /// <summary>
     /// Captures every present registered axis into an immutable-to-callers, ordinally ordered bag. Returns
@@ -199,6 +237,26 @@ public sealed class KoanContextCarrierRegistry
         return strongest;
     }
 
+    private static string[] SnapshotSegmentationDimensions(IReadOnlyCollection<string>? dimensions)
+    {
+        if (dimensions is null)
+            throw new InvalidOperationException("A context carrier returned a null segmentation-dimension declaration.");
+
+        try
+        {
+            return dimensions
+                .Select(static dimension => new Semantics.SemanticId(dimension).Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+        }
+        catch (Exception error) when (error is ArgumentException or NullReferenceException)
+        {
+            throw new InvalidOperationException(
+                "A context carrier declared an invalid segmentation-dimension identity.");
+        }
+    }
+
     private static KoanContextCarrierException SanitizeCarrierFailure(
         KoanContextCarrierException failure,
         string axisKey,
@@ -247,6 +305,7 @@ public sealed class KoanContextCarrierRegistry
     private sealed record RegisteredCarrier(
         string AxisKey,
         ContextIngressTrust MinimumIngressTrust,
+        IReadOnlyList<string> SegmentationDimensions,
         IKoanContextCarrier Instance);
 
     private sealed record CarrierScope(string AxisKey, IDisposable Scope);

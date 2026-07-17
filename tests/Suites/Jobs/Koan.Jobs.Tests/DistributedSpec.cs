@@ -1,5 +1,5 @@
-using Koan.Core.Context;
 using Koan.Jobs;
+using Koan.Jobs.Semantics;
 using Koan.Jobs.TestKit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -20,7 +20,7 @@ public sealed class DistributedSpec
             NullLogger<JobOrchestrator>.Instance,
             host.Services.GetRequiredService<IServiceScopeFactory>(),
             Enumerable.Empty<IJobPoolResolver>(),
-            host.Services.GetRequiredService<KoanContextCarrierRegistry>());
+            host.Services.GetRequiredService<JobsContextPlan>());
 
     [Fact]
     public async Task competing_consumers_never_double_claim()

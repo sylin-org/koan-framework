@@ -12,7 +12,7 @@ Ledger election is capability-driven:
   in-memory ledger and `Auto`/`DataStore` work to `DataJobLedger`;
 - custom registrations may replace the default interfaces before the host is built.
 
-`JobsCompositionContributor` projects this decision into the shared composition model:
+The retained module's `JobsCompositionFacts` projector publishes this decision into the shared composition model:
 
 | Subject | Selection | Reason |
 |---|---|---|
@@ -67,10 +67,12 @@ context-bearing truth.
 
 ## Logical-flow context
 
-- `JobCoordinator` captures the host's `KoanContextCarrierRegistry` exactly once before the first
-  await. Source items share that submission snapshot, and coalescing folds the opaque bag so work from
-  distinct context axes cannot collapse together accidentally.
-- `JobOrchestrator` restores with `ContextIngressTrust.HostTrusted` before loading the work item or
+- `JobsContextPlan` wraps Core's memoized `SegmentationContextPlan`. `JobCoordinator` binds every hard
+  obligation and captures exactly once before persistence or the first await. Source items share that
+  submission snapshot, and coalescing folds the opaque bag so work from distinct context axes cannot
+  collapse together accidentally. Missing required context rejects before work or ledger persistence.
+- `JobOrchestrator` restores with `ContextIngressTrust.HostTrusted`, requires every applicable axis,
+  and re-binds segmentation before loading the work item or
   invoking its handler. This states that the durable ledger is inside the application's administrative
   trust boundary; it does not claim that opaque syntax is tamper detection.
 - A missing value suppresses that registered axis rather than inheriting the worker flow. Unknown axes,
@@ -78,6 +80,9 @@ context-bearing truth.
   `DeadReason.CarrierRestoreFailed` before application code.
 - Jobs owns capture timing and durable settlement. Each module-owned `IKoanContextCarrier` owns the
   meaning and versioned encoding of its axis; Jobs never names tenant, subject, or another axis.
+- The Jobs realization receipt covers submit, coalesce identity, load, execute, settle, retry, and
+  chain propagation. The ledger stays host-scoped/shared, Data remains responsible for work-item state
+  isolation, and the context-free wake signal never becomes a tenant-routing authority.
 
 The contract is at-least-once. A process may stop after an external effect but before settlement, so
 handlers must make external effects idempotent or use a business-specific deduplication/outbox boundary.
@@ -86,7 +91,9 @@ Koan does not imply cross-provider transactions.
 ## Inspection
 
 - startup provenance reports the number of discovered job types;
-- runtime facts report ledger selection, the wake provider, and Communication's framework-signal election;
+- runtime facts report ledger selection, the wake provider, Communication's framework-signal election,
+  the Jobs segmentation realization, and a guarantee statement that names host-trusted restoration,
+  shared control-plane ledger, Data-owned state isolation, at-least-once execution, and context-free wake;
 - `/health/ready` reports bounded aggregate queue facts in Development and aggregate status in production;
 - `JobRecord` queries provide per-work-item transitions, progress, and failure text;
 - optional metrics preserve aggregate outcomes beyond ledger retention.

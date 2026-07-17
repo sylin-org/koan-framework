@@ -7,13 +7,6 @@ public static class KoanLoggerExtensions
     public static void LogKoanInit(this ILogger logger, string message)
         => logger.LogInformation("[Koan:init] {Message}", message);
 
-    public static void LogKoanDiscover(this ILogger logger, string providerType, string connectionString, bool success)
-    {
-        var status = success ? "OK" : "FAIL";
-        logger.LogInformation("[Koan:discover] {ProviderType}: {ConnectionString} {Status}", 
-            providerType, connectionString, status);
-    }
-
     public static void LogKoanModules(this ILogger logger, string message)
         => logger.LogInformation("[Koan:modules] {Message}", message);
 

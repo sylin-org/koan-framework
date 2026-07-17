@@ -43,11 +43,10 @@ internal sealed class RedisOptionsConfigurator : AdapterOptionsConfigurator<Redi
 
     protected override void ConfigureProviderSpecific(RedisOptions options)
     {
-        Logger?.LogInformation("Redis Orchestration-Aware Configuration Started");
-        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
-            KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
-        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}'",
-            options.ConnectionString);
+        LogConfiguration(LogLevel.Debug, "initial",
+            ("environment", KoanEnv.EnvironmentName),
+            ("orchestrationMode", KoanEnv.OrchestrationMode),
+            ("connection", options.ConnectionString));
 
         // Redis-specific configuration
         var database = ReadProviderConfiguration(options.Database,
@@ -66,18 +65,18 @@ internal sealed class RedisOptionsConfigurator : AdapterOptionsConfigurator<Redi
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            Logger?.LogInformation("Using explicit connection string from configuration");
+            LogConfiguration(LogLevel.Information, "explicit");
             options.ConnectionString = explicitConnectionString;
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            Logger?.LogInformation("Auto-detection mode - using autonomous service discovery");
-            options.ConnectionString = ResolveAutonomousConnection(database, password, Logger);
+            LogConfiguration(LogLevel.Information, "auto");
+            options.ConnectionString = ResolveAutonomousConnection(database, password);
         }
         else
         {
-            Logger?.LogInformation("Using pre-configured connection string");
+            LogConfiguration(LogLevel.Information, "preconfigured");
         }
 
         // Configure other Redis-specific options
@@ -91,28 +90,26 @@ internal sealed class RedisOptionsConfigurator : AdapterOptionsConfigurator<Redi
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
 
-        Logger?.LogInformation("Final Redis Configuration");
-        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
-        Logger?.LogInformation("Database: {Database}", database);
-        Logger?.LogInformation("Redis Orchestration-Aware Configuration Complete");
+        LogConfiguration(LogLevel.Information, "final",
+            ("connection", options.ConnectionString),
+            ("database", database));
     }
 
     private string ResolveAutonomousConnection(
         int? database,
-        string? password,
-        ILogger? logger)
+        string? password)
     {
         try
         {
             if (IsAutoDetectionDisabled())
             {
-                logger?.LogInformation("Auto-detection disabled via configuration - using localhost");
+                LogDiscovery(LogLevel.Information, "disabled", ("fallback", "localhost:6379"));
                 return BuildRedisConnectionString("localhost", 6379, database, password);
             }
 
             if (_discoveryCoordinator == null)
             {
-                logger?.LogWarning("Service discovery coordinator not available, falling back to localhost");
+                LogDiscovery(LogLevel.Warning, "coordinator-missing", ("fallback", "localhost:6379"));
                 return BuildRedisConnectionString("localhost", 6379, database, password);
             }
 
@@ -135,18 +132,18 @@ internal sealed class RedisOptionsConfigurator : AdapterOptionsConfigurator<Redi
 
             if (result.IsSuccessful)
             {
-                logger?.LogInformation("Redis discovered via autonomous discovery: {ServiceUrl}", result.ServiceUrl);
+                LogDiscovery(LogLevel.Information, "success", ("url", result.ServiceUrl));
                 return result.ServiceUrl;
             }
             else
             {
-                logger?.LogWarning("Autonomous Redis discovery failed, falling back to localhost");
+                LogDiscovery(LogLevel.Warning, "fallback", ("reason", result.ErrorMessage), ("fallback", "localhost:6379"));
                 return BuildRedisConnectionString("localhost", 6379, database, password);
             }
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Error in autonomous Redis discovery, falling back to localhost");
+            LogDiscovery(LogLevel.Error, "exception", ("error", ex), ("fallback", "localhost:6379"));
             return BuildRedisConnectionString("localhost", 6379, database, password);
         }
     }

@@ -55,7 +55,7 @@ public sealed class KoanHostContextException : InvalidOperationException
         return $"Koan cannot perform '{operation}' because {reason}. " +
                $"Required service: '{requiredService.FullName ?? requiredService.Name}'. " +
                "Start the application through services.AddKoan() and a Koan host, use " +
-               "IServiceCollection.StartKoan() for non-hosted startup, or enter " +
+               "IServiceCollection.StartKoan() for synchronous console startup, or enter " +
                "AppHost.PushScope(provider) with the required module composed.";
     }
 }

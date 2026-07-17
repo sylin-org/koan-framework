@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -8,8 +7,11 @@
     <PackageTags>$(CommonPackageTags);mcp;operations;jobs;cache;agent;governance</PackageTags>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Koan.Mcp\Koan.Mcp.csproj" />
-    <ProjectReference Include="..\Koan.Jobs\Koan.Jobs.csproj" />
-    <ProjectReference Include="..\Koan.Cache\Koan.Cache.csproj" />
+    <ProjectReference Include="..\Koan.Mcp\Koan.Mcp.csproj"
+                      />
+    <ProjectReference Include="..\Koan.Jobs\Koan.Jobs.csproj"
+                      />
+    <ProjectReference Include="..\Koan.Cache\Koan.Cache.csproj"
+                      />
   </ItemGroup>
 </Project>

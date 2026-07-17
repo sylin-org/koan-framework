@@ -26,11 +26,7 @@ public sealed class InMemoryVectorAdapterFactory : IVectorAdapterFactory
         = new(StringComparer.Ordinal);
 
     public string Provider => "inmemory";
-
-    public bool CanHandle(string provider)
-        => string.Equals(provider, "inmemory", StringComparison.OrdinalIgnoreCase)
-           || string.Equals(provider, "memory", StringComparison.OrdinalIgnoreCase)
-           || string.Equals(provider, "inproc", StringComparison.OrdinalIgnoreCase);
+    public IReadOnlyCollection<string> Aliases => ["memory", "inproc"];
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)
         => new()

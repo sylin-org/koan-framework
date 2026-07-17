@@ -2,7 +2,7 @@
 
 Contract
 - IStorageService orchestrates provider lookup and object lifecycle.
-- Auto-registration: This assembly exposes Initialization/KoanAutoRegistrar implementing IKoanAutoRegistrar. Options bind from Koan:Storage and IStorageService is registered if missing.
+- Composition: this assembly exposes one `StorageModule : KoanModule`. Referencing the package lets `AddKoan()` bind `Koan:Storage` and register `IStorageService` when no application replacement exists.
 - Constants: Configuration paths are centralized under Storage.Infrastructure.Constants per ARCH-0040.
 - Providers implement IStorageProvider and optional capabilities:
   - IStatOperations.HeadAsync → ObjectStat

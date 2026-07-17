@@ -4,11 +4,10 @@ using System.Threading;
 namespace Koan.Storage.Keys;
 
 /// <summary>
-/// STOR-0011 §2: the ambient that carries the current blob op's entity TYPE — so the type-erased
-/// <see cref="ScopedStorageService"/> decorator can apply <c>ManagedFieldRegistry.ForType</c> + the
-/// <c>[HostScoped]</c> exemption + the typed <c>IStorageGuard</c> — or an explicit HOST-SCOPE flag (infra opting
-/// out of isolation). When no scope is set, the decorator falls back to the type-less ambient axis bag (the
-/// fail-safe: a raw <c>IStorageService</c> caller isolates by default).
+/// Carries a storage operation's semantic subject through the type-erased <see cref="ScopedStorageService"/>
+/// boundary. The Storage identity compiler uses that type to apply the shared segmentation plan, including a
+/// subject's <c>[HostScoped]</c> applicability. A raw <c>IStorageService</c> operation has no subject and isolates
+/// by default. Infrastructure can deliberately declare an explicit host operation.
 /// </summary>
 public static class StorageScope
 {
@@ -24,7 +23,7 @@ public static class StorageScope
         return Push(new Frame(entityType, false));
     }
 
-    /// <summary>Enter an explicit host scope — the op is unprefixed and unguarded (the <c>IAmbientExempt</c> analog).</summary>
+    /// <summary>Enter an explicit control-plane scope whose physical storage key is not segmented.</summary>
     public static IDisposable HostScoped() => Push(new Frame(null, true));
 
     private static IDisposable Push(Frame f)

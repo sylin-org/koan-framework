@@ -21,11 +21,11 @@ public sealed class EventContextAndFlowSpec
             tenantAcceptance = await new TenantEventOrder().Events.Raise<TenantEvent>(ct);
         }
 
-        var hostAcceptance = await new TenantEventOrder().Events.Raise<TenantEvent>(ct);
+        var unscoped = () => new TenantEventOrder().Events.Raise<TenantEvent>(ct);
+        await unscoped.Should().ThrowAsync<Koan.Core.Semantics.Segmentation.SegmentationRequiredException>();
         await tenantAcceptance.WaitForSettlement(ct);
-        await hostAcceptance.WaitForSettlement(ct);
 
-        state.TenantObservations.Should().Equal("tenant-a", null);
+        state.TenantObservations.Should().Equal("tenant-a");
         Tenant.Current.Should().BeNull();
     }
 

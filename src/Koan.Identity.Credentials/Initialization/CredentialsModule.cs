@@ -22,8 +22,6 @@ namespace Koan.Identity.Credentials.Initialization;
 [After(typeof(Koan.Identity.Initialization.SecIdentityModule))]
 public sealed class CredentialsModule : KoanModule
 {
-    public override string Id => "Koan.Identity.Credentials";
-
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<StepUpOptions>(StepUpOptions.SectionPath);
