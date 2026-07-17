@@ -3,6 +3,7 @@ using Koan.Packaging.Models;
 using Koan.Packaging.Services;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Xml.Linq;
 using Xunit;
 
@@ -132,14 +133,32 @@ public sealed class TemplatePackageCompilerTests
             var entries = archive.Entries.Select(entry => entry.FullName).ToArray();
             Assert.Contains("content/koan-web/.template.config/template.json", entries);
             Assert.Contains("content/koan-console/.template.config/template.json", entries);
+            Assert.Contains("README.md", entries);
+            Assert.Contains(PackagingConstants.PackageQuality.CanonicalIcon, entries);
             Assert.DoesNotContain(entries, entry => entry.Contains("/bin/", StringComparison.OrdinalIgnoreCase));
             Assert.DoesNotContain(entries, entry => entry.Contains("/obj/", StringComparison.OrdinalIgnoreCase));
+
+            var packedIcon = archive.GetEntry(PackagingConstants.PackageQuality.CanonicalIcon)
+                ?? throw new InvalidOperationException("Packed template mascot is missing.");
+            using (var expected = File.OpenRead(Path.Combine(
+                       RepositoryRoot(),
+                       PackagingConstants.PackageQuality.CanonicalIcon)))
+            using (var actual = packedIcon.Open())
+            {
+                Assert.Equal(SHA256.HashData(expected), SHA256.HashData(actual));
+            }
 
             var nuspec = archive.Entries.Single(entry => entry.FullName.EndsWith(".nuspec", StringComparison.Ordinal));
             using (var stream = nuspec.Open())
             {
                 var document = XDocument.Load(stream);
                 Assert.DoesNotContain(document.Descendants(), element => element.Name.LocalName == "dependency");
+                Assert.Equal(
+                    PackagingConstants.PackageQuality.CanonicalIcon,
+                    document.Descendants().Single(element => element.Name.LocalName == "icon").Value);
+                Assert.Equal(
+                    "README.md",
+                    document.Descendants().Single(element => element.Name.LocalName == "readme").Value);
             }
 
             var webProject = archive.GetEntry("content/koan-web/KoanWebApp.csproj")

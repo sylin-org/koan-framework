@@ -376,7 +376,7 @@ internal sealed class PackagePipeline(
             "Directory.Build.props", "Directory.Build.targets",
             "Directory.Packages.props", "Directory.Packages.targets",
             "global.json", ".editorconfig", ".config/dotnet-tools.json",
-            "NuGet.Config", "README.md", "icon.png", "resources/image/0_2.jpg"
+            "NuGet.Config", "README.md", "icon.png"
         ];
         var status = await processRunner.RequireAsync(
             "git",
@@ -399,6 +399,27 @@ internal sealed class PackagePipeline(
         var document = XDocument.Load(stream);
         var metadata = document.Descendants().First(element => element.Name.LocalName == "metadata");
         string? Value(string name) => metadata.Elements().FirstOrDefault(element => element.Name.LocalName == name)?.Value.Trim();
+        string? EntryHash(string? packagePath)
+        {
+            if (string.IsNullOrWhiteSpace(packagePath)) return null;
+            var normalized = packagePath.Replace('\\', '/').TrimStart('/');
+            var entry = archive.Entries.SingleOrDefault(candidate =>
+                string.Equals(candidate.FullName.TrimStart('/'), normalized, StringComparison.OrdinalIgnoreCase));
+            if (entry is null) return null;
+            using var entryStream = entry.Open();
+            return Convert.ToHexString(SHA256.HashData(entryStream)).ToLowerInvariant();
+        }
+
+        bool HasEntry(string? packagePath)
+        {
+            if (string.IsNullOrWhiteSpace(packagePath)) return false;
+            var normalized = packagePath.Replace('\\', '/').TrimStart('/');
+            return archive.Entries.Any(candidate =>
+                string.Equals(candidate.FullName.TrimStart('/'), normalized, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var readme = Value("readme");
+        var icon = Value("icon");
         var dependencies = metadata.Descendants()
             .Where(element => element.Name.LocalName == "dependency")
             .Select(element =>
@@ -413,13 +434,16 @@ internal sealed class PackagePipeline(
             Value("version") ?? string.Empty,
             Value("description"),
             Value("license"),
-            Value("readme"),
+            readme,
+            HasEntry(readme),
+            icon,
+            EntryHash(icon),
             Value("tags"),
             metadata.Elements().FirstOrDefault(element => element.Name.LocalName == "repository")?.Attribute("commit")?.Value,
             dependencies);
     }
 
-    private static void ValidateMetadata(ReleasePackage expected, InspectedPackage actual, string sourceCommit)
+    private void ValidateMetadata(ReleasePackage expected, InspectedPackage actual, string sourceCommit)
     {
         var errors = new List<string>();
         if (!string.Equals(expected.PackageId, actual.PackageId, StringComparison.OrdinalIgnoreCase)) errors.Add($"ID is '{actual.PackageId}'");
@@ -427,6 +451,27 @@ internal sealed class PackagePipeline(
         if (string.IsNullOrWhiteSpace(actual.Description)) errors.Add("description is missing");
         if (string.IsNullOrWhiteSpace(actual.License)) errors.Add("license is missing");
         if (string.IsNullOrWhiteSpace(actual.Readme)) errors.Add("README is missing");
+        else if (!actual.ReadmeExists) errors.Add($"declared README '{actual.Readme}' is absent from the nupkg");
+        if (!string.Equals(
+                actual.Icon,
+                PackagingConstants.PackageQuality.CanonicalIcon,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            errors.Add($"icon is '{actual.Icon ?? "missing"}', expected '{PackagingConstants.PackageQuality.CanonicalIcon}'");
+        }
+        else if (actual.IconSha256 is null)
+        {
+            errors.Add($"declared icon '{actual.Icon}' is absent from the nupkg");
+        }
+        else
+        {
+            var canonicalIcon = Path.Combine(repositoryRoot, PackagingConstants.PackageQuality.CanonicalIcon);
+            var canonicalHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(canonicalIcon))).ToLowerInvariant();
+            if (!string.Equals(actual.IconSha256, canonicalHash, StringComparison.Ordinal))
+            {
+                errors.Add($"embedded icon hash is '{actual.IconSha256}', expected repository mascot '{canonicalHash}'");
+            }
+        }
         if (string.IsNullOrWhiteSpace(actual.PackageTags)) errors.Add("package tags are missing");
         if (actual.RepositoryCommit is null) errors.Add("repository commit metadata is missing");
         else if (!string.Equals(actual.RepositoryCommit, sourceCommit, StringComparison.OrdinalIgnoreCase))
@@ -527,6 +572,9 @@ internal sealed class PackagePipeline(
         string? Description,
         string? License,
         string? Readme,
+        bool ReadmeExists,
+        string? Icon,
+        string? IconSha256,
         string? PackageTags,
         string? RepositoryCommit,
         List<PackageDependency> Dependencies);

@@ -3,12 +3,12 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 108,
-    "repairRequired": 37,
-    "reviewRequired": 71,
-    "structurallyReady": 0,
+    "repairRequired": 36,
+    "reviewRequired": 65,
+    "structurallyReady": 7,
     "ownedReadmes": 72,
     "technicalCompanions": 62,
-    "findings": 568
+    "findings": 247
   },
   "findingDefinitions": [
     {
@@ -48,34 +48,10 @@
       "correction": "Add TECHNICAL.md when this package owns non-trivial activation, lifecycle, provider, projection, or build behavior; otherwise confirm during R11 review that the README contains the complete contract."
     },
     {
-      "code": "identity.icon.missing",
-      "severity": "error",
-      "summary": "The package declares no embedded icon.",
-      "correction": "Pack the canonical Koan mascot and set PackageIcon through the shared packaging policy."
-    },
-    {
-      "code": "identity.icon.noncanonical",
-      "severity": "warning",
-      "summary": "The package does not use the canonical Koan mascot.",
-      "correction": "Pack the repository-owned mascot as icon.png."
-    },
-    {
       "code": "metadata.description.terse",
       "severity": "warning",
       "summary": "The package description may be too terse to explain its distinct reference intent.",
       "correction": "Describe what capability appears, for whom, and the important boundary without repeating framework-wide marketing."
-    },
-    {
-      "code": "metadata.release-notes.generic",
-      "severity": "warning",
-      "summary": "Release notes point only to the framework-wide release page.",
-      "correction": "Compile package-specific change intent from Git/release facts while retaining a durable exact-wave link."
-    },
-    {
-      "code": "metadata.tags.generic",
-      "severity": "warning",
-      "summary": "The package inherits the complete historical framework-wide tag set.",
-      "correction": "Keep only universally true shared tags and let this package own its capability-specific discovery terms."
     }
   ],
   "packages": [
@@ -98,14 +74,11 @@
       ],
       "readme": "packaging/Sylin.Koan/README.md",
       "technicalDocumentation": "packaging/Sylin.Koan/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -127,13 +100,10 @@
       ],
       "readme": "src/Koan.AI/README.md",
       "technicalDocumentation": "src/Koan.AI/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "identity.icon.noncanonical",
-        "metadata.description.terse",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "metadata.description.terse"
       ]
     },
     {
@@ -157,15 +127,12 @@
       ],
       "readme": "src/Koan.AI.Agents/README.md",
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.meaningful-use.missing",
         "docs.readme.package-title.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -184,15 +151,12 @@
       ],
       "readme": "src/Koan.AI.Compute/README.md",
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.meaningful-use.missing",
         "docs.readme.package-title.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -213,13 +177,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -238,13 +199,10 @@
       ],
       "readme": "src/Connectors/AI/LMStudio/README.md",
       "technicalDocumentation": "src/Connectors/AI/LMStudio/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -264,13 +222,10 @@
       ],
       "readme": "src/Connectors/AI/Ollama/README.md",
       "technicalDocumentation": "src/Connectors/AI/Ollama/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -289,13 +244,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -315,13 +267,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -339,13 +288,10 @@
       ],
       "readme": "src/Koan.AI.Contracts/README.md",
       "technicalDocumentation": "src/Koan.AI.Contracts/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -361,12 +307,9 @@
       "dependencies": [],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
-        "docs.readme.owned.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.owned.missing"
       ]
     },
     {
@@ -388,15 +331,12 @@
       ],
       "readme": "src/Koan.AI.Eval/README.md",
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.meaningful-use.missing",
         "docs.readme.package-title.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -418,15 +358,12 @@
       ],
       "readme": "src/Koan.AI.Models/README.md",
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.meaningful-use.missing",
         "docs.readme.package-title.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -450,15 +387,12 @@
       ],
       "readme": "src/Koan.AI.Orchestration/README.md",
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.meaningful-use.missing",
         "docs.readme.package-title.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -478,15 +412,12 @@
       ],
       "readme": "src/Koan.AI.Prompt/README.md",
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.meaningful-use.missing",
         "docs.readme.package-title.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -505,15 +436,12 @@
       ],
       "readme": "src/Koan.AI.Review/README.md",
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.meaningful-use.missing",
         "docs.readme.package-title.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -535,15 +463,12 @@
       ],
       "readme": "src/Koan.AI.Training/README.md",
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.meaningful-use.missing",
         "docs.readme.package-title.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -563,13 +488,10 @@
       ],
       "readme": "src/Koan.AI.Web/README.md",
       "technicalDocumentation": "src/Koan.AI.Web/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -588,14 +510,11 @@
       ],
       "readme": "packaging/Sylin.Koan.App/README.md",
       "technicalDocumentation": "packaging/Sylin.Koan.App/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -617,14 +536,11 @@
       ],
       "readme": "src/Koan.Cache/README.md",
       "technicalDocumentation": "src/Koan.Cache/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -640,12 +556,9 @@
       "dependencies": [],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
-        "docs.readme.owned.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.owned.missing"
       ]
     },
     {
@@ -666,13 +579,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -692,13 +602,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -714,13 +621,10 @@
       "dependencies": [],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -740,13 +644,10 @@
       ],
       "readme": "src/Koan.Canon/README.md",
       "technicalDocumentation": "src/Koan.Canon/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -765,13 +666,10 @@
       ],
       "readme": "src/Koan.Canon.Contracts/README.md",
       "technicalDocumentation": "src/Koan.Canon.Contracts/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -793,13 +691,10 @@
       ],
       "readme": "src/Koan.Canon.Web/README.md",
       "technicalDocumentation": "src/Koan.Canon.Web/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -819,13 +714,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -845,14 +737,11 @@
       ],
       "readme": "src/Koan.Communication/README.md",
       "technicalDocumentation": "src/Koan.Communication/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -871,13 +760,10 @@
       ],
       "readme": "src/Connectors/Communication/RabbitMq/README.md",
       "technicalDocumentation": "src/Connectors/Communication/RabbitMq/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -893,13 +779,10 @@
       "dependencies": [],
       "readme": "src/Koan.Core/README.md",
       "technicalDocumentation": "src/Koan.Core/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -917,13 +800,10 @@
       ],
       "readme": "src/Koan.Data.Abstractions/README.md",
       "technicalDocumentation": "src/Koan.Data.Abstractions/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -943,13 +823,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -972,14 +849,11 @@
       ],
       "readme": "src/Koan.Data.AI/README.md",
       "technicalDocumentation": "src/Koan.Data.AI/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -1000,14 +874,11 @@
       ],
       "readme": "src/Koan.Data.Backup/README.md",
       "technicalDocumentation": "src/Koan.Data.Backup/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -1029,13 +900,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1055,14 +923,11 @@
       ],
       "readme": "src/Connectors/Data/Couchbase/README.md",
       "technicalDocumentation": "src/Connectors/Data/Couchbase/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -1084,12 +949,9 @@
       ],
       "readme": "src/Connectors/Data/ElasticSearch/README.md",
       "technicalDocumentation": "src/Connectors/Data/ElasticSearch/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
-        "docs.readme.boundaries.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.boundaries.missing"
       ]
     },
     {
@@ -1109,13 +971,10 @@
       ],
       "readme": "src/Connectors/Data/InMemory/README.md",
       "technicalDocumentation": "src/Connectors/Data/InMemory/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -1123,7 +982,7 @@
       "projectPath": "src/Connectors/Data/Json/Koan.Data.Connector.Json.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "JSON file-backed data provider for Koan: simple repository for demos, tests, and local development.",
       "targetFrameworks": [
         "net10.0"
@@ -1135,19 +994,15 @@
       ],
       "readme": "src/Connectors/Data/Json/README.md",
       "technicalDocumentation": "src/Connectors/Data/Json/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
-      "findings": [
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
-      ]
+      "packageIcon": "icon.png",
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Mongo",
       "projectPath": "src/Connectors/Data/Mongo/Koan.Data.Connector.Mongo.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "MongoDB data provider for Koan: options binding and repository integration for document databases.",
       "targetFrameworks": [
         "net10.0"
@@ -1160,12 +1015,8 @@
       ],
       "readme": "src/Connectors/Data/Mongo/README.md",
       "technicalDocumentation": "src/Connectors/Data/Mongo/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
-      "findings": [
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
-      ]
+      "packageIcon": "icon.png",
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.OpenSearch",
@@ -1186,12 +1037,9 @@
       ],
       "readme": "src/Connectors/Data/OpenSearch/README.md",
       "technicalDocumentation": "src/Connectors/Data/OpenSearch/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
-        "docs.readme.boundaries.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.boundaries.missing"
       ]
     },
     {
@@ -1199,7 +1047,7 @@
       "projectPath": "src/Connectors/Data/Postgres/Koan.Data.Connector.Postgres.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "PostgreSQL provider for Koan relational data: Dapper-based SQL integration with guardrails and governance.",
       "targetFrameworks": [
         "net10.0"
@@ -1213,19 +1061,15 @@
       ],
       "readme": "src/Connectors/Data/Postgres/README.md",
       "technicalDocumentation": "src/Connectors/Data/Postgres/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
-      "findings": [
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
-      ]
+      "packageIcon": "icon.png",
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Redis",
       "projectPath": "src/Connectors/Data/Redis/Koan.Data.Connector.Redis.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Redis-backed key/value repository adapter for Koan: simple CRUD, paging guardrails, and options binding.",
       "targetFrameworks": [
         "net10.0"
@@ -1238,19 +1082,15 @@
       ],
       "readme": "src/Connectors/Data/Redis/README.md",
       "technicalDocumentation": "src/Connectors/Data/Redis/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
-      "findings": [
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
-      ]
+      "packageIcon": "icon.png",
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Sqlite",
       "projectPath": "src/Connectors/Data/Sqlite/Koan.Data.Connector.Sqlite.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "SQLite provider for Koan relational data: lightweight local development and testing support.",
       "targetFrameworks": [
         "net10.0"
@@ -1262,19 +1102,15 @@
       ],
       "readme": "src/Connectors/Data/Sqlite/README.md",
       "technicalDocumentation": "src/Connectors/Data/Sqlite/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
-      "findings": [
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
-      ]
+      "packageIcon": "icon.png",
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.SqlServer",
       "projectPath": "src/Connectors/Data/SqlServer/Koan.Data.Connector.SqlServer.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "SQL Server provider for Koan relational data with JSON-projection pushdowns, guardrails, and governance.",
       "targetFrameworks": [
         "net10.0"
@@ -1286,12 +1122,8 @@
       ],
       "readme": "src/Connectors/Data/SqlServer/README.md",
       "technicalDocumentation": "src/Connectors/Data/SqlServer/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
-      "findings": [
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
-      ]
+      "packageIcon": "icon.png",
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Core",
@@ -1310,12 +1142,9 @@
       ],
       "readme": "src/Koan.Data.Core/README.md",
       "technicalDocumentation": "src/Koan.Data.Core/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
-        "docs.readme.boundaries.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.boundaries.missing"
       ]
     },
     {
@@ -1334,15 +1163,12 @@
       ],
       "readme": "src/Koan.Data.Relational/README.md",
       "technicalDocumentation": "src/Koan.Data.Relational/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -1360,13 +1186,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1386,14 +1209,11 @@
       ],
       "readme": "src/Koan.Data.SearchEngine/README.md",
       "technicalDocumentation": "src/Koan.Data.SearchEngine/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -1413,13 +1233,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1438,13 +1255,10 @@
       ],
       "readme": "src/Koan.Data.Vector/README.md",
       "technicalDocumentation": "src/Koan.Data.Vector/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "identity.icon.noncanonical",
-        "metadata.description.terse",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "metadata.description.terse"
       ]
     },
     {
@@ -1463,13 +1277,10 @@
       ],
       "readme": "src/Koan.Data.Vector.Abstractions/README.md",
       "technicalDocumentation": "src/Koan.Data.Vector.Abstractions/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -1490,13 +1301,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1518,12 +1326,9 @@
       ],
       "readme": "src/Connectors/Data/Vector/Milvus/README.md",
       "technicalDocumentation": "src/Connectors/Data/Vector/Milvus/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
-        "docs.readme.boundaries.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.boundaries.missing"
       ]
     },
     {
@@ -1545,13 +1350,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1572,13 +1374,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1601,12 +1400,9 @@
       ],
       "readme": "src/Connectors/Data/Vector/Weaviate/README.md",
       "technicalDocumentation": "src/Connectors/Data/Vector/Weaviate/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
-        "docs.readme.boundaries.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.boundaries.missing"
       ]
     },
     {
@@ -1626,13 +1422,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1650,13 +1443,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1674,13 +1464,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1698,13 +1485,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1724,13 +1508,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1749,13 +1530,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1776,14 +1554,11 @@
       ],
       "readme": "src/Koan.Jobs/README.md",
       "technicalDocumentation": "src/Koan.Jobs/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -1805,14 +1580,11 @@
       ],
       "readme": "src/Koan.Mcp/README.md",
       "technicalDocumentation": "src/Koan.Mcp/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -1830,13 +1602,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1856,13 +1625,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1882,13 +1648,10 @@
       ],
       "readme": "src/Koan.Media.Abstractions/README.md",
       "technicalDocumentation": "src/Koan.Media.Abstractions/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.install.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -1908,14 +1671,11 @@
       ],
       "readme": "src/Koan.Media.Core/README.md",
       "technicalDocumentation": "src/Koan.Media.Core/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -1937,14 +1697,11 @@
       ],
       "readme": "src/Koan.Media.Web/README.md",
       "technicalDocumentation": "src/Koan.Media.Web/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -1962,13 +1719,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -1976,7 +1730,7 @@
       "projectPath": "src/Koan.Orchestration.Abstractions/Koan.Orchestration.Abstractions.csproj",
       "shape": "library",
       "role": "contracts",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Contracts for Koan DevHost orchestration: descriptors, planner models, hosting provider and artifact exporter SPIs.",
       "targetFrameworks": [
         "net10.0"
@@ -1984,12 +1738,8 @@
       "dependencies": [],
       "readme": "src/Koan.Orchestration.Abstractions/README.md",
       "technicalDocumentation": "src/Koan.Orchestration.Abstractions/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
-      "findings": [
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
-      ]
+      "packageIcon": "icon.png",
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Orchestration.Aspire",
@@ -2006,14 +1756,11 @@
       ],
       "readme": "src/Koan.Orchestration.Aspire/README.md",
       "technicalDocumentation": "src/Koan.Orchestration.Aspire/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -2029,15 +1776,12 @@
       "dependencies": [],
       "readme": "src/Koan.Orchestration.Cli/README.md",
       "technicalDocumentation": "src/Koan.Orchestration.Cli/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -2058,13 +1802,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -2083,14 +1824,11 @@
       ],
       "readme": "src/Connectors/Orchestration/Docker/README.md",
       "technicalDocumentation": "src/Connectors/Orchestration/Docker/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -2109,14 +1847,11 @@
       ],
       "readme": "src/Connectors/Orchestration/Podman/README.md",
       "technicalDocumentation": "src/Connectors/Orchestration/Podman/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -2132,14 +1867,11 @@
       "dependencies": [],
       "readme": "src/Koan.Orchestration.Generators/README.md",
       "technicalDocumentation": "src/Koan.Orchestration.Generators/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -2158,14 +1890,11 @@
       ],
       "readme": "src/Connectors/Orchestration/Renderers/Compose/README.md",
       "technicalDocumentation": "src/Connectors/Orchestration/Renderers/Compose/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -2183,13 +1912,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -2209,14 +1935,11 @@
       ],
       "readme": "src/Koan.Storage/README.md",
       "technicalDocumentation": "src/Koan.Storage/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -2234,16 +1957,13 @@
       ],
       "readme": "src/Connectors/Storage/Local/README.md",
       "technicalDocumentation": "src/Connectors/Storage/Local/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
         "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.description.terse",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "metadata.description.terse"
       ]
     },
     {
@@ -2262,13 +1982,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -2276,7 +1993,7 @@
       "projectPath": "templates/Sylin.Koan.Templates.csproj",
       "shape": "template",
       "role": "template",
-      "status": "repair-required",
+      "status": "review-required",
       "description": "\u0060dotnet new\u0060 templates for the Koan Framework: koan-web (minimal Entity \u002B EntityController web API) and koan-console (Entity CRUD console app), both over Sqlite and ready to run.",
       "targetFrameworks": [
         "net10.0"
@@ -2284,10 +2001,9 @@
       "dependencies": [],
       "readme": "templates/README.md",
       "technicalDocumentation": "templates/TECHNICAL.md",
-      "packageIcon": "",
+      "packageIcon": "icon.png",
       "findings": [
-        "docs.readme.boundaries.missing",
-        "identity.icon.missing"
+        "docs.readme.boundaries.missing"
       ]
     },
     {
@@ -2307,13 +2023,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -2333,13 +2046,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -2360,14 +2070,11 @@
       ],
       "readme": "src/Koan.Testing/README.md",
       "technicalDocumentation": "src/Koan.Testing/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -2387,14 +2094,11 @@
       ],
       "readme": "src/Koan.Testing.Containers/README.md",
       "technicalDocumentation": "src/Koan.Testing.Containers/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -2410,14 +2114,11 @@
       "dependencies": [],
       "readme": "src/Koan.Testing.Hosting/README.md",
       "technicalDocumentation": "src/Koan.Testing.Hosting/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -2437,12 +2138,9 @@
       ],
       "readme": "src/Koan.Web/README.md",
       "technicalDocumentation": "src/Koan.Web/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
-        "docs.readme.boundaries.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.boundaries.missing"
       ]
     },
     {
@@ -2460,13 +2158,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -2486,12 +2181,9 @@
       ],
       "readme": "src/Koan.Web.Auth/README.md",
       "technicalDocumentation": "src/Koan.Web.Auth/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
-        "docs.readme.boundaries.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.boundaries.missing"
       ]
     },
     {
@@ -2510,13 +2202,10 @@
       ],
       "readme": "src/Connectors/Web/Auth/Discord/README.md",
       "technicalDocumentation": "src/Connectors/Web/Auth/Discord/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -2535,13 +2224,10 @@
       ],
       "readme": "src/Connectors/Web/Auth/Google/README.md",
       "technicalDocumentation": "src/Connectors/Web/Auth/Google/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -2560,13 +2246,10 @@
       ],
       "readme": "src/Connectors/Web/Auth/Microsoft/README.md",
       "technicalDocumentation": "src/Connectors/Web/Auth/Microsoft/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -2585,13 +2268,10 @@
       ],
       "readme": "src/Connectors/Web/Auth/Oidc/README.md",
       "technicalDocumentation": "src/Connectors/Web/Auth/Oidc/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -2610,13 +2290,10 @@
       ],
       "readme": "src/Connectors/Web/Auth/Test/README.md",
       "technicalDocumentation": "src/Connectors/Web/Auth/Test/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.meaningful-use.missing"
       ]
     },
     {
@@ -2637,15 +2314,12 @@
       ],
       "readme": "src/Koan.Web.Auth.Roles/README.md",
       "technicalDocumentation": "src/Koan.Web.Auth.Roles/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -2667,13 +2341,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -2692,15 +2363,12 @@
       ],
       "readme": "src/Koan.Web.Auth.Services/README.md",
       "technicalDocumentation": "src/Koan.Web.Auth.Services/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.readme.package-title.missing"
       ]
     },
     {
@@ -2722,15 +2390,12 @@
       ],
       "readme": "src/Koan.Web.Backup/README.md",
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.install.missing",
         "docs.readme.meaningful-use.missing",
         "docs.readme.package-title.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -2751,15 +2416,12 @@
       ],
       "readme": "src/Koan.Web.Extensions/README.md",
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
         "docs.readme.package-title.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -2778,13 +2440,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -2805,13 +2464,10 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     },
     {
@@ -2830,14 +2486,11 @@
       ],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
         "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.description.terse",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "metadata.description.terse"
       ]
     },
     {
@@ -2856,14 +2509,12 @@
       ],
       "readme": "src/Koan.ZenGarden/README.md",
       "technicalDocumentation": "src/Koan.ZenGarden/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.install.missing",
         "docs.readme.package-title.missing",
-        "identity.icon.noncanonical",
-        "metadata.description.terse",
-        "metadata.release-notes.generic"
+        "metadata.description.terse"
       ]
     },
     {
@@ -2879,13 +2530,10 @@
       "dependencies": [],
       "readme": null,
       "technicalDocumentation": null,
-      "packageIcon": "0_2.jpg",
+      "packageIcon": "icon.png",
       "findings": [
         "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
+        "docs.technical.missing"
       ]
     }
   ]

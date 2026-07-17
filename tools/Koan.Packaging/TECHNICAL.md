@@ -69,7 +69,9 @@ NBGV calculation.
 artifact names, and SHA-256 values. Packing requires `HEAD == VersionCommit`, validates package
 repository metadata against that commit, enables transitive NuGet audit, and rejects high or critical
 advisories. The packed Koan dependency set must equal the evaluated `ProjectReference` graph, and a
-selected dependency's range floor must equal the selected dependency identity.
+selected dependency's range floor must equal the selected dependency identity. The verifier also
+requires the declared package-owned README to exist in the nupkg and requires `icon.png` to match the
+repository mascot byte-for-byte; evaluated metadata cannot substitute for packed-content proof.
 
 The manifest package set must be an exact subset of active committed lineage by package ID, project
 path, and version; bootstrap state must also match. An artifact cannot therefore introduce an identity

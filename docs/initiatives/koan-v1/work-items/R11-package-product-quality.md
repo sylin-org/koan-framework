@@ -110,7 +110,7 @@ graduation claim. Architectural and prose review plus the applicable executable 
 |---|---|---|
 | [R11-01](r11/R11-01-quality-contract-and-compiler.md) | one deterministic read-only assessment owner and generated baseline | passed |
 | [R11-02](r11/R11-02-package-topology-inventory.md) | exact package disposition queue before mass documentation work | in-progress |
-| R11-03 | canonical mascot, truthful shared metadata, owned-README and packed-content policy | pending |
+| [R11-03](r11/R11-03-package-identity-substrate.md) | canonical mascot, truthful shared metadata, owned-README and packed-content policy | passed |
 | R11-04 | golden package journey behind AddKoan + Entity + EntityController | pending |
 | R11-05 | dependency-ordered family graduation with coalescence before polish | pending |
 | R11-06 | NuGet rendering, clean-consumer, operator, reviewer, and agent proof | pending |

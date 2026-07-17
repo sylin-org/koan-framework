@@ -126,6 +126,9 @@ promotion job exchanges trusted identity for a short-lived NuGet credential and 
 `wave-promote`. Use them only in the protected workflow or an explicitly authorized disposable
 rehearsal.
 
+Every packed package must contain its declared package-owned README and the canonical `icon.png` bytes;
+the verifier rejects presentation metadata that points at absent or divergent payloads.
+
 `--clean-room` proves the exact `Sylin.Koan.Templates` nupkg plus FirstUse and GoldenJourney outside
 the checkout against only the staged/local package feed. The template gate uses an isolated CLI home,
 creates both public template shapes, restores/builds them, and requires a business-visible result from

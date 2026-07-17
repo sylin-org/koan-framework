@@ -363,7 +363,6 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             "NuGet.Config",
             "README.md",
             "icon.png",
-            "resources/image/0_2.jpg",
             "build/compat-ranges.targets"
         ];
         foreach (var path in repositoryWide) yield return path;

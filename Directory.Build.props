@@ -39,12 +39,11 @@
   <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   <IncludeSymbols>true</IncludeSymbols>
   <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-  <!-- Prefer a README.md in the project folder; fall back to repo root README.md -->
+  <!-- A package page must be owned by the package. Missing README.md is an R11 repair,
+       never an invitation to publish the framework root README under a different identity. -->
   <PackageReadmeFile Condition="Exists('$(MSBuildProjectDirectory)\README.md')">README.md</PackageReadmeFile>
-  <PackageReadmeFile Condition="'$(PackageReadmeFile)' == '' and Exists('$(MSBuildThisFileDirectory)README.md')">README.md</PackageReadmeFile>
-    <PackageReleaseNotes>See release notes: https://github.com/sylin-org/Koan-framework/releases</PackageReleaseNotes>
-    <!-- Common tags; projects can append by using $(CommonPackageTags) in their PackageTags -->
-    <CommonPackageTags>Koan;framework;modular;dotnet;aspnetcore;cqrs;ddd;messaging;data;opentelemetry</CommonPackageTags>
+  <!-- Only universally true discovery terms belong here. Capability vocabulary is package-owned. -->
+  <CommonPackageTags>koan;dotnet;framework</CommonPackageTags>
 
   <!-- Baseline language/features across the repo -->
   <ImplicitUsings Condition="'$(ImplicitUsings)' == ''">enable</ImplicitUsings>
@@ -65,12 +64,9 @@
   <PackageReference Include="Nerdbank.GitVersioning" Version="3.9.50" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
-  <!-- Pack project-level README if present; otherwise include repo README -->
+  <!-- Canonical package presentation: one package-owned README and one repository-owned mascot. -->
   <None Include="$(MSBuildProjectDirectory)\README.md" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildProjectDirectory)\README.md')" />
-  <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Condition="!Exists('$(MSBuildProjectDirectory)\README.md') and Exists('$(MSBuildThisFileDirectory)README.md')" />
-    <!-- If you provide an icon.png at repo root, it will be packed and used automatically -->
-    <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)icon.png')" />
-  <None Include="$(MSBuildThisFileDirectory)resources\image\0_2.jpg" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)resources\image\0_2.jpg')" />
+  <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="/" />
   </ItemGroup>
   <!-- In-repo Roslyn generators attached as analyzers. See ARCH-0077 (orchestration generator
        scope-narrowing rationale; deprecation path toward .NET Aspire). -->
@@ -98,10 +94,7 @@
                       ReferenceOutputAssembly="false"
                       Condition="Exists('$(MSBuildThisFileDirectory)src\Koan.Core.Registry.Generators\Koan.Core.Registry.Generators.csproj') and '$(MSBuildProjectName)' != 'Koan.Core.Registry.Generators' and '$(MSBuildProjectName)' != 'Koan.Orchestration.Generators'" />
   </ItemGroup>
-  <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory)icon.png')">
+  <PropertyGroup>
     <PackageIcon>icon.png</PackageIcon>
-  </PropertyGroup>
-  <PropertyGroup Condition="!Exists('$(MSBuildThisFileDirectory)icon.png') and Exists('$(MSBuildThisFileDirectory)resources\\image\\0_2.jpg')">
-    <PackageIcon>0_2.jpg</PackageIcon>
   </PropertyGroup>
 </Project>
