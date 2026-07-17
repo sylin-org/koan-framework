@@ -1,5 +1,6 @@
 using Koan.Core;
 using Koan.Core.Observability.Health;
+using Koan.Data.Core.Routing;
 
 namespace Koan.Data.Core.Diagnostics;
 
@@ -8,14 +9,15 @@ namespace Koan.Data.Core.Diagnostics;
 /// </summary>
 /// <remarks>
 /// Referencing a connector makes it available; it does not necessarily make that connector an
-/// application dependency. A provider participates when it wins the default election, owns an
-/// explicitly configured source, or is selected by a runtime repository or Direct operation.
+/// application dependency. A provider participates when it wins the default election or is selected
+/// by a runtime repository or Direct operation. Merely configuring a named source describes an
+/// available route; it does not make that optional route a readiness dependency.
 /// </remarks>
 public abstract class DataAdapterHealthContributorBase(
     string provider,
     IServiceProvider services,
-    DataSourceRegistry sourceRegistry,
-    IDataDiagnostics diagnostics) : IHealthContributor
+    IDataDiagnostics diagnostics,
+    DataDefaultProviderPlan defaultProvider) : IHealthContributor
 {
     private const string ComponentPrefix = "data:";
     private const string DefaultSource = "Default";
@@ -49,60 +51,62 @@ public abstract class DataAdapterHealthContributorBase(
                 });
         }
 
-        try
+        foreach (var source in sources)
         {
-            return await CheckActive(sources, ct).ConfigureAwait(false);
+            try
+            {
+                await ProbeSource(source, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                return new HealthReport(
+                    Name,
+                    HealthState.Unhealthy,
+                    $"Data source '{source}' is unavailable",
+                    null,
+                    new Dictionary<string, object?>
+                    {
+                        ["active"] = true,
+                        ["provider"] = Provider,
+                        ["sources"] = string.Join(",", sources),
+                        ["failedSource"] = source,
+                        ["error"] = Redaction.DeIdentify(ex.Message)
+                    });
+            }
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            return new HealthReport(
-                Name,
-                HealthState.Unhealthy,
-                Redaction.DeIdentify(ex.Message),
-                null,
-                new Dictionary<string, object?>
-                {
-                    ["active"] = true,
-                    ["provider"] = Provider,
-                    ["sources"] = string.Join(",", sources)
-                });
-        }
+
+        return new HealthReport(
+            Name,
+            HealthState.Healthy,
+            null,
+            null,
+            HealthyData(sources));
     }
 
-    /// <summary>Probes the sources that make this provider an application dependency.</summary>
-    protected abstract Task<HealthReport> CheckActive(
-        IReadOnlyCollection<string> sources,
-        CancellationToken ct);
+    /// <summary>Probes one logical source that makes this provider an application dependency.</summary>
+    protected abstract Task ProbeSource(string source, CancellationToken ct);
+
+    /// <summary>Adds adapter-specific details to a successful report.</summary>
+    protected virtual IReadOnlyDictionary<string, object?> HealthyData(
+        IReadOnlyCollection<string> sources) =>
+        new Dictionary<string, object?>
+        {
+            ["active"] = true,
+            ["provider"] = Provider,
+            ["sources"] = string.Join(",", sources)
+        };
 
     private IReadOnlyCollection<string> GetActiveSources()
     {
         var sources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        try
+        if (Matches(defaultProvider.ProviderId))
         {
-            var decision = AdapterResolver.ResolveDefault(services);
-            if (Matches(decision.Adapter))
-            {
-                sources.Add(decision.Source);
-            }
-        }
-        catch (InvalidOperationException)
-        {
-            // Resolution failures are already owned by runtime facts. An unelected provider does
-            // not become critical merely because another provider's election failed.
-        }
-
-        foreach (var sourceName in sourceRegistry.GetSourceNames())
-        {
-            var source = sourceRegistry.GetSource(sourceName);
-            if (source is not null && Matches(source.Adapter))
-            {
-                sources.Add(source.Name);
-            }
+            sources.Add(DefaultSource);
         }
 
         foreach (var participation in _runtimeDiagnostics.GetAdapterParticipationsSnapshot()

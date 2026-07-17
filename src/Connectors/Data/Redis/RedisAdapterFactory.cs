@@ -32,29 +32,34 @@ public sealed class RedisAdapterFactory : IDataAdapterFactory
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
+        var route = ResolveRoute(sp, source);
+        return new RedisRepository<TEntity, TKey>(
+            route.Connection,
+            route.Database,
+            sp.GetRequiredService<Koan.Data.Core.Semantics.DataSegmentationPlan>());
+    }
+
+    internal RedisSourceRoute ResolveRoute(IServiceProvider sp, string source)
+    {
         var baseOpts = sp.GetRequiredService<IOptions<RedisOptions>>().Value;
-        var muxer = sp.GetRequiredService<IConnectionMultiplexer>();
         var config = sp.GetRequiredService<IConfiguration>();
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
 
-        // Database mode (ARCH-0103): the routed source selects a distinct Redis logical database (a distinct physical
-        // keyspace on the shared connection). Resolved via the shared AdapterConnectionResolver, the same primitive the
-        // relational trio uses for its per-source connection string. Default source ⇒ the base index (0) ⇒ unchanged.
-        // (Per-source distinct SERVERS — a separate IConnectionMultiplexer per source — is a follow-on; logical-database
-        // isolation realizes Database mode for the common single-instance deployment.)
-        //
-        // FOOTGUN (documented, ARCH-0103 follow-on): the index defaults to baseOpts.Database (0). Two Database-mode
-        // sources that both omit the 'Database' setting collide on db 0 with no error — the same silent-share shape as
-        // a source that omits its connection string (the AdapterConnectionResolver Default-fallback, ARCH-0103 P1 §7).
-        // Configure a distinct 'Database' index per Redis source. A boot-time cross-source collision check (the analogue
-        // of the overlapping-Database-predicate detection ARCH-0102 §3 pins) is the durable fix.
+        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
+            config,
+            sourceRegistry,
+            Provider,
+            source,
+            baseOpts.ConnectionString,
+            this);
         var database = AdapterConnectionResolver.GetSourceSetting(
-            config, sourceRegistry, "redis", source, "Database", baseOpts.Database, this);
+            config, sourceRegistry, Provider, source, "Database", baseOpts.Database, this);
 
-        return new RedisRepository<TEntity, TKey>(
-            muxer,
-            database,
-            sp.GetRequiredService<Koan.Data.Core.Semantics.DataSegmentationPlan>());
+        var connection = string.Equals(connectionString, baseOpts.ConnectionString, StringComparison.Ordinal)
+            ? sp.GetRequiredService<IConnectionMultiplexer>()
+            : sp.GetRequiredService<RedisSourceConnectionPool>().Get(connectionString);
+
+        return new RedisSourceRoute(connection, database, source);
     }
 
     // The partition separator must NOT be ':' — Redis key delimiter is ':', and the keyspace scan pattern
@@ -70,4 +75,9 @@ public sealed class RedisAdapterFactory : IDataAdapterFactory
             Partition = PartitionTokenPolicy.Default,
         };
 }
+
+internal sealed record RedisSourceRoute(
+    IConnectionMultiplexer Connection,
+    int Database,
+    string Source);
 

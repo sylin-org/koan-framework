@@ -39,6 +39,12 @@ public sealed class DataService(IServiceProvider sp) : IDataService
 
         var factory = decision.Factory;
 
+        // Selection is the activation boundary, including failed first use. From this point the
+        // application depends on this route, so readiness must report it even when repository
+        // construction or the first provider operation cannot connect.
+        var diagnostics = sp.GetService<DataDiagnostics>();
+        diagnostics?.ObserveParticipation(factory.Provider, source);
+
         // Create repository with source context
         var repo = factory.Create<TEntity, TKey>(sp, source);
 
@@ -58,13 +64,11 @@ public sealed class DataService(IServiceProvider sp) : IDataService
 
         // Repository construction is the activation boundary: inspection and route description remain pure, while
         // any runtime path that actually asks for a repository makes that provider/source visible to readiness.
-        var diagnostics = sp.GetService<DataDiagnostics>();
         diagnostics?.Observe(new EntityConfigInfo(
             typeof(TEntity).FullName ?? typeof(TEntity).Name,
             typeof(TKey).FullName ?? typeof(TKey).Name,
             factory.Provider,
             AggregateMetadata.GetIdSpec(typeof(TEntity))?.Prop.Name));
-        diagnostics?.ObserveParticipation(factory.Provider, source);
 
         _cache[key] = facade;
         return facade;

@@ -347,12 +347,11 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         {
             throw new NotSupportedException($"No IDataProviderConnectionFactory registered for provider '{provider}'. Make sure the corresponding adapter package is referenced and registered.");
         }
-        var connection = factory.Create(connectionString, source);
         var canonicalProvider = sp.GetService<DataProviderCatalog>()
             ?.Find(provider)
             ?.Provider ?? provider;
         sp.GetService<DataDiagnostics>()?.ObserveParticipation(canonicalProvider, source);
-        return connection;
+        return factory.Create(connectionString, source);
     }
 
     private sealed record ConnectionRoute(string Provider, string ConnectionString, string Source);

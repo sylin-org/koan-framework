@@ -33,7 +33,7 @@ source: src/Koan.Data.Connector.Json/
 ## Health and readiness
 
 `JsonHealthContributor` uses the data pillar's selection-aware health base. JSON participates in
-readiness when it wins default adapter election, owns an explicitly configured source, or appears in
+readiness when it wins default adapter election or appears in
 an observed entity configuration. Otherwise it reports `Unknown`, is non-critical, and performs no
 filesystem work.
 

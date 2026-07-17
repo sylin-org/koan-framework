@@ -22,8 +22,9 @@ internal sealed class JsonHealthContributor : DataAdapterHealthContributorBase
         DataSourceRegistry sourceRegistry,
         IDataDiagnostics diagnostics,
         IOptions<JsonDataOptions> options,
-        DataProviderCatalog providers)
-        : base(Constants.Provider.Name, services, sourceRegistry, diagnostics)
+        DataProviderCatalog providers,
+        DataDefaultProviderPlan defaultProvider)
+        : base(Constants.Provider.Name, services, diagnostics, defaultProvider)
     {
         _configuration = configuration;
         _sourceRegistry = sourceRegistry;
@@ -32,47 +33,31 @@ internal sealed class JsonHealthContributor : DataAdapterHealthContributorBase
             ?? throw new InvalidOperationException("The JSON provider is absent from the host Data catalog.");
     }
 
-    protected override Task<HealthReport> CheckActive(
-        IReadOnlyCollection<string> sources,
-        CancellationToken ct)
+    protected override Task ProbeSource(string source, CancellationToken ct)
     {
-        foreach (var source in sources)
+        ct.ThrowIfCancellationRequested();
+        var path = AdapterConnectionResolver.GetSourceSetting(
+            _configuration,
+            _sourceRegistry,
+            Constants.Provider.Name,
+            source,
+            Constants.Configuration.Keys.DirectoryPath,
+            _options.Value.DirectoryPath,
+            _sourceOwner);
+
+        if (string.IsNullOrWhiteSpace(path))
         {
-            ct.ThrowIfCancellationRequested();
-            var path = AdapterConnectionResolver.GetSourceSetting(
-                _configuration,
-                _sourceRegistry,
-                Constants.Provider.Name,
-                source,
-                Constants.Configuration.Keys.DirectoryPath,
-                _options.Value.DirectoryPath,
-                _sourceOwner);
-
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                throw new InvalidOperationException(
-                    $"JSON directory is not configured for source '{source}'.");
-            }
-
-            // JsonRepository provisions its directory on first use. Readiness exercises that same
-            // contract so a fresh, selected JSON store is ready without manual scaffolding.
-            Directory.CreateDirectory(path);
-            var probe = Path.Combine(path, $".__koan-health-{Guid.NewGuid():N}.tmp");
-            using (File.Create(probe, 1, FileOptions.DeleteOnClose)) { }
-            if (File.Exists(probe)) File.Delete(probe);
+            throw new InvalidOperationException(
+                $"JSON directory is not configured for source '{source}'.");
         }
 
-        return Task.FromResult(new HealthReport(
-            Name,
-            HealthState.Healthy,
-            null,
-            null,
-            new Dictionary<string, object?>
-            {
-                ["active"] = true,
-                ["provider"] = Constants.Provider.Name,
-                ["sources"] = string.Join(",", sources)
-            }));
+        // JsonRepository provisions its directory on first use. Readiness exercises that same
+        // contract so a fresh, selected JSON store is ready without manual scaffolding.
+        Directory.CreateDirectory(path);
+        var probe = Path.Combine(path, $".__koan-health-{Guid.NewGuid():N}.tmp");
+        using (File.Create(probe, 1, FileOptions.DeleteOnClose)) { }
+        if (File.Exists(probe)) File.Delete(probe);
+        return Task.CompletedTask;
     }
 }
 

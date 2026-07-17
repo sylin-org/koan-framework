@@ -28,7 +28,7 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
 {
     // One MongoClientProvider (one MongoClient / connection pool) per resolved source — keyed by connection+database, so
     // every entity type on a source SHARES one pool instead of opening one per (entity, source). The Default source uses
-    // the DI-managed provider (which also drives boot-time readiness); a routed source that physically coincides with
+    // the DI-managed provider (which also drives lazy readiness); a routed source that physically coincides with
     // Default reuses that same DI provider (the dedup below) rather than opening a duplicate client.
     //
     // Lifetime (ARCH-0103 §9.15): each cached provider lives for the factory's lifetime (the factory is a DI singleton
@@ -51,13 +51,19 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
+        var route = ResolveRoute(sp, source);
+        return new MongoDocumentStore<TEntity, TKey>(route.Provider, route.Options, sp, route.Source);
+    }
+
+    internal MongoSourceRoute ResolveRoute(IServiceProvider sp, string source)
+    {
         var globalOptions = sp.GetRequiredService<IOptionsMonitor<MongoOptions>>();
 
         if (string.IsNullOrWhiteSpace(source) || string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase))
         {
             // Reuse the DI-managed provider so readiness monitoring and discovery outputs stay in sync.
             var sharedProvider = sp.GetRequiredService<MongoClientProvider>();
-            return new MongoDocumentStore<TEntity, TKey>(sharedProvider, globalOptions, sp, "Default");
+            return new MongoSourceRoute(sharedProvider, globalOptions, "Default");
         }
 
         var baseOptions = globalOptions.CurrentValue;
@@ -84,7 +90,7 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
             && string.Equals(database, baseOptions.Database, StringComparison.Ordinal))
         {
             var sharedProvider = sp.GetRequiredService<MongoClientProvider>();
-            return new MongoDocumentStore<TEntity, TKey>(sharedProvider, globalOptions, sp, source);
+            return new MongoSourceRoute(sharedProvider, globalOptions, source);
         }
 
         var sourceOptions = new MongoOptions
@@ -101,7 +107,7 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
             connectionString + "|" + database,
             _ => new MongoClientProvider(optionsMonitor, sp.GetService<ILogger<MongoClientProvider>>()));
 
-        return new MongoDocumentStore<TEntity, TKey>(provider, optionsMonitor, sp, source);
+        return new MongoSourceRoute(provider, optionsMonitor, source);
     }
 
     public async ValueTask DisposeAsync()
@@ -140,4 +146,9 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
         };
     }
 }
+
+internal sealed record MongoSourceRoute(
+    MongoClientProvider Provider,
+    IOptionsMonitor<MongoOptions> Options,
+    string Source);
 

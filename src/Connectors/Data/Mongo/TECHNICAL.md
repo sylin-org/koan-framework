@@ -37,6 +37,9 @@ source: src/Koan.Data.Connector.Mongo/
   concrete explicit configuration.
 - The selected discovery method is emitted as a credential-redacted runtime fact; raw endpoints are not
   included in that fact.
+- Availability is not readiness dependency: a referenced or configured named Mongo source stays non-critical until
+  it wins default election or an Entity/Direct operation selects it. Active sources are probed through the same
+  per-source client pool used by repositories; startup does not eagerly connect an unused optional source.
 
 ## References
 

@@ -1,6 +1,7 @@
 using Koan.Core.Observability.Health;
 using Koan.Core;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Core.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -50,7 +51,7 @@ public sealed class JsonHealthContributorSpec
     }
 
     [Fact]
-    public async Task Configured_json_source_probes_its_own_directory()
+    public async Task Configured_json_source_stays_inactive_until_runtime_selection_then_probes_its_own_directory()
     {
         var root = TempPath();
         var defaultPath = Path.Combine(root, "unused-default");
@@ -62,14 +63,30 @@ public sealed class JsonHealthContributorSpec
         });
         var registry = Registry(configuration);
         using var services = Services(includeHigherPriorityAdapter: true);
-        var contributor = Contributor(services, configuration, registry, defaultPath);
+        var inactive = Contributor(services, configuration, registry, defaultPath);
 
         try
         {
-            var report = await contributor.Check();
+            var available = await inactive.Check();
+
+            available.State.Should().Be(HealthState.Unknown);
+            inactive.IsCritical.Should().BeFalse();
+            Directory.Exists(archivePath).Should().BeFalse();
+            Directory.Exists(defaultPath).Should().BeFalse();
+
+            var active = Contributor(
+                services,
+                configuration,
+                registry,
+                defaultPath,
+                new StubDiagnostics(participations:
+                [
+                    new DataAdapterParticipationInfo("json", "Archive")
+                ]));
+            var report = await active.Check();
 
             report.State.Should().Be(HealthState.Healthy);
-            contributor.IsCritical.Should().BeTrue();
+            active.IsCritical.Should().BeTrue();
             Directory.Exists(archivePath).Should().BeTrue();
             Directory.Exists(defaultPath).Should().BeFalse();
         }
@@ -136,13 +153,19 @@ public sealed class JsonHealthContributorSpec
         IConfiguration configuration,
         DataSourceRegistry registry,
         string path,
-        IDataDiagnostics? diagnostics = null) =>
-        new(
+        IDataDiagnostics? diagnostics = null)
+    {
+        var providers = new DataProviderCatalog(services.GetServices<IDataAdapterFactory>(), null);
+        var defaultProvider = new DataDefaultProviderPlan(providers, registry);
+        return new JsonHealthContributor(
             services,
             configuration,
             registry,
             diagnostics ?? new StubDiagnostics(),
-            Options.Create(new JsonDataOptions { DirectoryPath = path }));
+            Options.Create(new JsonDataOptions { DirectoryPath = path }),
+            providers,
+            defaultProvider);
+    }
 
     private static ServiceProvider Services(bool includeHigherPriorityAdapter)
     {

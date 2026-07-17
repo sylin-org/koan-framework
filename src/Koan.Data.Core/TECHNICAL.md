@@ -92,8 +92,9 @@ validation:
 ## Data-adapter health participation
 
 - `DataAdapterHealthContributorBase` distinguishes connector availability from application
-  dependency. A provider participates when it wins default election, owns a configured source, or
-  is selected by a runtime repository or Direct request in that host.
+  dependency. A provider participates when it wins default election or is selected by a runtime
+  repository or Direct request in that host. A configured named source describes an available route;
+  it remains non-gating until an operation actually selects it.
 - An available but inactive provider returns `Unknown`, remains non-critical, and must not open a
   connection or mutate backing infrastructure.
 - An active provider probes every participating source and is critical. Provider implementations

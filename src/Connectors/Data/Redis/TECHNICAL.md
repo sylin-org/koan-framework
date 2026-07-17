@@ -25,6 +25,9 @@ source: src/Koan.Data.Connector.Redis/
 ## Configuration
 
 - Endpoints, SSL, timeouts, naming and TTL policies.
+- A named source may select its own endpoint and logical database. Koan shares one connection multiplexer per
+  distinct endpoint for the host lifetime; the default DI multiplexer remains the shared transport for cache and
+  coherence modules.
 
 ## Key conventions
 
@@ -43,7 +46,8 @@ source: src/Koan.Data.Connector.Redis/
 
 ## Operations
 
-- Health: `PING` round-trip for readiness; simple get/set smoke checks.
+- Health: an available Redis package stays non-critical until it wins default election or a runtime operation selects
+  one of its sources. Active sources receive a `PING` round-trip through the same pooled endpoint used by Entity work.
 - Metrics: connection pool size, operation latency, error rates.
 - Logs: key patterns only (no raw values); redact sensitive data.
 

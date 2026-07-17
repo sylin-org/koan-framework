@@ -4,6 +4,7 @@ using Koan.Core.Observability.Health;
 using Koan.Data.Core;
 using Koan.Data.Core.Diagnostics;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Routing;
 using Koan.Tests.Shared;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -48,6 +49,7 @@ public sealed class DataAdapterParticipationSpec
         var registrations = new ServiceCollection();
         registrations.AddSingleton<IConfiguration>(configuration);
         registrations.AddKoanDataCore();
+        registrations.AddSingleton<IDataAdapterFactory, OtherAdapterFactory>();
         registrations.AddSingleton<IDataDiagnostics, EmptyPublicDiagnostics>();
 
         using var services = registrations.BuildServiceProvider();
@@ -58,13 +60,49 @@ public sealed class DataAdapterParticipationSpec
 
         var health = new ProbeHealthContributor(
             services,
-            services.GetRequiredService<DataSourceRegistry>(),
             publicDiagnostics);
 
         health.IsCritical.Should().BeTrue();
         var report = await health.Check();
 
         report.State.Should().Be(HealthState.Healthy);
+        health.ActiveSources.Should().Equal("Archive");
+    }
+
+    [Fact]
+    public async Task Configured_source_is_available_but_does_not_gate_readiness_until_selected()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Koan:Data:Sources:Default:Adapter"] = "other-provider",
+                ["Koan:Data:Sources:Archive:Adapter"] = "participating-provider",
+                ["Koan:Data:Sources:Archive:ConnectionString"] = "configured-but-unused"
+            })
+            .Build();
+        var registrations = new ServiceCollection();
+        registrations.AddSingleton<IConfiguration>(configuration);
+        registrations.AddKoanDataCore();
+        registrations.AddSingleton<IDataAdapterFactory, OtherAdapterFactory>();
+
+        using var services = registrations.BuildServiceProvider();
+        var health = new ProbeHealthContributor(
+            services,
+            services.GetRequiredService<IDataDiagnostics>());
+
+        var available = await health.Check();
+
+        health.IsCritical.Should().BeFalse();
+        available.State.Should().Be(HealthState.Unknown);
+        health.ActiveSources.Should().BeEmpty();
+
+        services.GetRequiredService<DataDiagnostics>()
+            .ObserveParticipation("participating-provider", "Archive");
+
+        var selected = await health.Check();
+
+        health.IsCritical.Should().BeTrue();
+        selected.State.Should().Be(HealthState.Healthy);
         health.ActiveSources.Should().Equal("Archive");
     }
 
@@ -109,6 +147,23 @@ public sealed class DataAdapterParticipationSpec
             => _inner.GetNamingCapability(services);
     }
 
+    private sealed class OtherAdapterFactory : IDataAdapterFactory
+    {
+        private readonly NonIsolatingFakeAdapterFactory _inner = new();
+
+        public string Provider => "other-provider";
+
+        public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
+            IServiceProvider sp,
+            string source = "Default")
+            where TEntity : class, IEntity<TKey>
+            where TKey : notnull
+            => _inner.Create<TEntity, TKey>(sp, source);
+
+        public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+            => _inner.GetNamingCapability(services);
+    }
+
     private sealed class EmptyPublicDiagnostics : IDataDiagnostics
     {
         public IReadOnlyList<EntityConfigInfo> GetEntityConfigsSnapshot() => [];
@@ -116,27 +171,19 @@ public sealed class DataAdapterParticipationSpec
 
     private sealed class ProbeHealthContributor(
         IServiceProvider services,
-        DataSourceRegistry sourceRegistry,
         IDataDiagnostics diagnostics)
         : DataAdapterHealthContributorBase(
             "participating-provider",
             services,
-            sourceRegistry,
-            diagnostics)
+            diagnostics,
+            services.GetRequiredService<DataDefaultProviderPlan>())
     {
         public IReadOnlyCollection<string> ActiveSources { get; private set; } = [];
 
-        protected override Task<HealthReport> CheckActive(
-            IReadOnlyCollection<string> sources,
-            CancellationToken ct)
+        protected override Task ProbeSource(string source, CancellationToken ct)
         {
-            ActiveSources = sources;
-            return Task.FromResult(new HealthReport(
-                Name,
-                HealthState.Healthy,
-                "participating",
-                null,
-                null));
+            ActiveSources = [.. ActiveSources, source];
+            return Task.CompletedTask;
         }
     }
 }

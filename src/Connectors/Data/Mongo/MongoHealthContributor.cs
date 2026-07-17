@@ -1,32 +1,37 @@
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using Koan.Core;
 using Koan.Core.Observability.Health;
+using Koan.Data.Core;
+using Koan.Data.Core.Diagnostics;
+using Koan.Data.Core.Routing;
 
 namespace Koan.Data.Connector.Mongo;
 
-/// <summary>
-/// Health probe for Mongo connectivity — pings through the <b>shared</b> <see cref="MongoClientProvider"/> (no fresh
-/// <c>MongoClient</c>/connection-pool per probe), on the <see cref="AdapterHealthContributorBase"/> family shape.
-/// </summary>
-internal sealed class MongoHealthContributor(MongoClientProvider provider, IOptions<MongoOptions> options)
-    : AdapterHealthContributorBase
+/// <summary>Reports readiness for the Mongo sources that actually participate in this application.</summary>
+internal sealed class MongoHealthContributor : DataAdapterHealthContributorBase
 {
-    public override string Name => "data:mongo";
+    private const string ProviderName = "mongo";
+    private readonly IServiceProvider _services;
+    private readonly MongoAdapterFactory _factory;
 
-    protected override async Task ProbeAsync(CancellationToken ct)
+    public MongoHealthContributor(
+        IServiceProvider services,
+        IDataDiagnostics diagnostics,
+        DataProviderCatalog providers,
+        DataDefaultProviderPlan defaultProvider)
+        : base(ProviderName, services, diagnostics, defaultProvider)
     {
-        var db = await provider.GetDatabase(ct).ConfigureAwait(false);
-        await db.RunCommandAsync((Command<BsonDocument>)new BsonDocument("ping", 1), cancellationToken: ct).ConfigureAwait(false);
+        _services = services;
+        _factory = providers.Find(ProviderName) as MongoAdapterFactory
+            ?? throw new InvalidOperationException("The MongoDB provider is absent from the host Data catalog.");
     }
 
-    protected override IReadOnlyDictionary<string, object?>? HealthyData() => new Dictionary<string, object?>
+    protected override async Task ProbeSource(string source, CancellationToken ct)
     {
-        ["database"] = options.Value.Database,
-        ["connectionString"] = Redaction.DeIdentify(options.Value.ConnectionString),
-    };
+        var route = _factory.ResolveRoute(_services, source);
+        var database = await route.Provider.GetDatabase(ct).ConfigureAwait(false);
+        await database.RunCommandAsync(
+            (Command<BsonDocument>)new BsonDocument("ping", 1),
+            cancellationToken: ct).ConfigureAwait(false);
+    }
 }

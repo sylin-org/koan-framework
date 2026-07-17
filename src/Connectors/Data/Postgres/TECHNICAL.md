@@ -56,7 +56,9 @@ source: src/Koan.Data.Connector.Postgres/
 
 ## Operations
 
-- Health: TCP connect and simple `SELECT 1`.
+- Health: an available PostgreSQL package stays non-critical until it wins default election or a runtime operation
+  selects one of its sources. Active sources resolve the same source-specific connection as repositories, then open
+  it and execute `SELECT 1`.
 - Metrics: command duration, retries, timeouts; track server version for feature toggles.
 - Logs: SQL with parameter redaction; note when in-memory filtering occurs.
 

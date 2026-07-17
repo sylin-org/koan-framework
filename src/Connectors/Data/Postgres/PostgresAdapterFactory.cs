@@ -33,10 +33,15 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
+        var resolver = sp.GetRequiredService<IStorageNameResolver>();
+        return new PostgresRepository<TEntity, TKey>(sp, ResolveOptions(sp, source), resolver);
+    }
+
+    internal PostgresOptions ResolveOptions(IServiceProvider sp, string source)
+    {
         var config = sp.GetRequiredService<IConfiguration>();
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
         var baseOpts = sp.GetRequiredService<IOptions<PostgresOptions>>().Value;
-        var resolver = sp.GetRequiredService<IStorageNameResolver>();
 
         // Resolve the source's connection through the shared resolver: the Default (or a non-Default whose source
         // relies on discovery and resolves to "auto") collapses onto the discovery-resolved base connection, so a
@@ -58,7 +63,7 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory
             Readiness = baseOpts.Readiness
         };
 
-        return new PostgresRepository<TEntity, TKey>(sp, sourceOpts, resolver);
+        return sourceOpts;
     }
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)

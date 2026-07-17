@@ -145,6 +145,13 @@ public sealed class SqliteConfigurationTruthSpec
                 "test-discovery"));
         }
 
+        public Task<AdapterDiscoveryResult> ResolveServiceIntent(
+            string serviceName,
+            string intent,
+            DiscoveryContext? context = null,
+            CancellationToken cancellationToken = default)
+            => DiscoverService(serviceName, context, cancellationToken);
+
         public IServiceDiscoveryAdapter[] GetRegisteredAdapters() => [];
     }
 

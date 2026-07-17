@@ -25,8 +25,9 @@ internal sealed class SqliteHealthContributor : DataAdapterHealthContributorBase
         IDataDiagnostics diagnostics,
         IOptions<SqliteOptions> options,
         SqliteConnectionLifecycle connections,
-        DataProviderCatalog providers)
-        : base(ProviderName, services, sourceRegistry, diagnostics)
+        DataProviderCatalog providers,
+        DataDefaultProviderPlan defaultProvider)
+        : base(ProviderName, services, diagnostics, defaultProvider)
     {
         _configuration = configuration;
         _sourceRegistry = sourceRegistry;
@@ -36,61 +37,20 @@ internal sealed class SqliteHealthContributor : DataAdapterHealthContributorBase
             ?? throw new InvalidOperationException("The SQLite provider is absent from the host Data catalog.");
     }
 
-    protected override async Task<HealthReport> CheckActive(
-        IReadOnlyCollection<string> sources,
-        CancellationToken ct)
+    protected override async Task ProbeSource(string source, CancellationToken ct)
     {
-        foreach (var source in sources)
-        {
-            ct.ThrowIfCancellationRequested();
-            try
-            {
-                var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-                    _configuration,
-                    _sourceRegistry,
-                    ProviderName,
-                    source,
-                    _options.Value.ConnectionString,
-                    _sourceOwner);
+        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
+            _configuration,
+            _sourceRegistry,
+            ProviderName,
+            source,
+            _options.Value.ConnectionString,
+            _sourceOwner);
 
-                await using var connection = _connections.Create(connectionString, source);
-                await connection.OpenAsync(ct).ConfigureAwait(false);
-                await using var command = connection.CreateCommand();
-                command.CommandText = "PRAGMA user_version;";
-                _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                return new HealthReport(
-                    Name,
-                    HealthState.Unhealthy,
-                    $"SQLite source '{source}' is unavailable",
-                    null,
-                    new Dictionary<string, object?>
-                    {
-                        ["active"] = true,
-                        ["provider"] = ProviderName,
-                        ["sources"] = string.Join(",", sources),
-                        ["failedSource"] = source,
-                        ["error"] = Koan.Core.Redaction.DeIdentify(ex.Message)
-                    });
-            }
-        }
-
-        return new HealthReport(
-            Name,
-            HealthState.Healthy,
-            null,
-            null,
-            new Dictionary<string, object?>
-            {
-                ["active"] = true,
-                ["provider"] = ProviderName,
-                ["sources"] = string.Join(",", sources)
-            });
+        await using var connection = _connections.Create(connectionString, source);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version;";
+        _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
     }
 }

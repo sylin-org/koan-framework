@@ -43,6 +43,7 @@ public sealed class RedisDataModule : KoanModule, IKoanAspireResources
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, Discovery.RedisDiscoveryAdapter>());
 
         services.AddSingleton<IDataAdapterFactory, RedisAdapterFactory>();
+        services.AddSingleton<RedisSourceConnectionPool>();
 
         // Only register connection multiplexer if Redis is available or in Aspire context
         RegisterConnectionMultiplexer(services);
@@ -63,86 +64,8 @@ public sealed class RedisDataModule : KoanModule, IKoanAspireResources
             KoanLog.BootDebug(logger, Infrastructure.Constants.Logging.Connection, "attempt",
                 ("connection", cs));
 
-            // ARCH-0080 follow-up: parse to ConfigurationOptions and force tolerant defaults
-            // when the user hasn't pinned them. The factory must NEVER throw at host-build time —
-            // a missing/unreachable Redis is a runtime concern (health contributors, retry logic
-            // in adapters), not a startup-fatal one. Pre-fix callers had to embed
-            // `abortConnect=false` in every connection string to avoid eager Connect() throws;
-            // now the factory defaults that for them.
-            //
-            // Parse + Connect are wrapped in the same try so a malformed connection string
-            // doesn't slip past as a bare ArgumentException/FormatException.
-            var abortConnectImplicitlyDefaulted = !cs.Contains("abortConnect", StringComparison.OrdinalIgnoreCase);
-            try
-            {
-                var options = ConfigurationOptions.Parse(cs);
-                if (abortConnectImplicitlyDefaulted)
-                {
-                    options.AbortOnConnectFail = false;
-                }
-
-                var mux = ConnectionMultiplexer.Connect(options);
-
-                // DX guard: with implicit AbortOnConnectFail=false, a typo'd connection string
-                // boots silently into a permanently disconnected state. Surface that as a
-                // Warning so deployments don't go undetected until first request. Users who
-                // pinned abortConnect explicitly know what they signed up for.
-                //
-                // Skipped when ANY endpoint targets port 0 — that's "deliberately unreachable"
-                // sentinel test code uses (per the pillar boot smokes) and the noise would
-                // train reviewers to ignore real production occurrences.
-                if (abortConnectImplicitlyDefaulted && !mux.IsConnected && !IsDeliberatelyUnreachable(options))
-                {
-                    KoanLog.BootWarning(logger, Infrastructure.Constants.Logging.Connection, "disconnected",
-                        ("connection", cs),
-                        ("abortOnConnectFail", false),
-                        ("guidance", "The host remains available, but cache/coherence operations will fail until Redis is reachable. Pin abortConnect=true to fail fast."));
-                }
-
-                return mux;
-            }
-            catch (RedisConnectionException ex)
-            {
-                // With AbortOnConnectFail=false this branch should be unreachable on transport
-                // failure; preserved for genuinely malformed config (auth rejection, etc.) and
-                // for callers who pinned abortConnect=true.
-                KoanLog.BootError(logger, Infrastructure.Constants.Logging.Connection, "failed",
-                    ("error", ex));
-                throw new InvalidOperationException($"Redis is not available. Connection string: {Redaction.DeIdentify(cs)}. " +
-                    "Ensure Redis is running or use the Aspire AppHost for managed Redis.", ex);
-            }
-            catch (Exception ex) when (ex is ArgumentException or FormatException)
-            {
-                // Parse-time failure: the connection string itself is malformed (not just
-                // unreachable). Wrap with the same helpful guidance the connect branch uses.
-                KoanLog.BootError(logger, Infrastructure.Constants.Logging.Connection, "malformed",
-                    ("error", ex));
-                throw new InvalidOperationException(
-                    $"Redis connection string is malformed and could not be parsed: {Redaction.DeIdentify(cs)}. " +
-                    "Expected StackExchange.Redis configuration syntax (e.g., 'localhost:6379' or " +
-                    "'host1:6379,host2:6379,abortConnect=false'). See https://stackexchange.github.io/StackExchange.Redis/Configuration.",
-                    ex);
-            }
+            return RedisConnectionFactory.Connect(cs, logger);
         });
-    }
-
-    /// <summary>
-    /// Returns true when ANY parsed endpoint targets port 0 — the sentinel pillar boot smokes
-    /// use to indicate "deliberately unreachable Redis." Skipping the disconnect warning for
-    /// this case keeps test runs quiet while preserving the warning for real production typos.
-    /// </summary>
-    private static bool IsDeliberatelyUnreachable(ConfigurationOptions options)
-    {
-        foreach (var ep in options.EndPoints)
-        {
-            // EndPoint can be DnsEndPoint or IPEndPoint; both expose Port.
-            switch (ep)
-            {
-                case System.Net.DnsEndPoint dns when dns.Port == 0: return true;
-                case System.Net.IPEndPoint ip when ip.Port == 0: return true;
-            }
-        }
-        return false;
     }
 
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

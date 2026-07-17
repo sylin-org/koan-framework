@@ -1,6 +1,5 @@
 using Koan.Core;
 using Koan.Core.Observability.Health;
-using Koan.Core.Provenance;
 using Koan.Data.Abstractions.Naming;
 using Koan.Orchestration.Attributes;
 using Koan.Testing.Integration;
@@ -152,13 +151,6 @@ public sealed class SqliteHealthContributorSpec
                 File.Exists(fallbackPath).Should().BeFalse(
                     "repository operations and readiness must agree on the authoritative Default source");
 
-                var module = ProvenanceRegistry.Instance.CurrentSnapshot.Pillars
-                    .SelectMany(pillar => pillar.Modules)
-                    .Single(candidate => candidate.Name == "Koan.Data.Connector.Sqlite");
-                var connection = module.Settings
-                    .Single(setting => setting.Key == "Koan:Data:Sqlite:ConnectionString");
-                connection.Value.Should().Be(Connection(databasePath));
-                connection.SourceKey.Should().Be("Koan.Data.Sources.Default.ConnectionString");
             }
 
             File.Delete(databasePath);
@@ -171,7 +163,7 @@ public sealed class SqliteHealthContributorSpec
     }
 
     [Fact]
-    public async Task Configured_named_sqlite_source_probes_its_own_database()
+    public async Task Configured_named_sqlite_source_stays_inactive_until_selected_then_probes_its_own_database()
     {
         var databasePath = TempDatabase("archive");
         var fallbackPath = TempDatabase("named-unused-fallback");
@@ -190,10 +182,22 @@ public sealed class SqliteHealthContributorSpec
                              .StartAsync())
             {
                 var contributor = SqliteHealth(host.Services);
-                var report = await contributor.Check();
+                var available = await contributor.Check();
+
+                contributor.IsCritical.Should().BeFalse();
+                available.State.Should().Be(HealthState.Unknown);
+                File.Exists(databasePath).Should().BeFalse();
+                File.Exists(fallbackPath).Should().BeFalse();
+
+                using (EntityContext.Source("Archive"))
+                {
+                    await new HealthRecord { Value = "selected" }.Save();
+                }
+
+                var active = await contributor.Check();
 
                 contributor.IsCritical.Should().BeTrue();
-                report.State.Should().Be(HealthState.Healthy);
+                active.State.Should().Be(HealthState.Healthy);
                 File.Exists(databasePath).Should().BeTrue();
                 File.Exists(fallbackPath).Should().BeFalse();
             }
@@ -227,7 +231,7 @@ public sealed class SqliteHealthContributorSpec
 
             contributor.IsCritical.Should().BeTrue();
             report.State.Should().Be(HealthState.Unhealthy);
-            report.Description.Should().Be("SQLite source 'Default' is unavailable");
+            report.Description.Should().Be("Data source 'Default' is unavailable");
             report.Data.Should().ContainKey("failedSource").WhoseValue.Should().Be("Default");
         }
         finally
@@ -254,6 +258,13 @@ public sealed class SqliteHealthContributorSpec
                 .WithSetting("Koan:Data:Sources:ZArchive:ConnectionString", Connection(brokenPath))
                 .ConfigureServices(services => services.AddKoan())
                 .StartAsync();
+
+            using (EntityContext.Source("ZArchive"))
+            {
+                _ = host.Services
+                    .GetRequiredService<IDataService>()
+                    .GetRepository<HealthRecord, string>();
+            }
 
             var report = await SqliteHealth(host.Services).Check();
 

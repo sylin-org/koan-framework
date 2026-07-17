@@ -70,7 +70,7 @@ by their caller.
 
 ## Operations
 
-- Readiness is critical only when SQLite wins provider election, owns a configured source, or participates in a
+- Readiness is critical only when SQLite wins provider election or participates in a
   runtime repository or Direct connection request. Available-but-unused SQLite reports `Unknown` and does not
   touch disk.
 - Active readiness resolves and probes every participating source through the same routing path repositories use.

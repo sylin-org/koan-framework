@@ -1,30 +1,34 @@
-using Koan.Core;
 using Koan.Core.Observability.Health;
-using Microsoft.Extensions.DependencyInjection;
-using StackExchange.Redis;
+using Koan.Data.Core;
+using Koan.Data.Core.Diagnostics;
+using Koan.Data.Core.Routing;
 
 namespace Koan.Data.Connector.Redis;
 
-internal sealed class RedisHealthContributor(IServiceProvider serviceProvider) : IHealthContributor
+internal sealed class RedisHealthContributor : DataAdapterHealthContributorBase
 {
-    public string Name => "data:redis";
-    public bool IsCritical => true;
+    private const string ProviderName = "redis";
+    private readonly IServiceProvider _services;
+    private readonly RedisAdapterFactory _factory;
 
-    public async Task<HealthReport> Check(CancellationToken ct = default)
+    public RedisHealthContributor(
+        IServiceProvider services,
+        IDataDiagnostics diagnostics,
+        DataProviderCatalog providers,
+        DataDefaultProviderPlan defaultProvider)
+        : base(ProviderName, services, diagnostics, defaultProvider)
     {
-        try
-        {
-            // Lazy resolve the connection multiplexer only when health check runs
-            var muxer = serviceProvider.GetRequiredService<IConnectionMultiplexer>();
-            var db = muxer.GetDatabase();
-            // PING check
-            var pong = await db.PingAsync();
-            return new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Healthy, null, null, new Dictionary<string, object?> { ["latencyMs"] = pong.TotalMilliseconds });
-        }
-        catch (Exception ex)
-        {
-            return new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Unhealthy, ex.Message, null, null);
-        }
+        _services = services;
+        _factory = providers.Find(ProviderName) as RedisAdapterFactory
+            ?? throw new InvalidOperationException("The Redis provider is absent from the host Data catalog.");
+    }
+
+    protected override async Task ProbeSource(string source, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var route = _factory.ResolveRoute(_services, source);
+        _ = await route.Connection.GetDatabase(route.Database).PingAsync().ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
     }
 }
 

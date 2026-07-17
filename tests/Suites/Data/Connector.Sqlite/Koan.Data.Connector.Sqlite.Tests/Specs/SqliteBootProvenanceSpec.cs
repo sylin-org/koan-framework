@@ -22,7 +22,7 @@ public sealed class SqliteBootProvenanceSpec
             var registry = ProvenanceRegistry.Instance;
             var module = registry.GetOrCreateModule("data", "Koan.Data.Connector.Sqlite");
 
-            new SqliteDataModule().Report(module, configuration, new TestHostEnvironment(root));
+            new SqliteModule().Report(module, configuration, new TestHostEnvironment(root));
 
             Directory.Exists(Path.Combine(root, ".koan")).Should().BeFalse();
             var connection = registry.CurrentSnapshot.FindModule("data", "Koan.Data.Connector.Sqlite")!
