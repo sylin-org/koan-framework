@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: semantic portfolio and seven graduated outcomes passed; OrderIntake, CustomerCanon, and SnapVault remain explicit graduation work
+  scope: semantic portfolio and eight graduated outcomes passed; CustomerCanon and SnapVault remain explicit graduation work
 ---
 
 # R10 — Graduate the golden sample portfolio
@@ -116,7 +116,7 @@ R10 passes only when:
 | [R10-04](r10/R10-04-s0-console-json.md) | LocalChecklist | passed | standard console host → local JSON checklist → materialized query → clean process/facts |
 | [R10-05](r10/R10-05-s10-devportal.md) | DevPortal | passed | local editorial draft → approved publication → named SQLite/Mongo/Postgres channel → transfer/facts/social-card proof |
 | [R10-06](r10/R10-06-g1c2-gardencoop-embedded.md) | GardenCoop 02 — LocalDiscovery | passed | cumulative garden result → local Produce save → ONNX embedding → sqlite-vec search → HTTP/facts proof |
-| [R10-07](r10/R10-07-s14-workload-lab.md) | OrderIntake | in-progress | bounded order intake → named source → verified durable receipt → capabilities/facts/correction proof |
+| [R10-07](r10/R10-07-s14-workload-lab.md) | OrderIntake | passed | bounded order intake → named source → verified durable receipt → capabilities/facts/correction proof |
 | [R10-08](r10/R10-08-public-documentation.md) | public documentation | passed | greenfield front door/TOC → current product/package companions → enforced truth gate → FirstUse/product-surface proof |
 | [R10-09](r10/R10-09-semantic-sample-portfolio.md) | semantic sample portfolio | passed | intent-based taxonomy → accepted culls → cumulative GardenCoop → OpenGraph absorbed by DevPortal → focused retained evidence |
 

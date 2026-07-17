@@ -1,354 +1,166 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Koan Adapter Benchmark</title>
-    <link rel="stylesheet" href="css/benchmark.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OrderIntake · Koan</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #07111f; color: #e5edf7; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 15% 0%, #14315a 0, transparent 38%), #07111f; }
+    main { width: min(1040px, calc(100% - 32px)); margin: 0 auto; padding: 64px 0 80px; }
+    header { max-width: 760px; margin-bottom: 32px; }
+    .eyebrow { color: #67e8f9; font-size: .78rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { margin: 10px 0 14px; font-size: clamp(2.5rem, 7vw, 5.5rem); letter-spacing: -.065em; line-height: .95; }
+    header p { color: #a9bad0; font-size: 1.08rem; line-height: 1.65; }
+    .grid { display: grid; grid-template-columns: minmax(280px, .72fr) minmax(0, 1.28fr); gap: 20px; }
+    .card { background: rgba(10, 26, 46, .86); border: 1px solid #243c5c; border-radius: 18px; padding: 24px; box-shadow: 0 24px 70px rgba(0,0,0,.22); }
+    h2 { margin: 0 0 18px; font-size: 1rem; letter-spacing: .04em; }
+    label { display: grid; gap: 8px; margin: 16px 0; color: #b7c6d9; font-size: .85rem; }
+    select, input, button { width: 100%; border: 1px solid #355170; border-radius: 11px; padding: 12px 13px; font: inherit; }
+    select, input { background: #09182b; color: #edf6ff; }
+    button { margin-top: 8px; border: 0; background: linear-gradient(135deg, #22d3ee, #60a5fa); color: #03111f; font-weight: 850; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .hint, .empty { color: #879bb5; font-size: .85rem; line-height: 1.55; }
+    .status-line { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; margin-bottom: 16px; }
+    .status { color: #67e8f9; font-weight: 850; }
+    progress { width: 100%; height: 9px; accent-color: #22d3ee; }
+    .message { min-height: 24px; margin: 12px 0 20px; color: #a9bad0; }
+    .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
+    .metric { padding: 13px 10px; border-radius: 12px; background: #09182b; border: 1px solid #1d3553; text-align: center; }
+    .metric strong { display: block; font-size: 1.35rem; }
+    .metric span { color: #8196b0; font-size: .69rem; text-transform: uppercase; }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 15px; margin: 20px 0 0; font-size: .83rem; }
+    dt { color: #7f93ad; } dd { margin: 0; overflow-wrap: anywhere; }
+    .error { margin-top: 16px; padding: 14px; border: 1px solid #7f3650; background: #321425; border-radius: 12px; color: #fecdd3; white-space: pre-wrap; }
+    footer { margin-top: 22px; color: #7990ab; font-size: .8rem; }
+    a { color: #67e8f9; }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } .metrics { grid-template-columns: repeat(2, 1fr); } }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Koan Adapter Benchmark</h1>
-            <p class="subtitle">Multi-Provider Performance Testing Suite</p>
-            <div class="hero-stats">
-                <div class="hero-stat">
-                    <div class="hero-stat-value">4</div>
-                    <div class="hero-stat-label">Providers</div>
-                </div>
-                <div class="hero-stat">
-                    <div class="hero-stat-value">11</div>
-                    <div class="hero-stat-label">Test Types</div>
-                </div>
-                <div class="hero-stat">
-                    <div class="hero-stat-value">3</div>
-                    <div class="hero-stat-label">Entity Tiers</div>
-                </div>
-            </div>
-        </header>
+  <main>
+    <header>
+      <div class="eyebrow">Koan · meaningful provider evidence</div>
+      <h1>One workload.<br>One honest receipt.</h1>
+      <p>Accept a bounded order batch through a named source, read every order back, remove exactly that trial's data,
+        and keep the durable evidence. Local works immediately; optional sources explain how to become available.</p>
+    </header>
 
-        <div class="config-panel">
-            <div class="config-header">
-                <h2>Benchmark Configuration</h2>
-                <div class="config-actions">
-                    <button id="resetConfigBtn" class="btn-link" title="Reset to defaults">
-                        <span>↻</span> Reset
-                    </button>
-                </div>
-            </div>
+    <section class="grid">
+      <form id="trial-form" class="card">
+        <h2>Run an order-intake trial</h2>
+        <label>Target
+          <select id="target">
+            <option value="Local">Local · SQLite · ready now</option>
+            <option value="Documents">Documents · MongoDB · optional</option>
+            <option value="Relational">Relational · PostgreSQL · optional</option>
+            <option value="KeyValue">KeyValue · Redis · optional</option>
+          </select>
+        </label>
+        <label>Orders
+          <input id="count" type="number" min="1" max="1000" value="100" required>
+        </label>
+        <button id="run" type="submit">Run and verify</button>
+        <p class="hint">The receipt describes this run. It does not declare a winner or recommend an architecture.</p>
+      </form>
 
-            <div class="config-row">
-                <div class="config-group">
-                    <label>
-                        Mode
-                        <span class="tooltip-icon" title="Sequential tests providers one at a time. Parallel tests all providers simultaneously.">ⓘ</span>
-                    </label>
-                    <div class="mode-toggle">
-                        <button id="sequentialBtn" class="mode-btn active">
-                            <span class="mode-icon">▶</span> Sequential
-                        </button>
-                        <button id="parallelBtn" class="mode-btn">
-                            <span class="mode-icon">⎈</span> Parallel
-                        </button>
-                    </div>
-                    <small class="help-text">
-                        <strong>Sequential:</strong> Test providers one at a time for direct comparison<br>
-                        <strong>Parallel:</strong> Test all providers simultaneously for real-world scenarios
-                    </small>
-                </div>
+      <section class="card" aria-live="polite">
+        <div class="status-line"><h2>Durable trial</h2><span id="status" class="status">Ready</span></div>
+        <progress id="progress" max="1" value="0"></progress>
+        <p id="message" class="message">Choose Local for the zero-infrastructure path.</p>
+        <div id="receipt" class="empty">A verified receipt will appear here.</div>
+        <div id="error" class="error" hidden></div>
+      </section>
+    </section>
 
-                <div class="config-group">
-                    <label>
-                        Scale
-                        <span class="tooltip-icon" title="Controls the number of entities created and tested. More entities = longer test time but more accurate results.">ⓘ</span>
-                    </label>
-                    <select id="scaleSelect" class="form-control">
-                        <option value="Quick">Quick (1,000 entities ~ 30 sec)</option>
-                        <option value="Standard" selected>Standard (5,000 entities ~ 2 min)</option>
-                        <option value="Full">Full (10,000 entities ~ 5 min)</option>
-                    </select>
-                    <small class="help-text">Estimated duration varies by hardware and selected providers</small>
-                </div>
-            </div>
+    <footer>Inspect the same composition at <a href="/.well-known/Koan/facts">/.well-known/Koan/facts</a>.</footer>
+  </main>
 
-            <div class="config-row">
-                <div class="config-group">
-                    <label>
-                        Providers
-                        <span class="tooltip-icon" title="Select which storage providers to benchmark. Container-based providers require Docker.">ⓘ</span>
-                    </label>
-                    <div id="providerCheckboxes" class="checkbox-group">
-                        <!-- Populated by JS -->
-                    </div>
-                    <small class="help-text">
-                        <span class="badge badge-inline">In-Process</span> runs in-app,
-                        <span class="badge badge-inline">Container</span> requires Docker
-                    </small>
-                </div>
+  <script>
+    const form = document.querySelector('#trial-form');
+    const runButton = document.querySelector('#run');
+    const statusNode = document.querySelector('#status');
+    const progressNode = document.querySelector('#progress');
+    const messageNode = document.querySelector('#message');
+    const receiptNode = document.querySelector('#receipt');
+    const errorNode = document.querySelector('#error');
+    const terminal = new Set(['Completed', 'Failed', 'Dead', 'Cancelled']);
 
-                <div class="config-group">
-                    <label>
-                        Entity Tiers
-                        <span class="tooltip-icon" title="Entity complexity levels: Minimal (basic CRUD), Indexed (with search fields), Complex (full relations).">ⓘ</span>
-                    </label>
-                    <div id="tierCheckboxes" class="checkbox-group">
-                        <!-- Populated by JS -->
-                    </div>
-                    <small class="help-text">More tiers = more comprehensive testing</small>
-                </div>
-            </div>
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      runButton.disabled = true;
+      errorNode.hidden = true;
+      receiptNode.textContent = 'Submitting durable work…';
+      try {
+        const target = document.querySelector('#target').value;
+        const count = document.querySelector('#count').value;
+        const response = await fetch(`/api/trials/${encodeURIComponent(target)}?count=${encodeURIComponent(count)}`, { method: 'POST' });
+        if (!response.ok) throw new Error(await response.text());
+        let trial = await response.json();
+        render(trial);
+        while (!terminal.has(trial.status)) {
+          await new Promise(resolve => setTimeout(resolve, 350));
+          const statusResponse = await fetch(`/api/trials/${encodeURIComponent(trial.id)}`);
+          if (!statusResponse.ok) throw new Error(await statusResponse.text());
+          trial = await statusResponse.json();
+          render(trial);
+        }
+      } catch (error) {
+        statusNode.textContent = 'Request failed';
+        errorNode.textContent = error.message;
+        errorNode.hidden = false;
+      } finally {
+        runButton.disabled = false;
+      }
+    });
 
-            <div class="config-row config-actions-row">
-                <div class="config-summary">
-                    <span id="testCountSummary" class="summary-text">Ready to run benchmark</span>
-                </div>
-                <div class="config-buttons">
-                    <button id="runBenchmarkBtn" class="btn-primary">
-                        <span class="btn-icon">▶</span> Run Benchmark
-                    </button>
-                    <button id="stopBenchmarkBtn" class="btn-secondary" style="display:none;">
-                        <span class="btn-icon">■</span> Stop
-                    </button>
-                </div>
-            </div>
-        </div>
+    function render(trial) {
+      statusNode.textContent = `${trial.status} · ${trial.target}`;
+      progressNode.value = trial.progress || 0;
+      messageNode.textContent = trial.progressMessage || 'Waiting for the worker…';
+      if (trial.receipt) renderReceipt(trial.receipt);
+      if (trial.error || trial.correction) {
+        errorNode.textContent = [trial.error, trial.correction].filter(Boolean).join('\n\n');
+        errorNode.hidden = false;
+      } else {
+        errorNode.hidden = true;
+      }
+    }
 
-        <div id="progressPanel" class="progress-panel" style="display:none;">
-            <div class="progress-header-section">
-                <h2>Running Benchmark</h2>
-                <div class="progress-mode-badge" id="progressModeBadge">Sequential</div>
-            </div>
+    function renderReceipt(receipt) {
+      receiptNode.replaceChildren();
+      const metrics = document.createElement('div');
+      metrics.className = 'metrics';
+      for (const [label, value] of [['requested', receipt.requested], ['written', receipt.written], ['read', receipt.readBack], ['verified', receipt.verified], ['removed', receipt.removed]]) {
+        const cell = document.createElement('div');
+        cell.className = 'metric';
+        const strong = document.createElement('strong'); strong.textContent = value;
+        const span = document.createElement('span'); span.textContent = label;
+        cell.append(strong, span); metrics.append(cell);
+      }
+      const details = document.createElement('dl');
+      const rows = [
+        ['Provider', receipt.provider],
+        ['Capabilities', receipt.capabilities.join(', ')],
+        ['Write', duration(receipt.writeDuration)],
+        ['Read + verify', duration(receipt.readDuration)],
+        ['Cleanup', duration(receipt.cleanupDuration)],
+        ['Total', duration(receipt.totalDuration)],
+        ['Runtime', `${receipt.framework} · ${receipt.architecture}`]
+      ];
+      for (const [label, value] of rows) {
+        const dt = document.createElement('dt'); dt.textContent = label;
+        const dd = document.createElement('dd'); dd.textContent = value;
+        details.append(dt, dd);
+      }
+      receiptNode.append(metrics, details);
+    }
 
-            <!-- Hero Progress Section -->
-            <div class="progress-hero">
-                <div class="circular-progress-wrapper">
-                    <svg class="circular-progress" width="180" height="180" viewBox="0 0 180 180">
-                        <defs>
-                            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
-                                <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
-                            </linearGradient>
-                        </defs>
-                        <circle class="circular-progress-bg" cx="90" cy="90" r="80" fill="none" stroke-width="12"></circle>
-                        <circle id="circularProgressBar" class="circular-progress-fill" cx="90" cy="90" r="80" fill="none" stroke-width="12"
-                                stroke-dasharray="502.4" stroke-dashoffset="502.4" transform="rotate(-90 90 90)"></circle>
-                    </svg>
-                    <div class="circular-progress-text">
-                        <div class="circular-progress-percent" id="circularProgressPercent">0%</div>
-                        <div class="circular-progress-label">Complete</div>
-                    </div>
-                </div>
-
-                <div class="progress-live-stats">
-                    <div class="live-stat-card">
-                        <div class="live-stat-content">
-                            <div class="live-stat-value" id="liveCurrentTest">Initializing...</div>
-                            <div class="live-stat-label">Current Test</div>
-                        </div>
-                    </div>
-                    <div class="live-stat-card">
-                        <div class="live-stat-content">
-                            <div class="live-stat-value" id="liveCurrentProvider">-</div>
-                            <div class="live-stat-label">Active Provider</div>
-                        </div>
-                    </div>
-                    <div class="live-stat-card highlight">
-                        <div class="live-stat-content">
-                            <div class="live-stat-value" id="liveSpeed">0</div>
-                            <div class="live-stat-label">ops/sec</div>
-                        </div>
-                    </div>
-                    <div class="live-stat-card">
-                        <div class="live-stat-content">
-                            <div class="live-stat-value"><span id="liveCurrentOps">0</span> / <span id="liveTotalOps">0</span></div>
-                            <div class="live-stat-label">Operations</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Provider Progress Cards -->
-            <div id="providerProgressContainer" class="provider-progress-container" style="display:none;">
-                <h3>Provider Status</h3>
-                <div id="providerProgressBars" class="provider-progress-grid"></div>
-            </div>
-
-            <!-- Test Activity Stream -->
-            <div class="test-activity-section">
-                <div class="activity-header">
-                    <h3>Test Activity</h3>
-                    <button id="clearLogBtn" class="btn-link-small">Clear</button>
-                </div>
-                <div class="test-log" id="testLog"></div>
-            </div>
-        </div>
-
-        <div id="resultsPanel" class="results-panel" style="display:none;">
-            <div class="results-header">
-                <h2>Benchmark Results</h2>
-                <div class="results-actions">
-                    <button id="exportJsonBtn" class="btn-link" title="Export results as JSON">
-                        <span>⬇</span> Export JSON
-                    </button>
-                    <button id="exportCsvBtn" class="btn-link" title="Export results as CSV">
-                        <span>⬇</span> Export CSV
-                    </button>
-                    <button id="shareResultsBtn" class="btn-link" title="Copy shareable link to clipboard">
-                        Share
-                    </button>
-                </div>
-            </div>
-
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="overview">
-                    Overview
-                </button>
-                <button class="tab-btn" data-tab="writes">
-                    Writes
-                </button>
-                <button class="tab-btn" data-tab="reads">
-                    Reads
-                </button>
-                <button class="tab-btn" data-tab="queries">
-                    Queries
-                </button>
-                <button class="tab-btn" data-tab="migration">
-                    Migration
-                </button>
-                <button class="tab-btn" data-tab="details">
-                    Details
-                </button>
-            </div>
-
-            <div class="tab-content">
-                <div id="overviewTab" class="tab-pane active">
-                    <!-- Executive Summary -->
-                    <div class="executive-summary">
-                        <div class="summary-stats-grid">
-                            <div class="summary-stat-card">
-                                <div class="summary-stat-content">
-                                    <div class="summary-stat-value" id="totalDuration">-</div>
-                                    <div class="summary-stat-label">Total Duration</div>
-                                </div>
-                            </div>
-                            <div class="summary-stat-card">
-                                <div class="summary-stat-content">
-                                    <div class="summary-stat-value" id="entitiesTested">-</div>
-                                    <div class="summary-stat-label">Entities Tested</div>
-                                </div>
-                            </div>
-                            <div class="summary-stat-card">
-                                <div class="summary-stat-content">
-                                    <div class="summary-stat-value" id="providersCount">-</div>
-                                    <div class="summary-stat-label">Providers</div>
-                                </div>
-                            </div>
-                            <div class="summary-stat-card">
-                                <div class="summary-stat-content">
-                                    <div class="summary-stat-value" id="testsCompleted">-</div>
-                                    <div class="summary-stat-label">Tests Completed</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Performance Leaderboard -->
-                    <div class="leaderboard-section">
-                        <h3>Performance Leaderboard</h3>
-                        <div id="leaderboard" class="leaderboard-grid"></div>
-                    </div>
-
-                    <!-- Performance Comparison Chart -->
-                    <div class="chart-container-premium">
-                        <div class="chart-header">
-                            <h3>Overall Performance Comparison</h3>
-                            <p class="chart-description">Lower duration is better - shows total time to complete all tests</p>
-                        </div>
-                        <canvas id="overviewChart"></canvas>
-                    </div>
-
-                    <!-- Use Case Recommendations -->
-                    <div class="recommendations-premium">
-                        <h3>Smart Recommendations</h3>
-                        <div id="recommendations" class="recommendations-grid"></div>
-                    </div>
-                </div>
-
-                <div id="writesTab" class="tab-pane">
-                    <div class="chart-container">
-                        <h3>Single Write Performance</h3>
-                        <canvas id="singleWriteChart"></canvas>
-                    </div>
-                    <div class="chart-container">
-                        <h3>Batch Write Performance</h3>
-                        <canvas id="batchWriteChart"></canvas>
-                    </div>
-                </div>
-
-                <div id="readsTab" class="tab-pane">
-                    <div class="chart-container">
-                        <h3>Read By ID Performance</h3>
-                        <canvas id="readByIdChart"></canvas>
-                    </div>
-                    <div class="chart-container">
-                        <h3>Update Operations Performance</h3>
-                        <canvas id="updateChart"></canvas>
-                    </div>
-                    <div class="chart-container">
-                        <h3>Pagination Performance</h3>
-                        <canvas id="paginationChart"></canvas>
-                    </div>
-                </div>
-
-                <div id="queriesTab" class="tab-pane">
-                    <div class="chart-container">
-                        <h3>Simple Filter Query Performance</h3>
-                        <canvas id="querySimpleChart"></canvas>
-                    </div>
-                    <div class="chart-container">
-                        <h3>Range Filter Query Performance</h3>
-                        <canvas id="queryRangeChart"></canvas>
-                    </div>
-                    <div class="chart-container">
-                        <h3>Complex Filter Query Performance</h3>
-                        <canvas id="queryComplexChart"></canvas>
-                    </div>
-                </div>
-
-                <div id="migrationTab" class="tab-pane">
-                    <div class="chart-container">
-                        <h3>Cross-Provider Migration Performance</h3>
-                        <p>Shows the performance of migrating data from one provider to another.</p>
-                        <canvas id="migrationChart"></canvas>
-                    </div>
-                </div>
-
-                <div id="detailsTab" class="tab-pane">
-                    <div id="detailedResults"></div>
-                </div>
-            </div>
-        </div>
-
-        <footer>
-            <p>
-                <strong>Note:</strong> PostgreSQL, MongoDB, and Redis run in Docker containers
-                (networked), while SQLite is in-process. Performance differences reflect both
-                provider characteristics and deployment architecture.
-            </p>
-        </footer>
-    </div>
-
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
-    <!-- SignalR -->
-    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
-
-    <!-- Application Scripts -->
-    <script src="js/api.js"></script>
-    <script src="js/progress.js"></script>
-    <script src="js/charts.js"></script>
-    <script src="js/results.js"></script>
-    <script src="js/app.js"></script>
+    function duration(value) {
+      if (typeof value === 'string') return value;
+      return `${value} ms`;
+    }
+  </script>
 </body>
 </html>

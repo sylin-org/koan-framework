@@ -34,6 +34,7 @@ then add one visible capability.
 | Sample | Meaningful result | Concepts | Start |
 |---|---|---|---|
 | [DevPortal](applications/DevPortal/README.md) | Approve local articles, publish them through named provider channels, and render entity-backed share cards | named sources, Entity transfer, OpenGraph | `dotnet run --project samples/applications/DevPortal` |
+| [OrderIntake](applications/OrderIntake/README.md) | Run bounded order intake through one named source and keep a verified durable receipt | named sources, Entity batch work, Jobs, readiness | `dotnet run --project samples/applications/OrderIntake` |
 
 Other application directories are active graduation work, not current curriculum. Presence in the tree
 is not a support claim.

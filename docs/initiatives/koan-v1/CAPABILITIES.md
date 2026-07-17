@@ -109,8 +109,8 @@ not itself promote a product claim: compatibility boundaries remain pre-V1 work.
   [`Koan.Core.Context`](../../../src/Koan.Core/Context/) through `KoanContext`,
   `IKoanContextCarrier`, and the host-owned `KoanContextCarrierRegistry`.
 - **Executable evidence:** Data.Core passes 349/349, including current health-participation and
-  observed-Entity diagnostics. [`S0.ConsoleJsonRepo`](../../../samples/S0.ConsoleJsonRepo/Program.cs) and
-  [`S1.Web`](../../../samples/S1.Web/Todo.cs) demonstrate console and web paths.
+  observed-Entity diagnostics. [`LocalChecklist`](../../../samples/fundamentals/LocalChecklist/Program.cs) and
+  [`TaskGraph`](../../../samples/fundamentals/TaskGraph/Todo.cs) demonstrate console and web paths.
 - **Inspection and failure:** repositories and capabilities are resolvable through the static data
   facade; missing/unsupported operations use explicit exceptions rather than silent client-side
   emulation where the capability contract applies.
@@ -159,7 +159,7 @@ not itself promote a product claim: compatibility boundaries remain pre-V1 work.
   Web relationship passes 7/7; MCP relationship passes 2/2 and MCP
   conformance 74/74. R07-02 adds a 42/42 focused stream coordinator proof, one focused SQLite provider
   proof, six shared provider-bounded realization cells, three shared fail-closed cells, and a 5/5
-  acceptance plus 7/7 full real Backup consumer proof. [`S10.DevPortal`](../../../samples/S10.DevPortal/README.md) demonstrates provider switching.
+  acceptance plus 7/7 full real Backup consumer proof. [`DevPortal`](../../../samples/applications/DevPortal/README.md) demonstrates provider switching.
 - **Inspection and failure:** [`AdapterResolutionDecision`](../../../src/Koan.Data.Core/Routing/AdapterResolutionDecision.cs)
   is the single calculation for configured/default data selection used by runtime behavior, lockfile,
   and schema-1 facts. [ARCH-0112](../../decisions/ARCH-0112-bounded-relationship-negotiation.md) adds
@@ -235,9 +235,10 @@ not itself promote a product claim: compatibility boundaries remain pre-V1 work.
   and cancellation prefixes, and the shared finite behavior. Entity Language passes 25/25 for
   scalar/set/stream presence, absence, removal, and invalid receivers. The last complete SQLite
   baseline remains 79/79; R07-14 adds a focused 2/2 SQLite transaction/shared-source proof and a
-  focused 1/1 tenant-context seal. [`S14.AdapterBench`](../../../samples/S14.AdapterBench/Jobs/BenchmarkJob.cs)
-  demonstrates a business-facing job, while [`S6.SnapVault`](../../../samples/S6.SnapVault/README.md)
-  now consumes the ledger-confirmed source summary. [`GoldenJourney`](../../../samples/GoldenJourney/README.md)
+  focused 1/1 tenant-context seal. [`OrderIntake`](../../../samples/applications/OrderIntake/README.md)
+  demonstrates a business-facing job with durable progress and a verified workload receipt, while
+  [`SnapVault`](../../../samples/applications/SnapVault/README.md) consumes the ledger-confirmed source summary.
+  [`GoldenJourney`](../../../samples/GoldenJourney/README.md)
   observes completed business priority and 100% progress from a running source application.
 - **Inspection and failure:** health snapshots/contributors, metrics, state transitions, explicit
   ledgers, and Communication-owned wake facts exist. Source submission returns a fixed-size

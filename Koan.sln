@@ -647,6 +647,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Samples.GardenCoop.C02
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Samples.SnapVault.Tests", "tests\Suites\Samples\Koan.Samples.SnapVault.Tests\Koan.Samples.SnapVault.Tests.csproj", "{6EA5ADD3-74CA-41F8-90F0-3138C6F61BAA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Samples.OrderIntake.Tests", "tests\Suites\Samples\Koan.Samples.OrderIntake.Tests\Koan.Samples.OrderIntake.Tests.csproj", "{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -3355,6 +3357,18 @@ Global
 		{6EA5ADD3-74CA-41F8-90F0-3138C6F61BAA}.Release|x64.Build.0 = Release|Any CPU
 		{6EA5ADD3-74CA-41F8-90F0-3138C6F61BAA}.Release|x86.ActiveCfg = Release|Any CPU
 		{6EA5ADD3-74CA-41F8-90F0-3138C6F61BAA}.Release|x86.Build.0 = Release|Any CPU
+		{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16}.Debug|x64.Build.0 = Debug|Any CPU
+		{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16}.Debug|x86.Build.0 = Debug|Any CPU
+		{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16}.Release|Any CPU.Build.0 = Release|Any CPU
+		{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16}.Release|x64.ActiveCfg = Release|Any CPU
+		{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16}.Release|x64.Build.0 = Release|Any CPU
+		{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16}.Release|x86.ActiveCfg = Release|Any CPU
+		{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -3670,6 +3684,7 @@ Global
 		{6017EF3E-3B99-4C91-AC13-617A1EC918C5} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{8AC937F3-E305-4465-B243-08A138E11D8E} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{6EA5ADD3-74CA-41F8-90F0-3138C6F61BAA} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
+		{042A1AC7-BDFD-4AAD-9EF3-97BF1ED48C16} = {7598F677-7B36-05E8-0932-0C05E9C86353}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {669C5778-BFAE-4972-B427-0AFF99562045}

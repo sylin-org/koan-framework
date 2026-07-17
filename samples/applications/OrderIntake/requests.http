@@ -1,0 +1,17 @@
+@baseUrl = http://localhost:5174
+
+### Start the zero-infrastructure workload
+# @name localTrial
+POST {{baseUrl}}/api/trials/Local?count=100
+
+### Paste the returned id
+@trialId = replace-with-trial-id
+
+### Observe progress and the completed receipt
+GET {{baseUrl}}/api/trials/{{trialId}}
+
+### Optional target: fails with an exact correction until MongoDB is running
+POST {{baseUrl}}/api/trials/Documents?count=25
+
+### Inspect the same resolved source decisions reported at startup
+GET {{baseUrl}}/.well-known/Koan/facts

@@ -8,14 +8,14 @@ last_updated: 2026-07-17
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
-  status: in-progress
-  scope: legacy OrderIntake behavior, public claims, workload, providers, Jobs, UI, and deployment discovery complete
+  status: passed
+  scope: local receipt, optional-source activation, corrective failure, health participation, facts, build, and docs
 ---
 
 # R10-07 — Rebuild OrderIntake as the provider workload lab
 
 - Tranche: `T7B — active-sample graduation`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R10-06 g1c2.GardenCoopEmbedded graduation
 - Owner: honest named-source trials, durable Entity-first work, comparable receipts, and corrective optional infrastructure
 
@@ -58,8 +58,9 @@ on this environment; it is not a universal provider ranking or architecture reco
 
 The three external targets are optional. Referencing their adapters describes available composition; it does not
 make unreachable infrastructure healthy or gate the local path. When an optional source is used while unavailable,
-the job must fail loudly and its status surface must give the exact compose command/correction. Starting the pinned
-sample services makes the same workload available without application code changes.
+the job must fail loudly, its status surface must give the exact compose command/correction, and readiness must then
+report that selected dependency as unhealthy. Starting the pinned sample services makes the same workload available
+without application code changes.
 
 ## Exploration evidence
 
@@ -115,6 +116,110 @@ sample services makes the same workload available without application code chang
 | cumulative contract | `tests/Suites/Samples/Koan.Samples.OrderIntake.Tests/` | real local host, durable job, receipt, facts, cleanup, and correction |
 | public truth | sample README/index, DX-0044, Jobs card, R10/NOW/PROGRESS | no stale benchmark recommendation remains active |
 
+## Implementation exploration contract
+
+**Task:** replace OrderIntake's synthetic benchmark stack with one bounded, durable, provider-routed business
+workload and a focused executable contract.
+
+**Application intent:** “Run one bounded order-intake workload against a chosen configured source, verify that every
+order can be read back, clean up only that run, and preserve a durable receipt describing exactly what happened.”
+
+**Public expression:** the standard four-line `AddKoan()` host plus `TrialOrder : Entity<TrialOrder>` and
+`OrderIntakeTrial : Entity<OrderIntakeTrial>, IKoanJob<OrderIntakeTrial>`. A caller submits
+`POST /api/trials/{target}?count={boundedCount}` and polls the returned trial resource. Direct references make
+SQLite, MongoDB, PostgreSQL, Redis, Web, and Jobs available; bundled configuration pins `Default` and `Local` to
+SQLite and maps the three optional targets. Local requires only a writable sample directory.
+
+**Guarantee/correction:** `Local` durably records the trial and Jobs ledger, upserts deterministic order IDs, reads
+those exact IDs, verifies their business values, removes exactly those IDs, and persists counts, phase timings,
+provider capabilities, and a runtime fingerprint. Every phase is idempotent under at-least-once job execution.
+An unavailable optional target settles as a failed job whose status names the exact target-specific compose command.
+Configuration alone does not gate readiness; selecting that route activates its readiness responsibility without
+changing the SQLite default or corrupting the local control plane.
+
+**Complete intent surface:** developers add no service, repository, worker, queue, provider selector, SignalR hub,
+database tuning, or host middleware. The sample's references and source configuration are the complete infrastructure
+intent; its Entity/job/controller code is the complete application intent. Operators optionally run one named
+compose service before selecting a non-local target.
+
+**Public concepts:**
+
+- `WorkloadTarget` states the business-facing destination intent without exposing connector ids at the API.
+- `TrialOrder` is the bounded business payload exercised through ordinary Entity batch verbs.
+- `OrderIntakeTrial` is the durable job/work item and owns the idempotent three-phase workflow.
+- `TrialReceipt` is the reviewable evidence produced by that workflow; it is not a ranking.
+- `TrialStatusView` joins work-item result with Jobs lifecycle/progress for HTTP without duplicating orchestration.
+
+**Docs read:**
+
+- `docs/engineering/index.md` requires Entity-first data, controller-owned HTTP, centralized constants, and focused
+  validation; it directly governs every replacement file.
+- `docs/architecture/principles.md` requires business-to-code mapping, one composition, domain-owned meaning, thin
+  runtime paths, and corrective semantic honesty; it rejects the current benchmark/provider-switch machinery.
+- `docs/reference/cards/jobs.md` defines the canonical Entity + `IKoanJob<T>` grammar, durable progress, at-least-once
+  idempotence, and ledger ownership used by the trial.
+- `docs/guides/jobs-howto.md` confirms normal versus inline execution, durable ledger behavior, status/query APIs,
+  retries, and progress semantics; the sample uses the ordinary normal worker while focused tests tune time only.
+- `docs/getting-started/overview.md` establishes explicit source intent and four-line hosting as the greenfield path.
+
+**Code read:**
+
+- current `Program.cs`, `BenchmarkJob`, `BenchmarkController`, and `BenchmarkService` mix host wiring, direct SQLite
+  tuning, duplicate engines, SignalR, hard-coded availability, and technical benchmark tiers; rebuild/delete.
+- `samples/applications/DevPortal/Controllers/PublicationController.cs` is the closest named-source/corrective-error
+  consumer; retain its narrow `EntityContext.Source` idea, not its publication-specific transfer workflow.
+- `samples/GoldenJourney/Domain/ReviewRequest.cs` is the closest business job; retain the static handler and durable
+  progress grammar.
+- `src/Koan.Data.Core/Model/Entity.cs` already supplies bounded batch save/get/remove statics; no repository or new
+  framework abstraction is required.
+- `src/Koan.Jobs/JobCoordinator.cs`, `JobRecord`, and `JobContext` establish that work-item save, ledger progress,
+  settlement, and captured context belong to Jobs. Target source scopes therefore wrap only TrialOrder operations,
+  never the entire handler.
+
+**Reusing:** standard named-source configuration and `EntityContext.Source`; Entity batch `Save`, `Get(ids)`, and
+`Remove(ids)`; `Data<T>.Capabilities`; Jobs submission, worker, ledger query, and `ctx.Progress`; `KoanModule.Report`;
+TestServer and the graduated sample fixture convention.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| `WorkloadTarget` | `samples/applications/OrderIntake/Domain/WorkloadTarget.cs` | one typed business intent for four source mappings |
+| `TrialOrder` | `samples/applications/OrderIntake/Domain/TrialOrder.cs` | the actual bounded Entity payload |
+| `OrderIntakeTrial` | `samples/applications/OrderIntake/Domain/OrderIntakeTrial.cs` | one owner for job state and the idempotent workload |
+| `TrialReceipt` | `samples/applications/OrderIntake/Domain/TrialReceipt.cs` | immutable review evidence separated from Jobs mechanics |
+| `TrialsController` / `TrialStatusView` | `samples/applications/OrderIntake/Controllers/` | custom HTTP and its projection remain controller-owned |
+| routes, limits, corrections | `samples/applications/OrderIntake/Infrastructure/OrderIntakeConstants.cs` | stable application vocabulary has one owner |
+| startup explanation | `samples/applications/OrderIntake/Initialization/OrderIntakeModule.cs` | one application composition/report owner without host ceremony |
+| source mappings, requests, UI, optional services | sample root, `wwwroot/`, and `docker/compose.yml` | standard configuration and one dependency-free operator surface |
+| cumulative proof | `tests/Suites/Samples/Koan.Samples.OrderIntake.Tests/` | real local worker/ledger/HTTP/facts/cleanup/correction contract |
+
+**Coalescence:** closest patterns are DevPortal's named-source routing and GoldenJourney's Entity job; neither is
+widened because provider routing is Data law and orchestration is Jobs law. OrderIntake owns only target vocabulary,
+payload values, verification, and receipt. Source/provider plans compile at host composition; one execution performs
+three bounded batch operations with no per-item discovery or provider negotiation. Disposition is `rebuild` for the
+application and `delete` for benchmark services/interfaces, three technical Entity tiers, provider-pair migrations,
+SignalR, direct SQLite configuration, synchronous execution, charts, and application-container scripts.
+
+**Ergonomics:** humans read target → orders → verify → cleanup → receipt. IntelliSense stays on Entity/Jobs and one
+business enum; agents see one route family and one status shape rather than modes, tiers, providers, and duplicate
+engines. The only cognitive branch is choosing a target; Local always works and each optional branch carries its own
+correction.
+
+**Constraints satisfied:**
+
+- all data work uses Entity statics; no repository/service layer;
+- all HTTP uses attribute-routed controllers; the SignalR `MapHub` exception is deleted;
+- stable routes, limits, source names, and correction commands are centralized; there is no tunable benchmark mode;
+- the workload is explicitly bounded, so no unsupported stream or unpaged scan is used;
+- no placeholder, compatibility path, or application-owned adapter tuning remains;
+- public docs, sample index, solution membership, lockfile, and live R10 records update with the implementation.
+
+**Risks:** remote connectors differ in startup/connect timeout behavior, so focused correction proof uses one
+deliberately unreachable Documents source while configuration and source facts cover all three. A target source scope
+must be disposed before every `ctx.Progress` and before handler return so the durable control plane never follows the
+workload data plane.
+
 ## Focused acceptance
 
 1. The renamed application uses the four-line host, direct capability references only, zero direct database-driver
@@ -123,8 +228,9 @@ sample services makes the same workload available without application code chang
    status response exposes a verified durable receipt with exact counts, phase timings, capabilities, and runtime.
 3. The workload deletes only its own IDs. Repeating it produces a separate durable receipt and does not use
    `RemoveAll`, cross-provider migration, warmed identifiers, or unbounded work.
-4. `Documents`, `Relational`, and `KeyValue` are typed named-source intents. Missing infrastructure does not break
-   local readiness and yields a corrective failed-job response; pinned compose services enable the same workflow.
+4. `Documents`, `Relational`, and `KeyValue` are typed named-source intents. Missing unselected infrastructure does
+   not break initial readiness; selecting it yields both a corrective failed-job response and an honest unhealthy
+   readiness report. Pinned compose services enable the same workflow.
 5. UI, README, API, startup facts, and lockfile say “workload receipt,” never “objective winner,” “fastest,” or
    “architecture recommendation.” Environment and methodology limits are explicit.
 6. Strict sample build and one focused cumulative test pass with warnings as errors. The test proves dashboard,
@@ -135,4 +241,21 @@ sample services makes the same workload available without application code chang
 
 ## Acceptance evidence
 
-Pending implementation and focused execution.
+- The inherited benchmark stack, provider rankings, direct SQLite tuning, duplicate execution engines, SignalR,
+  charts, start scripts, and application-container scaffold are deleted. The replacement is the standard four-line
+  host, two business Entities, one typed target enum, one controller, one startup report, and one dependency-free UI.
+- Data Core now distinguishes connector availability from runtime participation. The default winner and actually
+  selected sources gate readiness; configured-but-unused optional routes remain visible and non-critical. MongoDB,
+  PostgreSQL, Redis, JSON, and SQLite consume that shared law, while Redis named sources now honor their configured
+  endpoint through one pooled connection per endpoint.
+- `DataAdapterParticipationSpec` passes 3/3; JSON health passes 5/5; SQLite health passes 7/7; Mongo source-pool
+  deduplication passes 2/2. These are focused owner tests, not release certification.
+- Strict Release build of `OrderIntake` passes with zero warnings and errors. Its cumulative contract passes 1/1 in
+  about one second and proves the dashboard, initial readiness, inactive optional connectors, local submission,
+  durable worker completion/progress, canonical SQLite receipt, exact cleanup, persisted trial, unavailable Mongo
+  correction, post-selection unhealthy readiness, complete facts, and clean host shutdown.
+- The README, request file, UI, startup note, source mappings, compose file, solution membership, and lockfile agree:
+  Local needs no Docker; optional infrastructure activates only when selected; receipts describe one bounded run and
+  never rank providers.
+
+R10-07 passes. `OrderIntake` is graduated public curriculum.

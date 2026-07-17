@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: semantic portfolio and seven graduated outcomes passed; OrderIntake rebuild assessed and active; R08-05 paused
+  scope: semantic portfolio and eight graduated outcomes passed; CustomerCanon and SnapVault remain; R08-05 paused
 ---
 
 # Koan V1 reorganization current handoff
@@ -91,10 +91,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
   gone. GardenCoop Chapter 2 is a strict runnable superset of Chapter 1, while OpenGraph's automatic web-pipeline
   contribution lets DevPortal own the Article social-card story without changing its four-line host.
 - Focused retained evidence is green: OpenGraph 39/39, DevPortal 1/1, GardenCoop C1 1/1, GardenCoop C2 1/1,
-  LocalChecklist 1/1, TaskGraph 5 pass plus 2 intentional skips, SnapVault 33/33, and zero-warning builds for
-  CustomerCanon and OrderIntake. The public truth gate passes across 174 current files and 36 navigation targets.
-- `CustomerCanon`, `OrderIntake`, and `SnapVault` remain visible as application dogfood, not graduated curriculum.
-  R10-07 now owns OrderIntake's break-and-rebuild; later cards must graduate or remove the other two.
+  LocalChecklist 1/1, TaskGraph 5 pass plus 2 intentional skips, OrderIntake 1/1, and SnapVault 33/33. CustomerCanon
+  retains a zero-warning build. The public truth gate passes across 174 current files and 36 navigation targets.
+- `OrderIntake` is now graduated curriculum: one bounded named-source workload, durable receipt, exact cleanup,
+  corrective optional infrastructure, and participation-owned readiness. `CustomerCanon` and `SnapVault` remain
+  visible application dogfood and must still graduate or be removed.
 - No package, tag, GitHub Release, branch, or remote configuration was published or mutated. Initial coherent
   public observation and a later real public-to-candidate upgrade/rollback remain separate gates.
 
@@ -117,16 +118,13 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Implement [R10-07](work-items/r10/R10-07-s14-workload-lab.md) as the assessed OrderIntake replacement:
+Open the next focused application assessment:
 
-1. replace the inherited synthetic benchmark engine in `samples/applications/OrderIntake` with one bounded,
-   verified order-intake job and durable receipt;
-2. keep the local SQLite target zero-infrastructure and express optional MongoDB, PostgreSQL, and Redis paths as
-   typed named sources with corrective failures;
-3. remove SignalR, provider rankings, direct database tuning, raw adapter switching, benchmark tiers/migrations,
-   application-container scaffolding, and unsupported performance advice;
-4. prove the dashboard, job lifecycle, exact cleanup, receipt, readiness/facts, unavailable-provider correction,
-   and clean host shutdown in one focused cumulative contract;
+1. inspect `SnapVault` as the smallest likely graduation because its 33-test behavior suite already passes;
+2. state its one business result, shortest meaningful run, supported deployment boundary, and any claims/mechanics
+   that should be removed before changing code;
+3. graduate it only if source, docs, focused evidence, facts, and operator path agree; otherwise cull it;
+4. assess `CustomerCanon` after SnapVault using the same graduate-or-remove standard;
 5. keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared but do not mutate remote settings,
    push, tag, release, or publish until R10 reaches its portfolio boundary and authorization is renewed.
 

@@ -71,27 +71,11 @@
       "version": "0.17"
     },
     {
-      "id": "Koan.Web.OpenApi",
-      "version": "0.17"
-    },
-    {
       "id": "Koan.ZenGarden.Core",
       "version": "0.17"
     }
   ],
   "directReferences": [
-    {
-      "kind": "project",
-      "id": "Koan.Core"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Core.Adapters"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Data.Abstractions"
-    },
     {
       "kind": "project",
       "id": "Koan.Data.Connector.Mongo"
@@ -110,23 +94,11 @@
     },
     {
       "kind": "project",
-      "id": "Koan.Data.Core"
-    },
-    {
-      "kind": "project",
       "id": "Koan.Jobs"
     },
     {
       "kind": "project",
-      "id": "Koan.Web"
-    },
-    {
-      "kind": "project",
       "id": "Koan.Web.Extensions"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Web.OpenApi"
     }
   ]
 }
