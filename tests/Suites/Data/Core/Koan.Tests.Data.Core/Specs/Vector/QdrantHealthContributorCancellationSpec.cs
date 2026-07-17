@@ -1,5 +1,6 @@
 using System.Net;
 using Koan.Data.Vector.Connector.Qdrant;
+using Koan.Data.Vector.Abstractions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -14,6 +15,7 @@ public sealed class QdrantHealthContributorCancellationSpec
         var contributor = new QdrantHealthContributor(
             new StubHttpClientFactory(handler),
             Options.Create(new QdrantOptions()),
+            new ActiveParticipation(),
             NullLogger<QdrantHealthContributor>.Instance);
         using var stopping = new CancellationTokenSource();
 
@@ -24,6 +26,13 @@ public sealed class QdrantHealthContributorCancellationSpec
         var act = async () => await check;
         await act.Should().ThrowAsync<OperationCanceledException>(
             "intentional host shutdown is not a Qdrant health failure");
+    }
+
+    private sealed class ActiveParticipation : IVectorAdapterParticipation
+    {
+        public void Observe(string provider, string source) { }
+
+        public IReadOnlyCollection<string> ActiveSources(string provider) => ["Default"];
     }
 
     private sealed class StubHttpClientFactory(HttpMessageHandler handler) : IHttpClientFactory

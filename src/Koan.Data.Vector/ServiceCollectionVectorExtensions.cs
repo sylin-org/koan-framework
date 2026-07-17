@@ -12,6 +12,7 @@ public static class ServiceCollectionVectorExtensions
 {
     public static IServiceCollection AddKoanDataVector(this IServiceCollection services)
     {
+        services.TryAddSingleton<IVectorAdapterParticipation, VectorAdapterParticipation>();
         services.TryAddSingleton<IVectorService, VectorService>();
         services.TryAddSingleton<VectorProviderCatalog>(sp => new VectorProviderCatalog(
             sp.GetServices<IVectorAdapterFactory>(),

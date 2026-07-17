@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: semantic portfolio and eight graduated outcomes passed; CustomerCanon and SnapVault remain; R08-05 paused
+  scope: semantic portfolio and eight graduated outcomes passed; SnapVault graduation active; CustomerCanon remains; R08-05 paused
 ---
 
 # Koan V1 reorganization current handoff
@@ -94,8 +94,10 @@ Replace this file at every handoff. It is a restart point, not a diary.
   LocalChecklist 1/1, TaskGraph 5 pass plus 2 intentional skips, OrderIntake 1/1, and SnapVault 33/33. CustomerCanon
   retains a zero-warning build. The public truth gate passes across 174 current files and 36 navigation targets.
 - `OrderIntake` is now graduated curriculum: one bounded named-source workload, durable receipt, exact cleanup,
-  corrective optional infrastructure, and participation-owned readiness. `CustomerCanon` and `SnapVault` remain
-  visible application dogfood and must still graduate or be removed.
+  corrective optional infrastructure, and participation-owned readiness. [R10-10](work-items/r10/R10-10-snapvault.md)
+  is active: SnapVault's 33/33 domain suite earns preservation, while its perimeter is being rebuilt around a
+  zero-infrastructure SQLite/local-storage path and participation-owned optional Vector readiness. `CustomerCanon`
+  remains visible application dogfood and must still graduate or be removed.
 - No package, tag, GitHub Release, branch, or remote configuration was published or mutated. Initial coherent
   public observation and a later real public-to-candidate upgrade/rollback remain separate gates.
 
@@ -118,14 +120,14 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Open the next focused application assessment:
+Complete the active SnapVault graduation:
 
-1. inspect `SnapVault` as the smallest likely graduation because its 33-test behavior suite already passes;
-2. state its one business result, shortest meaningful run, supported deployment boundary, and any claims/mechanics
-   that should be removed before changing code;
-3. graduate it only if source, docs, focused evidence, facts, and operator path agree; otherwise cull it;
-4. assess `CustomerCanon` after SnapVault using the same graduate-or-remove standard;
-5. keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared but do not mutate remote settings,
+1. make Vector connector readiness follow actual provider participation rather than package presence;
+2. make SnapVault's default Development composition SQLite/local-storage and prove one real HTTP photo ingest;
+3. align code comments, errors, facts, README, requests, and optional-provider boundaries as greenfield truth;
+4. graduate SnapVault only when its command, business result, focused suite, readiness, and clean stop agree;
+5. assess `CustomerCanon` afterward using the same graduate-or-remove standard;
+6. keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared but do not mutate remote settings,
    push, tag, release, or publish until R10 reaches its portfolio boundary and authorization is renewed.
 
 Do not call the proven local feed a public upgrade. It is exact candidate evidence only.

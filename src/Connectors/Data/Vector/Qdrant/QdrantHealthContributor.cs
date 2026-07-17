@@ -1,46 +1,31 @@
 using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Koan.Core;
 using Koan.Core.Logging;
-using Koan.Core.Observability.Health;
+using Koan.Data.Vector;
+using Koan.Data.Vector.Abstractions;
 
 namespace Koan.Data.Vector.Connector.Qdrant;
 
 public sealed class QdrantHealthContributor(
     IHttpClientFactory httpFactory,
     IOptions<QdrantOptions> options,
-    ILogger<QdrantHealthContributor>? logger = null) : IHealthContributor
+    IVectorAdapterParticipation participation,
+    ILogger<QdrantHealthContributor>? logger = null)
+    : VectorAdapterHealthContributorBase("qdrant", participation)
 {
-    public string Name => "data:qdrant";
-    public bool IsCritical => true;
-
-    public async Task<HealthReport> Check(CancellationToken ct = default)
+    protected override async Task ProbeSource(string source, CancellationToken ct)
     {
-        try
+        var http = httpFactory.CreateClient(Infrastructure.Constants.HttpClientName);
+        http.BaseAddress = new Uri(options.Value.Endpoint);
+        var response = await http.GetAsync("/readyz", ct).ConfigureAwait(false);
+        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
         {
-            var http = httpFactory.CreateClient(Infrastructure.Constants.HttpClientName);
-            http.BaseAddress = new Uri(options.Value.Endpoint);
-            var response = await http.GetAsync("/readyz", ct);
-            var body = await response.Content.ReadAsStringAsync(ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                return new HealthReport(Name, HealthState.Unhealthy, $"HTTP {(int)response.StatusCode}: {body}", null, null);
-            }
+            throw new HttpRequestException($"HTTP {(int)response.StatusCode}: {body}");
+        }
 
-            KoanLog.HealthDebug(logger, Infrastructure.Constants.Logging.Health, "healthy",
-                ("status", (int)response.StatusCode));
-            return new HealthReport(Name, HealthState.Healthy, "qdrant reachable", null, null);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            KoanLog.HealthWarning(logger, Infrastructure.Constants.Logging.Health, "failed",
-                ("error", ex));
-            return new HealthReport(Name, HealthState.Unhealthy, ex.Message, null, null);
-        }
+        KoanLog.HealthDebug(logger, Infrastructure.Constants.Logging.Health, "healthy",
+            ("status", (int)response.StatusCode));
     }
 }

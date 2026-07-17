@@ -9,6 +9,7 @@ Vector search facade for Koan: workflow-driven APIs over vector providers.
 - Provider-agnostic save/search for embeddings
 - Workflow profiles with declarative defaults (topK, alpha, metadata enrichers)
 - Works with Weaviate and other adapters via abstractions
+- Selection-aware readiness: referenced providers remain available but non-critical until an entity uses them
 
 ## Install
 

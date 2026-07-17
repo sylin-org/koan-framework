@@ -28,7 +28,7 @@ source: src/Koan.Data.Vector/
 
 - Workflows: `VectorWorkflow<T>.For(profile)` resolves profile defaults and orchestrates document + vector persistence
 - Profiles: register via `VectorProfiles.Register` or configuration (`Koan:Data:Vector:Profiles`)
-- Health: provider-specific readiness via `IVectorSearchRepository`
+- Health: the Vector pillar records the provider/source selected during repository resolution; connector probes become critical only for those active routes
 - Metrics: opt-in telemetry (`EmitMetrics()`) captures profile, topK, alpha, match counts
 
 ## References

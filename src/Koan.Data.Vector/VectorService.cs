@@ -6,7 +6,9 @@ using Koan.Data.Vector.Abstractions;
 
 namespace Koan.Data.Vector;
 
-internal sealed class VectorService(IServiceProvider services) : IVectorService, IDisposable, IAsyncDisposable
+internal sealed class VectorService(
+    IServiceProvider services,
+    IVectorAdapterParticipation participation) : IVectorService, IDisposable, IAsyncDisposable
 {
     private readonly System.Collections.Concurrent.ConcurrentDictionary<(Type, Type, string), object> _cache = new();
     private int _disposed;
@@ -54,6 +56,7 @@ internal sealed class VectorService(IServiceProvider services) : IVectorService,
         }
 
         if (factory is null) return null;
+        participation.Observe(factory.Provider, source);
         var inner = factory.Create<TEntity, TKey>(services, source);
         var repository = new ScopedVectorRepository<TEntity, TKey>(inner, services);
         var winner = (IVectorSearchRepository<TEntity, TKey>)_cache.GetOrAdd(key, repository);

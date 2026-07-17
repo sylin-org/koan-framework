@@ -4,7 +4,7 @@ domain: data
 title: "Vector — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-07-16
+last_updated: 2026-07-17
 framework_version: v0.19.0
 validation:
   date_last_tested: 2026-07-16
@@ -65,6 +65,8 @@ await foreach (var batch in repo.ExportAll()) { /* provider migration */ }
 ```
 
 The repository exposes `Upsert` / `Delete` / `Search` / `Flush` / `ExportAll` and the `TKey`-generic key the facade hides. The connector is present only when you reference that adapter (Reference = Intent). The shared Lucene-DSL translator behind the ElasticSearch / OpenSearch connectors is documented in [DATA-0103](../../decisions/DATA-0103-search-engine-shared-core.md).
+
+Referencing a connector makes it available for election; it does not by itself make the external service a readiness dependency. Once repository resolution selects a provider for an entity/source route, that connector becomes critical and `/health/ready` probes it. Startup and health facts therefore distinguish optional capability presence from an active application dependency.
 
 ## The sample that shows it
 
