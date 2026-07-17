@@ -22,7 +22,7 @@ This report separates objective package repairs from human review. `structurally
 
 | Packages | Repair required | Review required | Structurally ready | Owned READMEs | Technical companions | Findings |
 |---:|---:|---:|---:|---:|---:|---:|
-| 108 | 36 | 57 | 15 | 72 | 62 | 231 |
+| 108 | 35 | 57 | 16 | 73 | 63 | 229 |
 
 ## Packages
 
@@ -135,4 +135,4 @@ This report separates objective package repairs from human review. `structurally
 | `Sylin.Koan.Web.OpenGraph`<br>[`src/Koan.Web.OpenGraph/Koan.Web.OpenGraph.csproj`](../../src/Koan.Web.OpenGraph/Koan.Web.OpenGraph.csproj) | projection / library<br>net10.0 | `repair-required` | root README fallback | `docs.readme.owned.missing` (error): The package falls back to the framework root README.<br>`docs.technical.missing` (warning): No package-owned technical companion describes runtime or build ownership. |
 | `Sylin.Koan.Web.Sse`<br>[`src/Koan.Web.Sse/Koan.Web.Sse.csproj`](../../src/Koan.Web.Sse/Koan.Web.Sse.csproj) | projection / library<br>net10.0 | `repair-required` | root README fallback | `docs.readme.owned.missing` (error): The package falls back to the framework root README.<br>`docs.technical.missing` (warning): No package-owned technical companion describes runtime or build ownership.<br>`metadata.description.terse` (warning): The package description may be too terse to explain its distinct reference intent. |
 | `Sylin.Koan.ZenGarden`<br>[`src/Koan.ZenGarden/Koan.ZenGarden.csproj`](../../src/Koan.ZenGarden/Koan.ZenGarden.csproj) | capability / library<br>net10.0 | `review-required` | [README](../../src/Koan.ZenGarden/README.md)<br>[TECHNICAL](../../src/Koan.ZenGarden/TECHNICAL.md) | `docs.readme.boundaries.missing` (warning): The README has no recognizable guarantees, requirements, failure, or limitation section.<br>`docs.readme.install.missing` (warning): The README does not show the package-specific install or reference expression.<br>`docs.readme.package-title.missing` (warning): The README does not use the exact package ID as its primary title.<br>`metadata.description.terse` (warning): The package description may be too terse to explain its distinct reference intent. |
-| `Sylin.Koan.ZenGarden.Core`<br>[`src/Koan.ZenGarden.Core/Koan.ZenGarden.Core.csproj`](../../src/Koan.ZenGarden.Core/Koan.ZenGarden.Core.csproj) | capability / library<br>net10.0 | `repair-required` | root README fallback | `docs.readme.owned.missing` (error): The package falls back to the framework root README.<br>`docs.technical.missing` (warning): No package-owned technical companion describes runtime or build ownership. |
+| `Sylin.Koan.ZenGarden.Contracts`<br>[`src/Koan.ZenGarden.Contracts/Koan.ZenGarden.Contracts.csproj`](../../src/Koan.ZenGarden.Contracts/Koan.ZenGarden.Contracts.csproj) | contracts / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.ZenGarden.Contracts/README.md)<br>[TECHNICAL](../../src/Koan.ZenGarden.Contracts/TECHNICAL.md) | none |

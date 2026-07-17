@@ -1,4 +1,4 @@
-namespace Koan.ZenGarden.Core;
+namespace Koan.ZenGarden;
 
 /// <summary>
 /// Resolves Zen Garden connection intents to concrete offering endpoints.

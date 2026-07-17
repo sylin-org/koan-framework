@@ -12,7 +12,7 @@ using Koan.Core.Infrastructure;
 using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using WeaviateItems = Koan.Data.Vector.Connector.Weaviate.Infrastructure.WeaviateProvenanceItems;
 
 namespace Koan.Data.Vector.Connector.Weaviate;

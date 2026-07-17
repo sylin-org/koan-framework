@@ -1,5 +1,5 @@
 using AwesomeAssertions;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using Koan.ZenGarden.Extensions;
 using Koan.ZenGarden.Models;
 using Microsoft.Extensions.DependencyInjection;

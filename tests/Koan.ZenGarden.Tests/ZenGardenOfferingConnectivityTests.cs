@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using AwesomeAssertions;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using Koan.ZenGarden.Extensions;
 using Koan.ZenGarden.Models;
 using Koan.ZenGarden.Tests.Support;
@@ -108,7 +108,7 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
             ToolType = ZenGardenToolType.Offering
         });
 
-        var query = Core.ToolFqid.Parse(offering);
+        var query = ToolFqid.Parse(offering);
 
         return all
             .Where(tool => query.MatchesSnapshot(tool.ToolFqid, tool.OfferingType, tool.Aliases))

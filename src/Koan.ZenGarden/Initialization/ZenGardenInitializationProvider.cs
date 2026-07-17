@@ -1,4 +1,4 @@
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using Koan.ZenGarden.Models;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -120,7 +120,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
             return null;
         }
 
-        var query = Core.ToolFqid.Parse(intent.Offering);
+        var query = ToolFqid.Parse(intent.Offering);
 
         var matched = tools
             .Where(tool => tool.Ready)
@@ -217,7 +217,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
 
     private static ZenGardenOfferingResolution MapResolution(ZenGardenToolSnapshot snapshot)
     {
-        var parsed = Core.ToolFqid.Parse(snapshot.ToolFqid);
+        var parsed = ToolFqid.Parse(snapshot.ToolFqid);
 
         return new ZenGardenOfferingResolution
         {

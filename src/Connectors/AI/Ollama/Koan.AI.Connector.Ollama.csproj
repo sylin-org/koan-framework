@@ -12,7 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\Koan.ZenGarden.Core\Koan.ZenGarden.Core.csproj" />
+    <ProjectReference Include="..\..\..\Koan.ZenGarden.Contracts\Koan.ZenGarden.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />

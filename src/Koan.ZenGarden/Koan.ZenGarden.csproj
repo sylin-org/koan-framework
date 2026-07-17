@@ -16,7 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\Koan.ZenGarden.Core\Koan.ZenGarden.Core.csproj" />
+    <ProjectReference Include="..\Koan.ZenGarden.Contracts\Koan.ZenGarden.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

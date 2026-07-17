@@ -1,4 +1,3 @@
-using Koan.ZenGarden.Core;
 using Koan.ZenGarden.Models;
 
 namespace Koan.ZenGarden;
@@ -28,7 +27,7 @@ public sealed record ZenGardenSubscription
         return new ZenGardenSubscription
         {
             ToolType = ZenGardenToolType.SeedBank,
-            ToolFqid = Core.ToolFqid.Parse(seedBank).ToString()
+            ToolFqid = Koan.ZenGarden.ToolFqid.Parse(seedBank).ToString()
         };
     }
 
@@ -51,7 +50,7 @@ public sealed record ZenGardenSubscription
 
         if (!string.IsNullOrWhiteSpace(ToolFqid))
         {
-            var query = Core.ToolFqid.Parse(ToolFqid);
+            var query = Koan.ZenGarden.ToolFqid.Parse(ToolFqid);
             if (!query.MatchesSnapshot(snapshot.ToolFqid, snapshot.OfferingType, null))
             {
                 return false;
@@ -108,7 +107,7 @@ public sealed record ZenGardenSubscription
             trimmed = trimmed[..bracketStart].Trim();
         }
 
-        var fqid = Core.ToolFqid.Parse(trimmed).ToString();
+        var fqid = Koan.ZenGarden.ToolFqid.Parse(trimmed).ToString();
         return (fqid, requires);
     }
 }

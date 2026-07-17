@@ -4,7 +4,7 @@ using Koan.Core.Diagnostics;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Core.Services;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;

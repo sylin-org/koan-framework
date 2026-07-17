@@ -10,7 +10,7 @@ using Koan.Data.Adapters.Configuration;
 using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using MongoItems = Koan.Data.Connector.Mongo.Infrastructure.MongoProvenanceItems;
 
 namespace Koan.Data.Connector.Mongo;

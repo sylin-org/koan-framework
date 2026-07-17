@@ -1,4 +1,4 @@
-namespace Koan.ZenGarden.Core;
+namespace Koan.ZenGarden;
 
 /// <summary>
 /// Non-blocking capability wish receipt returned by initialization provider.

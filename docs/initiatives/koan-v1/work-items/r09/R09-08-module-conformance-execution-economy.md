@@ -43,7 +43,7 @@ All Koan-defined contracts consumed by another module live in an isolated contra
 no `KoanModule`. Functional projects implement those contracts and contain activation. The slice must
 delete—not introduce—`Inert` activation metadata; any edge that appears to require it identifies a
 contract/package boundary to repair. The first concrete correction is S3's dependency on the
-ZenGarden client contract: the contract surface belongs in `Koan.ZenGarden.Core`, while
+ZenGarden client contract: the contract surface belongs in `Koan.ZenGarden.Contracts`, while
 `Koan.ZenGarden` retains the implementation and activation module.
 
 ## Focused discovery and coalescence assessment
@@ -186,7 +186,7 @@ Disposition:
   `buildTransitive` package consumers. Authored activation-edge metadata and its `Required`/`Inert` postures
   are deleted; source and staged-package manifests are byte-equivalent after transitive reduction.
 - Cross-module contracts are structurally activation-free. ZenGarden client/watch/model contracts moved to
-  `Koan.ZenGarden.Core`; S3 references that contracts assembly and no longer acquires the implementation.
+  `Koan.ZenGarden.Contracts`; S3 references that contracts assembly and no longer acquires the implementation.
 - The retained module owns registration, contribution, startup, provenance, and safe evidence. The separate
   reporting contributor interface, registry scan, parameterless construction, and duplicate lifecycle are gone.
 - Focused verification passed 68 tests: Core lifecycle/manifest/contribution 47, source/package/generator/

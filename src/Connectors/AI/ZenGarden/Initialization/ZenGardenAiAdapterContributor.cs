@@ -6,7 +6,7 @@ using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
 using Koan.Core.AI;
 using Koan.Core.Logging;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;

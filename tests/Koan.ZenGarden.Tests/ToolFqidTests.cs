@@ -1,5 +1,5 @@
 using AwesomeAssertions;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using Xunit;
 
 namespace Koan.ZenGarden.Tests;

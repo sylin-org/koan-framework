@@ -3,12 +3,12 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 108,
-    "repairRequired": 36,
+    "repairRequired": 35,
     "reviewRequired": 57,
-    "structurallyReady": 15,
-    "ownedReadmes": 72,
-    "technicalCompanions": 62,
-    "findings": 231
+    "structurallyReady": 16,
+    "ownedReadmes": 73,
+    "technicalCompanions": 63,
+    "findings": 229
   },
   "findingDefinitions": [
     {
@@ -214,7 +214,7 @@
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
-        "Sylin.Koan.ZenGarden.Core"
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": "src/Connectors/AI/Ollama/README.md",
       "technicalDocumentation": "src/Connectors/AI/Ollama/TECHNICAL.md",
@@ -259,7 +259,7 @@
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
-        "Sylin.Koan.ZenGarden.Core"
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": null,
       "technicalDocumentation": null,
@@ -993,7 +993,7 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.ZenGarden.Core"
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": "src/Connectors/Data/Mongo/README.md",
       "technicalDocumentation": "src/Connectors/Data/Mongo/TECHNICAL.md",
@@ -1376,7 +1376,7 @@
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
         "Sylin.Koan.Data.Vector.Abstractions",
-        "Sylin.Koan.ZenGarden.Core"
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": "src/Connectors/Data/Vector/Weaviate/README.md",
       "technicalDocumentation": "src/Connectors/Data/Vector/Weaviate/TECHNICAL.md",
@@ -1958,7 +1958,7 @@
       ],
       "dependencies": [
         "Sylin.Koan.Storage",
-        "Sylin.Koan.ZenGarden.Core"
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": null,
       "technicalDocumentation": null,
@@ -2481,7 +2481,7 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.ZenGarden.Core"
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": "src/Koan.ZenGarden/README.md",
       "technicalDocumentation": "src/Koan.ZenGarden/TECHNICAL.md",
@@ -2494,23 +2494,20 @@
       ]
     },
     {
-      "packageId": "Sylin.Koan.ZenGarden.Core",
-      "projectPath": "src/Koan.ZenGarden.Core/Koan.ZenGarden.Core.csproj",
+      "packageId": "Sylin.Koan.ZenGarden.Contracts",
+      "projectPath": "src/Koan.ZenGarden.Contracts/Koan.ZenGarden.Contracts.csproj",
       "shape": "library",
-      "role": "capability",
-      "status": "repair-required",
-      "description": "Initialization and connection-intent contracts for Koan Zen Garden integrations.",
+      "role": "contracts",
+      "status": "structurally-ready",
+      "description": "Inert client, discovery, connection-intent, and capability contracts for Koan Zen Garden integrations.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.ZenGarden.Contracts/README.md",
+      "technicalDocumentation": "src/Koan.ZenGarden.Contracts/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     }
   ]
 }

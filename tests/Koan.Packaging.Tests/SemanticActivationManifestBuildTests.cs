@@ -15,7 +15,7 @@ public sealed class SemanticActivationManifestBuildTests
     private const string CompatibilityPackageId = "Sylin.Koan.Test.Activation.Compatibility";
     private const string DownstreamSemanticModuleId = "Sylin.Koan.Test.Downstream";
     private const string S3PackageId = "Sylin.Koan.Storage.Connector.S3";
-    private const string ZenGardenContractsPackageId = "Sylin.Koan.ZenGarden.Core";
+    private const string ZenGardenContractsPackageId = "Sylin.Koan.ZenGarden.Contracts";
     private const string ZenGardenPackageId = "Sylin.Koan.ZenGarden";
     private const string PackageVersion = "1.0.0";
     private const string NuGetV3Source = "https://api.nuget.org/v3/index.json";

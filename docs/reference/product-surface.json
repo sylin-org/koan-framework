@@ -379,7 +379,7 @@
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
-        "Sylin.Koan.ZenGarden.Core"
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": "src/Connectors/AI/Ollama/README.md",
       "ownsReadme": true,
@@ -412,7 +412,7 @@
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
-        "Sylin.Koan.ZenGarden.Core"
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": null,
       "ownsReadme": false,
@@ -972,7 +972,7 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.ZenGarden.Core"
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": "src/Connectors/Data/Mongo/README.md",
       "ownsReadme": true,
@@ -1275,7 +1275,7 @@
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
         "Sylin.Koan.Data.Vector.Abstractions",
-        "Sylin.Koan.ZenGarden.Core"
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": "src/Connectors/Data/Vector/Weaviate/README.md",
       "ownsReadme": true,
@@ -1702,7 +1702,7 @@
       ],
       "dependencies": [
         "Sylin.Koan.Storage",
-        "Sylin.Koan.ZenGarden.Core"
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": null,
       "ownsReadme": false,
@@ -2094,7 +2094,7 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.ZenGarden.Core"
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": "src/Koan.ZenGarden/README.md",
       "ownsReadme": true,
@@ -2102,16 +2102,16 @@
       "claims": []
     },
     {
-      "packageId": "Sylin.Koan.ZenGarden.Core",
+      "packageId": "Sylin.Koan.ZenGarden.Contracts",
       "shape": "library",
-      "description": "Initialization and connection-intent contracts for Koan Zen Garden integrations.",
+      "description": "Inert client, discovery, connection-intent, and capability contracts for Koan Zen Garden integrations.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.ZenGarden.Contracts/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.ZenGarden.Contracts/TECHNICAL.md",
       "claims": []
     }
   ]

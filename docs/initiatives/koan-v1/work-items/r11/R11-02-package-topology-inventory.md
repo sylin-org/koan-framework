@@ -169,7 +169,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Web.OpenGraph` | `projection` | `assess` |
 | `Sylin.Koan.Web.Sse` | `projection` | `assess` |
 | `Sylin.Koan.ZenGarden` | `capability` | `assess` |
-| `Sylin.Koan.ZenGarden.Core` | `capability` | `assess` |
+| `Sylin.Koan.ZenGarden.Contracts` | `contracts` | `keep` |
 
 ## First review order
 

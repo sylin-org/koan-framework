@@ -265,7 +265,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         var offeringSubscription = ZenGardenSubscription.ForOffering(offering);
         var toolFqid = offeringSubscription.ToolFqid
             ?? throw new InvalidOperationException("Failed to normalize offering selector.");
-        var offeringSelector = Core.ToolFqid.Parse(toolFqid).ToString();
+        var offeringSelector = ToolFqid.Parse(toolFqid).ToString();
 
         var snapshot = await ResolveCurrentToolSnapshotAsync(toolFqid, cancellationToken).ConfigureAwait(false);
         var requested = requestedRequirements.Select(static x => x.Canonical).ToArray();
@@ -1048,7 +1048,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             ToolType = Models.ZenGardenToolType.Offering
         }, ct).ConfigureAwait(false);
 
-        var query = Core.ToolFqid.Parse(toolFqid);
+        var query = ToolFqid.Parse(toolFqid);
         return broad.FirstOrDefault(tool =>
             query.MatchesSnapshot(tool.ToolFqid, tool.OfferingType, tool.Aliases));
     }
@@ -1110,7 +1110,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
     private static bool IsToolMatch(string requestedToolFqid, ZenGardenToolSnapshot current)
     {
-        return Core.ToolFqid.Parse(requestedToolFqid)
+        return ToolFqid.Parse(requestedToolFqid)
             .MatchesSnapshot(current.ToolFqid, current.OfferingType, current.Aliases);
     }
 

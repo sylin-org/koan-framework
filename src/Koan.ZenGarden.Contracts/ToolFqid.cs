@@ -1,4 +1,4 @@
-namespace Koan.ZenGarden.Core;
+namespace Koan.ZenGarden;
 
 /// <summary>
 /// Immutable identifier for a Zen Garden tool (offering or seed-bank).

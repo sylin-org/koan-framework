@@ -134,7 +134,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
             return;
         }
 
-        var seedBankName = Core.ToolFqid.Parse(selected.ToolFqid).ToString();
+        var seedBankName = ToolFqid.Parse(selected.ToolFqid).ToString();
         var firstEvent = await CaptureInitialEvent(
             ZenGardenSubscription.ForStorage(seedBankName),
             TimeSpan.FromSeconds(15));

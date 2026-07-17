@@ -8,7 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\Koan.Storage\Koan.Storage.csproj" />
-    <ProjectReference Include="..\..\..\Koan.ZenGarden.Core\Koan.ZenGarden.Core.csproj" />
+    <ProjectReference Include="..\..\..\Koan.ZenGarden.Contracts\Koan.ZenGarden.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Minio" Version="6.*" />

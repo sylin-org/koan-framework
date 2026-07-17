@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 
-namespace Koan.ZenGarden.Core;
+namespace Koan.ZenGarden;
 
 /// <summary>
 /// Parsed representation of a Zen Garden connection intent URI.

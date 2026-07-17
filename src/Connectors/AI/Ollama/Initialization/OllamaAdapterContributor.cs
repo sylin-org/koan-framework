@@ -13,7 +13,7 @@ using Koan.AI.Connector.Ollama.Infrastructure;
 using Koan.AI.Connector.Ollama.Options;
 using Koan.Core.Adapters;
 using Koan.Core.Logging;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

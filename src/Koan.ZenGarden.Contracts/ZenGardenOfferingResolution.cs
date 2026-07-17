@@ -1,4 +1,4 @@
-namespace Koan.ZenGarden.Core;
+namespace Koan.ZenGarden;
 
 /// <summary>
 /// Resolved offering endpoint and metadata returned by Zen Garden initialization provider.

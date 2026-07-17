@@ -1,7 +1,7 @@
 using Koan.Core.AI;
 using Koan.Core.Modules;
 using Koan.ZenGarden.AI;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using Koan.ZenGarden.Initialization;
 using Koan.ZenGarden.Koi;
 using Koan.ZenGarden.Persistence;

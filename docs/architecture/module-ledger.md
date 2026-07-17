@@ -26,7 +26,7 @@
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.AI.Connector.Ollama
-- Depends on: Koan.AI.Contracts, Koan.Core, Koan.ZenGarden.Core
+- Depends on: Koan.AI.Contracts, Koan.Core, Koan.ZenGarden.Contracts
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
@@ -36,7 +36,7 @@
 - Documentation: README ❌ · TECHNICAL ❌
 
 ### Koan.AI.Connector.ZenGarden
-- Depends on: Koan.AI.Contracts, Koan.Core, Koan.ZenGarden.Core
+- Depends on: Koan.AI.Contracts, Koan.Core, Koan.ZenGarden.Contracts
 - Depended by: –
 - Documentation: README ❌ · TECHNICAL ❌
 
@@ -196,7 +196,7 @@
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Data.Connector.Mongo
-- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.ZenGarden.Core
+- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.ZenGarden.Contracts
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
@@ -281,7 +281,7 @@
 - Documentation: README ❌ · TECHNICAL ❌
 
 ### Koan.Data.Vector.Connector.Weaviate
-- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Data.Vector, Koan.Data.Vector.Abstractions, Koan.ZenGarden.Core
+- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Data.Vector, Koan.Data.Vector.Abstractions, Koan.ZenGarden.Contracts
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
@@ -411,7 +411,7 @@
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Storage.Connector.S3
-- Depends on: Koan.Storage, Koan.ZenGarden.Core
+- Depends on: Koan.Storage, Koan.ZenGarden.Contracts
 - Depended by: –
 - Documentation: README ❌ · TECHNICAL ❌
 
@@ -521,11 +521,11 @@
 - Documentation: README ❌ · TECHNICAL ❌
 
 ### Koan.ZenGarden
-- Depends on: Koan.Core, Koan.ZenGarden.Core
+- Depends on: Koan.Core, Koan.ZenGarden.Contracts
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.ZenGarden.Core
+### Koan.ZenGarden.Contracts
 - Depends on: –
 - Depended by: Koan.AI.Connector.Ollama, Koan.AI.Connector.ZenGarden, Koan.Data.Connector.Mongo, Koan.Data.Vector.Connector.Weaviate, Koan.Storage.Connector.S3, Koan.ZenGarden
 - Documentation: README ❌ · TECHNICAL ❌

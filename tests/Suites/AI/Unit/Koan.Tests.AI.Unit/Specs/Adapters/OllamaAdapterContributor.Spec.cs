@@ -11,7 +11,7 @@ using Koan.AI.Contracts.Sources;
 using Koan.AI.Connector.Ollama.Initialization;
 using Koan.AI.Connector.Ollama.Options;
 using Koan.Core.Adapters;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

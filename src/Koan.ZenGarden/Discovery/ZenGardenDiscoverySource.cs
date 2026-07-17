@@ -1,6 +1,6 @@
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Composition;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.ZenGarden.Discovery;

@@ -227,7 +227,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.ZenGarden.Tests", "tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.ZenGarden", "src\Koan.ZenGarden\Koan.ZenGarden.csproj", "{1A637298-756A-4866-AE33-1CE159760D70}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.ZenGarden.Core", "src\Koan.ZenGarden.Core\Koan.ZenGarden.Core.csproj", "{75789E12-7ECD-4D44-B229-C30C7CE7081B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.ZenGarden.Contracts", "src\Koan.ZenGarden.Contracts\Koan.ZenGarden.Contracts.csproj", "{75789E12-7ECD-4D44-B229-C30C7CE7081B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "S3", "S3", "{0CC9EC52-EF53-B1D4-5378-DD742D031F72}"
 EndProject
