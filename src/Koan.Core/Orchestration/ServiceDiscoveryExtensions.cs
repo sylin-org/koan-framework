@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Reflection;
 using System.Linq;
-using Koan.Orchestration.Attributes;
+using Koan.Core.Services;
 
 namespace Koan.Core.Orchestration;
 

@@ -1,7 +1,7 @@
 using Koan.Core;
 using Koan.Core.Observability.Health;
 using Koan.Data.Abstractions.Naming;
-using Koan.Orchestration.Attributes;
+using Koan.Core.Services;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 

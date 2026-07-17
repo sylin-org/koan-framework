@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
-using Koan.Core.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration.Abstractions;
@@ -97,7 +96,7 @@ public sealed class SqlServerDataModule : KoanModule
         if (connectionIsAuto)
         {
             var adapter = new SqlServerDiscoveryAdapter(cfg, NullLogger<SqlServerDiscoveryAdapter>.Instance);
-            effectiveConnectionString = AdapterBootReporting.ResolveConnectionString(
+            effectiveConnectionString = ServiceDiscoveryReporting.ResolveConnectionString(
                 cfg,
                 adapter,
                 null,

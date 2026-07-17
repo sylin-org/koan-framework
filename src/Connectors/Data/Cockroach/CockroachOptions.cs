@@ -1,5 +1,5 @@
 using Koan.Core.Adapters;
-using Koan.Core.Adapters.Configuration;
+using Koan.Data.Adapters.Configuration;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Postgres; // reuse the Postgres SchemaDdlPolicy / SchemaMatchingMode enums (pg-wire reuse)
 using System.ComponentModel.DataAnnotations;

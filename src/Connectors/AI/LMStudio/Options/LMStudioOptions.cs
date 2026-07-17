@@ -1,14 +1,13 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Koan.Core.Adapters;
-using Koan.Core.Adapters.Configuration;
 
 namespace Koan.AI.Connector.LMStudio.Options;
 
 /// <summary>
-/// LM Studio options that implement IAdapterOptions for autonomous discovery integration.
+/// LM Studio connection, routing, and readiness options.
 /// </summary>
-public sealed class LMStudioOptions : IAdapterOptions
+public sealed class LMStudioOptions
 {
     [Required]
     public string ConnectionString { get; set; } = "auto"; // discover local instance when possible
@@ -49,9 +48,4 @@ public sealed class LMStudioOptions : IAdapterOptions
     public Dictionary<string, string>? Labels { get; set; }
 
     public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();
-
-    // Adapter paging defaults (required by interface)
-    public int DefaultPageSize { get; set; } = 10;
-    public int MaxPageSize { get; set; } = 100;
 }
-

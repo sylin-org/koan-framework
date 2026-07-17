@@ -3,7 +3,7 @@ using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
-using Koan.Orchestration.Attributes;
+using Koan.Core.Services;
 using Koan.Testing.Integration;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;

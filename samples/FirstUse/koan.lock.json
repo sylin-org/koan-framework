@@ -19,10 +19,6 @@
       "version": "0.18"
     },
     {
-      "id": "Koan.Core.Adapters",
-      "version": "0.17"
-    },
-    {
       "id": "Koan.Data.Abstractions",
       "version": "0.18"
     },
@@ -44,10 +40,6 @@
     },
     {
       "id": "Koan.Mcp",
-      "version": "0.17"
-    },
-    {
-      "id": "Koan.Orchestration.Abstractions",
       "version": "0.17"
     },
     {

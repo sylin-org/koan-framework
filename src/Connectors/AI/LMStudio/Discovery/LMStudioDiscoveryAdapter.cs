@@ -11,7 +11,7 @@ using Koan.AI.Connector.LMStudio.Infrastructure;
 using Koan.Core;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
-using Koan.Orchestration.Attributes;
+using Koan.Core.Services;
 
 namespace Koan.AI.Connector.LMStudio.Discovery;
 

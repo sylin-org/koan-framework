@@ -14,9 +14,6 @@ using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.Core.Adapters;
 using Koan.Core.AI;
-using Koan.Orchestration;
-using Koan.Orchestration.Attributes;
-using Koan.Orchestration.Models;
 using Koan.AI.Connector.LMStudio.Options;
 using Koan.AI.Connector.LMStudio.Infrastructure;
 
@@ -40,7 +37,6 @@ internal sealed class LMStudioAdapter :
     private readonly ReadinessStateManager _stateManager = new();
     private readonly object _initGate = new();
     private Task? _initializationTask;
-    private UnifiedServiceMetadata? _orchestrationContext;
 
     private string AdapterId => Constants.Adapter.Type;
     public string DisplayName => "LM Studio AI Provider";
@@ -311,23 +307,6 @@ internal sealed class LMStudioAdapter :
         catch (AdapterNotReadyException ex)
         {
             _logger.LogWarning(ex, "[{AdapterId}] LM Studio adapter not ready after initialization (state={State})", AdapterId, ReadinessState);
-        }
-    }
-
-    [OrchestrationAware]
-    public async Task InitializeWithOrchestration(UnifiedServiceMetadata orchestrationContext, CancellationToken cancellationToken = default)
-    {
-        _orchestrationContext = orchestrationContext;
-        ApplyConfiguredBaseAddress();
-
-        _ = EnsureInitializationStarted();
-        try
-        {
-            await WaitForReadiness(ReadinessTimeout, cancellationToken);
-        }
-        catch (AdapterNotReadyException ex)
-        {
-            _logger.LogWarning(ex, "[{AdapterId}] LM Studio adapter not ready after orchestration initialization (state={State})", AdapterId, ReadinessState);
         }
     }
 

@@ -1,5 +1,4 @@
-using Koan.Orchestration;
-using Koan.Orchestration.Attributes;
+using Koan.Core.Services;
 
 namespace Koan.AI.Connector.LMStudio;
 
@@ -24,4 +23,3 @@ namespace Koan.AI.Connector.LMStudio;
 internal sealed class LMStudioServiceDescriptor
 {
 }
-

@@ -11,7 +11,7 @@ public class AdapterReadinessConfiguration : IAdapterReadinessConfiguration
 
 public sealed class AdaptersReadinessOptions
 {
-    public const string SectionPath = Infrastructure.ConfigurationConstants.Adapters.ReadinessSection;
+    public const string SectionPath = "Koan:Adapters:Readiness";
 
     public ReadinessPolicy DefaultPolicy { get; set; } = ReadinessPolicy.Hold;
 

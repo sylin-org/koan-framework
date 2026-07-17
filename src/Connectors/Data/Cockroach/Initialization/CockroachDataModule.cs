@@ -6,7 +6,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using Koan.Core;
-using Koan.Core.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
@@ -110,7 +109,7 @@ public sealed class CockroachDataModule : KoanModule
         if (connectionIsAuto)
         {
             var adapter = new CockroachDiscoveryAdapter(cfg, NullLogger<CockroachDiscoveryAdapter>.Instance);
-            effectiveConnectionString = AdapterBootReporting.ResolveConnectionString(
+            effectiveConnectionString = ServiceDiscoveryReporting.ResolveConnectionString(
                 cfg,
                 adapter,
                 null,
@@ -146,4 +145,3 @@ public sealed class CockroachDataModule : KoanModule
         return $"Host=localhost;Port=26257;Database={database};Username=root";
     }
 }
-

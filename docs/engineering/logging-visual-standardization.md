@@ -187,7 +187,7 @@ Bootstrap telemetry should read as three clear steps: invite, inspect, and decla
 ## Sample end-to-end startup excerpt
 
 ```text
-21:07:36 info [K:BOOT] module.activate -> loaded module=Koan.Core.Adapters src=CoreAdaptersModule
+21:07:36 info [K:BOOT] module.activate -> loaded module=Sylin.Koan.Core src=AdapterLifecycleModule
 21:07:36 info [K:BOOT] module.activate -> loaded module=Koan.Data.Connector.Sqlite src=SqliteDataModule
 21:07:36 info [K:CNFG] sqlite.discovery -> delegating adapter="SqliteDiscoveryAdapter" src=ServiceDiscoveryCoordinator
 21:07:37 warn [K:CNFG] sqlite.discovery -> fallback reason="autonomous discovery failed" fallback="Data Source=Data/Koan.sqlite" src=SqliteDiscoveryAdapter

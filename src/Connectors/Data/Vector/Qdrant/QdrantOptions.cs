@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Koan.Core.Adapters;
-using Koan.Core.Adapters.Configuration;
+using Koan.Data.Adapters.Configuration;
 
 namespace Koan.Data.Vector.Connector.Qdrant;
 

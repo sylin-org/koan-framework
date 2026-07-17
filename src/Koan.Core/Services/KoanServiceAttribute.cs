@@ -1,9 +1,7 @@
-using System;
-
-namespace Koan.Orchestration.Attributes;
+namespace Koan.Core.Services;
 
 /// <summary>
-/// Unified declaration of a service adapter's identity and defaults.
+/// Describes a service-backed adapter once for runtime discovery, inspection, and development tooling.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
 public sealed class KoanServiceAttribute : Attribute
@@ -32,23 +30,19 @@ public sealed class KoanServiceAttribute : Attribute
     public int HealthTimeoutSeconds { get; init; }
     public int HealthRetries { get; init; }
 
-    // Free-form capability bag; prefer known keys per Kind. Use "key=value" entries.
     public string[]? Capabilities { get; init; }
     public string[]? Provides { get; init; }
     public string[]? Consumes { get; init; }
 
-    // Replaces legacy ContainerDefaults/AppEnvDefaults/EndpointDefaults
     public string[]? Env { get; init; }
     public string[]? Volumes { get; init; }
     public string[]? AppEnv { get; init; }
 
-    // Endpoint defaults (container/internal)
     public string? Scheme { get; init; }
     public string? Host { get; init; }
     public int EndpointPort { get; init; }
     public string? UriPattern { get; init; }
 
-    // Endpoint defaults (local/dev)
     public string? LocalScheme { get; init; }
     public string? LocalHost { get; init; }
     public int LocalPort { get; init; }

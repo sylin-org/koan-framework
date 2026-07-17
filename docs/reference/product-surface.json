@@ -362,9 +362,7 @@
       ],
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Core"
       ],
       "readme": "src/Connectors/AI/LMStudio/README.md",
       "ownsReadme": true,
@@ -381,8 +379,6 @@
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
-        "Sylin.Koan.Orchestration.Abstractions",
         "Sylin.Koan.ZenGarden.Core"
       ],
       "readme": "src/Connectors/AI/Ollama/README.md",
@@ -416,8 +412,6 @@
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
-        "Sylin.Koan.Orchestration.Abstractions",
         "Sylin.Koan.ZenGarden.Core"
       ],
       "readme": null,
@@ -800,29 +794,10 @@
       "targetFrameworks": [
         "net10.0"
       ],
-      "dependencies": [
-        "Sylin.Koan.Orchestration.Abstractions"
-      ],
+      "dependencies": [],
       "readme": "src/Koan.Core/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Core/TECHNICAL.md",
-      "claims": []
-    },
-    {
-      "packageId": "Sylin.Koan.Core.Adapters",
-      "shape": "library",
-      "description": "Unified adapter framework for Koan: base classes, capability system, orchestration bridge, and development templates.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Orchestration.Abstractions"
-      ],
-      "readme": "src/Koan.Core.Adapters/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": "src/Koan.Core.Adapters/TECHNICAL.md",
       "claims": []
     },
     {
@@ -909,8 +884,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Connector.Postgres",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.Relational",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Relational"
       ],
       "readme": null,
       "ownsReadme": false,
@@ -926,10 +900,8 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Connectors/Data/Couchbase/README.md",
       "ownsReadme": true,
@@ -948,8 +920,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.SearchEngine",
-        "Sylin.Koan.Data.Vector.Abstractions",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": "src/Connectors/Data/ElasticSearch/README.md",
       "ownsReadme": true,
@@ -965,10 +936,8 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Connectors/Data/InMemory/README.md",
       "ownsReadme": true,
@@ -984,10 +953,8 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Connectors/Data/Json/README.md",
       "ownsReadme": true,
@@ -1003,10 +970,8 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Orchestration.Abstractions",
         "Sylin.Koan.ZenGarden.Core"
       ],
       "readme": "src/Connectors/Data/Mongo/README.md",
@@ -1026,8 +991,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.SearchEngine",
-        "Sylin.Koan.Data.Vector.Abstractions",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": "src/Connectors/Data/OpenSearch/README.md",
       "ownsReadme": true,
@@ -1046,7 +1010,6 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Relational",
-        "Sylin.Koan.Orchestration.Abstractions",
         "Sylin.Koan.Orchestration.Aspire"
       ],
       "readme": "src/Connectors/Data/Postgres/README.md",
@@ -1065,7 +1028,6 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Orchestration.Abstractions",
         "Sylin.Koan.Orchestration.Aspire"
       ],
       "readme": "src/Connectors/Data/Redis/README.md",
@@ -1100,8 +1062,7 @@
       "dependencies": [
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.Relational",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Relational"
       ],
       "readme": "src/Connectors/Data/SqlServer/README.md",
       "ownsReadme": true,
@@ -1118,7 +1079,6 @@
       "dependencies": [
         "Sylin.Koan.Cache.Abstractions",
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
         "Sylin.Koan.Data.Abstractions"
       ],
       "readme": "src/Koan.Data.Core/README.md",
@@ -1258,8 +1218,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
-        "Sylin.Koan.Data.Vector.Abstractions",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": "src/Connectors/Data/Vector/Milvus/README.md",
       "ownsReadme": true,
@@ -1278,8 +1237,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
-        "Sylin.Koan.Data.Vector.Abstractions",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": null,
       "ownsReadme": false,
@@ -1317,7 +1275,6 @@
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
         "Sylin.Koan.Data.Vector.Abstractions",
-        "Sylin.Koan.Orchestration.Abstractions",
         "Sylin.Koan.ZenGarden.Core"
       ],
       "readme": "src/Connectors/Data/Vector/Weaviate/README.md",

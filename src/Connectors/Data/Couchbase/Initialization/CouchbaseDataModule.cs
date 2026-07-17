@@ -8,7 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Adapters;
-using Koan.Core.Adapters.Reporting;
+using Koan.Data.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
@@ -82,7 +82,7 @@ public sealed class CouchbaseDataModule : KoanModule
         }
 
         var adapter = new CouchbaseDiscoveryAdapter(configuration, NullLogger<CouchbaseDiscoveryAdapter>.Instance);
-        return AdapterBootReporting.ResolveConnectionString(
+        return ServiceDiscoveryReporting.ResolveConnectionString(
             configuration,
             adapter,
             parameters,

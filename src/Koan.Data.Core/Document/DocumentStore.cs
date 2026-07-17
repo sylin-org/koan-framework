@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Adapters;
+using Koan.Data.Adapters;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
@@ -29,7 +30,7 @@ namespace Koan.Data.Core.Document;
 /// declares its native extras (bulk / atomic / CAS / TTL).</para>
 ///
 /// <para><b>Cross-cutting (ARCH-0103 evaluation):</b> the op-template gates readiness via the shared
-/// <see cref="AdapterReadinessExtensions.WithReadinessAsync{T,TEntity}"/> (so schema auto-provision rides too) and opens
+/// <see cref="DataAdapterReadinessExtensions.WithDataReadinessAsync{T,TEntity}"/> (so schema auto-provision rides too) and opens
 /// one <see cref="Activity"/> per op with consistent tags (entity · source · partition) and error status — the
 /// telemetry + readiness boilerplate the per-adapter repos used to repeat ~12 times each.</para>
 /// </summary>
@@ -93,7 +94,7 @@ public abstract class DocumentStore<TEntity, TKey> :
     protected Task<T> RunAsync<T>(string op, Func<Task<T>> native, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        return this.WithReadinessAsync<T, TEntity>(
+        return this.WithDataReadinessAsync<T, TEntity>(
             () => AdapterActivity.TraceAsync(Telemetry, $"{Verb}.{op}", Tag, native), ct);
     }
 

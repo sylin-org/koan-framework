@@ -78,7 +78,6 @@ mkdir src/Connectors/Data/Vector/Acme
     <ProjectReference Include="..\..\..\..\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\..\..\..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
     <!-- Your connector's HTTP/driver dependencies here. -->
   </ItemGroup>
 </Project>
@@ -92,8 +91,7 @@ The parent `src/Connectors/Directory.Build.props` imports the root and turns on 
 // src/Connectors/Data/Vector/Acme/AcmeVectorAdapterFactory.cs
 using Koan.Data.Abstractions;
 using Koan.Data.Vector.Abstractions;
-using Koan.Orchestration;
-using Koan.Orchestration.Attributes;
+using Koan.Core.Services;
 
 namespace Koan.Data.Vector.Connector.Acme;
 

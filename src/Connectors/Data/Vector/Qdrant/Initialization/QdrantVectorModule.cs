@@ -6,7 +6,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Koan.Core;
-using Koan.Core.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration.Abstractions;
@@ -98,7 +97,7 @@ public sealed class QdrantVectorModule : KoanModule
         if (connectionIsAuto)
         {
             var adapter = new QdrantDiscoveryAdapter(cfg, NullLogger<QdrantDiscoveryAdapter>.Instance);
-            effectiveConnectionString = AdapterBootReporting.ResolveConnectionString(
+            effectiveConnectionString = ServiceDiscoveryReporting.ResolveConnectionString(
                 cfg,
                 adapter,
                 null,

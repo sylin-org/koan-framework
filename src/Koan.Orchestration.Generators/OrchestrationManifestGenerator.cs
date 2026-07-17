@@ -18,7 +18,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
     private const string HealthDefaultsAttr = "Koan.Orchestration.Abstractions.Attributes.HealthEndpointDefaultsAttribute";
     private const string OrchestrationServiceManifestAttr = "Koan.Orchestration.OrchestrationServiceManifestAttribute";
     // Correct FQN for the unified service attribute
-    private const string KoanServiceAttr = "Koan.Orchestration.Attributes.KoanServiceAttribute";
+    private const string KoanServiceAttr = "Koan.Core.Services.KoanServiceAttribute";
 
     public void Initialize(GeneratorInitializationContext context) { }
 

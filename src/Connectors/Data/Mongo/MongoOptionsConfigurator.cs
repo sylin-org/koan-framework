@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Adapters;
-using Koan.Core.Adapters.Configuration;
+using Koan.Data.Adapters.Configuration;
 using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;

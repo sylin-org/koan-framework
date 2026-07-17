@@ -5,8 +5,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Koan.Core;
-using Koan.Core.Adapters;
-using Koan.Core.Adapters.Configuration;
 using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
@@ -14,32 +12,32 @@ using Koan.AI.Connector.LMStudio.Infrastructure;
 
 namespace Koan.AI.Connector.LMStudio.Options;
 
-internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<LMStudioOptions>
+internal sealed class LMStudioOptionsConfigurator : IConfigureOptions<LMStudioOptions>
 {
     private readonly IServiceDiscoveryCoordinator? _discoveryCoordinator;
-
-    protected override string ProviderName => "LMStudio";
+    private readonly IConfiguration _configuration;
+    private readonly ILogger _logger;
 
     public LMStudioOptionsConfigurator(
         IConfiguration config,
         ILogger<LMStudioOptionsConfigurator> logger,
-        IOptions<AdaptersReadinessOptions> readinessOptions,
         IServiceDiscoveryCoordinator? discoveryCoordinator = null)
-        : base(config, logger, readinessOptions)
     {
+        _configuration = config;
+        _logger = logger;
         _discoveryCoordinator = discoveryCoordinator;
     }
 
     public LMStudioOptionsConfigurator(IConfiguration config)
-        : base(config, NullLogger<LMStudioOptionsConfigurator>.Instance,
-            Microsoft.Extensions.Options.Options.Create(new AdaptersReadinessOptions()))
     {
+        _configuration = config;
+        _logger = NullLogger<LMStudioOptionsConfigurator>.Instance;
         _discoveryCoordinator = null;
     }
 
-    protected override void ConfigureProviderSpecific(LMStudioOptions options)
+    public void Configure(LMStudioOptions options)
     {
-        KoanLog.ConfigInfo(Logger, LogActions.Config, LocalLogOutcomes.Start);
+        KoanLog.ConfigInfo(_logger, LogActions.Config, LocalLogOutcomes.Start);
 
         var explicitConnection = ReadProviderConfiguration("",
             Constants.Configuration.Keys.ConnectionString,
@@ -62,7 +60,7 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
         {
             options.ConnectionString = explicitConnection;
             options.BaseUrl = explicitConnection;
-            KoanLog.ConfigDebug(Logger, LogActions.Config, "connection-explicit",
+            KoanLog.ConfigDebug(_logger, LogActions.Config, "connection-explicit",
                 ("source", "configuration"));
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
@@ -70,12 +68,12 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
         {
             options.ConnectionString = ResolveAutonomousConnection(defaultModel, options);
             options.BaseUrl = options.ConnectionString;
-            KoanLog.ConfigDebug(Logger, LogActions.Discovery, "auto", ("resolved", options.ConnectionString));
+            KoanLog.ConfigDebug(_logger, LogActions.Discovery, "auto", ("resolved", options.ConnectionString));
         }
         else
         {
             options.BaseUrl = options.ConnectionString;
-            KoanLog.ConfigDebug(Logger, LogActions.Config, "connection-preconfigured",
+            KoanLog.ConfigDebug(_logger, LogActions.Config, "connection-preconfigured",
                 ("value", options.ConnectionString));
         }
 
@@ -98,7 +96,7 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
             options.Weight = weight;
         }
 
-        var labelsSection = Configuration.GetSection(Constants.Configuration.Keys.Labels);
+        var labelsSection = _configuration.GetSection(Constants.Configuration.Keys.Labels);
         if (labelsSection.Exists())
         {
             options.Labels = new Dictionary<string, string>();
@@ -111,7 +109,7 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
             }
         }
 
-        KoanLog.ConfigInfo(Logger, LogActions.Config, LocalLogOutcomes.Complete,
+        KoanLog.ConfigInfo(_logger, LogActions.Config, LocalLogOutcomes.Complete,
                 ("connection", options.ConnectionString ?? "(null)"),
                 ("defaultModel", options.DefaultModel ?? "(null)"),
                 ("apiKey", string.IsNullOrWhiteSpace(options.ApiKey) ? "(none)" : "(set)"),
@@ -125,14 +123,14 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
             if (!options.AutoDiscoveryEnabled)
             {
                 var fallback = options.BaseUrl;
-                KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-disabled", ("fallback", fallback));
+                KoanLog.ConfigInfo(_logger, LogActions.Discovery, "auto-disabled", ("fallback", fallback));
                 return fallback;
             }
 
             if (_discoveryCoordinator == null)
             {
                 var fallback = options.BaseUrl;
-                KoanLog.ConfigWarning(Logger, LogActions.Discovery, "coordinator-missing", ("fallback", fallback));
+                KoanLog.ConfigWarning(_logger, LogActions.Discovery, "coordinator-missing", ("fallback", fallback));
                 return fallback;
             }
 
@@ -147,7 +145,7 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
                 }
             };
 
-            KoanLog.ConfigDebug(Logger, LogActions.Discovery, "request",
+            KoanLog.ConfigDebug(_logger, LogActions.Discovery, "request",
                 ("mode", context.OrchestrationMode.ToString()),
                 ("requiredModel", defaultModel ?? "(none)"));
 
@@ -156,14 +154,14 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
 
             if (result.IsSuccessful)
             {
-                KoanLog.ConfigInfo(Logger, LogActions.Discovery, "success",
+                KoanLog.ConfigInfo(_logger, LogActions.Discovery, "success",
                     ("url", result.ServiceUrl),
                     ("method", result.DiscoveryMethod));
                 return result.ServiceUrl;
             }
 
             var fallbackFailure = options.BaseUrl;
-            KoanLog.ConfigWarning(Logger, LogActions.Discovery, "failed",
+            KoanLog.ConfigWarning(_logger, LogActions.Discovery, "failed",
                 ("reason", result.ErrorMessage ?? "unknown"),
                 ("fallback", fallbackFailure));
             return fallbackFailure;
@@ -171,12 +169,36 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
         catch (Exception ex)
         {
             var fallbackException = options.BaseUrl;
-            KoanLog.ConfigWarning(Logger, LogActions.Discovery, "exception",
+            KoanLog.ConfigWarning(_logger, LogActions.Discovery, "exception",
                 ("reason", ex.Message),
                 ("fallback", fallbackException));
-            KoanLog.ConfigDebug(Logger, LogActions.Discovery, "exception-detail",
+            KoanLog.ConfigDebug(_logger, LogActions.Discovery, "exception-detail",
                 ("exception", ex.ToString()));
             return fallbackException;
+        }
+    }
+
+    private T ReadProviderConfiguration<T>(T defaultValue, params string[] keys)
+    {
+        if (typeof(T) == typeof(string))
+        {
+            var result = Core.Configuration.ReadFirst(_configuration, keys) ?? defaultValue?.ToString() ?? "";
+            return (T)(object)result;
+        }
+
+        if (typeof(T) == typeof(bool))
+        {
+            return (T)(object)Core.Configuration.Read(_configuration, keys[0], (bool)(object)defaultValue!);
+        }
+
+        var configured = Core.Configuration.ReadFirst(_configuration, defaultValue?.ToString() ?? "", keys);
+        try
+        {
+            return (T)Convert.ChangeType(configured, typeof(T));
+        }
+        catch
+        {
+            return defaultValue;
         }
     }
 

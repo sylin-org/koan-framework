@@ -13,9 +13,9 @@ using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExt
 
 namespace Koan.Core.Adapters.Initialization;
 
-public sealed class CoreAdaptersModule : KoanModule
+public sealed class AdapterLifecycleModule : KoanModule
 {
-    private static readonly KoanLog.KoanLogScope Log = KoanLog.For<CoreAdaptersModule>();
+    private static readonly KoanLog.KoanLogScope Log = KoanLog.For<AdapterLifecycleModule>();
 
     public override void Register(IServiceCollection services)
     {

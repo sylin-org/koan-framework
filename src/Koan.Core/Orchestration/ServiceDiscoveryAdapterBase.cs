@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Koan.Core.Logging;
 using Koan.Core.Orchestration.Abstractions;
-using Koan.Orchestration.Attributes;
+using Koan.Core.Services;
 
 namespace Koan.Core.Orchestration;
 

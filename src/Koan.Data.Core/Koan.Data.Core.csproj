@@ -9,7 +9,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\Koan.Core.Adapters\Koan.Core.Adapters.csproj" />
     <ProjectReference Include="..\Koan.Cache.Abstractions\Koan.Cache.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>

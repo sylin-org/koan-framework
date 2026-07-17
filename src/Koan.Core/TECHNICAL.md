@@ -56,6 +56,14 @@ source: src/Koan.Core/
   provider-election or structural-contribution lifecycle.
 - `ServiceDiscoveryAdapterBase`: the concern-owned discovery template. Adapters supply environment,
   runtime-topology, normalization, and health hooks but cannot replace activation or precedence.
+- `KoanServiceAttribute`, `ServiceKind`, and `DeploymentKind` in `Koan.Core.Services`: the
+  always-present runtime service description read by discovery and, by metadata name, optional
+  DevHost tooling. Core has no dependency on `Sylin.Koan.Orchestration.Abstractions`.
+- `IAdapterReadiness`, `IAsyncAdapterInitializer`, `AdaptersReadinessOptions`, and
+  `AdapterLifecycleModule`: one shared backend lifecycle. The module starts and monitors adapters;
+  concern-specific recovery remains with the concern (for example, schema provisioning in Data Core).
+- `ServiceDiscoveryReporting`: reuses the normal discovery adapter to render startup provenance; it
+  does not implement another endpoint-election policy.
 - `DiscoveryCandidatePriority`: the canonical explicit → legacy environment → automatic → host-gateway →
   loopback ordering used by every discovery adapter and optional contributor.
 - `buildTransitive/Sylin.Koan.Core.targets`: emits static composition, the embedded resolved-module

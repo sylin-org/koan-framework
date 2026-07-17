@@ -9,6 +9,8 @@ Data access core for Koan: common primitives, options, and helpers used by relat
 
 - Entity contracts and helpers for aggregate storage
 - Options and conventions shared across data adapters
+- Data-owned adapter option binding for readiness and default paging
+- Schema recovery composed around Core's generic readiness gate
 - Selection-aware health semantics for data connectors
 - Support for paging, streaming, and batching semantics (see references)
 

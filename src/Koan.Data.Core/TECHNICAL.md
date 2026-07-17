@@ -91,6 +91,14 @@ validation:
 
 ## Data-adapter health participation
 
+- Generic readiness state, initialization order, and monitoring ship in `Sylin.Koan.Core` under the
+  `Koan.Core.Adapters` namespace. Data Core adds only Data semantics: provider option binding,
+  default paging, and bounded schema recovery through `DataAdapterReadinessExtensions`.
+- `AdapterOptionsConfigurator<TOptions>` and `IAdapterOptions` live in
+  `Koan.Data.Adapters.Configuration`; AI and other concerns do not implement a Data paging contract.
+- `AdapterBootReporting` lives in `Koan.Data.Adapters.Reporting` and reports Data settings through
+  Core provenance. Endpoint resolution delegates to Core's `ServiceDiscoveryReporting` chokepoint.
+
 - `DataAdapterHealthContributorBase` distinguishes connector availability from application
   dependency. A provider participates when it wins default election or is selected by a runtime
   repository or Direct request in that host. A configured named source describes an available route;

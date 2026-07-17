@@ -1,7 +1,7 @@
-namespace Koan.Orchestration;
+namespace Koan.Core.Services;
 
 /// <summary>
-/// Unified service kinds for declarative discovery and UX grouping.
+/// Classifies the runtime concern provided by a service-backed adapter.
 /// </summary>
 public enum ServiceKind
 {

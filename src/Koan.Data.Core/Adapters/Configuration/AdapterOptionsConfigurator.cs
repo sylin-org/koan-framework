@@ -2,9 +2,11 @@ using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Koan.Core.Adapters;
 using Koan.Core.Logging;
+using DataConfiguration = Koan.Data.Core.Infrastructure.ConfigurationConstants;
 
-namespace Koan.Core.Adapters.Configuration;
+namespace Koan.Data.Adapters.Configuration;
 
 /// <summary>
 /// Base configurator for data adapter options that centralizes common configuration patterns.
@@ -69,9 +71,9 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         }
 
         // Policy configuration with enum parsing
-        var policyStr = Core.Configuration.ReadFirst(Configuration, config.Policy.ToString(),
-            Infrastructure.ConfigurationConstants.Data.Readiness.PolicyForProvider(ProviderName),
-            Infrastructure.ConfigurationConstants.Data.Readiness.Policy);
+        var policyStr = Koan.Core.Configuration.ReadFirst(Configuration, config.Policy.ToString(),
+            DataConfiguration.Readiness.PolicyForProvider(ProviderName),
+            DataConfiguration.Readiness.Policy);
 
         if (Enum.TryParse<ReadinessPolicy>(policyStr, out var policy))
         {
@@ -79,10 +81,10 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         }
 
         // Timeout configuration with TimeSpan conversion
-        var timeoutSecondsStr = Core.Configuration.ReadFirst(Configuration,
+        var timeoutSecondsStr = Koan.Core.Configuration.ReadFirst(Configuration,
             ((int)config.Timeout.TotalSeconds).ToString(),
-            Infrastructure.ConfigurationConstants.Data.Readiness.TimeoutForProvider(ProviderName),
-            Infrastructure.ConfigurationConstants.Data.Readiness.Timeout);
+            DataConfiguration.Readiness.TimeoutForProvider(ProviderName),
+            DataConfiguration.Readiness.Timeout);
 
         if (int.TryParse(timeoutSecondsStr, out var timeoutSeconds) && timeoutSeconds > 0)
         {
@@ -94,8 +96,8 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         }
 
         // Gating configuration
-        config.EnableReadinessGating = Core.Configuration.Read(Configuration,
-            Infrastructure.ConfigurationConstants.Data.Readiness.EnableReadinessGatingForProvider(ProviderName),
+        config.EnableReadinessGating = Koan.Core.Configuration.Read(Configuration,
+            DataConfiguration.Readiness.GatingForProvider(ProviderName),
             config.EnableReadinessGating);
 
         KoanLog.ConfigDebug(Logger, LogActions.ReadinessConfiguration, LogOutcomes.Applied,
@@ -112,9 +114,9 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
     /// </summary>
     protected void ConfigurePaging(IAdapterOptions options)
     {
-        options.DefaultPageSize = Core.Configuration.ReadFirst(Configuration, options.DefaultPageSize,
-            Infrastructure.ConfigurationConstants.Data.Paging.DefaultPageSizeForProvider(ProviderName),
-            Infrastructure.ConfigurationConstants.Data.Paging.DefaultPageSize);
+        options.DefaultPageSize = Koan.Core.Configuration.ReadFirst(Configuration, options.DefaultPageSize,
+            DataConfiguration.Paging.DefaultPageSizeForProvider(ProviderName),
+            DataConfiguration.Paging.DefaultPageSize);
 
         KoanLog.ConfigDebug(Logger, LogActions.PagingConfiguration, LogOutcomes.Applied,
             ("provider", ProviderName),
@@ -136,23 +138,23 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         if (typeof(T) == typeof(string))
         {
             var defaultString = defaultValue as string;
-            var result = Core.Configuration.ReadFirst(Configuration, providerKeys) ?? defaultString;
+            var result = Koan.Core.Configuration.ReadFirst(Configuration, providerKeys) ?? defaultString;
             return (T)(object)(result ?? "");
         }
         else if (typeof(T) == typeof(int))
         {
-            var result = Core.Configuration.ReadFirst(Configuration, (int)(object)defaultValue!, providerKeys);
+            var result = Koan.Core.Configuration.ReadFirst(Configuration, (int)(object)defaultValue!, providerKeys);
             return (T)(object)result;
         }
         else if (typeof(T) == typeof(bool))
         {
-            var result = Core.Configuration.ReadFirst(Configuration, (bool)(object)defaultValue!, providerKeys);
+            var result = Koan.Core.Configuration.ReadFirst(Configuration, (bool)(object)defaultValue!, providerKeys);
             return (T)(object)result;
         }
         else
         {
             // Fallback - try to read as string and convert
-            var stringResult = Core.Configuration.ReadFirst(Configuration, defaultValue?.ToString() ?? "", providerKeys);
+            var stringResult = Koan.Core.Configuration.ReadFirst(Configuration, defaultValue?.ToString() ?? "", providerKeys);
             try
             {
                 return (T)Convert.ChangeType(stringResult, typeof(T));

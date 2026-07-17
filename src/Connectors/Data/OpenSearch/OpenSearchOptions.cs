@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Koan.Core.Adapters;
-using Koan.Core.Adapters.Configuration;
+using Koan.Data.Adapters.Configuration;
 using Koan.Data.SearchEngine;
 
 namespace Koan.Data.Connector.OpenSearch;

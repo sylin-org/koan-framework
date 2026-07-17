@@ -7,7 +7,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using Koan.Core;
-using Koan.Core.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
@@ -28,7 +27,7 @@ namespace Koan.Data.Connector.Mongo.Initialization;
 /// the independently discovered optimization owner
 /// into ONE <see cref="KoanModule"/>: <see cref="Register"/> wires the services and applies the
 /// once-guarded driver configuration (<see cref="MongoDriverConfiguration"/>); <see cref="Report"/>
-/// publishes provenance, reusing the fleet-shared <see cref="AdapterBootReporting.ResolveConnectionString"/>
+/// publishes provenance, reusing the fleet-shared <see cref="ServiceDiscoveryReporting.ResolveConnectionString"/>
 /// for the boot-report connection display. <see cref="KoanModule.Id"/> preserves the prior ModuleName so
 /// boot reports are unchanged.
 /// </summary>
@@ -60,7 +59,7 @@ public sealed class MongoModule : KoanModule
     {
         module.Describe(Version);
         // Autonomous discovery adapter handles all connection string resolution; the boot report shows
-        // the discovery result via the fleet-shared AdapterBootReporting.ResolveConnectionString.
+        // the discovery result via the fleet-shared ServiceDiscoveryReporting.ResolveConnectionString.
         module.AddNote("MongoDB discovery handled by autonomous MongoDiscoveryAdapter");
         module.AddNote("Layered discovery: accepts compiled automatic sources through the shared Mongo discovery pipeline");
         module.AddNote("AODB isolation: RowScoped + ContainerScoped + DatabaseScoped (conformance: AodbConformanceSpecsBase)");
@@ -108,7 +107,7 @@ public sealed class MongoModule : KoanModule
             if (!string.IsNullOrWhiteSpace(password)) parameters["password"] = password;
 
             var adapter = new MongoDiscoveryAdapter(cfg, NullLogger<MongoDiscoveryAdapter>.Instance);
-            effectiveConnectionString = AdapterBootReporting.ResolveConnectionString(
+            effectiveConnectionString = ServiceDiscoveryReporting.ResolveConnectionString(
                 cfg,
                 adapter,
                 parameters,

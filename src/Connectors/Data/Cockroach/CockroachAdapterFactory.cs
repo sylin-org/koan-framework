@@ -6,8 +6,7 @@ using Koan.Data.Abstractions;
 using Koan.Core;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
-using Koan.Orchestration;
-using Koan.Orchestration.Attributes;
+using Koan.Core.Services;
 
 namespace Koan.Data.Connector.Cockroach;
 

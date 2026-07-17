@@ -1,4 +1,4 @@
-using Koan.Core.Adapters.Configuration;
+using Koan.Data.Adapters.Configuration;
 using Koan.Data.Abstractions;
 
 namespace Koan.Data.Core.Extensions;

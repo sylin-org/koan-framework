@@ -10,7 +10,6 @@
     <ProjectReference Include="..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\Koan.Data.Relational\Koan.Data.Relational.csproj" />
-    <ProjectReference Include="..\..\..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.2" />

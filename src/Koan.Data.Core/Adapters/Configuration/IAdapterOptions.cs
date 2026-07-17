@@ -1,4 +1,6 @@
-namespace Koan.Core.Adapters.Configuration;
+using Koan.Core.Adapters;
+
+namespace Koan.Data.Adapters.Configuration;
 
 /// <summary>
 /// Common interface for adapter configuration options.

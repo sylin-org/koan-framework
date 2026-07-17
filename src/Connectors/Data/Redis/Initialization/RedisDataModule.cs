@@ -6,7 +6,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
-using Koan.Core.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Logging;
 using Koan.Core.Modules;
@@ -113,7 +112,7 @@ public sealed class RedisDataModule : KoanModule, IKoanAspireResources
         if (connectionIsAuto)
         {
             var adapter = new RedisDiscoveryAdapter(cfg, NullLogger<RedisDiscoveryAdapter>.Instance);
-            effectiveConnectionString = AdapterBootReporting.ResolveConnectionString(
+            effectiveConnectionString = ServiceDiscoveryReporting.ResolveConnectionString(
                 cfg,
                 adapter,
                 null,

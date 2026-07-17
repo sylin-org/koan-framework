@@ -117,7 +117,7 @@ graduation claim. Architectural and prose review plus the applicable executable 
 | R11-07 | complete active-package disposition and one final release-certification boundary | pending |
 
 Open later child cards only when the preceding slice establishes the facts needed to size them. This keeps R11 a
-sequence of meaningful decisions rather than 109 parallel documentation chores.
+sequence of meaningful decisions rather than 108 parallel documentation chores.
 
 ## Validation economy
 

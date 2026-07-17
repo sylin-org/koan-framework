@@ -3,13 +3,12 @@ using System.Collections.Generic;
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
-using Koan.Core.Adapters.Configuration;
+using Koan.Core.Adapters;
+using Koan.Data.Adapters.Configuration;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Provenance;
-using Koan.Core.Orchestration;
-using Koan.Core.Orchestration.Abstractions;
 
-namespace Koan.Core.Adapters.Reporting;
+namespace Koan.Data.Adapters.Reporting;
 
 /// <summary>
 /// Centralized utilities for consistent adapter boot report generation.
@@ -107,7 +106,7 @@ public static class AdapterBootReporting
         string connectionString,
         string settingName = "ConnectionString")
     {
-        var redactedConnectionString = Redaction.DeIdentify(connectionString);
+        var redactedConnectionString = Koan.Core.Redaction.DeIdentify(connectionString);
         module.AddSetting($"{moduleName}:{settingName}", redactedConnectionString);
     }
 
@@ -166,48 +165,4 @@ public static class AdapterBootReporting
                 retryCount.Value.ToString(CultureInfo.InvariantCulture));
     }
 
-    /// <summary>
-    /// Runs autonomous discovery for adapters that support it and returns the resolved connection string.
-    /// Falls back to the provided delegate when discovery fails or produces no result.
-    /// </summary>
-    /// <param name="configuration">The configuration instance to supply to discovery context.</param>
-    /// <param name="adapter">The discovery adapter to execute.</param>
-    /// <param name="parameters">Optional discovery parameters scoped to the adapter.</param>
-    /// <param name="fallback">Delegate returning a fallback connection string when discovery is unavailable.</param>
-    /// <param name="healthCheckTimeout">Optional override for health check timeout during discovery.</param>
-    /// <returns>A connection string suitable for provenance reporting.</returns>
-    public static string ResolveConnectionString(
-        IConfiguration? configuration,
-        IServiceDiscoveryAdapter adapter,
-        IDictionary<string, object>? parameters,
-        Func<string> fallback,
-        TimeSpan? healthCheckTimeout = null)
-    {
-        ArgumentNullException.ThrowIfNull(adapter);
-        ArgumentNullException.ThrowIfNull(fallback);
-
-        var safeConfiguration = configuration ?? new ConfigurationBuilder().AddInMemoryCollection().Build();
-        var context = new DiscoveryContext
-        {
-            Configuration = safeConfiguration,
-            OrchestrationMode = KoanEnv.OrchestrationMode,
-            HealthCheckTimeout = healthCheckTimeout ?? TimeSpan.FromMilliseconds(500),
-            Parameters = parameters is { Count: > 0 } ? parameters : null
-        };
-
-        try
-        {
-            var result = adapter.Discover(context).GetAwaiter().GetResult();
-            if (result.IsSuccessful && !string.IsNullOrWhiteSpace(result.ServiceUrl))
-            {
-                return result.ServiceUrl!;
-            }
-        }
-        catch
-        {
-            // Swallow discovery exceptions; fallback handles reporting.
-        }
-
-        return fallback();
-    }
 }

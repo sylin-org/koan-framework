@@ -1,7 +1,7 @@
-namespace Koan.Orchestration;
+namespace Koan.Core.Services;
 
 /// <summary>
-/// Declares how a service is deployed for dev orchestration.
+/// Describes how a service is expected to become available to an application.
 /// </summary>
 public enum DeploymentKind
 {

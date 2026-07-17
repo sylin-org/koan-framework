@@ -1,7 +1,7 @@
 # Sylin.Koan.Core
 
-Core primitives for Koan: configuration helpers, environment snapshot (`KoanEnv`), logical-flow
-context, durable context carriage, constants, and foundational abstractions.
+Core primitives for Koan: composition, configuration, environment and logical-flow context, runtime
+facts, service discovery, and the shared lifecycle used by backend adapters.
 
 - Target framework: net10.0
 - License: Apache-2.0
@@ -12,8 +12,16 @@ context, durable context carriage, constants, and foundational abstractions.
 dotnet add package Sylin.Koan.Core
 ```
 
+Applications normally reference `Sylin.Koan` or `Sylin.Koan.App`; both bring Core transitively.
+Reference Core directly when authoring a Koan module, provider, projection, or host integration.
+
 ## Notes
 - Options: bind with Microsoft.Extensions.Options
+- Adapter lifecycle: readiness state, startup initialization, monitoring, and operation gating live
+  in Core because AI, Data, Communication, and future provider families share the same lifecycle.
+- Service description: provider packages annotate their implementation with
+  `Koan.Core.Services.KoanServiceAttribute`. Runtime discovery and development tooling observe that
+  one declaration; referencing Core does not activate the DevHost CLI or a container engine.
 - Environment: use `KoanEnv.Current` for machine/env metadata
 - Logical-flow context: `KoanContext.Get<T>()`, `Push<T>()`, and `Suppress<T>()` carry immutable,
   exact-type values through async execution and restore the prior snapshot on scope disposal. Context

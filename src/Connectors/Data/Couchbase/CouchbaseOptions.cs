@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using Koan.Core.Adapters;
-using Koan.Core.Adapters.Configuration;
+using Koan.Data.Adapters.Configuration;
 using Koan.Data.Abstractions.Naming;
 
 namespace Koan.Data.Connector.Couchbase;

@@ -12,7 +12,6 @@ using Koan.AI.Connector.LMStudio.Infrastructure;
 using Koan.AI.Connector.LMStudio.Options;
 using Koan.AI.Connector.LMStudio.Orchestration;
 using Koan.Core;
-using Koan.Core.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
@@ -86,7 +85,7 @@ public sealed class LMStudioAiModule : KoanModule
         }
 
         var adapter = new LMStudioDiscoveryAdapter(cfg, NullLogger<LMStudioDiscoveryAdapter>.Instance);
-        var resolved = AdapterBootReporting.ResolveConnectionString(
+        var resolved = ServiceDiscoveryReporting.ResolveConnectionString(
             cfg,
             adapter,
             null,

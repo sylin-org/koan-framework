@@ -1,5 +1,5 @@
 using Koan.Core.Adapters;
-using Koan.Core.Adapters.Configuration;
+using Koan.Data.Adapters.Configuration;
 using System.ComponentModel.DataAnnotations;
 
 namespace Koan.Data.Connector.Redis;

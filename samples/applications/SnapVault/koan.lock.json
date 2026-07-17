@@ -31,10 +31,6 @@
       "version": "0.18"
     },
     {
-      "id": "Koan.Core.Adapters",
-      "version": "0.17"
-    },
-    {
       "id": "Koan.Data.AI",
       "version": "0.19"
     },
@@ -89,10 +85,6 @@
     {
       "id": "Koan.Media.Web",
       "version": "0.18"
-    },
-    {
-      "id": "Koan.Orchestration.Abstractions",
-      "version": "0.17"
     },
     {
       "id": "Koan.Security.Trust",

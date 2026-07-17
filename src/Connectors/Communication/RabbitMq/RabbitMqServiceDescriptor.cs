@@ -1,5 +1,4 @@
-using Koan.Orchestration;
-using Koan.Orchestration.Attributes;
+using Koan.Core.Services;
 
 namespace Koan.Communication.Connector.RabbitMq;
 

@@ -11,9 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\..\..\Koan.Core.Adapters\Koan.Core.Adapters.csproj" />
     <ProjectReference Include="..\..\..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\Koan.ZenGarden.Core\Koan.ZenGarden.Core.csproj" />
   </ItemGroup>
   <ItemGroup>

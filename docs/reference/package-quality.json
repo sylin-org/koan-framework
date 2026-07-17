@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 109,
+    "packages": 108,
     "repairRequired": 37,
-    "reviewRequired": 72,
+    "reviewRequired": 71,
     "structurallyReady": 0,
-    "ownedReadmes": 73,
-    "technicalCompanions": 63,
-    "findings": 578
+    "ownedReadmes": 72,
+    "technicalCompanions": 62,
+    "findings": 568
   },
   "findingDefinitions": [
     {
@@ -234,9 +234,7 @@
       ],
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Core"
       ],
       "readme": "src/Connectors/AI/LMStudio/README.md",
       "technicalDocumentation": "src/Connectors/AI/LMStudio/TECHNICAL.md",
@@ -262,8 +260,6 @@
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
-        "Sylin.Koan.Orchestration.Abstractions",
         "Sylin.Koan.ZenGarden.Core"
       ],
       "readme": "src/Connectors/AI/Ollama/README.md",
@@ -315,8 +311,6 @@
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
-        "Sylin.Koan.Orchestration.Abstractions",
         "Sylin.Koan.ZenGarden.Core"
       ],
       "readme": null,
@@ -896,42 +890,13 @@
       "targetFrameworks": [
         "net10.0"
       ],
-      "dependencies": [
-        "Sylin.Koan.Orchestration.Abstractions"
-      ],
+      "dependencies": [],
       "readme": "src/Koan.Core/README.md",
       "technicalDocumentation": "src/Koan.Core/TECHNICAL.md",
       "packageIcon": "0_2.jpg",
       "findings": [
         "docs.readme.boundaries.missing",
         "docs.readme.meaningful-use.missing",
-        "identity.icon.noncanonical",
-        "metadata.release-notes.generic",
-        "metadata.tags.generic"
-      ]
-    },
-    {
-      "packageId": "Sylin.Koan.Core.Adapters",
-      "projectPath": "src/Koan.Core.Adapters/Koan.Core.Adapters.csproj",
-      "shape": "library",
-      "role": "capability",
-      "status": "review-required",
-      "description": "Unified adapter framework for Koan: base classes, capability system, orchestration bridge, and development templates.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Orchestration.Abstractions"
-      ],
-      "readme": "src/Koan.Core.Adapters/README.md",
-      "technicalDocumentation": "src/Koan.Core.Adapters/TECHNICAL.md",
-      "packageIcon": "0_2.jpg",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.package-title.missing",
         "identity.icon.noncanonical",
         "metadata.release-notes.generic",
         "metadata.tags.generic"
@@ -1060,8 +1025,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Connector.Postgres",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.Relational",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Relational"
       ],
       "readme": null,
       "technicalDocumentation": null,
@@ -1086,10 +1050,8 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Connectors/Data/Couchbase/README.md",
       "technicalDocumentation": "src/Connectors/Data/Couchbase/TECHNICAL.md",
@@ -1118,8 +1080,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.SearchEngine",
-        "Sylin.Koan.Data.Vector.Abstractions",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": "src/Connectors/Data/ElasticSearch/README.md",
       "technicalDocumentation": "src/Connectors/Data/ElasticSearch/TECHNICAL.md",
@@ -1143,10 +1104,8 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Connectors/Data/InMemory/README.md",
       "technicalDocumentation": "src/Connectors/Data/InMemory/TECHNICAL.md",
@@ -1171,10 +1130,8 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Connectors/Data/Json/README.md",
       "technicalDocumentation": "src/Connectors/Data/Json/TECHNICAL.md",
@@ -1197,10 +1154,8 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Orchestration.Abstractions",
         "Sylin.Koan.ZenGarden.Core"
       ],
       "readme": "src/Connectors/Data/Mongo/README.md",
@@ -1227,8 +1182,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.SearchEngine",
-        "Sylin.Koan.Data.Vector.Abstractions",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": "src/Connectors/Data/OpenSearch/README.md",
       "technicalDocumentation": "src/Connectors/Data/OpenSearch/TECHNICAL.md",
@@ -1255,7 +1209,6 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Relational",
-        "Sylin.Koan.Orchestration.Abstractions",
         "Sylin.Koan.Orchestration.Aspire"
       ],
       "readme": "src/Connectors/Data/Postgres/README.md",
@@ -1281,7 +1234,6 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Orchestration.Abstractions",
         "Sylin.Koan.Orchestration.Aspire"
       ],
       "readme": "src/Connectors/Data/Redis/README.md",
@@ -1330,8 +1282,7 @@
       "dependencies": [
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.Relational",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Relational"
       ],
       "readme": "src/Connectors/Data/SqlServer/README.md",
       "technicalDocumentation": "src/Connectors/Data/SqlServer/TECHNICAL.md",
@@ -1355,7 +1306,6 @@
       "dependencies": [
         "Sylin.Koan.Cache.Abstractions",
         "Sylin.Koan.Core",
-        "Sylin.Koan.Core.Adapters",
         "Sylin.Koan.Data.Abstractions"
       ],
       "readme": "src/Koan.Data.Core/README.md",
@@ -1564,8 +1514,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
-        "Sylin.Koan.Data.Vector.Abstractions",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": "src/Connectors/Data/Vector/Milvus/README.md",
       "technicalDocumentation": "src/Connectors/Data/Vector/Milvus/TECHNICAL.md",
@@ -1592,8 +1541,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
-        "Sylin.Koan.Data.Vector.Abstractions",
-        "Sylin.Koan.Orchestration.Abstractions"
+        "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": null,
       "technicalDocumentation": null,
@@ -1649,7 +1597,6 @@
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
         "Sylin.Koan.Data.Vector.Abstractions",
-        "Sylin.Koan.Orchestration.Abstractions",
         "Sylin.Koan.ZenGarden.Core"
       ],
       "readme": "src/Connectors/Data/Vector/Weaviate/README.md",
@@ -2039,10 +1986,6 @@
       "technicalDocumentation": "src/Koan.Orchestration.Abstractions/TECHNICAL.md",
       "packageIcon": "0_2.jpg",
       "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
         "identity.icon.noncanonical",
         "metadata.release-notes.generic",
         "metadata.tags.generic"
