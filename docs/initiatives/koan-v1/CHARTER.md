@@ -4,10 +4,10 @@ domain: framework
 title: "Koan V1 Initiative Charter"
 audience: [architects, maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-13
-framework_version: v0.17.0
+last_updated: 2026-07-16
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-16
   status: reviewed
   scope: product mission, invariants, privacy, and session protocol
 ---
@@ -74,6 +74,17 @@ change references and configuration; it should not rewrite business rules.
    every layer.
 10. **Evidence before claims.** Public maturity follows reproducible repository evidence, not private
     use or implementation existence.
+11. **Intent-to-code mapping.** Capability design begins with the business sentence and smallest honest
+    application expression. Each visible concept maps to a real decision or guarantee; internal
+    composition machinery does not become application ceremony.
+12. **One decision owner.** Intrinsic complexity is centralized at the correct chokepoint. A slice
+    finishes by deleting superseded owners rather than preserving parallel paths.
+13. **Specificity cascade.** Mechanics rise only while their meaning remains identical; framework law,
+    capability-family mechanics, pillar policy, adapter realization, and application policy stay distinct.
+14. **Compile once, execute plans.** Structural composition is host-owned and memoized. Runtime paths
+    execute immutable plans rather than rediscovering contributors or renegotiating providers.
+15. **One model, truthful projections.** Startup, facts, health, errors, agent surfaces, and tests
+    project canonical decisions without becoming alternate decision owners.
 
 ## Non-goals
 
@@ -143,15 +154,19 @@ and provider ecosystems are primarily collaboration surfaces. Feature-count pari
 1. Read this charter, [`NOW.md`](NOW.md), [`PROGRESS.md`](PROGRESS.md), and the selected work card.
 2. Verify prerequisites against the repository, not only the ledger.
 3. Claim exactly one row in `PROGRESS.md`; record date and agent/model.
-4. Re-derive every load-bearing claim before editing.
-5. Keep the diff within the card's declared scope. If reality invalidates the card, use STOP rather
+4. State the user's business sentence, smallest honest application expression, guarantee, and
+   corrective failure before selecting internal types.
+5. Complete the focused discovery/coalescence assessment: current owner, repeated mechanics,
+   specificity, target owner, state lifetime, hot path, and delete/retain disposition.
+6. Re-derive every load-bearing claim before editing.
+7. Keep the diff within the card's declared scope. If reality invalidates the card, use STOP rather
    than forcing the planned work.
-6. Run the card's verification and the applicable acceptance layers.
-7. Update capability evidence only when the gate actually improves.
-8. Close the progress row and record divergences or operator gates.
-9. Replace `NOW.md` with a concise handoff that points to authoritative artifacts instead of copying
+8. Run the card's verification and the applicable acceptance layers.
+9. Update capability evidence only when the gate actually improves.
+10. Close the progress row and record divergences or operator gates.
+11. Replace `NOW.md` with a concise handoff that points to authoritative artifacts instead of copying
    their contents.
-10. End with the files changed, commands run, results, remaining risks, and exact next safe action.
+12. End with the files changed, commands run, results, remaining risks, and exact next safe action.
 
 ## Status and decision vocabulary
 

@@ -4,12 +4,12 @@ domain: observability
 title: "Inspect Koan Runtime Facts"
 audience: [developers, operators, maintainers, ai-agents]
 status: current
-last_updated: 2026-07-14
-framework_version: v0.17.0
+last_updated: 2026-07-16
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-14
+  date_last_tested: 2026-07-16
   status: verified
-  scope: module activation, default data-adapter election, and relationship negotiation vertical slices
+  scope: schema 2 decisions, guarantees, corrections, startup, HTTP, and MCP projections
 ---
 
 # Inspect Koan runtime facts
@@ -45,6 +45,10 @@ foreach (var fact in snapshot.Facts)
 
 Treat `Code`, `ReasonCode`, `Kind`, and `State` as machine fields. Treat `Summary` and `Correction` as
 human guidance whose exact wording may improve without a schema change.
+
+Schema 2 adds the explicit `guarantee` kind. A guarantee is a value-free statement compiled from a
+concern-owned plan or realization receipt. Startup selects guarantees by this kind—not by a pillar's
+fact code—while Web and MCP continue to project the complete envelope.
 
 ## Read facts over Web or MCP
 
@@ -82,6 +86,10 @@ Health impact follows `Kind`, not `State` alone. A request-level capability deci
 `rejected` because Koan safely refused an unbounded operation while the host remains healthy.
 `Rejection`/`Degradation` kinds and collection failures affect the runtime-facts health contributor.
 
+`guarantee` is an explanation category, not a health verdict. Read its stable capability tokens and
+reason alongside the named provider/realization bounds; do not infer confidentiality, topology,
+durability, or exactly-once behavior from an unrelated guarantee.
+
 ## Authoring rule
 
 Do not create ad hoc fact DTOs or copy provider payloads into this envelope. Add a typed contribution
@@ -91,10 +99,10 @@ with that provider.
 
 ## Current boundary
 
-The proved schema currently covers module activation, composition reporter failure, lockfile status,
-default data-adapter election, and child relationship execution/rejection. Relationship proof covers
-InMemory, JSON, and SQLite direct child edges; it is not a provider-fleet, recursive-graph, or request
-audit-history claim.
+The proved schema covers module activation, provider elections, lockfile status, hard-segmentation
+realizations, Communication and Jobs context guarantees, bounded relationship decisions, and reporter
+failures. It remains a current host explanation—not telemetry history, a provider-fleet certification,
+or proof that every discovered capability is healthy.
 
 ## References
 

@@ -8,6 +8,12 @@
 
 ---
 
+> **Implementation update (R10-01, 2026-07-17):** Lifecycle `Prior` is now the persisted value
+> captured before an operation begins and is exposed directly as `context.Prior`. The deferred
+> loader object was deleted because an `AfterUpsert` caller could otherwise execute its first read
+> after persistence and observe the new row. One stable snapshot makes handler phase irrelevant and
+> removes async/semaphore ceremony from application policy.
+
 > **Implementation update (2026-07-15):** [DATA-0107](DATA-0107-provider-bounded-entity-streams.md)
 > now satisfies the provider-query streaming prerequisite for SQLite, PostgreSQL, SQL Server,
 > CockroachDB, MongoDB, and Couchbase. InMemory, JSON, and Redis reject before query/yield. The
@@ -95,6 +101,14 @@
 > channel beside a local default; channel-qualified topology uses the pre-release v3 exchange. Dynamic
 > channels, authorization/filter semantics, branching, mirroring, failover, and RabbitMQ Events remain
 > non-claims.
+
+> **Implementation update (R09-06, 2026-07-16):** Core now compiles hard segmentation-to-carrier
+> obligations once per subject. Communication owns the thin terminal/ingress realization: Send/Raise
+> capture required context, provider election rejects insufficient or unknown immutable ingress trust,
+> and ingress restores then re-binds before application handlers. The in-process floor is host-trusted;
+> RabbitMQ is authenticated only after full-body HMAC verification. Facts distinguish logical context
+> from typed routing, shared physical topology, payload confidentiality, and settlement. The public
+> Entity grammar is unchanged.
 
 ## Context
 

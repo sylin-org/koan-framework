@@ -172,6 +172,16 @@
       href: ARCH-0113-entity-capability-communication.md
     - name: ARCH-0114 Layered capability activation
       href: ARCH-0114-layered-capability-activation.md
+    - name: ARCH-0115 Semantic Application Model and typed contribution compilation
+      href: ARCH-0115-semantic-contribution-compilation.md
+    - name: ARCH-0116 One module lifecycle
+      href: ARCH-0116-one-module-lifecycle.md
+    - name: ARCH-0117 Safe connector telemetry by construction
+      href: ARCH-0117-safe-connector-telemetry.md
+    - name: ARCH-0118 Evidence-derived product surface
+      href: ARCH-0118-evidence-derived-product-surface.md
+    - name: ARCH-0119 One console host lifecycle
+      href: ARCH-0119-one-console-host-lifecycle.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

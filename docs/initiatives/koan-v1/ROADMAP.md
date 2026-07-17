@@ -4,10 +4,10 @@ domain: framework
 title: "Koan V1 Reorganization Roadmap"
 audience: [architects, maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-13
-framework_version: v0.17.0
+last_updated: 2026-07-16
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-16
   status: reviewed
   scope: tranche dependencies and exit criteria
 ---
@@ -27,7 +27,8 @@ T0 Privacy and memory boundary
               -> T4 Foundation hardening
                   -> T5 Golden V0-to-V1 proof
                       -> T6 Capability-ring graduation
-                          -> T7 V1 release readiness
+                          -> T7A Semantic Composition Kernel
+                              -> T7B V1 release readiness
 ```
 
 Feedback may move from later tranches to earlier ones. A later tranche cannot declare an earlier exit
@@ -128,7 +129,22 @@ Capabilities graduate in this order unless evidence changes the dependency graph
 **Exit gate:** each ring meets [`ACCEPTANCE.md`](ACCEPTANCE.md), has a published support boundary, and
 does not depend on an ungraduated lower ring.
 
-## T7 — V1 release readiness
+## T7A — Semantic Composition Kernel
+
+**Outcome:** application intent compiles once through one Semantic Application Model into typed,
+host-owned execution plans and truthful projections without exposing framework machinery in normal
+business code.
+
+**Exit gate:**
+
+- every capability slice starts from its business sentence and smallest honest C# expression;
+- shared contribution/election mechanics have one owner while pillar semantics remain typed;
+- Tenancy proves a hard cross-pillar overlay and ZenGarden proves optional layered activation;
+- inactive capabilities remain inert, runtime paths execute compiled plans, and separate hosts remain isolated;
+- startup, facts, health, errors, agents, and tests project the same canonical decisions;
+- superseded registries, cross-pillar shortcuts, and post-hoc decision twins are deleted.
+
+## T7B — V1 release readiness
 
 **Outcome:** the public product, package set, upgrade contract, documentation, and actual implementation
 describe the same framework.
@@ -142,4 +158,5 @@ describe the same framework.
 - production guidance covers schema, deployment, recovery, diagnostics, and security posture;
 - public claims are generated from or linked to repository evidence;
 - experimental surfaces cannot be mistaken for foundation;
+- every maintained sample has graduated golden-example evidence or an explicit non-maintained disposition;
 - the architect makes an explicit V1 release decision.

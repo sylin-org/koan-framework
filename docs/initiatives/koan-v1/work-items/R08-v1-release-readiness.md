@@ -4,19 +4,19 @@ domain: framework
 title: "R08 - Make Koan V1 Responsibly Releasable"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
-last_updated: 2026-07-16
+last_updated: 2026-07-17
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-16
+  date_last_tested: 2026-07-17
   status: in-progress
-  scope: T7 entry assessment and dependency-ordered release-readiness plan
+  scope: R08-01 through R08-04 passed locally; R08-05 prepared; public observation and upgrade proof remain
 ---
 
 # R08 — Make Koan V1 responsibly releasable
 
-- Tranche: `T7 — V1 release readiness`
-- Status: `in-progress`
-- Depends on: R07
+- Tranche: `T7B — V1 release readiness`
+- Status: `pending R10 sample graduation and explicit remote authorization`
+- Depends on: passed R09; R08-01 preserves its completed release-wave baseline
 - Unlocks: one trustworthy public package generation, coherent package-first first use, and the
   explicit V1 decision
 - Owner: release-wave truth, public product boundary, upgrade contract, and release evidence
@@ -35,6 +35,17 @@ R07 closes the semantic capability ring. The remaining mismatch is promotion: lo
 clean-room applications are substantially stronger than the public installation surface. Publishing
 before that boundary is trustworthy would turn good framework code into a poor first-use experience
 and make package availability look like a support promise.
+
+## Interruption and resume boundary
+
+R08-01 is complete locally: Git-owned intent, historical inputs, exact release-wave escrow, resumable
+cross-event promotion, and six least-privilege workflow boundaries are implemented. No real package,
+tag, or Release was published.
+
+The accepted [R09 Semantic Composition Kernel](R09-semantic-composition-kernel.md) was a newly discovered
+prerequisite for the remaining product release. R09 is now passed: runtime decision owners, typed
+contribution/election mechanics, truthful projections, contract boundaries, and one module lifecycle have
+converged without redesigning the completed release mechanism. R08 resumes at **Safe public surface** below.
 
 ## T7 entry assessment
 
@@ -62,12 +73,12 @@ configuration changed.
   `src/Koan.AI/version.json` is corrected to `0.18`. Git remains the sole patch-identity owner.
 - The console template pins `Sylin.Koan` to `0.17.*` although the current bundle intent is `0.18`.
   Neither template is installed, instantiated, restored, built, and run by the clean-room gate.
-- Cross-event artifact/symbol recovery remains open as PMC-016. PMC-017 is closed by lineage schema
-  3, which retains normalized per-owner input maps and compares prior plus current ownership.
-- Build, test, and repository-controlled scripts currently run in the same job granted publication
-  permissions. Verification and promotion do not yet have a least-privilege boundary.
-- Connector-wide secret redaction remains unproved (PMC-019), so the first all-owner bootstrap is not
-  safe to interpret as a production-provider promotion.
+- PMC-016 and PMC-017 are closed locally. Lineage schema 3 retains prior/current input ownership; one
+  exact hash-bound GitHub Release escrow supplies resumable package and symbol custody.
+- The workflow now has six permission boundaries: proof is read-only, staging has contents write but no
+  OIDC credential, and promotion consumes exact prepared evidence with narrow write plus OIDC authority.
+- Connector-owned configuration, discovery, health-selection, and startup telemetry now crosses one
+  credential-safe structured boundary; PMC-019 is resolved by R08-02. This does not yet promote any provider.
 - There is no current public upgrade rehearsal, support window, rollback contract, or single
   evidence-derived provider/package maturity matrix. Stale public guides can still outrank the
   conservative capability ledger in navigation.
@@ -113,19 +124,31 @@ configuration changed.
 
 ## Dependency-ordered execution
 
-1. **R08-01 — one durable release wave.** Close PMC-016/017 under the existing compiler owner,
-   normalize current source intent, and separate unprivileged proof from narrow promotion.
-2. **Safe public surface.** Close or fail-closed gate PMC-019 and publish one evidence-backed package,
-   provider, platform, and maturity boundary instead of competing catalogs.
-3. **Package-first and upgrade proof.** Generate correct template identities; install, instantiate,
-   restore, build, and run both templates; rehearse a public-to-candidate upgrade and rollback; publish
-   the compatibility/support contract.
-4. **Observed release and decision.** With separate authorization, configure trusted publishing,
-   observe one automatic public wave and NuGet-only clean installs, then ask the architect for the
-   explicit V1 decision.
+1. **R08-01 — one durable release wave — passed locally.** PMC-016/017, canonical source intent,
+   exact escrow/recovery, and the six-job permission split are complete. Public observation is not.
+2. **R09 prerequisite — passed.** Compile the Semantic Application Model and converge runtime decision
+   owners without changing the completed release mechanism.
+3. **R08-02 — safe connector telemetry — passed.** PMC-019 is resolved through one shared redaction sink,
+   concern-owned logging chokepoints, runtime mutation proof, and a repository bypass gate.
+4. **R08-03 — canonical product surface — passed.** One fail-closed compiler joins standard evaluated
+   package facts to irreducible maturity/evidence claims and generates human/machine projections. The
+   obsolete package-kind taxonomy and manual catalog are deleted; PMC-010 is resolved.
+5. **R08-04 — package-first templates — passed locally.** Release-derived compatibility bands, suppressed
+   impact edges, direct-pack refusal, 108 exact candidate packages, both generated template shapes, and
+   package-only FirstUse/GoldenJourney are proved with no user version input.
+6. **[R10 — golden sample portfolio](R10-golden-samples.md) — in progress.** Graduate every maintained
+   sample as a current, executable Koan example; GardenCoop establishes the evidence template. R08-05 waits so
+   the first public wave does not publish a framework whose own curriculum teaches legacy structure.
+7. **[R08-05 — initial coherent public observation](r08/R08-05-initial-public-observation.md) — pending
+   explicit authorization.** One readiness/observation contract covers trusted publishing, immutable evidence
+   custody, exact package-only startup truth, NuGet-only installs, and fail-closed recovery. Preparation performs
+   no remote mutation.
+8. **Real upgrade/rollback proof.** Stage a later candidate, upgrade an application created from the coherent
+   public baseline, restore its prior project/lock state, and publish the compatibility/support contract.
+9. **Explicit V1 decision.** Ask the architect only after observed public and upgrade/rollback evidence agree.
 
-Only the current slice receives a child card. Later steps remain outcomes until their prerequisite
-evidence is green.
+Each active execution slice receives one bounded child card after focused discovery identifies its smallest
+decision owners. Open the upgrade/rollback child only after R08-05 establishes a coherent public baseline.
 
 ## Verification
 

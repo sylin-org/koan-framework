@@ -62,7 +62,7 @@ intent on the read side, but both were lost crossing the `Vector<T>` boundary. T
 | # | Site | What it knows | What it persists |
 |---|------|---------------|------------------|
 | **W1** | [EmbeddingWorker.cs:271](../../src/Koan.Data.AI/Workers/EmbeddingWorker.cs#L271) | `metadata.Model ?? job.Model`, `metadata.Source` — used at 254-268 for cost + telemetry | `null` metadata |
-| **W2** | [Koan.Data.AI/Initialization/KoanAutoRegistrar.cs:475](../../src/Koan.Data.AI/Initialization/KoanAutoRegistrar.cs#L475) | synchronous embed hook; same lifecycle metadata in scope | `null` metadata |
+| **W2** | [DataAiModule.cs](../../src/Koan.Data.AI/Initialization/DataAiModule.cs) | Entity Lifecycle embedding hook; same lifecycle metadata in scope | `null` metadata |
 | **W3** | [EmbeddingMigrator.cs:250](../../src/Koan.Data.AI/Migration/EmbeddingMigrator.cs#L250) | `targetModel`/`targetSource`/`targetProvider` — the migration *is* a model change; written to `EmbeddingState.Model` at 264 | `null` metadata |
 
 The provenance survived only in **out-of-band sidecars** (`EmbeddingState<T>` keyed by entity id;
@@ -163,7 +163,7 @@ parser, same operator-aware capabilities. No new filter dialect.
 
 **Write (provenance):**
 - `Koan.Data.Vector` owns the reserved `__embedding.*` key constants; `Koan.Data.AI` owns provenance construction because it owns lifecycle model/source intent.
-- W1 `EmbeddingWorker`, W2 `KoanAutoRegistrar`, and W3 `EmbeddingMigrator` call one internal `EmbeddingWriter`; only that writer selects the embedding source/model and crosses the vector persistence seam.
+- W1 `EmbeddingWorker`, W2 `DataAiModule`, and W3 `EmbeddingMigrator` call one internal `EmbeddingWriter`; only that writer selects the embedding source/model and crosses the vector persistence seam.
 - W4: model-mismatch guard + "models in index" diagnostic on the vector read/health path.
 
 **Read (forwarding):**

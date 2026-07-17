@@ -13,7 +13,7 @@
 | Stage tag  | Purpose                                                     | Typical emitters                                      | Default severity                                                   |
 | ---------- | ----------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------ |
 | `[K:BLDG]` | Compiler and build diagnostics surfacing before host start. | `dotnet` build output, Roslyn diagnostics.            | `warning` / `error` as produced.                                   |
-| `[K:BOOT]` | Module discovery and registrar execution.                   | `KoanAutoRegistrar`, module auto-loaders.             | `info` (success), `warn` on fallback.                              |
+| `[K:BOOT]` | Constitution compilation and module activation.              | `KoanModule`, module loader.                           | `info` (success), `warn` on fallback.                              |
 | `[K:CNFG]` | Configuration and orchestration decisions.                  | `ServiceDiscoveryCoordinator`, adapter configurators. | `info` with key/value context, `warn` on fallback.                 |
 | `[K:SNAP]` | Rich blocks summarizing environment or version state.       | `KoanEnv`, version inventory.                         | `info` block with ruler.                                           |
 | `[K:DATA]` | Data surface readiness and schema guard activity.           | `SqliteRepository`, `EntitySchemaGuard`.              | `info` condensed summaries, promote table/optimization decisions.  |
@@ -30,7 +30,7 @@ Each stage token is a fixed four-character code rendered inside the brackets so 
    ```text
    21:07:38 info [K:CNFG] sqlite.discovery -> success source=local candidate="Data Source=./data/app.db" latency=132ms src=SqliteDiscoveryAdapter
    21:07:37 warn [K:CNFG] sqlite.discovery -> fallback reason="health check timeout" fallback="Data Source=Data/Koan.sqlite" src=SqliteDiscoveryAdapter
-   21:07:38 info [K:BOOT] registrar.init -> loaded module=Koan.Data.Connector.Sqlite src=KoanAutoRegistrar
+   21:07:38 info [K:BOOT] module.activate -> loaded module=Koan.Data.Connector.Sqlite src=SqliteDataModule
    ```
 
 2. **Aggregated debug counts** – emit once per stage to replace repetitive debug spam.
@@ -63,16 +63,17 @@ Each stage token is a fixed four-character code rendered inside the brackets so 
 
 ## Stage helper API
 
-`Koan.Core.Logging` now exposes `KoanLogStage` plus `ILogger` extensions so contributors can emit the fixed-format lines without handcrafting tokens.
+`Koan.Core.Logging` exposes `KoanLog` as the framework-owned structured logging boundary. Use its
+stage verbs so contributors do not handcraft tokens and connector context receives the framework's
+credential-safety policy before Microsoft logging dispatch.
 
 ```csharp
 using Koan.Core.Logging;
 using Microsoft.Extensions.Logging;
 
 // Action + outcome + extra context
-logger.LogKoanStage(
-   KoanLogStage.Cnfg,
-   LogLevel.Information,
+KoanLog.ConfigInfo(
+   logger,
    action: "sqlite.discovery",
    outcome: "success",
    ("source", "local"),
@@ -80,10 +81,27 @@ logger.LogKoanStage(
    ("latency", TimeSpan.FromMilliseconds(132)));
 
 // Shorthand helpers for common severities
-logger.LogKoanStageInfo(KoanLogStage.Srvc, "background.start", "started", ("count", 9));
-logger.LogKoanStageWarning(KoanLogStage.Cnfg, "sqlite.discovery", "fallback", ("reason", "timeout"));
-logger.LogKoanStageDebug(KoanLogStage.Hlth, "probe.detail", null, ("name", "SchedulingOrchestrator"));
+KoanLog.ServiceInfo(logger, "background.start", "started", ("count", 9));
+KoanLog.ConfigWarning(logger, "sqlite.discovery", "fallback", ("reason", "timeout"));
+KoanLog.HealthDebug(logger, "probe.detail", null, ("name", "SchedulingOrchestrator"));
 ```
+
+### Connector safety boundary
+
+Koan-owned connector configuration, discovery, health-selection, and startup telemetry must cross
+`KoanLog`. The sink de-identifies string, `Uri`, and exception context once, using `Redaction` as the
+single credential grammar. Connector authors pass the original structured value; they do not add a
+provider-specific sanitizer or flatten exceptions into interpolated prose.
+
+```csharp
+KoanLog.ConfigDebug(logger, "adapter.discovery.decision", "candidate",
+    ("provider", "postgres"),
+    ("connection", connectionString));
+```
+
+This is an exact boundary, not a global logging claim. Koan does not sanitize arbitrary application
+logs, provider-driver internals, third-party logging providers, or business payloads. Those values remain
+their owners' responsibility. See [ARCH-0117](../decisions/ARCH-0117-safe-connector-telemetry.md).
 
 ## Bootstrap step delineation (proposal)
 
@@ -144,11 +162,11 @@ Bootstrap telemetry should read as three clear steps: invite, inspect, and decla
 
 ## Developer experience guardrails
 
-- Emit stage tags via the `ILogger` extensions (`logger.LogKoanStageInfo(KoanLogStage.Cnfg, ...)`) so contributors do not handcraft prefixes.
+- Emit framework decisions through `KoanLog` (`KoanLog.ConfigInfo(...)`, `KoanLog.HealthDebug(...)`) so contributors do not handcraft prefixes or bypass connector redaction policy.
 - Promote `info` messages only when a decision changes runtime behavior (e.g., selected connection string). Leave iterative attempts at `debug` or `trace`.
 - Ensure fallback paths (`warn`) state the reason, fallback target, and next action to unblock operators.
 - For multi-line snapshots, pad columns and keep width under 100 columns to avoid wrapping in standard consoles.
-- Lean on structured logging (`logger.LogInformation("{Stage} {Action}...", stage, action, ...)`) so sinks can query `Stage` even when rendered with textual tags.
+- Keep values in structured context tuples so sinks can query them without interpolating configuration or exception prose.
 
 ## Edge cases
 
@@ -169,8 +187,8 @@ Bootstrap telemetry should read as three clear steps: invite, inspect, and decla
 ## Sample end-to-end startup excerpt
 
 ```text
-21:07:36 info [K:BOOT] registrar.init -> loaded module=Koan.Core.Adapters src=KoanAutoRegistrar
-21:07:36 info [K:BOOT] registrar.init -> loaded module=Koan.Data.Connector.Sqlite src=KoanAutoRegistrar
+21:07:36 info [K:BOOT] module.activate -> loaded module=Koan.Core.Adapters src=CoreAdaptersModule
+21:07:36 info [K:BOOT] module.activate -> loaded module=Koan.Data.Connector.Sqlite src=SqliteDataModule
 21:07:36 info [K:CNFG] sqlite.discovery -> delegating adapter="SqliteDiscoveryAdapter" src=ServiceDiscoveryCoordinator
 21:07:37 warn [K:CNFG] sqlite.discovery -> fallback reason="autonomous discovery failed" fallback="Data Source=Data/Koan.sqlite" src=SqliteDiscoveryAdapter
 21:07:37 info [K:DATA] schema.ensure -> create entity="g1c1.GardenCoop.Models.Plot" provider="sqlite" src=EntitySchemaGuard

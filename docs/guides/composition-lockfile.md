@@ -119,10 +119,10 @@ guessing from loaded assemblies. Package and project identities are preserved as
 with their origin; connector declarations will map the identities they support.
 
 > **Source-checkout note.** A `ProjectReference` does not import a referenced package's build assets.
-> Koan's FirstUse and GoldenJourney source contracts import the same target centrally through the
-> repository build, while their package-only copies receive it through `buildTransitive`. Other
-> source-only framework dogfood projects must explicitly import the target or set
-> `KoanComposition=false`; package consumers need no project-file ceremony.
+> The Koan repository sets `UseKoanSource` once for the executable sample tree, and its root build imports the
+> same composition target centrally. Sample project files therefore remain package-shaped and never repeat a
+> source-only import. Source applications elsewhere in the repository may opt into that bridge with
+> `UseKoanSource=true`; package consumers receive it automatically through `buildTransitive` and need no ceremony.
 
 ## Drift gates
 
@@ -135,28 +135,18 @@ Two independent checks, each catching a different failure:
   `lockfile ok | DRIFT(<keys>)`. Drift keys read as a diff: `+Id` loaded but not locked, `-Id` locked
   but absent, `Id@ver` changed.
 
-## Enrich the twin (advanced)
+## Runtime enrichment boundary
 
-Pillars contribute their runtime-resolved sections through a discovered seam — referencing the pillar
-is what makes the lockfile describe it. The data pillar ships the `data:default` election this way; a
-custom pillar can add its own:
+Koan's active retained modules project their own canonical plans and receipts into the resolved twin
+through `KoanModule.ReportComposition`. The same generated instance owns registration, typed
+structural contribution, startup, provenance, and evidence; there is no separate reporter discovery,
+factory, or DI enumerable. Capability-package authors may override that method to project already-made
+safe decisions. Application code and adapters do not register composition reporters.
 
-<!-- validate -->
-```csharp
-using System;
-using Koan.Core.Composition;
-
-// Discovered automatically (the interface is [KoanDiscoverable]); no manual registration.
-public sealed class MyPillarComposition : IKoanCompositionContributor
-{
-    public void Contribute(KoanCompositionBuilder builder, IServiceProvider services)
-    {
-        builder.AddElection("search:default", adapter: "opensearch", via: "reference-priority");
-        builder.AddCapability("search:opensearch", new[] { "query.filter", "vector.knn" });
-        // Contributions are best-effort: never throw — a failure must not break the boot report.
-    }
-}
-```
+For review, compare two complete resolved twins as structured JSON. Koan's bounded comparer considers
+modules, direct references, elections, capabilities, configuration keys, and Entities when both models
+contain those sections. It reports stable added/removed/changed identities and never compares runtime
+fact prose, timestamps, sessions, correlation IDs, configuration values, or business data.
 
 ## Limits (by design, honest)
 

@@ -142,7 +142,7 @@ The understand-pass confirmed, by hand: **Koan ships the isolation *mechanism* b
 - **Auth:** none. No `UseAuthentication`/`UseAuthorization`, no `[Authorize]`. Fully anonymous → ambient tenant resolves to the dev default. Ties into D1.
 - **CORS:** `AllowAnyOrigin + AnyMethod + AnyHeader` with a "credentials for SignalR" comment that is actually incompatible with `AllowAnyOrigin`. Revisit for the SSE migration.
 - **Static hosting:** `UseStaticFiles` + `MapFallbackToFile("index.html")` serves the SPA; `window.open()` downloads/exports depend on these resolving server-side; `DownloadPhoto` 302s to `/storage/{Key}`. Preserve.
-- **ZenGarden:** Reference = Intent (auto-registrar calls `AddKoanZenGarden()` binding config from DI). The explicit `AddKoanZenGarden(builder.Configuration)` in `Program.cs` is **redundant** and goes. The model-advisor diagnostic logging moves into `SnapVaultModule.Start`.
+- **ZenGarden:** Reference = Intent through the descriptor-backed module; `AddKoan()` is the complete activation path. Module-specific activation in `Program.cs` is unsupported. The model-advisor diagnostic logging moves into `SnapVaultModule.Start`.
 
 ---
 

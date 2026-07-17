@@ -4,12 +4,12 @@ domain: framework
 title: "Koan Framework Architecture Principles"
 audience: [architects, developers, ai-agents]
 status: current
-last_updated: 2026-07-13
+last_updated: 2026-07-17
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-17
   status: reviewed
-  scope: alignment with product constitution and current bootstrap implementation
+  scope: alignment with product constitution, standard module identity/dependency derivation, and contracts boundary
 ---
 
 # Koan Framework Architecture Principles
@@ -65,6 +65,12 @@ deterministic topological ordering (`[Before]`/`[After]`). Embedded intent manif
 loading, assembly-closure loading, and loose-module fallback preserve participation across deployment
 shapes. These mechanisms are tactical; predictable activation and explanation are the contract.
 
+Reference intent follows ordinary .NET dependency boundaries. A Koan-defined contract consumed by
+another module lives in an isolated `*.Core`, `*.Abstractions`, or `*.Contracts` project with no
+`KoanModule`; referencing it cannot activate functionality. The functional project implements those contracts
+and contains its activation module; referencing it expresses participation. Project-reference activation
+metadata or an equivalent escape hatch is not an accepted substitute for separating contracts from functionality.
+
 ### Capability-graded provider transparency **(consolidation era — ARCH-0084)**
 
 Same entity code across SQLite, Postgres, SQL Server, MongoDB, Couchbase, Redis, JSON-file, and
@@ -109,6 +115,11 @@ The framework is measured in **developer-facing concepts**, not projects. A part
 only if a dogfood application reaches for it naturally, or removing it forces ceremony back into
 an app. Overlap is collapsed where ≥2 real usages prove it; speculative abstraction is resisted;
 scaffolding from the feasibility phase is cut, not lovingly refactored.
+
+Standard .NET facilities and metadata are the default substrate. Koan creates a new concept only when
+the BCL, hosting, DI, options, logging, health, MSBuild, or NuGet model cannot express the required
+semantic guarantee. Framework-specific metadata must not restate information already available from
+ordinary project structure or package identity.
 
 ### 2 · Deterministic configuration, explicit hierarchy
 

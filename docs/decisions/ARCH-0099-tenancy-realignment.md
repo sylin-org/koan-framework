@@ -1,5 +1,10 @@
 # ARCH-0099: Tenancy realignment — dev-open/prod-closed posture, first-owner onboarding, the mandatory mode ladder, and tenant-as-native-container
 
+> **R09 product-support amendment (2026-07-16):** The current proven floor is shared-row Data plus
+> Cache key/tag and Storage path-prefix segmentation, all compiled from one Core dimension. Native
+> container/database-per-tenant placement, relocation, and migration remain future realizations; this
+> ADR's mode ladder is strategic direction, not a claim that every rung is currently supported.
+
 - Status: Accepted (2026-06-22)
 - Deciders: Enterprise Architect
 - Supersedes / amends: **ARCH-0095** (tenancy — posture default, the owner-admin rejection, the mode-ladder priority), **ARCH-0096 §5** (tenant is now a *name* particle, leading), **DATA-0105 §1** (tenant storage isolation is the per-adapter native container, not a relational schema-qualifier only). Reconciles these against **DATA-0094** (native partition container — Accepted, and the more general model). Grounded in prior-art research (workflow `wf_94dbd26f-e67`, 4 web-verified clusters) + a code-and-docs audit (`wf_c789391c-72e`).

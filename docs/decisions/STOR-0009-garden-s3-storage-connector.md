@@ -1,4 +1,13 @@
 ---
+
+## Current implementation boundary
+
+As of 2026-07-16 this ADR is only partially realized. The S3 provider and its S3 operations, bucket
+naming, explicit endpoint configuration, and lazy two-hop garden storage lookup ship. S3 does **not**
+accept `zen-garden://` connection intents, does not participate in offering discovery, and does not use
+an offering-binding contract. `GardenAwareEndpointManager<TConnection>` exists in `Koan.ZenGarden`, but
+the S3 provider is not currently wired through it; the resilient decorator described below is not a
+supported product surface. Treat those portions as target design, not current instructions.
 id: STOR-0009
 slug: STOR-0009-garden-s3-storage-connector
 domain: STOR
@@ -64,19 +73,19 @@ Fallback — Explicit configuration:
 
 Note: the port catalog endpoint (GET /api/v1/stone/storage/s3/ports, STORAGE-0016 §4) is diagnostic-only. Koan consumers use SSE-based discovery exclusively — the tool snapshot already contains connection.port and connection.uris.
 
-5. S3StorageOptionsConfigurator handles zen-garden:// resolution
+5. Current S3 endpoint resolution
 
-- Follows the MongoOptionsConfigurator pattern (STOR-0001).
-- Parses connection string: zen-garden://storage or zen-garden://storage:images. The single-colon separator in the connection URI is mapped to the Zen Garden double-colon FQN convention (storage::images) by ZenGardenConnectionIntent.TryParse().
-- Routes to ZenGardenInitializationProvider.ResolveAsync(intent) for endpoint resolution.
-- Falls back to S3StorageOptions.Endpoint if resolution fails.
+- `S3StorageOptionsConfigurator` binds explicit S3 settings only.
+- `S3StorageProvider` resolves lazily at first use because application identity is not ready during options binding.
+- Explicit `Koan:Storage:Providers:S3:Endpoint` wins.
+- Without an explicit endpoint, the provider uses the active Zen Garden client's bound Moss endpoint and the garden storage APIs to locate the primary storage stone and its S3 block.
+- Failure is corrective; no `zen-garden://` URI or offering fallback is advertised.
 
-6. ZenGarden offering binding
+6. Storage is not an offering binding
 
-- S3ZenGardenOfferingBinding: AdapterId="s3", Offering="seed-bank".
-- ToolType filter: ZenGardenToolType.SeedBank (not Offering).
-- Uses ZenGardenStorageSurface for catalog and subscription (not OfferingSurface).
-- Prerequisite: ZenGardenSubscription.ForStorage(name) must produce a ToolFqid that correctly matches seed-bank snapshots whose fqid is "seed-bank:{name}". Currently ForStorage("storage") produces ToolFqid{OfferingType="storage"} which does not match snapshot fqid "seed-bank:storage" parsed as ToolFqid{OfferingType="seed-bank", Instance="storage"}. Fix: ForStorage must prepend "seed-bank:" before parsing, yielding ToolFqid{OfferingType="seed-bank", Instance=name}. This is a bug in ZenGardenSubscription that must be fixed before this ADR's discovery flow works.
+- Storage remains a first-class garden concept and uses the storage catalog/API.
+- Adapter service-name/alias contribution applies to service discovery; it is not reused for seed-bank or storage topology merely for symmetry.
+- A future Storage contribution target must be earned from matching Storage semantics and lifecycle.
 
 7. GardenAwareEndpointManager in Koan.ZenGarden
 

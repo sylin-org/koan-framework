@@ -4,12 +4,12 @@ domain: framework
 title: "Koan Product Constitution"
 audience: [architects, developers, maintainers, ai-agents]
 status: current
-last_updated: 2026-07-13
-framework_version: v0.17.0
+last_updated: 2026-07-17
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-17
   status: reviewed
-  scope: product identity, constitutional principles, and proposal decision test
+  scope: product identity, constitutional principles, contract/implementation boundary, and proposal decision test
 ---
 
 # Koan Product Constitution
@@ -49,6 +49,13 @@ application workflows belong on their own explicit surfaces.
 A module reference declares that its capability should participate in composition. Koan owns its
 registration, safe defaults, and explanation. Environment-specific commitments—credentials,
 availability, topology, durability, security posture, and cost—remain explicit.
+
+Every Koan-defined contract intended for consumption by another module **must** live in an isolated
+contract assembly (`*.Core`, `*.Abstractions`, or `*.Contracts`) that contains no activating module.
+Functional assemblies contain the implementation and its `KoanModule`. Consumers reference the
+contract assembly for vocabulary and the functional assembly only when they intend activation. Koan
+does not use `Inert` reference metadata to compensate for a contract placed in an implementation
+assembly; that is a package-boundary defect to correct.
 
 Reference = Intent is a product contract, not a mandate for one discovery implementation. Build-time
 registries, manifests, and runtime fallbacks may collaborate as long as activation remains predictable
@@ -104,6 +111,12 @@ known limitations, packaging, and a compatibility expectation.
 
 Private downstream experience can generate questions. Only anonymous, repository-owned evidence can
 answer them publicly.
+
+Code presented as an active sample is therefore a product contract, not a scratchpad or historical
+illustration. Every active sample must be a golden example of the preferred Koan application grammar,
+good .NET practice, a meaningful business result, truthful limitations, and executable evidence. Work
+that has not reached that bar may be incubated or archived during migration, but it must not be presented
+as supported curriculum.
 
 ## A meaningful step
 

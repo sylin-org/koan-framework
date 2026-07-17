@@ -1,46 +1,81 @@
 # NuGet publishing
 
 Every push that advances `dev`—direct or merged—is a release event. The
-[release-on-dev workflow](../../.github/workflows/release-on-dev.yml) derives independently versioned
-packages from Git, proves the exact artifacts, and publishes without routine operator input.
+[release-on-dev workflow](../../.github/workflows/release-on-dev.yml) finishes any incomplete prior
+package wave, derives independently versioned packages from Git, proves exact artifacts, and promotes
+them without routine operator input.
 
 ## One-time setup
 
-Configure [nuget.org trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing)
-for this GitHub repository and `release-on-dev.yml`, then set the repository Actions variable
-`NUGET_USER` to the nuget.org package owner. GitHub OIDC produces a short-lived API key; there is no
-committed or long-lived publishing secret.
+Before the first authorized public wave:
 
-If trusted publishing is absent or `NUGET_USER` is empty, publication fails red. It never creates a
-release tag or reports success without registry convergence.
+1. Configure [nuget.org trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing)
+   for this repository and `release-on-dev.yml`.
+2. Set the repository Actions variable `NUGET_USER` to the nuget.org package owner. GitHub OIDC then
+   produces a short-lived API key; no committed or long-lived publishing secret is used.
+3. Enable immutable Releases for the GitHub repository. The workflow token cannot read the
+   administration-level repository setting, so this is an explicit one-time prerequisite. Promotion
+   accepts terminal success only when GitHub reports the published Release as immutable.
+4. Protect `dev`, the release workflow, and `automation/package-lineage-dev` according to the
+   repository's release trust policy. Workflow code and immutable Release custody are the attestation
+   boundary.
+
+If trusted publishing is absent, `NUGET_USER` is empty, the exact draft is not prepared, or the final
+Release is mutable, the workflow fails red. Do not introduce a long-lived API key or mutable evidence
+as a workaround.
+
+This implementation cycle completed local failure simulations and workflow contract tests, but did
+not perform a real NuGet publication or observe a real immutable Release. The first public run remains
+a separately authorized operation after the prerequisites above are verified.
+
+## Six permission boundaries
+
+The workflow separates proof, GitHub mutation, and credential use into six jobs:
+
+| Job | Permission boundary | Responsibility |
+| --- | --- | --- |
+| `prepare_prior` | contents read | Serialize the event; inspect, materialize, and prove any incomplete prior version wave. |
+| `stage_prior` | contents write | Stage only the exact prior bundle and marker on its draft Release. |
+| `promote_prior` | contents write + OIDC | Recheck prepared prior escrow, request a short-lived credential, and converge the prior wave. |
+| `prove_current` | contents read | Compile lineage, run the release ratchet, pack, clean-room test, and build current escrow. |
+| `stage_current` | contents write | Persist the exact lineage candidate and stage the exact current draft escrow. |
+| `promote_current` | contents write + OIDC | Recheck prepared current escrow, request a short-lived credential, and converge the current wave. |
+
+Build/test/pack work has neither `contents:write` nor `id-token:write`. Staging has no OIDC
+credential. Promotion consumes the previously built coordinator and handoff; it does not restore,
+compile, test, or rebuild source.
 
 ## What happens
 
-1. Check out the `dev` source event with full history, then wait for every earlier requested, queued,
-   waiting, pending, or running release event. Serialization happens before version calculation.
-2. Fetch the prior `automation/package-lineage-dev` tip. The compiler applies the exact prior-source
-   to current-source tree delta onto that linear version history.
-3. Bootstrap every owner once, or detect breaking `version.json` tiers and mapped shared-input
-   consumers; write markers only for affected owners that would otherwise retain their prior identity.
-   The one-time bootstrap evaluates the preceding `dev` source's package inventory with the pinned
-   toolchain. If that predecessor cannot be evaluated, lineage compilation fails before packing or
-   publication; automation does not guess a historical inventory.
-4. Commit and push the exact `VersionCommit`. Its state records every package/version identity;
-   `release-lineage.json` records it separately from the developer's `SourceCommit`.
-5. Run the complete green ratchet at that version commit with the repository-pinned SDK, public
-   versioning, high/critical advisory warnings as errors, and a clean tracked-tree assertion.
-6. Compile `release-set.json` from `PreviousVersionCommit` to `VersionCommit`, verify it against the
-   committed lineage state, and reconcile current identities missing from nuget.org.
-7. Pack every selected identity in dependency order, inspect metadata/symbols/ranges/hashes, and run
-   FirstUse plus GoldenJourney outside the checkout against only the staged package feed.
-8. Publish in dependency order. Existing nupkgs are reconciled rather than replaced; symbols replay,
-   transient pushes retry, registry visibility is awaited, and `release-state.json` advances after
-   each complete identity.
-9. Only after convergence, create or verify `release/dev/<12-character-source-commit>` as a
-   non-forced tag at the exact version commit, then attach lineage, manifest, and state evidence.
+1. `prepare_prior` waits for every earlier active `dev` release event. Serialization happens before
+   version calculation.
+2. It inspects the previous durable `VersionCommit`. A prepared prior wave is promoted first; a
+   missing or markerless prior wave is reconstructed only while no selected nupkg is public. Public
+   identity without exact prepared escrow fails closed.
+3. `prove_current` applies the exact prior-source to current-source delta onto
+   `automation/package-lineage-dev`. Bootstrap covers every owner once; later events select direct
+   changes, breaking reverse dependents, mapped shared-input consumers, and current identities absent
+   from nuget.org.
+4. The exact lineage candidate is tested with the public-release ratchet. `release-set.json` is
+   compiled from committed lineage truth, packages are packed in dependency order, and FirstUse plus
+   GoldenJourney run outside the checkout against only the staged feed.
+5. `wave-bundle` creates `release-wave-<full-VersionCommit>.zip` containing lineage, manifest, all
+   selected nupkg/snupkg files, and both application proofs. `release-wave.json` binds its exact hashes,
+   package count, version commit, and `release/dev/<full-VersionCommit>`.
+6. `stage_current` persists the exact lineage commit, creates one draft GitHub Release, uploads the
+   ZIP first, and uploads the marker last. The uploaded marker becomes authority and is never replaced.
+7. After a second prepared-state check, OIDC supplies the NuGet credential. Promotion follows manifest
+   dependency order, pushes a missing nupkg, always replays each required exact snupkg with
+   duplicate-safe semantics, and waits until every nupkg is visible.
+8. One deterministic `release-completion.json` binds the prepared marker, bundle, lineage, manifest,
+   and package/symbol hashes. Promotion re-reads the complete draft, creates or verifies the
+   non-forced full-commit tag, publishes the same draft, and requires GitHub to report it immutable.
 
-When no identity needs publication, lineage/build/test/plan still run and the workflow exits green
-without publishing or tagging.
+There is no per-package remote checklist, abbreviated tag, or artifact rebuild after partial public
+publication. The immutable Release is exact binary custody; NuGet is the package availability surface.
+
+When no identity needs publication, lineage can still advance, but the workflow creates no
+release-wave ZIP, draft Release, tag, or completion receipt.
 
 ## Happy path
 
@@ -49,53 +84,61 @@ push or merge to dev
 ```
 
 The workflow summary lists the source/version commits, breaking closure, generated markers, and each
-selected package's previous version, resulting version, and reason. A completed release has:
+selected package's previous version, resulting version, and reason. A completed non-empty wave has:
 
 - a green `Release packages from dev` run;
-- attached `release-lineage.json` and `release-set.json` that distinguish developer source from
-  shipped version truth; and
-- a `release/dev/<source-commit>` release targeted at the version commit after registry visibility
-  was confirmed.
+- immutable Release assets containing exact lineage, manifest, packages, symbols, and application
+  evidence;
+- one exact completion receipt; and
+- `release/dev/<full-VersionCommit>` targeted at that same full version commit.
 
-No package selection, patch calculation, tag, or credential copy/paste belongs in the happy path.
+No package selection, patch calculation, recovery choice, tag, or credential copy/paste belongs in
+the happy path.
 
 ## Failure → recovery
 
 ### Build, test, pack, audit, or clean-room failure
 
-Read the first failed step. Fix the source, metadata, dependency, or advisory and advance `dev` again.
-No package artifact was published and no release tag was created. The compiled version lineage remains
-durable; the later source event advances from it and registry reconciliation closes unpublished gaps.
+Read the first failed step, fix the source/metadata/dependency/advisory, and advance or re-run `dev`.
+No current-wave package artifact was published and no current-wave marker or tag was created. Prior
+recovery may already have converged in the same run. The previous lineage remains durable; the failed
+current candidate has not yet been persisted remotely.
 
-### Publish stopped partway through
+### Draft staging stopped
 
-Re-run the failed workflow before a later lineage event advances. The same source event resolves to
-the same durable version commit. Every selected identity is repacked under the pinned toolchain and
-verified again; public nupkgs are reconciled (including symbol replay), missing identities continue in
-dependency order, and state advances only after each identity is available. Never build different
-source under the same ID/version; cross-run artifact-hash retention is not claimed.
+A draft with no uploaded marker is `staging`. Automation may delete and rebuild that draft only after
+confirming that none of its selected nupkgs is public. A marker left in GitHub's `starter` state is not
+authority and follows the same reset path.
 
-If a later lineage event has already advanced after a partial nupkg/symbol publication, the current
-workflow does not yet certify cross-event artifact recovery. Treat that as red operational debt; do
-not claim success from nupkg visibility alone or hand-pack a replacement. The bounded successor is
-tracked as [PMC-016](../initiatives/koan-v1/POST-CYCLE-TODO.md#current-register).
+Once `release-wave.json` is uploaded, the draft is prepared authority. Missing, tampered, conflicting,
+or unknown assets then fail closed; automation never replaces the marker or bundle. The exact
+completion asset alone may be deleted and retried when GitHub left it in `starter` state.
 
-### A later event is waiting
+### Package, symbol, visibility, or response failed
 
-This is expected. Each push remains its own event, and the entire lineage/release operation waits for
-earlier active events rather than canceling or overtaking them. A completed or failed earlier event no
-longer holds the queue; a later source contains the earlier source delta and advances from the last
-durable lineage tip.
+Re-run the workflow or let the next `dev` event start. `prepare_prior` inspects the prior full
+`VersionCommit` before current compilation. It downloads the original escrow, skips an nupkg already
+visible, always replays every required exact snupkg, waits for the entire manifest, and emits the one
+completion receipt. No operator chooses a package, artifact path, or old commit.
+
+An immutable published completion remains historical custody evidence. A later nuget.org outage or
+package unlisting does not reinterpret that completed wave.
 
 ### nuget.org visibility times out
 
-Re-run after the registry recovers. The compiler queries the registry before publication, and publish
-checks again before every push, so an identity that became visible after timeout is reconciled safely.
+Retry after the registry recovers. If the push succeeded before the timeout, the next attempt observes
+the nupkg, skips repushing it, replays exact symbols, and waits again.
 
 ### Trusted-publishing exchange fails
 
-Verify the nuget.org policy names this repository/workflow and that `NUGET_USER` names its owner. Do
-not add a long-lived key as a workaround.
+Verify that the nuget.org policy names this repository/workflow and `NUGET_USER` names its owner. Do
+not add a long-lived key.
+
+### Published Release is not immutable
+
+Treat this as a failed release boundary, not success. Do not move the tag, replace assets, or create a
+second Release. Verify the one-time repository setting before any first publication; if this failure is
+ever observed, stop subsequent waves and review the remote state explicitly.
 
 ## Local diagnosis
 
@@ -103,23 +146,22 @@ not add a long-lived key as a workaround.
 dotnet run --project tools/Koan.Packaging -- inventory
 ```
 
-`inventory` is read-only. `lineage` intentionally creates and switches branches, so reproduce the
-workflow only in a clean disposable checkout using the
-[packaging tool sequence](../../tools/Koan.Packaging/README.md).
-
-Local `publish` exists for controlled recovery/testing and requires an explicitly named short-lived
-credential, but it is not the normal release path.
+`inventory` is read-only. `lineage` creates and switches branches; reproduce compilation only in a
+clean disposable checkout using the [packaging tool sequence](../../tools/Koan.Packaging/README.md).
+`wave-stage` and `wave-promote` mutate remote state and are not local recovery commands.
 
 ## Anti-patterns
 
 - Do not skip an individual `dev` release event or batch releases by commit-message convention.
 - Do not pack every repository package and call that selection; pack the exact compiled set.
 - Do not ignore a pack failure and publish the remaining files.
-- Do not disable audit, edit lineage/manifest evidence, or publish artifacts from another commit.
-- Do not create the release tag before registry convergence.
+- Do not disable audit, edit lineage/manifest/marker evidence, or publish artifacts from another
+  commit.
+- Do not create, shorten, move, or force the release tag by hand.
+- Do not replace uploaded release-wave assets or introduce a mutable per-package checklist.
 - Do not calculate versions before the release queue lease or create merge commits on the linear
   package-lineage branch.
-- Do not treat `SourceCommit` as package metadata; `VersionCommit` owns the shipped bits.
+- Do not treat `SourceCommit` as package metadata; `VersionCommit` owns the shipped bits and tag.
 
 See [versioning.md](versioning.md), [packaging.md](packaging.md), and
 [ARCH-0110](../decisions/ARCH-0110-dev-release-compiler.md).

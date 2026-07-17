@@ -5,6 +5,12 @@
 - Deciders: framework architect
 - Related: ARCH-0084 (capability model / Reference=Intent), ARCH-0086 (KoanModule + source-gen discovery), the P1.1 composition lockfile, the `X-aot-substrate` single-file work (`8531bef6`), `S2.Sovereign-proof`
 
+> **Implementation update (R10-01, 2026-07-17):** GardenCoop revalidated the win-x64 native path
+> and exposed two documentation/runtime gaps. `KoanFactJson` now uses its own source-generated
+> serialization context, so the public facts endpoint remains available when reflection serialization
+> is disabled. Public guidance now distinguishes a self-contained native deployment directory from a
+> physical single-file claim; static assets and native connector libraries may remain beside the executable.
+
 ## Context
 
 The sovereign-floor mission (P5.1) is "every capability satisfied by an **in-process** resource, in a single deployable with no container runtime." The single-file (JIT) leg shipped first (`8531bef6`): boot discovers Reference=Intent connectors that single-file bundling hides via an embedded `koan.modules.manifest` + `Assembly.Load`.

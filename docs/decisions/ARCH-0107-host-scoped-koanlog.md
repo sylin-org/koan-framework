@@ -65,8 +65,9 @@ provider, configuration, or disposable runtime state.
 
 - One ambient owner now governs Entity statics, application identity, and façade logging.
 - Concurrent host-aware flows can emit to different logger factories without cross-routing.
-- `StartKoan()` gains façade logging through its existing `AppHost` lease without starting a special
-  hosted bridge.
+- `StartKoan()` gains façade logging through its existing `AppHost` lease. ARCH-0119 later replaced
+  the raw-provider bootstrap with the standard Generic Host lifecycle; no logging-specific bridge was
+  introduced.
 - Each façade call performs one ambient provider lookup. `ILoggerFactory` remains responsible for
   efficient category logger reuse.
 - Registrar calls made before any host owns `AppHost` remain intentionally silent; this decision does
@@ -84,3 +85,4 @@ behavior.
 - [ARCH-0057 — KoanLog façade and stage logging centralization](ARCH-0057-koanlog-facade-and-stage-logging.md)
 - [Koan product constitution](../architecture/product-constitution.md)
 - [R04-02 host-scoped runtime](../initiatives/koan-v1/work-items/r04/R04-02-host-scoped-runtime.md)
+- [ARCH-0119 — one console host lifecycle](ARCH-0119-one-console-host-lifecycle.md)

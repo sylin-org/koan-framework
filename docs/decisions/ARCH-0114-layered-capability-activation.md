@@ -9,9 +9,8 @@
 Every layerable Koan capability follows one lifecycle:
 
 1. The base concern provides a complete minimal implementation and remains useful by itself.
-2. An adapter may declare typed compatibility metadata for an optional engine. Declaration is inert.
+2. An adapter declares only concern-neutral identity and protocol behavior; optional engines remain unknown to it.
 3. Referencing the engine and running `AddKoan()` activates the engine through Reference = Intent.
-   Explicit engine registration is the equivalent advanced opt-in.
 4. The engine contributes typed candidates, policies, or providers through the concern-owned seam.
 5. The concern-owned coordinator applies precedence, health, context, and fallback policy.
 6. The adapter interprets the elected value for its protocol and reports provider-specific health.
@@ -28,7 +27,7 @@ different concern boundary and proves why the same lifecycle cannot apply.
 | Owner | Responsibility |
 |---|---|
 | Base concern | Minimal local provider, semantic contract, coordinator, precedence, context, fallback, facts |
-| Adapter | Compatibility declaration, protocol conversion, normalization, health validation |
+| Adapter | Neutral identity/aliases, protocol conversion, normalization, health validation |
 | Optional engine | Activation and typed contribution only |
 | Application | Business intent and explicit overrides; no integration glue |
 
@@ -57,8 +56,8 @@ a weaker mechanism merely to keep startup green; that failure posture belongs to
 
 The same decision must be legible from three viewpoints:
 
-- the adapter's module report states that compatibility is declared;
-- the optional engine's module report states that contribution is active;
+- the adapter's module report states its autonomous capability;
+- the optional engine's retained module and compiled-plan facts state that contribution is active;
 - the coordinator records the selected method or rejection as a credential-redacted runtime fact.
 
 Reports distinguish `declared`, `active`, and `selected`; they do not infer activation from metadata or
@@ -66,9 +65,10 @@ selection from package presence.
 
 ## Current service-discovery realization
 
-- `IZenGardenOfferingBinding` is adapter-owned compatibility metadata.
-- `Koan.ZenGarden` activates `IDiscoveryCandidateContributor` only when its engine is registered.
-- `ServiceDiscoveryCoordinator` folds contributions into the shared probe.
+- a hidden invariant `IContributeTo<DiscoveryContributionTarget>` binds the retained Zen Garden module to the concern-owned target.
+- the generated descriptor dispatches the exact retained module only when direct Reference = Intent activates it.
+- adapter service names and aliases are the neutral selectors; there is no engine-specific binding map.
+- Core compiles one immutable host plan, then `ServiceDiscoveryCoordinator` queries its retained live sources per operation.
 - `ServiceDiscoveryAdapterBase` owns the non-replaceable candidate pipeline.
 - adapters may customize only environment inputs, runtime topology, normalization, and health.
 - `DiscoveryCandidatePriority` names and constrains the shared precedence slots.
@@ -80,7 +80,7 @@ the candidate mesh without changing application code.
 
 Every layerable adapter proves:
 
-- declaration without engine activation is inert;
+- transitive contract presence without direct engine activation is inert;
 - activation adds exactly the intended typed contribution;
 - explicit configuration wins over every automatic layer;
 - an unhealthy contribution falls through to the next eligible candidate;

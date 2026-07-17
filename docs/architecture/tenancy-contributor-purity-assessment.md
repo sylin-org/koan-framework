@@ -1,5 +1,10 @@
 # Tenancy contributor-purity assessment — is it a golden example?
 
+> **Historical assessment, superseded by ARCH-0115 / R09-05 (2026-07-16).** Its problem discovery
+> remains useful, but its implementation claims describe the deleted Data-owned model. Current Tenancy
+> contributes one Core hard-segmentation dimension; Data, Cache, and Storage own separate compiled
+> realizations and value-free coverage receipts.
+
 - Date: 2026-06-24
 - Standard (architect): tenancy MUST be a golden example of the contributor model — **zero bespoke tenancy code in the framework core**; tenancy = registered contributors over **generic** seams; the seams generic enough that a future **Moderation** capability (its own field + a context filter, possibly **non-equality** row-visibility) plugs in identically, never touching a core pipeline.
 - Method: 4-auditor evidence-based sweep (`wf_8a2f7cf4-758`) — data filter/stamp, cache key, cross-assembly grep, and the Moderation thought-experiment. Every claim file:line-grounded.

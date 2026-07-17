@@ -4,10 +4,10 @@ domain: framework
 title: "Koan V1 Reorganization Acceptance Gate"
 audience: [architects, maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-13
-framework_version: v0.17.0
+last_updated: 2026-07-16
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-16
   status: reviewed
   scope: initiative work-item acceptance criteria
 ---
@@ -36,9 +36,30 @@ evidence, or truthful-support requirements.
 
 Failure in this section is `BLOCK`, regardless of the rest of the scorecard.
 
+## 0A. Semantic and coalescence entry gate — mandatory before production edits
+
+- State the user's business sentence, smallest honest C# expression, and complete user action surface:
+  references, code, decorations, configuration, context, and runtime prerequisites.
+- Name the exact guarantee that expression creates and the corrective result when it cannot be met.
+- Justify every additional public concept as a real business decision, required guarantee, or deliberate
+  override; framework assembly vocabulary is not a justification.
+- Map the current decision owner, consumers, state lifetime, hot-path cost, and repeated mechanics.
+- Decide the target specificity level: framework law, capability family, pillar, adapter, or application.
+- Record a `keep`, `absorb`, `rebuild`, or `delete` disposition for the closest existing pattern.
+- Identify the one target owner, compiled/runtime state boundary, red proof, and deletion list.
+- Evaluate human readability, IntelliSense discovery, and coding-model legibility.
+- Minimize distinct application concepts and cognitive branches, not physical lines or tokens. Hidden
+  prerequisites count as ceremony.
+
+Production implementation before this record is complete is `STOP`, not exploration-by-editing.
+
 ## 1. Meaningful outcome and business density
 
 - The user-visible result is stated before implementation detail.
+- The common path maps intent to code as nearly 1:1 as semantic honesty permits; departures from the
+  golden `AddKoan` / `Entity<T>` / `EntityController<T>` example are explicitly justified.
+- For changed application-facing behavior, a focused fixture compiles and, where meaningful, runs the
+  complete representative action surface.
 - Each step leaves a coherent, useful application state rather than scaffolding debt.
 - The common-path application code reads primarily as business language.
 - Ceremony removed from the application is owned, explained, and diagnosable by Koan rather than
@@ -83,6 +104,15 @@ documentation and diff validation remain required.
 - External-framework research identifies whether Koan should adopt, adapt, integrate, complement, or
   decline each relevant idea; similarity alone is not a reason to copy.
 - New abstractions earn their cognitive and maintenance cost.
+- Repeated mechanics have one owner at the narrowest level where their meaning remains identical.
+- Superseded decision paths, registries, and post-hoc projections are deleted; compatibility does not
+  leave two canonical owners.
+- Structural work compiles into host-owned immutable plans and does not recur on ordinary operations.
+
+For a changed common path, the objective proof is: representative usage compiles; every visible
+concept maps to a named decision or guarantee; no provider, DI, registry, compiler, or contributor
+vocabulary appears; IntelliSense has one canonical front door; and failure names the unmet intent and
+safe correction.
 
 ## 6. Support, upgrade, and removal
 
@@ -101,6 +131,10 @@ Add this block to the work item when closing it:
 
 - Outcome: PASS | BLOCK | STOP
 - Date and commit:
+- Application intent and complete public expression:
+- Guarantee / correction:
+- Coalescence disposition:
+- Ergonomics proof:
 - Evidence:
 - Tests / validation:
 - Unsupported scenarios:

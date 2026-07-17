@@ -37,7 +37,7 @@ The two do not trade off. Truthful, independent, bump-on-change numbers (Axis 1)
 package-affecting commit, mapped shared-input change, or generated compatibility marker is **not**
 republished. This is the anti-spam guarantee.
 
-This *supersedes* ARCH-0082's two-tier (kernel-lockstep) model. The reason two-tier existed was to keep the abstraction contract surface coherent and avoid a compatibility matrix among independently-versioned packages — but **§3's compatibility ranges now provide that guarantee directly and more precisely** (an incompatible pair fails to resolve regardless of version numbers). With ranges in place, lockstep added only cost: in nbgv it would require all 14 abstraction packages to carry identical `pathFilters` lists and be bumped together, a fragile, manual operation. So the kernel/periphery split no longer drives versioning. `build/kernel-manifest.txt` and `$(KoanPackageKind)` survive only as informational metadata (what is "contract surface"), not as a version lever.
+This *supersedes* ARCH-0082's two-tier (kernel-lockstep) model. The reason two-tier existed was to keep the abstraction contract surface coherent and avoid a compatibility matrix among independently-versioned packages — but **§3's compatibility ranges now provide that guarantee directly and more precisely** (an incompatible pair fails to resolve regardless of version numbers). With ranges in place, lockstep added only cost: in nbgv it would require all 14 abstraction packages to carry identical `pathFilters` lists and be bumped together, a fragile, manual operation. So the kernel/periphery split no longer drives versioning. ARCH-0118 subsequently deleted `$(KoanPackageKind)` entirely; evaluated standard project facts now describe package shape while product claims own maturity.
 
 Trade-off accepted: there is no longer a single "kernel version" number to cite; each abstraction package versions on its own cadence. Consumers reason about compatibility through the ranges, not through a coordinated kernel number.
 
@@ -115,6 +115,7 @@ The skew was *fatal* only because DATA-0096 **hard-deleted** a type. Pre-1.0, ke
    and fails before packing if any required member remains stale or is absent from the exact plan.
 
 ## Non-goals
-- `kernel-manifest.txt` / `$(KoanPackageKind)` are retained only as informational "contract surface" metadata; they no longer drive versioning (see §1).
+- `$(KoanPackageKind)` was subsequently deleted by ARCH-0118; it is neither authoring nor
+  informational metadata. `kernel-manifest.txt` does not drive versioning (see §1).
 - No `Koan.Sdk` metapackage (a later option for consumers who want a single pinned version surface).
 - No retroactive re-tagging of already-published 0.8.x packages.

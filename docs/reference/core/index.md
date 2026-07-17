@@ -58,19 +58,16 @@ builder.Services.AddKoan();
 ### Custom Modules
 
 ```csharp
-public class MyModule : IKoanAutoRegistrar
+public sealed class MyModule : KoanModule
 {
-    public string ModuleName => "MyModule";
-    public string ModuleVersion => "1.0.0";
-
-    public void Initialize(IServiceCollection services)
+    public override void Register(IServiceCollection services)
     {
         services.AddScoped<IMyService, MyService>();
     }
 }
 ```
 
-That's it. Your module registers automatically when referenced.
+That's it. Identity is derived from the package/assembly; the module activates automatically when referenced.
 
 ## Health Checks
 

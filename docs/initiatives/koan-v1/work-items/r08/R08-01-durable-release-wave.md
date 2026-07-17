@@ -8,14 +8,14 @@ last_updated: 2026-07-16
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-16
-  status: in-progress
+  status: passed
   scope: cross-event recovery, historical package inputs, and least-privilege promotion boundary
 ---
 
 # R08-01 — Make one release wave the complete durable truth
 
-- Tranche: `T7 — V1 release readiness`
-- Status: `in-progress`
+- Tranche: `T7B — V1 release readiness`
+- Status: `passed`
 - Depends on: R08 entry assessment, R07-03, and R07-04
 - Unlocks: connector security closure and a trustworthy first public package wave
 - Owner: `Koan.Packaging` and the serialized `dev` release workflow
@@ -75,16 +75,14 @@ privileged single workflow job; both must be corrected at this owner before its 
   set on the eventual draft GitHub Release before requesting a NuGet credential; publishing that
   same release is the single durable completion transition.
 
-### OPEN
-
-- Determine the minimum workflow job split that removes publish credentials from repository builds
-  without duplicating compilation or verification logic.
-
 ### PROVED
 
 - Two direct packs of the same project at the same HEAD produced different SHA-256 hashes for both
   nupkg and snupkg. Exact rebuild is not an artifact-recovery mechanism; the original verified bytes
   must survive until package, symbol, and final release completion converge.
+- Six jobs are the minimum honest authority split for prior/current recovery: read-only proof,
+  contents-write staging, and contents-write-plus-OIDC promotion for each wave. Promotion consumes the
+  prepared coordinator/handoff and never restores, compiles, tests, packs, or rebuilds source.
 
 ## Scope
 
@@ -154,12 +152,13 @@ No step asks a maintainer for a package ID, version, old commit, artifact path, 
 ## Acceptance additions
 
 - PMC-017 acceptance passes without operator input: add, change, rename, and deletion of an evaluated
-  external packed file select only its owner from the prior/current input-map union. PMC-016 remains
-  the active acceptance scenario.
+  external packed file select only its owner from the prior/current input-map union. PMC-016 also
+  passes locally through exact-escrow and cross-event failure-injection evidence.
 - Every privileged workflow permission is absent from build/test/proof jobs and present only where
   consumed.
 - Replaying the same source or advancing a later source cannot lose an earlier package/symbol stage.
-- The tracked tree is clean except for intentional ignored/untracked evidence under `tmp/`.
+- Verification leaves no unexpected/generated tracked drift. Intentional closure/governance documents
+  are enumerated in the handoff; ignored/untracked evidence under `tmp/` is never staged.
 
 ## Stop conditions
 
@@ -185,3 +184,31 @@ No step asks a maintainer for a package ID, version, old commit, artifact path, 
 - Schema 2 fails closed because its missing historical arbitrary-input ownership cannot be inferred.
   The T7 audit found no promoted automatic lineage, so the first trusted run can bootstrap directly
   into schema 3; any subsequently discovered remote v2 tip requires an explicit migration decision.
+
+### 2026-07-16 — exact escrow and resumable promotion
+
+- Commit `f450a7efe` adds one deterministic release-wave bundle and marker that bind exact lineage,
+  manifest, nupkg/snupkg, application evidence, source/version commits, and full-commit tag.
+- Commit `d3f43923b` adds GitHub Release escrow and one resumable coordinator. It derives state from the
+  exact Release, reconciles a prior wave before a later wave, validates every byte, replays symbols,
+  waits for package visibility, emits one completion receipt, and fails closed on conflicting custody.
+- Commit `546817ee0` separates prior/current proof, staging, and promotion into six workflow jobs.
+  Build/test/pack has no publish authority; staging has no OIDC credential; promotion does not rebuild.
+- Failure-injection, escrow, bundle, NuGet target, coordinator, and workflow-structure tests were
+  recorded green when the commits landed. The companion ADR and operator/tooling documentation now
+  describe the same authority and recovery model.
+- No release certification rerun, NuGet publication, tag, GitHub Release, or remote configuration
+  mutation was part of closure. Real immutable-Release observation remains an R08 operator-gated step.
+
+## Acceptance result
+
+- Outcome: PASS
+- Date and commit: 2026-07-16; `4acff8b3b` through `546817ee0`
+- Evidence: lineage schema 3, exact wave bundle/marker, GitHub Release escrow, resumable coordinator,
+  NuGet promotion target, and six-job workflow contract
+- Tests / validation: focused packaging, real-Git lineage, failure-injection, and workflow contract
+  evidence recorded with the implementation; documentation/diff validation is repeated at R09 kickoff
+- Unsupported scenarios: no real public wave or immutable Release has been observed; trusted publishing,
+  repository configuration, package-first upgrade, and support policy remain R08 work
+- Follow-up work: preserve this baseline through R09, then resume R08 at Safe public surface
+- Reviewer: maintainer-authorized autonomous implementation

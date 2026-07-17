@@ -82,25 +82,63 @@ FirstUse and GoldenJourney are copied outside the repository and restore only Pa
 the staged feed. They prove the shortest meaningful result and the cumulative persistence/jobs/agent/
 operator journey without project references or repository build props making it pass accidentally.
 
-### 5. Publication is exact, ordered, and resumable
+### 5. Exact binary escrow precedes publication
 
-Only exact artifacts that passed verification are publishable. Packages are pushed in project
-dependency order. Existing nupkgs are reconciled while their symbol artifact is replayed, transient
-pushes retry, registry visibility is confirmed before dependents continue, and version-keyed
-`release-state.json` records progress. Re-running the same source resolves the same durable version
-commit and converges instead of minting a replacement set.
+For a non-empty manifest, verification produces one
+`release-wave-<full-VersionCommit>.zip`. Its exact entry set is lineage, manifest, all selected
+nupkg/snupkg artifacts, and the separate FirstUse and GoldenJourney evidence. For one fixed set of
+exact inputs, canonical entry names, order, timestamps, lengths, and hashes give the ZIP deterministic
+encoding. A standalone `release-wave.json` binds the ZIP, its inner lineage/manifest hashes, package
+count, source/version commits, and canonical tag. Recovery preserves that escrow; it does not assume a
+later build from the same commit will recreate identical evidence metadata.
 
-nuget.org trusted publishing exchanges the workflow's GitHub OIDC identity for a short-lived
-credential. A missing trusted-publishing owner is a hard failure. No long-lived API key is stored and
-no release is reported successful when publication was skipped.
+The workflow creates one draft GitHub Release, uploads the ZIP first, and uploads the marker last. The
+uploaded marker is prepared authority: it is never replaced or rebuilt. A missing or markerless draft
+may be reset only while no selected nupkg is public. Once any selected identity is public, missing
+prepared escrow is a hard block.
 
-### 6. Evidence follows success
+State is derived from that one Release:
 
-For a non-empty release set, the workflow creates `release/dev/<source-commit>` and a GitHub release
-only after the entire release set is available. It creates or verifies the tag ref itself at
-`VersionCommit` without force, then uses that existing exact tag; lineage, manifest, and final state
-are attached. An empty set exits successfully without a tag or release.
-Tags are audit evidence; they never drive package versions or publication.
+- `missing`: no Release uses the exact tag;
+- `staging`: a draft has no uploaded marker;
+- `prepared`: the draft's exact marker and bundle validate;
+- `published`: the same Release has the exact completion receipt, full-commit tag, and immutable bit.
+
+Recovery needs no secondary database or operator-maintained archive. The only in-place repair is an
+exact completion asset left by GitHub in `starter` state; uploaded assets are never clobbered.
+
+### 6. Publication is exact, ordered, and recoverable across events
+
+Promotion downloads and revalidates the original escrow. Packages are processed in manifest
+dependency order. A missing nupkg is pushed; every required exact snupkg is replayed using
+duplicate-safe semantics on each nonterminal attempt; every nupkg must become visible. One
+deterministic `release-completion.json` then binds the marker, bundle, lineage, manifest, and
+package/symbol hashes.
+
+Promotion re-reads the complete draft immediately before the final boundary, creates or verifies
+`release/dev/<full-VersionCommit>` at the exact `VersionCommit` without force, and publishes that same
+draft. Terminal success requires GitHub to report the Release immutable. The completion receipt is
+historical custody evidence; later registry outage or unlisting does not reopen it.
+
+Before compiling the current source wave, automation inspects and converges the prior durable
+`VersionCommit`. A package push followed by symbol, receipt, visibility, or response failure is
+therefore completed from the original prior escrow even after a later `dev` event arrives. It is never
+rebuilt under an already-public identity.
+
+nuget.org trusted publishing exchanges GitHub OIDC identity for a short-lived credential only after
+prepared escrow is rechecked. A missing trusted-publishing owner is fatal. No long-lived API key is
+stored. An empty manifest advances lineage as required but creates no bundle, draft Release, tag, or
+receipt.
+
+### 7. Proof, staging, and promotion have separate authority
+
+The workflow has six permission boundaries: read-only `prepare_prior`, write-only `stage_prior`,
+write-plus-OIDC `promote_prior`, read-only `prove_current`, write-only `stage_current`, and
+write-plus-OIDC `promote_current`.
+
+Build, test, pack, and clean-room proof never receive contents-write or OIDC permission. Staging never
+receives a NuGet credential. Promotion consumes the already-built coordinator and exact handoff; it
+does not restore, compile, test, or rebuild source.
 
 ## Consequences
 
@@ -110,40 +148,47 @@ Tags are audit evidence; they never drive package versions or publication.
 - Unchanged packages are neither rebuilt nor republished during steady-state operation; a generated
   marker means the dependency compatibility contract changed even though application source did not.
 - An artifact newly pushed by the verified run is the artifact that passed metadata, closure,
-  advisory, and clean-room behavior checks. An immutable identity already present in the registry is
-  existence-reconciled; cross-run byte-hash retention is not claimed.
-- Agents and reviewers can inspect one deterministic manifest instead of reverse-engineering logs.
-- Interrupted same-source publication has an explicit, idempotent identity-reconciliation path.
-  Cross-event artifact recovery after a later lineage advancement remains uncertified and is tracked
-  as [PMC-016](../initiatives/koan-v1/POST-CYCLE-TODO.md#current-register).
+  advisory, and clean-room behavior checks. Original verified bytes survive in draft/immutable Release
+  escrow until nupkg, symbols, receipt, and tag converge.
+- Agents and reviewers can inspect one canonical manifest, bundle marker, and completion receipt
+  instead of reverse-engineering logs or mutable recovery checklists.
+- Interrupted publication is recovered automatically before the next source wave is compiled; an
+  operator never selects the failed package, old commit, or artifact path.
+- Expensive proof and credentialed mutation no longer share one job authority.
 
 ### Trade-offs and boundaries
 
 - The first run may reconcile an accumulated set of unpublished current identities and will be much
   larger than steady-state releases.
 - nuget.org cannot provide a multi-package transaction. Dependency ordering, visibility waits,
-  immutable identities, and resumable convergence provide atomic *release behavior*, not registry
-  rollback.
+  immutable identities, exact escrow, and resumable convergence provide atomic *release behavior*,
+  not registry rollback.
 - A deliberate major/minor compatibility decision still belongs in `version.json`; automation does
   not infer semantic breaking intent.
-- Package deletion/rename, reserved lineage paths on `dev`, non-forward source history, and manual
-  lineage divergence are initially unsupported and fail before packing.
+- Package-owner rename, reserved lineage paths on `dev`, non-forward source history, and manual
+  lineage divergence are unsupported and fail before packing. Package deletion is explicit retirement;
+  mapped external input add/change/delete/rename remains owner-local.
 - The dedicated version branch is an automation projection, not an application-development branch.
   Source ancestry is recorded explicitly rather than merged into its topology.
-- Same-source rerun replays selected symbols/state from the same version commit. If a later lineage
-  event has already advanced after a partial symbol publication, automatic cross-event artifact
-  recovery is not yet certified and the missing symbol may remain undetected by that later event. The
-  first trusted publication remains gated by
-  [PMC-016](../initiatives/koan-v1/POST-CYCLE-TODO.md#current-register).
+- GitHub's workflow token cannot read the administration-level immutable-Releases setting. Enabling
+  it is a one-time repository prerequisite verified before the separately authorized first public
+  wave; terminal publication still fails closed unless the resulting Release reports immutable.
+- Completion schema 1 is durable history. Any future receipt evolution must add schema-dispatched
+  readers and preserve a frozen schema-1 fixture before changing canonical bytes.
+- The implementation and adversarial simulations are complete locally, but no real NuGet publication
+  or immutable GitHub Release was observed in this implementation cycle.
 
 ## Operational contract
 
-The one-time setup is a nuget.org trusted-publishing policy for this repository/workflow and the
-`NUGET_USER` repository variable. After that, the normal release instruction is simply:
+The one-time setup is a nuget.org trusted-publishing policy for this repository/workflow, the
+`NUGET_USER` repository variable, immutable GitHub Releases, and the repository's protected release
+trust boundary. After the separately authorized first public observation, the normal release
+instruction is simply:
 
 ```text
 push or merge a package-affecting commit into dev
 ```
 
 Failure is red and actionable. Fix the source or infrastructure problem and re-run the failed event;
-do not hand-pack a replacement set or create a release tag.
+the next event also reconciles any incomplete prior wave before compiling current work. Do not
+hand-pack a replacement set, edit escrow assets, or create/move the release tag.

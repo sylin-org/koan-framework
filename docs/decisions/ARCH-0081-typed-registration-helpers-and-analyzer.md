@@ -12,6 +12,11 @@
 > registrations. References below to the coherence helper and analyzer target describe the
 > architecture at the time of this decision and are superseded by ARCH-0075's R07-12 amendment.
 
+> **R09-02 amendment (2026-07-16).** `Koan.Core.Registry.Generators` remains a Roslyn project/build
+> boundary, but it is no longer an independently packed product. `Sylin.Koan.Core` owns and delivers
+> that generator through its `buildTransitive` tools. The standalone-packaging comparison below is
+> historical; `Koan.Cache.Analyzers` retains its independently earned package identity.
+
 ---
 
 ## Context
@@ -36,7 +41,7 @@ The helper is a behavior guard rail — adapter authors who use it can't get the
 ### Forces
 
 1. **Mechanical fix isn't enough.** A previously-broken pattern can be reintroduced verbatim by anyone unaware of the history. The framework's adapter ecosystem is open — third-party adapters won't have the same review pressure.
-2. **Roslyn analyzers are the framework's existing tool of choice.** `Koan.Core.Registry.Generators` already ships source-gen infrastructure as a Roslyn component (`IsRoslynComponent = true`, netstandard2.0, packed as `analyzers/dotnet/cs`). Adding an analyzer follows the existing pattern.
+2. **Roslyn analyzers are the framework's existing tool of choice.** At the time of this decision, `Koan.Core.Registry.Generators` shipped source-generation infrastructure as an independently packed Roslyn component (`IsRoslynComponent = true`, netstandard2.0, packed as `analyzers/dotnet/cs`); R09-02 now delivers that DLL only inside `Sylin.Koan.Core`. Adding an analyzer follows the established Roslyn pattern.
 3. **Diagnostic specificity matters.** A blanket "no `TryAddEnumerable` with factory" is too aggressive — there are legitimate use cases. The framework only cares about its own interfaces (`ICacheStore`, `ICacheCoherenceChannel`, etc.) where it ships typed helpers.
 4. **Compile-time errors > runtime errors > integration-test catches.** The earlier the bug surfaces, the cheaper it is to fix. Analyzers give compile-time errors.
 

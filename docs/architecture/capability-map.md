@@ -35,7 +35,7 @@ validation:
 
 ## Orientation: reference = intent
 
-Koan embraces a simple contract: referencing a package expresses intent, and `AddKoan()` activates the capability automatically. The runtime scans for `IKoanAutoRegistrar` implementations, so you compose your application by adding packages:
+Koan embraces a simple contract: referencing a package expresses intent, and `AddKoan()` activates its generated `KoanModule` descriptor automatically. You compose an application by adding packages:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);

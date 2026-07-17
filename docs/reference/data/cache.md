@@ -72,7 +72,10 @@ var report = await Cache.WithJson<UsageReport>("report:" + tenantId)
 ```
 
 Use `[CachePolicy]` when a custom key template, tier, strategy, tags, or provider pin is genuinely needed.
-Provider pins match `ICacheStore.Name`.
+Provider pins match `ICacheStore.Name` exactly (case-insensitive) and fail closed when unavailable. Within
+each Local/Remote tier, provider priority and then stable provider identity make automatic selection
+deterministic; DI registration order does not decide. Startup facts report the selected `cache:local` and
+`cache:remote` receipts as well as the resulting topology.
 
 ## Request-scoped behavior
 

@@ -883,19 +883,20 @@ public class Order : Entity<Order>
 ### 3. Custom Data Providers
 
 ```csharp
-// Add support for new storage backend
-public class CosmosDbAutoRegistrar : IKoanAutoRegistrar
+// Add support for a new data backend
+public sealed class CosmosDbModule : KoanModule, IKoanAspireResources
 {
-    public bool CanRegister(IServiceCollection services, IConfiguration config)
+    public override void Register(IServiceCollection services)
     {
-        return config.GetSection("Koan:Data:CosmosDb").Exists();
-    }
-
-    public void Register(IServiceCollection services, IConfiguration config)
-    {
-        services.Configure<CosmosDbOptions>(config.GetSection("Koan:Data:CosmosDb"));
+        services.AddKoanOptions<CosmosDbOptions>("Koan:Data:CosmosDb");
         services.AddSingleton<IDataProvider<CosmosDb>, CosmosDbProvider>();
     }
+
+    public void RegisterAspireResources(
+        IDistributedApplicationBuilder builder,
+        IConfiguration configuration,
+        IHostEnvironment environment)
+        => builder.AddAzureCosmosDB("cosmos");
 }
 ```
 

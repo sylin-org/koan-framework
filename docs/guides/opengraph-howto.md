@@ -16,7 +16,7 @@ until you register a card and call `UseOpenGraphCards()`.
 
 ## 2. Register a card per entity type
 
-In your `IKoanAutoRegistrar.Initialize` or `Program.cs` startup, declare one card per
+In your application's `Program.cs`, or in `KoanModule.Register` for a reusable package, declare one card per
 type. Each `For<T>` supplies the three facts the framework cannot infer: the route
 template (your SPA router owns it), the resolver (token to entity), and the
 projections (entity to card fields).

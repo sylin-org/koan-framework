@@ -1,14 +1,23 @@
 ---
 id: STOR-0011
 title: "Storage blob-key axis isolation — the data-axis model on the blob path"
-status: Accepted
+status: Superseded
 date: 2026-06-24
 relates_to: [ARCH-0101, DATA-0105, DATA-0106, ARCH-0096, ARCH-0099, ARCH-0100, STOR-0001]
 supersedes_design: docs/architecture/tenancy-storage-vector-isolation-design.md (§0.4)
 revision: v2 — chokepoint relocated to IStorageService after design review wf_ac5a1e07-54a; implemented + impl-diff reviewed (wf_03ef19e6-88c)
+superseded_by: [ARCH-0115, R09-05]
 ---
 
 # STOR-0011 — Storage blob-key axis isolation
+
+> **Superseded by ARCH-0115 / R09-05 (2026-07-16).** `ScopedStorageService` remains the correct
+> all-verbs chokepoint, but Storage no longer reads Data registries, locates `AppHost`, or enumerates
+> `IStorageGuard`. `StorageIdentityPlan` binds Core's host-owned hard-segmentation plan once per
+> operation and owns safe logical↔physical path translation. `StorageKeyScoper` and the Tenancy-owned
+> Storage guard are deleted. Current proof is `StorageTenantIsolationSpec` (12 focused real-host cases,
+> including raw/typed/host/list/transfer/range/presign). The body below is retained as historical rationale,
+> not current implementation guidance.
 
 > **R07 context amendment (2026-07-15):** Blob-key scoping still reads Data-axis value providers and
 > guards; it no longer treats the durable carrier bag as the ambient value source. Cross-hop carriage

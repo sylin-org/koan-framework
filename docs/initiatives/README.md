@@ -4,10 +4,10 @@ domain: framework
 title: "Koan Initiatives"
 audience: [architects, maintainers, ai-agents]
 status: current
-last_updated: 2026-07-13
-framework_version: v0.17.0
+last_updated: 2026-07-16
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-16
   status: verified
   scope: initiative index and links
 ---
@@ -28,7 +28,7 @@ architecture canon:
 
 | Initiative | Mission | State |
 |---|---|---|
-| [Koan V1 reorganization](koan-v1/README.md) | Move Koan toward an Entity-centered V1 through meaningful, gated increments | Active — R02 capability baseline |
+| [Koan V1 reorganization](koan-v1/README.md) | Move Koan toward an Entity-centered V1 through meaningful, gated increments | Active — R09 Semantic Composition Kernel |
 
 ## Initiative contract
 

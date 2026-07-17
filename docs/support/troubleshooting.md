@@ -45,7 +45,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan(); // Required for module discovery
 ```
 
-Missing `AddKoan()` prevents Koan from wiring controllers, Flow, and adapters. Verify the assembly containing `KoanAutoRegistrar` types is referenced by the project.
+Missing `AddKoan()` prevents Koan from wiring controllers, Flow, and adapters. Verify the capability package is referenced and its assembly contains one concrete `KoanModule`.
 
 ### Review Boot Reports
 

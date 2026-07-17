@@ -1,5 +1,9 @@
 # CORE-0003: Initializer Idempotency and Multi-Container Support
 
+> **Superseded in lifecycle shape by [ARCH-0116](ARCH-0116-one-module-lifecycle.md) (2026-07-17).**
+> Multi-container idempotency remains required, but registration now runs through the retained
+> `KoanModule`; the initializer interface and registry described below were removed.
+
 **Status**: Accepted
 **Date**: 2025-10-03
 **Deciders**: Enterprise Architecture Team

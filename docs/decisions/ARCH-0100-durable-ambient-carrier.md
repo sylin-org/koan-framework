@@ -7,6 +7,13 @@
 > `EntityContext` is no longer the cross-pillar owner, and the Data-axis DSL no longer registers
 > carriage. The original type names, implementation locations, and snippets below are historical.
 
+> **2026-07-16 amendment:** R09-06 joins hard segmentation to opaque carriage through Core's memoized
+> `SegmentationContextPlan`. A carrier declares which hard dimension it represents; Communication and
+> Jobs own thin typed wrappers at their terminals/ingress. Ordinary capture preserves explicit
+> tri-state state. Only an applicable hard typed operation may ask the carrier to materialize a
+> deterministic resolved fallback, preventing different nodes from independently choosing context
+> while leaving genuinely host-scoped work unscoped.
+
 **Status**: Proposed (2026-06-24) · adversarially reviewed (3 lenses, all *ratifiable-with-fixes* — folded below)
 **Date**: 2026-06-24
 **Deciders**: Enterprise Architect

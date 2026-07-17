@@ -109,20 +109,17 @@ in
 
 ## Bootstrap and provenance
 
-**Registrar / KoanModule** — The boot-time module primitive: one self-describing unit an
+**KoanModule** — The boot-time module primitive: one self-describing unit an
 assembly author writes to register services (`Register`), declare ordered one-time startup
-(`Start`), and self-report (`Report`). `KoanModule` implements the registrar interface, so
-the source-generated discovery and `[Before]`/`[After]` ordering apply to it unchanged — it
-is the preferred way to author what older code wrote as a hand-rolled `KoanAutoRegistrar`.
-Defined by [`KoanModule`](../../src/Koan.Core/KoanModule.cs), over the
-[`IKoanAutoRegistrar`](../../src/Koan.Core/IKoanAutoRegistrar.cs) contract.
+(`Start`), and self-report (`Report`). Source generation discovers the single concrete module
+in each implementation assembly; `[Before]`/`[After]` provide exceptional type-safe ordering.
+Defined by [`KoanModule`](../../src/Koan.Core/KoanModule.cs).
 
 **Reference = Intent** — The principle that adding a package reference *is* the
 configuration: each referenced module registers itself through discovery, so `Program.cs`
 stays at four lines (`AddKoan()`) regardless of how many capabilities are wired. The
-mechanism is the auto-registrar discovered at boot. Defined by
-[`IKoanAutoRegistrar`](../../src/Koan.Core/IKoanAutoRegistrar.cs); the principle is written
-up in [architecture/principles.md](../architecture/principles.md#reference--intent).
+mechanism is the generated module descriptor compiled into the host constitution. The principle
+is written up in [architecture/principles.md](../architecture/principles.md#reference--intent).
 
 **Provenance** — The structured record of *who configured what and from where*: every module
 publishes settings, tools, and notes (with their source — app settings, environment,

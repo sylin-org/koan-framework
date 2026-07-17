@@ -16,7 +16,7 @@ validation:
 
 > One-screen map of the Orchestration pillar — self-describing service adapters, a DevHost CLI that renders compose, and zero-touch dependency containers in dev. Full detail: [aspire-integration.md](../../guides/aspire-integration.md).
 
-**What it does** — Every backing service an adapter needs is declared *once*, on the adapter, with `[KoanService(...)]` (image, ports, env, volumes, endpoint defaults). Reference = Intent: adding the package contributes the service to the plan — no compose files to hand-write. From those descriptors three surfaces are driven: (1) the **DevHost CLI** (`Koan inspect/export/up/down/status/logs/doctor`) plans the stack and renders Docker/Podman compose; (2) in development the app **self-orchestrates** — `KoanEnv.OrchestrationMode` resolves to `SelfOrchestrating` and a hosted service spins up dependency containers on boot, so `start.bat` (the canonical sample entrypoint) just runs the app; (3) an optional **.NET Aspire** AppHost discovers the same modules via `IKoanAspireRegistrar`. `OrchestrationMode` (Standalone / SelfOrchestrating / DockerCompose / Kubernetes / AspireAppHost) selects networking automatically (localhost vs service-name vs k8s-DNS vs aspire-managed).
+**What it does** — Every backing service an adapter needs is declared *once*, on the adapter, with `[KoanService(...)]` (image, ports, env, volumes, endpoint defaults). Reference = Intent: adding the package contributes the service to the plan — no compose files to hand-write. From those descriptors three surfaces are driven: (1) the **DevHost CLI** (`Koan inspect/export/up/down/status/logs/doctor`) plans the stack and renders Docker/Podman compose; (2) in development the app **self-orchestrates** — `KoanEnv.OrchestrationMode` resolves to `SelfOrchestrating` and a hosted service spins up dependency containers on boot, so `start.bat` (the canonical sample entrypoint) just runs the app; (3) an optional **.NET Aspire** AppHost discovers modules that implement `IKoanAspireResources`. `OrchestrationMode` (Standalone / SelfOrchestrating / DockerCompose / Kubernetes / AspireAppHost) selects networking automatically (localhost vs service-name vs k8s-DNS vs aspire-managed).
 
 ## The one canonical pattern
 
@@ -53,10 +53,10 @@ Koan up --profile local      # plan + start the stack
 
 ## The escape hatch
 
-For a full distributed-app graph, an Aspire AppHost discovers the same modules: a module implements `IKoanAspireRegistrar` on its `KoanAutoRegistrar` and `builder.AddKoanDiscoveredResources()` wires every referenced module in `Priority` order.
+For a full distributed-app graph, an Aspire AppHost discovers the same modules: the package's one `KoanModule` also implements `IKoanAspireResources`, and `builder.AddKoanDiscoveredResources()` wires every referenced module in `Priority` order.
 
 ```csharp
-public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
+public sealed class PostgresDataModule : KoanModule, IKoanAspireResources
 {
     public int Priority => 100; // infra before apps
     public void RegisterAspireResources(IDistributedApplicationBuilder b, IConfiguration cfg, IHostEnvironment env)

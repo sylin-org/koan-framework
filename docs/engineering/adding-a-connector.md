@@ -7,7 +7,7 @@ Wire a new external system (database, vector store, message broker, AI provider,
 > - [ARCH-0079 — Integration tests as canon](../decisions/) (every connector ships at least one integration spec)
 > - [ARCH-0080 — Shared transport ownership](../decisions/ARCH-0080-shared-transport-ownership.md) (if your connector needs Redis, Postgres, etc., consume — don't re-register)
 > - [ARCH-0081 — Typed registration helpers](../decisions/ARCH-0081-typed-registration-helpers-and-analyzer.md) (use the helpers, not raw `TryAddEnumerable`)
-> - [ARCH-0082 — Versioning](../decisions/ARCH-0082-versioning-strategy.md) (your connector is periphery)
+> - [ARCH-0085 — Versioning](../decisions/ARCH-0085-versioning-compatibility-and-automation.md) (each package owns version intent)
 >
 > Companion workbooks:
 > - [versioning.md](versioning.md) — what version your connector ships at and when it bumps
@@ -17,7 +17,7 @@ Wire a new external system (database, vector store, message broker, AI provider,
 
 ## When to use this
 
-You want to add a new connector to a pillar that already exists (Data, Data.Vector, Cache, Messaging, Storage, AI, etc.). The pillar defines the contract; you're filling it in for a specific provider.
+You want to add a new connector to a pillar that already exists (Data, Data.Vector, Cache, Communication, Storage, AI, etc.). The pillar defines the contract; you're filling it in for a specific provider.
 
 **Out of scope:** creating an entirely new *pillar* (a new abstraction layer with multiple adapters of its own). That's an ADR-level decision; a pillar needs its `*.Abstractions` package, a core implementation, and a place in the kernel manifest. Talk to the architect.
 
@@ -37,13 +37,14 @@ A Koan connector is **just** a few standard pieces:
 1. **Adapter factory** — implements the pillar's factory interface, decorated with `[KoanService]` so orchestration knows how to spin up a dependency container locally. Decorated with `[ProviderPriority]` for tie-breaking when multiple adapters can handle the same provider name.
 2. **Repository / client** — does the actual I/O. Owned per request via DI scope.
 3. **Options + configurator** — strongly-typed config bound from `Koan:Data:<Provider>:*` (or equivalent).
-4. **`KoanAutoRegistrar`** — discovered by `services.AddKoan()` reflectively. Registers everything above.
+4. **One domain-named `KoanModule`** — discovered at build time and activated by `AddKoan()`. Registers everything above.
 5. **Autonomous discovery adapter** — answers "where is the service?" for local/container/Aspire environments. Optional but expected.
 6. **Health contributor** — reports readiness.
 7. **Orchestration evaluator** — decides whether to inject the dependency into compose/Aspire when the user runs `koan up`.
 8. **Tests** — at minimum, one integration spec hitting a real container via Testcontainers (ARCH-0079).
 
-The connector package publishes as `Sylin.Koan.<Pillar>.Connector.<Name>` and slots into the versioning system as periphery — bumps only when its folder has commits.
+The connector package publishes as `Sylin.Koan.<Pillar>.Connector.<Name>` and owns an independent
+`version.json`; Git impact and the package graph determine when it mints.
 
 Reference example to model after: **Weaviate** (`src/Connectors/Data/Vector/Weaviate/`) — clean, modern, all the standard pieces.
 
@@ -63,7 +64,6 @@ mkdir src/Connectors/Data/Vector/Acme
 <!-- src/Connectors/Data/Vector/Acme/Koan.Data.Vector.Connector.Acme.csproj -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -116,12 +116,23 @@ namespace Koan.Data.Vector.Connector.Acme;
 public sealed class AcmeVectorAdapterFactory : IVectorAdapterFactory
 {
     public string Provider => "acme";
-    public bool CanHandle(string provider) => string.Equals(provider, "acme", StringComparison.OrdinalIgnoreCase);
+    public IReadOnlyCollection<string> Aliases => ["acme-vector"];
     // ARCH-0103 §4.1 — the source parameter is the routed Moniker (Database-mode placement); honor it for per-source
     // physical isolation where the backend supports it, else accept it and document the deferral.
     public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default") => ...
 }
 ```
+
+`Provider` is the one canonical ID. `Aliases` is the complete declarative set of additional names;
+do not add a matching predicate or derive identity from the factory class name. Koan validates ID/alias
+collisions when it compiles the host catalog. It derives normal project/package reference identities from
+the factory assembly; declare `ReferenceIdentities` only when the shipped package identity genuinely differs.
+
+A directly referenced connector participates in automatic selection. A connector that is merely present
+transitively stays inert unless its pillar defines a typed layered-capability rule. `[ProviderPriority]`
+orders only the candidate set already admitted by that pillar—it never overrides an explicit provider name,
+lane capability, cache placement, or other typed guarantee. An explicit ID/alias resolves exactly or fails
+with a correction; Koan does not substitute an unrelated provider.
 
 The `[KoanService]` attribute feeds the orchestration generator: this is what makes `koan up` know to start an `acme/acme:1.0` container on port 8080. Model the exact field set after [`WeaviateVectorAdapterFactory.cs`](../../src/Connectors/Data/Vector/Weaviate/WeaviateVectorAdapterFactory.cs) — it's the canonical example.
 
@@ -176,16 +187,13 @@ public sealed class AcmeOrchestrationEvaluator(...) : IKoanOrchestrationEvaluato
 
 This is what makes `koan up` decide whether to inject your dependency into the generated compose file. Model after [`RedisOrchestrationEvaluator.cs`](../../src/Connectors/Data/Redis/Orchestration/RedisOrchestrationEvaluator.cs).
 
-### Step 7 — `KoanAutoRegistrar`
+### Step 7 — the module
 
 ```csharp
-// Initialization/KoanAutoRegistrar.cs
-public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
+// Initialization/AcmeVectorModule.cs
+public sealed class AcmeVectorModule : KoanModule
 {
-    public string ModuleName => "Koan.Data.Vector.Connector.Acme";
-    public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
-
-    public void Initialize(IServiceCollection services)
+    public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<AcmeOptions>();
         services.AddSingleton<IConfigureOptions<AcmeOptions>, AcmeOptionsConfigurator>();
@@ -195,16 +203,16 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, AcmeDiscoveryAdapter>());
     }
 
-    public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
+    public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        module.Describe(ModuleVersion);
+        module.Describe(Version);
         module.AddNote("Acme vector adapter");
         module.Capability("ANN search").Capability("Filter pushdown");
     }
 }
 ```
 
-The class **must be named `KoanAutoRegistrar`** (or be marked with the `IKoanAutoRegistrar` interface — the reflective discovery matches both). Without it, `services.AddKoan()` doesn't see your connector.
+The class name is business-facing, not conventional magic. It must be the assembly's single concrete `KoanModule`; identity is derived from the standard `PackageId`/assembly name. The source generator rejects multiple activation owners.
 
 ### Step 8 — Tests (ARCH-0079 mandate)
 
@@ -298,7 +306,7 @@ major/minor change is an explicit `version.json` edit. See [versioning.md](versi
 | Add a new data store connector (SQL / NoSQL / document) | Same as above, pillar = `Data`, factory interface = `IDataAdapterFactory`. Model after `Koan.Data.Connector.Mongo`. |
 | Add a new vector connector | This workbook. Model after Weaviate. |
 | Add a new AI provider | Pillar = `AI`, model after `Koan.AI.Connector.Ollama`. |
-| Add a new messaging broker | Pillar = `Messaging`, model after `Koan.Messaging.Connector.RabbitMq`. |
+| Add a new communication transport | Pillar = `Communication`, model after `Koan.Communication.Connector.RabbitMq`. |
 | Add a new storage backend | Pillar = `Storage`, model after `Koan.Storage.Connector.Local` or `Koan.Storage.Connector.S3`. |
 | Add a connector that shares transport with another | Don't re-register the shared transport (e.g. `IConnectionMultiplexer`). See [ARCH-0080](../decisions/ARCH-0080-shared-transport-ownership.md) for the consume-don't-register pattern. |
 
@@ -308,7 +316,7 @@ major/minor change is an explicit `version.json` edit. See [versioning.md](versi
 
 ### Symptom: `services.AddKoan()` doesn't pick up my connector
 
-**Why it happens:** the reflective discovery looks for types implementing `IKoanAutoRegistrar` (or named `KoanAutoRegistrar`) in loaded assemblies. If your assembly isn't loaded, or the type doesn't match the convention, it's invisible.
+**Why it happens:** the capability package is absent from the application's reference manifest, or the implementation assembly does not contain exactly one constructible `KoanModule`.
 
 **Recovery:**
 
@@ -316,9 +324,9 @@ major/minor change is an explicit `version.json` edit. See [versioning.md](versi
 # 1. Confirm the project reference / package reference is in place in the consuming project.
 #    `dotnet list <consumer.csproj> reference` should show your connector.
 
-# 2. Confirm the type exists and has the right shape.
-grep -r "class KoanAutoRegistrar" src/Connectors/Data/Vector/Acme/
-#    Expect: public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
+# 2. Confirm the assembly has one module.
+rg "class .*Module : KoanModule" src/Connectors/Data/Vector/Acme/
+#    Expect: public sealed class AcmeVectorModule : KoanModule
 
 # 3. Build the consumer in Release mode (Debug-only references can be skipped on Release runs).
 dotnet build <consumer.csproj> -c Release
@@ -337,7 +345,7 @@ If the assembly is present but discovery still misses it, check the boot report 
 
 ```pwsh
 # 1. Verify your orchestration evaluator is registered.
-#    KoanAutoRegistrar.Initialize() should TryAddEnumerable the evaluator.
+#    AcmeVectorModule.Register() should register the evaluator.
 
 # 2. Verify IsServiceEnabled returns true under your test conditions.
 #    Most evaluators return true when the connector's section is present in config.
@@ -394,7 +402,7 @@ Re-run the release compiler inventory, then package verification for the affecte
 
 ## Anti-patterns
 
-- **Don't manually register the connector with `services.AddYourConnector()`** — `KoanAutoRegistrar` + Reference = Intent is the model. Static-method registration breaks the framework's promise that *adding a NuGet reference is sufficient*.
+- **Don't require applications to call `services.AddYourConnector()`** — the package's `KoanModule` should call its concern-owned registration internally. Reference = Intent means adding the package is sufficient.
 - **Don't skip the discovery adapter** — without it, every consumer must set `Endpoint` explicitly. The whole "drop in a connector and it just works in compose/Aspire" experience depends on autonomous discovery.
 - **Don't use raw `TryAddEnumerable(ServiceDescriptor.Singleton<I>(factory))`** — that's the indistinguishable-descriptor footgun KOAN0001 catches. Use the typed helpers (`AddCacheStore<T>`, etc.) where they exist for the pillar; for pillars without helpers yet, use the two-generic form: `Singleton<TService, TImpl>(...)`. See [ARCH-0081](../decisions/ARCH-0081-typed-registration-helpers-and-analyzer.md).
 - **Don't re-register shared transports** — if your connector talks to Redis, you reference `Koan.Data.Connector.Redis` and consume its `IConnectionMultiplexer`. You do not register your own. See [ARCH-0080](../decisions/ARCH-0080-shared-transport-ownership.md).

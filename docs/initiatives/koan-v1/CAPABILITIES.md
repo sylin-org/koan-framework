@@ -4,19 +4,20 @@ domain: framework
 title: "Koan V1 Capability Evidence Ledger"
 audience: [architects, maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-15
-framework_version: v0.17.0
+last_updated: 2026-07-17
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-15
+  date_last_tested: 2026-07-17
   status: reviewed
   scope: evidence vocabulary and initial assessment queue
 ---
 
 # Koan V1 Capability Evidence Ledger
 
-This ledger controls what the initiative may claim about Koan. A capability is not supported merely
-because an API, sample, or document exists. Record the implementation, executable evidence,
-documented contract, known limits, and ownership before promoting a claim.
+This ledger owns the detailed evidence and limits behind Koan's product claims. A capability is not
+supported merely because an API, sample, or document exists. Current maturity and installable package
+projections are compiled from [`product/claims.json`](../../../product/claims.json) into the
+[product surface](../../reference/product-surface.md); do not restate them here.
 
 [`PROGRESS.md`](PROGRESS.md) tracks work. This file tracks product truth. R02 assessed the current
 snapshot conservatively; the command-level record is in [`R02-EVIDENCE.md`](R02-EVIDENCE.md).
@@ -58,40 +59,20 @@ it here.
 
 ## Assessed capability summary
 
-| Surface | Assessment state | Maturity | Evidence record | Principal question |
-|---|---|---|---|---|
-| Bootstrap, discovery, and startup reporting | assessed | `demonstrated` | [record](#bootstrap-discovery-and-startup-reporting) | Bounded lanes pass; a shared fact model now proves one vertical slice, not exhaustive runtime narration. |
-| `Entity<T>` data semantics and context | assessed | `verified` | [record](#entityt-data-semantics-and-context) | Entity streams are provider-bounded on six qualified adapters and fail closed on complete-scan resident adapters. |
-| Backend discovery and negotiation | assessed | `demonstrated` | [record](#backend-discovery-and-negotiation) | Streaming selection/rejection is capability-driven and runtime-explained; fleet-wide behavioral parity is not certified. |
-| Web/API conventions | assessed | `verified` | [record](#webapi-conventions) | In-memory API behavior is well tested; package installation is blocked. |
-| Entity Events and Transport | assessed | `verified` | [record](#entity-events-and-transport) | The zero-config local ring and named RabbitMQ Transport channels have focused conformance; heterogeneous contracts, retries, and remote settlement remain unsupported. |
-| Jobs and scheduling | assessed | `verified` | [record](#jobs-and-scheduling) | Core/in-process behavior is strong; distributed tiers remain separate. |
-| Cache and distributed state | assessed | `verified` | [record](#cache-and-distributed-state) | Cross-engine behavior is tested; production coherence topologies are not certified. |
-| Media processing and serving | assessed | `verified` | [record](#media-processing-and-serving) | Recipe and HTTP behavior are strong; prewarm, automatic cleanup, and multi-source routing are unsupported. |
-| AI, vector, and semantic capabilities | assessed | `experimental` | [record](#ai-vector-and-semantic-capabilities) | Strong unit/in-memory evidence; external providers and the combined production lifecycle remain uncertified. |
-| MCP and agent-facing surfaces | assessed | `verified` | [record](#mcp-and-agent-facing-surfaces) | Core contract passes conformance; transports and operational authorization need broader proof. |
-| Authentication and authorization | assessed | `verified` | [record](#authentication-and-authorization) | Core identity passes; real external identity providers were not exercised. |
-| Testing and local infrastructure | assessed | `demonstrated` | [record](#testing-and-local-infrastructure) | Bounded lanes and concurrent conformance host isolation are coherent; the ring support boundary remains open. |
-| Packaging, installation, and upgrades | assessed | `specified` | [record](#packaging-installation-and-upgrades) | Local release artifacts pass the real FirstUse clean room; public 0.17.0 remains incoherent. |
-| Operations, health, and diagnostics | assessed | `demonstrated` | [record](#operations-health-and-diagnostics) | Schema-1 runtime facts are verified for module/default-data decisions; fleet completeness remains open. |
-
-R02 may split or merge rows only when the resulting boundaries better match user-visible contracts.
-
-No row is labeled `supported-*`. That is deliberate: current public package installation is not
-coherent, the locally proved compatibility/release contract has not yet been observed through a real
-publication, and several provider or failure paths remain untested. `Verified` means the scope stated
-in that record is automated—not that the entire capability fleet is production-certified.
+Use the generated [product surface](../../reference/product-surface.md) for the current maturity,
+installable packages, targets, documentation, and evidence projection. Its machine-readable equivalent
+is [`product-surface.json`](../../reference/product-surface.json). The records below retain the deeper
+contract, unsupported scenarios, and open risks without duplicating maturity judgment.
 
 ## Capability records
 
 Every record below was initially assessed by Codex on 2026-07-13 at
 `4471e9c7ffeaa2cd198a62589a9763c4555d9b7f`. R04 evidence amendments are dated in their text and the
-initiative progress ledger; they do not silently promote the original maturity labels.
+initiative progress ledger; they do not silently promote current product claims.
 
 R05 closure adds one cumulative source/package journey, independent-reader evidence, backend
 rejection/recovery, and converged operator/agent inspection. It strengthens the records below but does
-not promote any maturity label: the coherent package closure has not been published and compatibility
-boundaries remain pre-V1 work.
+not itself promote a product claim: compatibility boundaries remain pre-V1 work.
 
 ### Bootstrap, discovery, and startup reporting
 
@@ -114,8 +95,6 @@ boundaries remain pre-V1 work.
 - **Unsupported / compatibility:** exact or exhaustive startup narration, deterministic ordering of
   every incidental background-service enumeration, and bootstrap certification across trimming/AOT
   and all deployment shapes are not established. Pre-1.0 compatibility is not promised.
-- **Maturity / safe claim:** `demonstrated`. Koan discovers referenced modules and can explain major
-  composition choices at startup; the report is useful but not a complete proof of runtime state.
 - **Open risks:** extend the proven fact path to other negotiations without claiming exhaustive runtime
   state or admitting arbitrary provider payloads.
 
@@ -139,8 +118,6 @@ boundaries remain pre-V1 work.
   database, transaction shape, query expression, tenancy mode, or migration path. Provider-bounded
   streams do not imply snapshot consistency, mutation-safe iteration, resumability, or constant memory
   inside opaque drivers. The surface is pre-1.0.
-- **Maturity / safe claim:** `verified`. Core `Entity<T>` persistence semantics are automated and are
-  Koan's strongest first-class application language; provider-specific claims require their suites.
 - **Current T6 boundary:** SQLite is the durable Level-1 application provider (35/35 plus both
   executable journeys); InMemory is the ephemeral conformance oracle (56/56); JSON is the bundled
   zero-infrastructure fallback (20/20), not a durable application claim. The canonical
@@ -193,8 +170,6 @@ boundaries remain pre-V1 work.
   messaging connector, nor prove fallback/election behavior for every ambiguous multi-provider graph.
   InMemory, JSON, and Redis deliberately reject provider-bounded Entity streams because their current
   query path scans/materializes the complete source before slicing.
-- **Maturity / safe claim:** `demonstrated`. Koan has a real capability-negotiation model and reports
-  major elections; only specifically tested provider combinations may claim parity.
 - **Open risks:** expand the stream sort floor only with new cross-provider proof; verify index
   sufficiency and performance; design recursive graph/depth budgets without turning
   facts into request history.
@@ -214,8 +189,6 @@ boundaries remain pre-V1 work.
   explicit.
 - **Unsupported / compatibility:** external adapter web suites, all OpenAPI/authorization combinations,
   production hosting topologies, and package-first creation were not certified in R02.
-- **Maturity / safe claim:** `verified`. The tested in-memory entity-controller contract produces a
-  meaningful API with little application ceremony; provider and package claims need separate proof.
 - **Open risks:** convert the shortest path into an executable golden journey with asserted HTTP and
   startup output.
 
@@ -247,8 +220,6 @@ boundaries remain pre-V1 work.
   inbox/outbox, dead letters, replay, schema negotiation, remote settlement, exactly-once effects, and
   application-authored framework signals are not supported. Legacy `Koan.Messaging` is not the
   implementation behind Entity Communication.
-- **Maturity / safe claim:** `verified` for the process-local ring and the named RabbitMQ Transport
-  guarantees above. No broader production-mesh or provider-parity claim follows.
 - **Open risks:** add compatibility aliases/version negotiation before heterogeneous deployments;
   provider-specific broadcast durability and replay require separate proof.
 
@@ -274,8 +245,6 @@ boundaries remain pre-V1 work.
   recorded in job state rather than hidden in application glue.
 - **Unsupported / compatibility:** R02 did not certify distributed competing consumers, messaging
   transport, every durable ledger, clock-skew behavior, or upgrade compatibility.
-- **Maturity / safe claim:** `verified`. In-process/core job semantics are automated; distributed and
-  provider-specific tiers must be claimed separately.
 - **Open risks:** distributed ledger tiers still need their own current composition and behavior
   evidence; source submission is intentionally sequential/non-atomic, and streaming bounds producer
   memory rather than the cost of one ledger row per Entity.
@@ -303,8 +272,6 @@ boundaries remain pre-V1 work.
 - **Unsupported / compatibility:** no durable replay/catch-up, retry, dedupe, multi-carrier publication,
   remote settlement, global flush wire contract, or batch-atomic source eviction is claimed. The former
   `Uncache` and generic cache handle have no compatibility alias.
-- **Maturity / safe claim:** `verified`. The tested cache contract and cross-engine semantics pass;
-  production coherence guarantees remain topology- and provider-specific.
 - **Open risks:** production guarantees remain provider/topology-specific; durable replay requires a real
   use case and provider contract before the surface grows.
 
@@ -328,9 +295,6 @@ boundaries remain pre-V1 work.
 - **Unsupported / compatibility:** no upload-time prewarm, scheduled orphan cleanup, automatic multi-source
   routing, signed/content-addressed Media route, configurable route prefix, or scalar/set/stream Entity Media
   facet is claimed. The stream `Store` path and default derivative write buffer their complete payloads.
-- **Maturity / safe claim:** `verified`. The tested in-process recipe and Entity-backed HTTP contract is
-  automated; lifecycle automation and broader routing remain explicitly unsupported, and the packages remain
-  pre-1.0/unpublished through the current release process.
 - **Open risks:** replace public `MediaDerivation` leakage and application cleanup only when one context-aware
   lifecycle/rendering coordinator has real consumers; do not add a facet or provider SPI for symmetry.
 
@@ -349,8 +313,6 @@ boundaries remain pre-V1 work.
   AI client paths expose a typed host-context failure; optional availability probes remain nullable.
 - **Unsupported / compatibility:** external model servers, every vector database, background
   embedding durability, model migration, cost/rate behavior, and semantic parity are not certified.
-- **Maturity / safe claim:** `experimental`. Koan has useful verified AI building blocks and in-memory
-  vector behavior, but the combined lifecycle is not foundation-ready.
 - **Open risks:** define model/provider negotiation and observable embedding state before positioning AI
   as a stable property of every entity.
 
@@ -374,8 +336,6 @@ boundaries remain pre-V1 work.
   structured surface rather than source or log scraping.
 - **Unsupported / compatibility:** not every transport, explorer path, production edge-auth policy,
   sandbox, code-mode behavior, or hostile-client scenario is certified by R02.
-- **Maturity / safe claim:** `verified`. The core MCP projection and invocation contract passes its
-  conformance suite; deployment-specific safety claims require their own evidence.
 - **Open risks:** expand fact coverage beyond the current module/default-data slice and make safe
   operational boundaries unmistakable by default.
 
@@ -394,8 +354,6 @@ boundaries remain pre-V1 work.
 - **Unsupported / compatibility:** no claim is made for every external provider, production key
   management, federation topology, regulatory posture, or secure deployment without operator-owned
   configuration.
-- **Maturity / safe claim:** `verified`. Core identity behavior is automated; Koan does not make a
-  sample or default configuration a blanket security certification.
 - **Open risks:** document secure responsibility boundaries and create external-provider smoke lanes
   before `supported-extension` language.
 
@@ -418,8 +376,6 @@ boundaries remain pre-V1 work.
 - **Unsupported / compatibility:** inherited testing does not presently guarantee every entity/module
   combination, external infrastructure lifecycle, deterministic full-suite execution, or stable public
   test-kit APIs.
-- **Maturity / safe claim:** `demonstrated`. Koan provides useful reusable conformance tests; applications
-  do not yet inherit a fully verified, package-installable test contract.
 - **R06 graduation result:** the testing portion of the foundation ring was internally verified: the
   parallel-enabled meta-suite passes 12 with 3 explicit capability/trait skips, and local connector
   suites pass InMemory 55/55, SQLite 15/15, and JSON 14/14. The row remains `demonstrated` because the
@@ -472,9 +428,6 @@ boundaries remain pre-V1 work.
 - **Unsupported / compatibility:** the staged package set is coherent, but public package-first install,
   upgrades, rollback, migration, release cadence, and support windows are not established until the
   automated `dev` release is actually published and observed.
-- **Maturity / safe claim:** `specified`. Staged PackageReference clean rooms are demonstrated, but
-  those packages were not published; source checkout remains the only coherent path currently
-  available to a new user.
 - **Open risks:** observe the first trusted `dev` publication and prove cross-event
   partial-publication recovery from exact retained artifacts; retain advisory review and establish
   explicit pre-1.0 upgrade/rollback policy before promoting the package path. Historical arbitrary
@@ -499,9 +452,6 @@ boundaries remain pre-V1 work.
 - **Unsupported / compatibility:** exhaustive composition, all provider negotiations, production
   telemetry pipelines, alerting/SLO contracts, and every provider health contributor are not
   certified. Schema changes require a new version; exact human formatting is not a contract.
-- **Maturity / safe claim:** `demonstrated`. Koan offers one verified fact model and consistent
-  projections for module activation and default data election; operators must not treat current
-  coverage as exhaustive runtime truth.
 - **Open risks:** migrate other provider negotiations through the model, and add
   provider-owned detail surfaces without weakening redaction or schema stability.
 

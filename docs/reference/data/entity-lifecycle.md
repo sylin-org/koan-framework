@@ -3,13 +3,13 @@ type: REF
 domain: data
 title: "Entity Lifecycle"
 audience: [developers, architects, ai-agents]
-last_updated: 2026-07-15
+last_updated: 2026-07-17
 framework_version: v0.18.0
 status: current
 validation:
-  date_last_tested: 2026-07-15
+  date_last_tested: 2026-07-17
   status: tested
-  scope: host ownership, Data/Entity parity, REST/MCP parity, transactions, bulk preflight, facts
+  scope: host ownership, stable pre-write snapshots, Data/Entity parity, transactions, bulk preflight, facts
 ---
 
 # Entity Lifecycle
@@ -28,9 +28,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddKoan(() =>
     Order.Lifecycle
-        .BeforeUpsert(async context =>
+        .BeforeUpsert(context =>
         {
-            var prior = await context.Prior.Get(context.CancellationToken);
+            var prior = context.Prior;
             if (prior?.Status == OrderStatus.Shipped)
                 return context.Cancel("A shipped order cannot be changed.", "order.shipped");
 
@@ -56,7 +56,7 @@ Framework modules may declare their own handlers during normal Koan module regis
   idempotent.
 - `Before*` handlers return `context.Proceed()` or `context.Cancel(reason, code)`. Cancellation throws
   `EntityLifecycleCancelledException` before the corresponding persistence operation.
-- `context.Prior.Get()` loads the persisted predecessor lazily and at most once for that operation.
+- `context.Prior` is the stable persisted predecessor captured before the operation, or `null` for a new entity.
 - `Protect`, `ProtectAll`, and `AllowMutation` guard fields from subsequent handler mutation.
 - `Items` carries operation-local values between handlers; it is not shared between writes.
 - Handler exceptions surface to the caller. Koan does not silently retry application handlers.

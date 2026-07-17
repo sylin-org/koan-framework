@@ -24,7 +24,7 @@ links:
 ## Contract
 
 - **Inputs**: Data adapter project with `AdapterConnectionDiagnostics<TOptions>` registered; options configurator inheriting from `AdapterOptionsConfigurator<TOptions>`; boot report augmenters deriving from `AdapterConnectionBootReportAugmenter<TOptions>`.
-- **Outputs**: Mutable `BootReport` entries that reflect the resolved connection string (redacted when required), discovery provenance, and adapter health notes without manual duplication in `KoanAutoRegistrar`.
+- **Outputs**: Mutable boot-report entries that reflect the resolved connection string (redacted when required), discovery provenance, and adapter health notes without manual duplication in each adapter module.
 - **Error Modes**: Diagnostics snapshot never recorded (augmenter skips updates), adapter options evaluated before diagnostics registration, or missing consumers list causing incomplete boot settings.
 - **Success Criteria**: Each adapter surfaces a single snapshot, boot report entries mutate in-place after orchestrators finish, and module notes describe auto-discovery outcomes with the latest health status.
 
@@ -52,7 +52,7 @@ This pattern keeps adapter configuration logic focused while ensuring boot diagn
 
 ## Registration Pattern
 
-`KoanAutoRegistrar` handles option binding, diagnostics, and the augmenter registration in a few lines. Example for MongoDB:
+The adapter's `KoanModule` handles option binding, diagnostics, and augmenter registration in a few lines. Example for MongoDB:
 
 ```csharp
 public void Initialize(IServiceCollection services)

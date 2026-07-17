@@ -290,7 +290,7 @@ Koi's HTTP API is simple (REST + SSE). Rather than creating a separate NuGet pac
 ### 14. DI registration and startup
 
 ```csharp
-// In ServiceCollectionExtensions.AddKoanZenGarden()
+// In the descriptor-backed ZenGardenModule registration path (activated by AddKoan())
 services.AddSingleton<IKoiHandler>(sp =>
 {
     var options = sp.GetRequiredService<IOptions<ZenGardenOptions>>();

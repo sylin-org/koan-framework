@@ -4,7 +4,7 @@ domain: framework
 title: "R07-05 - Canonical Entity Lifecycle"
 audience: [architects, maintainers, ai-agents]
 status: current
-last_updated: 2026-07-15
+last_updated: 2026-07-17
 framework_version: v0.18.0
 validation:
   date_last_tested: 2026-07-15
@@ -66,7 +66,7 @@ alias in one explicit Data.Core 0.18 breaking wave.
 
 ## Evidence
 
-- Data.Core focused Lifecycle: 9/9 — cancellation, Data/Entity read parity, lazy prior, protection,
+- Data.Core focused Lifecycle: 10/10 — cancellation, Data/Entity read parity, stable pre-write prior, protection,
   bulk preflight, transaction timing, repeated hosts, corrective composition failure, runtime facts.
 - Full affected regression: Data.Core 347/347; Data.AI 84/84; Web Extensions 111/111; MCP
   Conformance 75/75; Identity 114/114; OpenGraph 38/38; SoftDelete 9/9; Backup 7/7; Cache

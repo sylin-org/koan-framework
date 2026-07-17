@@ -8,6 +8,13 @@
 
 ---
 
+> **Implementation update (R09-07, 2026-07-16):** fact schema 2 adds the explicit `guarantee` kind.
+> Concern-owned plans and realization receipts supply guarantee content; startup compiles one
+> deterministic view by fact kind/state, while HTTP and MCP continue to serialize the exact host
+> envelope. The prior segmentation-code special case is deleted. Facts remain explanation rather than
+> runtime decision or health authority, and the existing exact lock-model comparer remains the bounded
+> semantic-change substrate.
+
 ## Context
 
 Koan already had useful diagnostics, but not one account of what happened. Bootstrap failures lived in
@@ -33,6 +40,8 @@ same facts. It does not require one universal provider payload or exact human fo
 Each fact contains only stable shared fields: code, kind, state, subject, safe summary, reason code,
 optional correction, source, correlation ID, and observation time. Schema 1 defines discovery,
 dependency, election, capability, default, degradation, rejection, health, and correction kinds.
+Schema 2 adds guarantee as a distinct explanation kind; it does not change health semantics or imply
+provider-fleet certification.
 
 The envelope has no arbitrary payload dictionary. Raw exception messages, stack traces, configuration
 values, connection material, and provider-specific objects are not accepted. Framework-owned fact
@@ -59,7 +68,7 @@ The accepting vertical slice owns two decisions:
 - module activation creates one redacted fact. `KoanBootException.Fact`, lenient startup rendering,
   health, Web, and MCP use that same fact;
 - `AdapterResolver.ResolveDefault` returns one `AdapterResolutionDecision`. Actual Entity data
-  resolution and `DataCompositionContributor` use it. The composition builder derives both the
+  resolution and the retained Data module's evidence projector use it. The composition builder derives both the
   `data:default` lockfile election and runtime election fact from that decision.
 
 A contributor that cannot report records rejection or collection failure. It cannot disappear and

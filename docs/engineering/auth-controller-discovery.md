@@ -17,7 +17,7 @@ validation:
 ## Contract
 
 - **Scope**: Registration flow for Koan Web Auth controllers and the discovery endpoint at `/.well-known/auth/providers`.
-- **Inputs**: `KoanAutoRegistrar.Initialize` execution during module bootstrapping and ASP.NET Core MVC `ApplicationPartManager` state.
+- **Inputs**: `AuthModule.Register` execution during module bootstrapping and ASP.NET Core MVC `ApplicationPartManager` state.
 - **Outputs**: Discovery controller availability, authentication provider metadata, and healthy redirect flow for test providers.
 - **Failure modes**: MVC omits the auth controllers, endpoint returns 404, auth UI cannot fetch provider list, sign-in redirects fail.
 - **Success criteria**: Auth controller assembly added to MVC parts exactly once, discovery endpoint returns provider metadata, login journey proceeds.
@@ -36,7 +36,7 @@ The S5.Recs stack reported 404s from `/.well-known/auth/providers` despite loadi
 
 ## Resolution Steps
 
-1. Update `KoanAutoRegistrar.Initialize` to call `services.AddControllers()` and register an `AssemblyPart` for `DiscoveryController` when absent.
+1. Update `AuthModule.Register` to call `services.AddControllers()` and register an `AssemblyPart` for `DiscoveryController` when absent.
 2. Rebuild the solution (`dotnet build --nologo --verbosity:minimal`).
 3. Restart the S5.Recs Docker stack via `samples/S5.Recs/start.bat`.
 4. Verify `http://localhost:5084/.well-known/auth/providers` returns the expected provider payload.

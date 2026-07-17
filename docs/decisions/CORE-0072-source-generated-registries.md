@@ -1,5 +1,9 @@
 ﻿# CORE-0072: Source-generated registries for bootstrap and service discovery
 
+> **Superseded in part by [ARCH-0116](ARCH-0116-one-module-lifecycle.md) (2026-07-17).** Source
+> generation remains, but initializer and auto-registrar catalogs were removed; module activation is
+> represented only by semantic module descriptors.
+
 Status: Accepted  
 Date: 2025-11-12
 

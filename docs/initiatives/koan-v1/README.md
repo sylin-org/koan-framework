@@ -4,10 +4,10 @@ domain: framework
 title: "Koan V1 Reorganization Initiative"
 audience: [architects, maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-13
-framework_version: v0.17.0
+last_updated: 2026-07-16
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-13
+  date_last_tested: 2026-07-16
   status: verified
   scope: initiative artifact structure and links
 ---
@@ -47,6 +47,14 @@ language that R04-07 proved; it is historical where ARCH-0113 now defines Lifecy
 Transport, and capability lifting.
 R05 execution follows the three-card [`R05-BACKLOG.md`](R05-BACKLOG.md); it preserves FirstUse and
 proves meaningful growth in the cumulative [`GoldenJourney`](../../../samples/GoldenJourney/README.md).
+R06 and R07 graduate the foundation and semantic capability rings. R09 has now passed and records its
+completed composition architecture in the [parent](work-items/R09-semantic-composition-kernel.md),
+[backlog](R09-BACKLOG.md), [coalescence inventory](R09-COALESCENCE-INVENTORY.md), and closing
+[single-module handoff](work-items/r09/R09-09-one-bootstrap-language-and-release-handoff.md).
+R08-01 preserves the completed Git-driven exact release-wave baseline; R08-01 through R08-04 pass locally and
+R08-05's public-observation contract is prepared. The active
+[R10 golden-sample graduation](work-items/R10-golden-samples.md) now ensures the maintained curriculum teaches
+and executes the rebuilt architecture before that first public wave. See [NOW.md](NOW.md).
 Small design and polish debts deliberately kept out of the active acceptance path live in the
 [`POST-CYCLE-TODO.md`](POST-CYCLE-TODO.md) register with their required decisions and evidence.
 
@@ -59,8 +67,9 @@ Small design and polish debts deliberately kept out of the active acceptance pat
 | What is in progress or runnable? | `PROGRESS.md` |
 | What should the next session do? | `NOW.md` |
 | What exactly does a work item require? | its `work-items/Rxx-*.md` card |
-| What foundation repair executes next? | `R04-BACKLOG.md` and its linked child card |
-| What golden-journey work executes next? | `R05-BACKLOG.md` and its linked child card |
+| What records the foundation-repair sequence? | `R04-BACKLOG.md` and its linked historical child cards |
+| What records the golden-journey sequence? | `R05-BACKLOG.md` and its linked historical child cards |
+| What records the completed semantic-composition work? | `R09-BACKLOG.md`, `R09-COALESCENCE-INVENTORY.md`, and the linked accepted child cards |
 | Which small issues wait until the main cycle closes? | `POST-CYCLE-TODO.md` |
 | Which module capabilities should grow Entity language? | the Entity Semantics Contract and `ARCH-0113`; the R04 slate is historical input |
 | What makes work acceptable? | `ACCEPTANCE.md` |
@@ -71,7 +80,7 @@ Small design and polish debts deliberately kept out of the active acceptance pat
 When artifacts disagree, shipped evidence wins. Record the contradiction in the Progress
 Divergence log; do not silently reconcile it by editing multiple narratives.
 
-## Initial sequence
+## Execution sequence
 
 ```text
 R00 privacy boundary
@@ -80,10 +89,18 @@ R00 privacy boundary
           -> R03 Entity Semantics Contract
               -> R04 foundation-hardening backlog
                   -> R05 golden V0-to-V1 journey
+                      -> R06 foundation graduation
+                          -> R07 semantic capability ring
+                              -> R08-01 durable release-wave baseline
+                                  -> R09 semantic composition kernel
+                                      -> remaining R08 release readiness
+                                          -> R10 golden sample graduation
+                                              -> R08 public observation and V1 decision
 ```
 
-Later implementation cards are created only after R04 ranks the foundations and R05 defines the
-acceptance journey. This prevents the initiative from becoming a speculative feature backlog.
+Later implementation cards are created only when the active parent and preceding evidence establish
+their smallest meaningful result. This prevents the initiative from becoming a speculative feature
+or abstraction backlog.
 
 ## Completion and archive
 

@@ -1,22 +1,22 @@
 ---
 type: REF
 domain: orchestration
-title: "NativeAOT — sovereign single-binary map"
+title: "NativeAOT — sovereign native-deployment map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-06-21
+last_updated: 2026-07-17
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-06-21
+  date_last_tested: 2026-07-17
   status: verified
-  scope: docs/reference/cards/nativeaot.md
+  scope: GardenCoop win-x64 native executable, business API, lifecycle result, and runtime facts
 ---
 
-# NativeAOT — sovereign single-binary map
+# NativeAOT — sovereign native-deployment map
 
-> One-screen map of the sovereign floor — publishing a Koan app to one self-contained native binary (no .NET runtime, no container, no servers). The floor of the deployment-footprint ladder. Full detail: [nativeaot-howto.md](../../guides/nativeaot-howto.md) · decision: [ARCH-0093](../../decisions/ARCH-0093-nativeaot-substrate.md).
+> One-screen map of the sovereign floor — publishing a self-contained native Koan deployment (no .NET runtime, container, or external server required). The floor of the deployment-footprint ladder. Full detail: [nativeaot-howto.md](../../guides/nativeaot-howto.md) · decision: [ARCH-0093](../../decisions/ARCH-0093-nativeaot-substrate.md).
 
-**What it does** — When every capability an app uses is satisfied by an **in-process** resource (SQLite data, sqlite-vec vectors, ONNX embeddings, Channels messaging, Web/MCP), the app publishes to a single NativeAOT binary that boots the whole stack with nothing else installed. Reference = Intent still selects the adapters; the build does the AOT-specific wiring **for you**: referencing `Sylin.Koan.Core` emits `obj/koan.trimroots.xml` (an ILLink descriptor rooting every Koan module `preserve="all"`, off the same `@(ReferencePath)` filter as the composition lockfile and single-file manifest). That is mandatory under AOT — ILC starts reachability at your entry point, so a never-symbol-used Reference=Intent connector would otherwise be trimmed and its source-gen `[ModuleInitializer]` would never run (boot would discover no adapters). Proven on **win-x64 and linux-x64** with byte-identical results. Verified once, this stays falsifiable: the boot report lists every discovered module.
+**What it does** — When every capability an app uses is satisfied by an **in-process** resource (SQLite data, sqlite-vec vectors, ONNX embeddings, Channels messaging, Web/MCP), the app publishes a NativeAOT executable that boots the whole stack without an installed .NET runtime or external service. The deployment directory may also contain application assets and native connector libraries; NativeAOT does not imply one physical file. Reference = Intent still selects the adapters; the build does the AOT-specific wiring **for you**: referencing `Sylin.Koan.Core` emits `obj/koan.trimroots.xml` (an ILLink descriptor rooting every Koan module `preserve="all"`, off the same `@(ReferencePath)` filter as the composition lockfile and single-file manifest). That is mandatory under AOT — ILC starts reachability at your entry point, so a never-symbol-used Reference=Intent connector would otherwise be trimmed and its source-gen `[ModuleInitializer]` would never run (boot would discover no adapters). Proven on **win-x64 and linux-x64** with byte-identical results. Verified once, this stays falsifiable: the boot report lists every discovered module.
 
 ## The one canonical pattern
 
@@ -62,4 +62,4 @@ No AOT toolchain (or a connector that isn't AOT-clean yet)? Publish **single-fil
 
 ## The sample that shows it
 
-[`samples/guides/g1c2.GardenCoopEmbedded`](../../../samples/guides/g1c2.GardenCoopEmbedded) — one binary that embeds → stores → semantically searches produce, entirely in-process: `curl "…/api/produce/search?q=sweet red fruit"` → `200`, ranked hits, no container, no servers.
+[`samples/guides/g1c2.GardenCoopEmbedded`](../../../samples/guides/g1c2.GardenCoopEmbedded) — one native application deployment that embeds → stores → semantically searches produce entirely in-process: `curl "…/api/produce/search?q=sweet red fruit"` → `200`, ranked hits, no container or external server.

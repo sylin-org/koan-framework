@@ -91,9 +91,9 @@ extension appears in IntelliSense without an import.
 - [`Upsert(this object)` and `Delete(this object)`](../../../src/Koan.Data.Core/AggregateExtensions.cs)
   attach persistence verbs to every object whenever `Koan.Data.Core` is imported, then use reflection
   to reject non-entities at runtime.
-- [`Send<T>(this T) where T : class`](../../../src/Koan.Messaging.Core/MessagingExtensions.cs) attaches
-  messaging to every class whenever `Koan.Messaging` is imported. The receiver should express a
-  message contract or the method should live on an explicit message facet.
+- The retired `Send<T>(this T) where T : class` Messaging extension attached messaging to every class.
+  R07 replaced it with the Entity-only Events and Transport facets documented by
+  [Communication](../../reference/communication/index.md).
 - [backup extensions](../../../src/Koan.Data.Backup/Extensions/EntityBackupExtensions.cs) attach
   type-wide backup/restore/catalog operations to an arbitrary entity instance; the receiver is unused
   for identity and state.

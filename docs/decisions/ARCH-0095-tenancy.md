@@ -1,5 +1,10 @@
 # ARCH-0095: First-class multi-tenancy — the ambient Tenant slice, the eight primitives, and the classification axis
 
+> **R09 implementation amendment (2026-07-16):** Tenancy now contributes one host-owned `tenant`
+> hard-segmentation dimension through ARCH-0115. Data, Cache, and Storage compile and execute their own
+> realizations; `TenantAxis`, `TenantStorageGuard`, and Tenancy's Data/Storage registration fanout are
+> deleted. Older guard/managed-field passages below are historical design context, not current code.
+
 > **R07 context amendment (2026-07-15):** The Tenant developer surface and Data isolation policy remain
 > module-owned. [ARCH-0113](ARCH-0113-entity-capability-communication.md) moves the generic logical-flow
 > state beneath Data to `Koan.Core.Context.KoanContext`; Tenancy now implements

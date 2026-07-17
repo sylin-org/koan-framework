@@ -5,7 +5,7 @@ title: "Cache Entity identity convergence"
 audience: [architects, maintainers, ai-agents]
 status: current
 last_updated: 2026-07-16
-framework_version: v0.19.0
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-16
   status: passed
@@ -17,8 +17,8 @@ validation:
 ## Why this boundary exists
 
 A cache entry is not identified by `Entity type + id` alone. The active Entity policy may choose a
-custom template; Data routing contributes partition/source values; managed equality axes such as
-tenant add an isolation suffix. If repository reads/writes and out-of-band eviction independently
+custom template; Data routing contributes partition/source values; Core hard-segmentation dimensions
+such as tenant add an isolation suffix. If repository reads/writes and out-of-band eviction independently
 reconstruct that identity, a plausible successful removal can target a key that never existed.
 
 That failure occurred in two generations:
@@ -36,15 +36,15 @@ the limitation.
 `CacheRepositoryDecorator`/`CachedRepository` and `EntityCacheEvictionCoordinator`. The plan owns:
 
 - selection of the first active Entity-scoped policy;
-- exclusion of transformed storage representations and non-equality read scopes;
+- exclusion of transformed storage representations and Data-local scopes that Cache cannot represent;
 - parsing/rendering the selected key template;
 - canonical Entity type identity;
 - `{Partition}` and `{Source}` values from captured `EntityContext`; and
-- equality managed-axis folding through `ScopedEntityCacheKey` and the shared
-  `AmbientAxisComposer`.
+- production of one business/base key consumed by `CacheIdentityPlan`.
 
-`ScopedEntityCacheKey` is now an internal suffix renderer, not a second public full-key builder. No
-explicit eviction API can bypass policy/template selection.
+`CacheIdentityPlan` is the single physical renderer for Entity and generic keys, tags, singleflight,
+eviction, and coherence. It binds the Core segmentation plan once at `CacheClient`; no explicit
+eviction API can bypass policy/template selection or physical segmentation.
 
 ## Public semantics
 
@@ -79,10 +79,10 @@ though it is not counted as confirmed.
 
 ## Preserved isolation laws
 
-- Managed equality axes partition cache identity. Off/no applicable axis returns the base key
+- Core hard-segmentation dimensions partition cache identity. Off/no applicable dimension returns the base key
   unchanged.
-- A non-equality axis or pure predicate read contributor excludes the Entity type entirely; a viewer
-  visibility predicate is never misrepresented as a scalar key segment.
+- A Data-local managed field or pure predicate contributor excludes the Entity type until its capability
+  explicitly joins the cross-pillar segmentation family; an unknown scope is never silently omitted.
 - Storage-transformed Entities remain excluded so provider payloads cannot become a second cached
   representation outside Data's reversal boundary.
 - Entity type names use `CacheKey.EntityTypeName`, including closed-generic type arguments.
@@ -110,5 +110,5 @@ project `entity.Cache.Evict()` as an agent mutation.
 - Entity-language consumer cells prove scalar/set/stream discovery, module removal, invalid receiver
   rejection, and coexistence with all current module facets.
 
-The former `Uncache()`, generic `EntityCacheExtensions.Cache<TEntity,TKey>()`, typed handle, and public
-default-template-only `ScopedEntityCacheKey.For` path are deleted without compatibility aliases.
+The former `Uncache()`, generic `EntityCacheExtensions.Cache<TEntity,TKey>()`, typed handle,
+`ScopedEntityCacheKey`, and its default-template-only path are deleted without compatibility aliases.

@@ -2,7 +2,7 @@
 
 > **Contract**
 >
-> - **Inputs:** Koan modules that expose adapters or orchestration capabilities, their `KoanAutoRegistrar` implementations, and downstream samples consuming them.
+> - **Inputs:** Koan modules that expose adapters or orchestration capabilities, plus downstream samples consuming them.
 > - **Outputs:** A consistent self-registration standard, checklists for new modules, and an audit log of gaps with remediation guidance.
 > - **Failure modes:** Modules requiring manual DI wiring, duplicated controller/configuration setup in samples, or adapters that misreport capabilities because their bootstrap never executes.
 > - **Success criteria:** Referencing a Koan adapter/orchestration package wires the expected services without host intervention, diagnostics accurately describe provider election, and samples demonstrate the canonical `.AddKoan()` entry point.
@@ -20,23 +20,21 @@
 
 ## Adapter Self-Registration Pattern
 
-Every adapter package (data, cache, web, messaging, secrets) must provide a `KoanAutoRegistrar` that:
+Every functional adapter package (data, cache, web, communication, storage) must provide exactly one domain-named `KoanModule` that:
 
 - Invokes the pillar’s first-class registration (`services.AddKoanData…`, `services.AddKoanCache()`, etc.) or the adapter hook (`services.AddKoanCacheAdapter("redis")`) exactly once, relying on idempotent extension methods.
 - Binds options via `services.AddKoanOptions<T>(Constants.Configuration.Section)` so late-bound configuration still applies without building a temporary `ServiceProvider`.
-- Registers discovery + orchestration bridges (`IServiceDiscoveryAdapter`, `IKoanOrchestrationEvaluator`, `IKoanAspireRegistrar`) using `TryAddEnumerable` so multiple adapters can coexist.
-- Uses `services.TryAdd`/`TryAddEnumerable` for extensibility and avoids `services.BuildServiceProvider()` inside `Initialize` (no premature container builds).
-- Emits boot telemetry with `report.AddModule`, `report.AddProviderElection`, guardrail settings, and discovery notes so the host understands which provider won and how it will connect.
+- Registers discovery + orchestration bridges (`IServiceDiscoveryAdapter`, `IKoanOrchestrationEvaluator`) using `TryAddEnumerable` so multiple adapters can coexist. If the same module contributes Aspire resources, it also implements `IKoanAspireResources`.
+- Uses `services.TryAdd`/`TryAddEnumerable` for extensibility and avoids `services.BuildServiceProvider()` inside `Register` (no premature container builds).
+- Reports provenance through `Report(...)` and resolved runtime evidence through `ReportComposition(...)` so the host explains which provider won and how it will connect.
 - Leaves diagnostics (health contributors, readiness monitors, capability registries) enabled by default to respect “reference = intent”.
 
 ### Reference Snippet
 
 ```csharp
-public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
+public sealed class RedisDataModule : KoanModule, IKoanAspireResources
 {
-    public string ModuleName => "Koan.Data.Connector.Redis";
-
-    public void Initialize(IServiceCollection services)
+    public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<RedisOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.AddSingleton<IConfigureOptions<RedisOptions>, RedisOptionsConfigurator>();
@@ -47,31 +45,27 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         services.AddSingleton<IDataAdapterFactory, RedisAdapterFactory>();
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-        report.AddNote("Redis discovery handled by autonomous RedisDiscoveryAdapter");
-        report.AddProviderElection("DataStore", "redis", new[] { "redis", "postgres", "mongo", "fallback" }, "Reference = adapter package");
-        report.AddSetting("Database", Configuration.Read(cfg, "Koan:Data:Redis:Database", 0).ToString());
-        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
+        module.Describe(Version);
+        module.AddNote("Redis discovery is handled by RedisDiscoveryAdapter");
+        module.AddSetting("ConnectionString", "auto (resolved by discovery)");
     }
 
     public void RegisterAspireResources(IDistributedApplicationBuilder builder, IConfiguration configuration, IHostEnvironment environment)
     {
-        // example: wire Aspire resource registration when the package participates in self-orchestration
+        // wire Aspire resources when this capability also participates in an AppHost
     }
 }
 ```
 
-> **Note (ARCH-0086):** new modules should extend **`KoanModule`** rather than implement `IKoanAutoRegistrar`
-> directly — `Id` + `Register(services)` + `Start(sp, ct)` (ordered one-time startup) + `Report(...)`. It *is* an
-> `IKoanAutoRegistrar`, so the discovery/ordering shown here is unchanged; the registrar form above still works
-> via the bridge. See [ARCH-0086](../decisions/ARCH-0086-koan-module.md) and the
-> [Framework Utilities Guide](../guides/framework-utilities.md#bootstrap--modules).
+Identity is derived from standard `PackageId`/assembly metadata. Do not add a custom module ID, descriptor,
+activation attribute, or project-reference mode. Cross-module contracts belong in an isolated Core/Contracts/
+Abstractions package so referencing vocabulary never activates the functional implementation.
 
 #### Cache adapter convergence
 
-- Cache auto-registrars should delegate to `services.AddKoanCacheAdapter(<name>)` _and_ surface provider election (`report.AddProviderElection("CacheStore", …)`) so diagnostics stay in sync with the data layer.
+- Cache modules should delegate to `services.AddKoanCacheAdapter(<name>)` and surface provider election so diagnostics stay in sync with the data layer.
 - Distributed cache adapters (Redis today) should re-use the data connector’s discovery adapters or expose a lightweight wrapper to avoid duplicating connection-string heuristics.
 - When a cache adapter depends on a data connector (Redis cache ↔ Redis data), document the dependency explicitly and short-circuit option binding if the data connector already supplied a connection string.
 
@@ -100,12 +94,11 @@ Samples should showcase the canonical Koan experience:
 
 | Scope                               | Evidence                                                                                                                                                                                                          |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Koan.Cache**                      | `Koan.Cache.Initialization.KoanAutoRegistrar` invokes `AddKoanCache()`, binds `CacheOptions`, and reports provider + policy details via `BootReport`.                                                             |
-| **Cache adapters – Memory & Redis** | Auto-registrars call `AddKoanCacheAdapter(<provider>)` and emit provider elections; redis registrar binds adapter options and integrates with the cache pillar defaults.                                          |
-| **Data connectors**                 | All shipping data adapters expose `Initialize`/`Describe` pairs that bind options, register discovery and health contributors, and avoid temporary service providers.                                             |
-| **Orchestration host providers**    | Docker, Podman, and Compose connectors now expose `Initialization/KoanAutoRegistrar` classes that register their providers, capture engine diagnostics, and participate in boot telemetry + Aspire orchestration. |
-| **~~GraphQL module~~** _(attic'd 2026-06)_ | ~~`Koan.Web.Connector.GraphQl` self-registers via `Initialization/KoanAutoRegistrar`, binds GraphQL options, and reports path + debug settings alongside discovery hints.~~ Connector cut from `dev` (recoverable at git tag `attic/koan-web-graphql`). |
-| **Service Inbox Redis module**      | `Koan.Service.Inbox.Connector.Redis` ships as a reusable module with options binding, hosted announcement service, and controller registration surfaced through its auto-registrar.                               |
+| **Koan.Cache**                      | `CacheModule` invokes `AddKoanCache()`, binds `CacheOptions`, and reports provider + policy details.                                                                                                               |
+| **Cache adapters – Memory & Redis** | Adapter modules register their provider and emit provider-election evidence; Redis binds adapter options and integrates with the cache pillar defaults.                                                          |
+| **Data connectors**                 | Every shipping data adapter exposes one module whose `Register`/`Report` methods bind options, register discovery and health contributors, and avoid temporary service providers.                                |
+| **Orchestration host providers**    | Docker, Podman, and Compose expose domain-named modules that register providers, capture engine diagnostics, and participate in boot telemetry; modules with Aspire behavior implement `IKoanAspireResources`.     |
+| **Service Inbox Redis module**      | `Koan.Service.Inbox.Connector.Redis` ships as a reusable module with options binding, hosted announcement service, and controller registration surfaced through its module.                                      |
 | **Redis cache discovery**           | The Redis cache adapter now reuses the shared discovery coordinator, logging a redacted connection string and aligning provider elections across cache/data pillars.                                              |
 | **Sample conformance**              | `KoanAspireIntegration`, `S8.Location.Api`, and `S15.RedisInbox` sample all rely on `.AddKoan()` fluents with Koan-provided helpers for Swagger, authorization, and static file handling.  |
 | **Authorization helper**            | `Koan.Web.Extensions.Authorization.AddKoanAuthorization` centralises policy registration and capability mapping, letting samples declare role policies without re-wiring MVC or capability infrastructure.        |
@@ -130,7 +123,7 @@ Samples should showcase the canonical Koan experience:
 
 ## Developer Checklist (New Modules)
 
-- [ ] Provide `KoanAutoRegistrar` that calls the pillar’s `AddKoan…` extension and binds options via `AddKoanOptions`.
+- [ ] Provide one domain-named `KoanModule` that calls the pillar’s `AddKoan…` extension and binds options via `AddKoanOptions`.
 - [ ] Avoid constructing a temporary `ServiceProvider`; defer logging to BootReport or per-request loggers.
 - [ ] Register health contributors and discovery adapters with `TryAddEnumerable` so multiple packages can coexist.
 - [ ] Document provider elections and configuration in `BootReport`.

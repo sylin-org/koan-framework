@@ -4,12 +4,12 @@ domain: core
 title: "Framework Utilities Guide"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-06-05
-framework_version: v0.6.3
+last_updated: 2026-07-17
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-03-26
+  date_last_tested: 2026-07-17
   status: verified
-  scope: all-examples-tested-except-background-jobs-section
+  scope: module declaration verified by downstream generated/trim-shaped packaging proof; other sections retain prior evidence
 related_guides:
   - entity-capabilities-howto.md
   - data-modeling.md
@@ -192,13 +192,14 @@ internal sealed class PostgresDiscoveryAdapter : ServiceDiscoveryAdapterBase
 
 **Location:** `Koan.Core` (`KoanModule`; host `Koan.Core.Hosting.Modules.KoanModuleHost`)
 
-The boot-time module primitive (ARCH-0086). Extend it to author one self-describing unit instead of
-hand-writing the `IKoanInitializer` + `IKoanAutoRegistrar` pair. It **implements** `IKoanAutoRegistrar`, so
-the existing source-generated discovery (`KoanRegistry`) and topological ordering (`RegistrarOrdering` via
-`[Before]`/`[After]`) apply unchanged.
+The boot-time module primitive (ARCH-0086/ARCH-0115). Framework and capability-package authors use one
+ordinary module for registration, typed structural contribution, startup, provenance, and safe composition
+evidence. The generator derives its stable identity from the standard NuGet `PackageId` (falling back to
+`AssemblyName`), emits the construction metadata, and the host retains one instance for the complete lifecycle.
+An implementation assembly contains at most one concrete `KoanModule`.
 
 #### Members
-- `string Id` (abstract) — canonical module id, e.g. `"data.postgres"`; surfaces as `ModuleName`.
+- `string Id` — derived and host-bound; module authors do not declare or override it.
 - `string? Version` (virtual) — defaults to the declaring assembly version.
 - `void Register(IServiceCollection services)` (virtual) — register DI services. Replaces `Initialize`.
 - `Task Start(IServiceProvider sp, CancellationToken ct)` (virtual) — one-time startup work, DI available,
@@ -207,14 +208,15 @@ the existing source-generated discovery (`KoanRegistry`) and topological orderin
 - `void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)` (virtual) — publish
   provenance. Named `Report` (not `Describe`) to disambiguate from per-provider capabilities
   (`IDescribesCapabilities.Describe`, ARCH-0084).
+- `void ReportComposition(KoanCompositionBuilder composition, IServiceProvider services)` (virtual) —
+  optionally project already-resolved safe decisions from this active retained module. Do not perform
+  provider election, structural contribution, or application work here.
 
 #### Usage Example
 
 ```csharp
 public sealed class MyPillarModule : KoanModule
 {
-    public override string Id => "my.pillar";
-
     public override void Register(IServiceCollection services)
         => services.AddSingleton<IMyService, MyService>();
 
@@ -223,14 +225,32 @@ public sealed class MyPillarModule : KoanModule
         // one-time startup work, DI available, ordered by [Before]/[After]
         return Task.CompletedTask;
     }
+
+    public override void ReportComposition(
+        KoanCompositionBuilder composition,
+        IServiceProvider services)
+    {
+        var plan = services.GetRequiredService<MyPillarPlan>();
+        composition.AddObservation(
+            "koan.my-pillar.plan.selected",
+            "my-pillar:plan",
+            $"Koan selected '{plan.Posture}' for MyPillar.",
+            plan.Reason,
+            Id);
+    }
 }
 ```
 
 #### When to Use
-New boot-time modules (a pillar, connector, or app-level wiring). Recurring periodic/pokable work stays on
-the `IKoanBackgroundService` family — `Start` models one-time ordered startup only. Code that registers
-services (e.g. recipes) or must run before the container is built belongs in `Register`, not `Start` (which
-receives an already-built `IServiceProvider`).
+New framework or capability-package modules. Recurring periodic/pokable work stays on the
+`IKoanBackgroundService` family — `Start` models one-time ordered startup only. Code that registers
+services belongs in `Register`, not `Start`. `ReportComposition` is a fail-soft projection of canonical
+plans/receipts; never create a separate discoverable reporter or place configuration values, credentials,
+ambient context values, or business payloads in it. Application developers normally need only `AddKoan()`.
+
+Cross-module contracts belong in an isolated `*.Core`, `*.Abstractions`, or `*.Contracts` assembly with
+no `KoanModule`. Reference that contracts assembly when only its API is needed; reference the functional
+assembly when the capability should participate. No Koan-specific project-reference metadata is required.
 
 ### [KoanDiscoverable] + KoanRegistry.GetDiscoveredImplementors
 
@@ -269,7 +289,7 @@ hand-rolling an `AppDomain` assembly scan. Used by `IKoanAuthEventContributor` /
 
 **Purpose**: Read a configuration value **with source attribution** — returns not just the value but
 where it came from (appsettings, environment variable, LaunchKit, etc.). This is the preferred
-method inside `IKoanAutoRegistrar.Describe()` to report settings with their origin.
+method inside `KoanModule.Report(...)` to report settings with their origin.
 
 #### Return type: `ConfigurationValue<T>`
 
@@ -333,8 +353,8 @@ public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnv
 ```
 
 #### When to Use
-- Inside `IKoanAutoRegistrar.Describe()` to show where settings came from in the boot report
-- Connector auto-registrars reporting their resolved configuration
+- Inside `KoanModule.Report(...)` to show where settings came from in the boot report
+- Connector modules reporting their resolved configuration
 - Any diagnostic context where traceability of config values matters
 - Use plain `Configuration.Read<T>()` when you only need the resolved value
 
@@ -395,7 +415,7 @@ public void Register(IServiceCollection services, IConfiguration configuration)
 ```
 
 #### When to Use
-- KoanAutoRegistrar implementations
+- `KoanModule.Register` implementations
 - Options configuration in any Koan component
 - Layered configuration scenarios (appsettings → environment → code)
 
@@ -742,9 +762,9 @@ public class MongoRepository<T>
 **Location**: `src/Koan.Core/Provenance/ProvenanceModuleWriter.cs` and
 `src/Koan.Core/Hosting/Bootstrap/ProvenanceModuleExtensions.cs`
 **Pattern**: Fluent writer + extension methods
-**Used in**: `IKoanAutoRegistrar.Describe(ProvenanceModuleWriter module, ...)`
+**Used in**: `KoanModule.Report(ProvenanceModuleWriter module, ...)`
 
-`ProvenanceModuleWriter` is the object passed to `Describe()` for every `IKoanAutoRegistrar`. Use it
+`ProvenanceModuleWriter` is the object passed to `Report()` for every active `KoanModule`. Use it
 to contribute structured metadata to the framework boot report.
 
 #### Full API
@@ -793,8 +813,8 @@ public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnv
 ```
 
 #### When to Use
-- In every `IKoanAutoRegistrar.Describe()` implementation
-- Connector auto-registrars reporting resolved configuration
+- In every `KoanModule.Report(...)` implementation that has configuration to explain
+- Connector modules reporting resolved configuration
 - Any module that wants to appear in the Koan boot report or ZenGarden topology
 
 ---
