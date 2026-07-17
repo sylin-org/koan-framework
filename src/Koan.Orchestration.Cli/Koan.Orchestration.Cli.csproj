@@ -5,15 +5,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Koan.Orchestration.Cli</RootNamespace>
-    <Description>Command-line interface for Koan orchestration: discover modules, render Compose bundles, and execute provider workflows.</Description>
+    <Description>Koan development-host CLI: discover application services, compile plans, render Compose bundles, and execute provider workflows.</Description>
     <PackageTags>$(CommonPackageTags);cli;orchestration;compose;devhost</PackageTags>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>koan-orchestrate</ToolCommandName>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Koan.Orchestration.Cli.Core\Koan.Orchestration.Cli.Core.csproj" />
     <ProjectReference Include="..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
     <ProjectReference Include="..\Connectors\Orchestration\Renderers\Compose\Koan.Orchestration.Renderers.Connector.Compose.csproj" />
     <ProjectReference Include="..\Connectors\Orchestration\Docker\Koan.Orchestration.Connector.Docker.csproj" />
     <ProjectReference Include="..\Connectors\Orchestration\Podman\Koan.Orchestration.Connector.Podman.csproj" />

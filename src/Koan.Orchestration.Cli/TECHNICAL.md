@@ -6,7 +6,7 @@ since: 0.6.3
 packages: [Sylin.Koan.Orchestration.Cli]
 source: src/Koan.Orchestration.Cli/
 validation:
-  date: 2025-09-29
+  date: 2026-07-17
   status: verified
 ---
 
@@ -16,6 +16,10 @@ validation:
 - Support workflows for describing environments (`inspect`), exporting compose bundles, running/stopping stacks, checking health, and tailing logs.
 - Enforce safe defaults: prod profiles never start containers, host port conflicts are detected and handled deterministically, and outputs redact sensitive values.
 - Persist local planning decisions (launch manifest, overrides) so repeated runs are stable across profiles and hosts.
+
+Planning and command execution are deliberately internal to this executable. Reusable provider,
+exporter, and plan contracts live in `Sylin.Koan.Orchestration.Abstractions`; Koan does not publish a
+second implementation package whose only consumer is this CLI.
 
 ## Command surface
 

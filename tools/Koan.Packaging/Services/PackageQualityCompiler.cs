@@ -327,12 +327,17 @@ internal sealed class PackageQualityCompiler(string repositoryRoot)
 
     private static bool ContainsInstallInstruction(string content, PackageProject project)
     {
-        var command = project.PackAsTool
-            ? $"dotnet tool install {project.PackageId}"
-            : project.PackageType.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Contains("Template", StringComparer.OrdinalIgnoreCase)
-                ? $"dotnet new install {project.PackageId}"
-                : $"dotnet add package {project.PackageId}";
+        if (project.PackAsTool)
+        {
+            return content.Contains($"dotnet tool install {project.PackageId}", StringComparison.OrdinalIgnoreCase) ||
+                   content.Contains($"dotnet tool install --global {project.PackageId}", StringComparison.OrdinalIgnoreCase) ||
+                   content.Contains($"dotnet tool install -g {project.PackageId}", StringComparison.OrdinalIgnoreCase);
+        }
+
+        var command = project.PackageType.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Contains("Template", StringComparer.OrdinalIgnoreCase)
+            ? $"dotnet new install {project.PackageId}"
+            : $"dotnet add package {project.PackageId}";
         return content.Contains(command, StringComparison.OrdinalIgnoreCase);
     }
 

@@ -39,7 +39,7 @@ and generated quality report. It does not run the complete release ratchet.
 | Family | Scope | Status |
 |---|---|---|
 | foundation runtime | Core, Data contracts/runtime, JSON, SQLite, Web, Communication | passed |
-| contract isolation | ZenGarden, AI contracts, Vector/Media abstractions, Orchestration CLI contracts | pending |
+| contract isolation | ZenGarden, AI contracts, Vector/Media abstractions, Orchestration CLI contracts | in progress |
 | provider families | Data, Vector, AI, Cache, Storage, Auth, Orchestration providers | pending |
 | semantic capabilities | Jobs, MCP, AI, Cache, Tenancy, Identity, Canon, Media, Classification, Security | pending |
 | projections and tools | Web add-ons, testing, analyzers, generators, CLI and operator surfaces | pending |
@@ -74,6 +74,24 @@ its single-process, whole-file, non-transactional boundary explicitly.
 
 This passes the foundation family only. It is not a release certification and does not promote `structurally-ready`
 into a support claim.
+
+## Contract-isolation progress
+
+- `Sylin.Koan.ZenGarden.Core` was renamed to `Sylin.Koan.ZenGarden.Contracts`; reusable endpoint, initialization,
+  tool, and capability vocabulary now states its inert role directly and functional activation remains in
+  `Sylin.Koan.ZenGarden`.
+- `Sylin.Koan.Orchestration.Cli.Core` was dissolved. Its public package claim was false—the containing types were
+  internal and consumed only by the executable—so planning and command mechanics now live with their only runtime
+  owner in `Sylin.Koan.Orchestration.Cli`. The retained Abstractions package remains the independent provider/exporter
+  SPI.
+- focused CLI proof: restored dependency graph, warning-free Release build, executable `--help`, and a clean tool
+  package containing the owned README and canonical icon; the quality compiler now recognizes standard
+  `dotnet tool install --global` first-use instructions.
+- generated truth after the CLI merge: 107 packages, 34 repair-required, 56 review-required, 17 structurally ready,
+  and 223 findings. The dissolved false boundary removes one package and its two findings; the retained CLI advances
+  to structurally ready.
+- AI, Vector, Storage, and Media boundaries remain under assessment; none is graduated merely because its name says
+  `Contracts` or `Abstractions`.
 
 ## Acceptance
 

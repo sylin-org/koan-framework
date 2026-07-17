@@ -137,7 +137,6 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Orchestration.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Orchestration.Aspire` | `projection` | `assess` |
 | `Sylin.Koan.Orchestration.Cli` | `tool` | `assess` |
-| `Sylin.Koan.Orchestration.Cli.Core` | `capability` | `assess` |
 | `Sylin.Koan.Orchestration.Connector.Docker` | `provider` | `assess` |
 | `Sylin.Koan.Orchestration.Connector.Podman` | `provider` | `assess` |
 | `Sylin.Koan.Orchestration.Generators` | `analyzer` | `assess` |
@@ -176,8 +175,8 @@ in the family disposition tables, not as phantom active-package rows.
 1. **Foundations and entry points:** `Sylin.Koan.Core`, the former Core adapter mechanism, Orchestration contracts, both bundles,
    Templates, Web, Data abstractions/runtime, JSON, SQLite, and Communication. This establishes the golden package
    journey and tests whether every public boundary is earned.
-2. **Contract-isolation anomalies:** review `ZenGarden.Core` (derived as capability though its description says
-   contracts), the two AI contract packages, Vector and Media abstractions, and `Orchestration.Cli.Core`. Ambiguous
+2. **Contract-isolation anomalies:** review the former `ZenGarden.Core` contract boundary, the two AI contract
+   packages, Vector and Media abstractions, and the former `Orchestration.Cli.Core` implementation split. Ambiguous
    derivation is evidence, not an instruction to add role metadata.
 3. **Mechanism candidates:** review `Data.Relational.Dapper`, Identity's fine-grained packages,
    MCP Explorer/Operations, and build/runtime splits for merge or clearer independent intent before documentation.
@@ -199,6 +198,7 @@ terminal package decisions; the listed boundary repairs happen before graduation
 | `Sylin.Koan.Core` | `keep` | Mandatory composition, context, provenance, health, discovery, and module substrate shared by every functional concern. Remove the reverse dependency on DevHost orchestration contracts; runtime service description belongs at this always-present boundary. |
 | `Sylin.Koan.Core.Adapters` | `merge` (implemented) | It did not state an application capability or provider choice. Generic readiness/lifecycle now belongs to Core; data paging and schema behavior belong to Data; discovery reporting belongs to the Core discovery owner. Dead orchestration bridge types and the public package were removed. |
 | `Sylin.Koan.Orchestration.Abstractions` | `keep` | Inert DevHost vocabulary for CLI hosting providers, exporters, plans, and renderers. Slim it to that contract and keep functional activation in CLI/provider packages; application Core must not depend on it. |
+| `Sylin.Koan.Orchestration.Cli.Core` | `merge` (implemented) | Every implementation type was internal and visible only to the CLI, despite package prose claiming a reusable public surface. Planning, discovery, endpoint formatting, and launch-manifest behavior now have one honest owner: the CLI executable. |
 | `Sylin.Koan.Data.Abstractions` | `keep` | Entity and repository vocabulary independently consumed by providers, projections, and modules without selecting a data runtime or backend. Its legacy ASP.NET JSON Patch dependency and duplicate object-shaped patch path were removed; the boundary now exposes one provider-neutral `PatchPayload`. |
 | `Sylin.Koan.Data.Core` | `keep` | Entity data runtime and provider election. It owns data-specific adapter policy after the `Core.Adapters` redistribution. |
 | `Sylin.Koan.Data.Connector.Json` | `keep` | Bounded, file-backed local provider that gives the foundation bundle an immediate meaningful result. Its package page must state its concurrency and deployment limits plainly. |

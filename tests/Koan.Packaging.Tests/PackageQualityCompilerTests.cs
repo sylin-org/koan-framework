@@ -80,6 +80,38 @@ public sealed class PackageQualityCompilerTests : IDisposable
     }
 
     [Fact]
+    public void AcceptsTheStandardGlobalToolInstallExpression()
+    {
+        var tool = Project(
+            "Sylin.Koan.Tool",
+            packAsTool: true,
+            description: "A packaged command-line tool with one explicit operator-facing purpose.");
+        File.WriteAllText(
+            Path.Combine(tool.ProjectDirectory, "README.md"),
+            """
+            # Sylin.Koan.Tool
+
+            ## Install
+
+            `dotnet tool install --global Sylin.Koan.Tool`
+
+            ## Use
+
+            Run the installed tool to produce its meaningful result.
+
+            ## Boundaries
+
+            The tool reports corrective failures and its unsupported scenarios.
+            """);
+
+        var assessment = Assessment(Compiler().Compile([tool]), tool);
+
+        Assert.DoesNotContain(
+            assessment.Findings,
+            code => code == PackagingConstants.PackageQuality.Findings.MissingInstall);
+    }
+
+    [Fact]
     public void ProducesDeterministicMachineAndHumanReports()
     {
         var firstPackage = Project(

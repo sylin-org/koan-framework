@@ -57,8 +57,7 @@ owned by functional `KoanModule` implementations.
 
 ## Related packages
 
-- `Sylin.Koan.Orchestration.Cli.Core`: planning and command runtime.
-- `Sylin.Koan.Orchestration.Cli`: operator executable.
+- `Sylin.Koan.Orchestration.Cli`: operator executable and owner of planning and command runtime.
 - `Sylin.Koan.Orchestration.Connector.Docker` and `.Podman`: hosting providers.
 - `Sylin.Koan.Orchestration.Renderers.Connector.Compose`: Compose artifact exporter.
 - `Sylin.Koan.Orchestration.Generators`: build-time manifest observation.

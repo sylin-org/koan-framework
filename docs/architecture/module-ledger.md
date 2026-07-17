@@ -357,7 +357,7 @@
 
 ### Koan.Orchestration.Abstractions
 - Depends on: –
-- Depended by: Koan.Orchestration.Cli, Koan.Orchestration.Cli.Core, Koan.Orchestration.Connector.Docker, Koan.Orchestration.Connector.Podman, Koan.Orchestration.Renderers.Connector.Compose
+- Depended by: Koan.Orchestration.Cli, Koan.Orchestration.Connector.Docker, Koan.Orchestration.Connector.Podman, Koan.Orchestration.Renderers.Connector.Compose
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Orchestration.Aspire
@@ -366,33 +366,28 @@
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Orchestration.Cli
-- Depends on: Koan.Orchestration.Abstractions, Koan.Orchestration.Cli.Core, Koan.Orchestration.Connector.Docker, Koan.Orchestration.Connector.Podman, Koan.Orchestration.Renderers.Connector.Compose
+- Depends on: Koan.Orchestration.Abstractions, Koan.Orchestration.Connector.Docker, Koan.Orchestration.Connector.Podman, Koan.Orchestration.Generators, Koan.Orchestration.Renderers.Connector.Compose
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Orchestration.Cli.Core
-- Depends on: Koan.Orchestration.Abstractions, Koan.Orchestration.Connector.Docker, Koan.Orchestration.Connector.Podman, Koan.Orchestration.Generators, Koan.Orchestration.Renderers.Connector.Compose
-- Depended by: Koan.Orchestration.Cli
-- Documentation: README ❌ · TECHNICAL ❌
-
 ### Koan.Orchestration.Connector.Docker
 - Depends on: Koan.Core, Koan.Orchestration.Abstractions
-- Depended by: Koan.Orchestration.Cli, Koan.Orchestration.Cli.Core
+- Depended by: Koan.Orchestration.Cli
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Orchestration.Connector.Podman
 - Depends on: Koan.Core, Koan.Orchestration.Abstractions
-- Depended by: Koan.Orchestration.Cli, Koan.Orchestration.Cli.Core
+- Depended by: Koan.Orchestration.Cli
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Orchestration.Generators
 - Depends on: –
-- Depended by: Koan.Orchestration.Cli.Core
+- Depended by: Koan.Orchestration.Cli
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Orchestration.Renderers.Connector.Compose
 - Depends on: Koan.Core, Koan.Orchestration.Abstractions
-- Depended by: Koan.Orchestration.Cli, Koan.Orchestration.Cli.Core
+- Depended by: Koan.Orchestration.Cli
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Security.Trust

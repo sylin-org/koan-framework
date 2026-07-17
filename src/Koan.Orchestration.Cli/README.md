@@ -1,12 +1,35 @@
-# Koan Orchestration CLI - Build and Install
+# Sylin.Koan.Orchestration.Cli
 
-> ✅ Validated against planning pipeline, provider workflows, and endpoint formatting on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for detailed flows, edge cases, and component references.
+> ✅ Validated against the planning pipeline, provider workflows, and endpoint formatting on **2026-07-17**. See [`TECHNICAL.md`](./TECHNICAL.md) for detailed flows, edge cases, and component references.
 
-This CLI provides inspect/export/doctor/up/down/status/logs for Koan orchestration (Docker/Podman).
+Koan's development-host tool discovers an application's declared services, compiles an inspectable plan, and can
+render or run that plan through Docker or Podman. Planning is part of this executable; provider and exporter authors
+depend only on `Sylin.Koan.Orchestration.Abstractions`.
+
+## Install
+
+```powershell
+dotnet tool install --global Sylin.Koan.Orchestration.Cli
+koan-orchestrate --help
+```
+
+Use `dotnet tool update --global Sylin.Koan.Orchestration.Cli` to move an existing installation forward.
+
+## Smallest meaningful use
+
+From a Koan application checkout:
+
+```powershell
+koan-orchestrate inspect
+koan-orchestrate export compose
+```
+
+`inspect` explains the discovered application and services. `export compose` writes `.Koan/compose.yml` from the same
+plan without starting containers. Use `up` only when you intend to start the selected local engine.
 
 ## Prerequisites
 
-- .NET SDK 9.0 or newer (verify with `dotnet --info`).
+- .NET SDK 10.0 or newer (verify with `dotnet --info`).
 - One container engine if you plan to run services: Docker Desktop or Podman.
 
 Optional environment knobs:
@@ -15,6 +38,17 @@ Optional environment knobs:
 - `Koan_ORCHESTRATION_PREFERRED_PROVIDERS` - comma-separated provider order, e.g. `docker,podman`.
 - `Koan_PORT_PROBE_MAX` - max increments when auto-avoiding host ports in non-prod (default 200).
 - `Koan_NO_INSPECT` - set to `1` to suppress the automatic `inspect` banner in human mode.
+
+## Guarantees and boundaries
+
+- `inspect` and `export` are useful without a running container engine; lifecycle commands require Docker or Podman.
+- `up` is intentionally disabled for Staging and Prod profiles. The tool produces development artifacts; it is not a
+  production deployment engine.
+- Generated `.Koan` state is local planning state and is excluded from source control automatically.
+- Human-oriented output redacts recognized sensitive keys. JSON output is intended for trusted automation and is not
+  redacted.
+- A project that declares no services produces an empty plan; Koan does not invent demo infrastructure.
+- Provider availability, port ownership, and container readiness depend on the selected local engine and host.
 
 ## Quick run (no install)
 
@@ -43,7 +77,7 @@ dotnet build src/Koan.Orchestration.Cli -c Release
 
 Artifacts (Release):
 
-- Windows: `src/Koan.Orchestration.Cli/bin/Release/net9.0/` (framework-dependent) or `publish/` (if published).
+- Windows: `src/Koan.Orchestration.Cli/bin/Release/net10.0/` (framework-dependent) or `publish/` (if published).
 - macOS/Linux: same path, platform-specific if published.
 
 ## Publish binaries (optional)
@@ -99,9 +133,9 @@ Koan doctor --json
 ## Verify
 
 ```pwsh
-Koan doctor
-Koan export compose --out compose.yaml
-Koan status --json
+koan-orchestrate doctor
+koan-orchestrate export compose --out compose.yaml
+koan-orchestrate status --json
 ```
 
 ## Batched scripts (Windows PowerShell)
@@ -161,7 +195,7 @@ Precedence (first hit wins):
 - Descriptor file in project root: `Koan.orchestration.yml|yaml|json`.
 - Environment-driven prototype: `Koan_DATA_PROVIDER=postgres|redis` shortcuts.
 - Discovery via generated manifest (preferred) or reflection of adapter attributes.
-- Fallback demo plan (single Postgres).
+- Empty plan when the project declares no services.
 
 Generated manifest: adapters annotate with attributes (ServiceId, ContainerDefaults, EndpointDefaults, AppEnvDefaults); a source generator emits `Koan.Orchestration.__KoanOrchestrationManifest.Json`. The CLI prefers this manifest over reflection for stability and speed.
 
@@ -204,7 +238,7 @@ New-Item -ItemType Directory -Force -Path .Koan | Out-Null
 '{"Mode":"Local","Services":{"mongo":{"Env":{"MONGO_INITDB_ROOT_USERNAME":"root"},"Volumes":["./Data/mongo:/data/db"]}}}' | \
 	Set-Content .Koan/overrides.json
 
-Koan export compose
+koan-orchestrate export compose
 ```
 
 See also

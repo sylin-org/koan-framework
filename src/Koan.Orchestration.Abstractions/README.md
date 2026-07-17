@@ -10,8 +10,8 @@ dotnet add package Sylin.Koan.Orchestration.Abstractions
 ```
 
 Most application developers should not reference this package. Choose it when implementing a DevHost
-engine or artifact renderer that must plug into `Sylin.Koan.Orchestration.Cli.Core` without activating
-the CLI, Docker, Podman, Compose export, or an application runtime capability.
+engine or artifact renderer that must plug into `Sylin.Koan.Orchestration.Cli` without activating the
+CLI, Docker, Podman, Compose export, or an application runtime capability.
 
 ## Smallest meaningful use
 

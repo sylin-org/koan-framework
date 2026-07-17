@@ -1557,7 +1557,7 @@
     {
       "packageId": "Sylin.Koan.Orchestration.Cli",
       "shape": "tool",
-      "description": "Command-line interface for Koan orchestration: discover modules, render Compose bundles, and execute provider workflows.",
+      "description": "Koan development-host CLI: discover application services, compile plans, render Compose bundles, and execute provider workflows.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1565,24 +1565,6 @@
       "readme": "src/Koan.Orchestration.Cli/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Orchestration.Cli/TECHNICAL.md",
-      "claims": []
-    },
-    {
-      "packageId": "Sylin.Koan.Orchestration.Cli.Core",
-      "shape": "library",
-      "description": "Core orchestration logic for the Koan CLI: app discovery, manifest assembly, compose generation, and provider election. Shared with the CLI front-end (Koan.Orchestration.Cli) and consumable by tooling that builds on the same primitives.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Orchestration.Abstractions",
-        "Sylin.Koan.Orchestration.Connector.Docker",
-        "Sylin.Koan.Orchestration.Connector.Podman",
-        "Sylin.Koan.Orchestration.Renderers.Connector.Compose"
-      ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
       "claims": []
     },
     {

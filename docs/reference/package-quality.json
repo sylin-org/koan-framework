@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 108,
-    "repairRequired": 35,
-    "reviewRequired": 57,
-    "structurallyReady": 16,
+    "packages": 107,
+    "repairRequired": 34,
+    "reviewRequired": 56,
+    "structurallyReady": 17,
     "ownedReadmes": 73,
     "technicalCompanions": 63,
-    "findings": 229
+    "findings": 223
   },
   "findingDefinitions": [
     {
@@ -1748,8 +1748,8 @@
       "projectPath": "src/Koan.Orchestration.Cli/Koan.Orchestration.Cli.csproj",
       "shape": "tool",
       "role": "tool",
-      "status": "review-required",
-      "description": "Command-line interface for Koan orchestration: discover modules, render Compose bundles, and execute provider workflows.",
+      "status": "structurally-ready",
+      "description": "Koan development-host CLI: discover application services, compile plans, render Compose bundles, and execute provider workflows.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1757,36 +1757,7 @@
       "readme": "src/Koan.Orchestration.Cli/README.md",
       "technicalDocumentation": "src/Koan.Orchestration.Cli/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
-    },
-    {
-      "packageId": "Sylin.Koan.Orchestration.Cli.Core",
-      "projectPath": "src/Koan.Orchestration.Cli.Core/Koan.Orchestration.Cli.Core.csproj",
-      "shape": "library",
-      "role": "capability",
-      "status": "repair-required",
-      "description": "Core orchestration logic for the Koan CLI: app discovery, manifest assembly, compose generation, and provider election. Shared with the CLI front-end (Koan.Orchestration.Cli) and consumable by tooling that builds on the same primitives.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Orchestration.Abstractions",
-        "Sylin.Koan.Orchestration.Connector.Docker",
-        "Sylin.Koan.Orchestration.Connector.Podman",
-        "Sylin.Koan.Orchestration.Renderers.Connector.Compose"
-      ],
-      "readme": null,
-      "technicalDocumentation": null,
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Orchestration.Connector.Docker",
