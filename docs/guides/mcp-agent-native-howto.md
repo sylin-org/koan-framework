@@ -5,7 +5,7 @@ title: "Agent-native MCP — from one attribute to governed access"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-06-20
-framework_version: v0.17
+framework_version: source-first
 validation:
   date_last_tested: 2026-06-20
   status: verified
@@ -19,7 +19,7 @@ related_guides:
 
 # Agent-native MCP — from one attribute to governed access
 
-> A single walkthrough that grows one entity from *"an agent can call it"* to *"an agent calls exactly what it's allowed to, is told what it could unlock, and leaves an audit trail."* Each step shows **what you write**, **what the agent sees**, and **what happens**. The transport details (STDIO vs HTTP/SSE, auth, streaming) are in [mcp-http-sse-howto.md](mcp-http-sse-howto.md); the authorization model is in [authorization-howto.md](authorization-howto.md). One-screen maps: [agent-native card](../reference/cards/agent-native.md) · [mcp card](../reference/cards/mcp.md).
+> A single walkthrough that grows one entity from *"an agent can call it"* to *"an agent calls exactly what it's allowed to, is told what it could unlock, and leaves an audit trail."* Each step shows **what you write**, **what the agent sees**, and **what happens**. Streamable HTTP, authentication, and session details are in [MCP over HTTP](mcp-http-sse-howto.md); the authorization model is in [authorization-howto.md](authorization-howto.md). One-screen maps: [agent-native card](../reference/cards/agent-native.md) · [mcp card](../reference/cards/mcp.md).
 
 ## The one idea
 
@@ -36,7 +36,9 @@ A Koan app projects itself to an agent as `project(model × grant)` — **one pr
 | 7 Compose | *Code Mode* | many steps in one sandboxed call |
 | 8 Govern | `AgentGrant` · `[Audit]` · `[Door]` | lent access, an audit trail, and signposted locks |
 
-**Reference = Intent.** *Referencing* the `Koan.Mcp` package is the whole opt-in — its auto-registrar wires the MCP services and hosts the STDIO server for you. You never call `AddKoanMcp()`; `AddKoan()` discovers it. Everything below is just declarations on entities you already have.
+**Reference = Intent.** Referencing `Koan.Mcp` contributes its `KoanModule`; `AddKoan()` compiles and
+activates that module and hosts the STDIO server. Ordinary applications never call `AddKoanMcp()`.
+Everything below is a declaration on entities you already have.
 
 ```csharp
 // Program.cs — the whole bootstrap for a local (STDIO) MCP server.
@@ -177,7 +179,7 @@ Some verbs should depend on *where the call arrived*, not *who* the caller is �
 [Access(read: "anyone", write: "owner", remove: "origin:local, is:admin")]   // local agent OR an admin may remove
 ```
 
-**What the agent sees** — a STDIO agent (running beside the app) sees `note.delete`; a remote HTTP/SSE agent does not (its `can:[]` simply omits the local-only verb).
+**What the agent sees** — a STDIO agent (running beside the app) sees `note.delete`; a remote Streamable HTTP agent does not (its `can:[]` simply omits the local-only verb).
 
 **What happens** — the framework stamps an **un-forgeable** `koan:origin` claim at the transport edge (STDIO → `local`, HTTP → `remote`, or `internal` when the source IP is in a declared trusted network — fail-closed). Origin is *orthogonal to identity*: a STDIO call is `local` yet anonymous, so it satisfies `origin:local` without signing in. Declare the LAN once (`Koan:Web:Origin:InternalNetworks`) and homelab clients are treated as `internal`.
 

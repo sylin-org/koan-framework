@@ -5,7 +5,7 @@ title: "Jobs — pillar map"
 audience: [developers, ai-agents]
 status: current
 last_updated: 2026-07-16
-framework_version: v0.19.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-16
   status: verified
@@ -84,4 +84,6 @@ public static async Task Execute(Crawl job, JobContext ctx, CancellationToken ct
 
 ## The sample that shows it
 
-[`samples/S14.AdapterBench`](../../../samples/S14.AdapterBench/README.md) — `BenchmarkJob : Entity<BenchmarkJob>, IKoanJob<BenchmarkJob>` runs an adapter benchmark in the background and streams durable `ctx.Progress(...)` to the ledger (mirrored to SignalR for the live UI).
+[`samples/GoldenJourney`](../../../samples/GoldenJourney/README.md) —
+`ReviewRequest : Entity<ReviewRequest>, IKoanJob<ReviewRequest>` performs a business assessment,
+records durable progress, and exposes the result through the same HTTP and agent-visible application.

@@ -2,7 +2,7 @@
 
 **Boot the application composition you actually want to test.** `KoanIntegrationHost` wraps a real
 .NET generic host without taking a dependency on xUnit or choosing which Koan modules to activate.
-Use it when a test needs DI, hosted-service lifecycle, and Koan's normal reflective discovery path.
+Use it when a test needs DI, hosted-service lifecycle, and Koan's normal compiled composition path.
 
 Repository development references `src/Koan.Testing.Hosting` directly. Consume published Koan
 packages only as one coherent version set; external package-set readiness is tracked separately from

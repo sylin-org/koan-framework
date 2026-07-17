@@ -125,7 +125,7 @@ provides confirmed Transport, competing-group signals, and ephemeral per-node br
 authenticated context, but
 not remote settlement, retries, deduplication, dead letters, replay, Events, or outbox coupling.
 Jobs wake and Cache peer invalidation both reuse Communication while retaining their different delivery topology.
-Legacy `Koan.Messaging` is not the implementation behind this API.
+No arbitrary-object messaging surface is implemented underneath this API.
 
 See the [Communication reference](../../docs/reference/communication/index.md) and
 [ARCH-0113](../../docs/decisions/ARCH-0113-entity-capability-communication.md).

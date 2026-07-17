@@ -5,7 +5,7 @@ title: "Koan Product Constitution"
 audience: [architects, developers, maintainers, ai-agents]
 status: current
 last_updated: 2026-07-17
-framework_version: v0.20.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-17
   status: reviewed
@@ -16,7 +16,7 @@ validation:
 
 This document defines the durable product rules used to decide what Koan should become. It does not
 claim that every current package satisfies them. Current behavior is established by source, tests, and
-the [capability evidence ledger](../initiatives/koan-v1/CAPABILITIES.md).
+the generated [product surface](../reference/product-surface.md).
 
 ## Promise
 
@@ -115,8 +115,7 @@ answer them publicly.
 Code presented as an active sample is therefore a product contract, not a scratchpad or historical
 illustration. Every active sample must be a golden example of the preferred Koan application grammar,
 good .NET practice, a meaningful business result, truthful limitations, and executable evidence. Work
-that has not reached that bar may be incubated or archived during migration, but it must not be presented
-as supported curriculum.
+that has not reached that bar stays outside the public curriculum or is archived.
 
 ## A meaningful step
 

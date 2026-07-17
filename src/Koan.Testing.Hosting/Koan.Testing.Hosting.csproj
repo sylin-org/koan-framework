@@ -1,17 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    ARCH-0091 + P2.1: the xUnit-AGNOSTIC slice of the shared test harness — the ARCH-0079 reflective
+    ARCH-0091 + P2.1: the xUnit-AGNOSTIC slice of the shared test harness — a real compiled
     AddKoan() host (KoanIntegrationHost). Carries NO xUnit dependency so it can be referenced by BOTH
     xUnit v2 (the fenced tests/Suites/Jobs projects) and xUnit v3 consumers without an Xunit.* assembly
     collision. Promoted to src/ and shipped (Sylin.Koan.Testing.Hosting) so consumers can boot the same
-    reflective host their app uses — the foundation the conformance kit (Sylin.Koan.Testing) builds on.
+    composition matching the host their app uses — the foundation the conformance kit (Sylin.Koan.Testing) builds on.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
-    <Description>Koan test harness — the ARCH-0079 reflective AddKoan() integration host (KoanIntegrationHost), xUnit-agnostic. Boot a real Koan host in your app's tests.</Description>
+    <Description>Koan test harness — the AddKoan() integration host (KoanIntegrationHost), xUnit-agnostic. Boot a real compiled Koan composition in your app's tests.</Description>
     <PackageTags>$(CommonPackageTags);testing;integration-testing;harness</PackageTags>
   </PropertyGroup>
   <ItemGroup>

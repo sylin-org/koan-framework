@@ -5,7 +5,7 @@ title: "Background Jobs How-To"
 audience: [developers, architects]
 status: current
 last_updated: 2026-07-16
-framework_version: v0.19.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-16
   status: verified
@@ -49,7 +49,7 @@ That's all the wiring there is. **Reference = Intent**: adding `Koan.Jobs` and i
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();   // discovers your jobs, starts the worker
 var app = builder.Build();
-app.Run();
+await app.RunAsync();
 ```
 
 With no data adapter referenced, jobs run in-memory (fast, ephemeral). Add a data adapter (SQLite, Postgres, Mongo, SQL Server) and the same jobs become **durable**—they survive restarts. You change nothing in your job code; see [§10](#10-durability-pick-your-tier).

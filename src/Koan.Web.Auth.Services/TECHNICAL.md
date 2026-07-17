@@ -97,9 +97,9 @@ graph TD
     I -->|No| K[Throw ServiceDiscoveryException]
 ```
 
-### Attribute Processing
+### Attribute processing
 
-The auto-registrar processes attributes using reflection:
+`AuthServicesModule` processes service metadata during compiled module startup:
 
 ```csharp
 private ServiceMetadata[] DiscoverServices()

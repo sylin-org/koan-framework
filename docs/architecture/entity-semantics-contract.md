@@ -5,7 +5,7 @@ title: "Entity Semantics Contract"
 audience: [architects, developers, framework-authors, ai-agents]
 status: current
 last_updated: 2026-07-16
-framework_version: v0.19.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-16
   status: reviewed
@@ -19,12 +19,11 @@ business behavior and the primary IntelliSense discovery surface for capabilitie
 entity. This contract keeps that advantage without turning Entity into a catalog of everything Koan
 can do.
 
-The contract is normative for new APIs and changes to existing APIs. It does not claim the v0.17
-surface already conforms. The [R03 inventory](../initiatives/koan-v1/R03-ENTITY-INVENTORY.md) identifies
-the original deltas. [ARCH-0113](../decisions/ARCH-0113-entity-capability-communication.md) supersedes
-the earlier lifecycle/event/messaging split and records the greenfield rebuild order.
+The contract is normative for current APIs and new capability design. Source, focused tests, and the
+[generated product surface](../reference/product-surface.md) determine which parts are implemented and
+their maturity.
 
-R07-14 applies the same lifting law to Jobs without pretending Jobs is Communication: scalar
+Jobs follow the same lifting law without pretending Jobs is Communication: scalar
 `entity.Job.Submit()` and direct finite/async source `Submit()` converge only at the Jobs-owned ledger
 acceptance chokepoint. The source terminal captures context once, preserves order and multiplicity,
 uses bounded backpressure, and returns a fixed-size accepted-prefix summary. The static `.Jobs` facet
@@ -110,7 +109,7 @@ Adding every type-wide operation as another top-level static method will eventua
 unreadable. A module therefore contributes one or a very small number of noun facets:
 
 ```csharp
-// Illustrative contract shape; individual APIs graduate through their own work items.
+// Representative facet shape; use only facets supplied by referenced modules.
 var related = await Article.Semantic.Search("food security", ct);
 await Article.Cache.Flush(ct);
 Article.Lifecycle.BeforeUpsert(...);
@@ -122,8 +121,8 @@ belongs to the cache control plane. Facet names are short domain/capability noun
 `Helper`, or `Service` wrappers.
 
 Static facet syntax never licenses a process-global mutable registry. Communication receiver behavior
-uses stable business-named typed handlers discovered by the host. A future Entity-shaped composition
-facade is admitted only if it is genuinely host-bound and replaces rather than duplicates that path.
+uses stable business-named typed handlers compiled into the host. Any Entity-shaped composition facade
+must be genuinely host-bound and replace rather than duplicate that path.
 
 ### 3. Modules extend the language; Data.Core does not predict them
 
@@ -142,7 +141,7 @@ Consequences:
 - module control-plane APIs remain in the module's own namespace;
 - two modules may not claim the same facet/member without an explicit composition decision.
 
-R04's checked-in .NET 10 consumer suite proves static and instance extension members on constrained
+The checked-in .NET 10 consumer suite proves static and instance extension members on constrained
 Entity subtypes, module absence/presence/removal, invalid receivers, and collision behavior. Every new
 facet must extend those cells for its own scalar, type, set, and stream forms.
 
@@ -260,13 +259,12 @@ public sealed class ImportTodo : IReceiveEntity<Todo> { /* business code */ }
 await todo.Transport.Send(ct);
 ```
 
-Implementation status through R07-18: Lifecycle and both process-local Communication lanes ship. Local
+Current support boundary: Lifecycle and both process-local Communication lanes ship. Local
 Events prove payloadless/explicit details, occurrence identity, subscription fan-out, zero-subscriber
 success, isolated copies, context carriage, acceptance, settlement, and independent bounded ingress.
 Direct-reference election, RabbitMQ Transport, and startup-declared business channels also ship with
 focused conformance. Stable distributed receiver aliases, retries, RabbitMQ Events, and heterogeneous
-contract negotiation remain unimplemented; those paragraphs below remain admission contracts rather
-than current capability claims.
+contract negotiation are not supported.
 
 Lifecycle registration is deterministic, idempotent per owner, removable, host-scoped, and invoked by
 the canonical Data operation path. Before-hooks may reject with a stable code and correction.
@@ -298,12 +296,11 @@ wait makes local tests deterministic; a separate host drain serves shutdown. Sou
 and cancellation failures throw typed lane exceptions carrying the bounded partial receipt, with
 cancellation still catchable as `OperationCanceledException`.
 
-The sole V1 receiver path is a typed, auto-discovered business handler with stable application identity,
+The sole receiver path is a typed, compiled business handler with stable application identity,
 usable unchanged in-process or through a connector. A type-derived default group identity is
 refactor-sensitive and reported. Stable business aliases, schema versions, and their rolling migration
-rules are not shipped; PMC-023 owns that decision before heterogeneous or long-lived distributed use.
-Lambdas are deferred. The full laws, adapter
-rules, and greenfield deletion map are in
+rules are not shipped. Lambda receivers are not part of the current contract. The full laws and adapter
+rules are in
 [ARCH-0113](../decisions/ARCH-0113-entity-capability-communication.md).
 
 Events or Transport may be physically local, networked, or broker-backed. Adapters cannot change
@@ -311,8 +308,8 @@ occurrence/snapshot identity, fan-out/receiver-group cardinality, copy, context,
 semantics. Crossing a process does not itself cross a bounded context; crossing a bounded context
 requires the explicit integration contract rather than silently publishing a persisted Entity schema.
 
-The V1 foundation provides the complete local ring through one faithful in-process adapter. R07-07
-provides local `Send`; R07-08 provides local `Raise`; both use auto-discovered typed handlers and zero
+The foundation provides the complete local ring through one faithful in-process adapter. Local `Send`
+and `Raise` use compiled typed handlers and zero
 routing configuration. A build-generated application communication manifest distinguishes direct
 PackageReference/ProjectReference connector intent from transitive availability. One eligible outbound
 adapter is elected per logical channel; every local group binds once to the same channel. Publishers
@@ -325,10 +322,10 @@ channel never silently falls back to process-local reach, and connector health p
 readiness. Endpoint, credentials, and trust remain deployment configuration or orchestration discovery,
 not values Koan invents.
 
-V1 uses an inferred default channel, an optional business-named channel at the terminal, and one
+The current surface uses an inferred default channel, an optional business-named channel at the terminal, and one
 host/deployment binding. Sender selection uses standard LINQ or a truthful Data query. A named typed
 receiver may apply `Where` at ingress after authenticated deserialization; `false` is a terminal
-filtered settlement, never retry/dead-letter, and never a confidentiality boundary. V1 performs no
+filtered settlement, never retry/dead-letter, and never a confidentiality boundary. The current surface performs no
 adapter predicate pushdown, provider lowering, automatic `When` routing, mirroring, or failover.
 
 Business-named channels are startup-declared at `Koan:Communication:Channels:{name}`. Transport and
@@ -338,17 +335,17 @@ while internal framework routes remain on their owned default channels. An unkno
 rejects before source enumeration. The channel participates in wire and binding identity plus startup
 facts; it is not an authorization, confidentiality, or receiver-filter boundary.
 
-Mesh identity derives from stable application identity plus environment. V1 is limited to replicas
+Mesh identity derives from stable application identity plus environment. The current mesh is limited to replicas
 sharing one application communication manifest and trust boundary; heterogeneous/cross-application
-communication requires a future explicit integration manifest. Wire identity is mesh/application,
+communication is unsupported without an explicit integration contract. Wire identity is mesh/application,
 channel, versioned contract, operation/item, correlation, and sealed context—not a deployment plan
 hash. The route plan remains diagnostic rather than becoming a second wire-compatibility protocol.
 
 Boot emits every selected Communication lane/channel, assurance, applicable bounds, typed Event
 subscription and Transport receiver bindings, and context carriage through the same facts envelope.
-Later heterogeneous-mesh work must expand this into the complete contract/channel/outbound-adapter/local-
-group/inbound-binding matrix through the same startup, operator, and authorized agent projections.
-Every surface reuses the same reason codes and safe corrections.
+Every surface reuses the same reason codes and safe corrections. No claim is made for a heterogeneous
+mesh until the complete contract/channel/outbound-adapter/local-group/inbound-binding matrix is
+projected through startup, operator, and authorized agent views.
 
 ## Relationships and execution cost
 
@@ -374,8 +371,8 @@ indexing is a consequence of saving an Entity declared with `[Embedding]`; the c
 therefore `[Embedding]` + `Save()`, owned by Lifecycle. Explicit finite-set and whole-collection
 rebuilds are migration control-plane operations with aggregate outcomes.
 
-There is no generic source `.Index()` or `.Embed()` terminal in the V1 contract. Scalar
-`EntityAi.Embed(entity)` remains an on-demand transform, not a persistence synonym. A future source
+There is no generic source `.Index()` or `.Embed()` terminal in the current contract. Scalar
+`EntityAi.Embed(entity)` remains an on-demand transform, not a persistence synonym. Any source
 operation must first prove a distinct application intent, bounded source behavior, provider
 negotiation, partial outcomes, and a real consumer; IntelliSense symmetry alone is insufficient.
 
@@ -472,7 +469,7 @@ Every module contributing Entity language must add compilation and runtime evide
     and later settlement observation are asserted for lifted side effects; and
 11. XML documentation and agent schema describe the same effects and limits.
 
-## Greenfield evolution and removal
+## Pre-1.0 change policy
 
 Koan is pre-1.0. A current API, package, sample, or document is evidence to assess, not a compatibility
 anchor. When it conflicts with the coherent contract, the owning work item classifies it as:
@@ -488,17 +485,10 @@ adoption and only when it does not leave two plausible common paths. False-succe
 or semantically misleading surfaces are removed in the same coherent change that introduces their
 replacement.
 
-The current rebuild specifically permits:
-
-- `Entity.Events` persistence lifecycle to become `Entity.Lifecycle` with no alias;
-- arbitrary-object Messaging to be replaced by Entity `Events` and `Transport`;
-- only Pipeline's Entity-cardinality normalization to move into Data.Core while each typed capability
-  owns its execution/results, then delete the public generic DSL; and
-- adapters and bridge packages to be deleted when they cannot satisfy the shared semantics.
-
-Migration proceeds as meaningful vertical slices: establish the lower context/Data boundary, prove one
-faithful in-process capability, then add network breadth. Each slice leaves a useful application state
-and removes or supersedes the mechanism it replaces.
+Changes proceed as meaningful vertical slices. Each slice leaves a useful application state, proves a
+faithful local capability before adding network breadth, and removes any mechanism it replaces. An
+adapter or bridge that cannot satisfy the shared semantics is removed rather than presented as a
+second plausible path.
 
 ## Proposal checklist
 
@@ -515,7 +505,7 @@ Before approving a new Entity capability, record:
 - startup and per-operation explanation;
 - agent/API projection boundary;
 - compile/runtime evidence and unsupported scenarios;
-- compatibility, module-removal, and deprecation plan.
+- module-removal and replacement plan.
 
 If those answers are longer than the business outcome because the capability is mainly infrastructure,
 it likely belongs off Entity.

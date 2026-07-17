@@ -6,7 +6,7 @@ since: 0.2.x
 packages: [Sylin.Koan.Data.Abstractions]
 source: src/Koan.Data.Abstractions/
 last_updated: 2026-07-15
-framework_version: v0.17.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-15
   status: reviewed

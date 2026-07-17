@@ -15,7 +15,7 @@
       enforcement off so consumers can pack the framework without -p:EnforceExtendedAnalyzerRules=false.
     -->
     <EnforceExtendedAnalyzerRules>false</EnforceExtendedAnalyzerRules>
-    <Description>Source generator analyzers for Koan orchestration: auto-registrar helpers, module metadata inspection, and diagnostics.</Description>
+    <Description>Source generator analyzers for Koan orchestration manifests, module metadata inspection, and diagnostics.</Description>
     <PackageTags>$(CommonPackageTags);analyzer;source-generator;orchestration</PackageTags>
     <IsPackable>true</IsPackable>
   </PropertyGroup>

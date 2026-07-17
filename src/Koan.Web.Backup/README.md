@@ -22,7 +22,7 @@ builder.Services.AddKoan();
 
 var app = builder.Build();
 app.UseKoanWebBackup(); // Applies the registered CORS policy; it does not add a hub.
-app.Run();
+await app.RunAsync();
 ```
 
 The routes are currently unversioned and fixed under `/api`. The `basePath` argument on

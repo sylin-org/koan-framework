@@ -2,7 +2,7 @@
 uid: reference.modules.Koan.canon.domain
 title: Koan.Canon.Domain - Technical Reference
 description: Runtime, pipeline, persistence, and host-ownership contracts for Koan Canon.
-since: 0.17.x
+since: source-first
 packages: [Sylin.Koan.Canon.Domain]
 source: src/Koan.Canon.Domain/
 last_updated: 2026-07-15

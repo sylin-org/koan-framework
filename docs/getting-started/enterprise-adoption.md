@@ -69,8 +69,7 @@ Koan lets small teams ship sophisticated, AI-native services with governance int
 - Entities inherit from `Entity<T>` and controllers from `EntityController<T>` unless a justified exception is documented.
 - Dependencies are declared via Koan packages; manual DI registrations are limited to app-specific services.
 - Lifecycle hooks cover mission-critical automation paths and log structured audit events.
-- Canonical `/health/live` and `/health/ready` endpoints are exposed and monitored; `/api/health`
-  is treated only as a compatibility up-check.
+- Canonical `/health/live` and `/health/ready` endpoints are exposed and monitored.
 
 ### Security & Compliance
 

@@ -5,7 +5,7 @@ title: "Web Pillar Reference"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-15
-framework_version: v0.17.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
@@ -46,7 +46,7 @@ var app = builder.Build();
 await app.RunAsync();
 ```
 
-The package reference expresses intent; `AddKoan()` discovers referenced Koan modules. Application
+The package reference expresses intent; `AddKoan()` compiles and activates referenced Koan modules. Application
 code still owns its model, route, authorization declarations, and any business-specific actions.
 Koan.Web maps controllers by default through its startup filter (`AutoMapControllers = true`); an
 application only owns explicit pipeline mapping when it disables that default.

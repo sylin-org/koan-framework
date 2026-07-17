@@ -1460,7 +1460,7 @@
     {
       "packageId": "Sylin.Koan.Orchestration.Generators",
       "shape": "analyzer",
-      "description": "Source generator analyzers for Koan orchestration: auto-registrar helpers, module metadata inspection, and diagnostics.",
+      "description": "Source generator analyzers for Koan orchestration manifests, module metadata inspection, and diagnostics.",
       "targetFrameworks": [],
       "dependencies": [],
       "readme": "src/Koan.Orchestration.Generators/README.md",
@@ -1618,7 +1618,7 @@
     {
       "packageId": "Sylin.Koan.Testing.Hosting",
       "shape": "library",
-      "description": "Koan test harness \u2014 the ARCH-0079 reflective AddKoan() integration host (KoanIntegrationHost), xUnit-agnostic. Boot a real Koan host in your app\u0027s tests.",
+      "description": "Koan test harness \u2014 the AddKoan() integration host (KoanIntegrationHost), xUnit-agnostic. Boot a real compiled Koan composition in your app\u0027s tests.",
       "targetFrameworks": [],
       "dependencies": [],
       "readme": "src/Koan.Testing.Hosting/README.md",

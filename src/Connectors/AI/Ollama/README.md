@@ -29,7 +29,7 @@ builder.Services
 		.AddAiWeb(); // optional HTTP endpoints under /ai
 var app = builder.Build();
 app.MapControllers();
-app.Run();
+await app.RunAsync();
 ```
 
 Then query the default engine:

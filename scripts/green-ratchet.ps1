@@ -14,6 +14,8 @@
                     infra is absent. Skip with -SkipTests.
     B.  Docs lint   scripts/docs-lint.ps1    — links / front-matter / anchors / terms.
                     Errors are fatal; warnings are not.
+    B'. Public docs scripts/public-docs-lint.ps1 — current navigation boundary, retired
+                    product vocabulary, canonical host lifetime, and ADR immutability.
     C.  Doc code    scripts/validate-code-examples.ps1 — compiles the C# blocks in the
                     INSTRUCTIONAL docs a change touches (diff-scoped vs -Base) that are
                     marked `<!-- validate -->` (OPT-IN: a block is compiled only when an
@@ -113,6 +115,7 @@ try {
     }
 
     Invoke-Leg 'B. docs-lint' { & "$root/scripts/docs-lint.ps1" -Output table }
+    Invoke-Leg "B'. public-docs" { & "$root/scripts/public-docs-lint.ps1" }
 
     if ($FullDocs) {
         Invoke-Leg 'C. doc-code (full)' { & "$root/scripts/validate-code-examples.ps1" -Full }

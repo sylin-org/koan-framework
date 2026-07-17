@@ -16,7 +16,7 @@ runtime contract.
 - a provider change must be checked through the same `AddKoan()` discovery path used by the app;
 - reviewers want tests that read as one business-valid example rather than infrastructure wiring.
 
-Use `Koan.Testing.Hosting` when you need a custom reflective host without inherited batteries. Use
+Use `Koan.Testing.Hosting` when you need a custom compiled-composition host without inherited batteries. Use
 `Koan.Testing.Containers` for adapter development against reusable real backing-store fixtures.
 
 ## Add one class per Entity

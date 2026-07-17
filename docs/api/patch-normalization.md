@@ -5,7 +5,7 @@ title: "PATCH Formats and Normalization"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2025-10-09
-framework_version: v0.6.3
+framework_version: source-first
 validation:
   status: verified
   date_last_tested: 2025-10-09

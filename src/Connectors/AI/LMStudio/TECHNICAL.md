@@ -4,7 +4,7 @@ Koan.AI.Connector.LMStudio - Technical reference
 > Inputs: Koan AI chat/stream/embedding contracts, discovery metadata, orchestration hints.  
 > Outputs: OpenAI-compatible HTTP requests, Koan AI responses, readiness metadata, health metrics.  
 > Error Modes: HTTP failures, serialization errors, readiness timeouts, missing models/auth.  
-> Criteria: Adapter registered via Koan auto-registrar, readiness policy respected, orchestration metadata published.
+> Criteria: `LMStudioAiModule` participates through `AddKoan()`, readiness policy is respected, and orchestration metadata is published.
 
 ## Options
 
@@ -30,7 +30,7 @@ Koan.AI.Connector.LMStudio - Technical reference
 
 - Discovery adapter checks (in order): `LMSTUDIO_API_BASE_URL`, `Koan_AI_LMSTUDIO_URLS`, explicit config, host-first loopback, container endpoints, Aspire AppHost service bindings.
 - Health validation verifies `/v1/models` responds 2xx and optionally confirms `requiredModel` presence.
-- Auto-registrar wires `LMStudioOptions`, discovery adapter, readiness evaluators, and orchestrator metadata.
+- `LMStudioAiModule` wires `LMStudioOptions`, the discovery adapter, readiness evaluators, and orchestration metadata.
 - Orchestration evaluator contributes container descriptors (image, port 1234, health endpoint `/health`).
 
 ## Edge cases

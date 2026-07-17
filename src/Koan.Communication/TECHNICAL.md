@@ -18,9 +18,9 @@ internal node broadcast. Shared mechanisms do not become a public generic pipeli
 `KoanCommunicationModule` contributes construction-free descriptor availability. On the supported
 composition path, the host constitution activates it only from direct or explicit bundle intent, then
 one retained module instance performs registration and startup; the constitution projects the
-activation fact. It is excluded from the framework's legacy initializer, auto-registrar,
-DI-construction, and provenance-reconstruction paths. An unmarked legacy host may activate discovered
-descriptors only through Core's explicitly degraded compatibility fallback; that mode is not
+activation fact. No parallel initializer, registrar, DI-construction, or provenance-reconstruction
+path owns its lifecycle. A host without a generated constitution may use Core's explicitly degraded
+fallback; that mode is not
 declaration evidence. One immutable
 `CommunicationHandlerCatalog` discovers closed `IHandleEntityEvent<TEntity,TEvent>` subscriptions and
 `IReceiveEntity<TEntity>` receivers from the generated registry. Concrete handler classes are scoped;
@@ -139,4 +139,4 @@ confidentiality; and remote settlement remains unavailable unless an adapter exp
 - shared-reference semantics; or
 - non-cooperative handler shutdown.
 
-Legacy `Koan.Messaging` is a separate previous-generation mechanism and is not adapted underneath Entity Communication.
+No arbitrary-object message bus is adapted underneath Entity Communication.

@@ -5,11 +5,11 @@ title: "MCP over HTTP"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-15
-framework_version: v0.17.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-15
   status: verified
-  scope: Streamable HTTP source contract and compatibility boundary
+  scope: Streamable HTTP source contract, security posture, and focused integration evidence
 related_guides:
   - entity-capabilities-howto.md
   - authorization-howto.md
@@ -31,13 +31,12 @@ related_guides:
 - **Success criteria**: the client initializes, receives a session id, discovers only usable tools,
   invokes them through `POST /mcp`, and can inspect the same runtime facts as an operator.
 
-The historical option names contain `Sse` for compatibility. They do not make the deprecated
-two-endpoint transport canonical. When HTTP is enabled, Streamable HTTP is the default.
+The current master option retains `Sse` in its name, but enabling it selects Streamable HTTP.
 
 ## Shortest supported path
 
-The repository currently verifies this path from source and staged clean-room artifacts. The public
-0.17.0 package set is not yet a coherent install path.
+The repository verifies this path from source and staged clean-room artifacts. The coherent candidate
+package wave has not yet been published and observed from public feeds.
 
 Reference Koan MCP and Web in the application closure, then expose business data or workflows:
 
@@ -65,7 +64,7 @@ using Koan.Core;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
 var app = builder.Build();
-app.Run();
+await app.RunAsync();
 ```
 
 Enable the network transport:
@@ -195,8 +194,7 @@ See [OAuth server](oauth-server-howto.md) for token acquisition and
 | `EnableStdioTransport` | `true` | Host the local process-owned transport |
 | `EnableHttpSseTransport` | `false` | Master HTTP opt-in; selects Streamable HTTP by default |
 | `EnableStreamableHttpTransport` | unset | Explicit override; otherwise follows the HTTP master switch |
-| `EnableLegacySseTransport` | `false` | Opt into deprecated `/mcp/sse` plus `/mcp/rpc` compatibility |
-| `HttpSseRoute` | `/mcp` | Base route for Streamable HTTP and the legacy-derived routes |
+| `HttpSseRoute` | `/mcp` | Base route for Streamable HTTP |
 | `RequireAuthentication` | environment-derived | Require a remote authenticated principal |
 | `ResourceUri` | unset | Fixed OAuth resource/audience identifier |
 | `MaxConcurrentConnections` | `100` | Bound active HTTP sessions |
@@ -207,8 +205,8 @@ See [OAuth server](oauth-server-howto.md) for token acquisition and
 | `Transport.StreamReplayBufferSize` | `256` | Recent events retained per stream for resume |
 | `Transport.MaxRetainedStreamsPerSession` | `64` | Bound completed request streams retained per session |
 
-The `EnableHttpSseTransport`, `HttpSseRoute`, and `SseConnectionTimeout` names are compatibility
-vocabulary. Do not infer that the legacy transport is active from those names.
+The `EnableHttpSseTransport`, `HttpSseRoute`, and `SseConnectionTimeout` property names retain `Sse`;
+their current HTTP behavior is the single Streamable HTTP route described above.
 
 ## Failure interpretation
 
@@ -222,13 +220,6 @@ vocabulary. Do not infer that the legacy transport is active from those names.
 | `406` | POST does not accept the supported response media types | Send both JSON and event-stream in `Accept` |
 | `409` on `GET /mcp` | A standalone GET stream is already open | Reuse or close the existing stream |
 | Tool absent from `tools/list` | Not composed, disabled, or not permitted for this caller | Inspect `koan://self`, `koan://facts`, and access configuration |
-
-## Legacy compatibility boundary
-
-Set `EnableLegacySseTransport=true` only for a client that still requires the deprecated
-`GET /mcp/sse` plus `POST /mcp/rpc` protocol. The shim shares the same dispatcher, sessions,
-authorization, and projection core as Streamable HTTP, but preserves its historical wire shape.
-Do not use the legacy route pair in new examples or application code.
 
 ## Verified evidence and limits
 

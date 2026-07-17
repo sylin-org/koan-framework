@@ -201,8 +201,7 @@ public sealed class TodosController : EntityController<Todo> { }
 
 ### Health Endpoint Failures
 
-Use the canonical probes to distinguish a running process from dependency readiness. `/api/health`
-is a lightweight compatibility up-check and does not aggregate dependencies:
+Use the canonical probes to distinguish a running process from dependency readiness:
 
 ```powershell
 curl http://localhost:5000/health/live

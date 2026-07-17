@@ -32,7 +32,7 @@ validation:
 
 ## Backup workflow
 
-1. **Reference and policy declaration** – The package auto-registrar calls `AddKoanBackupRestore()`.
+1. **Reference and policy declaration** – `DataBackupModule` calls `AddKoanBackupRestore()` during `AddKoan()` composition.
    `[EntityBackup]` and assembly-level `[EntityBackupScope]` control discovery participation.
 2. **Entity discovery** – `EntityDiscoveryService` scans Koan aggregates, caching `EntityTypeInfo` records (entity type, key type, provider). Its pre-scan fallback consumes Data Core's provider-free registered-type facts and resolves provider metadata against the service's injected host; it does not inspect Data Core private caches or inherit a prior host's repository. Optional warmup occurs during maintenance startup when `WarmupEntitiesOnStartup` is enabled.
 3. **Streaming export** – `StreamingBackupService` orchestrates backups:

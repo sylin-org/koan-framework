@@ -13,8 +13,8 @@
 
 ## Shortest supported path
 
-The repository currently demonstrates this contract from source and from staged clean-room
-artifacts; the public 0.17.0 package set is not a coherent install path. Add `Koan.Mcp` to the
+The repository demonstrates this contract from source and from staged clean-room artifacts; the
+coherent candidate wave has not yet been published and observed from public feeds. Add `Koan.Mcp` to the
 application closure (`Sylin.Koan.Mcp` is the package identity), annotate the entity, and keep the
 normal Koan bootstrap:
 
@@ -36,7 +36,7 @@ using Koan.Core;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
 var app = builder.Build();
-app.Run();
+await app.RunAsync();
 ```
 
 The package reference is the registration. Do not add `AddKoanMcp()`, manually map protocol

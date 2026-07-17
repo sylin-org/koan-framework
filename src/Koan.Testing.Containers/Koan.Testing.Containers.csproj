@@ -2,7 +2,7 @@
   <!--
     ARCH-0091 + P2.1: the xUnit v3 container-fixture library. Thin IAsyncLifetime fixtures over the
     official Testcontainers 4.x module builders, shared per engine assembly via
-    [assembly: AssemblyFixture(...)]. KoanDataSpec boots the ARCH-0079 reflective host + leases an
+    [assembly: AssemblyFixture(...)]. KoanDataSpec boots a real compiled Koan host + leases an
     isolation partition per engine. Promoted to src/ and shipped (Sylin.Koan.Testing.Containers) so the
     conformance kit's container-gated batteries (and consumers) reuse the same real fixtures.
   -->

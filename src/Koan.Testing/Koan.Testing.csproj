@@ -3,7 +3,7 @@
     P2.1: the consumer conformance kit (Sylin.Koan.Testing). A consumer references this one package
     and writes `class MyEntityConformance : EntityConformanceSpecs<MyEntity>` — trait-gated batteries
     (round-trip, pushdown-vs-oracle, paging, partition isolation, caching, embedding) arrive by
-    inheritance. Built on the xUnit-free reflective host (Sylin.Koan.Testing.Hosting); the oracle is
+    inheritance. Built on the xUnit-free compiled-composition host (Sylin.Koan.Testing.Hosting); the oracle is
     the shipped InMemoryFilterEvaluator (Koan.Data.Abstractions), reused — not duplicated. Engine-
     specific Testcontainers fixtures ship separately (Sylin.Koan.Testing.Containers) so the kit stays
     lean; container-backed entities self-skip when their store is unreachable.

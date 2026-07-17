@@ -5,7 +5,7 @@ title: "MCP — pillar map"
 audience: [developers, ai-agents]
 status: current
 last_updated: 2026-06-20
-framework_version: v0.17.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-06-20
   status: verified
@@ -16,7 +16,7 @@ validation:
 
 > One-screen map of the MCP pillar — exposing Koan entities + verbs to MCP clients. Walkthrough: [mcp-agent-native-howto.md](../../guides/mcp-agent-native-howto.md) (one entity from `[McpEntity]` to governed access). Transport detail: [mcp-http-sse-howto.md](../../guides/mcp-http-sse-howto.md).
 
-**What it does** — Projects your `Entity<T>` types and hand-written verbs as Model Context Protocol tools that AI clients invoke over JSON-RPC — STDIO plus the **Streamable HTTP** transport (the modern default, single `{baseRoute}` endpoint, spec 2025-06-18; [AI-0037](../../decisions/AI-0037-mcp-streamable-http-transport.md)) with a deprecated legacy SSE shim still available opt-in ([AI-0012](../../decisions/AI-0012-mcp-jsonrpc-runtime.md), [AI-0013](../../decisions/AI-0013-mcp-http-sse-deployment.md)). Annotate an entity `[McpEntity]` and its CRUD/query operations become MCP tools — same schema and read-path visibility predicates as the REST surface ([WEB-0068](../../decisions/WEB-0068-query-options-predicates.md)). Referencing `Koan.Mcp` is the whole opt-in (Reference = Intent); **Code Mode** ([AI-0014](../../decisions/AI-0014-mcp-code-mode.md)) lets a client compose several tools in one sandboxed script instead of one round-trip per call.
+**What it does** — Projects your `Entity<T>` types and hand-written verbs as Model Context Protocol tools that AI clients invoke over JSON-RPC through STDIO or one **Streamable HTTP** endpoint ([AI-0037](../../decisions/AI-0037-mcp-streamable-http-transport.md)). Annotate an Entity with `[McpEntity]` and its governed CRUD/query operations become MCP tools with the same read visibility as REST ([WEB-0068](../../decisions/WEB-0068-query-options-predicates.md)). Referencing `Koan.Mcp` is the whole opt-in. **Code Mode** ([AI-0014](../../decisions/AI-0014-mcp-code-mode.md)) lets a client compose several operations in one sandboxed script instead of one round-trip per call.
 
 > **Beyond tools** — the server also emits spec-shaped tool annotations (`readOnly`/`destructive`/`idempotent`; mark custom verbs with `[McpReadOnly]`/`[McpDestructive]`/`[McpIdempotent]`), introspection **resources** (`koan://entities`, `koan://self`) over the `IMcpResourceProvider` seam, and an authority-free `correlationId` pin — all projected per grant. See the [agent-native projection card](agent-native.md).
 
@@ -24,7 +24,9 @@ validation:
 
 ## The one canonical pattern
 
-Annotate an `Entity<T>` with `[McpEntity]` — its `Save` / `Remove` / `Query` operations are auto-exposed as tools. **Reference = Intent:** referencing `Koan.Mcp` is the whole opt-in (its auto-registrar calls `AddKoanMcp()` + maps the endpoints) — `AddKoan()` discovers it; you write no MCP wiring.
+Annotate an `Entity<T>` with `[McpEntity]` — its `Save` / `Remove` / `Query` operations are exposed as
+tools. **Reference = Intent:** referencing `Koan.Mcp` contributes its `McpModule`; `AddKoan()` activates
+that module and its endpoint contribution. Ordinary applications write no MCP registration or mapping.
 
 ```csharp
 [McpEntity(Name = "Todo", Description = "Task management entity")]

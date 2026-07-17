@@ -116,10 +116,10 @@ in each implementation assembly; `[Before]`/`[After]` provide exceptional type-s
 Defined by [`KoanModule`](../../src/Koan.Core/KoanModule.cs).
 
 **Reference = Intent** — The principle that adding a package reference *is* the
-configuration: each referenced module registers itself through discovery, so `Program.cs`
+configuration: each referenced module contributes through compiled composition, so `Program.cs`
 stays at four lines (`AddKoan()`) regardless of how many capabilities are wired. The
 mechanism is the generated module descriptor compiled into the host constitution. The principle
-is written up in [architecture/principles.md](../architecture/principles.md#reference--intent).
+is written up in [architecture/principles.md](../architecture/principles.md#references-declare-availability-pillars-resolve-behavior).
 
 **Provenance** — The structured record of *who configured what and from where*: every module
 publishes settings, tools, and notes (with their source — app settings, environment,

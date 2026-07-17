@@ -124,8 +124,8 @@ Framework signals are reserved for Koan modules. Applications do not receive a g
 subscribe API. Jobs wake uses competing groups; Cache peer invalidation uses every-node delivery.
 Both owning modules retain their correctness fallback.
 
-This is the Entity Communication connector. The legacy `Sylin.Koan.Messaging.Connector.RabbitMq`
-package has a different arbitrary-message contract and is not used underneath `Entity.Transport`.
+This connector implements Entity Transport. It does not add arbitrary-message publication, Events,
+or a second communication grammar underneath `Entity.Transport`.
 
 See [technical details](TECHNICAL.md) and the
 [Communication reference](../../../../docs/reference/communication/index.md).

@@ -1,155 +1,106 @@
 ---
 type: REF
 domain: core
-title: "Core Pillar Reference"
+title: "Core and composition reference"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-09-28
-framework_version: v0.6.3
+last_updated: 2026-07-17
+framework_version: source-first
 validation:
-  date_last_tested: 2025-09-28
+  date_last_tested: 2026-07-17
   status: verified
-  scope: docs/reference/core/index.md
+  scope: AddKoan, KoanModule lifecycle, compiled composition, runtime facts, and health projection
 ---
 
-# Core Pillar Reference
+# Core and composition reference
 
-**Document Type**: REF
-**Target Audience**: Developers, Architects, AI Agents
-**Last Updated**: 2025-09-28
-**Framework Version**: v0.6.2
+## Contract
 
----
-
-## Overview
-
-Foundation layer providing auto-registration, health checks, configuration, and shared runtime contracts.
-
-**Package**: `Koan.Core`
-
-## Guard Utilities
-
-Fluent, zero-allocation parameter validation with natural language syntax.
+`AddKoan()` is the complete default bootstrap. It compiles the generated module constitution for the
+application's referenced Koan assemblies, registers Core once, lets each retained module register
+services, applies host-owned declarations, and freezes one semantic composition.
 
 ```csharp
-string title = userInput.Must().NotBe.Blank();
-int priority = userPriority.Must().Be.InRange(1, 5);
-string email = userEmail.Must().Be.ValidEmail();
-```
-
-**Features:**
-- Natural language: `value.Must().NotBe.Blank()`, `value.Must().Be.Between(1, 10, RangeType.Inclusive)`
-- Automatic parameter name capture via `CallerArgumentExpression`
-- Zero heap allocations (`ref struct` pattern)
-- Type-safe extension methods
-- Comprehensive validation: nulls, blanks, ranges, emails, URLs, enums, collections
-
-➤ **[Guard Utilities Reference](guard-utilities.md)**
-
-## Auto-Registration
-
-Zero-config module discovery loads all referenced Koan modules automatically.
-
-```csharp
-// Program.cs
+var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
+var app = builder.Build();
+await app.RunAsync();
 ```
 
-### Custom Modules
+Use the declaration overload only for application-owned semantic declarations that must participate
+in the same composition:
 
 ```csharp
-public sealed class MyModule : KoanModule
+builder.Services.AddKoan(() =>
+{
+    Order.Lifecycle.BeforeUpsert(order => order.Validate());
+});
+```
+
+Calling the declaration overload after composition is frozen rejects with a corrective error.
+
+## Module authoring
+
+A functional Koan assembly contributes one domain-named `KoanModule` only when it owns registration,
+one-time startup work, or reporting:
+
+```csharp
+public sealed class BillingModule : KoanModule
 {
     public override void Register(IServiceCollection services)
-    {
-        services.AddScoped<IMyService, MyService>();
-    }
+        => services.AddSingleton<InvoicePolicy>();
+
+    public override Task Start(IServiceProvider services, CancellationToken ct)
+        => Task.CompletedTask;
 }
 ```
 
-That's it. Identity is derived from the package/assembly; the module activates automatically when referenced.
+Module identity derives from ordinary package/assembly identity. Do not add a parallel Koan ID or
+descriptor attribute. Shared cross-module vocabulary belongs in an isolated Core, Abstractions, or
+Contracts assembly; referencing contracts must not activate functionality.
 
-## Health Checks
+`Register` owns DI composition. `Start` owns ordered one-time startup after DI is available. `Report`
+and `ReportComposition` project resolved facts; applications do not call them. Recurring or pokable
+work belongs to the background-service or Jobs contracts, not `Start`.
 
-Built-in health endpoints with custom contributors.
+## Composition and provider decisions
 
-### Endpoints
+Core compiles structural contributions once per host shape. Pillars then own semantic policy and
+immutable plans; adapters own mechanics. Runtime operations consume those plans without rediscovering
+contributors or renegotiating providers on every call.
 
-- `GET /health/live` - Process liveness; does not probe dependencies
-- `GET /health/ready` - Aggregated dependency readiness; returns `503` when unhealthy
-- `GET /health` - Human-friendly process up-check
-- `GET /api/health` - Lightweight compatibility up-check; not dependency readiness
+Reference means availability, not universal activation. A pillar may ship a low-priority local
+provider; a referenced eligible provider can supersede it. Explicit configured intent wins or fails
+with a correction. It does not silently fall back to an incompatible guarantee.
 
-### Custom Health Checks
+## Explanation surfaces
 
-```csharp
-public class DatabaseHealth : IHealthContributor
-{
-    public string Name => "database";
-    public bool IsCritical => true;
+One host-owned runtime-facts envelope feeds:
 
-    public async Task<HealthReport> Check(CancellationToken ct = default)
-    {
-        try
-        {
-            await CheckDatabaseConnection();
-            return new HealthReport(Name, HealthState.Healthy, "Database ready", null, null);
-        }
-        catch (Exception ex)
-        {
-            return new HealthReport(Name, HealthState.Unhealthy, ex.Message, null, null);
-        }
-    }
-}
-```
+- startup reporting;
+- `/.well-known/Koan/facts`;
+- `koan://facts` when MCP is present;
+- readiness contributors; and
+- composition failure details.
 
-## Environment Detection
+The checked-in `koan.lock.json` records statically referenced composition. Runtime facts add resolved
+elections and capability decisions. These are projections of the same composition, not alternate
+configuration sources.
 
-```csharp
-if (KoanEnv.IsDevelopment)
-{
-    // Development code
-}
+## Health
 
-if (KoanEnv.InContainer)
-{
-    // Container-specific setup
-}
-```
+With Koan Web referenced:
 
-## Configuration
+- `GET /health/live` reports process liveness without dependency probes.
+- `GET /health/ready` reports aggregate readiness and returns `503` when a critical active dependency
+  is unhealthy.
 
-```csharp
-// Read configuration with defaults
-var setting = Configuration.Read(config, "MyApp:Setting", "default");
+An available but unelected optional provider must not make the application unready merely because it
+is referenced. Active modules and selected providers own truthful health contributions.
 
-// Multiple fallback keys
-var value = Configuration.ReadFirst(config,
-    "MyApp:NewKey",
-    "MyApp:OldKey");
-```
+## Support boundary
 
-Environment variables work too:
-
-```bash
-export Koan__MyApp__Setting=value
-```
-
-## Boot Reports
-
-Development-only module discovery reporting:
-
-```csharp
-// Program.cs
-var app = builder.Build();
-
-// Logs discovered modules in development
-// [INFO] Koan:modules data→sqlite web→controllers
-```
-
-Redacted in production automatically.
-
----
-
-**Last Validation**: 2025-01-17 by Framework Specialist
-**Framework Version Tested**: v0.2.18+
+The current source proves compiled module activation, one retained module lifecycle, ordered startup,
+canonical facts, and focused host ownership. It does not make every package in the repository assessed
+or every provider production-certified. Use the [product surface](../product-surface.md) for maturity
+and [troubleshooting](../../support/troubleshooting.md) for corrective paths.

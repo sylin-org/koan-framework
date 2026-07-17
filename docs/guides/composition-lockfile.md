@@ -5,7 +5,7 @@ title: "Composition Lockfile How-To"
 audience: [developers, architects]
 status: current
 last_updated: 2026-07-15
-framework_version: v0.17.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-15
   status: verified
@@ -25,7 +25,7 @@ richer **resolved twin** and the boot report prints a one-line verdict.
 ```bash
 dotnet build                  # koan.lock.json is refreshed automatically
 git diff koan.lock.json       # PR review now SHOWS composition drift, e.g.:
-                              #   +    { "id": "Koan.Data.Connector.Postgres", "version": "0.17" }
+                              #   +    { "id": "Koan.Data.Connector.Postgres", "version": "<major.minor>" }
 ```
 
 At boot the report prints:
@@ -64,13 +64,15 @@ Koan assemblies only.
 ```jsonc
 {
   "schema": 2,
-  "app": { "name": "S5.Recs", "koan": "0.17", "tfm": "net10.0" },
+  "app": { "name": "Koan.FirstUse", "koan": "0.18", "tfm": "net10.0" },
   "modules": [
-    { "id": "Koan.Core", "version": "0.17" },
-    { "id": "Koan.Data.Connector.Postgres", "version": "0.17" }
+    { "id": "Koan.Communication", "version": "0.20" },
+    { "id": "Koan.Core", "version": "0.18" },
+    { "id": "Koan.Data.Connector.Sqlite", "version": "0.17" }
   ],
   "directReferences": [
-    { "kind": "package", "id": "Sylin.Koan.Data.Connector.Postgres" }
+    { "kind": "project", "id": "Koan.Data.Connector.Sqlite" },
+    { "kind": "project", "id": "Sylin.Koan.App" }
   ]
 }
 ```
@@ -84,11 +86,11 @@ otherwise churn it on every build) so a diff means a *real* composition change, 
 ```jsonc
 {
   "schema": 2,
-  "app": { "name": "S5.Recs", "koan": "0.17", "tfm": "net10.0" },
-  "modules": [ { "id": "Koan.Core", "version": "0.17" } /* … */ ],
-  "elections": { "data:default": { "adapter": "postgres", "via": "reference-priority", "priority": 14 } },
-  "configKeys": [ "Koan:Data:Postgres:ConnectionString" ],
-  "entities": [ { "type": "Anime", "traits": [] } ]
+  "app": { "name": "Koan.FirstUse", "koan": "0.18", "tfm": "net10.0" },
+  "modules": [ { "id": "Koan.Core", "version": "0.18" } /* … */ ],
+  "elections": { "data:default": { "adapter": "sqlite", "via": "entity-attribute" } },
+  "configKeys": [ "Koan:Data:Sqlite:ConnectionString" ],
+  "entities": [ { "type": "Approval", "traits": [] } ]
 }
 ```
 
@@ -114,8 +116,8 @@ The two inventories answer different questions:
 
 For example, an application bundle can supply `Koan.Communication` transitively, so Communication
 appears under `modules`; it does not appear under `directReferences` unless the application chose that
-component directly. Future automatic provider selection uses this provenance boundary rather than
-guessing from loaded assemblies. Package and project identities are preserved as written, together
+component directly. Provider selection uses this provenance boundary rather than guessing from loaded
+assemblies. Package and project identities are preserved as written, together
 with their origin; connector declarations will map the identities they support.
 
 > **Source-checkout note.** A `ProjectReference` does not import a referenced package's build assets.

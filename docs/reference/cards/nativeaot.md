@@ -5,7 +5,7 @@ title: "NativeAOT — sovereign native-deployment map"
 audience: [developers, ai-agents]
 status: current
 last_updated: 2026-07-17
-framework_version: v0.17.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-17
   status: verified

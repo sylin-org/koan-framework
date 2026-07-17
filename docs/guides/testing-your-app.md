@@ -5,7 +5,7 @@ title: "Testing Your App — Conformance Kits"
 audience: [developers, architects]
 status: current
 last_updated: 2026-07-15
-framework_version: v0.17.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-15
   status: verified
@@ -15,7 +15,7 @@ validation:
 # Testing Your App — Conformance Kits
 
 **Your app inherits a test suite.** Reference `Sylin.Koan.Testing` from your test project, write one
-class per entity, and a battery of conformance specs runs through a real reflective `AddKoan()` host
+class per entity, and a battery of conformance specs runs through a real compiled `AddKoan()` host
 (ARCH-0079) — round-trip, pushdown-vs-reference-oracle, paging, partition isolation, and (when the
 entity declares the trait) cache coherence and embedding. You write one method; the batteries arrive
 by inheritance and gate themselves on what the entity declares.

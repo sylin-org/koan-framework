@@ -1,108 +1,90 @@
 ---
 type: GUIDE
-domain: core
-title: "Koan Framework documentation"
+domain: framework
+title: "Koan documentation"
 audience: [developers, architects, ai-agents]
 status: current
+last_updated: 2026-07-17
+framework_version: source-first
+validation:
+  date_last_tested: 2026-07-17
+  status: in-progress
+  scope: public documentation front door and executable FirstUse path
 ---
 
-# Koan Framework Documentation
+# Koan documentation
 
-**Model your domain as entities. Reference your intents. Koan composes the rest — and tells you
-exactly what it did.**
+Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applications. Its job is to
+turn business intent into readable code while centralizing composition, backend negotiation,
+lifecycle, and explanation.
 
-## Quick navigation
+## Start with a result
 
-### 🚀 [Getting started](getting-started/overview.md)
+From a new checkout:
 
-The golden path: a running app in 60 seconds, then the framework concept-by-concept.
-Short on time? [Quickstart](getting-started/quickstart.md).
+```powershell
+dotnet run --project samples/FirstUse
+```
 
-### 📖 [Developer guides](guides/README.md)
+Then create and inspect one approval:
 
-Task-oriented how-tos:
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/approvals `
+  -ContentType application/json -Body '{"subject":"Approve supplier invoice"}'
+Invoke-RestMethod http://localhost:5000/api/approvals
+Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
+```
 
-- [Building APIs](guides/building-apis.md) — REST over entities, hooks, pagination
-- [Data modeling](guides/data-modeling.md) — entity-first patterns, relationships
-- [Background jobs](guides/jobs-howto.md) — entity-first jobs, scheduling, the capability ladder
-- [Multi-tenancy](guides/tenancy-howto.md) — automatic tenant isolation across data, blobs, and cache; posture; `[HostScoped]`
-- [AI integration](guides/ai-integration.md) — embeddings, semantic search, chat
-- [Media recipes](guides/media-recipes-howto.md) — format-preserving image pipeline
-- [Authentication](guides/authentication-setup.md) — auth providers and service auth
+Use the URL printed by the application if it differs. The [quickstart](getting-started/quickstart.md)
+explains the result; [FirstUse](../samples/FirstUse/README.md) is the executable contract.
 
-### 🧭 [Samples ladder](../samples/README.md)
-
-S0 (console, 5 min) → S1 (CRUD) → S10 (multi-provider) → S14 (jobs/benchmarks), then the
-dogfood flagships.
-
-### 🚨 [Troubleshooting](support/troubleshooting.md)
-
-Start with the **boot report** — the console output at startup names every discovered module,
-adapter election, and boot phase; most registration/connectivity questions are answered there.
-
-### 📚 Reference
-
-Per-pillar reference: [Core](reference/core/index.md) · [Data](reference/data/index.md) ·
-[Web](reference/web/index.md) · [AI](reference/ai/index.md) ·
-[Cache](reference/data/cache.md) · [API docs](api/index.md)
-
-New to the vocabulary? The [glossary](reference/glossary.md) defines every term — entity,
-partition, adapter, pushdown, boot report, lane, coherence — pinned to the type that defines it.
-
-### 🏗️ Architecture
-
-- **[Framework principles](architecture/principles.md)** — the canon, with enforcement points
-- **[Architecture decisions](decisions/index.md)** — 280+ ADRs; supersession is explicit
-- **[Framework assessment & maturity model](assessment/00-overview.md)** — the framework's
-  published self-audit: what is settled, what is experimental, what is being cut
-
-## The shape of a Koan app
+## Read business, not plumbing
 
 ```csharp
-// Program.cs — complete.
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
 var app = builder.Build();
-app.Run();
+await app.RunAsync();
 ```
 
 ```csharp
-public sealed class Product : Entity<Product>
+public sealed class Todo : Entity<Todo>
 {
-    public string Name { get; set; } = "";
-    public decimal Price { get; set; }
+    public string Title { get; set; } = "";
 }
 
-[Route("api/[controller]")]
-public sealed class ProductController : EntityController<Product> { }
-// → REST CRUD with pagination, GUID v7 ids, /api/health, zero-config SQLite
+[Route("api/todos")]
+public sealed class TodosController : EntityController<Todo>;
 ```
 
-```csharp
-var products = await Product.All();                 // same code on SQLite, Postgres, Mongo, …
-var cheap    = await Product.Query(p => p.Price < 10);
-```
+References make capabilities available. `AddKoan()` compiles the referenced module set. Entity and
+pillar semantics express application intent; elected providers own mechanics. Startup, health,
+runtime facts, and agent resources explain the same resolved composition.
 
-Capabilities are negotiated, not assumed:
+## The current learning path
 
-```csharp
-if (Data<Product, string>.Capabilities.Has(DataCaps.Query.Linq)) { /* pushdown active */ }
-```
+1. [Quickstart](getting-started/quickstart.md) — run one meaningful approval workflow.
+2. [Golden path](getting-started/overview.md) — learn the minimal application grammar and grow it deliberately.
+3. [Graduated samples](../samples/README.md) — use only examples with focused executable evidence.
+4. [Developer guides](guides/README.md) — add a capability when the business needs it.
+5. [Product surface](reference/product-surface.md) — check maturity, package shape, and evidence before relying on a claim.
+6. [Architecture](architecture/product-constitution.md) — understand the laws behind the conventions.
 
-## Current status
+## Current support boundary
 
-- **Version**: pre-1.0, [NBGV](../version.json)-driven (0.17.x); in active consolidation
-  ("fewer but more meaningful parts")
-- **Settled core**: data pillar + connectors, web, cache, jobs, vector, security/trust —
-  see the [maturity model](assessment/03-maturity-model.md) for the full per-pillar grading
-- **License**: Apache 2.0 · **Target**: .NET 10
-- **Packages**: published as `Sylin.Koan.*`; until 1.0, build from source
+Koan is pre-1.0 and source-first. Package versions are owned independently; a coherent candidate wave
+has local clean-room evidence, but public-feed installation has not yet been observed. Package presence
+does not imply support, production certification, or backend parity. The generated
+[product surface](reference/product-surface.md) is the authority for assessed, experimental,
+specified, and unassessed capabilities.
 
-## Contributing
+Use canonical `/health/live` and `/health/ready` probes. Use `/.well-known/Koan/facts` or
+`koan://facts` to understand runtime decisions. Unsupported configured intent should reject with a
+correction instead of silently choosing weaker behavior.
 
-ADR-first workflow; keep the green ratchet green (`scripts/green-ratchet.ps1`). See
-[engineering docs](engineering/index.md) and [CONTRIBUTING](../CONTRIBUTING.md).
+## Documentation boundary
 
----
-
-**Your entities are the app.**
+This navigation is the current public product curriculum. Initiative ledgers, assessments, plans,
+proposals, and archived material remain in the repository as engineering evidence; they are not
+alternate usage guidance. Architecture decision records are preserved as dated decisions and may
+describe the system at the time they were written.

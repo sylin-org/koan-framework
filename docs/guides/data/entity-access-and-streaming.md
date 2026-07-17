@@ -5,7 +5,7 @@ title: "Entity access and streaming"
 audience: [developers]
 status: current
 last_updated: 2026-07-15
-framework_version: v0.6.3
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-15
   status: verified

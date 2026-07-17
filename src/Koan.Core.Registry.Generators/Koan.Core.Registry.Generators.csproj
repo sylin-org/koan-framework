@@ -7,7 +7,7 @@
     <AssemblyName>Koan.Core.Registry.Generators</AssemblyName>
     <RootNamespace>Koan.Core.Registry.Generators</RootNamespace>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <Description>Source generator infrastructure for Koan registries (initializers, auto-registrars, background services, service discovery).</Description>
+    <Description>Source generator infrastructure for Koan semantic modules, background services, and service discovery registries.</Description>
     <PackageTags>$(CommonPackageTags);analyzer;source-generator;registry</PackageTags>
     <!-- R09-02: Core owns and ships this implementation detail as a transitive build tool. -->
     <IsPackable>false</IsPackable>

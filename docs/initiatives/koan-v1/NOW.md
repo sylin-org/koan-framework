@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: GardenCoop/inventory/S1/S0/S10/g1c2 passed; S14 workload-lab rebuild assessed and active; R08-05 paused
+  scope: GardenCoop/inventory/S1/S0/S10/g1c2/public documentation passed; S14 workload-lab rebuild assessed and active; R08-05 paused
 ---
 
 # Koan V1 reorganization current handoff
@@ -80,6 +80,12 @@ Replace this file at every handoff. It is a restart point, not a diary.
   ONNX/sqlite-vec providers, and `ripe red tomato` ranks Heirloom Tomatoes first. Strict source and self-contained
   folder runs agree with readiness/facts. Dogfood also coalesced AI contribution startup, made invalid configured
   AI intent reject host startup, closed vector repository lifetime, and removed a single-file-unsafe Core diagnostic.
+- [R10-08](work-items/r10/R10-08-public-documentation.md) passes. The public product surface is now one
+  greenfield curriculum: root/agent front doors, 36 product-only navigation targets, graduated samples,
+  current architecture/references, and 174 package/current companion files agree. A merge-gated truth
+  check rejects removed activation/Messaging vocabulary, stale routes/versions/samples, non-awaited hosts,
+  invalid package recipes, non-product navigation, and ADR edits. Product-surface proof passes 7/7 and
+  the real FirstUse source contract passes 1/1; ADRs remain untouched.
 - No package, tag, GitHub Release, branch, or remote configuration was published or mutated. Initial coherent
   public observation and a later real public-to-candidate upgrade/rollback remain separate gates.
 

@@ -5,7 +5,7 @@ title: "Entity Data Foundation"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-15
-framework_version: v0.17.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-15
   status: verified
@@ -32,9 +32,9 @@ var open = await Todo.Query(todo => !todo.Done);
 await saved.Remove();
 ```
 
-This is a pre-1.0 candidate boundary, not a blanket production-support claim. Build from source today;
-the public 0.17.0 package set is not coherent. The staged package closure proves the intended path but
-has not been published and observed.
+This is a pre-1.0 candidate boundary, not a blanket production-support claim. Build from source today.
+The staged coherent package closure proves the intended path locally but has not been published and
+observed from public feeds.
 
 ## Smallest durable application path
 
@@ -142,8 +142,7 @@ they do not apply; a skip is absence of evidence, not provider certification.
 ## Inspect and recover
 
 - Read startup's data election and composition summary first.
-- Use `/health/ready` for aggregate dependency readiness; `/api/health` is only a shallow compatibility
-  up-check.
+- Use `/health/ready` for aggregate dependency readiness and `/health/live` for process liveness.
 - Read `/.well-known/Koan/facts` as an operator or `koan://facts` as an MCP client; both project the
   same redacted schema-1 decisions.
 - Review `koan.lock.json` for referenced-module drift. Runtime facts add the provider actually elected.

@@ -4,7 +4,7 @@
 > Inputs: Koan AI chat or embedding requests mapped to LM Studio's OpenAI-compatible API.  
 > Outputs: Text completions, streaming deltas, embedding vectors, and model metadata.  
 > Error Modes: HTTP failures, model not found, readiness timeout, serialization faults.  
-> Criteria: Adapter registered via Koan auto-registrar, discovery resolved base URL, default model reachable or readiness marked degraded.
+> Criteria: `LMStudioAiModule` participates through `AddKoan()`, discovery resolves the base URL, and readiness reports default-model reachability.
 
 LM Studio adapter for Koan. Provides local OpenAI-compatible chat, streaming, and embeddings routed through LM Studio runtimes (desktop or headless) with Koan's autonomous discovery.
 
@@ -33,7 +33,7 @@ builder.Services
 
 var app = builder.Build();
 app.MapControllers();
-app.Run();
+await app.RunAsync();
 ```
 
 Then prompt LM Studio through the engine facade:

@@ -1,252 +1,126 @@
 # Koan Framework
 
-**Model your domain as entities. Reference your intents. Koan composes the rest — storage, web,
-AI, jobs, caching — and reports the major choices it made.**
+Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applications: the “Ruby on
+Rails for agentic .NET.” It is designed to move from V0 to V1 in meaningful small steps—application
+code states business intent while the framework owns composition, backend negotiation, lifecycle,
+and explanation.
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![.NET](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/download)
+> **Status:** pre-1.0 and source-first. Packages use independent NBGV versions; there is no single
+> framework package version. The current coherent package wave is proved locally but has not yet been
+> published and observed from public feeds. Use this checkout for the supported first-use path and
+> consult the [generated product surface](docs/reference/product-surface.md) for evidence-backed maturity.
 
-Koan is a .NET 10 meta-framework for **agentic, data-driven web applications** — think
-*Rails for .NET*, built for the era where AI capability is part of the domain model and a lot of
-your code is written with coding agents. One grammar — `Entity<T>` — covers CRUD, REST, vector
-search, background jobs, caching, embeddings, and agent (MCP) tools.
+## Reach a meaningful result
 
-The [product constitution](docs/architecture/product-constitution.md) defines what that promise means:
-V0 to V1 in meaningful, small steps, business-readable application code, and infrastructure complexity
-that remains inspectable.
-
-> **Status: pre-1.0, consolidation phase** (version via [NBGV](version.json), currently 0.17.x).
-> Capability maturity is being re-baselined from current code and executable evidence by the
-> [Koan V1 initiative](docs/initiatives/koan-v1/README.md); do not infer support from package or sample
-> existence. **Build from source today.** Koan does not currently support a public-package install
-> path: the coherent package graph is proven from staged artifacts but has not yet been observed as
-> one public publication. See the
-> [current capability evidence](docs/initiatives/koan-v1/R02-EVIDENCE.md#clean-package-install-probe).
-
----
-
-## Shortest path to a running app
-
-```bash
+```powershell
 git clone https://github.com/sylin-org/koan-framework
 cd koan-framework
 dotnet run --project samples/FirstUse
-# in another shell:
-curl -X POST http://localhost:5000/api/approvals -H "Content-Type: application/json" -d '{"subject":"Approve supplier invoice"}'
-curl http://localhost:5000/api/approvals
-curl --get --data-urlencode 'filter={"subject":"Approve supplier invoice"}' http://localhost:5000/api/approvals
-curl http://localhost:5000/.well-known/Koan/facts
 ```
 
-The printed URL can differ when a launch profile or `--urls` is used. The application code is in
-[`samples/FirstUse`](samples/FirstUse/README.md): one business entity, one controller, and the
-four-line bootstrap. Koan elects SQLite, creates the development schema, exposes the governed REST
-surface, and projects the same runtime facts to operators and MCP clients. Its boot report is the
-framework's character in one screen: **the app explains itself.**
+In another shell, create a business request and inspect what composed it:
 
-When that first result makes sense, continue with
-[`samples/GoldenJourney`](samples/GoldenJourney/README.md). It grows one cumulative application
-through business rules, durable work, bounded agent collaboration, and explained adapter recovery
-without replacing the four-line bootstrap or introducing application infrastructure plumbing.
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/approvals `
+  -ContentType application/json -Body '{"subject":"Approve supplier invoice"}'
+Invoke-RestMethod http://localhost:5000/api/approvals
+Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
+```
 
-## The whole framework in three beats
+Use the URL printed by the application if it differs. The complete walkthrough is in
+[`samples/FirstUse`](samples/FirstUse/README.md).
 
-### 1 · Model an entity → get an application
+## The application grammar
 
-<!-- validate -->
+The normal web host is four lines:
+
 ```csharp
-// Program.cs — complete. Nothing else to wire.
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
 var app = builder.Build();
-app.Run();
+await app.RunAsync();
 ```
 
-<!-- validate -->
-```csharp
-public sealed class Approval : Entity<Approval>
-{
-    public string Subject { get; set; } = "";
-    public ApprovalState State { get; set; } = ApprovalState.Pending;
-}
-
-public enum ApprovalState { Pending, Approved, Rejected }
-
-[Route("api/approvals")]
-public sealed class ApprovalsController : EntityController<Approval>;
-```
-
-That's a full REST API: GET/POST/DELETE with pagination and querying, GUID v7 ids generated on
-first read, `/health/live` and dependency-aware `/health/ready` probes, structured logging, and
-zero-config SQLite (`.koan/data/Koan.sqlite`). Schema
-is created automatically in development. JSON defaults: camelCase, nulls omitted
-(Newtonsoft.Json — chosen for predictable polymorphic serialization).
-
-Working with entities is direct — no repositories, no DbContext:
+A model and its HTTP surface remain business-shaped:
 
 ```csharp
-var approval = await Approval.Get(id);                    // null if missing
-var pending = await Approval.Query(a => a.State == ApprovalState.Pending);
-await new Approval { Subject = "Approve invoice" }.Save();
-await approval.Remove();
-// Qualified adapters fetch one consumer-paced, provider-bounded candidate page at a time.
-await foreach (var item in Approval.AllStream(batchSize: 1000)) { /* consume */ }
+public sealed class Todo : Entity<Todo>
+{
+    public string Title { get; set; } = "";
+    public bool Done { get; set; }
+}
+
+[Route("api/todos")]
+public sealed class TodosController : EntityController<Todo>;
 ```
 
-Business persistence rules stay equally direct and apply to Entity, Data, generated REST, and MCP
-paths. Applications without custom rules keep the parameterless `AddKoan()` above:
+That expression gains Entity persistence, query, paging, controller conventions, health, structured
+startup reporting, and runtime facts from referenced capabilities. There is no application repository,
+`DbContext`, schema bootstrap, controller CRUD plumbing, or framework service-registration list.
 
 ```csharp
-builder.Services.AddKoan(() =>
-    Approval.Lifecycle.BeforeUpsert(context =>
-        string.IsNullOrWhiteSpace(context.Current.Subject)
-            ? context.Cancel("An approval needs a subject.", "approval.subject")
-            : context.Proceed()));
+var todo = await new Todo { Title = "Ship the meaningful step" }.Save();
+var same = await Todo.Get(todo.Id);
+var open = await Todo.Query(item => !item.Done);
+await todo.Remove();
 ```
 
-The plan is host-owned and appears in Koan's startup/runtime facts; it is not process-static state.
+## Grow by intent
 
-### 2 · Reference an intent → gain a capability
+References make capabilities available. `AddKoan()` compiles their modules once; the relevant pillar
+elects providers and reports the result. Adding a capability should add business vocabulary, not
+infrastructure ceremony.
 
-Adding a package **is** the configuration. Each line below is one package reference and (at
-most) one attribute:
+Examples:
+
+- `[Cacheable]` adds Entity cache semantics.
+- `IKoanJob<T>` makes an Entity durable work with progress and schedules.
+- `[Embedding]` adds semantic indexing and search when AI/vector providers are present.
+- `[McpEntity]` projects a governed Entity surface to agents.
+- Entity Events and Transport are local-first; adding an eligible connector can transparently extend
+  the communication mesh without changing the application terminal.
 
 ```csharp
-// dotnet add package Sylin.Koan.Data.Connector.Postgres  → same entities, Postgres storage
-// dotnet add package Sylin.Koan.Cache                    → transparent L1/L2 caching:
-[Cacheable(300)]
-public sealed class Todo : Entity<Todo> { /* … */ }
-
-// Entity Transport is included in the foundation: no adapter or registration code.
-public sealed record ApprovalGranted;
-
-public sealed class RecordApproval : IHandleEntityEvent<Approval, ApprovalGranted>
-{
-    public Task Handle(
-        Approval approval,
-        EventOccurrence<ApprovalGranted> occurrence,
-        CancellationToken ct)
-    { /* business reaction to the occurrence */ return Task.CompletedTask; }
-}
-
-public sealed class NotifyApproval : IReceiveEntity<Approval>
-{
-    public bool Where(Approval approval) => approval.State == ApprovalState.Approved;
-
-    public Task Receive(Approval approval, CancellationToken ct)
-    { /* business code over an isolated snapshot */ return Task.CompletedTask; }
-}
-
-await approval.Events.Raise<ApprovalGranted>(ct);
-await approval.Transport.Send(ct);
-await pending.Transport.Send(ct);
-
-// dotnet add package Sylin.Koan.Jobs → durable background work, jobs are entities too:
-public sealed class ImportJob : Entity<ImportJob>, IKoanJob<ImportJob>
-{
-    public string Source { get; set; } = "";
-    public static async Task Execute(ImportJob job, JobContext ctx, CancellationToken ct)
-    { /* runs on the ledger: at-least-once, retries, scheduling, progress */ }
-}
-
-// dotnet add package Sylin.Koan.Data.AI (+ an Ollama + vector connector)
-// → entities become semantically searchable:
-[Embedding(Properties = new[] { nameof(Title) })]
-public sealed class Todo : Entity<Todo> { /* embeddings maintained in the background */ }
-
-var related = await SemanticSearch<Todo>("groceries and meal planning");
-// using static Koan.Data.AI.EntityEmbeddingExtensions;
-
-// dotnet add package Sylin.Koan.Mcp → entities become agent tools over Streamable HTTP:
-[McpEntity]
-public sealed class Todo : Entity<Todo> { /* agents can now query and mutate Todos */ }
+await order.Events.Raise<OrderApproved>(ct); // something happened to this order
+await order.Transport.Send(ct);              // distribute an isolated copy of its current state
 ```
 
-Process-local Entity [Events and Transport](docs/reference/communication/index.md) are tested
-foundation capabilities under `AddKoan()`. The older generic
-[Messaging](docs/reference/messaging/index.md) path is deprecated and remains temporarily for internal
-consumers. A directly referenced RabbitMQ Communication connector can carry Transport and
-framework-owned internal routes; startup-declared business channels can choose reach without naming
-providers in domain code. RabbitMQ Events, retries, remote settlement, and cross-application contract
-negotiation are not claimed.
+The same terminals lift pointwise over Entity collections and lazy streams. Backend differences are
+negotiated, not hidden: configured intent either resolves to an eligible provider or fails with a
+corrective explanation.
 
-Backends differ, and Koan refuses to pretend otherwise: every adapter declares its capabilities,
-the framework negotiates them, and an unsupported operation **fails loudly** instead of silently
-degrading.
+## Inspect what happened
 
-```csharp
-var profile = Data<Todo, string>.Capabilities
-    .Detail<FilterExecutionProfile>(DataCaps.Query.FilterExecution);
+When Koan is working well, the same resolved composition is visible through:
 
-if (profile?.Kind is FilterExecutionKind.Native)
-{
-    // normalized filters execute in the backend
-}
-```
+- the startup report;
+- `/health/live` and `/health/ready`;
+- `/.well-known/Koan/facts` for operators and reviewers;
+- `koan://facts`, `koan://entities`, and `koan://self` for MCP clients; and
+- `koan.lock.json` for referenced-module drift.
 
-`DataCaps.Query.Filter` describes which operators are correct; `FilterExecutionProfile` describes
-their physical cost posture. Relationship traversal uses both and rejects implicit backend scans.
+These are projections of runtime decisions, not separate configuration authorities.
 
-### 3 · The app explains itself
+## Choose Koan when
 
-Beyond the boot report: capability sets are queryable at runtime, well-known endpoints describe
-the running service, health contributors aggregate readiness, and `[McpEntity]` exposes applicable
-domain surfaces to agents through the same endpoint service the REST controllers use. Discovery is
-**source-generated first**, with embedded-manifest and runtime fallbacks for deployment shapes that
-need them; activation is deterministically ordered and reported.
+Choose Koan when the application is naturally Entity-centric, you value conventions over repeated
+plumbing, and you want data, jobs, communication, web, and agent surfaces to compose through one
+inspectable runtime.
 
-> **See all three beats run for real** — [the wedge demo](docs/case-studies/agent-wedge-demo/README.md): a
-> live, captured transcript building a multi-provider AI app from one entity to an agent-operable MCP
-> server in one session (REST → Postgres → cache → jobs → semantic search → an agent mutating over
-> `koan://entities`), every command and output run against the framework.
+Do not choose it when you need a stable 1.0 compatibility promise today, require a publicly certified
+package-only install, need an unsupported provider guarantee, or want direct control of every ORM,
+transport, and hosting mechanism. Koan rejects false backend parity; package existence is not a support
+claim.
 
-## What's implemented today
+## Read next
 
-- **One grammar everywhere** — the same `Entity<T>` is your table row, your REST resource, your
-  cache entry, your job, your embedding source, and your agent tool.
-- **Capability-graded multi-provider** — SQLite, Postgres, SQL Server, MongoDB, Couchbase,
-  Redis, JSON-file storage; Weaviate, Qdrant, Milvus, Elasticsearch, OpenSearch vectors — behind
-  one API that *negotiates* features (pushdown, bulk ops, CAS, TTL) rather than faking parity. A
-  shared convergence-test model lets provider suites compare their behavior with reference semantics;
-  current verification remains provider- and suite-specific.
-- **Background jobs as entities** ([JOBS-0005](docs/decisions/JOBS-0005-job-orchestrator-rebuild.md))
-  — a capability ladder from in-memory to durable-ledger to distributed competing consumers,
-  with cron/`@boot` scheduling, idempotency, chains, and contention-free claims.
-- **Transparent entity caching** — `[Cacheable]` L1/L2 with cross-node coherence and a
-  principled fresh-or-null contract (stale reads are opt-in, never a surprise).
-- **AI as a property of your data** — `[Embedding]` keeps vectors in sync in the background;
-  semantic search is a query, not a subsystem you build.
-- **Decision-first engineering** — 280+ ADRs, integration-tests-as-canon, and a self-assessment
-  you can read. The architecture is auditable, not asserted.
-- **Composition you can diff** — supported application builds write a checked-in
-  [`koan.lock.json`](docs/guides/composition-lockfile.md) describing the statically referenced Koan
-  modules, so PR review *sees* composition drift in a plain `git diff`. At runtime, the resolved twin
-  adds elections and the boot report checks the two views for drift.
-- **Your app inherits a test suite** — reference
-  [`Sylin.Koan.Testing`](docs/guides/testing-your-app.md) and write one method per entity;
-  `EntityConformanceSpecs<T>` runs round-trip, pushdown-vs-reference-oracle, paging, partition, cache
-  and embedding batteries — gated automatically on what the entity declares.
+- [Quickstart](docs/getting-started/quickstart.md)
+- [Golden path](docs/getting-started/overview.md)
+- [Graduated samples](samples/README.md)
+- [Product constitution](docs/architecture/product-constitution.md)
+- [Entity semantics contract](docs/architecture/entity-semantics-contract.md)
+- [Current capability and package surface](docs/reference/product-surface.md)
+- [Troubleshooting](docs/support/troubleshooting.md)
 
-## Learn it
-
-| Path | Where |
-|---|---|
-| **First meaningful result** | [FirstUse](samples/FirstUse/README.md) — the executable source and package contract |
-| **First 15 minutes** | [Getting started](docs/getting-started/overview.md) — grow from that result, concept by concept |
-| **Run real apps** | [samples/](samples/README.md) — the ladder: S0 console → S1 CRUD → S10 multi-provider → S14 jobs/benchmarks, then the dogfood flagships |
-| **Do a task** | [Guides](docs/guides/README.md) — APIs, data modeling, auth, AI, media, jobs |
-| **Understand why** | [Product constitution](docs/architecture/product-constitution.md) · [Entity Semantics Contract](docs/architecture/entity-semantics-contract.md) · [Architecture principles](docs/architecture/principles.md) · [ADRs](docs/decisions/index.md) |
-| **Check what's solid** | [Framework assessment & maturity model](docs/assessment/00-overview.md) |
-| **When stuck** | [Troubleshooting](docs/support/troubleshooting.md) |
-| **Coding agents** | [llms.txt](llms.txt) — the framework in one file: three beats, the 8 concepts, anti-patterns, the canonical way |
-
-Requirements: **.NET 10 SDK**. Docker/Podman only for container-backed samples and integration
-tests. Coding agents: start at [CLAUDE.md](CLAUDE.md) and `.claude/skills/`.
-
-## Contributing
-
-Single-maintainer project in active consolidation ("fewer but more meaningful parts").
-Issues and discussions welcome; PRs should follow the ADR-first workflow and keep the green
-ratchet green (`scripts/green-ratchet.ps1`). See [docs/engineering](docs/engineering/index.md).
-
-Licensed under [Apache 2.0](LICENSE).
+Architecture decision records are retained as dated decisions. For current product behavior, prefer
+the pages above, executable samples, generated product surface, and source/tests.

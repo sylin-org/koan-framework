@@ -5,7 +5,7 @@ title: "Tenancy — pillar map"
 audience: [developers, ai-agents]
 status: current
 last_updated: 2026-06-24
-framework_version: v0.17.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-06-24
   status: verified
@@ -17,7 +17,7 @@ validation:
 > One-screen map of the Tenancy pillar — automatic, fail-closed multi-tenant isolation across data, cache, and
 > blobs from a single ambient scope. Full detail: [tenancy how-to](../../guides/tenancy-howto.md).
 
-**What it does** — Reference `Koan.Tenancy` and every non-`[HostScoped]` entity becomes **tenant-isolated by
+**What it does** — Reference the `Sylin.Koan.Tenancy` package and every non-`[HostScoped]` entity becomes **tenant-isolated by
 construction**: reads filter, writes stamp, blob keys and cache keys partition — all by the *ambient* tenant, with
 **no per-entity code** (Reference = Intent). Isolation is a **registered contributor** over the data-axis model
 ([ARCH-0101](../../decisions/ARCH-0101-data-axis-model.md)): the framework injects an invisible `__koan_tenant`

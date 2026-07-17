@@ -233,6 +233,7 @@ public class ServiceAuthenticationException : Exception
 - **[Usage Samples](SAMPLES.md)** - Comprehensive usage examples
 - **[Decision Document](../../docs/decisions/DEC-0053-service-to-service-authentication.md)** - Design decisions and rationale
 
-## Examples
+## Evidence
 
-See `samples/S5.Recs/Controllers/ServiceDemoController.cs` for complete examples.
+Focused behavior is exercised in the Auth/Security integration suites. There is no graduated public
+service-auth sample yet; package presence alone is not a deployment claim.

@@ -4,17 +4,12 @@
 
 Roslyn analyzers/source generators that emit the orchestration manifest (`__KoanOrchestrationManifest.Json`) and enforce adapter hygiene.
 
-## Quick start
+## Source-first use
 
-```xml
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <PackageReference Include="Sylin.Koan.Orchestration.Generators"
-                      Version="0.6.3"
-                      PrivateAssets="all" />
-  </ItemGroup>
-</Project>
-```
+The current repository attaches this analyzer only to projects that declare orchestration metadata.
+Public-feed installation is not yet a certified coherent path. When the package wave is observed,
+consume `Sylin.Koan.Orchestration.Generators` as an analyzer with `PrivateAssets="all"` and use the
+version selected by that coherent release.
 
 Annotate your adapters with `KoanServiceAttribute` (and related metadata attributes) so the generator can materialize a manifest entry.
 

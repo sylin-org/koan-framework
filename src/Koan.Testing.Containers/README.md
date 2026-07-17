@@ -2,7 +2,7 @@
 
 Use this package for xUnit v3 integration specs that must exercise a Koan data adapter against its
 real backing store. It supplies shared Testcontainers fixtures, Docker-free fixtures for the
-in-memory/file adapters, and `KoanDataSpec<TFixture>` for the common reflective-host workflow.
+in-memory/file adapters, and `KoanDataSpec<TFixture>` for the common compiled-host workflow.
 
 Reference it as part of one coherent Koan package version set. Repository development uses the
 project at `src/Koan.Testing.Containers`; public package-set readiness is tracked separately from
@@ -16,7 +16,7 @@ this module's runtime contract.
 - each test should receive a fresh host while sharing the expensive backing-store fixture.
 
 Do not choose it for pure unit tests or for application-level Entity conformance. Use
-`Koan.Testing.Hosting` for a standalone reflective host and `Koan.Testing` for the application
+`Koan.Testing.Hosting` for a standalone compiled-composition host and `Koan.Testing` for the application
 conformance batteries.
 
 ## Configure the test assembly

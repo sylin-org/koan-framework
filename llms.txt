@@ -1,147 +1,98 @@
-# Koan Framework
+# Koan Framework — agent orientation
 
-> A .NET 10 meta-framework for agentic, data-driven web applications — "Rails for .NET"
-> for the era where AI capability is part of the domain model. One grammar — `Entity<T>` —
-> covers CRUD, REST, vector search, background jobs, caching, embeddings, and agent (MCP) tools.
+Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applications. Its target is
+V0 to V1 in meaningful small steps: application code should read as business intent while framework
+pillars own composition, backend negotiation, lifecycle, and explanation.
 
-> Status: pre-1.0, consolidation phase (version via NBGV, currently 0.17.x). The core —
-> entity/data pillar, web, cache, jobs, vector — is settled and integration-tested; several
-> outer pillars are experimental. Until 1.0, build from source — published packages
-> (`Sylin.Koan.*` on NuGet) lag the repo.
+Status: pre-1.0 and source-first. Packages own independent NBGV versions. A coherent candidate wave
+has local clean-room evidence but has not yet been published and observed from public feeds. Package
+existence is not a support claim; use docs/reference/product-surface.md for maturity.
 
-## Start here
+## First supported action
 
-`samples/FirstUse` is the executable first-use contract. Run it with
-`dotnet run --project samples/FirstUse`. The same directory is compiled from source in tests and
-from staged packages in the release clean room. It proves one business entity through SQLite,
-REST, startup reporting, operator facts, governed MCP discovery, dry-run, and agent mutation.
+Run:
 
-`samples/GoldenJourney` is the cumulative growth contract. Read its entity first, then its
-business-named controller and bounded MCP toolset. Its executable source proof covers persistence,
-jobs and progress, shared runtime facts, agent business boundaries, and adapter rejection/recovery.
+    dotnet run --project samples/FirstUse
 
-## The whole framework in three beats
+Then POST one approval to /api/approvals, read it back, and inspect
+/.well-known/Koan/facts. Use the URL printed by ASP.NET Core if it differs.
 
-### 1 · Model an entity → get an application
+The canonical web host is:
 
-The entire bootstrap. The web pipeline, controllers, health endpoints, and discovery are
-auto-wired when `Koan.Web` is referenced — "Reference = Intent".
+    var builder = WebApplication.CreateBuilder(args);
+    builder.Services.AddKoan();
+    var app = builder.Build();
+    await app.RunAsync();
 
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan();
-var app = builder.Build();
-app.Run();
-```
+## Application grammar
 
-Model + API:
+- Entity<T> is the primary domain/data grammar.
+- EntityController<T> is the ordinary HTTP projection.
+- Instance and static Entity verbs are preferred over application repositories.
+- References make capabilities available; AddKoan() compiles generated semantic modules once.
+- A custom KoanModule is warranted only when an application or package owns real registration,
+  startup work, or reporting. Its identity derives from normal package/assembly identity.
+- Framework pillars own semantic policy; adapters own mechanics; applications own business intent.
+- Do not introduce a new abstraction where a standard .NET convention or an existing pillar
+  chokepoint owns the concern.
 
-```csharp
-using Koan.Data.Core.Model;
-using Koan.Web.Controllers;
-using Microsoft.AspNetCore.Mvc;
+## Entity capability vocabulary
 
-public sealed class Todo : Entity<Todo>
-{
-    public string Title { get; set; } = "";
-    public bool IsCompleted { get; set; }
-}
+Data:
 
-[Route("api/[controller]")]
-public sealed class TodoController : EntityController<Todo> { }
-```
+    await new Todo { Title = "Ship it" }.Save();
+    var todo = await Todo.Get(id);
+    var open = await Todo.Query(item => !item.Done);
+    await todo.Remove();
 
-That's a full REST API: GET/POST/DELETE with pagination and querying, GUID v7 ids generated
-on first read, `/health`, structured logging, and zero-config SQLite (`./data/app.db`).
-Schema is created automatically in development.
+Jobs:
 
-Working with data (the verbs — note: `Query`, not `Where`; `Remove`, not `Delete`):
+    public sealed class Review : Entity<Review>, IKoanJob<Review>
+    {
+        public static Task Execute(Review review, JobContext context, CancellationToken ct) => ...;
+    }
+    await review.Job.Submit(ct: ct);
 
-```csharp
-var todo  = await Todo.Get(id);                      // null when missing
-var open  = await Todo.Query(t => !t.IsCompleted);   // pushed down when the adapter supports it
-var page  = await Todo.FirstPage(20);
-await new Todo { Title = "Ship it" }.Save();
-await todo.Remove();
-// Provider-bounded on SQLite/Postgres/SQL Server/Cockroach/Mongo/Couchbase; others reject.
-await foreach (var t in Todo.AllStream(batchSize: 1000)) { /* consumer-paced pages */ }
-```
+Communication:
 
-### 2 · Reference an intent → gain a capability
+    await order.Events.Raise<OrderApproved>(ct);
+    await order.Transport.Send(ct);
 
-Adding a package reference (plus, at most, one attribute) is the configuration. Same entities,
-same controllers — Postgres storage, transparent `[Cacheable]` L1/L2, durable `IKoanJob<T>`
-background work, `[Embedding]` semantic search, `[McpEntity]` agent tools. Backends differ and
-Koan refuses to pretend otherwise: every adapter declares its capabilities, the framework
-negotiates them, and an unsupported operation fails loudly instead of silently degrading.
+Events mean something happened to an Entity. Transport means distribute an isolated copy of its
+current state. Both work locally with no external adapter and lift pointwise over finite Entity
+collections and lazy streams. Eligible connectors may extend the mesh without changing the terminal.
 
-Entity Communication is included in the foundation and activates through the same `AddKoan()` call:
+Agent projection:
 
-```csharp
-public sealed record OrderApproved;
+    [McpEntity]
+    public sealed class Todo : Entity<Todo>;
 
-public sealed class RecordApproval : IHandleEntityEvent<Order, OrderApproved>
-{
-    public Task Handle(Order order, EventOccurrence<OrderApproved> occurrence, CancellationToken ct)
-        => Task.CompletedTask;
-}
+Referencing Koan.Mcp activates its KoanModule through AddKoan(). Ordinary applications do not call
+AddKoanMcp() or map MCP endpoints manually.
 
-public sealed class ImportOrder : IReceiveEntity<Order>
-{
-    public Task Receive(Order order, CancellationToken ct) => Task.CompletedTask;
-}
+## Truth and inspectability
 
-await order.Events.Raise<OrderApproved>(ct); // a typed occurrence happened to this Entity
-await order.Transport.Send(ct);              // distribute an isolated copy of current Entity state
-```
+- Read startup reporting before guessing about composition.
+- Use /health/live for process liveness and /health/ready for dependency readiness.
+- /.well-known/Koan/facts and koan://facts project the same redacted runtime decisions.
+- koan://entities and koan://self describe the agent-visible surface.
+- koan.lock.json records referenced-module composition and drift.
+- Provider capability declarations bound what Koan may promise. Unsupported configured intent must
+  reject with a corrective explanation rather than silently degrade.
 
-Both terminals lift pointwise over finite Entity collections and lazy streams. The current supported
-adapter is bounded, process-local, and memory-only. The older arbitrary-object `Koan.Messaging`
-surface is deprecated; do not infer RabbitMQ, retry, or durability from the local Communication API.
+## Documentation authority
 
-### 3 · The app explains itself
+Current product guidance is the root README, docs/toc.yml curriculum, graduated samples, current
+reference pages, executable tests, and generated product surface. Initiative ledgers, assessments,
+plans, proposals, and archives are engineering evidence, not alternate application patterns.
+Architecture decision records are dated records and may describe their historical context.
 
-The boot report printed at startup names every discovered module, the elected adapters, and the
-boot phases — it is the primary debugging surface. Capability sets are queryable at runtime;
-well-known endpoints describe the running service. Discovery is a Roslyn source-generated
-registry compiled into your assemblies: deterministic, ordered, AOT-friendly — not runtime
-reflection magic.
+Start reading at:
 
-## The concept budget (8 concepts)
-
-Hello-CRUD needs exactly eight Koan concepts; nothing else is required:
-
-1. `Entity<T>` — your model, with a string `Id` (GUID v7, generated on first read)
-2. Entity statics & instance verbs — `Get` / `All` / `Query` / `Save()` / `Remove()`
-3. `EntityController<T>` — the REST surface over an entity
-4. `AddKoan()` — the single bootstrap call ("Reference = Intent": referenced packages register themselves)
-5. Provider election — the referenced data connector wins; zero-config defaults (SQLite → `./data/app.db`)
-6. The boot report — what the app prints at startup is the primary debugging surface
-7. Auto schema ("magic") — created in Development; gated by `Koan:AllowMagicInProduction` elsewhere
-8. Web defaults — controllers, `/health`, secure headers auto-wired; JSON is camelCase, nulls omitted (Newtonsoft.Json)
-
-## Anti-patterns (immediate red flags)
-
-These trigger the `koan-entity-first` skill — do not write them:
-
-- Manual `IRepository<T>` interfaces
-- Injecting repositories into services
-- Manual service registration in Program.cs (except via `KoanModule` / `KoanAutoRegistrar`)
-- Custom ORM/DbContext usage instead of Entity<T>
-- Provider-specific code without capability detection
-
-## The canonical way
-
-| Concern | Canonical way |
-|---|---|
-| Bootstrap | `KoanModule` (module primitive) + `AddKoan()` — never manual `Add*()` where a registrar exists |
-| Serializer | Newtonsoft.Json, camelCase, nulls omitted |
-| Scheduling / background work | `Koan.Jobs` (`IKoanJob<T>` + `JobContext`) |
-| Realtime | SSE |
-
-## Pointers
-
-- `CLAUDE.md` — agent entry point: pattern → skill table, core principles, framework utilities
-- `.claude/skills/` — 19 on-demand, card-anchored skills (entity-first, bootstrap, web, data-modeling, caching, jobs, vector, ai, auth, storage, …); each carries a compile-gated canonical pattern (DX-0048)
-- `docs/getting-started/overview.md` — the golden path, concept by concept (source of the snippets above)
-- `docs/assessment/00-overview.md` — the framework's own assessment: what is settled vs experimental
+- README.md
+- docs/getting-started/quickstart.md
+- docs/getting-started/overview.md
+- samples/README.md
+- docs/architecture/product-constitution.md
+- docs/architecture/entity-semantics-contract.md
+- docs/reference/product-surface.md

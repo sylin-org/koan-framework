@@ -5,7 +5,7 @@ title: "Communication — Entity Events and Transport"
 audience: [developers, architects, operators, ai-agents]
 status: current
 last_updated: 2026-07-16
-framework_version: v0.20.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-16
   status: verified
