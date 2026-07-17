@@ -1128,6 +1128,7 @@
       "dependencies": [
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Vector",
         "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": "src/Koan.Data.SearchEngine/README.md",
@@ -1155,7 +1156,7 @@
     {
       "packageId": "Sylin.Koan.Data.Vector",
       "shape": "library",
-      "description": "Koan vector module (facades, DI, defaults)",
+      "description": "Entity-first Koan vector runtime: provider election, memoized repository resolution, isolation-aware naming, querying, health participation, and facades.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1173,13 +1174,12 @@
     {
       "packageId": "Sylin.Koan.Data.Vector.Abstractions",
       "shape": "library",
-      "description": "Koan vector contracts (providers depend on this package only)",
+      "description": "Provider-neutral Koan vector contracts for search repositories, adapter factories, schemas, queries, matches, capabilities, and export shapes.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core"
+        "Sylin.Koan.Data.Abstractions"
       ],
       "readme": "src/Koan.Data.Vector.Abstractions/README.md",
       "ownsReadme": true,

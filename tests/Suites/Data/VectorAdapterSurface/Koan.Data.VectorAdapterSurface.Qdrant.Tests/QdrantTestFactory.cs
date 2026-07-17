@@ -163,7 +163,7 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddLogging();
         services.AddHttpClient("qdrant", c => c.BaseAddress = new Uri(_endpoint));
-        services.AddKoanDataVector();
+        services.AddVectorAdapterTestRuntime();
 
         services.AddOptions<QdrantOptions>().Configure(o =>
         {
@@ -186,7 +186,7 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddLogging();
         services.AddHttpClient("qdrant", c => c.BaseAddress = new Uri(_endpoint));
-        services.AddKoanDataVector();
+        services.AddVectorAdapterTestRuntime();
 
         services.AddOptions<QdrantOptions>().Configure(o => ApplyMatrixDefaults(o, _endpoint, EmbeddingDimension));
         services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();

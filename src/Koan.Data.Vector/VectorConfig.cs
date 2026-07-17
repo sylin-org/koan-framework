@@ -1,14 +1,14 @@
 using System;
 using Koan.Data.Abstractions;
 
-namespace Koan.Data.Vector.Abstractions;
+namespace Koan.Data.Vector;
 
 /// <summary>
 /// Vector-specific configuration for entity.
 /// Parallel to AggregateConfig but for vector operations.
 /// Immutable value holder for provider and service provider.
 /// </summary>
-public sealed class VectorConfig<TEntity, TKey>
+internal sealed class VectorConfig<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {

@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
+using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Core.Provenance;
 using Koan.Data.Abstractions;

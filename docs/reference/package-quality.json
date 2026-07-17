@@ -4,11 +4,11 @@
   "summary": {
     "packages": 107,
     "repairRequired": 33,
-    "reviewRequired": 55,
-    "structurallyReady": 19,
+    "reviewRequired": 53,
+    "structurallyReady": 21,
     "ownedReadmes": 74,
     "technicalCompanions": 64,
-    "findings": 220
+    "findings": 216
   },
   "findingDefinitions": [
     {
@@ -1178,6 +1178,7 @@
       "dependencies": [
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Vector",
         "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": "src/Koan.Data.SearchEngine/README.md",
@@ -1217,8 +1218,8 @@
       "projectPath": "src/Koan.Data.Vector/Koan.Data.Vector.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
-      "description": "Koan vector module (facades, DI, defaults)",
+      "status": "structurally-ready",
+      "description": "Entity-first Koan vector runtime: provider election, memoized repository resolution, isolation-aware naming, querying, health participation, and facades.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1229,32 +1230,25 @@
       "readme": "src/Koan.Data.Vector/README.md",
       "technicalDocumentation": "src/Koan.Data.Vector/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "metadata.description.terse"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Abstractions",
       "projectPath": "src/Koan.Data.Vector.Abstractions/Koan.Data.Vector.Abstractions.csproj",
       "shape": "library",
       "role": "contracts",
-      "status": "review-required",
-      "description": "Koan vector contracts (providers depend on this package only)",
+      "status": "structurally-ready",
+      "description": "Provider-neutral Koan vector contracts for search repositories, adapter factories, schemas, queries, matches, capabilities, and export shapes.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core"
+        "Sylin.Koan.Data.Abstractions"
       ],
       "readme": "src/Koan.Data.Vector.Abstractions/README.md",
       "technicalDocumentation": "src/Koan.Data.Vector.Abstractions/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.InMemory",

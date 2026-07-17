@@ -208,7 +208,7 @@ public sealed class MilvusTestFactory : IVectorAdapterTestFactory
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddLogging();
         services.AddHttpClient("milvus", c => c.BaseAddress = new Uri(_endpoint));
-        services.AddKoanDataVector();
+        services.AddVectorAdapterTestRuntime();
 
         services.AddOptions<MilvusOptions>().Configure(o =>
         {

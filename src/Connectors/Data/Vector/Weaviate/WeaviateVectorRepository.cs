@@ -12,7 +12,7 @@ using Koan.Data.Abstractions.Naming;
 using Koan.Core.Capabilities;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
-using Koan.Data.Vector.Abstractions.Configuration;
+using Koan.Data.Vector.Naming;
 using Koan.Data.Vector.Abstractions.Schema;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;

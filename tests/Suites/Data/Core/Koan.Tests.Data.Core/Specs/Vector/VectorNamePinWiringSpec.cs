@@ -19,7 +19,7 @@ namespace Koan.Tests.Data.Core.Specs.Vector;
 
 /// <summary>
 /// ARCH-0103 §9.14 — the WIRING proof for the warn-on-pin hardening: a real production vector adapter's pinned
-/// name-getter must actually CALL <see cref="Koan.Data.Vector.Abstractions.Configuration.VectorAdapterNaming.WarnIfPinnedNameDefeatsIsolation{TEntity}"/>.
+/// name-getter must actually CALL <see cref="Koan.Data.Vector.Naming.VectorAdapterNaming.WarnIfPinnedNameDefeatsIsolation{TEntity}"/>.
 /// <see cref="VectorNamePinWarningSpec"/> proves the shared warner/predicate in isolation; this proves the call site is
 /// live end-to-end — through the real <see cref="QdrantVectorRepository{TEntity,TKey}"/> built by its public factory,
 /// with a stub <see cref="IHttpClientFactory"/> so no Qdrant/Docker is needed (the <c>CollectionName</c> getter resolves

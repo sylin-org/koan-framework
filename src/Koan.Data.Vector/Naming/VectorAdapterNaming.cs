@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core.Logging;
 using Koan.Data.Abstractions;
@@ -7,7 +8,7 @@ using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core.Routing;
 using Koan.Data.Vector.Abstractions;
 
-namespace Koan.Data.Vector.Abstractions.Configuration;
+namespace Koan.Data.Vector.Naming;
 
 /// <summary>
 /// Resolves vector collection/index identifiers via the shared <see cref="StorageNameGenerator"/>, folding BOTH AODB
@@ -22,6 +23,7 @@ namespace Koan.Data.Vector.Abstractions.Configuration;
 /// source is folded with the SAME identifier-safe rendering as the partition (the record-plane <c>ResolveStorage</c>
 /// stays source-free — the record plane routes a source to a distinct physical store via the factory, not the name).</para>
 /// </summary>
+[EditorBrowsable(EditorBrowsableState.Never)]
 public static class VectorAdapterNaming
 {
     public static string GetOrCompute<TEntity, TKey>(IServiceProvider sp)

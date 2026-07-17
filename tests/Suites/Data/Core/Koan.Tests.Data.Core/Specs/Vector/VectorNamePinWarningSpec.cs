@@ -6,7 +6,7 @@ using Koan.Core.Logging;
 using Koan.Core.Naming;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
-using Koan.Data.Vector.Abstractions.Configuration;
+using Koan.Data.Vector.Naming;
 using Microsoft.Extensions.Logging;
 using Xunit;
 

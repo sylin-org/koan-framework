@@ -2,17 +2,18 @@ using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
+using Koan.Data.Vector.Abstractions;
 
-namespace Koan.Data.Vector.Abstractions;
+namespace Koan.Data.Vector;
 
 /// <summary>Host-owned vector configuration resolution for Entity types.</summary>
-public static class VectorConfigs
+internal static class VectorConfigs
 {
     private static ConditionalWeakTable<
         IServiceProvider,
         ConcurrentDictionary<(Type EntityType, Type KeyType), object>> _configsByProvider = new();
 
-    public static VectorConfig<TEntity, TKey> Get<TEntity, TKey>(IServiceProvider services)
+    internal static VectorConfig<TEntity, TKey> Get<TEntity, TKey>(IServiceProvider services)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {

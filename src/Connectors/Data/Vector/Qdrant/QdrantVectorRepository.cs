@@ -17,7 +17,7 @@ using Koan.Data.Abstractions;
 using Koan.Core.Capabilities;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
-using Koan.Data.Vector.Abstractions.Configuration;
+using Koan.Data.Vector.Naming;
 
 namespace Koan.Data.Vector.Connector.Qdrant;
 
@@ -26,7 +26,7 @@ namespace Koan.Data.Vector.Connector.Qdrant;
 ///
 /// <para>
 /// Qdrant constrains point ids to UUID or unsigned-64 only. For Koan's typical
-/// <see cref="Entity{T}"/> default — string keys that are GUID v7 values — this is a no-op:
+/// <c>Entity&lt;T&gt;</c> default — string keys that are GUID v7 values — this is a no-op:
 /// the string parses as a Guid and goes through verbatim. Arbitrary string keys (e.g. "v1",
 /// "alpha-1") get projected via UUIDv5 from a fixed namespace; the original string is always
 /// preserved in <c>payload.&lt;IdField&gt;</c> so search results round-trip the caller's id.

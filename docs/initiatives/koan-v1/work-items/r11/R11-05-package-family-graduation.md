@@ -100,7 +100,19 @@ into a support claim.
   README and canonical icon.
 - generated truth after AI contract graduation: 107 packages, 33 repair-required, 55 review-required, 19
   structurally ready, and 220 findings. Both retained contract packages now have zero structural findings.
-- Vector, Storage, and Media boundaries remain under assessment; none is graduated merely because its name says
+- `Sylin.Koan.Data.Vector.Abstractions` now contains only the provider/query/schema SPI. Runtime provider election,
+  per-host memoization, dependency injection, physical naming, and segmentation moved to `Sylin.Koan.Data.Vector`;
+  the contracts package consequently depends only on `Sylin.Koan.Data.Abstractions`.
+- `Sylin.Koan.Data.Vector` earns `keep` as the one runtime owner for entity-first facades, provider selection,
+  repository caching, isolation-aware naming, participation, and health. Its package page now documents the real
+  `Vector<TEntity>` surface and coordination limits instead of the former nonexistent profile/workflow examples.
+- focused Vector proof: Abstractions, runtime, SearchEngine, Qdrant, Milvus, Weaviate, OpenSearch, Elasticsearch,
+  and SQL Server build warning-free; Data Core vector specs pass 58/58 and the zero-infrastructure in-memory
+  conformance suite passes 33/33. Synthetic adapter hosts receive the neutral segmentation realization through one
+  shared test-kit chokepoint; production composition remains owned by Data Core.
+- generated truth after Vector contract graduation: 107 packages, 33 repair-required, 53 review-required, 21
+  structurally ready, and 216 findings. Both retained Vector packages now have zero structural findings.
+- Storage and Media boundaries remain under assessment; neither is graduated merely because its name says
   `Contracts` or `Abstractions`.
 
 ## Acceptance

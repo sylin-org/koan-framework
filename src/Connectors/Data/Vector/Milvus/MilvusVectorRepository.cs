@@ -15,7 +15,7 @@ using Koan.Data.Abstractions;
 using Koan.Core.Capabilities;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
-using Koan.Data.Vector.Abstractions.Configuration;
+using Koan.Data.Vector.Naming;
 
 namespace Koan.Data.Vector.Connector.Milvus;
 

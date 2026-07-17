@@ -51,7 +51,7 @@ public sealed class InMemoryVectorTestFactory : IVectorAdapterTestFactory
     {
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-        services.AddKoanDataVector();
+        services.AddVectorAdapterTestRuntime();
         services.AddSingleton<IVectorAdapterFactory>(_adapter);
         return services.BuildServiceProvider();
     }
