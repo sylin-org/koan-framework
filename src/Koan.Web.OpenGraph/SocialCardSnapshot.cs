@@ -11,7 +11,8 @@ namespace Koan.Web.OpenGraph;
 /// <c>Entity&lt;T&gt;.Events</c> warm/evict hook that keeps this in sync with its source entity.
 /// </summary>
 /// <remarks>
-/// The <see cref="IEntity{TKey}.Id"/> is a composite key, <c>"{typeDiscriminator}:{sourceId}"</c>,
+/// The <see cref="Koan.Data.Abstractions.IEntity{TKey}.Id"/> is a composite key,
+/// <c>"{typeDiscriminator}:{sourceId}"</c>,
 /// e.g. <c>"Work:019ebf08636e"</c>. Values are stored raw-but-hard-capped; HTML-encoding and
 /// absolute-URL promotion happen at emit time (the latter depends on the request scheme and host).
 /// Display-length truncation is also an emit-time concern, so the configured maxima can change
