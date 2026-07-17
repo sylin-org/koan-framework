@@ -870,10 +870,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             var opts = context.HttpContext?.RequestServices.GetService(typeof(Microsoft.Extensions.Options.IOptions<Koan.Web.Options.KoanWebOptions>)) as Microsoft.Extensions.Options.IOptions<Koan.Web.Options.KoanWebOptions>;
             var mergePolicy = opts?.Value.MergePatchNullsForNonNullable ?? MergePatchNullPolicy.SetDefault;
             var partialPolicy = opts?.Value.PartialJsonNulls ?? PartialJsonNullPolicy.SetNull;
-            Koan.Data.Abstractions.Instructions.IPatchApplicator<TEntity> applicator = request.Kind == PatchKind.MergePatch7386
-                ? new Koan.Data.Core.Patch.MergePatchApplicator<TEntity>(jt, mergePolicy)
-                : new Koan.Data.Core.Patch.PartialJsonApplicator<TEntity>(jt, partialPolicy);
-            applicator.Apply(working);
+            if (request.Kind == EntityPatchKind.MergePatch7386)
+            {
+                new Koan.Data.Core.Patch.MergePatchApplicator<TEntity>(jt, mergePolicy).Apply(working);
+            }
+            else
+            {
+                new Koan.Data.Core.Patch.PartialJsonApplicator<TEntity>(jt, partialPolicy).Apply(working);
+            }
         }
         else
         {

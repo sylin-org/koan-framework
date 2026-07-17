@@ -3,8 +3,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Core primitives for Koan: configuration helper, environment snapshot (KoanEnv), constants, foundational abstractions, and background services with fluent API.</Description>
-    <PackageTags>$(CommonPackageTags);core;configuration;options;environment;runtimesnapshot;constants;backgroundservices;fluentapi</PackageTags>
+    <Description>Composition and runtime substrate for Koan modules: lifecycle, context, provider catalogs, readiness, discovery, facts, and build provenance.</Description>
+    <PackageTags>$(CommonPackageTags);core;composition;modules;context;readiness;discovery;runtime-facts;provenance</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />

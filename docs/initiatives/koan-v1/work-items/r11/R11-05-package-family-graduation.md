@@ -1,0 +1,85 @@
+---
+type: SPEC
+domain: framework
+title: "R11-05 - Graduate Package Families"
+audience: [architects, maintainers, developers, ai-agents]
+status: current
+last_updated: 2026-07-17
+framework_version: source-first
+validation:
+  date_last_tested: 2026-07-17
+  status: in-progress
+  scope: dependency-ordered family assessment, coalescence, package prose, and focused consumer evidence
+---
+
+# R11-05 — Graduate package families
+
+- Tranche: `T7B — package-product graduation`
+- Status: `in-progress`
+- Depends on: R11-04 golden package journey
+- Unlocks: final packed rendering and complete release boundary
+
+## Application intent
+
+> Every package beyond the front door states one distinct capability addition, activates only that intent, and
+> explains its smallest useful result and honest limits without requiring framework-internal knowledge.
+
+## Method
+
+Work in dependency order. Before editing package prose, each family receives a focused discovery pass for duplicated
+mechanisms, misplaced dependencies, contract/function leakage, and opportunities to centralize policy at the concern
+owner. A package is documented only after its boundary earns `keep`; a failed boundary is merged, split, renamed, or
+retired first.
+
+Each family slice updates the exact R11-02 disposition, package-specific metadata/docs, focused behavior evidence,
+and generated quality report. It does not run the complete release ratchet.
+
+## Family queue
+
+| Family | Scope | Status |
+|---|---|---|
+| foundation runtime | Core, Data contracts/runtime, JSON, SQLite, Web, Communication | passed |
+| contract isolation | ZenGarden, AI contracts, Vector/Media abstractions, Orchestration CLI contracts | pending |
+| provider families | Data, Vector, AI, Cache, Storage, Auth, Orchestration providers | pending |
+| semantic capabilities | Jobs, MCP, AI, Cache, Tenancy, Identity, Canon, Media, Classification, Security | pending |
+| projections and tools | Web add-ons, testing, analyzers, generators, CLI and operator surfaces | pending |
+
+## Foundation discovery
+
+The package boundary review retains all seven foundation-runtime packages because each states distinct reference
+intent. It also found one responsibility leak: `Data.Abstractions` referenced ASP.NET Core JSON Patch and exposed a
+legacy object-shaped `PatchRequest`, while the current REST/MCP path already normalizes into canonical `PatchPayload`.
+
+The repair removes the unused legacy request/applicator path, leaves RFC/media-type normalization in Web, and leaves
+Data with one provider-neutral patch operation model. Data adapter and module authors no longer inherit HTTP patch
+machinery merely to consume Entity and repository contracts.
+
+The package review also corrected the JSON floor's corruption posture. Writes now produce a complete adjacent snapshot
+before replacing the active file, cancellation is honored at the file boundary, and invalid persisted JSON throws a
+corrective .NET `InvalidDataException` instead of being silently interpreted as an empty store. The package page states
+its single-process, whole-file, non-transactional boundary explicitly.
+
+## Foundation evidence
+
+- terminal dispositions: seven `keep`; each represents a distinct composition, contract, runtime, provider, or
+  projection intent;
+- focused builds: Core, Data Abstractions, Data Core, JSON, SQLite, Web, and Communication — zero warnings/errors;
+- patch normalization: `Koan.Web.PatchOps.Tests` 14/14 and Web JSON patch surface 5/5;
+- JSON provider: connector suite 21/21, including fail-loud corrupt-store coverage;
+- package artifacts: all seven Debug evidence nupkgs packed successfully and contain package-owned `README.md` plus
+  canonical `icon.png` bytes; artifacts remain local evidence, not release candidates;
+- generated quality: 108 packages, 36 repair-required, 57 review-required, 15 structurally ready, 231 findings; all
+  seven foundation-family packages have zero structural findings;
+- generated product surface: 15 claims and 108 packages agree with the evaluated graph.
+
+This passes the foundation family only. It is not a release certification and does not promote `structurally-ready`
+into a support claim.
+
+## Acceptance
+
+1. every active package receives a terminal R11-02 disposition before prose graduation;
+2. no contracts package depends on a functional engine or projection solely for borrowed vocabulary;
+3. every survivor has package-specific identity, install/reference expression, meaningful result, and boundaries;
+4. focused behavior and artifact proof is proportional to its role;
+5. generated quality and product-surface truth agree after every family slice;
+6. the full release ratchet remains a single R11-07 boundary.

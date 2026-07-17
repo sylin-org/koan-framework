@@ -81,14 +81,14 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
     {
         var (name, store) = Resolve();
         store[id] = record;
-        await PersistAsync(name, store).ConfigureAwait(false);
+        await PersistAsync(name, store, ct).ConfigureAwait(false);
     }
 
     protected override async Task<bool> RemoveAsync(TKey id, CancellationToken ct)
     {
         var (name, store) = Resolve();
         var ok = store.TryRemove(id, out _);
-        if (ok) await PersistAsync(name, store).ConfigureAwait(false);
+        if (ok) await PersistAsync(name, store, ct).ConfigureAwait(false);
         return ok;
     }
 
@@ -98,7 +98,7 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
         if (records.Count == 0) return;
         var (name, store) = Resolve();
         foreach (var r in records) store[r.Entity.Id] = r;
-        await PersistAsync(name, store).ConfigureAwait(false);
+        await PersistAsync(name, store, ct).ConfigureAwait(false);
     }
 
     protected override async Task<int> RemoveManyAsync(IReadOnlyList<TKey> ids, CancellationToken ct)
@@ -107,7 +107,7 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
         var (name, store) = Resolve();
         var count = 0;
         foreach (var id in ids) if (store.TryRemove(id, out _)) count++;
-        if (count > 0) await PersistAsync(name, store).ConfigureAwait(false);
+        if (count > 0) await PersistAsync(name, store, ct).ConfigureAwait(false);
         return count;
     }
 
@@ -116,7 +116,7 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
         var (name, store) = Resolve();
         var count = store.Count;
         store.Clear();
-        await PersistAsync(name, store).ConfigureAwait(false);   // an empty store persists as "[]"
+        await PersistAsync(name, store, ct).ConfigureAwait(false);   // an empty store persists as "[]"
         return count;
     }
 
@@ -136,7 +136,7 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
             // Prepare the source directory + touch the current partition's set file so presence checks see "[]".
             Directory.CreateDirectory(_baseDir);
             var (name, store) = Resolve();
-            await PersistAsync(name, store).ConfigureAwait(false);
+            await PersistAsync(name, store, ct).ConfigureAwait(false);
             return (TResult)(object)true;
         }
         return await base.ExecuteAsync<TResult>(instruction, ct).ConfigureAwait(false);
@@ -176,14 +176,23 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
                 store[entity.Id] = new KvRecord<TEntity>(entity, managed);
             }
         }
-        catch { /* ignore corrupted files in early dev */ }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException(
+                $"Koan JSON could not read '{path}' because it does not contain a valid entity store. " +
+                "Restore the file from a known-good copy or remove it deliberately; corrupt storage is never treated as empty.",
+                ex);
+        }
     }
 
-    private async Task PersistAsync(string physicalName, ConcurrentDictionary<TKey, KvRecord<TEntity>> store)
+    private async Task PersistAsync(
+        string physicalName,
+        ConcurrentDictionary<TKey, KvRecord<TEntity>> store,
+        CancellationToken ct)
     {
         var path = _files.GetOrAdd(physicalName, n => Path.Combine(_baseDir, SanitizeFileName(n) + ".json"));
         var gate = _writeGates.GetOrAdd(physicalName, static _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync().ConfigureAwait(false);
+        await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var arr = new JArray();
@@ -195,7 +204,21 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
                 ManagedFieldJsonInjector.InjectManaged(jo, rec.Managed);
                 arr.Add(jo);
             }
-            await File.WriteAllTextAsync(path, arr.ToString(Formatting.None)).ConfigureAwait(false);
+            // Keep the last complete store intact if serialization, cancellation, or process failure interrupts a write.
+            // The temporary file lives beside the target so the final rename stays on one volume.
+            var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
+            try
+            {
+                await File.WriteAllTextAsync(temporaryPath, arr.ToString(Formatting.None), ct).ConfigureAwait(false);
+                File.Move(temporaryPath, path, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
+            }
         }
         finally
         {

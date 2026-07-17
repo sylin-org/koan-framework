@@ -3,8 +3,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Data core for Koan: repository primitives, options, and shared helpers for relational and document providers.</Description>
-    <PackageTags>$(CommonPackageTags);data;repository;abstractions;options</PackageTags>
+    <Description>Entity data runtime for Koan: provider election, routing, lifecycle, queries, paging, relationships, and canonical operations.</Description>
+    <PackageTags>$(CommonPackageTags);data;entity;repository;provider-election;routing;queries;relationships</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />

@@ -16,7 +16,7 @@ SQLite provider for Koan relational data—suited to local development, tests, a
 
 > Current release status: the coherent package path is specified and exercised from staged artifacts, but the
 > existing public 0.17 package set is not a supported clean-room install. Until the next coherent publication, use
-> a source checkout/project reference. See the [repository installation status](../../../../README.md).
+> a source checkout/project reference. See the [repository installation status](https://github.com/sylin-org/Koan-framework#installation-status).
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Sqlite
@@ -75,10 +75,11 @@ collation promise.
 These streams do not provide snapshot consistency, mutation-safe traversal, resumability, or a public
 cursor. Concurrent writes can therefore cause skips or duplicates during offset-based traversal.
 
-See TECHNICAL.md for options and dialect notes.
+See the [technical reference](https://github.com/sylin-org/Koan-framework/blob/main/src/Connectors/Data/Sqlite/TECHNICAL.md)
+for options and dialect notes.
 
 ## References
 
-- [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
+- [DATA-0107 — provider-bounded Entity streams](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [Entity access and streaming](https://github.com/sylin-org/Koan-framework/blob/main/docs/guides/data/entity-access-and-streaming.md)
 

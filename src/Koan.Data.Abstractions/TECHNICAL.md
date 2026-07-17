@@ -5,7 +5,7 @@ description: Provider-facing entity, query, result, and capability contracts.
 since: 0.2.x
 packages: [Sylin.Koan.Data.Abstractions]
 source: src/Koan.Data.Abstractions/
-last_updated: 2026-07-15
+last_updated: 2026-07-17
 framework_version: source-first
 validation:
   date_last_tested: 2026-07-15
@@ -32,6 +32,15 @@ validation:
 - `QueryDefinition` — filter AST, sort, projection, page, partition, and optional count strategy.
 - `RepositoryQueryResult<TEntity>` and `CountResult` — values plus execution/estimate facts.
 - `DataCaps` — query, write, isolation, and retention capability tokens.
+- `PatchPayload<TKey>` and `PatchOp` — the provider-neutral patch operation accepted by Data.Core.
+
+## Projection isolation
+
+- This contract assembly does not reference ASP.NET Core or a JSON Patch library.
+- HTTP and agent projections parse their native request formats and normalize them to `PatchPayload<TKey>` before
+  calling Data. Adapters therefore implement Data semantics without inheriting protocol machinery.
+- `PatchPayload<TKey>` is the one Data patch shape; projection-specific request documents and media types remain with
+  their projection owners.
 
 ## Query ownership
 
@@ -57,7 +66,7 @@ validation:
 
 ## References
 
-- [DATA-0107 — provider-bounded Entity streams](/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [DATA-0096 — unified filter pipeline](/docs/decisions/DATA-0096-unified-filter-pipeline.md)
-- [ARCH-0084 — unified capability model](/docs/decisions/ARCH-0084-unified-capability-model.md)
-- [ARCH-0040 — configuration and constants naming](/docs/decisions/ARCH-0040-config-and-constants-naming.md)
+- [DATA-0107 — provider-bounded Entity streams](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [DATA-0096 — unified filter pipeline](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/DATA-0096-unified-filter-pipeline.md)
+- [ARCH-0084 — unified capability model](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/ARCH-0084-unified-capability-model.md)
+- [ARCH-0040 — configuration and constants naming](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/ARCH-0040-config-and-constants-naming.md)

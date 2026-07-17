@@ -1,10 +1,10 @@
 # Sylin.Koan.Core
 
-Core primitives for Koan: composition, configuration, environment and logical-flow context, runtime
-facts, service discovery, and the shared lifecycle used by backend adapters.
+The always-present Koan substrate for module composition, host lifecycle, logical context, provider catalogs,
+readiness, service discovery, runtime facts, and build provenance.
 
-- Target framework: net10.0
-- License: Apache-2.0
+Applications normally reference `Sylin.Koan` or `Sylin.Koan.App`, which bring Core transitively. Reference Core
+directly when authoring a Koan module, provider, projection, or host integration.
 
 ## Install
 
@@ -12,55 +12,60 @@ facts, service discovery, and the shared lifecycle used by backend adapters.
 dotnet add package Sylin.Koan.Core
 ```
 
-Applications normally reference `Sylin.Koan` or `Sylin.Koan.App`; both bring Core transitively.
-Reference Core directly when authoring a Koan module, provider, projection, or host integration.
+## Meaningful use
 
-## Notes
-- Options: bind with Microsoft.Extensions.Options
-- Adapter lifecycle: readiness state, startup initialization, monitoring, and operation gating live
-  in Core because AI, Data, Communication, and future provider families share the same lifecycle.
-- Service description: provider packages annotate their implementation with
-  `Koan.Core.Services.KoanServiceAttribute`. Runtime discovery and development tooling observe that
-  one declaration; referencing Core does not activate the DevHost CLI or a container engine.
-- Environment: use `KoanEnv.Current` for machine/env metadata
-- Logical-flow context: `KoanContext.Get<T>()`, `Push<T>()`, and `Suppress<T>()` carry immutable,
-  exact-type values through async execution and restore the prior snapshot on scope disposal. Context
-  belongs to the logical flow, not to a host singleton.
-- Durable hops: modules implement `IKoanContextCarrier`; the host-owned
-  `KoanContextCarrierRegistry` captures opaque, versioned values and restores or suppresses every
-  registered axis. Unknown axes, malformed/version-incompatible values, and insufficient
-  `ContextIngressTrust` fail before user work begins.
-- `KoanContextCarrierRegistry.Descriptors` exposes only ordinally ordered axis identities and minimum
-  ingress trust for safe inspection. It never exposes captured values.
-- `KoanContextFingerprint.Compute(...)` produces one deterministic, value-opaque identity for dedupe
-  and durable keys. It is not encryption or proof of provenance.
-- Keep service providers, scoped services, mutable runtime state, and disposable resources out of
-  `KoanContext`. Dependencies remain host-owned in DI; carried values remain module-owned meaning.
-- Host ownership: `AddKoan()` hosts attach the ambient `AppHost` provider while running and release
-  it when they stop. Use `AppHost.PushScope(provider)` when parallel flows must select different hosts.
-- A stopped host is never restored as a fallback when a newer host releases its lease.
-- Hosting integrations may use the low-level `AppHost.Attach(provider)` lease, but must dispose that
-  lease with the provider. Applications should normally let a Koan host or `StartKoan()` own it.
-- Required terse framework operations fail with `KoanHostContextException` when the host is absent,
-  disposed, or missing a required service. The exception exposes the operation, service type, and
-  failure kind alongside corrective startup guidance.
-- `AppHost.GetRequiredService<T>(operation)` exists for Koan framework surfaces and advanced hosting
-  integrations. Application business code should prefer constructor injection.
-- Application identity: `AppHost.Identity` follows that same current provider or flow scope. With no
-  active host, it falls back to the frozen process identity in `KoanEnv`.
-- Static `KoanLog.For<T>()` scopes retain only their category. Each emission follows the current
-  `AppHost` provider and its `ILoggerFactory`; hostless or unconfigured flows no-op without falling
-  back to a different host.
-- `IKoanRuntimeFacts.Current` exposes the current host's versioned, redacted composition and failure
-  facts. An incomplete snapshot is unknown, never implicit success. Startup, health, Web diagnostics,
-  and MCP project this same envelope.
-- The package carries `buildTransitive/Sylin.Koan.Core.targets`. Any executable package consumer whose
-  dependency graph contains Core refreshes a checked-in `koan.lock.json`; `KoanComposition=false`
-  explicitly opts out.
-- That target also embeds direct package/project reference provenance. The host exposes it as the
-  immutable `KoanApplicationReferenceManifest` service, keeping direct application intent distinct
-  from transitive module presence for future provider elections.
+A module is an ordinary class. Its identity and version derive from standard package/assembly facts; module authors
+do not declare a Koan ID or descriptor.
 
-## Links
-- Repo: https://github.com/sylin-org/Koan-framework
-- Docs: https://github.com/sylin-org/Koan-framework/tree/dev/docs
+```csharp
+using Koan.Core;
+using Microsoft.Extensions.DependencyInjection;
+
+public sealed class BillingModule : KoanModule
+{
+    public override void Register(IServiceCollection services)
+        => services.AddSingleton<InvoiceService>();
+}
+```
+
+When an application calls `AddKoan()`, the generated host constitution retains one module instance across
+registration, ordered startup, provenance, and composition reporting. Referencing Core alone does not activate an
+application capability beyond this substrate.
+
+Core also provides:
+
+- `KoanContext` and `IKoanContextCarrier` for immutable logical-flow meaning and explicit durable carriage;
+- one memoized provider catalog and priority model used by concern-owned election pipelines;
+- generic adapter readiness, initialization, monitoring, and operation gating;
+- service-description and discovery contracts shared by runtime providers and optional DevHost tooling;
+- `IKoanRuntimeFacts` and `KoanFactJson`, the redacted envelope shared by startup, health, Web, and MCP;
+- `AppHost` ownership for terse framework surfaces that must reach the current Koan host; and
+- transitive build targets that emit `koan.lock.json`, direct-reference provenance, semantic activation manifests,
+  and trimming roots for executable consumers.
+
+## Inspection and correction
+
+Keep the checked-in `koan.lock.json` under review. It records static application/module identity and direct package or
+project intent; negotiated runtime decisions remain in startup output, runtime facts, and
+`obj/koan.lock.resolved.json`.
+
+Required host-backed operations fail with `KoanHostContextException`, distinguishing an absent host, disposed host,
+and missing service while naming the operation and correction. Incomplete runtime facts are `Complete=false` and
+must never be interpreted as implicit success.
+
+## Boundaries and failures
+
+- Core is mechanism, not a business capability. It does not select a data store, transport, web projection,
+  observability exporter, container engine, or AI provider.
+- Put immutable module-owned meaning in `KoanContext`; keep services, mutable state, and disposable resources in DI.
+- Context carriage format validation is not authentication, confidentiality, or authorization. Ingress must state
+  trust and insufficient trust fails before user work.
+- Runtime facts exclude arbitrary configuration values, payloads, stack traces, and raw exceptions, but still expose
+  topology identities and require an operational access boundary.
+- Application code should prefer constructor injection. `AppHost.GetRequiredService` is for terse framework surfaces
+  and advanced hosting seams.
+- Core's generic provider/readiness mechanisms do not own concern policy. Data owns schema recovery, Communication
+  owns lane guarantees, and each pillar owns its selection and failure semantics.
+
+See [TECHNICAL.md](https://github.com/sylin-org/Koan-framework/blob/main/src/Koan.Core/TECHNICAL.md) for lifecycle,
+context, facts, provider-catalog, and build-target contracts.

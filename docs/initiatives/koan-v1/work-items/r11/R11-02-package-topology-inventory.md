@@ -48,7 +48,8 @@ R11-01 opened with 109 packages: 37 required an objective repair, 72 required re
 graduated. The first terminal coalescence retired `Sylin.Koan.Core.Adapters`; the current evaluated graph contains 108
 packages. R11-03 removed the shared presentation noise and R11-04 graduated the two entry bundles and Templates,
 leaving 36 repair-required, 62 review-required, 10 structurally ready for human review, 72 owned READMEs, 62
-technical companions, and 240 findings. The 36 missing
+technical companions, and 240 findings. R11-05's first family then graduated the seven foundation boundaries, leaving
+36 repair-required, 57 review-required, 15 structurally ready, and 231 findings. The 36 missing
 package owners are now reported honestly rather than falling back to the root README. These are repair inputs, not
 240 independent work items.
 
@@ -198,7 +199,7 @@ terminal package decisions; the listed boundary repairs happen before graduation
 | `Sylin.Koan.Core` | `keep` | Mandatory composition, context, provenance, health, discovery, and module substrate shared by every functional concern. Remove the reverse dependency on DevHost orchestration contracts; runtime service description belongs at this always-present boundary. |
 | `Sylin.Koan.Core.Adapters` | `merge` (implemented) | It did not state an application capability or provider choice. Generic readiness/lifecycle now belongs to Core; data paging and schema behavior belong to Data; discovery reporting belongs to the Core discovery owner. Dead orchestration bridge types and the public package were removed. |
 | `Sylin.Koan.Orchestration.Abstractions` | `keep` | Inert DevHost vocabulary for CLI hosting providers, exporters, plans, and renderers. Slim it to that contract and keep functional activation in CLI/provider packages; application Core must not depend on it. |
-| `Sylin.Koan.Data.Abstractions` | `keep` | Entity and repository vocabulary independently consumed by providers, projections, and modules without selecting a data runtime or backend. |
+| `Sylin.Koan.Data.Abstractions` | `keep` | Entity and repository vocabulary independently consumed by providers, projections, and modules without selecting a data runtime or backend. Its legacy ASP.NET JSON Patch dependency and duplicate object-shaped patch path were removed; the boundary now exposes one provider-neutral `PatchPayload`. |
 | `Sylin.Koan.Data.Core` | `keep` | Entity data runtime and provider election. It owns data-specific adapter policy after the `Core.Adapters` redistribution. |
 | `Sylin.Koan.Data.Connector.Json` | `keep` | Bounded, file-backed local provider that gives the foundation bundle an immediate meaningful result. Its package page must state its concurrency and deployment limits plainly. |
 | `Sylin.Koan.Data.Connector.Sqlite` | `keep` | Durable embedded relational provider selected by one reference, with a materially different guarantee from JSON. |
@@ -216,6 +217,10 @@ Two dependency corrections follow from the same review:
    Core while data-only configuration and schema behavior move to Data Core. AI providers consume only the generic
    lifecycle they actually use. This merge is implemented: the active matrix and generated reports now contain 108
    packages, while the foundation disposition table preserves the retired package's release-lineage decision.
+
+The foundation-family review is complete: all seven active survivors have package-specific identity, meaningful use,
+honest limitations, clean focused builds, and proportionate behavior proof. JSON persistence now fails on corrupt state
+instead of silently treating it as empty. This closes the first review-order group without claiming release maturity.
 
 `Web.Extensions` remains a provisional survivor only in the quality sense: its distinct optional intent is earned,
 but its prose and executable surface require a focused truth audit before R11 can graduate it.

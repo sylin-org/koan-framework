@@ -5,7 +5,7 @@ description: Contracts, options, design and operations for the Koan data core.
 since: 0.2.x
 packages: [Sylin.Koan.Data.Core]
 source: src/Koan.Data.Core/
-last_updated: 2026-07-15
+last_updated: 2026-07-17
 framework_version: source-first
 validation:
   date_last_tested: 2026-07-15
@@ -32,6 +32,13 @@ validation:
 
 - Primary abstractions: `IEntity<TKey>`, helpers and extensions for data operations
 - Extension points: adapter/provider implementations consume these primitives
+
+## Patch operation ownership
+
+- Data accepts one provider-neutral `PatchPayload<TKey>` made of `PatchOp` values.
+- Web, MCP, and future protocol projections own request documents, media types, and normalization into that shape.
+- Data Core owns patch execution, lifecycle, persistence, and result semantics; adapters do not parse HTTP payloads.
+- The contract boundary has no ASP.NET Core dependency and no parallel object-shaped patch request path.
 
 ## Context ownership
 

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Microsoft.AspNetCore.JsonPatch;
 using Koan.Web.Attributes;
 using Koan.Data.Abstractions.Instructions;
 
@@ -102,17 +101,22 @@ public sealed class EntityDeleteAllRequest
     public bool DryRun { get; init; }
 }
 
+public enum EntityPatchKind
+{
+    JsonPatch6902,
+    MergePatch7386,
+    PartialJson
+}
+
 public sealed class EntityPatchRequest<TEntity, TKey> where TEntity : class
 {
     public required EntityRequestContext Context { get; init; }
     public required TKey Id { get; init; }
     // Generalized patch support
     public object? Patch { get; init; }
-    public PatchKind Kind { get; init; }
+    public EntityPatchKind Kind { get; init; }
     public string? Set { get; init; }
     public string? Accept { get; init; }
     public bool DryRun { get; init; }
 }
-
-
 

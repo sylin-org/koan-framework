@@ -1,40 +1,10 @@
 ﻿using System;
 using Newtonsoft.Json.Linq;
-using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 
 namespace Koan.Data.Core.Patch;
 
-public static class PatchApplicators
-{
-    /// <summary>
-    /// Creates an applicator for the given patch kind and payload.
-    /// Payload formats:
-    ///  - JsonPatch6902: <c>JsonPatchDocument&lt;TEntity&gt;</c>
-    ///  - MergePatch7386: <c>JToken</c> (object)
-    ///  - PartialJson: <c>JToken</c> (object)
-    /// </summary>
-    public static IPatchApplicator<TEntity> Create<TEntity, TKey>(PatchKind kind, object payload, MergePatchNullPolicy mergeNulls, PartialJsonNullPolicy partialNulls)
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-    {
-        switch (kind)
-        {
-            case PatchKind.JsonPatch6902:
-                return payload is Microsoft.AspNetCore.JsonPatch.JsonPatchDocument<TEntity> patch
-                    ? new Koan.Data.Abstractions.Instructions.JsonPatchApplicator<TEntity>(patch)
-                    : throw new ArgumentException("Payload must be JsonPatchDocument<TEntity>");
-            case PatchKind.MergePatch7386:
-                return new MergePatchApplicator<TEntity>((JToken)payload, mergeNulls);
-            case PatchKind.PartialJson:
-                return new PartialJsonApplicator<TEntity>((JToken)payload, partialNulls);
-            default:
-                throw new NotSupportedException($"Unsupported patch kind: {kind}");
-        }
-    }
-}
-
-public sealed class MergePatchApplicator<TEntity> : IPatchApplicator<TEntity>
+public sealed class MergePatchApplicator<TEntity>
 {
     private readonly JToken _patch;
     private readonly MergePatchNullPolicy _nulls;
@@ -96,7 +66,7 @@ public sealed class MergePatchApplicator<TEntity> : IPatchApplicator<TEntity>
     }
 }
 
-public sealed class PartialJsonApplicator<TEntity> : IPatchApplicator<TEntity>
+public sealed class PartialJsonApplicator<TEntity>
 {
     private readonly JToken _patch;
     private readonly PartialJsonNullPolicy _nulls;

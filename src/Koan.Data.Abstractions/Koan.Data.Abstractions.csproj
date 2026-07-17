@@ -3,12 +3,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Data abstractions for Koan: repository contracts, entities, and filtering interfaces.</Description>
-    <PackageTags>$(CommonPackageTags);data;abstractions;repository;entities</PackageTags>
+    <Description>Provider-neutral Koan data contracts for Entity identity, repositories, structured queries, capabilities, and canonical operations.</Description>
+    <PackageTags>$(CommonPackageTags);data;contracts;repository;entity;query;capabilities</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="Microsoft.AspNetCore.JsonPatch" Version="10.0.8" />
   </ItemGroup>
   <ItemGroup>
     <!-- ARCH-0084: the unified capability primitive (Capability/CapabilitySet) lives in

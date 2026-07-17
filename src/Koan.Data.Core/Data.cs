@@ -293,22 +293,6 @@ public static class Data<TEntity, TKey>
     { using var _ = WithPartition(partition); return Repo.RemoveAll(strategy, ct); }
 
     public static async Task<TEntity?> Patch(
-        Koan.Data.Abstractions.Instructions.PatchRequest<TKey, TEntity> request,
-        MergePatchNullPolicy? mergeNulls = null,
-        PartialJsonNullPolicy? partialNulls = null,
-        CancellationToken ct = default)
-    {
-        var repo = Repo;
-        var current = await repo.Get(request.Id, ct);
-        if (current is null) return null;
-        var m = mergeNulls ?? MergePatchNullPolicy.SetDefault;
-        var p = partialNulls ?? PartialJsonNullPolicy.SetNull;
-        var applicator = Koan.Data.Core.Patch.PatchApplicators.Create<TEntity, TKey>(request.Kind, request.Payload!, m, p);
-        applicator.Apply(current);
-        return await repo.Upsert(current, ct);
-    }
-
-    public static async Task<TEntity?> Patch(
         Koan.Data.Abstractions.Instructions.PatchPayload<TKey> payload,
         CancellationToken ct = default)
     {

@@ -5,6 +5,8 @@ description: Contracts, configuration, and architecture for Koan’s ASP.NET Cor
 since: 0.2.x
 packages: [Sylin.Koan.Web]
 source: src/Koan.Web/
+last_updated: 2026-07-17
+framework_version: source-first
 ---
 
 ## Contract
@@ -81,10 +83,10 @@ source: src/Koan.Web/
 
 ## References
 
-- Web API: `/docs/api/web-http-api.md`
-- Decision - transformers: `/docs/decisions/WEB-0035-entitycontroller-transformers.md`
-- Engineering guardrails: `/docs/engineering/index.md`
-- Runtime facts: `/docs/engineering/runtime-facts.md`
+- [Web API](https://github.com/sylin-org/Koan-framework/blob/main/docs/api/web-http-api.md)
+- [WEB-0035 — EntityController transformers](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/WEB-0035-entitycontroller-transformers.md)
+- [Engineering guardrails](https://github.com/sylin-org/Koan-framework/blob/main/docs/engineering/index.md)
+- [Runtime facts](https://github.com/sylin-org/Koan-framework/blob/main/docs/engineering/runtime-facts.md)
 
 ## Relationship expansion safety
 

@@ -790,7 +790,7 @@
     {
       "packageId": "Sylin.Koan.Core",
       "shape": "library",
-      "description": "Core primitives for Koan: configuration helper, environment snapshot (KoanEnv), constants, foundational abstractions, and background services with fluent API.",
+      "description": "Composition and runtime substrate for Koan modules: lifecycle, context, provider catalogs, readiness, discovery, facts, and build provenance.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -803,7 +803,7 @@
     {
       "packageId": "Sylin.Koan.Data.Abstractions",
       "shape": "library",
-      "description": "Data abstractions for Koan: repository contracts, entities, and filtering interfaces.",
+      "description": "Provider-neutral Koan data contracts for Entity identity, repositories, structured queries, capabilities, and canonical operations.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -947,7 +947,7 @@
     {
       "packageId": "Sylin.Koan.Data.Connector.Json",
       "shape": "library",
-      "description": "JSON file-backed data provider for Koan: simple repository for demos, tests, and local development.",
+      "description": "Zero-configuration JSON persistence for small Koan applications, tests, and local development.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1038,7 +1038,7 @@
     {
       "packageId": "Sylin.Koan.Data.Connector.Sqlite",
       "shape": "library",
-      "description": "SQLite provider for Koan relational data: lightweight local development and testing support.",
+      "description": "Durable embedded SQLite provider for Koan Entity data with zero-config local storage, schema management, queries, and bounded paging.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1072,7 +1072,7 @@
     {
       "packageId": "Sylin.Koan.Data.Core",
       "shape": "library",
-      "description": "Data core for Koan: repository primitives, options, and shared helpers for relational and document providers.",
+      "description": "Entity data runtime for Koan: provider election, routing, lifecycle, queries, paging, relationships, and canonical operations.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1815,7 +1815,7 @@
     {
       "packageId": "Sylin.Koan.Web",
       "shape": "library",
-      "description": "ASP.NET Core integration for Koan: controller-first routing, health endpoints, and well-known endpoints (incl. observability reporting). OTel wiring lives in the opt-in Koan.Observability package (ARCH-0088).",
+      "description": "Controller-first ASP.NET Core projection for Koan Entities with health, startup composition, and redacted runtime facts.",
       "targetFrameworks": [
         "net10.0"
       ],

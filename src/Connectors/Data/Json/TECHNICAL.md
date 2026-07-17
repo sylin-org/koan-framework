@@ -4,7 +4,9 @@ title: Koan.Data.Connector.Json - Technical Reference
 description: JSON file storage adapter for Koan data.
 since: 0.2.x
 packages: [Sylin.Koan.Data.Connector.Json]
-source: src/Koan.Data.Connector.Json/
+source: src/Connectors/Data/Json/
+last_updated: 2026-07-17
+framework_version: source-first
 ---
 
 ## Contract
@@ -23,6 +25,16 @@ source: src/Koan.Data.Connector.Json/
   application code, without inferring a provider-side read bound.
 - A later incremental file implementation must earn a separate capability claim through shared
   conformance before these Entity streams become available.
+
+## Persistence and corruption behavior
+
+- Writes are serialized per physical aggregate file inside one Koan process.
+- A complete snapshot is written beside the target and then moved over it; cancellation or serialization failure does
+  not deliberately truncate the last complete file.
+- Invalid JSON throws a corrective `InvalidDataException` containing the affected path. The repository does not
+  reinterpret corrupt persisted state as an empty aggregate.
+- There is no cross-process writer coordination, transaction log, crash recovery protocol, or incremental update path.
+  Use a database connector when those guarantees matter.
 
 ## Configuration
 
@@ -44,6 +56,6 @@ provisioned or written reports `Unhealthy`; Koan does not substitute another ada
 
 ## References
 
-- [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
+- [DATA-0107 — provider-bounded Entity streams](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [Entity access and streaming](https://github.com/sylin-org/Koan-framework/blob/main/docs/guides/data/entity-access-and-streaming.md)
 

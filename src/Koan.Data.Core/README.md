@@ -90,15 +90,30 @@ Generic Host and returns its active provider facade. The caller owns it; use
 the ambient Koan host binding. ASP.NET Core and workers continue to use their native host builder with
 `AddKoan()`.
 
-See TECHNICAL.md for contracts, options, and extension points.
+## Boundaries and failures
+
+- Data Core is the Entity runtime and provider-election owner; it does not provide storage by itself. Reference a
+  connector or use the JSON floor carried by a Koan entry bundle.
+- Its dependency on Cache Abstractions is inert contract vocabulary. Referencing Data Core does not activate caching.
+- Stream-shaped Entity APIs run only when the elected provider proves bounded paging. Unsupported providers reject
+  before yielding instead of hiding whole-source materialization.
+- Relationship expansion is direct-edge and budgeted. It is not recursive graph traversal, snapshot isolation, or a
+  promise that scan-backed providers can execute without an explicit candidate limit.
+- `EntityContext` owns Data routing dimensions only; tenancy, subject, and other semantic axes are contributed and
+  enforced by their owning modules.
+- Canonical `PatchPayload` is provider-neutral. Web/MCP projections own protocol parsing and normalization before
+  the operation reaches Data.
+- Required Entity operations without a live composed host throw `KoanHostContextException` with the missing
+  operation/service correction.
 
 ## Customization
 
-- Configuration and advanced usage are documented in [`TECHNICAL.md`](./TECHNICAL.md).
+- Configuration and advanced usage are documented in
+  [TECHNICAL.md](https://github.com/sylin-org/Koan-framework/blob/main/src/Koan.Data.Core/TECHNICAL.md).
 
 ## References
 
-- Data access patterns: `/docs/guides/data/entity-access-and-streaming.md`
-- Decision: `/docs/decisions/DATA-0107-provider-bounded-entity-streams.md`
-- Engineering guardrails: `/docs/engineering/index.md`
+- [Data access patterns](https://github.com/sylin-org/Koan-framework/blob/main/docs/guides/data/entity-access-and-streaming.md)
+- [Provider-bounded Entity streams](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [Engineering guardrails](https://github.com/sylin-org/Koan-framework/blob/main/docs/engineering/index.md)
 - Repo: https://github.com/sylin-org/Koan-framework

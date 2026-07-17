@@ -1,12 +1,25 @@
-# Koan Communication
+# Sylin.Koan.Communication
 
 Entity Events and Transport are available automatically when an application references `Sylin.Koan`
 and calls `AddKoan()`. A lower-level application can reference `Sylin.Koan.Communication` directly.
 No handler registration, bus, or transport configuration is required.
 
+## Install
+
+```powershell
+dotnet add package Sylin.Koan.Communication
+```
+
+## Meaningful result
+
 ```csharp
 using Koan.Communication;
 using Koan.Data.Core.Model;
+
+public sealed class Order : Entity<Order>
+{
+    public bool Ready { get; set; }
+}
 
 public sealed record OrderApproved;
 
@@ -33,11 +46,17 @@ public sealed class ImportOrder : IReceiveEntity<Order>
     }
 }
 
-var eventAccepted = await order.Events.Raise<OrderApproved>(ct);
-var eventSettled = await eventAccepted.WaitForSettlement(ct);
+public static class OrderFlow
+{
+    public static async Task Publish(Order order, CancellationToken ct)
+    {
+        var eventAccepted = await order.Events.Raise<OrderApproved>(ct);
+        var eventSettled = await eventAccepted.WaitForSettlement(ct);
 
-var sendAccepted = await order.Transport.Send(ct);
-var sendSettled = await sendAccepted.WaitForSettlement(ct);
+        var sendAccepted = await order.Transport.Send(ct);
+        var sendSettled = await sendAccepted.WaitForSettlement(ct);
+    }
+}
 ```
 
 Both terminals work pointwise for an Entity, a finite set, or a lazy async stream. Event kinds are
@@ -127,5 +146,5 @@ not remote settlement, retries, deduplication, dead letters, replay, Events, or 
 Jobs wake and Cache peer invalidation both reuse Communication while retaining their different delivery topology.
 No arbitrary-object messaging surface is implemented underneath this API.
 
-See the [Communication reference](../../docs/reference/communication/index.md) and
-[ARCH-0113](../../docs/decisions/ARCH-0113-entity-capability-communication.md).
+See the [Communication reference](https://github.com/sylin-org/Koan-framework/blob/main/docs/reference/communication/index.md)
+and [ARCH-0113](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/ARCH-0113-entity-capability-communication.md).

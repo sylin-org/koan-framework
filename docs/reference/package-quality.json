@@ -4,11 +4,11 @@
   "summary": {
     "packages": 108,
     "repairRequired": 36,
-    "reviewRequired": 62,
-    "structurallyReady": 10,
+    "reviewRequired": 57,
+    "structurallyReady": 15,
     "ownedReadmes": 72,
     "technicalCompanions": 62,
-    "findings": 240
+    "findings": 231
   },
   "findingDefinitions": [
     {
@@ -717,7 +717,7 @@
       "projectPath": "src/Koan.Communication/Koan.Communication.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Koan Communication: Entity-first local Events and Transport with typed handlers, isolated snapshots, context carriage, and bounded acceptance.",
       "targetFrameworks": [
         "net10.0"
@@ -730,11 +730,7 @@
       "readme": "src/Koan.Communication/README.md",
       "technicalDocumentation": "src/Koan.Communication/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Communication.Connector.RabbitMq",
@@ -763,8 +759,8 @@
       "projectPath": "src/Koan.Core/Koan.Core.csproj",
       "shape": "library",
       "role": "foundation",
-      "status": "review-required",
-      "description": "Core primitives for Koan: configuration helper, environment snapshot (KoanEnv), constants, foundational abstractions, and background services with fluent API.",
+      "status": "structurally-ready",
+      "description": "Composition and runtime substrate for Koan modules: lifecycle, context, provider catalogs, readiness, discovery, facts, and build provenance.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -772,18 +768,15 @@
       "readme": "src/Koan.Core/README.md",
       "technicalDocumentation": "src/Koan.Core/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Abstractions",
       "projectPath": "src/Koan.Data.Abstractions/Koan.Data.Abstractions.csproj",
       "shape": "library",
       "role": "contracts",
-      "status": "review-required",
-      "description": "Data abstractions for Koan: repository contracts, entities, and filtering interfaces.",
+      "status": "structurally-ready",
+      "description": "Provider-neutral Koan data contracts for Entity identity, repositories, structured queries, capabilities, and canonical operations.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -793,10 +786,7 @@
       "readme": "src/Koan.Data.Abstractions/README.md",
       "technicalDocumentation": "src/Koan.Data.Abstractions/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Access",
@@ -975,7 +965,7 @@
       "shape": "library",
       "role": "provider",
       "status": "structurally-ready",
-      "description": "JSON file-backed data provider for Koan: simple repository for demos, tests, and local development.",
+      "description": "Zero-configuration JSON persistence for small Koan applications, tests, and local development.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1083,7 +1073,7 @@
       "shape": "library",
       "role": "provider",
       "status": "structurally-ready",
-      "description": "SQLite provider for Koan relational data: lightweight local development and testing support.",
+      "description": "Durable embedded SQLite provider for Koan Entity data with zero-config local storage, schema management, queries, and bounded paging.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1122,8 +1112,8 @@
       "projectPath": "src/Koan.Data.Core/Koan.Data.Core.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
-      "description": "Data core for Koan: repository primitives, options, and shared helpers for relational and document providers.",
+      "status": "structurally-ready",
+      "description": "Entity data runtime for Koan: provider election, routing, lifecycle, queries, paging, relationships, and canonical operations.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1135,9 +1125,7 @@
       "readme": "src/Koan.Data.Core/README.md",
       "technicalDocumentation": "src/Koan.Data.Core/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Relational",
@@ -2116,8 +2104,8 @@
       "projectPath": "src/Koan.Web/Koan.Web.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
-      "description": "ASP.NET Core integration for Koan: controller-first routing, health endpoints, and well-known endpoints (incl. observability reporting). OTel wiring lives in the opt-in Koan.Observability package (ARCH-0088).",
+      "status": "structurally-ready",
+      "description": "Controller-first ASP.NET Core projection for Koan Entities with health, startup composition, and redacted runtime facts.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -2129,9 +2117,7 @@
       "readme": "src/Koan.Web/README.md",
       "technicalDocumentation": "src/Koan.Web/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Web.Admin",
