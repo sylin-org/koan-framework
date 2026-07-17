@@ -358,30 +358,30 @@ restore, and report you did this.
 
 ---
 
-## TASK 4 (mid model) — dogfood on S6.SnapVault
+## TASK 4 (mid model) — dogfood on SnapVault
 
 **Goal:** make SnapVault multi-tenant-isolated on the blob path (`PhotoAsset : MediaEntity : StorageEntity` inherits
 the chokepoint via the decorator) + an acceptance test. SnapVault serves photos through `MediaController` — the very
 surface the decorator now covers, so this is the load-bearing dogfood.
 
 **4a.** Add `<ProjectReference Include="..\..\src\Koan.Tenancy\Koan.Tenancy.csproj" />` to
-`samples/S6.SnapVault/S6.SnapVault.csproj`. Wire per-request tenant resolution from an `X-Studio-Id` header (read
+`samples/applications/SnapVault/SnapVault.csproj`. Wire per-request tenant resolution from an `X-Studio-Id` header (read
 `src/Koan.Tenancy/` for the resolver seam — grep `ITenantResolver` — and the documented way a host supplies the
 tenant; add the minimal middleware/registration in `Program.cs` with a STOR-0011 comment). Do NOT hand-roll
 `Tenant.Use` per controller.
 
-**4b.** Create `tests/Suites/Samples/S6.SnapVault.AcceptanceTests/` (mirror an existing sample test csproj, or
-`Koan.Tenancy.Tests.csproj`; ProjectReference `..\..\..\..\samples\S6.SnapVault\S6.SnapVault.csproj` + the Local
+**4b.** Create focused evidence under `tests/Suites/Samples/Koan.Samples.SnapVault.Tests/` (mirror an existing sample test csproj, or
+`Koan.Tenancy.Tests.csproj`; reference `samples/applications/SnapVault/SnapVault.csproj` + the Local
 connector). Boot a real host with the Local provider (temp dir) + `Koan.Tenancy` + a no-Docker data adapter
 (`Koan:Data:Sources:Default:Adapter=sqlite`) + AI disabled. Assert isolation on SnapVault's **real `PhotoAsset`**
 storage path: studio-a and studio-b each store a `"sunset.jpg"` blob → each reads its own; an unscoped store fails
 closed. **If full `PhotoAsset` boot is impractical** (the `[Embedding]`/`MediaEntity` machinery needs AI/Mongo),
-fall back to a minimal `S6.SnapVault`-namespace `MediaEntity<DogfoodPhoto>` proving the same, plus an assertion that
+fall back to a minimal SnapVault-namespace `MediaEntity<DogfoodPhoto>` proving the same, plus an assertion that
 `typeof(PhotoAsset).IsSubclassOf(typeof(Koan.Storage.Model.StorageEntity<PhotoAsset>))`. Prefer the real path; report
-which you used and why. Add the test project to `Koan.sln` if test projects are listed there (`grep S6.SnapVault Koan.sln`).
+which you used and why. Add the test project to `Koan.sln` if test projects are listed there.
 
-**Verify:** the acceptance test green + `dotnet build samples/S6.SnapVault/S6.SnapVault.csproj` clean. **Commit:**
-`feat(STOR-0011): dogfood storage tenant isolation in S6.SnapVault + acceptance test`.
+**Verify:** the acceptance test green + `dotnet build samples/applications/SnapVault/SnapVault.csproj` clean. **Commit:**
+`feat(STOR-0011): dogfood storage tenant isolation in SnapVault + acceptance test`.
 
 ---
 

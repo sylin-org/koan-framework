@@ -71,4 +71,4 @@ repository's policy, custom-template, partition, and managed-scope plan.
 
 ## The sample that shows it
 
-[`samples/S1.Web`](../../../samples/S1.Web/README.md) — `Entity<Todo>` over a minimal web UI; reference `Koan.Cache` to see transparent read-through and write-through evicts in the boot report.
+[`TaskGraph`](../../../samples/fundamentals/TaskGraph/README.md) — `Entity<Todo>` over a minimal web UI; reference `Koan.Cache` to see transparent read-through and write-through evicts in the boot report.

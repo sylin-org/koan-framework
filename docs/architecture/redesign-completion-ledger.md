@@ -371,7 +371,7 @@ implemented and its tests pass on real stores.
     two highest-leverage delights (quota enforcement + erasure certificate) are DESIGNED-not-built; the **async-hop/
     durable-carrier hole most threatens the flagship**. Delight-killer: never ship a proof artifact before its
     fan-out is exhaustive.
-  - **SnapVault dogfood** — studied `samples/S6.SnapVault` (photo SaaS, single-tenant, no auth) →
+  - **SnapVault dogfood** — studied `samples/applications/SnapVault` (photo SaaS, single-tenant, no auth) →
     `docs/architecture/snapvault-tenancy-proposal.md` (its domain IS the tier example; "add nothing to the
     entities") + `docs/architecture/snapvault-conversion-plan.md` (the **break-and-rebuild** plan: dogfood +
     framework-first-per-feature; the big break = in-memory worker → `Koan.Jobs` to close the async-hop hole).

@@ -50,7 +50,7 @@ the stack itself). Enforce with an architecture test so the references cannot re
 5. **Architecture test** (the R1 gate): a unit test in the main solution asserting no
    mainline csproj references `Koan.ZenGarden*` (parse csproj XML; allowlist = satellites +
    their tests).
-6. Samples/dogfoods that exercise the garden path (e.g. g1c1) reference the satellite — the
+6. Samples/dogfoods that exercise the garden path (e.g. GardenCoop) reference the satellite — the
    end-to-end garden test must not be lost.
 7. Greenfield posture: no `[Obsolete]` bridges; the old direct references are deleted, not
    shimmed.

@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: tested
-  scope: four-line host, Entity lifecycle automation, SQLite, REST, facts, and NativeAOT companion
+  scope: cumulative GardenCoop journey; four-line host, lifecycle automation, local semantic discovery, facts, and NativeAOT Chapter 1
 ---
 
 # Garden Cooperative Journal
@@ -18,8 +18,9 @@ The Maple Street co-op wants a small application that speaks garden: sensors rep
 plots belong to stewards, and a dry bed creates one watering reminder. The Pis stay simple; the
 application owns the meaning.
 
-The complete, executable companion is
-[`samples/guides/g1c1.GardenCoop`](../../samples/guides/g1c1.GardenCoop/).
+The executable journey begins at
+[`GardenCoop/01-GardenJournal`](../../samples/journeys/GardenCoop/01-GardenJournal/). Chapter 2 preserves
+that whole result and adds one capability; chapters are not disconnected sample applications.
 
 ## 1. Start with the whole host
 
@@ -37,8 +38,7 @@ and composes them with the application module.
 From a checkout:
 
 ```pwsh
-Set-Location samples/guides/g1c1.GardenCoop
-dotnet run -- --urls http://localhost:5000
+dotnet run --project samples/journeys/GardenCoop/01-GardenJournal -- --urls http://localhost:5000
 ```
 
 Open <http://localhost:5000>. A fresh local SQLite database is enough; no external service or required
@@ -173,5 +173,32 @@ becomes acknowledged.
 GardenCoop has a measured win-x64 NativeAOT path. It publishes a self-contained native deployment
 directory—not a falsely advertised physical single file—containing the executable, dashboard assets,
 and SQLite native library. The exact command and current boundary live in the
-[sample README](../../samples/guides/g1c1.GardenCoop/README.md) and the
+[Chapter 1 README](../../samples/journeys/GardenCoop/01-GardenJournal/README.md) and the
 [NativeAOT guide](nativeaot-howto.md).
+
+## 7. Grow by one meaningful capability
+
+[Chapter 2 — Local Discovery](../../samples/journeys/GardenCoop/02-LocalDiscovery/) is a strict superset.
+Its host, garden models, automation, APIs, dashboard, and watering result remain intact. It adds a `Produce`
+Entity with embedding intent, local ONNX and sqlite-vec provider references, and one endpoint that expresses
+the new business question:
+
+```csharp
+[Embedding(Template = "{Name}. {Description}", Model = "all-MiniLM-L6-v2")]
+public sealed class Produce : Entity<Produce>
+{
+    public string Name { get; set; } = "";
+    public string Category { get; set; } = "";
+    public string Description { get; set; } = "";
+}
+```
+
+Run it with:
+
+```pwsh
+dotnet run --project samples/journeys/GardenCoop/02-LocalDiscovery -- --urls http://localhost:5092
+```
+
+The cumulative contract first proves Chapter 1's dry-reading and recovery story, then proves that `ripe red
+tomato` ranks Heirloom Tomatoes first. That is the journey rule: references add framework mechanics; each
+chapter adds only business-aligned code for one visible result.

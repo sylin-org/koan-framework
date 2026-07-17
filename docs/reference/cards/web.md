@@ -55,4 +55,4 @@ public Task<IReadOnlyList<Todo>> Open() => Todo.Query(t => !t.Done);
 
 ## The sample that shows it
 
-[`samples/S1.Web`](../../../samples/S1.Web/README.md) — `EntityController<Todo>` REST plus the relationship system over a minimal web UI.
+[`TaskGraph`](../../../samples/fundamentals/TaskGraph/README.md) — `EntityController<Todo>` REST plus the relationship system over a minimal web UI.

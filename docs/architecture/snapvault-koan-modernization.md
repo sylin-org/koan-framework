@@ -3,7 +3,7 @@
 > **⚠️ Approach superseded (2026-06-26):** the *in-place 6-phase* rebuild below is replaced by a **greenfield harvest** — build a clean Koan-native backend, port the genuine domain verbatim, keep the SPA (add tenant affordances), and delete the legacy backend in one swap once green. The reason, grounded in the understand-pass (workflow `wf_2024d47f-292`): the strip-list dwarfs the keep-list, so in-place mutation pays to carefully un-wire code that's being deleted anyway, and a clean build lets "fewer, more meaningful parts" be a *design* decision rather than a subtraction (and stays green throughout — no red window). **The STRIP/BUILD/KEEP table and the kept-domain list below remain accurate and are the harvest map.** The authoritative plan is now [snapvault-product-spec.md](./snapvault-product-spec.md) + [snapvault-ui-api-contract.md](./snapvault-ui-api-contract.md).
 
 - Status: **Superseded in approach** (Proposed 2026-06-26; greenfield pivot 2026-06-26)
-- Scope: `samples/S6.SnapVault` (the tenancy/AI/vector/media dogfood). Framework-side: **no changes** — this is a sample adopting capabilities the framework already ships.
+- Scope: `samples/applications/SnapVault` (the tenancy/AI/vector/media dogfood). Framework-side: **no changes** — this is a sample adopting capabilities the framework already ships.
 - Companion to: [snapvault-conversion-plan.md](./snapvault-conversion-plan.md) (the *tenancy* roadmap). This ADR is the *Koan-adoption* axis; the two share the Phase-1 tenancy foundation.
 - Applies: `break-and-rebuild-preferred`, `koan-ergonomics-first`, `contributor-pipelines-never-bespoke`, `no-stopgaps`. Design lens: `koan-design-principles` — "fewer but more meaningful parts".
 

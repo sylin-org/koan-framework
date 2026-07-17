@@ -5,7 +5,7 @@ title: "AI & Vector Search How-To"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-15
-framework_version: v0.6.3
+framework_version: source-first
 validation:
   status: not-yet-tested
   scope: docs/guides/ai-vector-howto.md
@@ -18,11 +18,10 @@ related_guides:
 
 # Koan AI & Vector Search – End-to-End How-To
 
-This guide walks through everything Koan offers for AI-powered semantic search, from generating your first embedding to production-ready hybrid search with personalization. Each section grows in sophistication, lists **concepts**, a **recipe** (packages/config), and usage **scenarios**. Examples draw from:
-
-- **S5.Recs** – Media recommendation engine with hybrid search and personalized vectors
-- **AI demos** – Sample applications showing embedding patterns and caching strategies
-- **Production patterns** – Real-world optimization and monitoring approaches
+This guide walks through Koan's AI-powered semantic-search surfaces, from a first embedding to hybrid
+and personalization patterns. The executable companion is [GardenCoop Chapter 2](../../samples/journeys/GardenCoop/02-LocalDiscovery/),
+which saves Produce entities, embeds them with local ONNX, and searches them with sqlite-vec. Advanced
+hybrid and personalization recipes are compositional patterns, not a certified production workload.
 
 **Related Guides:**
 - [Entity Capabilities](entity-capabilities-howto.md) – Core entity patterns for data access
@@ -113,7 +112,7 @@ Console.WriteLine($"Generated {embedding.Length}-dimensional vector");
 
 **Usage scenarios & benefits**
 
-- *S5.Recs* generates embeddings from media titles and synopses for semantic search
+- *GardenCoop Chapter 2* generates embeddings from produce names and descriptions for local semantic search
 - Developers can swap embedding models (all-minilm → nomic-embed → OpenAI) by changing config
 - Same embedding can be used across multiple vector databases
 
@@ -178,7 +177,7 @@ await Vector<Media>.Save(
 
 **Usage scenarios & benefits**
 
-- *S5.Recs* demonstrates media indexing for semantic search
+- *GardenCoop Chapter 2* demonstrates Entity indexing for semantic search
 - Metadata enables hybrid keyword+semantic search (see section 4)
 - The same Vector API can target another shipped connector; verify capability and migration support
   before changing providers
@@ -318,7 +317,7 @@ var balancedResults = await Vector<Media>.Search(
 
 **Usage scenarios & benefits**
 
-- *S5.Recs* handles both exact Japanese titles ("鬼滅の刃") and vague queries ("demon slayer anime")
+- One API can combine exact terms with semantic intent when the selected connector advertises both capabilities
 - Single API handles all search types - no separate keyword/semantic endpoints
 - Users control balance with UI slider (see section 8)
 
@@ -429,7 +428,7 @@ float[] BlendVectors(float[] vec1, float[] vec2, double weight1)
 
 **Usage scenarios & benefits**
 
-- *S5.Recs* personalizes search results based on user's historical preferences
+- Applications can blend explicit search with an application-owned preference vector
 - New users get pure search results; returning users get personalized blends
 - 66/34 split prioritizes explicit search intent over learned preferences
 
@@ -482,16 +481,14 @@ public async Task UpdateUserPreferences(string userId, string mediaId, int ratin
 
 **Recipe**
 
-- `EmbeddingCache` is a **sample-app pattern** (S7.Meridian), not a framework type — copy/adapt it into your project; Koan.AI ships no caching abstraction
+- `EmbeddingCache` below is an **application pattern**, not a framework type; own its policy when measured repetition justifies it
 - Storage backend (file system, Redis, database)
 - SHA512 content hashing for deterministic keys
 
 **Sample**
 
 ```csharp
-// IEmbeddingCache / EmbeddingCache are defined in the S7.Meridian sample, not in Koan.AI.
-// Port this class into your app (or wire your own cache) — Koan ships no caching abstraction.
-using Koan.Samples.Meridian.Services;
+// Application-owned example: Koan.AI does not ship this cache abstraction.
 
 public class EmbeddingService
 {
@@ -889,7 +886,9 @@ await foreach (var batch in vectorRepo.ExportAll(batchSize: 100, ct))
 4. Use Entity lifecycle for ordinary indexing and explicit migrators for backfills (section 7)
 5. Add personalization for returning users (section 5)
 
-Explore the S5.Recs sample to see production patterns in action. The combination of semantic search, hybrid matching, and personalization creates powerful recommendation experiences that understand both explicit queries and implicit user preferences.
+Run [GardenCoop Chapter 2](../../samples/journeys/GardenCoop/02-LocalDiscovery/) for the current local
+embed-save-search path. Treat hybrid matching, personalization, and production tuning as separate claims
+that need their own provider and workload evidence.
 
 **Related Guides:**
 - [Entity Capabilities](entity-capabilities-howto.md) – Learn core entity patterns for data access and CRUD operations

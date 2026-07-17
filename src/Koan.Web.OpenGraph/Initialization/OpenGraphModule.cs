@@ -5,6 +5,8 @@ using Koan.Core.Modules;
 using Koan.Core.Ordering;
 using Koan.Core.Provenance;
 using Koan.Web.OpenGraph.Infrastructure;
+using Koan.Web.OpenGraph.Hosting;
+using Koan.Web.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -14,9 +16,8 @@ namespace Koan.Web.OpenGraph.Initialization;
 
 /// <summary>
 /// Self-registration for the OpenGraph pillar (Reference = Intent). Registers options and the
-/// renderer; the <c>UseOpenGraphCards()</c> middleware is consumer-invoked because it must sit ahead
-/// of the app's own <c>MapFallbackToFile</c>. With no cards registered and no middleware call, the
-/// pillar is inert.
+/// renderer and contributes middleware through Koan's canonical web pipeline. With no configured
+/// shell or matching card, the pillar is inert.
 /// </summary>
 /// <remarks>
 /// Initialization ordering (CORE-0091): this pillar is a web-layer module that composes on top of
@@ -37,7 +38,8 @@ public sealed class OpenGraphModule : KoanModule
         services.AddKoanOptions<OpenGraphOptions>(Constants.Configuration.Section);
         services.TryAddSingleton<ShellCache>();
         services.TryAddSingleton<IOpenGraphCardRenderer, OpenGraphCardRenderer>();
-
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IKoanWebPipelineContributor, OpenGraphPipelineContributor>());
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration configuration, IHostEnvironment environment)

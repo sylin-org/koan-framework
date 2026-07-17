@@ -1,7 +1,7 @@
 ---
 type: SPEC
 domain: framework
-title: "R10-07 - Rebuild S14 as the Provider Workload Lab"
+title: "R10-07 - Rebuild OrderIntake as the Provider Workload Lab"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
 last_updated: 2026-07-17
@@ -9,10 +9,10 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: current-behavior, public-claim, workload, provider, Jobs, UI, and deployment discovery complete
+  scope: legacy OrderIntake behavior, public claims, workload, providers, Jobs, UI, and deployment discovery complete
 ---
 
-# R10-07 — Rebuild S14 as the provider workload lab
+# R10-07 — Rebuild OrderIntake as the provider workload lab
 
 - Tranche: `T7B — active-sample graduation`
 - Status: `in-progress`
@@ -21,7 +21,7 @@ validation:
 
 ## Task
 
-Break and rebuild `S14.AdapterBench` as `S14.WorkloadLab`. Retire the premise that one synthetic dashboard can
+Break and rebuild `applications/OrderIntake`. Retire the inherited premise that one synthetic dashboard can
 rank unlike data products or choose an application's architecture. Preserve the valuable core: execute real Koan
 Entity work durably, target deliberately named sources, expose the selected source's declared capabilities, and
 leave an exact receipt that a developer or reviewer can compare responsibly.
@@ -108,11 +108,11 @@ sample services makes the same workload available without application code chang
 
 | Change | Location | Reason |
 |---|---|---|
-| host, configuration, requests, UI | `samples/S14.WorkloadLab/` | one obvious executable application |
-| order and trial semantics | `samples/S14.WorkloadLab/Domain/` | code reads as the business workload and receipt |
-| submit/status/target projection | `samples/S14.WorkloadLab/Controllers/` | custom HTTP remains controller-owned |
-| optional services | `samples/S14.WorkloadLab/docker/compose.yml` | infrastructure mechanics stay outside application code |
-| cumulative contract | `tests/Suites/Samples/Koan.Samples.S14WorkloadLab.Tests/` | real local host, durable job, receipt, facts, cleanup, and correction |
+| host, configuration, requests, UI | `samples/applications/OrderIntake/` | one obvious executable application |
+| order and trial semantics | `samples/applications/OrderIntake/Domain/` | code reads as the business workload and receipt |
+| submit/status/target projection | `samples/applications/OrderIntake/Controllers/` | custom HTTP remains controller-owned |
+| optional services | `samples/applications/OrderIntake/docker/compose.yml` | infrastructure mechanics stay outside application code |
+| cumulative contract | `tests/Suites/Samples/Koan.Samples.OrderIntake.Tests/` | real local host, durable job, receipt, facts, cleanup, and correction |
 | public truth | sample README/index, DX-0044, Jobs card, R10/NOW/PROGRESS | no stale benchmark recommendation remains active |
 
 ## Focused acceptance

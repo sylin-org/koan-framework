@@ -8,7 +8,7 @@
     an "app" service entry into the published manifest. Opt in here; see ARCH-0077.
 
     Samples are NOT NuGet packages — they're demonstration apps. Web SDK already defaults to
-    IsPackable=false, but a few samples use the regular SDK (S0.ConsoleJsonRepo, S3.Mq.Sample)
+    IsPackable=false, but a few samples use the regular SDK (for example LocalChecklist)
     and would otherwise default to IsPackable=true, which would publish them to nuget.org.
     Setting IsPackable=false at this level covers every sample regardless of SDK (ARCH-0082).
   -->

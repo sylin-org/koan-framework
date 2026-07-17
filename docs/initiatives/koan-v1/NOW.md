@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: GardenCoop/inventory/S1/S0/S10/g1c2/public documentation passed; S14 workload-lab rebuild assessed and active; R08-05 paused
+  scope: semantic portfolio and seven graduated outcomes passed; OrderIntake rebuild assessed and active; R08-05 paused
 ---
 
 # Koan V1 reorganization current handoff
@@ -64,18 +64,18 @@ Replace this file at every handoff. It is a restart point, not a diary.
   AOT facts serialization centrally; native output is documented as a deployment directory, not a false single file.
 - [R10-02](work-items/r10/R10-02-portfolio-inventory.md) passes with an exact 27-project physical inventory and
   explicit graduation/incubation/archive-or-delete queues. [R10-03](work-items/r10/R10-03-s1-web.md) passes:
-  S1.Web is now the minimal deterministic AddKoan/Entity/EntityController relationship/cache rung with one
+  TaskGraph is now the minimal deterministic AddKoan/Entity/EntityController relationship/cache rung with one
   cumulative dashboard/business/HTTP/facts proof.
-- [R10-04](work-items/r10/R10-04-s0-console-json.md) passes. S0 is now one foundation reference, one owned
+- [R10-04](work-items/r10/R10-04-s0-console-json.md) passes. LocalChecklist is now one foundation reference, one owned
   standard host, one Entity/business method, and one deterministic materialized JSON result. The real process,
   JSON file, composition report, and shutdown are contract-backed; the public template shares ordinary `using var`.
 - The architect strengthened R10 into an all-active-samples mandate. `Assess` and `incubate` are temporary migration
   states only; every project still presented as V1 curriculum must graduate or leave the active portfolio.
-- [R10-05](work-items/r10/R10-05-s10-devportal.md) passes. S10 is now one Article Entity and a four-line host:
+- [R10-05](work-items/r10/R10-05-s10-devportal.md) passes. DevPortal is now one Article Entity and a four-line host:
   approved local content publishes idempotently through typed named channels backed by SQLite, Mongo, or Postgres.
   Local and real-container evidence agree with readiness/facts; demo services, switching, benchmarking, random graph,
   AngularJS, helper/container scaffolds, and false claims are gone.
-- [R10-06](work-items/r10/R10-06-g1c2-gardencoop-embedded.md) passes. g1c2 is now one local semantic-search story:
+- [R10-06](work-items/r10/R10-06-g1c2-gardencoop-embedded.md) passes. GardenCoop Chapter 2 adds one local semantic-search story:
   the four-line host seeds five Produce Entities after AI composition, `[Embedding]` indexes them through referenced
   ONNX/sqlite-vec providers, and `ripe red tomato` ranks Heirloom Tomatoes first. Strict source and self-contained
   folder runs agree with readiness/facts. Dogfood also coalesced AI contribution startup, made invalid configured
@@ -86,6 +86,15 @@ Replace this file at every handoff. It is a restart point, not a diary.
   check rejects removed activation/Messaging vocabulary, stale routes/versions/samples, non-awaited hosts,
   invalid package recipes, non-product navigation, and ADR edits. Product-surface proof passes 7/7 and
   the real FirstUse source contract passes 1/1; ADRs remain untouched.
+- [R10-09](work-items/r10/R10-09-semantic-sample-portfolio.md) passes. Samples now live under semantic
+  `fundamentals`, `journeys`, and `applications` identities; unrelated global numbers and non-earning projects are
+  gone. GardenCoop Chapter 2 is a strict runnable superset of Chapter 1, while OpenGraph's automatic web-pipeline
+  contribution lets DevPortal own the Article social-card story without changing its four-line host.
+- Focused retained evidence is green: OpenGraph 39/39, DevPortal 1/1, GardenCoop C1 1/1, GardenCoop C2 1/1,
+  LocalChecklist 1/1, TaskGraph 5 pass plus 2 intentional skips, SnapVault 33/33, and zero-warning builds for
+  CustomerCanon and OrderIntake. The public truth gate passes across 174 current files and 36 navigation targets.
+- `CustomerCanon`, `OrderIntake`, and `SnapVault` remain visible as application dogfood, not graduated curriculum.
+  R10-07 now owns OrderIntake's break-and-rebuild; later cards must graduate or remove the other two.
 - No package, tag, GitHub Release, branch, or remote configuration was published or mutated. Initial coherent
   public observation and a later real public-to-candidate upgrade/rollback remain separate gates.
 
@@ -108,9 +117,9 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Implement [R10-07](work-items/r10/R10-07-s14-workload-lab.md) as the assessed S14 replacement:
+Implement [R10-07](work-items/r10/R10-07-s14-workload-lab.md) as the assessed OrderIntake replacement:
 
-1. rename `S14.AdapterBench` to `S14.WorkloadLab` and replace the synthetic benchmark engine with one bounded,
+1. replace the inherited synthetic benchmark engine in `samples/applications/OrderIntake` with one bounded,
    verified order-intake job and durable receipt;
 2. keep the local SQLite target zero-infrastructure and express optional MongoDB, PostgreSQL, and Redis paths as
    typed named sources with corrective failures;

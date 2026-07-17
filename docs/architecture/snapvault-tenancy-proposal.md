@@ -1,7 +1,7 @@
 # SnapVault × tenancy — a worked proposal (the delight case study)
 
 - Date: 2026-06-22
-- Purpose: study `samples/S6.SnapVault` and propose how to incorporate **multi-tenancy + quotas + entitlements** (ARCH-0099 §1–§8, ARCH-0098) so the result is *delightful*. Doubles as the worked validation of the tenancy design against a real, non-trivial app — and surfaces the concrete framework gaps it exposes.
+- Purpose: study `samples/applications/SnapVault` and propose how to incorporate **multi-tenancy + quotas + entitlements** (ARCH-0099 §1–§8, ARCH-0098) so the result is *delightful*. Doubles as the worked validation of the tenancy design against a real, non-trivial app — and surfaces the concrete framework gaps it exposes.
 
 ## What SnapVault is (the proposal it already makes)
 

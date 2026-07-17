@@ -8,10 +8,10 @@ namespace Koan.Web.OpenGraph;
 public static class ApplicationBuilderExtensions
 {
     /// <summary>
-    /// Inserts the OpenGraph head-injection middleware. Place this one line ahead of the app's own
-    /// <c>MapFallbackToFile</c>: on an HTML navigation it injects the per-route card into the shell
-    /// and short-circuits; everything else (assets, <c>/api</c>, non-html, disabled) passes through to
-    /// the fallback untouched. The pillar does not own the host pipeline; the consumer inserts this.
+    /// Inserts the OpenGraph head-injection middleware. Koan contributes this automatically when the
+    /// package is referenced; this method remains public for non-Koan pipeline hosts. On an HTML
+    /// navigation it injects the per-route card into the shell and short-circuits; everything else
+    /// (assets, <c>/api</c>, non-html, disabled) passes through untouched.
     /// </summary>
     public static IApplicationBuilder UseOpenGraphCards(this IApplicationBuilder app)
     {

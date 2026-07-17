@@ -66,4 +66,4 @@ Source XOR adapter; parameterized; transactions via `.Begin()`. The adapter's co
 
 ## The sample that shows it
 
-[`samples/S1.Web`](../../../samples/S1.Web/README.md) — `Entity<Todo>` CRUD plus the relationship system (`[Parent]` navigation, batch loading, streaming) over a minimal web UI.
+[`TaskGraph`](../../../samples/fundamentals/TaskGraph/README.md) — `Entity<Todo>` CRUD plus the relationship system (`[Parent]` navigation, batch loading, streaming) over a minimal web UI.

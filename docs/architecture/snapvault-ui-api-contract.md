@@ -1,7 +1,7 @@
 # SnapVault — UI API Contract (functional acceptance gate)
 
 - Status: **Draft for review** (2026-06-26)
-- Purpose: the exact HTTP + realtime surface the SnapVault SPA (`samples/S6.SnapVault/wwwroot`) actually calls. The greenfield backend **must honor every row below**, except the rows explicitly marked **CHANGE** (the deliberate migrations the UI gets matching affordances for). Companion to [snapvault-product-spec.md](./snapvault-product-spec.md).
+- Purpose: the exact HTTP + realtime surface the SnapVault SPA (`samples/applications/SnapVault/wwwroot`) actually calls. The greenfield backend **must honor every row below**, except the rows explicitly marked **CHANGE** (the deliberate migrations the UI gets matching affordances for). Companion to [snapvault-product-spec.md](./snapvault-product-spec.md).
 - Source: understand-pass workflow `wf_2024d47f-292` (UI agent grepped `wwwroot/js/**`), corrected by hand where the UI map and backend map disagreed (notes below). All call sites are `file:line` in `wwwroot/`.
 
 ## Client conventions

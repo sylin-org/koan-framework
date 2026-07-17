@@ -1,106 +1,66 @@
-﻿## Samples Organization Standard
+# Sample portfolio standard
 
-Contract
+Koan samples are product evidence and curriculum, not a numbered inventory of repository experiments.
+Their structure should answer what a reader is trying to learn before it exposes implementation detail.
 
-- Inputs: Existing sample folders under `samples/` (e.g., `S12.MedTrials`, `S12.MedTrials.Core`, `S12.MedTrials.McpService`, `S13.DocMind`, `S13.DocMind.Tools`, `S16.PantryPal`, `S16.PantryPal.McpHost`).
-- Outputs: A clear, predictable folder layout for “sample families”: `SXX.Name/<Subproject>` where subprojects are API, Web, MCP, AppHost, Core, Tools, Infra, Docs.
-- Error modes: Name collisions when moving, partial migrations, broken relative paths. Mitigation: dry-run, atomic moves per family, README updates, and git-clean check.
-- Success criteria: All related samples are grouped under a single family root; top-level `samples/` is easy to scan; each subproject builds and its start script remains discoverable.
+## Portfolio shape
 
-Rationale
+```text
+samples/
+  FirstUse/                 # shortest complete product result
+  GoldenJourney/            # growth of the FirstUse application
+  fundamentals/             # one concern in isolation
+    LocalChecklist/
+    TaskGraph/
+  journeys/                 # one application growing cumulatively
+    GardenCoop/
+      01-GardenJournal/
+      02-LocalDiscovery/
+  applications/             # complete, business-shaped applications
+    DevPortal/
+```
 
-The `samples/` folder currently has multiple siblings that belong to the same scenario (e.g., `S16.PantryPal` and `S16.PantryPal.McpHost`). Grouping these into a “family root” improves legibility, discoverability, and lowers the cognitive load for users browsing examples. This follows Koan’s principles: premium DX, predictable defaults, and clean organization.
+Numbers are allowed only when order carries product meaning. A journey chapter must be a strict superset
+of the preceding chapter: preserve its complete business result and add one visible capability. Unrelated
+applications use semantic names, not global sequence numbers.
 
-Numbering and Naming
+## Placement rules
 
-- Prefix `SXX.` is retained for scenario grouping and ordering (e.g., S0 = minimal, S1–S4 = fundamentals, S10+ = integrated scenarios/case studies).
-- Family root naming: `SXX.QualifiedName` (e.g., `S16.PantryPal`, `S13.DocMind`, `S12.MedTrials`).
-- Subproject folders are PascalCase nouns that reflect the surface or role:
-  - API: HTTP APIs (typically EntityController-based web APIs)
-  - Web: UI-first web apps
-  - MCP: Model Context Protocol services/hosts
-  - AppHost: Aspire or orchestrator host(s)
-  - Core: shared domain, contracts, models, services
-  - Tools: CLI or background tools
-  - Infra: infrastructure, provisioning, or adapter demos
-  - Docs: family-specific documentation (if needed)
+- `fundamentals/` contains the smallest honest proof of one framework concern.
+- `journeys/` demonstrates V0-to-V1 growth in meaningful small steps.
+- `applications/` holds coherent business applications, including work still being graduated.
+- A multi-project application may group `Api`, `Worker`, or similarly earned process roles beneath one
+  application root. Do not create empty shells or speculative subprojects.
+- Shared code is promoted only after real reuse; samples should not hide their story behind a generic sample kit.
 
-Standard Layout (per family)
+## Graduation rules
 
-SXX.Name/
+A sample joins `samples/README.md` only when all of these agree:
 
-- API/ # Web API app (controllers, Models, Services, start.bat)
-- Web/ # UI-first app (optional)
-- MCP/ # MCP host/service (optional)
-- AppHost/ # Aspire AppHost (optional)
-- Core/ # Shared domain/contracts (optional)
-- Tools/ # Utilities/CLI (optional)
-- Infra/ # Infra/adapters/showcases (optional)
-- Docs/ # Family docs and local READMEs (optional)
-- README.md # Family overview: purpose, components, how to run
+1. one business sentence and one shortest meaningful command;
+2. business-first application code using the canonical `AddKoan()` and Entity grammar;
+3. an executable cumulative contract proving result, host surface, and composition facts;
+4. honest prerequisites, provider behavior, errors, and deployment claims;
+5. current paths and names across source, solution, requests, dashboard, and documentation.
 
-Required Conventions (DX)
+Project presence is not a support claim. Work that has not graduated remains outside the public curriculum;
+dead, duplicate, or speculative samples are deleted instead of archived in the active tree.
 
-- Each subproject contains its own `start.bat` aligned with our Windows-first dev flow. Keep `Program.cs` minimal (AddKoan pattern). Avoid inline endpoints; use controllers.
-- Root `README.md` explains the scenario, lists subprojects, and provides simple run instructions (link to subproject `README` when present).
-- No stubs or empty projects. If a subproject is not used, don’t create an empty folder.
-- Use standard Koan structure inside projects: `Models/`, `Services/`, `Controllers/`, `Contracts/`, `Infrastructure/`, `Initialization/`.
-- Centralize constants and avoid magic values per Core Engineering Principles.
+## Application code standard
 
-Streaming and Data Access in Samples
+Prefer intent-to-code expressions: `Entity<T>`, `EntityController<T>`, Entity capability rings, ordinary
+attributes, and standard .NET configuration. References state capability intent. Application modules are
+earned only when the application owns real composition, startup data, or reporting policy. Provider selection,
+middleware order, discovery, and repeated mechanics belong at framework chokepoints.
 
-- In code samples and snippets, prefer entity statics: `MyModel.All(ct)`, `MyModel.Query(...)`, `MyModel.AllStream(...)`, `MyModel.FirstPage(...)`, etc. See DATA-0107.
-- For larger sets, demonstrate `AllStream`/`QueryStream` only with the adapter capability boundary, or
-  use explicit paging. Avoid `All()` for large data paths.
+Use Entity statics for bounded materialized work. Demonstrate `AllStream` or `QueryStream` only where the
+selected adapter supplies provider-bounded streaming; otherwise use explicit paging.
 
-Migration Guidance
+## Change checklist
 
-1. Create the family root folder (e.g., `S16.PantryPal/`).
-2. Move each related sibling into a subfolder with the correct role:
-   - `S16.PantryPal` → `S16.PantryPal/API`
-   - `S16.PantryPal.McpHost` → `S16.PantryPal/MCP`
-   - `S12.MedTrials` → `S12.MedTrials/API`
-   - `S12.MedTrials.Core` → `S12.MedTrials/Core`
-   - `S12.MedTrials.McpService` → `S12.MedTrials/MCP`
-   - `S13.DocMind` → `S13.DocMind/API`
-   - `S13.DocMind.Tools` → `S13.DocMind/Tools`
-3. Ensure each moved subproject still builds and runs via its `start.bat`.
-4. Add a family-level `README.md` that describes components and how they relate.
-5. Update docs links that referenced old paths. Prefer relative links from `docs/` to `samples/` families.
-
-Edge Cases
-
-- Name collisions: If a family already has `API/` or `Core/`, consolidate intentionally. Resolve duplicate files with maintainers.
-- Cross-family reuse: If two families share a utility project, keep it under each family’s `Core/` (duplicated) OR promote to `samples/_shared/` with a small note in each family README.
-- Guides and standalone demos (`samples/guides/`, one-offs like `S0.ConsoleJsonRepo`) remain at top level.
-- Case studies spanning multiple families (e.g., docs integrations) should link to families, not duplicate code.
-
-Worked Examples (Current Repo)
-
-- S16.PantryPal
-  - Before: `S16.PantryPal`, `S16.PantryPal.McpHost`
-  - After: `S16.PantryPal/API`, `S16.PantryPal/MCP`
-- S12.MedTrials
-  - Before: `S12.MedTrials`, `S12.MedTrials.Core`, `S12.MedTrials.McpService`
-  - After: `S12.MedTrials/API`, `S12.MedTrials/Core`, `S12.MedTrials/MCP`
-- S13.DocMind
-  - Before: `S13.DocMind`, `S13.DocMind.Tools`
-  - After: `S13.DocMind/API`, `S13.DocMind/Tools`
-
-Validation Checklist (Quality Gates)
-
-- Build: Each subproject builds without errors after move.
-- Start scripts: `start.bat` runs from subproject folder; family README documents how to run.
-- Links: Docs and READMEs updated; no broken links in strict docs build.
-- Requirements coverage: Related sample siblings are co-located under a family root; naming matches this policy.
-
-Automation
-
-A helper script `scripts/reorg-samples.ps1` is provided to perform a dry-run plan or apply the moves for known families. Extend it incrementally as new families are identified.
-
-References
-
-- Engineering: `/docs/engineering/index.md`
-- Architecture: `/docs/architecture/principles.md`
-- Data Access: `/docs/guides/data/entity-access-and-streaming.md`, `/docs/decisions/DATA-0107-provider-bounded-entity-streams.md`
-- Web API: `/docs/api/web-http-api.md`, `/docs/decisions/WEB-0035-entitycontroller-transformers.md`
+- Decide whether the artifact is a fundamental, cumulative journey chapter, or complete application.
+- Name it for the business result; number only a journey chapter.
+- Move source, tests, solution entries, lockfiles, requests, and docs as one logical change.
+- Run the focused sample contract and any capability-owner tests exposed by dogfood.
+- Update `samples/README.md` only after graduation; state unfinished application work explicitly.
+- Leave ADRs unchanged. Historical names in decisions remain historical evidence.

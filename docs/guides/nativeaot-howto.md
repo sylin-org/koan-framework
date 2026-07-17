@@ -4,12 +4,12 @@ domain: orchestration
 title: "Publishing a Koan app with NativeAOT"
 audience: [developers, architects]
 status: current
-last_updated: 2026-06-21
-framework_version: v0.17.0
+last_updated: 2026-07-17
+framework_version: source-first
 validation:
-  date_last_tested: 2026-06-21
+  date_last_tested: 2026-07-17
   status: verified
-  scope: g1c2.GardenCoopEmbedded (win-x64 + linux-x64)
+  scope: GardenCoop Chapter 1 win-x64 native deployment, business API, lifecycle result, and facts
 related_guides:
   - composition-lockfile.md
   - ai-vector-howto.md
@@ -17,14 +17,14 @@ related_guides:
 
 # Publishing a Koan app with NativeAOT
 
-A Koan app can publish to a single self-contained **NativeAOT** binary — no .NET runtime, no
-container, no servers — when every capability it uses is satisfied by an in-process resource
-(SQLite data, sqlite-vec vectors, ONNX embeddings, Channels messaging, Web/MCP). This is the
-"sovereign floor" footprint. The framework wiring for AOT is decided in
+A Koan app can publish as a self-contained **NativeAOT deployment**—no installed .NET runtime—when
+every capability it uses is AOT-compatible. The deployment is a directory: the native executable may
+travel with application assets and connector-native libraries. The framework wiring for AOT is decided in
 [ARCH-0093](../decisions/ARCH-0093-nativeaot-substrate.md); this guide is the operational recipe.
 
-> Reference sample: [`samples/guides/g1c2.GardenCoopEmbedded`](../../samples/guides/g1c2.GardenCoopEmbedded) —
-> one binary that embeds → stores → semantically searches produce, entirely in-process.
+> Current measured sample: [GardenCoop Chapter 1](../../samples/journeys/GardenCoop/01-GardenJournal/) —
+> a win-x64 native executable that serves its dashboard, SQLite-backed garden API, lifecycle automation,
+> and runtime facts with no external service.
 
 ## TL;DR
 
@@ -122,8 +122,8 @@ sudo apt-get install -y clang zlib1g-dev binutils libicu-dev   # Debian/Ubuntu
   The server relational adapters (Postgres, SQL Server) keep Dapper — they never ship in a single
   binary; if you somehow AOT one, route it through the same `Koan.Data.Relational.Ado` helpers.
 - **No `dynamic`.** The DLR can't bind under AOT. Koan's hot paths avoid it.
-- **Native deps that work under AOT:** ONNX Runtime (P/Invoke), the sqlite-vec `vec0` loadable
-  extension (embedded + self-extracted), and `e_sqlite3`.
+- **Measured native dependency:** GardenCoop proves `e_sqlite3` in the current win-x64 deployment.
+  Treat every additional native connector as a separate publish-and-run claim until exercised.
 - **Globalization.** Set `<InvariantGlobalization>true</InvariantGlobalization>` in the app project
   (the floor doesn't need culture data). Otherwise the AOT binary needs ICU present on the target.
   Note the **build/SDK** box still needs `libicu` regardless — `dotnet` itself fails fast without it.
@@ -156,14 +156,16 @@ are AOT-clean: text is built by reflection over names + string ops, and `FullJso
 
 ## 6. Verify it ran
 
-The boot report's `Registry`/`Inventory` blocks list every discovered module — if the trim roots
-worked you'll see all of them (not a truncated set). Then exercise a real path end-to-end; for the
-reference sample:
+The boot report's `Registry`/`Inventory` blocks list every discovered module—if the trim roots worked
+you'll see all of them. Then exercise a real business path end-to-end; for the current sample:
 
-```bash
-./GardenCoopEmbedded &
-curl "http://127.0.0.1:5000/api/produce/search?q=sweet%20red%20fruit&k=3"
-# -> 200, semantically-ranked hits, all in one process
+```powershell
+dotnet publish samples/journeys/GardenCoop/01-GardenJournal/GardenCoop.C01.csproj `
+  -c Release -r win-x64 --self-contained true -p:KoanAot=true
+
+Set-Location samples/journeys/GardenCoop/01-GardenJournal/bin/Release/net10.0/win-x64/publish
+./GardenCoop.C01.exe --urls http://127.0.0.1:5000
+# In another terminal: Invoke-RestMethod http://127.0.0.1:5000/api/garden/reminders
 ```
 
 ## 7. Troubleshooting
@@ -173,7 +175,7 @@ curl "http://127.0.0.1:5000/api/produce/search?q=sweet%20red%20fruit&k=3"
 | `NETSDK1207` on a `Koan.*.Generators` project | A **global** `-p:PublishAot=true`. Use the `-p:KoanAot=true` gate (§1) so `PublishAot` is set only on the app. |
 | Windows link error mentioning `vswhere` / `link.exe` | Publish inside `vcvars64` with `-p:IlcUseEnvironmentalTools=true` (§3), or install the **Desktop development with C++** workload (MSVC `link.exe`). |
 | Boot throws missing-controller/entity `InvalidOperationException` | A reflection-reached type was trimmed — add it to `NativeAotRoots.xml` or `[DynamicDependency]` (§2). Koan modules are auto-rooted; this is for **your** types. |
-| `DllNotFoundException: e_sqlite3` (or `onnxruntime`) | The native lib wasn't published beside the binary. AOT is self-contained by default — don't force `--no-self-contained`; the connector's native bits travel with it. |
+| `DllNotFoundException: e_sqlite3` | The native library was not published beside the executable. AOT is self-contained by default—do not force `--no-self-contained`; the connector's native bits travel with it. |
 | `Reflection-based serialization has been disabled` | Something serialized via `System.Text.Json`. The floor is Newtonsoft (§4); for an MVC app ensure Koan.Web's Newtonsoft pipeline is active. |
 | Need a stack trace from the native binary | Publish with `-p:StripSymbols=false` (or `-p:IlcGenerateCompleteDebugInfo=true`) to keep symbols. |
 

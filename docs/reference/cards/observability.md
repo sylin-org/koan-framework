@@ -66,7 +66,3 @@ services.AddKoanObservability(o =>
 ```
 
 Because the pipeline is built once at boot, a post-boot `configure` updates the options seen by readers but does **not** rebuild the already-wired pipeline — supply pipeline-affecting settings via configuration (ARCH-0088).
-
-## The sample that shows it
-
-[`samples/S5.Recs`](../../../samples/S5.Recs/README.md) — references `Koan.Observability` directly, so booting the app stands up the full OTel traces+metrics pipeline by Reference=Intent with no wiring code.

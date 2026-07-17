@@ -1,6 +1,8 @@
 using System.Linq;
 using AwesomeAssertions;
 using Koan.Core.Ordering;
+using Koan.Web.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Koan.Web.OpenGraph.Tests;
@@ -22,5 +24,17 @@ public sealed class OpenGraphModuleOrderingTests
             .SelectMany(a => a.Targets);
 
         after.Should().Contain(typeof(Koan.Web.Initialization.WebModule));
+    }
+
+    [Fact]
+    public void Module_contributes_social_cards_at_the_early_web_pipeline_boundary()
+    {
+        var services = new ServiceCollection();
+        new Koan.Web.OpenGraph.Initialization.OpenGraphModule().Register(services);
+
+        using var provider = services.BuildServiceProvider();
+        var contributor = provider.GetServices<IKoanWebPipelineContributor>().Should().ContainSingle().Subject;
+
+        contributor.Stage.Should().Be(KoanWebPipelineStage.BeforeRouting);
     }
 }

@@ -1,44 +1,46 @@
 # Koan samples
 
-Samples are a public product surface and the Koan curriculum. This index lists only applications with
-a documented meaningful result and focused executable evidence. Other directories may be under
-assessment; their presence is not a usage recommendation or support claim.
+Samples are Koan's public curriculum. Names describe the business result; numbers appear only where
+order has meaning inside a cumulative journey.
 
-## Graduated examples
+## Start here
 
-These samples currently have a documented meaningful path and focused executable evidence:
+| Sample | Meaningful result | Start |
+|---|---|---|
+| [FirstUse](FirstUse/README.md) | Persist and approve one request; inspect the resulting API, facts, and governed agent tool | `dotnet run --project samples/FirstUse` |
+| [GoldenJourney](GoldenJourney/README.md) | Grow that same application through a rule, durable job, and agent recommendation | `dotnet run --project samples/GoldenJourney` |
+
+## Fundamentals
+
+Use these when you want one concern in isolation.
 
 | Sample | Meaningful result | Concepts | Start |
 |---|---|---|---|
-| [S0.ConsoleJsonRepo](S0.ConsoleJsonRepo/README.md) | Save a local checklist, complete one item, and reload open work | console host, Entity statics, JSON, provider bounds | `cd samples/S0.ConsoleJsonRepo && dotnet run` |
-| [FirstUse](FirstUse/README.md) | Persist and approve one request, inspect facts, expose governed MCP | bootstrap, Entity, SQLite, REST, facts, MCP | `dotnet run --project samples/FirstUse` |
-| [GoldenJourney](GoldenJourney/README.md) | Grow the same request through a rule, durable job, and agent recommendation | cumulative composition, jobs, agent tools, recovery | `dotnet run --project samples/GoldenJourney` |
-| [S1.Web](S1.Web/README.md) | Resolve one task graph over scalar, set, and stream cardinalities | EntityController, Parent, Relatives, Cache | `dotnet run --project samples/S1.Web` |
-| [S10.DevPortal](S10.DevPortal/README.md) | Approve local articles and publish them idempotently through named provider channels | named sources, provider negotiation, Entity transfer | `cd samples/S10.DevPortal && dotnet run` |
-| [g1c1.GardenCoop](guides/g1c1.GardenCoop/README.md) | Turn a dry sensor reading into a reminder, then observe recovery | lifecycle automation, SQLite, REST, facts, NativeAOT | `dotnet run --project samples/guides/g1c1.GardenCoop` |
-| [g1c2.GardenCoopEmbedded](guides/g1c2.GardenCoopEmbedded/README.md) | Find local produce by meaning with no external service | Entity embeddings, ONNX, SQLite, sqlite-vec | `dotnet run --project samples/guides/g1c2.GardenCoopEmbedded` |
+| [LocalChecklist](fundamentals/LocalChecklist/README.md) | Save a checklist, complete one item, and reload open work | console host, Entity statics, JSON | `dotnet run --project samples/fundamentals/LocalChecklist` |
+| [TaskGraph](fundamentals/TaskGraph/README.md) | Resolve one task graph over scalar, set, and stream cardinalities | EntityController, Parent, Relatives, Cache | `dotnet run --project samples/fundamentals/TaskGraph` |
 
-## What is not listed
+## Capability journeys
 
-An unlisted sample is not current curriculum. Maintainers track its graduation, archive, or deletion
-outside the public learning path. Historical applications under [`archive/`](archive/ARCHIVED.md)
-remain historical and carry no modernization or support promise.
+[GardenCoop](journeys/GardenCoop/README.md) is one application that grows in meaningful small steps:
 
-## What every graduated sample guarantees
+1. [Garden Journal](journeys/GardenCoop/01-GardenJournal/README.md) turns dry readings into watering reminders.
+2. [Local Discovery](journeys/GardenCoop/02-LocalDiscovery/README.md) keeps that complete application and adds local semantic produce search.
 
-1. Business intent is the dominant application code.
-2. `AddKoan()` is the normal bootstrap; extra application code owns real business policy.
-3. References state capability intent, and runtime decisions are inspectable.
-4. One standard .NET command reaches a meaningful result.
-5. A focused test proves the business result, HTTP or host surface, and composition facts.
-6. Any claimed container, external service, package-only, or NativeAOT shape is actually exercised.
-7. README, source, dashboard, requests, solution membership, and maturity status agree.
+Each chapter is independently runnable. Every later chapter must preserve the earlier business result,
+then add one visible capability.
 
-## Contributing a sample
+## Complete applications
 
-Start with one business sentence and a strict baseline. Identify the smallest honest host, the deliberate capability references, and the defining business result. Repair framework defects at their owner, remove obsolete sample ceremony, and add sample-specific executable proof before promoting documentation.
+| Sample | Meaningful result | Concepts | Start |
+|---|---|---|---|
+| [DevPortal](applications/DevPortal/README.md) | Approve local articles, publish them through named provider channels, and render entity-backed share cards | named sources, Entity transfer, OpenGraph | `dotnet run --project samples/applications/DevPortal` |
 
-Do not add launch helpers for ordinary `dotnet run`, private dogfood identities, generic test
-abstractions that hide the story, or deployment claims without evidence. A new sample joins this
-index only after its business result, host lifecycle, projections, composition facts, and stated
-deployment shape are exercised.
+Other application directories are active graduation work, not current curriculum. Presence in the tree
+is not a support claim.
+
+## Graduation contract
+
+A public sample must have one business sentence, a standard .NET command to a meaningful result, focused
+executable evidence, and documentation that agrees with its source, provider requirements, facts, and
+deployment shape. Business intent must dominate the application code; mechanics belong at framework
+chokepoints. Private dogfood identities and unsupported performance or deployment claims do not belong here.

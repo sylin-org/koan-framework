@@ -1,7 +1,7 @@
 # SnapVault — Product Spec & Greenfield Harvest Map
 
 - Status: **Draft for review** (2026-06-26)
-- Scope: `samples/S6.SnapVault`. This is the **spec-first** artifact for the greenfield backend rebuild: it says *what SnapVault is meant to offer*, realigns the surface around "fewer, more meaningful parts," and is the **harvest map** for porting the genuine domain out of the legacy backend.
+- Scope: `samples/applications/SnapVault`. This is the **spec-first** artifact for the greenfield backend rebuild: it says *what SnapVault is meant to offer*, realigns the surface around "fewer, more meaningful parts," and is the **harvest map** for porting the genuine domain out of the legacy backend.
 - Companions: [snapvault-ui-api-contract.md](./snapvault-ui-api-contract.md) (the functional acceptance gate — what the SPA calls) · [snapvault-koan-modernization.md](./snapvault-koan-modernization.md) (the original in-place ADR, **superseded** by this greenfield approach; its strip/build/keep table is folded in below).
 - Evidence: every claim here is cited to `file:line` in the current tree, gathered by a 6-agent understand-pass (workflow `wf_2024d47f-292`) and re-verified by hand on the load-bearing points (the verify-empirically discipline caught the critic itself being wrong about `Count.Fast`).
 - Applies: `koan-design-principles` ("fewer but more meaningful parts"), `break-and-rebuild-preferred` (one clean core, delete the legacy at swap — *not* a second permanent impl), `koan-ergonomics-first`, `no-stopgaps`, `contributor-pipelines-never-bespoke`.
@@ -12,7 +12,7 @@
 
 Two acceptance gates bound the rebuild. Nothing else is canon:
 
-1. **The flagship isolation spec** — `tests/S6.SnapVault.Tests/SnapVaultTenancyFlagshipSpec.cs` (real `AddKoan()`, no Docker). It ports to the new entities verbatim and must stay green.
+1. **The flagship isolation spec** — `tests/Suites/Samples/Koan.Samples.SnapVault.Tests/SnapVaultTenancyFlagshipSpec.cs` (real `AddKoan()`, no Docker). It ports to the new entities verbatim and must stay green.
 2. **The UI API contract** — [snapvault-ui-api-contract.md](./snapvault-ui-api-contract.md). The new backend must honor every endpoint/shape the SPA actually calls, *minus* the deliberate changes called out there (progress transport SignalR→SSE; optionally the media URLs).
 
 The greenfield discipline: **port the domain verbatim, build the structure from scratch.** "From scratch" applies to the file/service/controller shape — never to re-deriving the hard-won domain algorithms in §3, which copy across.

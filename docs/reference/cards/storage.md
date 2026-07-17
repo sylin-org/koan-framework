@@ -67,7 +67,3 @@ await foreach (var info in storage.ListObjects("hot", "uploads", prefix: "2026/"
     Console.WriteLine(info.Key);
 // Fluent routing sugar: storage.InProfile("cold", "photos").Onboard(key, stream)
 ```
-
-## The sample that shows it
-
-[`samples/S6.SnapVault`](../../../samples/S6.SnapVault/README.md) — a photo-management app whose `PhotoAsset : MediaEntity<PhotoAsset>` carries `[StorageBinding(Profile = "cold", Container = "photos")]` and onboards/reads image blobs through the storage seam (with derivative thumbnails on their own bindings).

@@ -116,7 +116,8 @@ Samples should showcase the canonical Koan experience:
 ### Recommended fixes
 
 1. **Expand diagnostics coverage** – Extend boot reporting for GraphQL and inbox modules with schema/capability metrics so telemetry stays rich as features grow.
-2. **Broaden sample sweep** – Audit remaining samples (S1, S2, S5, etc.) to ensure future changes keep `.AddKoan()` alignment and leverage the new authorization helper where applicable.
+2. **Broaden sample sweep** – Audit the maintained semantic sample portfolio to ensure future changes keep
+   `.AddKoan()` alignment and leverage the new authorization helper where applicable.
 3. **Author documentation updates** – Capture the new `AddKoanAuthorization` helper and orchestration registrar behaviour in `/docs/guides` so downstream teams adopt the conventions quickly.
 
 ---

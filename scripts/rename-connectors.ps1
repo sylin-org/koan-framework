@@ -116,7 +116,7 @@ foreach ($file in $files) {
 
     try {
         $fullPath = $file.FullName
-        if ($fullPath -match "\\samples\\S5\.Recs\\data\\" -or $fullPath -match "\\\.mongodb\\") {
+        if ($fullPath -match "\\\.mongodb\\") {
             continue
         }
 

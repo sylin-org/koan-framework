@@ -380,12 +380,12 @@ All spec deviations have been resolved. The specification now accurately reflect
 - ✅ **M1 - Runtime Core**: **COMPLETE**
 - ✅ **M2 - Web & API Surfaces**: **COMPLETE**
 - ⏳ **M3 - Adapter Modernization**: Pending (transport adapters not in scope yet)
-- ⏳ **M4 - Sample Migration**: S8.Canon exists but migration status unclear
+- ⏳ **M4 - Sample Migration**: `applications/CustomerCanon` is retained but has not passed golden-sample graduation
 - ⏳ **M5 - Operational Cutover**: Not started
 
 ### Immediate Next Steps (Per Migration Plan)
-1. Validate S8.Canon sample against current runtime (verify end-to-end)
-2. Port additional samples (S9, S14) to new runtime
+1. Rebuild CustomerCanon around one current business contract and verify it end-to-end
+2. Add another application consumer only when it earns a distinct Canon use case
 3. Begin adapter modernization (Dapr connector, projection services)
 
 ---
@@ -423,12 +423,13 @@ reference linked at the top of this document.
 - ✅ M1 — Runtime Core (2025-10-05)
 - ✅ M2 — Web & API Surfaces (2025-10-05)
 - ⏳ M3 — Adapter Modernization (next)
-- ⏳ M4 — Sample Migration (S8.Canon requires complete rewrite)
+- ⏳ M4 — Sample Migration (CustomerCanon requires a complete business-first rebuild)
 - ⏳ M5 — Operational Cutover (final)
 
-**Ready for**: Production deployment, M3 adapter work, M4 sample creation
+**Historical 2025 assessment only**: this section does not establish current production support. M3 adapter work
+and CustomerCanon graduation remain open under the current product maturity authority.
 
-**Timeline**: ✅ **SHIPPED** - No blocking issues, runtime is production-grade
+**Timeline**: the 2025 implementation milestone shipped; current production maturity is not asserted here.
 
 ---
 

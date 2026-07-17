@@ -74,7 +74,7 @@ Koan already owns the right seams; the inversion is cheap:
   Koan's own MLOps shed.
 
 Risks to manage: the neutral seam must stay at "produce candidates / map offering" altitude
-(if it grows ZG-shaped parameters it just relocates the leak); the g1c1 dogfood and samples
+(if it grows ZG-shaped parameters it just relocates the leak); the GardenCoop dogfood and samples
 must move to the satellite reference or Koan loses its only end-to-end garden test.
 
 ## R5 — Fix K1/K2: make Koi's hidden second customer an honest public one

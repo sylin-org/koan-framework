@@ -124,7 +124,8 @@ Elastic scaling depends on moving work away from single nodes.
 4. **Horizontal Scaling Guides & Samples**
 
    - Extend documentation with a Kubernetes deployment guide, including Canon worker scaling examples.
-   - Ship samples demonstrating multi-instance message processing and AI enrichment scaling (e.g., using `samples/S8.Canon`).
+   - Graduate a business application such as `samples/applications/CustomerCanon` before using it to demonstrate
+     multi-instance message processing or AI-enrichment scaling; the current application makes no such claim.
 
 5. **Policy-Driven Scaling Metadata**
    - Allow modules to declare scaling hints (CPU, memory, concurrency) that feed into infrastructure-as-code templates, reducing manual configuration.

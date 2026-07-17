@@ -30,7 +30,7 @@
 
    - Rebuild canon controllers on top of the new runtime following MVC conventions.
    - Generate OpenAPI descriptions and update API reference docs.
-   - Switch S8.Canon to the new endpoints and delete its legacy wiring.
+   - Switch `samples/applications/CustomerCanon` to the new endpoints and delete its legacy wiring.
    - ✅ Controller package (`Koan.Canon.Web`) registered with auto-discovery (Oct 2025).
 
 3. **M3 — Adapter Modernization**
@@ -41,7 +41,8 @@
 
 4. **M4 — Sample & Test Migration**
 
-   - Update all canon-enabled samples (S8, S9, S14) to reference `Koan.Canon.Domain` instead of legacy projects.
+   - Graduate CustomerCanon against `Koan.Canon.Domain`; add further application consumers only for distinct
+     business use cases rather than portfolio coverage.
    - Expand automated tests to cover multi-stage pipelines, observers, and failure scenarios.
    - Remove legacy sample instructions and replace them with the new workflow.
 
@@ -71,7 +72,7 @@
 - Correlation ID auto-detection (X-Correlation-ID → X-Request-ID → TraceIdentifier)
 - 1 passing web controller test
 
-**Next Steps**: Begin M3 (Adapter Modernization) and M4 (Sample Migration - S8.Canon requires complete rewrite for new runtime)
+**Next Steps**: Begin M3 (Adapter Modernization) and M4 (CustomerCanon requires a complete business-first rebuild).
 
 ## Edge Cases & Mitigations
 

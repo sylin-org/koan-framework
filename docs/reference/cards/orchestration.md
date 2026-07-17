@@ -66,7 +66,3 @@ public sealed class PostgresDataModule : KoanModule, IKoanAspireResources
 ```
 
 Per-project tweaks without touching the adapter: `.Koan/overrides.json` (image/env/volumes/ports, plus `Mode: Local`). Force the mode via the `ForceOrchestrationMode` config key.
-
-## The sample that shows it
-
-[`samples/S1.Web`](../../../samples/S1.Web/README.md) — its `start.bat` only runs the app (`dotnet run`); self-orchestration boots the declared dependency containers on the dev host, the same descriptors `Koan export compose` would render.

@@ -68,4 +68,4 @@ The repository exposes `Upsert` / `Delete` / `Search` / `Flush` / `ExportAll` an
 
 ## The sample that shows it
 
-[`samples/S5.Recs`](../../../samples/S5.Recs/README.md) — AnimeRadar: `[Embedding]` on `Media` plus hybrid `Vector<Media>.Search(...)` (semantic + keyword, alpha-weighted, filter push-down) over Weaviate with Ollama embeddings.
+[`GardenCoop Chapter 2`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/) — `[Embedding]` on `Produce` plus local ONNX and sqlite-vec ranks a natural-language query without an external service.

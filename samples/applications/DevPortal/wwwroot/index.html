@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Developer publishing portal · Koan</title>
+  <!--KOAN_OPENGRAPH-->
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Koan · DevPortal</p>
+      <h1>Publish the business intent, not the provider plumbing.</h1>
+      <p class="lede">Editors work locally. Approved articles move to a named publication channel. SQLite,
+        Mongo, and Postgres remain replaceable mechanics behind the same Entity expression.</p>
+    </header>
+
+    <section class="actions" aria-label="Run the publication story">
+      <button id="reset">1. Reset the editorial story</button>
+      <button id="preview" disabled>2. Publish to preview</button>
+      <button id="documents" disabled>Publish to documents</button>
+      <button id="relational" disabled>Publish to relational</button>
+    </section>
+
+    <section class="workspace">
+      <article class="result">
+        <div class="result-heading">
+          <div>
+            <p class="eyebrow">Live result</p>
+            <h2 id="result-title">Ready when you are</h2>
+          </div>
+          <span id="status">not run</span>
+        </div>
+        <pre id="output">Reset creates three editorial articles and approves two of them.</pre>
+      </article>
+
+      <aside>
+        <p class="eyebrow">The application language</p>
+        <pre><code>Article : Entity&lt;Article&gt;
+
+article.Approve();
+
+Article.Copy(article =&gt;
+    article.Status == Approved)
+  .To(source: channel)
+  .Run();
+
+ArticlesController
+  : EntityController&lt;Article&gt;</code></pre>
+        <p class="aside-note">Preview is a second local SQLite source. The optional Documents and Relational
+          channels use Mongo and Postgres only when you explicitly choose them.</p>
+        <a href="/.well-known/Koan/facts" target="_blank" rel="noreferrer">Inspect the runtime facts →</a>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const output = document.querySelector('#output');
+    const title = document.querySelector('#result-title');
+    const status = document.querySelector('#status');
+    const channels = ['preview', 'documents', 'relational'];
+
+    async function show(label, path, options) {
+      title.textContent = label;
+      status.textContent = 'running';
+      status.dataset.state = 'running';
+
+      try {
+        const response = await fetch(path, options);
+        const body = await response.json();
+        output.textContent = JSON.stringify(body, null, 2);
+        if (!response.ok) throw new Error(body.detail || body.title || response.statusText);
+        status.textContent = `${response.status} ${response.statusText}`;
+        status.dataset.state = 'ok';
+        return body;
+      } catch (error) {
+        status.textContent = 'request failed';
+        status.dataset.state = 'error';
+        if (!output.textContent) output.textContent = error.message;
+        throw error;
+      }
+    }
+
+    document.querySelector('#reset').addEventListener('click', async () => {
+      await show('Three drafts, two approved', '/api/publication/reset', { method: 'POST' });
+      channels.forEach(channel => document.querySelector(`#${channel}`).disabled = false);
+    });
+
+    channels.forEach(channel => {
+      document.querySelector(`#${channel}`).addEventListener('click', () =>
+        show(`Approved articles published to ${channel}`, `/api/publication/${channel}`, { method: 'POST' }));
+    });
+  </script>
+</body>
+</html>

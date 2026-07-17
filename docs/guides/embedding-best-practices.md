@@ -687,4 +687,4 @@ What's your budget?
 
 - [How-To: Embeddings](../archive/how-to/embeddings.md) - Comprehensive usage guide
 - [ADR AI-0020](../decisions/AI-0020-entity-first-ai-and-transaction-coordination.md) - Architecture decision
-- [Sample: S5.Recs](../../samples/S5.Recs) - Production example
+- [GardenCoop Chapter 2](../../samples/journeys/GardenCoop/02-LocalDiscovery/) - current local embedding and semantic-search example

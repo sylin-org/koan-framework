@@ -24,7 +24,7 @@ actually merged before starting (CHARTER "When blocked"). The consumable seam:
 `mongodb://…?replicaSet=…`; Koan's satellite (E06) resolves garden intents; Koan's trust
 satellite (E10) pins the pond CA and stamps `koi_id` claims. A pre-built Koan sample app
 exists to adapt (prefer an existing dogfood — check `KOAN/samples/` for the garden-coupled
-sample the satellite work moved, e.g. g1c1) rather than writing a new app.
+sample the satellite work moved, e.g. GardenCoop) rather than writing a new app.
 
 ## DECIDED
 

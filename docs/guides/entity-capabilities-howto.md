@@ -1272,9 +1272,8 @@ Here's where to go next:
 - **Partial updates?** → [Patch Capabilities](patch-capabilities-howto.md) (RFC 6902, merge-patch)
 
 **Real-world examples:**
-- `samples/S5.Recs` - Media recommendation engine with vector search
-- `samples/guides/g1c1.GardenCoop` - Multi-tenant task management
-- `samples/S14.AdapterBench` - Performance benchmarks across adapters
+- `samples/journeys/GardenCoop/01-GardenJournal` - sensor binding and watering-reminder automation
+- `samples/journeys/GardenCoop/02-LocalDiscovery` - the same application plus local Entity embedding and vector search
 
 **Keep exploring:**
 - Combine Flow + Jobs with transfers for safe large-scale migrations

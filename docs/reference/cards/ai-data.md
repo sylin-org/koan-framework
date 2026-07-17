@@ -69,4 +69,4 @@ Same adapter resolution and source routing as `EntityAi`; you just give up the c
 
 ## The sample that shows it
 
-[`samples/S7.Meridian`](../../../samples/S7.Meridian/README.md) — a document-intelligence workbench: `[MediaAnalysis]` extraction over uploaded PDFs/images, `[Embedding]` + hybrid vector search, and entity-as-context chat backed by an Ollama provider.
+[`GardenCoop Chapter 2`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/) — `[Embedding]` on `Produce` turns ordinary saves into a local ONNX + sqlite-vec semantic-search result.

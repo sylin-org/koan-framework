@@ -19,8 +19,8 @@ data, web, AI/vector, messaging, cache, media, jobs, orchestration, auth — beh
 model with **Reference = Intent** (a package reference auto-enables functionality) and multi-provider
 transparency. Front door: `Entity<T>`, `Data<T,K>`, `Vector<T>`, `[Embedding]`, `Job<T>`.
 
-The architect is the **sole implementor and sole consumer**, dogfooding sample apps (S5.Recs,
-S6.SnapVault, S14.AdapterBench, S16.PantryPal, g1c1.GardenCoop, …) to exercise framework surfaces.
+The architect is the **sole implementor and sole consumer**, dogfooding semantic applications such as
+GardenCoop, SnapVault, DevPortal, and OrderIntake to exercise framework surfaces.
 Breadth (~80 `src` projects, ~17 pillars) is the chief liability: every internal redesign ripples
 across tests/samples/docs/connectors and the coherence tax compounds. With **no external consumers**,
 this is the lowest-cost window to **shake the foundations so the patterns settle** — consolidating
@@ -65,8 +65,8 @@ A sole implementor with total freedom can refactor forever; the danger is **non-
   event-driven) can be built end-to-end without editing the framework, and the developer-facing
   concept count is ≤ a small N. **This is the v1 bar:** the proven surface, scaffolding removed,
   patterns settled — not feature-complete, but coherent and stable enough to stand as v1.
-- **Watch over-fitting:** sole-consumer bias means "meaningful" can quietly mean "meaningful to
-  S5/S6/S14" — keep the dogfood set diverse in shape.
+- **Watch over-fitting:** sole-consumer bias means "meaningful" can quietly mean "meaningful to the
+  current three applications" — keep the dogfood set diverse in shape.
 - **Keep the ADR/DDR trail** through the shake-up. Future-you is also a consumer who needs the *why*.
 
 ## 3. The consolidation map (surface audit, 2026-06)
@@ -129,8 +129,8 @@ projects" are correctly invisible plumbing.
   fold it). The win is *one push/pop idiom* (`CacheScopeAccessor` is manual/non-IDisposable, the odd
   one out), not merging genuinely-different payloads.
 - **#5 / Facet 4 deletion candidates (evidence-backed):** the 8 `Koan.AI.{Compute,Training,Agents,
-  Eval,Review,Models,Prompt,Orchestration}` sub-pillars have a **single consumer (`samples/S18.Prism`)**
-  — the sole-consumer over-fit the discipline warns about. Ceremony Abstractions/Core splits to merge:
+  Eval,Review,Models,Prompt,Orchestration}` sub-pillars had one speculative sample consumer; that application has
+  since left the maintained portfolio. The original sole-consumer over-fit remains the discipline warning. Ceremony Abstractions/Core splits to merge:
   `Rag`, `ServiceMesh`, `Recipe` (single implementer). Jobs + Scheduling are two execution engines
   (potential unified `Lane(...).OnCron(...)` — needs the ≥2-usage proof).
 - **Zero-risk now (non-project ghosts, not in the 108 csproj):** delete `Koan.Canon.Core`,
@@ -325,7 +325,7 @@ Each facet (1–4) runs:
     `DataCaps`/`VectorCaps` From/To/marker-fallback bridges (`Describe` is now a thin native-only resolver),
     removed the `Caps`/`WriteCapsImpl` wrappers + `Data<T>.QueryCaps`/`WriteCaps`; `Vector<T>.GetCapabilities`
     now returns `CapabilitySet`. The `/.well-known` aggregate + `Koan-Write-Capabilities` header re-render
-    token ids from `caps.All`. Migrated `S10.DevPortal` + the 4 test fakes; reconciled the active capability
+    token ids from `caps.All`. Migrated DevPortal + the 4 test fakes; reconciled the active capability
     guides/reference + added supersede banners to DATA-0002/0003 (historical ADRs left intact). Removed the
     vestigial `QueryCapabilities` field from Gen-1 `AdapterCapabilities`. Solution + samples green;
     Core 176, Data.Filtering 92, InMemory 32, Json 7, VectorAdapterSurface 26, Web AdapterSurface 56.

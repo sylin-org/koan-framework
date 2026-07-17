@@ -16,7 +16,7 @@ validation:
 
 > One-screen map of the sovereign floor — publishing a self-contained native Koan deployment (no .NET runtime, container, or external server required). The floor of the deployment-footprint ladder. Full detail: [nativeaot-howto.md](../../guides/nativeaot-howto.md) · decision: [ARCH-0093](../../decisions/ARCH-0093-nativeaot-substrate.md).
 
-**What it does** — When every capability an app uses is satisfied by an **in-process** resource (SQLite data, sqlite-vec vectors, ONNX embeddings, Channels messaging, Web/MCP), the app publishes a NativeAOT executable that boots the whole stack without an installed .NET runtime or external service. The deployment directory may also contain application assets and native connector libraries; NativeAOT does not imply one physical file. Reference = Intent still selects the adapters; the build does the AOT-specific wiring **for you**: referencing `Sylin.Koan.Core` emits `obj/koan.trimroots.xml` (an ILLink descriptor rooting every Koan module `preserve="all"`, off the same `@(ReferencePath)` filter as the composition lockfile and single-file manifest). That is mandatory under AOT — ILC starts reachability at your entry point, so a never-symbol-used Reference=Intent connector would otherwise be trimmed and its source-gen `[ModuleInitializer]` would never run (boot would discover no adapters). Proven on **win-x64 and linux-x64** with byte-identical results. Verified once, this stays falsifiable: the boot report lists every discovered module.
+**What it does** — An AOT-compatible Koan application publishes as a native executable that boots without an installed .NET runtime. The deployment directory may also contain application assets and native connector libraries; NativeAOT does not imply one physical file. Reference = Intent still selects adapters, and the build emits `obj/koan.trimroots.xml` to keep referenced Koan modules reachable. The current public sample proves the full GardenCoop Chapter 1 result on **win-x64**; other RIDs and native connectors remain separate claims until freshly exercised.
 
 ## The one canonical pattern
 
@@ -62,4 +62,4 @@ No AOT toolchain (or a connector that isn't AOT-clean yet)? Publish **single-fil
 
 ## The sample that shows it
 
-[`samples/guides/g1c2.GardenCoopEmbedded`](../../../samples/guides/g1c2.GardenCoopEmbedded) — one native application deployment that embeds → stores → semantically searches produce entirely in-process: `curl "…/api/produce/search?q=sweet red fruit"` → `200`, ranked hits, no container or external server.
+[`GardenCoop Chapter 1`](../../../samples/journeys/GardenCoop/01-GardenJournal/) — one native application deployment serving its dashboard, SQLite-backed garden API, lifecycle automation, and composition facts with no external service.

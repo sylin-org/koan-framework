@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: GardenCoop, exact inventory, S1.Web, S0, S10, g1c2, and public documentation passed; R10-07 S14 workload-lab rebuild active
+  scope: semantic portfolio and seven graduated outcomes passed; OrderIntake, CustomerCanon, and SnapVault remain explicit graduation work
 ---
 
 # R10 — Graduate the golden sample portfolio
@@ -110,14 +110,15 @@ R10 passes only when:
 
 | ID | Sample | Status | Meaningful proof |
 |---|---|---|---|
-| [R10-01](r10/R10-01-gardencoop.md) | g1c1.GardenCoop | passed | sensor reading → binding → dry reminder/recovery, HTTP/facts/dashboard, host lifecycle, NativeAOT runtime |
+| [R10-01](r10/R10-01-gardencoop.md) | GardenCoop 01 — GardenJournal | passed | sensor reading → binding → dry reminder/recovery, HTTP/facts/dashboard, host lifecycle, NativeAOT runtime |
 | [R10-02](r10/R10-02-portfolio-inventory.md) | portfolio inventory | passed | exact project/solution/docs inventory, explicit queue dispositions, S1.Web selected next |
-| [R10-03](r10/R10-03-s1-web.md) | S1.Web | passed | deterministic task graph → scalar/set/stream relationships, generated HTTP, cache/SQLite facts, dashboard |
-| [R10-04](r10/R10-04-s0-console-json.md) | S0.ConsoleJsonRepo | passed | standard console host → local JSON checklist → materialized query → clean process/facts |
-| [R10-05](r10/R10-05-s10-devportal.md) | S10.DevPortal | passed | local editorial draft → approved publication → named SQLite/Mongo/Postgres channel → transfer/facts proof |
-| [R10-06](r10/R10-06-g1c2-gardencoop-embedded.md) | g1c2.GardenCoopEmbedded | passed | local Produce save → ONNX embedding → sqlite-vec search → HTTP/facts/self-contained-folder proof |
-| [R10-07](r10/R10-07-s14-workload-lab.md) | S14.WorkloadLab | in-progress | bounded order intake → named source → verified durable receipt → capabilities/facts/correction proof |
+| [R10-03](r10/R10-03-s1-web.md) | TaskGraph | passed | deterministic task graph → scalar/set/stream relationships, generated HTTP, cache/SQLite facts, dashboard |
+| [R10-04](r10/R10-04-s0-console-json.md) | LocalChecklist | passed | standard console host → local JSON checklist → materialized query → clean process/facts |
+| [R10-05](r10/R10-05-s10-devportal.md) | DevPortal | passed | local editorial draft → approved publication → named SQLite/Mongo/Postgres channel → transfer/facts/social-card proof |
+| [R10-06](r10/R10-06-g1c2-gardencoop-embedded.md) | GardenCoop 02 — LocalDiscovery | passed | cumulative garden result → local Produce save → ONNX embedding → sqlite-vec search → HTTP/facts proof |
+| [R10-07](r10/R10-07-s14-workload-lab.md) | OrderIntake | in-progress | bounded order intake → named source → verified durable receipt → capabilities/facts/correction proof |
 | [R10-08](r10/R10-08-public-documentation.md) | public documentation | passed | greenfield front door/TOC → current product/package companions → enforced truth gate → FirstUse/product-surface proof |
+| [R10-09](r10/R10-09-semantic-sample-portfolio.md) | semantic sample portfolio | passed | intent-based taxonomy → accepted culls → cumulative GardenCoop → OpenGraph absorbed by DevPortal → focused retained evidence |
 
 Open later children only after the GardenCoop slice establishes the evidence template and a focused inventory
 selects the next highest-value maintained sample.

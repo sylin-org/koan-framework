@@ -1,0 +1,156 @@
+{
+  "schema": 2,
+  "app": {
+    "name": "GardenCoop.C02",
+    "koan": "0.18",
+    "tfm": "net10.0"
+  },
+  "modules": [
+    {
+      "id": "Koan.AI",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.AI.Connector.Onnx",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.AI.Contracts",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.AI.Prompt",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Cache.Abstractions",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Core",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Core.Adapters",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.AI",
+      "version": "0.19"
+    },
+    {
+      "id": "Koan.Data.Abstractions",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Data.Connector.Sqlite",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Core",
+      "version": "0.19"
+    },
+    {
+      "id": "Koan.Data.Relational",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Vector",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Data.Vector.Abstractions",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Vector.Connector.SqliteVec",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Media.Abstractions",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Orchestration.Abstractions",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Security.Trust",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Storage",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Web",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Web.Admin",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Web.Auth",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Web.Auth.Connector.Test",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Web.Auth.Services",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Web.OpenApi",
+      "version": "0.17"
+    }
+  ],
+  "directReferences": [
+    {
+      "kind": "project",
+      "id": "Koan.AI.Connector.Onnx"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.AI"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Connector.Sqlite"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Core"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Vector.Connector.SqliteVec"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Web"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Web.Admin"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Web.Auth"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Web.Auth.Connector.Test"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Web.Auth.Services"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Web.OpenApi"
+    }
+  ]
+}
