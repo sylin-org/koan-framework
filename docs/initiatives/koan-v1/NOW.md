@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: GardenCoop/inventory/S1/S0/S10/g1c2 passed; S14 capability/deployment discovery next; R08-05 paused
+  scope: GardenCoop/inventory/S1/S0/S10/g1c2 passed; S14 workload-lab rebuild assessed and active; R08-05 paused
 ---
 
 # Koan V1 reorganization current handoff
@@ -102,17 +102,17 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Open the S14.AdapterBench slice through focused discovery:
+Implement [R10-07](work-items/r10/R10-07-s14-workload-lab.md) as the assessed S14 replacement:
 
-1. derive the actual business/operator question its benchmark and durable-job surface should answer;
-2. inventory every provider, container, workload, metric, persistence, job, UI, and documentation claim against
-   current code and repeatable evidence;
-3. decide whether one coherent sample can honestly own both comparison and durable execution, or split/delete the
-   incidental half rather than preserve a feature showroom;
-4. choose the smallest local meaningful path, exact optional-provider prerequisites, one stable result, and the
-   framework/application/operator responsibility boundaries before editing;
-5. prefer central provider/job/measurement repairs over sample-local selectors, polling, or benchmark machinery;
-6. keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared but do not mutate remote settings,
+1. rename `S14.AdapterBench` to `S14.WorkloadLab` and replace the synthetic benchmark engine with one bounded,
+   verified order-intake job and durable receipt;
+2. keep the local SQLite target zero-infrastructure and express optional MongoDB, PostgreSQL, and Redis paths as
+   typed named sources with corrective failures;
+3. remove SignalR, provider rankings, direct database tuning, raw adapter switching, benchmark tiers/migrations,
+   application-container scaffolding, and unsupported performance advice;
+4. prove the dashboard, job lifecycle, exact cleanup, receipt, readiness/facts, unavailable-provider correction,
+   and clean host shutdown in one focused cumulative contract;
+5. keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared but do not mutate remote settings,
    push, tag, release, or publish until R10 reaches its portfolio boundary and authorization is renewed.
 
 Do not call the proven local feed a public upgrade. It is exact candidate evidence only.

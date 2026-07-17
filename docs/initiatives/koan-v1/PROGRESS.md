@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: GardenCoop, inventory, S1.Web, S0, S10, and g1c2 passed; S14 discovery next; R08-05 unauthorized
+  scope: GardenCoop, inventory, S1.Web, S0, S10, and g1c2 passed; R10-07 S14 workload-lab rebuild active; R08-05 unauthorized
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,6 +22,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T7B — maintained-sample graduation before public observation`
 - Active work item: [R10 — Graduate the golden sample portfolio](work-items/R10-golden-samples.md)
+- Active child: [R10-07 — Rebuild S14 as the provider workload lab](work-items/r10/R10-07-s14-workload-lab.md)
 - Most recently passed child: [R10-06 — Graduate g1c2.GardenCoopEmbedded](work-items/r10/R10-06-g1c2-gardencoop-embedded.md)
 - Pending release item: [R08-05 — Initial coherent public observation](work-items/r08/R08-05-initial-public-observation.md);
   its local contract is prepared, but R10 graduation and separate remote authorization come first
@@ -42,7 +43,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | passed | R06 | Codex · 2026-07-16 | R07-01 through [R07-18](work-items/r07/R07-18-business-channels.md) pass. Lifecycle, Events, Transport, cardinality, context, provider election, internal convergence, pointwise pillar operations, and inspectability now share explicit owners; stable heterogeneous Communication evolution remains PMC-023. |
 | R08 | [Make Koan V1 responsibly releasable](work-items/R08-v1-release-readiness.md) | T7B | pending | R09; R10 guards R08-05 | Codex · 2026-07-17 | R08-01 through R08-04 passed locally and R08-05 is prepared but unauthorized. R10 now graduates the maintained sample portfolio before public observation; no real publication occurred. |
 | R09 | [Compile the Semantic Composition Kernel](work-items/R09-semantic-composition-kernel.md) | T7A | passed | R07; protects R08-01 | Codex · 2026-07-17 | R09-01 through R09-09 passed. One retained module lifecycle, compiled semantic constitution, typed contribution/election mechanics, hard capability overlays, canonical evidence, contract isolation, and legacy-kernel deletion are proved. ARCH-0115 and ARCH-0116 record the result. |
-| R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | in-progress | R09; R08-04 | Codex · 2026-07-17 | GardenCoop, exact inventory, S1.Web, S0, S10, and g1c2 pass. All active samples must graduate or leave the portfolio; S14.AdapterBench is the next focused slice. |
+| R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | in-progress | R09; R08-04 | Codex · 2026-07-17 | GardenCoop, exact inventory, S1.Web, S0, S10, and g1c2 pass. R10-07 now rebuilds S14 as an honest named-source workload lab; all active samples must graduate or leave the portfolio. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -61,12 +62,13 @@ item should normally be `in-progress`.
 | R07 | passed | All 18 children and the parent acceptance pass. The zero-config local ring, direct provider intent, startup-declared business channels, pointwise capability law, canonical docs, focused packages, and truthful non-claims agree. |
 | R08 | pending | R08-01 through R08-04 passed locally. R08-05's preparation checklist is complete; R10 sample graduation, remote trust setup/public observation, and later real upgrade/rollback remain separate gates. Publication remains unauthorized. |
 | R09 | passed | All nine children pass. Functional assemblies use one module lifecycle, contracts are isolated without activation metadata, the duplicate bootstrap kernel is deleted, and focused source/package journeys remain meaningful. |
-| R10 | in-progress | R10-01 GardenCoop, R10-02 inventory, R10-03 S1.Web, R10-04 S0, R10-05 S10, and R10-06 g1c2 pass. S14 is next; every remaining active sample must graduate or leave the portfolio before V1. |
+| R10 | in-progress | R10-01 GardenCoop, R10-02 inventory, R10-03 S1.Web, R10-04 S0, R10-05 S10, and R10-06 g1c2 pass. R10-07 S14.WorkloadLab is active; every remaining active sample must graduate or leave the portfolio before V1. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-17 | R10-07 assessment | S14's unawaited host, accidental MongoDB default, SQLite-only tuning, hard-coded provider availability, synthetic tiers, pairwise migrations, SignalR and 1,271-line benchmark engine cannot support its objective-ranking and architecture-advice claims. | Rebuild it as `S14.WorkloadLab`: one bounded order-intake job, one typed named source per intent, one verified durable receipt, exact cleanup, local SQLite by default, and corrective optional infrastructure. Remove provider-winner claims and incidental machinery. |
 | 2026-07-17 | R10-06 closure | g1c2 now expresses one local semantic-search story through a four-line host, one embedded Entity, standard provider election, and one earned application module. Dogfood moved AI contribution compilation into `AiModule.Start`, made configured failures reject startup, closed vector repository lifetime at its cache owner, and removed an invalid single-file `Assembly.Location` diagnostic. Source, missing-model correction, focused tests, strict publish, and the deployed folder all agree. | Pass g1c2. Delete manual host/seeding, explicit provider hint, messaging/NativeAOT/one-exe claims, and unsupported RID promises. Preserve mixed AI adapter ownership as PMC-030. Select S14 next as the final capability/deployment sample. |
 | 2026-07-17 | R10-05 closure | S10 now maps local editorial approval to typed named publication channels through the existing Entity transfer grammar. Strict build and the cumulative local contract pass; unavailable Mongo returns a corrective 503 without changing the default; real Mongo and Postgres each receive the same two IDs idempotently with healthy readiness and complete facts. | Pass S10. Delete its demo/service/switching/benchmark/set-routing/random/frontend/helper/container scaffolds and false claims. Keep current transfer materialization explicit. Select g1c2 next because its in-process AI/vector sovereignty promise is coherent and narrower than S14's benchmark/job surface. |
 | 2026-07-17 | R10 mandate / R10-05 opening | The architect mandated that all active samples become golden examples. S10 was selected from the next three candidates because it teaches central provider composition, but its local path elects Mongo, abandons `RunAsync()` and exits, builds with two warnings, and advertises switching, fallback, set routing, benchmarking, deployment, and API behavior the code does not establish. | Make `assess`/`incubate` temporary states only. Rebuild S10 as one business story: local editorial drafts, approval, and idempotent publication to typed named channels using existing Entity transfer semantics. Keep SQLite zero-infrastructure; qualify and execute optional Mongo/Postgres; delete demo/provider/frontend/helper scaffolds and repair warnings at their owners. |

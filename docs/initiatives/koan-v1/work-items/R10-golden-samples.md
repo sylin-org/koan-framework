@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: GardenCoop, exact inventory, S1.Web, S0, S10, and g1c2 passed; S14 discovery next
+  scope: GardenCoop, exact inventory, S1.Web, S0, S10, and g1c2 passed; R10-07 S14 workload-lab rebuild active
 ---
 
 # R10 — Graduate the golden sample portfolio
@@ -116,6 +116,7 @@ R10 passes only when:
 | [R10-04](r10/R10-04-s0-console-json.md) | S0.ConsoleJsonRepo | passed | standard console host → local JSON checklist → materialized query → clean process/facts |
 | [R10-05](r10/R10-05-s10-devportal.md) | S10.DevPortal | passed | local editorial draft → approved publication → named SQLite/Mongo/Postgres channel → transfer/facts proof |
 | [R10-06](r10/R10-06-g1c2-gardencoop-embedded.md) | g1c2.GardenCoopEmbedded | passed | local Produce save → ONNX embedding → sqlite-vec search → HTTP/facts/self-contained-folder proof |
+| [R10-07](r10/R10-07-s14-workload-lab.md) | S14.WorkloadLab | in-progress | bounded order intake → named source → verified durable receipt → capabilities/facts/correction proof |
 
 Open later children only after the GardenCoop slice establishes the evidence template and a focused inventory
 selects the next highest-value maintained sample.
