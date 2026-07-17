@@ -87,6 +87,26 @@
       ]
     },
     {
+      "id": "canonical-entities",
+      "title": "Canonical Entity pipelines",
+      "summary": "Canon discovers Entity-first validation and convergence rules, compiles deterministic host-owned pipelines, and optionally projects them through inspectable HTTP surfaces.",
+      "maturity": "verified",
+      "packages": [
+        "Sylin.Koan.Canon",
+        "Sylin.Koan.Canon.Contracts",
+        "Sylin.Koan.Canon.Web"
+      ],
+      "documentation": [
+        "docs/guides/canon-capabilities-howto.md",
+        "docs/reference/canon/index.md"
+      ],
+      "evidence": [
+        "samples/applications/CustomerCanon",
+        "tests/Suites/Canon",
+        "tests/Suites/Samples/Koan.Samples.CustomerCanon.Tests"
+      ]
+    },
+    {
       "id": "entity-communication",
       "title": "Entity Events and Transport",
       "summary": "Entities and entity sequences express local-first events and transport intent with pluggable routing.",
@@ -614,34 +634,56 @@
       "claims": []
     },
     {
-      "packageId": "Sylin.Koan.Canon.Domain",
+      "packageId": "Sylin.Koan.Canon",
       "shape": "library",
-      "description": "Domain primitives, metadata records, and runtime contracts for the Koan Canonization engine.",
+      "description": "Functional Koan Canon runtime with automatic model and pipeline composition.",
+      "targetFrameworks": [],
+      "dependencies": [
+        "Sylin.Koan.Canon.Contracts",
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Core"
+      ],
+      "readme": "src/Koan.Canon/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Canon/TECHNICAL.md",
+      "claims": [
+        "canonical-entities"
+      ]
+    },
+    {
+      "packageId": "Sylin.Koan.Canon.Contracts",
+      "shape": "library",
+      "description": "Inert Entity, metadata, pipeline, persistence, and runtime contracts for Koan Canon.",
       "targetFrameworks": [],
       "dependencies": [
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Core"
       ],
-      "readme": "src/Koan.Canon.Domain/README.md",
+      "readme": "src/Koan.Canon.Contracts/README.md",
       "ownsReadme": true,
-      "technicalDocumentation": "src/Koan.Canon.Domain/TECHNICAL.md",
-      "claims": []
+      "technicalDocumentation": "src/Koan.Canon.Contracts/TECHNICAL.md",
+      "claims": [
+        "canonical-entities"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Canon.Web",
       "shape": "library",
-      "description": "ASP.NET Core surfaces for Koan Canon built on the new domain runtime.",
+      "description": "Generated ASP.NET Core and inspection surfaces for discovered Koan Canon models.",
       "targetFrameworks": [],
       "dependencies": [
-        "Sylin.Koan.Canon.Domain",
+        "Sylin.Koan.Canon",
+        "Sylin.Koan.Canon.Contracts",
         "Sylin.Koan.Core",
         "Sylin.Koan.Web",
         "Sylin.Koan.Web.Extensions"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
-      "claims": []
+      "readme": "src/Koan.Canon.Web/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Canon.Web/TECHNICAL.md",
+      "claims": [
+        "canonical-entities"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Classification",
@@ -1103,6 +1145,7 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Vector",
         "Sylin.Koan.Data.Vector.Abstractions",
         "Sylin.Koan.Orchestration.Abstractions"
       ],
@@ -1120,6 +1163,7 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Vector",
         "Sylin.Koan.Data.Vector.Abstractions",
         "Sylin.Koan.Orchestration.Abstractions"
       ],
@@ -1153,6 +1197,7 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Vector",
         "Sylin.Koan.Data.Vector.Abstractions",
         "Sylin.Koan.Orchestration.Abstractions",
         "Sylin.Koan.ZenGarden.Core"

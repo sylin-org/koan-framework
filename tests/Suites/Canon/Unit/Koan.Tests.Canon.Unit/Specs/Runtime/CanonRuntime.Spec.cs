@@ -87,6 +87,60 @@ public sealed class CanonRuntimeSpec
     }
 
     [Fact]
+    public async Task Failed_phase_stops_before_aggregation_and_canonical_persistence()
+    {
+        var persistence = new InMemoryCanonPersistence();
+        var builder = new CanonRuntimeBuilder()
+            .UsePersistence(persistence)
+            .UseAuditSink(new NoopAuditSink());
+        builder.ConfigurePipeline<ContactCanon>(pipeline =>
+            pipeline.AddStep(CanonPipelinePhase.Validation, (context, cancellationToken) =>
+                ValueTask.FromResult<CanonizationEvent?>(new CanonizationEvent
+                {
+                    Phase = CanonPipelinePhase.Validation,
+                    StageStatus = CanonStageStatus.Failed,
+                    CanonState = context.Entity.State,
+                    Message = "Customer validation failed",
+                    Detail = "Email is required"
+                })));
+
+        var result = await builder.Build().Canonize(new ContactCanon { DisplayName = "Invalid" });
+
+        result.Outcome.Should().Be(CanonizationOutcome.Failed);
+        result.DistributionSkipped.Should().BeTrue();
+        result.Events.Should().ContainSingle(evt =>
+            evt.Phase == CanonPipelinePhase.Validation && evt.Detail == "Email is required");
+        persistence.CanonicalEntities.Should().BeEmpty();
+        persistence.FindIndex(typeof(ContactCanon).FullName!, "Email=").Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Failed_late_phase_discards_pending_index_and_canonical_persistence()
+    {
+        var persistence = new InMemoryCanonPersistence();
+        var builder = new CanonRuntimeBuilder()
+            .UsePersistence(persistence)
+            .UseAuditSink(new NoopAuditSink());
+        builder.ConfigurePipeline<ContactCanon>(pipeline =>
+            pipeline.AddStep(CanonPipelinePhase.Policy, (context, cancellationToken) =>
+                ValueTask.FromResult<CanonizationEvent?>(new CanonizationEvent
+                {
+                    Phase = CanonPipelinePhase.Policy,
+                    StageStatus = CanonStageStatus.Failed,
+                    CanonState = context.Entity.State,
+                    Message = "Customer policy failed"
+                })));
+
+        const string email = "late-failure@example.com";
+        var result = await builder.Build().Canonize(new ContactCanon { Email = email, DisplayName = "Invalid" });
+
+        result.Outcome.Should().Be(CanonizationOutcome.Failed);
+        result.Events.Select(static item => item.Phase).Should().Contain(CanonPipelinePhase.Aggregation);
+        persistence.CanonicalEntities.Should().BeEmpty();
+        persistence.FindIndex(typeof(ContactCanon).FullName!, $"Email={email}").Should().BeNull();
+    }
+
+    [Fact]
     public async Task Rebuild_views_loads_from_the_configured_persistence()
     {
         var (persistence, runtime) = BuildRuntime();

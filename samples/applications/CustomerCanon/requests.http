@@ -1,0 +1,34 @@
+@baseUrl = http://localhost:5087
+
+### Readiness
+GET {{baseUrl}}/health/ready
+
+### Inspect the discovered Canon model and pipeline
+GET {{baseUrl}}/api/canon/models
+
+### Canonize a deliberately messy customer; repeat to observe the same canonical id
+POST {{baseUrl}}/api/canon/customer
+Content-Type: application/json
+X-Canon-Origin: customer-import
+
+{
+  "email": " Alice@Example.COM ",
+  "phone": "+1 (212) 555-0123",
+  "firstName": " Alice ",
+  "lastName": " Example ",
+  "country": "us",
+  "language": "EN"
+}
+
+### Reject an invalid arrival with 422; it is not persisted
+POST {{baseUrl}}/api/canon/customer
+Content-Type: application/json
+
+{
+  "email": "not-an-email",
+  "firstName": "Invalid",
+  "lastName": "Arrival"
+}
+
+### Inspect resolved composition
+GET {{baseUrl}}/.well-known/Koan/facts

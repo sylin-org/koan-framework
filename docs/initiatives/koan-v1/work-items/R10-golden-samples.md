@@ -8,14 +8,14 @@ last_updated: 2026-07-17
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
-  status: in-progress
-  scope: semantic portfolio and nine graduated outcomes passed; CustomerCanon remains explicit graduation work
+  status: passed
+  scope: ten published applications strict-build clean; eight sample suites 45 passed, 2 intentional skips
 ---
 
 # R10 — Graduate the golden sample portfolio
 
 - Tranche: `T7B — V1 release readiness / maintained-sample graduation`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: passed R09 and R08-04
 - Guards: R08-05 initial coherent public observation
 - Owner: maintained sample truth, application ergonomics, executable business proof, and curriculum order
@@ -120,6 +120,7 @@ R10 passes only when:
 | [R10-08](r10/R10-08-public-documentation.md) | public documentation | passed | greenfield front door/TOC → current product/package companions → enforced truth gate → FirstUse/product-surface proof |
 | [R10-09](r10/R10-09-semantic-sample-portfolio.md) | semantic sample portfolio | passed | intent-based taxonomy → accepted culls → cumulative GardenCoop → OpenGraph absorbed by DevPortal → focused retained evidence |
 | [R10-10](r10/R10-10-snapvault.md) | SnapVault | passed | local photo upload → durable ingest → event/media → scoped client sharing → readiness/facts proof |
+| [R10-11](r10/R10-11-customer-canon.md) | CustomerCanon | passed | messy customer arrival → validation/convergence/enrichment → canonical record or corrective rejection |
 
 Open later children only after the GardenCoop slice establishes the evidence template and a focused inventory
 selects the next highest-value maintained sample.
@@ -131,3 +132,12 @@ selects the next highest-value maintained sample.
 - Stop if one generic test abstraction erases sample-specific meaning.
 - Stop if a deployment claim cannot be executed responsibly; qualify or remove it instead.
 - Stop before R08-05 publication until the graduated portfolio boundary is green.
+
+## Closure
+
+All eleven children pass. The public curriculum contains ten runnable applications: FirstUse,
+GoldenJourney, LocalChecklist, TaskGraph, two cumulative GardenCoop chapters, DevPortal, OrderIntake,
+SnapVault, and CustomerCanon. Every sample has a meaningful result, current instructions, strict source
+truth, and proportionate executable evidence. The final portfolio boundary built all ten with zero
+warnings/errors and passed the eight sample-owned suites with 45 passes, 2 intentional TaskGraph skips,
+and no failures. R10 no longer blocks the requested package-polish review or the later R08-05 candidate.

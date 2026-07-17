@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Koan.Canon.Domain.Runtime;
+using Koan.Canon;
 using Koan.Canon.Web.Catalog;
 using Koan.Canon.Web.Infrastructure;
 using Microsoft.AspNetCore.Mvc;

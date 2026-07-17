@@ -1,9 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using Koan.Canon.Domain.Annotations;
-using Koan.Canon.Domain.Metadata;
-using Koan.Canon.Domain.Runtime;
+using Koan.Canon;
 using Koan.Canon.Web.Catalog;
 using Koan.Canon.Web.Infrastructure;
 using Microsoft.AspNetCore.Mvc;

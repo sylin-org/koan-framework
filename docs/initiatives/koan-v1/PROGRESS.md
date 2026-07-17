@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: semantic portfolio and nine graduated outcomes passed; CustomerCanon assessment next; R08-05 unauthorized
+  scope: R10 golden sample portfolio passed; package polish requested before exact R08-05 candidate
 ---
 
 # Koan V1 Reorganization Progress
@@ -20,10 +20,10 @@ or completes a work item. The roadmap describes order; it does not report progre
 ## Initiative state
 
 - Overall: `active`
-- Current tranche: `T7B — maintained-sample graduation before public observation`
-- Active work item: [R10 — Graduate the golden sample portfolio](work-items/R10-golden-samples.md)
-- Active child: CustomerCanon graduation assessment (card opens after focused discovery)
-- Most recently passed child: [R10-10 — Graduate SnapVault as the local-first studio proof](work-items/r10/R10-10-snapvault.md)
+- Current tranche: `T7B — package polish before public observation`
+- Active work item: none; pause at the architect-requested package review gate
+- Active child: none
+- Most recently passed child: [R10-11 — Rebuild CustomerCanon around the automatic Canon pillar](work-items/r10/R10-11-customer-canon.md)
 - Pending release item: [R08-05 — Initial coherent public observation](work-items/r08/R08-05-initial-public-observation.md);
   its local contract is prepared, but R10 graduation and separate remote authorization come first
 - V1 readiness: `not ready`; public observation, later upgrade/rollback proof,
@@ -43,7 +43,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | passed | R06 | Codex · 2026-07-16 | R07-01 through [R07-18](work-items/r07/R07-18-business-channels.md) pass. Lifecycle, Events, Transport, cardinality, context, provider election, internal convergence, pointwise pillar operations, and inspectability now share explicit owners; stable heterogeneous Communication evolution remains PMC-023. |
 | R08 | [Make Koan V1 responsibly releasable](work-items/R08-v1-release-readiness.md) | T7B | pending | R09; R10 guards R08-05 | Codex · 2026-07-17 | R08-01 through R08-04 passed locally and R08-05 is prepared but unauthorized. R10 now graduates the maintained sample portfolio before public observation; no real publication occurred. |
 | R09 | [Compile the Semantic Composition Kernel](work-items/R09-semantic-composition-kernel.md) | T7A | passed | R07; protects R08-01 | Codex · 2026-07-17 | R09-01 through R09-09 passed. One retained module lifecycle, compiled semantic constitution, typed contribution/election mechanics, hard capability overlays, canonical evidence, contract isolation, and legacy-kernel deletion are proved. ARCH-0115 and ARCH-0116 record the result. |
-| R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | in-progress | R09; R08-04 | Codex · 2026-07-17 | Nine outcomes and current documentation pass. SnapVault is graduated as the local-first studio/client proof; CustomerCanon remains. |
+| R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -62,12 +62,14 @@ item should normally be `in-progress`.
 | R07 | passed | All 18 children and the parent acceptance pass. The zero-config local ring, direct provider intent, startup-declared business channels, pointwise capability law, canonical docs, focused packages, and truthful non-claims agree. |
 | R08 | pending | R08-01 through R08-04 passed locally. R08-05's preparation checklist is complete; R10 sample graduation, remote trust setup/public observation, and later real upgrade/rollback remain separate gates. Publication remains unauthorized. |
 | R09 | passed | All nine children pass. Functional assemblies use one module lifecycle, contracts are isolated without activation metadata, the duplicate bootstrap kernel is deleted, and focused source/package journeys remain meaningful. |
-| R10 | in-progress | R10-01 through R10-10 pass. CustomerCanon remains explicit application-graduation work before V1. |
+| R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-17 | R10-11 / R10 closure | Canon's fused Domain/Web activation and CustomerCanon's registrar/module/controller ceremony contradicted Reference = Intent; failed stages could persist canonical state and identity indexes. The final portfolio boundary also exposed invalid XML documentation references in OpenGraph and Tenancy. | Split inert Contracts from one functional Canon module and optional Web projection; compile generated contributor/model discovery once per host; defer canonical/index commits until all phases succeed; graduate CustomerCanon as a four-line local-first application. Canon proof passes 37/37 + 6/6 + bootstrap/sample 1/1 each. All ten public samples strict-build clean and eight suites pass 45 with 2 intentional skips. Mark R10 passed and stop at the architect-requested package-polish gate before R08-05. |
+| 2026-07-17 | R10-11 opening | CustomerCanon builds but has no focused contract; a real run reports healthy readiness while both model discovery and the advertised customer POST return 500. Canon contracts and runtime are fused, Web accidentally owns domain activation and a bespoke AppDomain scan, and the application must restate pipeline registration through a module and registrar. Failed contributor events also do not stop later phases or canonical persistence. | Split inert Canon contracts from one functional Canon module and optional Web projection; use registry-backed model/contributor discovery; make failed stages corrective at the runtime/Web chokepoints; rebuild the sample as four-line host + canonical Customer + two rules; prove success, identity convergence, failed non-persistence, facts/readiness, and clean stop. |
 | 2026-07-17 | R10-10 closure | SnapVault's external-first perimeter made a healthy local application wait roughly a minute and report unused mechanisms as dependencies. Its domain suite was valuable, but did not prove the checked-in HTTP first use. | Make SQLite/local storage the zero-infrastructure default; make AI/vector providers opt-in and readiness participation-owned; consolidate all 34 contracts onto one real host; prove multipart upload, durable ingest, event/media, readiness/facts, and clean stop; remove stale launchers, interfaces, formats, and migration narration. SnapVault graduates. Assess CustomerCanon next. |
 | 2026-07-17 | R10-10 opening | SnapVault's real `AddKoan()` suite passes 33/33 and preserves valuable studio/client, tenancy, job, media, vector, and blob invariants. Its public perimeter is not graduate: MongoDB is the implicit default, there is no standard Development launch profile, the Docker launcher assumes external Host Moss, the README has no meaningful first result, and Qdrant/Weaviate/Milvus health is critical merely by reference even when Vector is unused. | Keep the domain core; rebuild the perimeter around SQLite/local storage and one HTTP ingest/share result. First centralize Vector readiness on host-owned provider participation, leaving connector contributors as thin probes. Remove unsupported deployment paths and historical phase narration; graduate only after command, facts, health, proof, and clean stop agree. |
 | 2026-07-17 | R10-07 closure | The rebuilt local path initially exposed a framework inconsistency: merely referencing/configuring Redis, MongoDB, and PostgreSQL gated readiness, Mongo initialized eagerly, and Redis named sources ignored their endpoint. The application itself also needed a canonical provider receipt and cleanup covering partial writes. | Centralize Data health on default/runtime participation; make Mongo lazy, share source-aware probes, pool Redis by named endpoint, and keep adapters thin. Graduate OrderIntake as one bounded Entity job with exact cleanup, durable receipt, corrective optional sources, and focused 1/1 proof. |

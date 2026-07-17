@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: semantic portfolio and nine graduated outcomes passed; CustomerCanon assessment next; R08-05 paused
+  scope: R10 portfolio passed; package polish requested before exact R08-05 candidate
 ---
 
 # Koan V1 reorganization current handoff
@@ -40,8 +40,8 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - Focused evidence is green: 28 Core redaction/discovery cells, one repository bypass-policy cell, and
   17 affected connector builds. Release certification was intentionally not run.
 - [R08-03 — Canonical product surface](work-items/r08/R08-03-canonical-product-surface.md) is passed.
-  One compiler derives 108 package shapes/platforms/dependencies from standard project facts and joins
-  them to 14 conservative claims. Thirty-seven missing owned READMEs and 88 unassessed packages remain
+  One compiler now derives 109 package shapes/platforms/dependencies from standard project facts and joins
+  them to 15 conservative claims. Thirty-six missing owned READMEs and 86 unassessed packages remain
   visible; no support promotion is implied. PMC-010 is resolved.
 - The obsolete `KoanPackageKind` taxonomy and release-manifest field are deleted. Checked-in JSON and
   Markdown projections byte-match regeneration; focused compiler/graph/planner/release-bundle proof passes 43/43.
@@ -55,7 +55,7 @@ Replace this file at every handoff. It is a restart point, not a diary.
   Communication/health startup, graceful disposal, and truthful startup evidence share one lifecycle. Focused
   owner/consumer proof passes 8/8 and a source-equivalent console completes Entity work without either false
   collection failure. Exact package repetition remains a next-candidate assertion, not a second 108-package run.
-- [R10 — Graduate the golden sample portfolio](work-items/R10-golden-samples.md) is active by architect mandate.
+- [R10 — Graduate the golden sample portfolio](work-items/R10-golden-samples.md) is passed by architect mandate.
   Every maintained sample must become an executable golden example of current Koan semantics and .NET practice;
   solution compilation alone is insufficient. [R10-01](work-items/r10/R10-01-gardencoop.md) now passes and the
   [golden-sample standard](work-items/r10/GOLDEN-SAMPLE-GRADUATION.md) records its reusable evidence bar.
@@ -91,12 +91,19 @@ Replace this file at every handoff. It is a restart point, not a diary.
   gone. GardenCoop Chapter 2 is a strict runnable superset of Chapter 1, while OpenGraph's automatic web-pipeline
   contribution lets DevPortal own the Article social-card story without changing its four-line host.
 - Focused retained evidence is green: OpenGraph 39/39, DevPortal 1/1, GardenCoop C1 1/1, GardenCoop C2 1/1,
-  LocalChecklist 1/1, TaskGraph 5 pass plus 2 intentional skips, OrderIntake 1/1, and SnapVault 34/34. CustomerCanon
-  retains a zero-warning build. The public truth gate passes across 174 current files and 36 navigation targets.
+  LocalChecklist 1/1, TaskGraph 5 pass plus 2 intentional skips, OrderIntake 1/1, SnapVault 34/34, and CustomerCanon
+  1/1. The public truth gate passes across 178 current files and 36 navigation targets.
 - [R10-10](work-items/r10/R10-10-snapvault.md) passes. SnapVault is a local-first photo studio with SQLite/local
   storage, durable HTTP ingest, media serving, scoped client sharing, optional AI/vector enrichment, and
   participation-owned readiness. Its strict build, 34/34 focused suite, manual startup, facts, docs, and clean stop
-  agree. `CustomerCanon` remains visible application dogfood and must still graduate or be removed.
+  agree.
+- [R10-11](work-items/r10/R10-11-customer-canon.md) passes. Canon is split into inert Contracts, one functional
+  module, and optional Web projection; generated registry discovery compiles host-owned pipelines automatically.
+  Failed/parked phases stop before canonical/index commit. CustomerCanon is a four-line local-first host with one
+  canonical Entity, one policy owner, two thin phase adapters, generated HTTP/inspection, and a cumulative host proof.
+- The final R10 boundary builds all ten published applications with zero warnings/errors. Eight sample-owned suites
+  pass 45 tests with 2 intentional TaskGraph skips and no failures. Public truth passes across 178 current files and
+  36 navigation targets; the product surface contains 15 claims and 109 packages.
 - No package, tag, GitHub Release, branch, or remote configuration was published or mutated. Initial coherent
   public observation and a later real public-to-candidate upgrade/rollback remain separate gates.
 
@@ -119,15 +126,13 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Assess `CustomerCanon` using the same evidence-first graduate-or-remove standard:
+Perform the architect-requested package-polish review before creating the exact R08-05 candidate. Assess package
+names, responsibility boundaries, descriptions, tags, dependency graphs, owned README/TECHNICAL pairs, installation
+paths, generated product-surface presentation, and retirement/rename consequences. Make any approved corrections
+before the one final release-certification run so certified artifacts are not invalidated afterward.
 
-1. state its one business result and inspect the shortest checked-in path, providers, facts, and focused proof;
-2. identify framework defects and coalescence opportunities before changing application code;
-3. preserve only business surfaces that earn their complexity; rebuild or remove unsupported perimeter claims;
-4. graduate it only when code, command, result, proof, documentation, readiness, and clean stop agree;
-5. then run the single appropriate R10 portfolio boundary and decide whether R10 can pass;
-6. keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared but do not mutate remote settings,
-   push, tag, release, or publish until R10 reaches its portfolio boundary and authorization is renewed.
+Keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared. Do not mutate remote settings, push,
+tag, release, or publish until package polish is accepted and separate remote-operation authorization is renewed.
 
 Do not call the proven local feed a public upgrade. It is exact candidate evidence only.
 

@@ -126,6 +126,15 @@
       "packages": ["Sylin.Koan.Observability"],
       "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
       "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Observability"]
+    },
+    {
+      "id": "canonical-entities",
+      "title": "Canonical Entity pipelines",
+      "summary": "Canon discovers Entity-first validation and convergence rules, compiles deterministic host-owned pipelines, and optionally projects them through inspectable HTTP surfaces.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Canon.Contracts", "Sylin.Koan.Canon", "Sylin.Koan.Canon.Web"],
+      "documentation": ["docs/reference/canon/index.md", "docs/guides/canon-capabilities-howto.md"],
+      "evidence": ["tests/Suites/Canon", "tests/Suites/Samples/Koan.Samples.CustomerCanon.Tests", "samples/applications/CustomerCanon"]
     }
   ]
 }

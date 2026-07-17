@@ -1,12 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Koan.Canon.Domain.Metadata;
-using Koan.Canon.Domain.Model;
-using Koan.Canon.Domain.Runtime;
+using Koan.Canon;
 using Koan.Canon.Web.Catalog;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -48,7 +46,13 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
 
         var options = BuildOptionsFromRequest();
         var result = await _runtime.Canonize(model, options, ct);
-        return Ok(CanonizationResponse<TModel>.FromResult(result));
+        var response = CanonizationResponse<TModel>.FromResult(result);
+        return result.Outcome switch
+        {
+            CanonizationOutcome.Failed => UnprocessableEntity(response),
+            CanonizationOutcome.Parked => Accepted(response),
+            _ => Ok(response)
+        };
     }
 
     [HttpPost("bulk")]

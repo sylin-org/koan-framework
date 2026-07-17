@@ -1,10 +1,5 @@
 global using AwesomeAssertions;
-global using Koan.Canon.Domain.Annotations;
-global using Koan.Canon.Domain.Audit;
-global using Koan.Canon.Domain.Metadata;
-global using Koan.Canon.Domain.Model;
-global using Koan.Canon.Domain.Runtime;
-global using Koan.Canon.Domain.Optimization;
+global using global::Koan.Canon;
 global using System;
 global using System.Collections.Generic;
 global using System.Linq;

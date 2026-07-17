@@ -22,7 +22,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Canon.Domain\Koan.Canon.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Canon.Contracts\Koan.Canon.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Canon\Koan.Canon.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
   </ItemGroup>

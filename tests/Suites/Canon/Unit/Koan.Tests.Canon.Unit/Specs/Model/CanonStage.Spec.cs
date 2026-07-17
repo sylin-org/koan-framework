@@ -1,4 +1,4 @@
-using Koan.Canon.Domain.Model;
+using Koan.Canon;
 
 namespace Koan.Tests.Canon.Unit.Specs.Model;
 

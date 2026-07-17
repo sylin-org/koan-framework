@@ -4,8 +4,8 @@ domain: framework
 title: "Koan Capability Map"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-09-29
-framework_version: v0.6.3
+last_updated: 2026-07-17
+framework_version: pre-1.0
 validation:
   date_last_tested: 2025-09-29
   status: verified
@@ -167,16 +167,17 @@ The remainder of this document drills into each layer and highlights first-class
 
 ---
 
-## 8. Domain pipelines & canonical data flows
+## 8. Canonical entities
 
-**Packages**: `Koan.Canon.Core`, `Koan.Canon.Web`, `Koan.Canon.Runtime.Connector.Dapr`, `Koan.Canon.Connector.RabbitMq`, `Koan.Mcp`
+**Packages**: `Koan.Canon.Contracts`, `Koan.Canon`, `Koan.Canon.Web`
 
-- Canon (Canonical data pipeline) modules standardize how domain models flow through stages, projections, and lineage tracking. The runtime builds on messaging, data, and storage primitives to deliver end-to-end, auditable pipelines.
-- `Koan.Canon.Runtime.Connector.Dapr` lights up Dapr-based execution models, and `Koan.Canon.Web` exposes surface APIs for pipeline control.
-- `Koan.Canon.Connector.RabbitMq` connects Canon flows to the messaging layer.
-- `Koan.Mcp` provides Model Context Protocol integration if you need MCP-based agent connectivity.
+- `Koan.Canon.Contracts` is inert vocabulary for models, metadata, contributors, persistence, and audit.
+- `Koan.Canon` activates the runtime through `AddKoan()`, discovers contributors, and compiles one
+  deterministic pipeline per canonical Entity and host.
+- `Koan.Canon.Web` adds generated HTTP and inspection surfaces for discovered models.
 
-**Developer benefit**: When your domain needs complex pipelines or projections, the Canon stack gives you a tested blueprint built on top of the core Koan patterns.
+**Developer benefit**: Define canonical identity and business rules; Koan owns composition, convergence,
+persistence, and optional Web projection without controllers or registrars.
 
 ---
 
@@ -186,7 +187,8 @@ The remainder of this document drills into each layer and highlights first-class
 2. **Add async & background work** when you need eventual consistency. `Koan.Messaging.*` and the Jobs ledger (JOBS-0005) reuse the data abstractions for persistence and the core runtime for configuration and logging. _(For lightweight in-proc cron/interval scheduling, reach for `Sylin.Agyo.Scheduling` from agyo-tools.)_
 3. **Introduce AI or media** to augment your domain. Use the same entity-first approach to persist metadata while AI adapters handle external intelligence.
 4. **Secure & operationalise** by layering orchestration (`Koan.Orchestration.*`), plus the agyo-tools helpers where needed — secrets (`Sylin.Agyo.Secrets.*`) and the observability module (`Sylin.Agyo.Observability`). These read the same configuration sources and emit manifest metadata consumed by the CLI.
-5. **scale the domain** with Canon or Flow once you need canonical projections, multi-stage pipelines, or Dapr-hosted workers.
+5. **Add Canon** when imperfect or duplicate arrivals must converge into trusted Entities through explicit
+   validation, aggregation, policy, projection, and distribution phases.
 
 The map is intentionally composable: everything hinges on the core runtime’s auto-registration, and every module exposes typed options and constants to align with Koan’s engineering guardrails.
 

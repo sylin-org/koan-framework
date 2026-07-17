@@ -11,7 +11,11 @@
       "version": "0.18"
     },
     {
-      "id": "Koan.Canon.Domain",
+      "id": "Koan.Canon",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Canon.Contracts",
       "version": "0.18"
     },
     {
@@ -39,10 +43,6 @@
       "version": "0.19"
     },
     {
-      "id": "Koan.Observability",
-      "version": "0.17"
-    },
-    {
       "id": "Koan.Orchestration.Abstractions",
       "version": "0.17"
     },
@@ -53,44 +53,16 @@
     {
       "id": "Koan.Web.Extensions",
       "version": "0.17"
-    },
-    {
-      "id": "Koan.Web.OpenApi",
-      "version": "0.17"
     }
   ],
   "directReferences": [
-    {
-      "kind": "project",
-      "id": "Koan.Canon.Domain"
-    },
     {
       "kind": "project",
       "id": "Koan.Canon.Web"
     },
     {
       "kind": "project",
-      "id": "Koan.Core"
-    },
-    {
-      "kind": "project",
       "id": "Koan.Data.Connector.Json"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Data.Core"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Observability"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Web"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Web.OpenApi"
     }
   ]
 }

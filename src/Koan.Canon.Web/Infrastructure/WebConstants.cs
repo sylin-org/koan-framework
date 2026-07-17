@@ -1,4 +1,4 @@
-﻿namespace Koan.Canon.Web.Infrastructure;
+namespace Koan.Canon.Web.Infrastructure;
 
 public static class WebConstants
 {

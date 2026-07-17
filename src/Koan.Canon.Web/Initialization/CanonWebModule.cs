@@ -1,21 +1,19 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Koan.Canon.Domain.Model;
-using Koan.Canon.Domain.Runtime;
+using Koan.Canon;
 using Koan.Canon.Web.Catalog;
 using Koan.Canon.Web.Controllers;
 using Koan.Canon.Web.Infrastructure;
 using Koan.Core;
-using Koan.Canon.Domain.Pillars;
+using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Hosting.Registry;
 using Koan.Web.Extensions;
 using Koan.Web.Controllers;
 using Koan.Web.Extensions.GenericControllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Canon.Web.Initialization;
 
@@ -25,9 +23,7 @@ public sealed class CanonWebModule : KoanModule
 
     public override void Register(IServiceCollection services)
     {
-        FlowPillarManifest.EnsureRegistered();
         services.AddKoanControllersFrom<CanonWebModule>();
-        services.AddCanonRuntime();
 
         var modelDescriptors = DiscoverDescriptors(includeValueObjects: true).ToList();
         services.AddSingleton<ICanonModelCatalog>(_ => new CanonModelCatalog(modelDescriptors));
@@ -83,21 +79,20 @@ public sealed class CanonWebModule : KoanModule
     private static IEnumerable<CanonModelDescriptor> DiscoverDescriptors(bool includeValueObjects)
     {
         var descriptors = new List<CanonModelDescriptor>();
-        foreach (var modelType in DiscoverTypes(typeof(CanonEntity<>)))
+        foreach (var modelType in KoanRegistry.GetDiscoveredImplementors(typeof(ICanonModel)))
         {
-            var slug = ToSlug(modelType.Name);
-            var route = $"{WebConstants.Routes.CanonPrefix}/{slug}";
-            descriptors.Add(new CanonModelDescriptor(modelType, slug, modelType.Name, route, isValueObject: false));
-        }
-
-        if (includeValueObjects)
-        {
-            foreach (var valueObjectType in DiscoverTypes(typeof(CanonValueObject<>)))
+            var isEntity = IsClosedSubclass(modelType, typeof(CanonEntity<>));
+            var isValueObject = IsClosedSubclass(modelType, typeof(CanonValueObject<>));
+            if (!isEntity && (!includeValueObjects || !isValueObject))
             {
-                var slug = ToSlug(valueObjectType.Name);
-                var route = $"{WebConstants.Routes.ValueObjectPrefix}/{slug}";
-                descriptors.Add(new CanonModelDescriptor(valueObjectType, slug, valueObjectType.Name, route, isValueObject: true));
+                continue;
             }
+
+            var slug = ToSlug(modelType.Name);
+            var route = isValueObject
+                ? $"{WebConstants.Routes.ValueObjectPrefix}/{slug}"
+                : $"{WebConstants.Routes.CanonPrefix}/{slug}";
+            descriptors.Add(new CanonModelDescriptor(modelType, slug, modelType.Name, route, isValueObject));
         }
 
         return descriptors
@@ -105,45 +100,17 @@ public sealed class CanonWebModule : KoanModule
             .Select(group => group.First());
     }
 
-    private static IEnumerable<Type> DiscoverTypes(Type openGenericBase)
+    private static bool IsClosedSubclass(Type type, Type openGenericBase)
     {
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
         {
-            Type?[] types;
-            try
+            if (current.IsGenericType && current.GetGenericTypeDefinition() == openGenericBase)
             {
-                types = assembly.GetTypes();
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                types = ex.Types;
-            }
-            catch
-            {
-                continue;
-            }
-
-            foreach (var type in types)
-            {
-                if (type is null || type.IsAbstract || !type.IsClass)
-                {
-                    continue;
-                }
-
-                var baseType = type.BaseType;
-                if (baseType is null || !baseType.IsGenericType)
-                {
-                    continue;
-                }
-
-                if (baseType.GetGenericTypeDefinition() != openGenericBase)
-                {
-                    continue;
-                }
-
-                yield return type;
+                return true;
             }
         }
+
+        return false;
     }
 
     private static string ToSlug(string value)

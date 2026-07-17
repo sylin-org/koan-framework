@@ -4,130 +4,117 @@ domain: canon
 title: "Canon Pillar Reference"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-15
+last_updated: 2026-07-17
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-07-15
+  date_last_tested: 2026-07-17
   status: tested
-  scope: Canon unit 35/35 and integration 6/6 plus public source inventory; no maturity promotion
+  scope: Canon unit 37/37, integration 6/6, non-Web bootstrap 1/1, CustomerCanon host 1/1
 ---
 
-# Canon Pillar Reference
+# Canon pillar reference
 
-## Contract
+Canon turns messy arrivals into one trusted Entity. Application code owns identity and business rules;
+Koan owns discovery, deterministic phase execution, metadata, convergence, persistence, inspection, and
+optional HTTP projection.
 
-- **Input:** a `CanonEntity<TModel>`, optional `CanonizationOptions`, and an optional ordered pipeline
-  configured for that model.
-- **Output:** a persisted canonical entity, metadata and state, a `CanonizationOutcome`, and the phase
-  events produced by configured contributors.
-- **Default:** with no configured pipeline, canonization still persists the entity through Koan Data.
-- **Errors:** invalid options, missing host/runtime registration, missing canonical records during
-  rebuild, and contributor or persistence failures surface as exceptions.
-- **Success:** business code describes canonical state and policy while the runtime owns phase order,
-  metadata carriage, persistence, observation, and optional Web exposure.
+## Reach for Canon when
 
-## What Canon is today
+- several arrivals may describe the same customer, device, account, or other business identity;
+- input needs normalization or validation before it becomes trusted state;
+- conflict policy, source attribution, lineage, lifecycle, or readiness must travel with the result;
+- later projections or distribution should run as explicit phases.
 
-Canon is an in-process canonicalization runtime built around `CanonEntity<TModel>`. It provides:
+Use ordinary `Entity<T>` when the application already has one unambiguous source of truth. Canon is not
+an event store, workflow engine, message transport, distributed lock, or universal MDM certification.
 
-- canonical metadata, source attribution, lineage, lifecycle, and readiness state;
-- ordered contributor phases: `Intake`, `Validation`, `Aggregation`, `Policy`, `Projection`, and
-  `Distribution`;
-- per-operation origin, correlation, staging, rebuild, requested-view, distribution, and tag options;
-- default persistence through Koan Data, with a complete replaceable `ICanonPersistence` boundary
-  and replaceable `ICanonAuditSink`;
-- optional model discovery and generic MVC controllers from `Koan.Canon.Web`.
+## Shortest Web path
 
-The phase names express intent. They do not imply a network hop, durable event log, message broker,
-AI service, or vector store. Those behaviors require explicit contributors and referenced modules.
-
-## Shortest domain path
+Reference `Sylin.Koan.Canon.Web`, `Sylin.Koan.Data.Connector.Json`, and the usual Koan Web packages, then:
 
 ```csharp
-using Koan.Canon.Domain.Model;
-using Koan.Canon.Domain.Runtime;
+using Koan.Canon;
 using Koan.Core;
+using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan();
-builder.Services.AddCanonRuntime();
+builder.Services.AddKoan().AsWebApi();
 var app = builder.Build();
-
-app.MapPost("/customers", (CustomerCanon customer, CancellationToken ct) =>
-    customer.Canonize(origin: "customer-api", cancellationToken: ct));
-
 await app.RunAsync();
 
-public sealed class CustomerCanon : CanonEntity<CustomerCanon>
+public sealed class Customer : CanonEntity<Customer>
 {
-    public string DisplayName { get; set; } = "";
+    [AggregationKey]
+    public string Email { get; set; } = "";
 }
 ```
 
-`Koan.Canon.Domain` users register `AddCanonRuntime(...)` explicitly. Referencing
-`Koan.Canon.Web` lets its Koan module register the runtime, discover concrete `CanonEntity<>` and
-`CanonValueObject<>` types, and add their generic controllers during `AddKoan()` composition.
+The customer is available at `/api/canon/customer`, and `/api/canon/models` explains why. No controller,
+registrar, application module, or explicit `AddCanonRuntime()` is required.
+
+## Add a business rule
+
+```csharp
+public sealed class NormalizeCustomer : ICanonPipelineContributor<Customer>
+{
+    public CanonPipelinePhase Phase => CanonPipelinePhase.Validation;
+
+    public ValueTask<CanonizationEvent?> Execute(
+        CanonPipelineContext<Customer> context,
+        CancellationToken cancellationToken)
+    {
+        context.Entity.Email = context.Entity.Email.Trim().ToLowerInvariant();
+        return ValueTask.FromResult<CanonizationEvent?>(null);
+    }
+}
+```
+
+Koan discovers it from source-generated metadata. Ordering is phase, optional `Order`, then type name.
+A contributor returning a failed or parked event terminates before later phases, indexing, or canonical
+persistence. Web maps those outcomes to 422 and 202 respectively.
+
+## Package boundaries
+
+| Package | Responsibility |
+|---|---|
+| `Sylin.Koan.Canon.Contracts` | Inert models, metadata, annotations, results, and extension contracts. |
+| `Sylin.Koan.Canon` | Functional activation, discovery, pipeline execution, defaults, persistence, and audit. |
+| `Sylin.Koan.Canon.Web` | Optional generated HTTP, model catalog, rebuild, and inspection surfaces. |
+
+Modules that merely describe Canon-aware types may reference Contracts without activating Canon. Any
+reference to the functional package makes `AddKoan()` activate the runtime.
 
 ## Runtime surfaces
 
-| Surface | Current meaning |
+| Surface | Meaning |
 |---|---|
-| `entity.Canonize(origin, configure, ct)` | Resolve the active runtime and canonize one entity. |
-| `ICanonRuntime.Canonize<T>(...)` | Execute the configured model pipeline or direct-persist fallback. |
-| `ConfigurePipeline<T>(...)` | Replace the descriptor for `T`; add delegate steps or contributors by phase. |
-| `RebuildViews<T>(id, views, ct)` | Reload a canonical entity and canonize it with rebuild options. |
-| `RegisterObserver(...)` | Observe phase boundaries and errors for the lifetime of the returned registration. |
-| `Replay(from, to, ct)` | Enumerate retained process-local `CanonizationRecord` snapshots. |
-| `SetRecordCapacity(n)` | Bound the in-memory record queue; the default capacity is 1024. |
+| `entity.Canonize(...)` | Canonize one Entity through the active host. |
+| `ICanonRuntime.Canonize<T>(...)` | Execute the compiled pipeline directly. |
+| `RebuildViews<T>(...)` | Reload a canonical snapshot and run requested projections. |
+| `RegisterObserver(...)` | Observe phase boundaries and errors until registration disposal. |
+| `Replay(...)` | Read bounded process-local result snapshots. |
+| `AddCanonRuntime(...)` | Advanced explicit pipeline/runtime override; unnecessary for normal use. |
 
-`ICanonPersistence` owns canonical read/write, stage write, and aggregation-index lookup/upsert.
-Aggregation and `RebuildViews` load prior state through that configured implementation. The default
-implementation lowers those operations to Entity/Data; a custom event-sourced, CQRS, or domain store
-does not need an ambient Data host when its audit sink and contributors are also host-independent.
-The default audit sink uses Koan Data. `GetCanonicalAsync<T>` returns `null` only for an absent record,
-and storage failures propagate.
+The default `ICanonPersistence` uses the selected Koan Data provider for canonical snapshots, stages,
+and aggregation indexes. Replacing it is a complete storage decision. The runtime, discovery catalog,
+configuration, and defaults are host-owned singletons.
 
-The overloads that receive an `IServiceProvider` select it for the complete asynchronous operation
-and restore the caller's prior flow afterward. Direct `ICanonRuntime` calls using default persistence
-must already execute within the intended Koan host.
+## Operational honesty
 
-Configured phases run in enum order; contributors within a phase run in registration order. The
-runtime passes one `CanonPipelineContext<T>` containing the entity, mutable metadata/options
-snapshots, services, persistence, optional stage, and a per-operation item bag.
+- Replay records do not survive restart and are not event sourcing.
+- `CanonizationEvent` is a phase result, not Koan Communication transport.
+- Canon currently runs in-process; distributed delivery, locking, retry, and recovery need explicit
+  application or adapter capability.
+- Provider concurrency, transaction, and durability guarantees come from the selected Data/persistence
+  implementation.
+- Generated admin routes require deployment-appropriate authorization.
 
-## Web surface
+## Evidence
 
-`Koan.Canon.Web` discovers concrete Canon models and exposes:
-
-- `/api/canon/{model}` — entity endpoints whose single and bulk writes pass through Canon;
-- `/api/canon/value-objects/{type}` — generic value-object entity endpoints;
-- `/api/canon/models` — discovered model and pipeline metadata;
-- `/api/canon/admin/records` — retained process-local canonization records;
-- `/api/canon/admin/{slug}/rebuild` — request a canonical model rebuild.
-
-These routes are application surfaces, not an authorization policy. Apply Koan/ASP.NET authorization
-appropriate to the deployment, especially to the admin endpoints.
-
-## Boundaries and maturity
-
-- `Replay` reads a bounded `ConcurrentQueue` owned by the current runtime. Records do not survive a
-  restart and do not constitute event sourcing or a durable replay guarantee.
-- A `CanonizationEvent` is a phase result/observation record. It is not Koan Messaging transport.
-- Canon's phase pipeline is a domain-specific runtime descriptor. It is not an Entity stream,
-  transport, or durability mechanism.
-- Canon persistence inherits the selected Data adapter's behavior. Large Entity reads may use
-  `AllStream`/`QueryStream` only on adapters qualified by DATA-0107; InMemory, JSON, and Redis reject
-  those streaming facades.
-- Replacing `ICanonPersistence` is a complete storage decision. Implementations built against 0.17
-  must add `GetCanonicalAsync<T>` when moving to the intentional pre-1.0 0.18 contract.
-- Koan remains pre-1.0. Treat Canon as an implemented, test-owned runtime surface—not blanket
-  certification of every ingestion, projection, recovery, or distributed-topology scenario.
-
-## Evidence and related decisions
-
-- [Canon domain source](../../../src/Koan.Canon.Domain/)
-- [Canon Web source](../../../src/Koan.Canon.Web/)
-- [Canon unit suites](../../../tests/Suites/Canon/Unit/)
-- [Canon integration suites](../../../tests/Suites/Canon/Integration/)
+- [Contracts source](../../../src/Koan.Canon.Contracts/)
+- [Runtime source](../../../src/Koan.Canon/)
+- [Web source](../../../src/Koan.Canon.Web/)
+- [CustomerCanon golden sample](../../../samples/applications/CustomerCanon/README.md)
+- [Canon unit suite](../../../tests/Suites/Canon/Unit/)
+- [Canon integration suite](../../../tests/Suites/Canon/Integration/)
 - [ARCH-0058 — Canon runtime architecture](../../decisions/ARCH-0058-canon-runtime-architecture.md)
-- [DATA-0107 — provider-bounded Entity streams](../../decisions/DATA-0107-provider-bounded-entity-streams.md)
