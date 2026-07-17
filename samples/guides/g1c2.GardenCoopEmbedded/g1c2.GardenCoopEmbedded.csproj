@@ -1,60 +1,24 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <OutputType>Exe</OutputType>
     <InvariantGlobalization>true</InvariantGlobalization>
     <RootNamespace>GardenCoopEmbedded</RootNamespace>
     <AssemblyName>GardenCoopEmbedded</AssemblyName>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Web -->
-    <ProjectReference Include="..\..\..\src\Koan.Web\Koan.Web.csproj" />
-    <!-- Data: SQLite (durable, in-process, file-backed) -->
-    <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
     <ProjectReference Include="..\..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
-    <!-- Vector: sqlite-vec (durable, in-process; shares the SQLite file) -->
-    <ProjectReference Include="..\..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\..\..\src\Connectors\Data\Vector\SqliteVec\Koan.Data.Vector.Connector.SqliteVec.csproj" />
-    <!-- Embeddings: ONNX Runtime (in-process; the model travels with the app) -->
-    <ProjectReference Include="..\..\..\src\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Data.AI\Koan.Data.AI.csproj" />
     <ProjectReference Include="..\..\..\src\Connectors\AI\Onnx\Koan.AI.Connector.Onnx.csproj" />
-    <!-- Messaging: in-process Channels (no broker) -->
-    <ProjectReference Include="..\..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
-    <ProjectReference Include="..\..\..\src\Connectors\Messaging\InMemory\Koan.Messaging.Connector.InMemory.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Plain SDK (not Web): appsettings.json isn't auto-included, so ship it with the (single-file) exe. -->
-    <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <!-- The embedding model travels with the app: fully offline, no model server. CopyToPublishDirectory
-         keeps it beside the published (incl. single-file) exe — a single self-contained folder. -->
     <Content Include="..\..\..\assets\models\all-MiniLM-L6-v2\model_quantized.onnx" Link="models\model_quantized.onnx" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\..\assets\models\all-MiniLM-L6-v2\vocab.txt" Link="models\vocab.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
-
-  <!-- NativeAOT is an explicit "sovereign binary" publish, opted into with -p:KoanAot=true. Setting PublishAot
-       HERE (locally, not as a global -p: property) is deliberate: a global PublishAot flows to the netstandard2.0
-       Roslyn generator ProjectReferences and trips NETSDK1207. The flag keeps the normal solution build (and CI)
-       completely untouched — AOT analyzers/ILC only engage when sovereignty is the goal. Publish with:
-         dotnet publish -c Release -r win-x64 -p:KoanAot=true -->
-  <PropertyGroup Condition="'$(KoanAot)' == 'true'">
-    <PublishAot>true</PublishAot>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <!-- Seeds the trim roots for the NativeAOT stretch publish (see README). -->
-    <TrimmerRootDescriptor Include="NativeAotRoots.xml" />
-  </ItemGroup>
-
-  <!-- In-repo (ProjectReference) builds don't auto-import the package build targets; import explicitly so the
-       composition lockfile AND the embedded boot module manifest (single-file discovery) are emitted. -->
-  <Import Project="..\..\..\src\Koan.Core\build\Sylin.Koan.Core.targets" />
 </Project>

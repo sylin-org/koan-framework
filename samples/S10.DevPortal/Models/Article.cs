@@ -1,23 +1,27 @@
+using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Transfers;
 
 namespace S10.DevPortal.Models;
 
-/// <summary>
-/// Demonstrates Entity&lt;T&gt; with auto GUID v7 generation and relationship navigation
-/// </summary>
-public class Article : Entity<Article>
+public sealed class Article : Entity<Article>
 {
-    public string Title { get; set; } = "";
-    public string Content { get; set; } = "";
-    public ResourceType Type { get; set; } = ResourceType.Article;
-    public string? TechnologyId { get; set; }  // Parent relationship demo
-    public string AuthorId { get; set; } = "";  // User relationship demo
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public bool IsPublished { get; set; } = false;
-}
+    public string Title { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public ArticleStatus Status { get; set; } = ArticleStatus.Draft;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-public enum ResourceType
-{
-    Article,
-    Tutorial  // Simplified for demo focus
+    public async Task Approve(CancellationToken ct = default)
+    {
+        Status = ArticleStatus.Approved;
+        UpdatedAt = DateTimeOffset.UtcNow;
+        await this.Save(ct);
+    }
+
+    public static Task<TransferResult<string>> PublishApproved(
+        PublicationChannel channel,
+        CancellationToken ct = default)
+        => Article.Copy(article => article.Status == ArticleStatus.Approved)
+            .To(source: channel.ToString())
+            .Run(ct);
 }

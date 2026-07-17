@@ -10,8 +10,8 @@ builder.Services.AddKoan();
 
 // Telemetry is enabled by referencing Koan.Observability (Reference=Intent, ARCH-0088).
 
-// Swagger/OpenAPI is auto-registered via Koan.Web.Connector.Swagger
-// Canon runtime and Customer pipeline are auto-registered via S8.Canon.Initialization.KoanAutoRegistrar
+// Swagger/OpenAPI is activated by the Koan.Web.Connector.Swagger reference.
+// Canon runtime and the Customer pipeline are activated by CanonSampleModule.
 
 var app = builder.Build();
 

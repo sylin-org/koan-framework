@@ -8,16 +8,13 @@ namespace Koan.Samples.Meridian.Initialization;
 
 /// <summary>
 /// Seeds default SourceType classifications for Meridian.
-/// Follows Koan pattern: static seed data in SeedData folder, initialization via IKoanInitializer.
+/// Uses static seed data from the SeedData folder when the Meridian module starts.
 /// </summary>
-public class SourceTypeSeeder : IKoanInitializer
+internal sealed class SourceTypeSeeder
 {
-    public void Initialize(IServiceCollection services)
+    public async Task Seed(CancellationToken ct)
     {
-        // Use background task to seed after app starts (allows Entity framework to be ready)
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(2000); // Wait for app to fully start
+        await Task.Delay(2000, ct); // Wait for app to fully start
 
             try
             {
@@ -93,7 +90,6 @@ public class SourceTypeSeeder : IKoanInitializer
             {
                 Console.WriteLine($"[Meridian] SourceType seed error: {ex.Message}");
             }
-        });
     }
 
     private static bool AreEqual(SourceType existing, SourceType seed)

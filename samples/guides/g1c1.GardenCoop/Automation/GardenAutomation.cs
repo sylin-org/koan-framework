@@ -6,10 +6,10 @@ namespace g1c1.GardenCoop.Automation;
 
 public static class GardenAutomation
 {
-    private const int WindowSize = 8;        // look at last 8 readings
-    private const double DryThreshold = 20.0; // below 20% = time to water
+    internal const int ReadingWindowSize = 8;
+    internal const double DrySoilThreshold = 20.0;
 
-    public static void Configure()
+    internal static void Configure()
     {
         Reading.ConfigureLifecycle();
         Sensor.ConfigureLifecycle();
@@ -20,7 +20,7 @@ public static class GardenAutomation
     private static void ConfigureReadingLifecycle()
     {
         Reading.Lifecycle
-            .AfterUpsert(async ctx =>  // every time a reading gets saved, run this
+            .AfterUpsert(async ctx =>
             {
                 var reading = ctx.Current;
                 var ct = ctx.CancellationToken;
@@ -28,15 +28,13 @@ public static class GardenAutomation
                 var plotId = reading.PlotId;
                 if (string.IsNullOrWhiteSpace(plotId))
                 {
-                    // no plot binding yet - sensor is orphaned
                     var sensor = await Sensor.Get(reading.SensorId, ct);
-                    var serial = sensor?.Id ?? "unknown";  // sensor.Id IS the serial now
+                    var serial = sensor?.Id ?? "unknown";
                     Console.WriteLine($"[Journal] Reading {reading.Id} arrived for sensor {serial}, but no plot binding exists yet.");
                     return;
                 }
 
-                // grab recent readings to figure out average humidity
-                var recent = await Reading.Recent(plotId, WindowSize, ct);
+                var recent = await Reading.Recent(plotId, ReadingWindowSize, ct);
                 if (recent.Length == 0)
                 {
                     return;
@@ -44,12 +42,10 @@ public static class GardenAutomation
 
                 var average = recent.Average(r => r.SoilHumidity);
 
-                // check if we already have an active reminder for this plot
                 var active = await Reminder.ActiveForPlot(plotId, ct);
 
-                if (average < DryThreshold)
+                if (average < DrySoilThreshold)
                 {
-                    // soil is dry - create a reminder if we don't have one
                     if (active is null)
                     {
                         var plot = await Plot.Get(plotId, ct);
@@ -58,7 +54,6 @@ public static class GardenAutomation
                             return;
                         }
 
-                        // new reminder - assign to plot's steward if they exist
                         await new Reminder
                         {
                             PlotId = plotId,
@@ -68,7 +63,6 @@ public static class GardenAutomation
                 }
                 else if (active is not null)
                 {
-                    // readings recovered above threshold - auto-acknowledge the reminder
                     await active.Acknowledge("Soil humidity back above threshold.", ct);
                 }
             });
@@ -77,16 +71,14 @@ public static class GardenAutomation
     private static void ConfigureReminderLifecycle()
     {
         Reminder.Lifecycle
-            .AfterUpsert(async ctx =>
+            .AfterUpsert(ctx =>
             {
-                // check if status changed to Active - that's when we'd send notifications
-                var prior = await ctx.Prior.Get(ctx.CancellationToken);
+                var prior = ctx.Prior;
                 var was = prior?.Status ?? ReminderStatus.Idle;
                 var now = ctx.Current.Status;
 
                 if (was != ReminderStatus.Active && now == ReminderStatus.Active)
                 {
-                    // just became active - time to notify
                     Console.WriteLine($"[Journal] Sending email (fake) to steward of {ctx.Current.PlotId} about low soil humidity.");
                 }
             });

@@ -1,29 +1,15 @@
 using Koan.Core;
-using Koan.Web.Extensions;
-using S10.DevPortal.Services;
+using Koan.Core.Hosting.App;
+
+[assembly: KoanApp(
+    Name = "Developer publishing portal",
+    Description = "Approve articles locally and publish them through named provider channels.",
+    Tags = new[] { "sample", "data", "providers", "transfers" }
+)]
 
 var builder = WebApplication.CreateBuilder(args);
-
-// S10.DevPortal - Clean framework initialization demonstrating "Reference = Intent"
-builder.Services.AddKoan()
-    .AsProxiedApi();
-
-// Local services for demo functionality
-builder.Services.AddSingleton<IDemoSeedService, DemoSeedService>();
-
+builder.Services.AddKoan();
 var app = builder.Build();
+await app.RunAsync();
 
-// Ensure local data folder exists for providers that default to ./data
-if (app.Environment.IsDevelopment())
-{
-    var dataPath = Path.Combine(app.Environment.ContentRootPath, "data");
-    try { Directory.CreateDirectory(dataPath); } catch { /* best effort */ }
-}
-
-app.RunAsync();
-
-// Make Program public for testing
-namespace S10.DevPortal
-{
-    public partial class Program { }
-}
+public partial class Program;

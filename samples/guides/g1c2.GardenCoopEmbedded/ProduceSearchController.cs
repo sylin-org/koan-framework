@@ -18,19 +18,20 @@ public sealed class ProduceSearchController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Hit>>> Search([FromQuery] string q, [FromQuery] int k = 5, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(q)) return BadRequest("query parameter 'q' is required");
+        if (string.IsNullOrWhiteSpace(q))
+            return BadRequest("Query parameter 'q' is required.");
 
-        var queryVector = await Client.Embed(q, ct);            // local ONNX embedding, via the AI facade
-        var result = await Vector<Produce>.Search(queryVector, topK: k);
+        var queryVector = await Client.Embed(q, ct);
+        var result = await Vector<Produce>.Search(queryVector, topK: Math.Clamp(k, 1, 20), ct: ct);
+        var listings = await Produce.Get(result.Matches.Select(match => match.Id), ct);
 
-        var hits = new List<Hit>(result.Matches.Count);
-        foreach (var match in result.Matches)
-        {
-            var id = (string)(object)match.Id;
-            var produce = await Produce.Get(id);
-            if (produce is not null)
-                hits.Add(new Hit(id, produce.Name, produce.Category, match.Score));
-        }
+        var hits = result.Matches.Zip(listings)
+            .Where(pair => pair.Second is not null)
+            .Select(pair => new Hit(
+                pair.First.Id,
+                pair.Second!.Name,
+                pair.Second.Category,
+                pair.First.Score));
         return Ok(hits);
     }
 }

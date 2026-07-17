@@ -13,8 +13,8 @@ builder.Services
     .AsWebApi();
 
 // Ollama (Koan.AI.Connector.Ollama) and Swagger (Koan.Web.Connector.Swagger) are wired by
-// Reference = Intent — their KoanAutoRegistrars register the services and the Swagger StartupFilter
-// mounts the UI in development. No explicit AddOllamaFromConfig()/UseSwagger() calls are needed.
+// Reference = Intent — their modules register the services and the Swagger startup filter mounts
+// the UI in development. No explicit AddOllamaFromConfig()/UseSwagger() calls are needed.
 
 var app = builder.Build();
 

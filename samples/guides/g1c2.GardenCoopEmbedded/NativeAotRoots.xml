@@ -1,7 +1,0 @@
-<linker>
-  <assembly fullname="GardenCoopEmbedded">
-    <type fullname="GardenCoopEmbedded.Produce" preserve="all" />
-    <type fullname="GardenCoopEmbedded.ProduceController" preserve="all" />
-    <type fullname="GardenCoopEmbedded.ProduceSearchController" preserve="all" />
-  </assembly>
-</linker>

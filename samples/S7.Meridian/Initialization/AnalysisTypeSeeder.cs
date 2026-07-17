@@ -8,16 +8,13 @@ namespace Koan.Samples.Meridian.Initialization;
 
 /// <summary>
 /// Seeds default AnalysisType templates for Meridian.
-/// Follows Koan pattern: static seed data in SeedData folder, initialization via IKoanInitializer.
+/// Uses static seed data from the SeedData folder when the Meridian module starts.
 /// </summary>
-public class AnalysisTypeSeeder : IKoanInitializer
+internal sealed class AnalysisTypeSeeder
 {
-    public void Initialize(IServiceCollection services)
+    public async Task Seed(CancellationToken ct)
     {
-        // Use background task to seed after app starts (allows Entity framework to be ready)
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(2500); // Wait slightly longer for app to fully start
+        await Task.Delay(2500, ct); // Wait slightly longer for app to fully start
 
             try
             {
@@ -72,7 +69,6 @@ public class AnalysisTypeSeeder : IKoanInitializer
             {
                 Console.WriteLine($"[Meridian] AnalysisType seed error: {ex.Message}");
             }
-        });
     }
 
     private static bool AreEqual(AnalysisType existing, AnalysisType seed)

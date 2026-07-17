@@ -15,6 +15,10 @@
   <PropertyGroup>
     <KoanRequiresOrchestrationGenerator>true</KoanRequiresOrchestrationGenerator>
     <IsPackable>false</IsPackable>
+    <!-- ProjectReference builds do not receive Core's buildTransitive assets. All executable
+         samples should nevertheless exercise the same composition contract as package consumers,
+         without repeating repository-only imports in application project files. -->
+    <UseKoanSource>true</UseKoanSource>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)GlobalUsings.cs" Link="_GlobalUsings.cs" />

@@ -8,16 +8,13 @@ namespace Koan.Samples.Meridian.Initialization;
 
 /// <summary>
 /// Seeds default OrganizationProfile templates for Meridian.
-/// Follows Koan pattern: static seed data in SeedData folder, initialization via IKoanInitializer.
+/// Uses static seed data from the SeedData folder when the Meridian module starts.
 /// </summary>
-public class OrganizationProfileSeeder : IKoanInitializer
+internal sealed class OrganizationProfileSeeder
 {
-    public void Initialize(IServiceCollection services)
+    public async Task Seed(CancellationToken ct)
     {
-        // Use background task to seed after app starts (allows Entity framework to be ready)
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(2000); // Wait for app to fully start
+        await Task.Delay(2000, ct); // Wait for app to fully start
 
             try
             {
@@ -92,7 +89,6 @@ public class OrganizationProfileSeeder : IKoanInitializer
             {
                 Console.WriteLine($"[Meridian] OrganizationProfile seed error: {ex.Message}");
             }
-        });
     }
 
     private static async Task DeactivateAllProfiles()

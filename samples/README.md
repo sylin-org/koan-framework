@@ -1,72 +1,49 @@
-# Koan Framework Samples
+# Koan samples
 
-**The samples are the curriculum**: each rung teaches a bounded set of concepts; the flagships
-are dogfood applications that drive framework evolution (aspirational reading, not tutorials).
+Samples are a public product surface and the Koan curriculum. Every active sample must be a golden,
+executable example of current Koan use—not merely code that happens to compile. The assessment labels
+below are temporary migration states; they must graduate or leave the active portfolio before V1.
 
-> Status below is truthful as of 2026-07: ✅ = in `Koan.sln`, builds, CI-protected ·
-> 🛠 dogfood = large real app, maintained but not a tutorial · ⚠ = on disk but currently broken
-> or not in the solution (being consolidated; see `docs/assessment/`). The old
-> [CATALOG.md](CATALOG.md) is superseded by this page pending regeneration.
+## Graduated examples
 
-## The learning ladder (do these in order)
+These samples currently have a documented meaningful path and focused executable evidence:
 
-| Rung | Sample | Teaches | Time | Status |
-|---|---|---|---|---|
-| 0 | **FirstUse** | One meaningful business result; bootstrap, SQLite election, REST, facts, governed MCP | 5 min | ✅ executable source/package contract |
-| 1 | **GoldenJourney** | Grow that result through rules, durable jobs, bounded agent collaboration, and explained recovery | 15 min | ✅ executable source contract |
-| 2 | **S0.ConsoleJsonRepo** | Minimal bootstrap; entity statics in a console app | 5 min | ✅ |
-| 3 | **S1.Web** | REST CRUD via `EntityController<T>`, relationships (`[Parent]`), pagination, `[Cacheable]` | 30 min | ✅ |
-| 4 | **S10.DevPortal** | Live multi-provider switching (Mongo ⇄ Postgres ⇄ SQLite), capability detection, bulk ops | 20 min | ✅ |
-| 5 | **S14.AdapterBench** | Cross-adapter benchmarking; **entity-first background jobs** (`IKoanJob<T>`, progress, durable ledger) | 20 min | ✅ |
+| Sample | Meaningful result | Concepts | Start |
+|---|---|---|---|
+| [S0.ConsoleJsonRepo](S0.ConsoleJsonRepo/README.md) | Save a local checklist, complete one item, and reload open work | console host, Entity statics, JSON, provider bounds | `cd samples/S0.ConsoleJsonRepo && dotnet run` |
+| [FirstUse](FirstUse/README.md) | Persist and approve one request, inspect facts, expose governed MCP | bootstrap, Entity, SQLite, REST, facts, MCP | `dotnet run --project samples/FirstUse` |
+| [GoldenJourney](GoldenJourney/README.md) | Grow the same request through a rule, durable job, and agent recommendation | cumulative composition, jobs, agent tools, recovery | `dotnet run --project samples/GoldenJourney` |
+| [S1.Web](S1.Web/README.md) | Resolve one task graph over scalar, set, and stream cardinalities | EntityController, Parent, Relatives, Cache | `dotnet run --project samples/S1.Web` |
+| [S10.DevPortal](S10.DevPortal/README.md) | Approve local articles and publish them idempotently through named provider channels | named sources, provider negotiation, Entity transfer | `cd samples/S10.DevPortal && dotnet run` |
+| [g1c1.GardenCoop](guides/g1c1.GardenCoop/README.md) | Turn a dry sensor reading into a reminder, then observe recovery | lifecycle automation, SQLite, REST, facts, NativeAOT | `dotnet run --project samples/guides/g1c1.GardenCoop` |
+| [g1c2.GardenCoopEmbedded](guides/g1c2.GardenCoopEmbedded/README.md) | Find local produce by meaning with no external service | Entity embeddings, ONNX, SQLite, sqlite-vec | `dotnet run --project samples/guides/g1c2.GardenCoopEmbedded` |
 
-After the ladder, pick by interest:
+## Portfolio under graduation
 
-| Sample | What it is | Status |
+The remaining non-archived projects are not yet V1 curriculum claims. They stay visible so their disposition is honest:
+
+| Disposition | Projects | Meaning |
 |---|---|---|
-| **S5.Recs** | AI recommendation engine: Mongo + Weaviate + Ollama, `[Embedding]` pipeline, partitioned imports, auth, scheduling | ✅ 🛠 dogfood |
-| **S18.Prism** | Personal knowledge intelligence; exercises the AI pillar end-to-end | ✅ 🛠 dogfood (spec-led; no README yet) |
-| **S8.Canon** (Api + Shared) | Canon runtime pipelines (`CanonEntity<T>`, pipeline contributors) | ✅ (root project excluded; use Api) |
-| **g1c1.GardenCoop** (guides/) | Narrative chapter-style guide; the only NativeAOT-publish dogfood | ✅ |
-| **S3.Mq.Sample** | RabbitMQ messaging skeleton | ✅ builds, minimal — being rebuilt as a proper messaging rung |
-| **S7.Meridian** | Document-intelligence flagship (16k LOC) | ⚠ builds (recently restored) but outside `Koan.sln` |
-| **S6.SnapVault** | Photo manager (media + storage + AI) | ⚠ broken (dependency pin); consolidation candidate |
-| **S8.PolyglotShop** | ServiceMesh showcase | ⚠ broken (references retired experimental pillars) |
+| Assess capability/deployment | `S14.AdapterBench` | benchmark/job claims require focused execution |
+| Assess dogfood | `S5.Recs`, `S6.SnapVault`, `S18.Prism`, `S8.Canon` / Api / Shared | valuable broad surfaces; prerequisites and business proofs must be explicit |
+| Incubate | `S7.Meridian`, `S19.McpCatalogSample`, `S20.OpenGraph` | outside the maintained solution pending assessment |
+| Archive or delete | `S3.Mq.Sample`, `S16.PantryPal` ghost directories | no executable project; not supported samples |
+| Archived | [`archive/`](archive/ARCHIVED.md) | historical material; no modernization promise |
 
-Known gaps the consolidation is addressing: no dedicated **messaging**, **jobs**, or **cache**
-tutorial rungs yet (today they're embedded in S3/S14/S1); several ghost directories from
-archived samples are pending deletion. Don't trust directory listings — trust this table and
-`Koan.sln`.
+The exact inventory and queue live in [R10-02](../docs/initiatives/koan-v1/work-items/r10/R10-02-portfolio-inventory.md). Graduation criteria live in the [golden-sample contract](../docs/initiatives/koan-v1/work-items/r10/GOLDEN-SAMPLE-GRADUATION.md).
 
-## Running a sample
+## What every graduated sample guarantees
 
-```bash
-# Anything in Koan.sln:
-dotnet run --project samples/FirstUse
+1. Business intent is the dominant application code.
+2. `AddKoan()` is the normal bootstrap; extra application code owns real business policy.
+3. References state capability intent, and runtime decisions are inspectable.
+4. One standard .NET command reaches a meaningful result.
+5. A focused test proves the business result, HTTP or host surface, and composition facts.
+6. Any claimed container, external service, package-only, or NativeAOT shape is actually exercised.
+7. README, source, dashboard, requests, solution membership, and maturity status agree.
 
-# Then see the same model survive meaningful growth:
-dotnet run --project samples/GoldenJourney
+## Contributing or graduating a sample
 
-# Samples with container dependencies ship a start.bat (preferred over docker compose by hand):
-cd samples/S5.Recs && ./start.bat
-```
+Start with one business sentence and a strict baseline. Identify the smallest honest host, the deliberate capability references, and the defining business result. Repair framework defects at their owner, remove obsolete sample ceremony, and add sample-specific executable proof before promoting documentation.
 
-Each sample prints a **boot report** at startup — discovered modules, adapter elections, boot
-phases. Read it; it is the framework's self-description and your first debugging surface.
-
-## Sample principles
-
-1. **Domain-focused** — real applications, not FooService demos
-2. **Entity-first** — `Entity<T>` patterns; no manual repositories
-3. **Reference = Intent** — capabilities arrive by package reference; Program.cs stays minimal
-   (the canonical form is 4 lines — extra incantations in older samples are being removed)
-4. **In the solution = alive** — every kept sample lives in `Koan.sln` and rides CI; anything
-   outside the solution is rotting by definition
-5. **Concept-budgeted** — each README states what new concepts the sample introduces
-
-## Contributing a sample
-
-Follow S5.Recs' README style (tutorial narrative, *why* over *what*), one-command run
-(`start.bat`), entity-first patterns only, and add the project to `Koan.sln` in the same PR.
-
-- Port allocations: `docs/decisions/OPS-0014-samples-port-allocation.md`
-- Archive policy & history: [archive/ARCHIVED.md](archive/ARCHIVED.md)
+Do not add launch helpers for ordinary `dotnet run`, private dogfood identities, generic test abstractions that hide the story, or deployment claims without evidence.

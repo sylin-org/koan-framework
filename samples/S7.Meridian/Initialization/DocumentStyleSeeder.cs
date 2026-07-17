@@ -12,16 +12,13 @@ namespace Koan.Samples.Meridian.Initialization;
 
 /// <summary>
 /// Seeds default DocumentStyle definitions for Meridian.
-/// Follows Koan pattern: static seed data in SeedData folder, initialization via IKoanInitializer.
+/// Uses static seed data from the SeedData folder when the Meridian module starts.
 /// </summary>
-public class DocumentStyleSeeder : IKoanInitializer
+internal sealed class DocumentStyleSeeder
 {
-    public void Initialize(IServiceCollection services)
+    public async Task Seed(CancellationToken ct)
     {
-        // Use background task to seed after app starts (allows Entity framework to be ready)
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(2500); // Wait for app to fully start
+        await Task.Delay(2500, ct); // Wait for app to fully start
 
             try
             {
@@ -79,7 +76,6 @@ public class DocumentStyleSeeder : IKoanInitializer
             {
                 Console.WriteLine($"[Meridian] DocumentStyle seed error: {ex.Message}");
             }
-        });
     }
 
     private static bool AreEqual(DocumentStyle existing, DocumentStyle seed)

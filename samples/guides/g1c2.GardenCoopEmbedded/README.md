@@ -1,87 +1,66 @@
-# GardenCoop, embedded — the single-binary slice
+# GardenCoop Embedded — useful local AI, no services to install
 
-A near-copy of [`g1c1.GardenCoop`](../g1c1.GardenCoop/), but every capability is satisfied by an **in-process
-resource** instead of a server. No container runtime, no model server, no vector server, no message broker —
-the whole stack lives inside one process and (with a self-contained publish) one `.exe`.
+This sample saves five co-op produce listings and finds them by meaning. The query `ripe red tomato` ranks
+**Heirloom Tomatoes** first while data, vectors, and embeddings all stay in the application process.
 
-This is the concrete proof of the *footprint floor* from the in-process adapter survey
-([`docs/assessment/evidence/inproc-adapter-survey.md`](../../../docs/assessment/evidence/inproc-adapter-survey.md)):
-"single binary" does **not** mean fewer capabilities — it means every capability runs in-process.
+It is the local-first version of Koan's Reference = Intent promise:
 
-## The embedded stack (Reference = Intent)
-
-`Program.cs` is one line — `builder.Services.AddKoan()`. Which providers light up is decided purely by which
-packages the `.csproj` references:
-
-| Capability | In-process resource | Package |
+| Concern | Referenced provider | Runtime resource |
 |---|---|---|
-| Data (rows) | SQLite (file-backed) | `Koan.Data.Connector.Sqlite` |
-| Vector (k-NN) | sqlite-vec (`vec0`, embedded native) | `Koan.Data.Vector.Connector.SqliteVec` |
-| Embeddings (text→vector) | ONNX Runtime + all-MiniLM-L6-v2 | `Koan.AI.Connector.Onnx` |
-| Messaging | `System.Threading.Channels` bus | `Koan.Messaging.Connector.InMemory` |
-| Web / REST | Kestrel (in-process) | `Koan.Web` |
+| REST and static UI | `Koan.Web.Extensions` | Kestrel |
+| Entity persistence | `Koan.Data.Connector.Sqlite` | `gardencoop.db` |
+| vector index | `Koan.Data.Vector.Connector.SqliteVec` | the same SQLite file |
+| text embeddings | `Koan.AI.Connector.Onnx` | bundled ONNX model |
 
-Rows **and** vectors share **one `.db` file** (`gardencoop.db`) — see `appsettings.json`, where both the SQLite
-data adapter and sqlite-vec point at the same `Data Source`. The embedding model travels with the app as
-content under `models/` (the `.csproj` copies it from `assets/models/all-MiniLM-L6-v2`).
+The application does not select those providers in business code. `[Embedding]` on `Produce` makes its normal
+`Save()` create the vector index; the references, configuration, and startup facts explain how that intent is met.
 
-## Run it
+## Run the meaningful path
 
-```bash
-dotnet run
+From the repository root:
+
+```powershell
+dotnet run --project samples/guides/g1c2.GardenCoopEmbedded
 ```
 
-On first run it seeds five produce listings with a plain `item.Save()`. `[Embedding]` on `Produce` makes that
-single call embed the listing **in-process** with the local ONNX model and store the vector in sqlite-vec —
-no explicit embed call in `Seed.cs`. Then:
+Open <http://localhost:5092>, or call the exact result directly:
 
-```bash
-# REST (auto from EntityController<Produce>)
-curl http://localhost:5099/api/produce
-
-# Semantic search — the query is embedded by the local model and matched in sqlite-vec
-curl "http://localhost:5099/api/produce/search?q=ripe%20red%20tomato"
-# => Heirloom Tomatoes ranks first, with no server in sight
+```powershell
+Invoke-RestMethod 'http://localhost:5092/api/produce/search?q=ripe%20red%20tomato&k=3'
 ```
 
-## One `.exe`, no container
+The first start loads the bundled model and saves five starter listings, so it is slower than later starts. No
+Docker runtime, network model endpoint, vector server, API key, or manual bootstrap code is required.
 
-Self-contained single-file publish bundles the runtime, the native `vec0` + ONNX binaries, and the model
-beside one executable:
+Useful inspection points:
 
-```bash
-dotnet publish -c Release -r win-x64 \
+- `GET /api/produce` — the conventional API declared by `EntityController<Produce>`;
+- `GET /api/produce/search?q=...` — the small custom scored-search intent;
+- `GET /.well-known/Koan/facts` — modules, provider decisions, configuration, and composition evidence;
+- `GET /health/ready` — canonical readiness.
+
+[`requests.http`](requests.http) contains all four calls.
+
+## Read the application
+
+- [`Program.cs`](Program.cs) is the standard four-line Koan host.
+- [`Produce.cs`](Produce.cs) is the business model, embedding intent, and one-line conventional API.
+- [`ProduceSearchController.cs`](ProduceSearchController.cs) embeds one query and joins scored vector matches back
+  to their Entities in one batch.
+- [`Initialization/GardenCoopEmbeddedModule.cs`](Initialization/GardenCoopEmbeddedModule.cs) owns the only earned
+  startup responsibility: ensuring the starter business data after AI composition is ready.
+- [`appsettings.json`](appsettings.json) supplies the local database and bundled model paths.
+
+## Publish honestly
+
+The supported deployment shape is a **self-contained folder**, not one executable. For Windows x64:
+
+```powershell
+dotnet publish samples/guides/g1c2.GardenCoopEmbedded -c Release -r win-x64 `
   -p:PublishSingleFile=true --self-contained true
-# -> bin/Release/net10.0/win-x64/publish/  (GardenCoopEmbedded.exe + models/ + native libs)
-./bin/Release/net10.0/win-x64/publish/GardenCoopEmbedded.exe   # runs offline, no install, no container
 ```
 
-The published binary **runs the full embedded stack** — boot discovers all in-process connectors, embeds via
-the bundled ONNX model, and serves semantic search. This works because the Koan build embeds a
-**module manifest** (`koan.modules.manifest`) in the app assembly listing its `Koan.*` references: a
-Reference=Intent connector is referenced via `<ProjectReference>` but never symbol-used, so the compiler drops
-it from the app's metadata and a single-file bundle leaves no loose `Koan.*.dll` to scan — the embedded manifest
-is the one intent record that survives bundling, so boot loads each module by name (X-aot-substrate).
-
-Swap `-r linux-x64` / `-r linux-arm64` for the edge/appliance targets — the vec0 native ships for all three
-floor RIDs (embedded in the connector and self-extracted at load).
-
-### NativeAOT (stretch)
-
-NativeAOT (`-p:PublishAot=true`) is the *aspirational* form of this rung. The managed pieces (SQLite + brute-force
-vector + Channels) are AOT-clean; the native dependencies here (ONNX Runtime, sqlite-vec) are **AOT-unverified**
-per the survey. `NativeAotRoots.xml` seeds the trim roots; treat a successful AOT publish as the `S2.Sovereign-proof`
-spike, not a guarantee. Self-contained single-file is the honest single-binary deliverable today.
-
-## Notes
-
-- **Seeding is a plain `item.Save()`.** `[Embedding(Template = "{Name}. {Description}")]` on `Produce` wires the
-  embed→store loop onto Save: the framework embeds the listing via the in-process ONNX *source* and stores the
-  vector in sqlite-vec, with no provider named in app code. The ONNX connector publishes itself as an AI source
-  (provider `onnx`, the embedded all-MiniLM model as its default), so it's a first-class citizen of the same
-  source/router pipeline that drives Ollama — the adapter mirrors the Ollama shape (provider-level identity,
-  model is a usage-time concern, here the one model bundled in the exe).
-- **Search** embeds the *query* at request time via the facade (`Client.Embed`) and matches it in sqlite-vec —
-  see `ProduceSearchController`.
-- Nothing here references a provider by name except the deliberate `[VectorAdapter("sqlitevec")]` routing hint;
-  remove it and the in-memory vector floor (`Koan.Data.Vector.Connector.InMemory`) would serve instead.
+Run `GardenCoopEmbedded.exe` from its publish directory. The executable contains the managed application and .NET
+runtime, while native ONNX/SQLite libraries, `models/`, and `appsettings.json` remain beside it. That folder runs
+without installing .NET or any external service. This sample does not claim NativeAOT, a literal one-file artifact,
+or untested operating-system/RID portability.

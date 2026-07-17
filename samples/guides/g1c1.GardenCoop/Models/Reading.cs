@@ -4,31 +4,28 @@ using Koan.Data.Core.Lifecycle;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Relationships;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
 
 namespace g1c1.GardenCoop.Models;
 
-public class Reading : Entity<Reading>  // inheriting from Entity<Reading> gives me auto GUID v7 for Id
+public sealed class Reading : Entity<Reading>
 {
-    // the Pi can send "sensorSerial" instead of looking up the GUID - we'll resolve it
     public string? SensorSerial { get; set; }
 
     [Parent(typeof(Sensor))]
-    public string SensorId { get; set; } = "";  // this will be set to the serial after lookup
+    public string SensorId { get; set; } = "";
 
     [Parent(typeof(Plot))]
-    public string? PlotId { get; set; }  // gets copied from sensor binding, might be null if sensor not bound yet
+    public string? PlotId { get; set; }
 
-    [Range(0, 100)]  // humidity is 0-100%
+    [Range(0, 100)]
     public double SoilHumidity { get; set; }
 
-    public double? TemperatureC { get; set; }  // optional - not all sensors have temp
+    public double? TemperatureC { get; set; }
 
     public DateTimeOffset SampledAt { get; set; } = DateTimeOffset.UtcNow;
 
     public static async Task<Reading[]> Recent(string plotId, int take = 20, CancellationToken ct = default)
     {
-        // grab recent readings for a plot - useful for averaging
         var items = await Reading.Query(r => r.PlotId == plotId, ct);
         return items
             .OrderByDescending(r => r.SampledAt)
@@ -41,31 +38,26 @@ public class Reading : Entity<Reading>  // inheriting from Entity<Reading> gives
         Reading.Lifecycle
             .BeforeUpsert(async ctx =>
             {
-                // let's prevent changes to most things, but allow setting the IDs we resolve
                 ctx.ProtectAll();
-                ctx.AllowMutation(nameof(Reading.SensorId));  // we set this from the serial
-                ctx.AllowMutation(nameof(Reading.PlotId));    // we copy this from the sensor
+                ctx.AllowMutation(nameof(Reading.SensorId));
+                ctx.AllowMutation(nameof(Reading.PlotId));
                 var reading = ctx.Current;
                 var ct = ctx.CancellationToken;
 
-                // if the Pi sent a serial instead of an ID, let's look up the sensor
                 if (!string.IsNullOrWhiteSpace(reading.SensorSerial))
                 {
-                    // find or create the sensor - one call does it all
                     var sensor = await Sensor.Ensure(reading.SensorSerial, ct);
 
-                    // update sensor's last seen and capabilities
                     sensor.LastSeenAt = reading.SampledAt;
-                    sensor.Capabilities |= SensorCapabilities.SoilHumidity;  // mark that this sensor reports humidity
+                    sensor.Capabilities |= SensorCapabilities.SoilHumidity;
                     if (reading.TemperatureC.HasValue)
                     {
-                        sensor.Capabilities |= SensorCapabilities.Temperature;  // OR the flags together
+                        sensor.Capabilities |= SensorCapabilities.Temperature;
                     }
-                    await sensor.Save(ct);  // Save() works on both Entity<T> and Entity<T,K>
+                    await sensor.Save(ct);
 
-                    // now set the reading's IDs from the sensor
-                    reading.SensorId = sensor.Id;  // sensor.Id IS the serial
-                    reading.PlotId = sensor.PlotId;  // might be null if sensor not bound to a plot yet
+                    reading.SensorId = sensor.Id;
+                    reading.PlotId = sensor.PlotId;
                 }
 
                 return EntityLifecycleResult.Proceed();

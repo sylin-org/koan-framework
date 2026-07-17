@@ -1,47 +1,74 @@
-﻿# g1c1.GardenCoop
+# Garden Cooperative
 
-## Contract
+GardenCoop receives garden sensor readings, binds them to plots, and keeps one watering reminder
+active while recent soil humidity is dry. It is a local, durable web application: SQLite, REST,
+OpenAPI, admin UI, test authentication, startup facts, and the dashboard arrive through referenced
+Koan capabilities.
 
-- **Inputs**: .NET 10 SDK, Koan repo checked out, no external services. Sensors simulated via UI or curl.
-- **Outputs**: Console-hosted Koan slice with write-path automation and static AngularJS dashboard under `wwwroot/`.
-- **Error modes**: Startup misconfig (missing Koan deps), API failures during sensor loop, reminder lifecycle exceptions.
-- **Success criteria**: `dotnet run` launches console host, dashboard available at `http://localhost:5000`, reminders activate/retire as readings arrive, window close stops app. Release publishes ship as NativeAOT single-file binaries via `dotnet publish`.
+## Run the complete story
 
-## Running the slice
-
-```pwsh
-cd samples/guides/g1c1.GardenCoop
-pwsh ./start.ps1    # optional helper, or just `dotnet run`
-```
-
-- Windows users can call `start.bat` for the same Development run or `start-native.bat` to build and launch the NativeAOT binary (add `--rid linux-x64` to cross-compile from Windows).
-- The console prints lifecycle notes ("Sending email (fake)") when reminders activate.
-- Open the browser dashboard, toggle the sensor loop, or post readings manually.
-- Flip to the **Admin** tab to inspect sensors, their GUID serials, and rebind them to plots without reflashing hardware.
-- When the admin view needs auth, Koan auto-elects the in-process TestProvider and redirects to `/.testoauth/authorize`; no appsettings are required in Development.
-- Close the console window or press Ctrl+C to shut down.
-
-### Publish as NativeAOT
+From the repository root:
 
 ```pwsh
-dotnet publish g1c1.GardenCoop.csproj -c Release -r win-x64 --self-contained true
-./bin/Release/net10.0/win-x64/native/g1c1.GardenCoop.exe
+Set-Location samples/guides/g1c1.GardenCoop
+dotnet run -- --urls http://localhost:5000
 ```
 
-- Substitute `linux-x64` or `osx-arm64` for the runtime identifier when targeting other platforms.
-- The publish step produces a trimmed single-file binary under `bin/Release/net10.0/<rid>/native/` with SQLite embedded.
-- Environment defaults are identical to `dotnet run`; override URLs with `--urls` when needed.
+Open <http://localhost:5000>. A fresh database starts with three plots and three readings. Bed 3 is
+dry, so the write lifecycle creates one active reminder and the console reports the simulated email.
 
-## Key ingredients
+The same result is inspectable without the dashboard:
 
-- **Entity statics** (`Plot`, `Sensor`, `Reading`, `Reminder`, `Member`) with Koan relationships, including `SensorCapabilities` flags (soil humidity + temperature in Chapter 1).
-- **Lifecycle automation** (`GardenAutomation`) that averages the latest readings and upserts reminders on the write path.
-- **Seeder** populating three plots/sensors and generating initial readings so one reminder fires on boot.
-- **AngularJS dashboard + admin view** served from `wwwroot/`, using CDN assets to keep scaffolding minimal.
+```pwsh
+Invoke-RestMethod http://localhost:5000/api/garden/plots
+Invoke-RestMethod http://localhost:5000/api/garden/reminders
+Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
+```
 
-## Next steps
+Stop the application with Ctrl+C. No external service or configuration is required.
 
-- Add hysteresis (activate below 20%, retire above 24%).
-- Introduce per-plot thresholds stored on `Plot`.
-- Light up additional `SensorCapabilities` (air humidity for rain dampening, GPS for future chapters).
-- Chapter 2 (`g1c2`) can pivot to Mongo or add a digest worker without rewriting the slice.
+## Why the code stays small
+
+`Program.cs` is the complete host:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
+var app = builder.Build();
+await app.RunAsync();
+```
+
+The application contains only its meaningful responsibilities:
+
+- `Entity<T>` models describe members, plots, sensors, readings, and reminders.
+- `EntityController<T>` controllers expose their standard HTTP capabilities.
+- `GardenAutomation` declares sensor binding and watering rules at the Entity lifecycle boundary.
+- `GardenCoopModule : KoanModule` composes those rules, seeds the first useful state, and explains the
+  application in Koan's startup report.
+
+Adding or removing a Koan project/package reference changes the available infrastructure capability;
+the business host does not need parallel provider wiring.
+
+## NativeAOT
+
+GardenCoop is also a measured NativeAOT sample. Opt in through Koan's local project gate so the AOT
+property does not flow into source-generator projects:
+
+```pwsh
+dotnet publish samples/guides/g1c1.GardenCoop/g1c1.GardenCoop.csproj `
+  -c Release -r win-x64 --self-contained true -p:KoanAot=true
+```
+
+Run the executable from its publish directory so standard ASP.NET content-root discovery finds the dashboard:
+
+```pwsh
+Set-Location samples/guides/g1c1.GardenCoop/bin/Release/net10.0/win-x64/publish
+./g1c1.GardenCoop.exe
+```
+
+The publish directory is a self-contained native deployment containing the executable, the static
+dashboard, and SQLite's native library; it is not described as a single-file deployment.
+
+The same project can target another supported RID when its NativeAOT toolchain is installed. See the
+[NativeAOT guide](../../../docs/guides/nativeaot-howto.md) for platform prerequisites and the current
+analysis-warning boundary.

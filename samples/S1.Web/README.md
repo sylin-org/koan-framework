@@ -1,124 +1,97 @@
-# S1.Web - Koan Framework Relationship System Demo
+# S1.Web — tasks and relationships
 
-This enhanced S1 sample demonstrates the new relationship system in Koan Framework, showcasing instance-based relationship navigation, batch loading, and streaming capabilities, along with a minimal AngularJS UI.
+S1 is the smallest complete example of a business model whose relationships remain equally readable for one entity, a finite set, and an asynchronous stream.
 
-The application code uses one inferred operation across cardinalities: `todo.Relatives()`,
-`todos.Relatives()`, and `Todo.AllStream().Relatives()`. Parent and child batching, backend safety
-negotiation, and source ordering remain inside Data.Core.
-
-## Entity Relationships
-
-The sample includes a hierarchical entity structure:
-
-```
-User (1) ──────┐
-               ├──> Todo (N) ──> TodoItem (N)
-Category (1) ──┘
+```text
+User ─────┐
+          ├──> Todo ──> TodoItem
+Category ─┘
 ```
 
-### Entities & Relationships
+## Run to a meaningful result
 
-- **User**: Represents users who create todos
-- **Category**: Organizes todos into categories (Work, Personal, etc.)
-- **Todo**: Main todo items with relationships to User and Category
-- **TodoItem**: Sub-tasks within a todo
-
-## API Endpoints
-
-### Standard CRUD Operations
-
-- Health endpoint: GET /api/health
-- CRUD base routes: /api/todo, /api/users, /api/categories, /api/todoitems
-- Bulk ops: POST /api/todo/bulk and DELETE /api/todo/bulk
-- Clear all: DELETE /api/todo/clear-all
-- Pagination headers: X-Total-Count, X-Page, X-Page-Size, X-Total-Pages, plus RFC 5988 Link
-
-### Relationship System Features
-
-- **Seeding with relationships**: POST /api/todo/seed-with-relationships
-- **Relationship demo**: GET /api/todo/relationship-demo/{id}
-- **Streaming demo**: GET /api/todo/streaming-demo
-- **Entity enrichment**: GET /api/todo?with=all (new RelationshipGraph format)
-
-## Quick Testing Guide
-
-### 1. Setup Data with Relationships
-
-```bash
-# Create users
-POST /api/users/seed/5
-
-# Create categories
-POST /api/categories/seed
-
-# Create interconnected todos and todo items
-POST /api/todo/seed-with-relationships
-```
-
-### 2. Test New Relationship Features
-
-```bash
-# Get enriched todos with RelationshipGraph format
-GET /api/todo?with=all
-
-# Comprehensive relationship navigation demo
-GET /api/todo/relationship-demo/{id}
-
-# Batch loading and streaming performance demo
-GET /api/todo/streaming-demo
-```
-
-## Run locally
-
-Launch the sample without Docker using the console bootstrap (mirrors `g1c1`):
-
-- **Windows (cmd or PowerShell)**
-
-    ```powershell
-    # defaults to http://localhost:4998
-    ./start.bat
-
-    # pass additional app arguments (e.g., custom URLs)
-    ./start.bat --urls "http://localhost:5055"
-    ```
-
-- **PowerShell helper with optional first-argument URL**
-
-    ```powershell
-    ./start.ps1                 # http://localhost:4998
-    ./start.ps1 "http://localhost:5055"
-    ./start.ps1 -AppArgs @('--urls','http://localhost:5055')
-    ```
-
-Both scripts set Development environments, spawn `dotnet run --project S1.Web.csproj --no-launch-profile`, and rely on the app lifecycle to open the browser once the server is listening while keeping the app on HTTP by default.
-
-Manual alternative:
+From the repository root:
 
 ```powershell
-# From repo root
-$env:ASPNETCORE_URLS = "http://localhost:4998"
-dotnet run --project "Koan/samples/S1.Web/S1.Web.csproj" --no-launch-profile
+dotnet run --project samples/S1.Web -- --urls http://localhost:5000
 ```
 
-> If you skip `--no-launch-profile`, the default Visual Studio launch profile will re-enable HTTPS and prompt for the ASP.NET Core developer certificate.
+Open <http://localhost:5000>, select **Reset the story**, and inspect the same relationship context across all three cardinalities.
 
-## Quick API tests
+The API path is just as short:
 
-Use the included requests.http file (VS Code "REST Client" extension) or copy curl equivalents.
+```http
+POST http://localhost:5000/api/todos/reset-demo
+GET  http://localhost:5000/api/todos/todo-proposal/context
+GET  http://localhost:5000/api/todos/relationships/set?limit=3
+GET  http://localhost:5000/api/todos/relationships/stream?limit=3
+```
 
-## Container (optional)
+`reset-demo` is deliberately destructive and deterministic. It replaces only this sample's four collections with two people, two categories, three tasks, and four task items.
 
-Existing Docker helpers remain available when you need containers:
+## Read the application
 
-- `./start-docker.bat [hostPort]`
-- `./start-compose.bat`
-- `./stop-docker.bat`
+The host contains only Koan's bootstrap contract:
 
-They still build the Dockerfile in this folder and mount `.Koan/Data` for persistence, but the primary path for day-to-day development is now the console bootstrap above.
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
+var app = builder.Build();
+await app.RunAsync();
+```
 
-## Notes
+Relationships are declared where the business says they exist:
 
-- Program.cs now mirrors the g1c1 console bootstrap: simple logging, lifecycle hooks, and browser launch once the app is ready.
-- Application policy (ProblemDetails, Rate Limiting) is configured in the app (see `Program.cs`).
-- JSON adapter persists under ./data by default; safe for dev.
-- For demo pagination, the controller emits headers and Link relations; the UI reads them to enable navigation.
+```csharp
+public sealed class Todo : Entity<Todo>
+{
+    [Parent(typeof(User))]
+    public string UserId { get; set; } = string.Empty;
+
+    [Parent(typeof(Category))]
+    public string CategoryId { get; set; } = string.Empty;
+}
+```
+
+CRUD exposure remains a declaration:
+
+```csharp
+[Route("api/users")]
+public sealed class UserController : EntityController<User>;
+```
+
+The relationship operation keeps the same intent as cardinality changes:
+
+```csharp
+await todo.Relatives(ct);
+await todos.Relatives(ct);
+Todo.AllStream(batchSize: 2).Relatives(ct);
+```
+
+Data.Core owns relationship discovery, batching, backend query negotiation, source ordering, and graph construction. The controller owns only the sample's bounded HTTP shape.
+
+## Referenced capability, activated behavior
+
+The project references SQLite, Web.Extensions, and Cache. Koan discovers and composes them during `AddKoan()`:
+
+- SQLite becomes the sole data provider, so entities need no provider annotation.
+- Web.Extensions brings the web capability that discovers `EntityController<T>` declarations and serves the dashboard.
+- `[Cacheable(120)]` opts `Category` into the cache pipeline; entities without the attribute remain ordinary data entities.
+
+The source checkout also emits [koan.lock.json](koan.lock.json) through the repository's shared source-app policy. Package consumers receive the same composition target transitively from Koan.Core.
+
+## Inspect what Koan decided
+
+- Runtime facts: <http://localhost:5000/.well-known/Koan/facts>
+- Health: <http://localhost:5000/api/health>
+- Repeatable requests: [requests.http](requests.http)
+
+Startup reporting and the facts document expose selected modules, providers, capability decisions, and any failed collections. The dashboard depends only on the public HTTP surface; it has no private testing hooks.
+
+## Project map
+
+- `Program.cs` — application identity and Koan bootstrap
+- `User.cs`, `Category.cs`, `Todo.cs`, `TodoItem.cs` — business model
+- `*Controller.cs` — declared CRUD plus the three relationship demonstrations
+- `wwwroot/` — small, dependency-free executable explanation
+- `requests.http` — the complete API journey

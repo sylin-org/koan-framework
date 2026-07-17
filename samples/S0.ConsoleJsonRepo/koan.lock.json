@@ -8,7 +8,11 @@
   "modules": [
     {
       "id": "Koan.Cache.Abstractions",
-      "version": "0.17"
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Communication",
+      "version": "0.20"
     },
     {
       "id": "Koan.Core",
@@ -28,7 +32,7 @@
     },
     {
       "id": "Koan.Data.Core",
-      "version": "0.18"
+      "version": "0.19"
     },
     {
       "id": "Koan.Orchestration.Abstractions",
@@ -38,15 +42,7 @@
   "directReferences": [
     {
       "kind": "project",
-      "id": "Koan.Data.Abstractions"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Data.Connector.Json"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Data.Core"
+      "id": "Sylin.Koan"
     }
   ]
 }

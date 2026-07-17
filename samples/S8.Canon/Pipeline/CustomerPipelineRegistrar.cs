@@ -5,7 +5,7 @@ namespace S8.Canon.Pipeline;
 
 /// <summary>
 /// Configures the Customer canonization pipeline with validation and enrichment contributors.
-/// Registered automatically via KoanAutoRegistrar.
+/// Registered automatically by the sample's single <c>CanonSampleModule</c>.
 /// </summary>
 public class CustomerPipelineRegistrar : ICanonRuntimeConfigurator
 {

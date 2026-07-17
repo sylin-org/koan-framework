@@ -24,7 +24,7 @@
     },
     {
       "id": "Koan.Cache.Abstractions",
-      "version": "0.17"
+      "version": "0.18"
     },
     {
       "id": "Koan.Core",
@@ -36,7 +36,7 @@
     },
     {
       "id": "Koan.Data.AI",
-      "version": "0.18"
+      "version": "0.19"
     },
     {
       "id": "Koan.Data.Abstractions",
@@ -48,7 +48,7 @@
     },
     {
       "id": "Koan.Data.Core",
-      "version": "0.18"
+      "version": "0.19"
     },
     {
       "id": "Koan.Data.Relational",
@@ -68,14 +68,6 @@
     },
     {
       "id": "Koan.Media.Abstractions",
-      "version": "0.17"
-    },
-    {
-      "id": "Koan.Messaging.Connector.InMemory",
-      "version": "0.17"
-    },
-    {
-      "id": "Koan.Messaging.Core",
       "version": "0.18"
     },
     {
@@ -89,13 +81,13 @@
     {
       "id": "Koan.Web",
       "version": "0.17"
+    },
+    {
+      "id": "Koan.Web.Extensions",
+      "version": "0.17"
     }
   ],
   "directReferences": [
-    {
-      "kind": "project",
-      "id": "Koan.AI"
-    },
     {
       "kind": "project",
       "id": "Koan.AI.Connector.Onnx"
@@ -110,27 +102,11 @@
     },
     {
       "kind": "project",
-      "id": "Koan.Data.Core"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Data.Vector"
-    },
-    {
-      "kind": "project",
       "id": "Koan.Data.Vector.Connector.SqliteVec"
     },
     {
       "kind": "project",
-      "id": "Koan.Messaging.Connector.InMemory"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Messaging.Core"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Web"
+      "id": "Koan.Web.Extensions"
     }
   ]
 }

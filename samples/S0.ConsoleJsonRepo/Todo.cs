@@ -1,9 +1,16 @@
+using Koan.Data.Core;
 using Koan.Data.Core.Model;
 
-namespace S0.ConsoleJsonRepo
+namespace S0.ConsoleJsonRepo;
+
+public sealed class Todo : Entity<Todo>
 {
-    public class Todo : Entity<Todo>
+    public string Title { get; set; } = string.Empty;
+    public bool Done { get; set; }
+
+    public async Task Complete(CancellationToken ct = default)
     {
-        public string Title { get; set; } = "";
+        Done = true;
+        await this.Save(ct);
     }
 }

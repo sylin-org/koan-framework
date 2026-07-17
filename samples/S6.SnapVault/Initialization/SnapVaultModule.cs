@@ -23,8 +23,6 @@ namespace S6.SnapVault.Initialization;
 /// </summary>
 public sealed class SnapVaultModule : KoanModule
 {
-    public override string Id => "S6.SnapVault";
-
     public override void Register(IServiceCollection services)
     {
         // Bind SnapVault:Collections -> CollectionOptions (was services.Configure<>(...) in the old Program.cs).
