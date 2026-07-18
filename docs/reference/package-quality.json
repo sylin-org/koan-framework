@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 106,
+    "packages": 105,
     "repairRequired": 16,
-    "reviewRequired": 22,
+    "reviewRequired": 21,
     "structurallyReady": 68,
-    "ownedReadmes": 90,
-    "technicalCompanions": 85,
-    "findings": 101
+    "ownedReadmes": 89,
+    "technicalCompanions": 84,
+    "findings": 97
   },
   "findingDefinitions": [
     {
@@ -2121,33 +2121,6 @@
       "technicalDocumentation": "src/Connectors/Web/Auth/Test/TECHNICAL.md",
       "packageIcon": "icon.png",
       "findings": []
-    },
-    {
-      "packageId": "Sylin.Koan.Web.Auth.Roles",
-      "projectPath": "src/Koan.Web.Auth.Roles/Koan.Web.Auth.Roles.csproj",
-      "shape": "library",
-      "role": "projection",
-      "status": "review-required",
-      "description": "Role attribution layer for Koan Web Auth: policy-backed role stores, attribute wiring, and controller extensions.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Web.Auth",
-        "Sylin.Koan.Web.Auth.Abstractions",
-        "Sylin.Koan.Web.Extensions"
-      ],
-      "readme": "src/Koan.Web.Auth.Roles/README.md",
-      "technicalDocumentation": "src/Koan.Web.Auth.Roles/TECHNICAL.md",
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Server",

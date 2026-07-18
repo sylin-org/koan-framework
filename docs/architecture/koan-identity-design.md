@@ -17,7 +17,7 @@ Koan today has **no durable user/identity entity.** Identity is 100% claims-driv
 - `RefreshToken.Subject` / `AgentGrant.Subject` / `CurrentUserDto.Id` — all denormalized claim strings.
 - `IUserStore` (`Koan.Web.Auth`) is an **empty `Exists()` stub** — the intended user store was never built.
 
-Everything else is already built and stays: sign-in (`Koan.Web.Auth` OAuth/OIDC + cookie + `ExternalIdentity`), token issuance/validation (`Koan.Security.Trust`, `Koan.Web.Auth.Server`), the role *catalog* (`Koan.Web.Auth.Roles`: `Role`/`RoleAlias`/`RolePolicyBinding`), the authorization floor (`Koan.Web` `[Access]` + `EntityAccess<T>` + `IAuthorize` + `EntityFloorAuthorizationProvider` + `AgentGrant`), and tenancy (`Koan.Tenancy` `TenantRecord`/`Membership`/`Invite` + the fail-closed ambient axis + the ARCH-0100 carrier).
+Everything else is already built and stays: sign-in (`Koan.Web.Auth` OAuth/OIDC + cookie + `ExternalIdentity`), token issuance/validation (`Koan.Security.Trust`, `Koan.Web.Auth.Server`), standard .NET role claims with Entity-first global/tenant bindings (`IdentityRole` and `Membership.Roles`), the authorization floor (`Koan.Web` `[Access]` + `EntityAccess<T>` + `IAuthorize` + `EntityFloorAuthorizationProvider` + `AgentGrant`), and tenancy (`Koan.Tenancy` `TenantRecord`/`Membership`/`Invite` + the fail-closed ambient axis + the ARCH-0100 carrier).
 
 **`Koan.Identity` supplies the missing keystone — the person — and the management/self-service experience that no .NET option ships, then composes with all of the above.**
 
@@ -40,7 +40,7 @@ The day-2 delights the market charges for or structurally can't do are **near-fr
 
 **Owns (net-new):** `Identity` (person) + attached **factors** (verified emails, linked external identities, optional local credential, passkeys/MFA); sign-in→identity **reconciliation** (implements `IUserStore`); **groups**; durable **sessions/devices**; **impersonation** primitive; **API tokens** (`Entity<ApiToken>`); **audit** emission; the **effective-access resolver/explainer**; the **two consoles** (`Koan.Identity.Web`); a **global user↔role binding**.
 
-**Composes with (no duplication):** `Koan.Web.Auth` (sign-in; relates `ExternalIdentity` → `Identity`), `Koan.Security.Trust` + `Koan.Web.Auth.Server` (tokens, the `actor` claim), `Koan.Web.Auth.Roles` (the **one** role catalog), `Koan.Web` `[Access]`/`EntityAccess`/`AgentGrant`/`IAuthorize` (authz floor), `Koan.Tenancy` (`Membership`/`Invite`).
+**Composes with (no duplication):** `Koan.Web.Auth` (sign-in; relates `ExternalIdentity` → `Identity`), `Koan.Security.Trust` + `Koan.Web.Auth.Server` (tokens, the `actor` claim), standard .NET role claims projected from `IdentityRole` and `Membership.Roles`, `Koan.Web` `[Access]`/`EntityAccess`/`AgentGrant`/`IAuthorize` (authz floor), and `Koan.Tenancy` (`Membership`/`Invite`).
 
 **Is NOT:** a standalone IdP/SSO server (that's `Auth.Server` + connectors); a new policy engine (the `[Access]`↔`EntityAccess` range already spans simple→fine-grained — the story is **evolve in place**, not Rego/Cedar); the tenancy control plane. *Resisting Keycloak-ification is the discipline that keeps it shippable.*
 
@@ -48,7 +48,7 @@ The day-2 delights the market charges for or structurally can't do are **near-fr
 
 - **D1 — Identity is the noun; membership = `identity × tenant`.** `Koan.Tenancy` keeps `Membership`; `Koan.Identity` gives `Membership.IdentityId` a real backing entity (soft-FK v1: string column + logical reference, no breaking migration).
 - **D2 — Full management suite, phased.** All capabilities in §6 are in scope; §7 sequences them so each phase is green and dogfoodable.
-- **D3 — One role catalog, two binding scopes.** Catalog stays in `Koan.Web.Auth.Roles`. `Koan.Identity` adds a **global** user↔role binding (no-tenancy case) + the effective-access resolver; `Membership.Roles` stays the **tenancy** binding. (WorkOS/Auth0 prior art.)
+- **D3 — One role vocabulary, two binding scopes.** Role keys use standard .NET string/claim semantics. `Koan.Identity` owns the **global** user↔role binding (no-tenancy case) + the effective-access resolver; `Membership.Roles` stays the **tenancy** binding. A governed definition catalog is deferred until an application needs definitions that constrain real grants or policies.
 - **D4 — Optional local-credential factor.** Password + passkey as opt-in attached factors (off by default; external-IdP-only stays the zero-config default); portable PHC/bcrypt hashes as part of the anti-lock-in promise.
 - **D5 — Person ≠ email.** One identity holds multiple **attached verified factors** (emails + SSO links + credentials) and many **revocable memberships**, with per-membership display overrides. Dissolves duplicate accounts, merge-hell, method-lockout, and departure-lockout at the root.
 - **D6 — Compose, don't duplicate.** The authz floor, sign-in, token issuance, and tenancy already exist; `Koan.Identity` references them.
@@ -64,7 +64,7 @@ The day-2 delights the market charges for or structurally can't do are **near-fr
 - **`Session`** (`Entity<Session>`, `[Parent(Identity)]`) — durable session/device record (device/browser/OS, approx city, first-seen/last-active, `IsCurrent` server-tagged) → the device list + "sign out everywhere-else".
 - **`ApiToken`** (`Entity<ApiToken>`, `[Parent(Identity)]`) — scoped/named/`ExpiresAt`/last-used PAT; rotate = new row, scopes preserved, brief overlap.
 - **`AuditEvent`** (append-only channel) — canonical `actor / action / target / before→after / context(IP,UA) / occurred_at`; emitted automatically by the lifecycle seam on identity/access mutations; optional hash-chaining; SIEM stream.
-- **Reused:** `Role`/`RoleAlias`/`RolePolicyBinding` (the catalog), `AgentGrant` (impersonation requests + JIT/time-boxed grants + support access — all `Save()`-to-issue/`Remove()`-to-revoke/`Query()`-to-observe on one primitive), `Membership`/`Invite` (tenancy binding).
+- **Reused:** standard role claims plus `IdentityRole`/`Membership.Roles` bindings, `AgentGrant` (impersonation requests + JIT/time-boxed grants + support access — all `Save()`-to-issue/`Remove()`-to-revoke/`Query()`-to-observe on one primitive), and `Membership`/`Invite` (tenancy binding).
 - **New binding:** `IdentityRole` (`[Parent(Identity)]`) — the **global** user↔role binding for the no-tenancy case (catalog from `Auth.Roles`).
 
 ## 6. Capability spec (delight/pain → capability)
@@ -77,7 +77,7 @@ Tag: **[T]**able-stakes · **[D]**ifferentiator. Each kills a research-cited pai
 
 **C. Operator console** — user list as an `Entity<T>` query (fuzzy/multi-field/custom-attr search, cursor paging); **uncapped bulk lifecycle** (suspend≠delete, preview+partial-failure, one audit batch); **lifecycle-aware delete** (detect dependents → reassign/anonymize/cascade, never a raw FK error); groups; role assignment. **[D]** (the ASP.NET-Identity / headless gap).
 
-**D. Access model & explainability** — the one catalog bound globally or per-membership; **effective-permissions panel** (flatten additive grants to one human answer); **role-overlap detector** (catch role explosion pre-commit); **bidirectional explainer** ("can X do Y on Z?" + "why does X have access to Z?" → the exact binding, one-click revoke); **self-explaining denials/allows** on the SEC-0004 seam; **author-time lint** (always-allow/unreachable/shadowed fail to save) + **preview==production** simulator on the real engine; in-place RBAC→ABAC/ReBAC evolution (no enforcement-code change). **[D]**.
+**D. Access model & explainability** — one standard role vocabulary bound globally or per-membership; **effective-permissions panel** (flatten additive grants to one human answer); **role-overlap detector** (catch role explosion pre-commit); **bidirectional explainer** ("can X do Y on Z?" + "why does X have access to Z?" → the exact binding, one-click revoke); **self-explaining denials/allows** on the SEC-0004 seam; **author-time lint** (always-allow/unreachable/shadowed fail to save) + **preview==production** simulator on the real engine; in-place RBAC→ABAC/ReBAC evolution (no enforcement-code change). **[D]**.
 
 **E. Day-2 power** — **safe impersonation** (actor-claim + carrier + auto-banner + 403-on-dangerous + request→approve→time-boxed on `AgentGrant`, no-self-approval, user-revocable, dual-sided audit); **JIT/time-boxed grants** (no standing admin; customer-grantable read-only support access distinct from impersonation; pre-expiry one-click extend; break-glass); **tamper-evident change-audit** + customer-facing view + SIEM stream. **[D]**.
 
@@ -91,7 +91,7 @@ Each phase compiles green; SnapVault is the driving consumer; per-phase: TDD-whe
 
 - **P0 — Person core + the seam.** `Identity` + `IdentityEmail` + factor model; reconciliation (implement `IUserStore`, relate `ExternalIdentity`); `Membership.IdentityId` soft-FK → `Identity`; dev-open/prod-closed posture + offline seeded dev users; `AuditEvent` channel scaffold.
 - **P1 — The two consoles + sessions.** `Koan.Identity.Web` auto-mounts the operator console (search/bulk/lifecycle/groups) + the self-service panel (profile/sessions-devices/connected/tokens/export-delete); durable `Session`/device list + "sign out everywhere-else"; audit-by-construction live.
-- **P2 — Access model & explainability.** `IdentityRole` global binding (one catalog); effective-access resolver; bidirectional explainer; self-explaining denials/allows; author-time lint + real-engine simulator; groups→role mapping.
+- **P2 — Access model & explainability.** `IdentityRole` global binding over standard role keys; effective-access resolver; bidirectional explainer; self-explaining denials/allows; author-time lint + real-engine simulator; groups→role mapping.
 - **P3 — Day-2 power.** Safe impersonation (actor claim + carrier + banner + 403 + request/approve on `AgentGrant`); JIT/time-boxed grants + support access + break-glass; tamper-evident audit + SIEM stream; Security Checkup + recovery + risk-tiered activity; local-credential + passkey/MFA factors.
 - **P4 — Membership (tenancy-on).** Invite-binds-to-identity + collision reconcile; the per-tenant resolver + safe domain routing + sprawl inventory; seat=active-member; atomic verifiable deprovisioning.
 - **P5 — SnapVault dogfood + measure.** Wire studios onto it; demonstrate the moats (person-identity, atomic deprovisioning, instant switching, safe impersonation); record the before/after reduction.

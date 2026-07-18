@@ -2187,25 +2187,6 @@
       "claims": []
     },
     {
-      "packageId": "Sylin.Koan.Web.Auth.Roles",
-      "shape": "library",
-      "description": "Role attribution layer for Koan Web Auth: policy-backed role stores, attribute wiring, and controller extensions.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Web.Auth",
-        "Sylin.Koan.Web.Auth.Abstractions",
-        "Sylin.Koan.Web.Extensions"
-      ],
-      "readme": "src/Koan.Web.Auth.Roles/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": "src/Koan.Web.Auth.Roles/TECHNICAL.md",
-      "claims": []
-    },
-    {
       "packageId": "Sylin.Koan.Web.Auth.Server",
       "shape": "library",
       "description": "SEC-0006 embedded OAuth 2.1 Authorization Server for Koan: the MCP auth on-ramp. Mints asymmetric (ES256) access tokens for OAuth clients via Authorization Code \u002B PKCE and the Device Authorization Grant, advertises itself per the MCP authorization spec, and reuses the trust fabric for issuance. Opt-in leaf (Reference = Intent).",

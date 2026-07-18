@@ -2340,6 +2340,80 @@ Status: `retired with focused proof complete`.
 Historical ADRs, archived proposals, assessment evidence, and attic content remain intact as dated evidence; current
 solution, samples, package inventories, and architecture inventory no longer present the retired package as active.
 
+### Role administration leaf discovery
+
+**Task:** Decide whether `Sylin.Koan.Web.Auth.Roles` is the effective role catalog promised by Identity/auth
+architecture, should coalesce into Identity, or should retire until a real role-definition use case exists.
+
+**Application intent:** “Grant a person a role and have authorization honor it.” Koan already expresses this directly:
+`IdentityRole` is the global person-to-role binding, `Membership.Roles` is the tenant binding, sign-in/request pipelines
+project both as standard .NET role claims, and ASP.NET authorization consumes those claims. A separate role-definition
+catalog is meaningful only if it constrains grants, drives policy compilation, or produces a proved admin experience.
+
+**Public expression:** Keep the effective expression already owned by Identity and standard .NET authorization. Do not
+require a catalog package, store interfaces, snapshot provider, import/export controller, custom requirement strings,
+or manual policy-registration helper merely to use role claims. A future catalog may be an Entity-first Identity/admin
+capability, but only when a golden application needs role metadata or governed assignment.
+
+**Guarantee/correction:** The current package does not make its catalog effective. No source outside the package
+consumes `Role`, `RoleAlias`, `RolePolicyBinding`, their store interfaces, or the snapshot. The named
+`auth.roles.admin` policy protecting its controller is never registered; persisted `RolePolicyBinding` values never
+compile into ASP.NET policies; aliases never normalize a grant or principal; role keys are not validated against the
+catalog; and `RowVersion` is copied but not enforced. The controller's export reads configured aliases rather than
+stored aliases. Default aliases can make the stores non-empty before any configured role exists, preventing later
+first-run role seeding.
+
+**Security/operational findings:** The optional first-user bootstrap is not atomic across nodes: check and mark are
+separate Entity operations, so concurrent sign-ins can both elevate. It catches store failures and silently skips
+instead of producing an inspectable correction. The hosted seeder infers production from a process environment
+variable instead of `IHostEnvironment`, catches all startup failures, and reports success only through logs. The
+package has no owned tests or application consumer; its build has two warnings and its README/TECHNICAL teach the
+removed `IKoanAuthEventContributor` contract. Generated product truth assigns it no claim.
+
+**Docs and code read:** All package source and companions, current consumers, solution/project graph, Identity's
+`IdentityRole`/management/reconciliation/access tests, Web.Extensions policy registration, Auth lifecycle options,
+the superseded Identity design note, current product truth, and relevant history were inspected. The closest honest
+pattern is the existing Entity-first Identity binding projected to ordinary `ClaimTypes.Role`, not the package's
+interface-wrapped Entity stores or inert string DSL.
+
+**Coalescence:** Retire the package rather than move its concepts. Remove the now-orphaned `AdminBootstrap` option from
+the inert Auth contracts; keep the independent role-list sign-in handler because it has real behavior and no Roles
+dependency. Do not add a `Role` Entity to Identity merely for structural symmetry: strings are the standard .NET role
+contract today, while a catalog is a future business capability requiring validation, assignment UX, policy effects,
+and tests. This keeps one effective authorization path and avoids turning speculative metadata into framework law.
+
+**Disposition:** Retire `Sylin.Koan.Web.Auth.Roles` in V1. Remove it from the active solution/package graph and remove
+the dead bootstrap configuration vocabulary. Update current architecture inventory and generated truth; retain ADRs,
+archived/assessment evidence, and the explicitly superseded long-form Identity plan as dated design history, with a
+current correction where needed. Prove Auth Abstractions/Web Auth and Identity's role behavior after the cut.
+
+**Ergonomics:** Developers and models see one direct rule: grant role strings through Identity or Membership and use
+standard `[Authorize(Roles = ...)]`; reading code is reading the access decision. Operators no longer see an admin
+route, policy-binding store, alias snapshot, and bootstrap knobs that do not govern authorization. Framework authors
+gain no replacement interfaces or lifecycle mechanism.
+
+### Role administration leaf implementation
+
+Status: `retired with focused proof complete`.
+
+- Removed `Sylin.Koan.Web.Auth.Roles` from the solution and active package graph. No catalog entities, store wrappers,
+  snapshot cache, seed hosted service, unregistered admin policy/controller, manual capability-policy helper, or
+  non-atomic first-user elevation remains as a V1 promise.
+- Removed the orphaned `AdminBootstrap` configuration shape from inert Web Auth contracts. The independently useful
+  role-list sign-in handler remains in Web Auth; it continues to operate on standard role claims without this package.
+- Web Auth passes 39/39 after the contract cut. Identity passes 114/114, including global `IdentityRole`, tenant
+  `Membership.Roles`, effective-access explanation, role stamping, and authorization behavior; the known independent
+  `ImpersonationController.Request` member-hiding warning remains visible for Identity graduation.
+- Current architecture prose now describes the effective model—standard role keys with Entity-first global/tenant
+  bindings—rather than the removed catalog assumption. ADRs and explicitly historical evidence remain unchanged.
+- Canonical truth now contains 105 packages: 16 repair-required, 21 review-required, and 68 structurally ready;
+  product surface remains 24 claims across 105 packages. No support claim required migration because the package was
+  unassessed and had no product claim.
+
+A future governed role catalog is not prohibited. Its admission bar is a golden consumer whose role definitions
+validate grants, drive actual authorization policy, produce a safe assignment/admin flow, and remain inspectable; it
+should then live with Identity's person/access domain rather than reappear as a disconnected Web Auth projection.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;
