@@ -104,7 +104,6 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private readonly IStorageNameResolver _nameResolver;
     private readonly StorageNameResolver.Convention _conv;
     private readonly ILinqSqlDialect _dialect = new MsSqlDialect();
-    private readonly int _defaultPageSize;
     private readonly ILogger _logger;
     private readonly JsonSerializerSettings _json;
     private readonly RelationalSchemaPolicy _schemaPolicy;
@@ -126,7 +125,6 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                       ? lf.CreateLogger($"Koan.Data.Connector.SqlServer[{typeof(TEntity).FullName}]")
                       : NullLogger.Instance);
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
-        _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
         _schemaPolicy = new RelationalSchemaPolicy
         {
             Projections = RelationalProjectionMode.ComputedProjections,
@@ -586,9 +584,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         else
         {
             var whereSql = RewriteWhereForProjection(query);
-            var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
-            var offset = shaping.EffectiveOffset();
-            var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE {whereSql} {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {size} ROWS ONLY";
+            var paging = shaping.HasPagination
+                ? $" OFFSET {shaping.EffectiveOffset()} ROWS FETCH NEXT {shaping.EffectivePageSize()} ROWS ONLY"
+                : string.Empty;
+            var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE {whereSql} {OrderByIdClause}{paging}";
             var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
             return new RepositoryQueryResult<TEntity>
             {

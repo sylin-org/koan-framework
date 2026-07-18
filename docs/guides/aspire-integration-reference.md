@@ -1363,13 +1363,15 @@ KOAN_DATA_POSTGRES_DATABASE=mydb
         "Username": "postgres",
         "Password": "postgres",
         "Database": "KoanAspireDemo"
-      },
-      "DefaultPageSize": 50,
-      "MaxPageSize": 1000
+      }
     }
   }
 }
 ```
+
+Data adapters do not choose pagination defaults or caps. Configure pagination at the consuming
+boundary, such as an `EntityController<T>` with `[Pagination(...)]`; `Entity<T>.All()` remains an
+explicit full-set request.
 
 ## Docker Infrastructure
 

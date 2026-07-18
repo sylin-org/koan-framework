@@ -77,9 +77,7 @@ function Write-AdapterMatrixMarkdown {
         if ($line -match '^\s*[A-Za-z]') { $inGuard = $false }
 
         if ($inGuard) {
-          if ($line -match '^\s*defaultPageSize:\s*(\d+)') { $current.defaultPageSize = [int]$Matches[1] }
-          elseif ($line -match '^\s*maxPageSize:\s*(\d+)') { $current.maxPageSize = [int]$Matches[1] }
-          elseif ($line -match '^\s*defaultTopK:\s*(\d+)') { $current.defaultTopK = [int]$Matches[1] }
+          if ($line -match '^\s*defaultTopK:\s*(\d+)') { $current.defaultTopK = [int]$Matches[1] }
           return
         }
 
@@ -106,7 +104,7 @@ function Write-AdapterMatrixMarkdown {
     $lines = @()
     $lines += "<!-- Auto-generated from docs/reference/_data/adapters.yml. Do not edit manually. -->"
     $lines += ""
-    $lines += "| Adapter | Storage | Tx | Batching | Paging | Filter | Schema | Instruction | Vector | Guardrails | Notes |"
+    $lines += "| Adapter | Storage | Tx | Batching | Paging | Filter | Schema | Instruction | Vector | Operation bound | Notes |"
     $lines += "|---|---|---:|---:|---|---|---|---|---|---|---|"
 
     foreach ($a in $adapters) {
@@ -120,11 +118,8 @@ function Write-AdapterMatrixMarkdown {
       $instr = if ($a.instructionApi) { $a.instructionApi } else { 'n/a' }
       $vector = if ($a.vector) { $a.vector } else { 'none' }
       $guard = ''
-      $gps = $null; $gmps = $null; $gtk = $null
-      if ($a.guardrails) { $gps = $a.guardrails.defaultPageSize; $gmps = $a.guardrails.maxPageSize; $gtk = $a.guardrails.defaultTopK }
-      else { $gps = $a.defaultPageSize; $gmps = $a.maxPageSize; $gtk = $a.defaultTopK }
-      if ($gps -or $gmps) { $guard = "page $gps/$gmps" }
-      elseif ($gtk) { $guard = "topK $gtk" }
+      $gtk = if ($a.guardrails) { $a.guardrails.defaultTopK } else { $a.defaultTopK }
+      if ($gtk) { $guard = "topK $gtk" }
       $notes = ($a.notes ?? '') -replace '\r?\n', ' '
 
       $lines += "| $name | $stor | $tx | $batch | $paging | $filter | $schema | $instr | $vector | $guard | $notes |"

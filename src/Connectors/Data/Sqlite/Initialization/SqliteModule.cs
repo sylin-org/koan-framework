@@ -56,12 +56,6 @@ public sealed class SqliteModule : KoanModule
 
         var connection = ResolveDefaultConnectionForReport(cfg, defaultOptions);
 
-        var defaultPageSize = Koan.Core.Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-
         var namingStyle = Koan.Core.Configuration.ReadFirstWithSource(
             cfg,
             defaultOptions.NamingStyle,
@@ -106,7 +100,6 @@ public sealed class SqliteModule : KoanModule
         module.PublishConfigValue(SqliteItems.NamingStyle, namingStyle);
         module.PublishConfigValue(SqliteItems.Separator, separator);
         module.PublishConfigValue(SqliteItems.EnsureCreatedSupported, ensureCreated);
-        module.PublishConfigValue(SqliteItems.DefaultPageSize, defaultPageSize);
     }
 
     private static ConfigurationValue<string> ResolveDefaultConnectionForReport(

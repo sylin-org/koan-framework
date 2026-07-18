@@ -1,6 +1,6 @@
 <!-- Auto-generated from docs/reference/_data/adapters.yml. Do not edit manually. -->
 
-| Adapter | Storage | Tx | Batching | Paging | Filter | Schema | Instruction | Vector | Guardrails | Notes |
+| Adapter | Storage | Tx | Batching | Paging | Filter | Schema | Instruction | Vector | Operation bound | Notes |
 |---|---|---:|---:|---|---|---|---|---|---|---|
 | SQLite | relational/sqlite | Yes | No | native | linq | migrations | direct | none |  | Embedded development provider; ships as the default local store. |
 | PostgreSQL | relational/postgresql | Yes | Yes | native | linq | migrations | direct | pgvector |  | Primary production relational provider; enables pgvector for semantic workloads. |

@@ -114,6 +114,12 @@ One Entity grammar does not mean every provider has the same physical behavior. 
 describe whether filtering is native, bounded residual work, or in-memory. Provider-specific tests
 earn provider-specific claims.
 
+Pagination intent belongs to the caller, not the adapter. `Product.All()` requests the complete
+visible set; an adapter does not invent a default limit. `Product.Page(page, size)` and an explicitly
+paged `QueryDefinition` carry an exact page request to the selected provider. Consumer boundaries
+such as Web may apply documented defaults and safety bounds, but they compile that policy into an
+explicit page before Data executes it.
+
 - Use `Get`, `Query`, `FirstPage`/`Page`, `AllStream`, `Save`, and `Remove` as the common vocabulary.
 - Prefer explicit paging when the result can grow; use Entity streams only when the selected adapter
   advertises `DataCaps.Query.ProviderBoundedPaging`.

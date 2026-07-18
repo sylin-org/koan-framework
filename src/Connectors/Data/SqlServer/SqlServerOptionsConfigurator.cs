@@ -73,11 +73,6 @@ internal sealed class SqlServerOptionsConfigurator : AdapterOptionsConfigurator<
         }
 
         // Configure other SQL Server-specific options
-        options.DefaultPageSize = ReadProviderConfiguration(
-            options.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-
         var ddlStr = ReadProviderConfiguration(options.DdlPolicy.ToString(),
             Infrastructure.Constants.Configuration.Keys.DdlPolicy,
             Infrastructure.Constants.Configuration.Keys.AltDdlPolicy);

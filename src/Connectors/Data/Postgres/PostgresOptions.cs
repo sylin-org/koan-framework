@@ -15,7 +15,6 @@ public sealed class PostgresOptions : IAdapterOptions
     public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.HashedNamespace;
     public string Separator { get; set; } = ".";
     public string? SearchPath { get; set; } = "public";
-    public int DefaultPageSize { get; set; } = 50;
     public RelationalDdlPolicy DdlPolicy { get; set; } = RelationalDdlPolicy.AutoCreate;
     public RelationalSchemaMatchingMode SchemaMatching { get; set; } = RelationalSchemaMatchingMode.Relaxed;
     public bool AllowProductionDdl { get; set; } = false;

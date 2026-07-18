@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Koan.Core.Adapters;
@@ -35,15 +34,11 @@ public static class AdapterBootReporting
         where TOptions : IAdapterOptions
     {
         module.Describe(moduleVersion);
-        // Standard adapter capabilities
-        module.AddSetting($"{moduleName}:DefaultPageSize",
-            options.DefaultPageSize.ToString(CultureInfo.InvariantCulture));
-
         // Readiness configuration
         module.AddSetting($"{moduleName}:ReadinessPolicy",
             options.Readiness.Policy.ToString());
         module.AddSetting($"{moduleName}:ReadinessTimeout",
-            options.Readiness.Timeout.TotalSeconds.ToString(CultureInfo.InvariantCulture));
+            options.Readiness.Timeout.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
         module.AddSetting($"{moduleName}:ReadinessGating",
             options.Readiness.EnableReadinessGating.ToString());
 
@@ -154,15 +149,15 @@ public static class AdapterBootReporting
     {
         if (queryTimeout.HasValue)
             module.AddSetting($"{moduleName}:QueryTimeout",
-                queryTimeout.Value.TotalSeconds.ToString(CultureInfo.InvariantCulture));
+                queryTimeout.Value.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         if (connectionTimeout.HasValue)
             module.AddSetting($"{moduleName}:ConnectionTimeout",
-                connectionTimeout.Value.TotalSeconds.ToString(CultureInfo.InvariantCulture));
+                connectionTimeout.Value.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         if (retryCount.HasValue)
             module.AddSetting($"{moduleName}:RetryCount",
-                retryCount.Value.ToString(CultureInfo.InvariantCulture));
+                retryCount.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
 }

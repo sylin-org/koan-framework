@@ -61,12 +61,6 @@ public sealed class SqlServerDataModule : KoanModule
             Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlServer,
             Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
 
-        var defaultPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-
         var namingStyle = Configuration.ReadFirstWithSource(
             cfg,
             defaultOptions.NamingStyle,
@@ -113,7 +107,6 @@ public sealed class SqlServerDataModule : KoanModule
         module.PublishConfigValue(SqlServerItems.NamingStyle, namingStyle);
         module.PublishConfigValue(SqlServerItems.Separator, separator);
         module.PublishConfigValue(SqlServerItems.EnsureCreatedSupported, ensureCreated);
-        module.PublishConfigValue(SqlServerItems.DefaultPageSize, defaultPageSize);
     }
 
     private static string BuildSqlServerFallback()

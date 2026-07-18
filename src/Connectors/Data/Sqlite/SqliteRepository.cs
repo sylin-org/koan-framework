@@ -64,7 +64,6 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private readonly IStorageNameResolver _nameResolver;
     private readonly StorageNameResolver.Convention _conv;
     private readonly ILinqSqlDialect _dialect = new SqliteDialect();
-    private readonly int _defaultPageSize;
     private readonly ILogger _logger;
     private readonly RelationalSchemaPolicy _schemaPolicy;
     private readonly StorageOptimizationInfo _optimizationInfo;
@@ -125,7 +124,6 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                       ? lf.CreateLogger($"Koan.Data.Connector.Sqlite[{typeof(TEntity).FullName}]")
                       : NullLogger.Instance);
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
-        _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
         _schemaPolicy = new RelationalSchemaPolicy
         {
             Projections = RelationalProjectionMode.PhysicalColumns,
@@ -575,9 +573,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         else
         {
             var whereSql = RewriteWhereForProjection(query);
-            var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
-            var offset = shaping.EffectiveOffset();
-            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} LIMIT {size} OFFSET {offset}";
+            var paging = shaping.HasPagination
+                ? $" LIMIT {shaping.EffectivePageSize()} OFFSET {shaping.EffectiveOffset()}"
+                : string.Empty;
+            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql}{paging}";
             var items = await QueryRowsWithRetry(conn, sql, parameters);
             return new RepositoryQueryResult<TEntity>
             {

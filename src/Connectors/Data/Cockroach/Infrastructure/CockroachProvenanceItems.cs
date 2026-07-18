@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Globalization;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Data.Connector.Cockroach;
 
@@ -24,11 +23,6 @@ internal static class CockroachProvenanceItems
     private static readonly IReadOnlyCollection<string> SearchPathConsumers = new[]
     {
         "Koan.Data.Connector.Cockroach.CockroachOptionsConfigurator",
-        "Koan.Data.Connector.Cockroach.CockroachAdapterFactory"
-    };
-
-    private static readonly IReadOnlyCollection<string> PagingConsumers = new[]
-    {
         "Koan.Data.Connector.Cockroach.CockroachAdapterFactory"
     };
 
@@ -67,13 +61,6 @@ internal static class CockroachProvenanceItems
         "Indicates whether the adapter supports Create/EnsureCreated semantics.",
         DefaultValue: BoolString(true),
         DefaultConsumers: NamingConsumers);
-
-    internal static readonly ProvenanceItem DefaultPageSize = new(
-        Constants.Configuration.Keys.DefaultPageSize,
-        "Default Page Size",
-        "Default number of rows returned when paging through results.",
-        DefaultValue: Defaults.DefaultPageSize.ToString(CultureInfo.InvariantCulture),
-        DefaultConsumers: PagingConsumers);
 
     private static string BoolString(bool value) => value ? "true" : "false";
 }

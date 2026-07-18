@@ -51,13 +51,6 @@ internal static class ConfigurationConstants
         public static string GatingForProvider(string provider) => $"{Section}:{provider}:Readiness:EnableReadinessGating";
     }
 
-    public static class Paging
-    {
-        public const string DefaultPageSize = Section + ":DefaultPageSize";
-
-        public static string DefaultPageSizeForProvider(string provider) => $"{Section}:{provider}:DefaultPageSize";
-    }
-
     public static class Runtime
     {
         public const string Section = ConfigurationConstants.Section + ":Runtime";

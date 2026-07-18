@@ -25,15 +25,9 @@ internal sealed class RedisOptionsConfigurator : AdapterOptionsConfigurator<Redi
             options.Database,
             Infrastructure.Constants.Configuration.Keys.Database,
             Infrastructure.Constants.Configuration.Keys.AltDatabase);
-        options.DefaultPageSize = ReadProviderConfiguration(
-            options.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-
         LogConfiguration(
             LogLevel.Information,
             "final",
-            ("database", options.Database),
-            ("defaultPageSize", options.DefaultPageSize));
+            ("database", options.Database));
     }
 }

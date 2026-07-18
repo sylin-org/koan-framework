@@ -12,7 +12,6 @@ public sealed class SqlServerOptions : IAdapterOptions
     public string ConnectionString { get; set; } = "auto"; // DX-first: auto-detect by default
     public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.FullNamespace;
     public string Separator { get; set; } = ".";
-    public int DefaultPageSize { get; set; } = 50;
     // Object materialization/serialization
     public bool JsonCaseInsensitive { get; set; } = true;
     public bool JsonWriteIndented { get; set; } = false;

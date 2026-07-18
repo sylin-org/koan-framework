@@ -74,12 +74,6 @@ public sealed class CockroachDataModule : KoanModule
             defaultOptions.SearchPath ?? "public",
             Infrastructure.Constants.Configuration.Keys.SearchPath);
 
-        var defaultPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-
         var namingStyle = Configuration.ReadFirstWithSource(
             cfg,
             defaultOptions.NamingStyle,
@@ -131,7 +125,6 @@ public sealed class CockroachDataModule : KoanModule
         module.PublishConfigValue(CockroachItems.NamingStyle, namingStyle);
         module.PublishConfigValue(CockroachItems.Separator, separator);
         module.PublishConfigValue(CockroachItems.EnsureCreatedSupported, ensureCreated);
-        module.PublishConfigValue(CockroachItems.DefaultPageSize, defaultPageSize);
     }
 
     private static string BuildCockroachFallback(CockroachOptions defaults)

@@ -15,9 +15,6 @@ public static class Constants
             public const string ConnectionStringsSqlite = "ConnectionStrings:Sqlite";
             public const string ConnectionStringsDefault = "ConnectionStrings:Default";
 
-            public const string DefaultPageSize = Section + ":DefaultPageSize";
-            public const string AltDefaultPageSize = AltSection + ":DefaultPageSize";
-
             // Naming and connection metadata
             public const string NamingStyle = Section + ":NamingStyle";
             public const string AltNamingStyle = AltSection + ":NamingStyle";
@@ -43,7 +40,6 @@ public static class Constants
     public static class Bootstrap
     {
         public const string EnsureCreatedSupported = "EnsureCreatedSupported";
-        public const string DefaultPageSize = "DefaultPageSize";
     }
 }
 

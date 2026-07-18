@@ -51,7 +51,6 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory
             ConnectionString = connectionString,
             NamingStyle = baseOpts.NamingStyle,
             Separator = baseOpts.Separator,
-            DefaultPageSize = baseOpts.DefaultPageSize,
             DdlPolicy = baseOpts.DdlPolicy,
             SchemaMatching = baseOpts.SchemaMatching,
             AllowProductionDdl = baseOpts.AllowProductionDdl,

@@ -2,17 +2,10 @@ namespace Koan.Data.SearchEngine;
 
 /// <summary>
 /// Shared base for the Elasticsearch and OpenSearch vector option classes (DATA-0103). Carries every
-/// field the shared <see cref="SearchEngineVectorRepository{TEntity,TKey}"/> reads, plus the single
-/// <see cref="DefaultPageSize"/> the <c>IAdapterOptions</c> contract requires. Concrete classes add
+/// field the shared <see cref="SearchEngineVectorRepository{TEntity,TKey}"/> reads. Concrete classes add
 /// only the per-package binding members (<c>ConnectionString</c>, <c>Readiness</c>) and the
 /// <c>IAdapterOptions</c> implementation.
 /// </summary>
-/// <remarks>
-/// This collapses the options drift the twins accumulated: Elasticsearch carried dead
-/// <c>DefaultTopK</c>/<c>MaxTopK</c> knobs (referenced nowhere, aliased into <c>DefaultPageSize</c>)
-/// while OpenSearch carried a plain <c>DefaultPageSize = 50</c>. Both are unified here onto the
-/// single plain <c>DefaultPageSize = 50</c> semantics every other Koan data adapter uses.
-/// </remarks>
 public abstract class SearchEngineVectorOptions : ISearchEngineVectorOptions
 {
     public string Endpoint { get; set; } = "http://localhost:9200";
@@ -36,10 +29,4 @@ public abstract class SearchEngineVectorOptions : ISearchEngineVectorOptions
     public string? Username { get; set; } = null;
     public string? Password { get; set; } = null;
     public bool DisableIndexAutoCreate { get; set; } = false;
-
-    /// <summary>
-    /// <c>IAdapterOptions</c> default-only page-size fallback (NOT a cap). Unified across both
-    /// search-engine connectors per DATA-0103.
-    /// </summary>
-    public int DefaultPageSize { get; set; } = 50;
 }

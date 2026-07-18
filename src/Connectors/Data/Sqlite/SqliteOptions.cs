@@ -12,7 +12,6 @@ public sealed class SqliteOptions : IAdapterOptions
     public string ConnectionString { get; set; } = "auto"; // DX-first: auto-detect by default
     public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.FullNamespace;
     public string Separator { get; set; } = ".";
-    public int DefaultPageSize { get; set; } = 50;
     // Schema policy
     public RelationalDdlPolicy DdlPolicy { get; set; } = RelationalDdlPolicy.AutoCreate;
     public RelationalSchemaMatchingMode SchemaMatching { get; set; } = RelationalSchemaMatchingMode.Relaxed;

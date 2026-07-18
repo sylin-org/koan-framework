@@ -47,7 +47,6 @@ public sealed class SqlServerAdapterFactory : IDataAdapterFactory
         var sourceOpts = new SqlServerOptions
         {
             ConnectionString = connectionString,
-            DefaultPageSize = baseOpts.DefaultPageSize,
             JsonCaseInsensitive = baseOpts.JsonCaseInsensitive,
             JsonWriteIndented = baseOpts.JsonWriteIndented,
             JsonIgnoreNullValues = baseOpts.JsonIgnoreNullValues,

@@ -8,6 +8,25 @@ public sealed class PostgresCrudSpec(PostgresFixture fixture, ITestOutputHelper 
     : KoanDataSpec<PostgresFixture>(fixture, output)
 {
     [Fact]
+    public async Task Raw_predicates_do_not_invent_a_default_page()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        using var _ = Lease(NewPartition("raw-pagination-intent"));
+
+        await Person.UpsertMany(Enumerable.Range(1, 75)
+            .Select(age => new Person { Name = $"Person-{age}", Age = age }));
+
+        var all = await Data<Person, string>.QueryRaw("1 = 1");
+        var page = await Data<Person, string>.QueryRaw(
+            "1 = 1",
+            shaping: QueryDefinition.All.WithPagination(page: 2, pageSize: 7));
+
+        all.Should().HaveCount(75);
+        page.Should().HaveCount(7);
+    }
+
+    [Fact]
     public async Task Upsert_query_count_and_remove_flow()
     {
         RequireBackingStore();

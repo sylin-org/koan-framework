@@ -86,11 +86,6 @@ internal sealed class PostgresOptionsConfigurator : AdapterOptionsConfigurator<P
         }
 
         // Configure other PostgreSQL-specific options
-        options.DefaultPageSize = ReadProviderConfiguration(
-            options.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-
         var ddlStr = ReadProviderConfiguration(options.DdlPolicy.ToString(),
             Infrastructure.Constants.Configuration.Keys.DdlPolicy,
             Infrastructure.Constants.Configuration.Keys.AltDdlPolicy);

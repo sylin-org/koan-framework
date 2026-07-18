@@ -51,7 +51,6 @@ public sealed class CockroachAdapterFactory : IDataAdapterFactory
         var sourceOpts = new CockroachOptions
         {
             ConnectionString = connectionString,
-            DefaultPageSize = baseOpts.DefaultPageSize,
             DdlPolicy = baseOpts.DdlPolicy,
             SchemaMatching = baseOpts.SchemaMatching,
             AllowProductionDdl = baseOpts.AllowProductionDdl,
@@ -65,7 +64,6 @@ public sealed class CockroachAdapterFactory : IDataAdapterFactory
         {
             ProviderName = Provider,
             ConnectionString = sourceOpts.ConnectionString,
-            DefaultPageSize = sourceOpts.DefaultPageSize,
             DdlPolicy = sourceOpts.DdlPolicy,
             SchemaMatching = sourceOpts.SchemaMatching,
             AllowProductionDdl = sourceOpts.AllowProductionDdl,

@@ -39,7 +39,6 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory
         {
             ProviderName = Provider,
             ConnectionString = options.ConnectionString,
-            DefaultPageSize = options.DefaultPageSize,
             DdlPolicy = options.DdlPolicy,
             SchemaMatching = options.SchemaMatching,
             AllowProductionDdl = options.AllowProductionDdl,
@@ -66,7 +65,6 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory
         var sourceOpts = new PostgresOptions
         {
             ConnectionString = connectionString,
-            DefaultPageSize = baseOpts.DefaultPageSize,
             DdlPolicy = baseOpts.DdlPolicy,
             SchemaMatching = baseOpts.SchemaMatching,
             AllowProductionDdl = baseOpts.AllowProductionDdl,

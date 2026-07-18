@@ -66,7 +66,6 @@ public sealed class NpgsqlRepository<
     private readonly IStorageNameResolver _nameResolver;
     private readonly StorageNameResolver.Convention _conv;
     private readonly ILinqSqlDialect _dialect = new NpgsqlDialect();
-    private readonly int _defaultPageSize;
     private readonly ILogger _logger;
     private readonly JsonSerializerSettings _json;
     private readonly RelationalSchemaPolicy _schemaPolicy;
@@ -87,7 +86,6 @@ public sealed class NpgsqlRepository<
                       ? lf.CreateLogger($"Koan.Data.Relational.Npgsql.{options.ProviderName}[{typeof(TEntity).FullName}]")
                       : NullLogger.Instance);
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
-        _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
         _schemaPolicy = new RelationalSchemaPolicy
         {
             Projections = RelationalProjectionMode.None,
@@ -623,9 +621,10 @@ public sealed class NpgsqlRepository<
         else
         {
             var whereSql = RewriteWhereForProjection(query);
-            var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
-            var offset = shaping.EffectiveOffset();
-            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} {StableOrderClause} LIMIT {size} OFFSET {offset}";
+            var paging = shaping.HasPagination
+                ? $" LIMIT {shaping.EffectivePageSize()} OFFSET {shaping.EffectiveOffset()}"
+                : string.Empty;
+            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} {StableOrderClause}{paging}";
             var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
             return new RepositoryQueryResult<TEntity>
             {

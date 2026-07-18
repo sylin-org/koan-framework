@@ -10,7 +10,7 @@ namespace Koan.Data.Adapters.Configuration;
 
 /// <summary>
 /// Base configurator for data adapter options that centralizes common configuration patterns.
-/// Eliminates duplication across adapters for readiness, paging, and configuration key resolution.
+/// Eliminates duplication across adapters for readiness and configuration key resolution.
 /// </summary>
 /// <typeparam name="TOptions">The adapter-specific options type that implements IAdapterOptions</typeparam>
 public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<TOptions>
@@ -44,7 +44,6 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
 
         // Apply common configuration patterns
         ConfigureReadiness(options.Readiness);
-        ConfigurePaging(options);
 
         KoanLog.ConfigDebug(Logger, LogActions.ConfigurationLifecycle, LogOutcomes.Complete, ("provider", ProviderName));
     }
@@ -105,22 +104,6 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
             ("policy", config.Policy),
             ("timeoutSeconds", config.Timeout.TotalSeconds),
             ("gating", config.EnableReadinessGating));
-    }
-
-    /// <summary>
-    /// Centralizes paging configuration with consistent key patterns. Per the IAdapterOptions
-    /// docstring, page-size capping is no longer the adapter layer's concern — only the
-    /// <see cref="IAdapterOptions.DefaultPageSize"/> fallback is bound here.
-    /// </summary>
-    protected void ConfigurePaging(IAdapterOptions options)
-    {
-        options.DefaultPageSize = Koan.Core.Configuration.ReadFirst(Configuration, options.DefaultPageSize,
-            DataConfiguration.Paging.DefaultPageSizeForProvider(ProviderName),
-            DataConfiguration.Paging.DefaultPageSize);
-
-        KoanLog.ConfigDebug(Logger, LogActions.PagingConfiguration, LogOutcomes.Applied,
-            ("provider", ProviderName),
-            ("defaultPageSize", options.DefaultPageSize));
     }
 
     /// <summary>
@@ -221,7 +204,6 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
     {
         public const string ConfigurationLifecycle = "adapter.config.lifecycle";
         public const string ReadinessConfiguration = "adapter.config.readiness";
-        public const string PagingConfiguration = "adapter.config.paging";
         public const string ConfigurationDecision = "adapter.config.decision";
         public const string DiscoveryDecision = "adapter.discovery.decision";
     }

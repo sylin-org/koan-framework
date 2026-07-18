@@ -22,13 +22,6 @@ public sealed class WeaviateOptions : IAdapterOptions
     public int DefaultTopK { get; set; } = 10;
     public int MaxTopK { get; set; } = 200;
 
-    // IAdapterOptions implementation — default-only fallback aliased to DefaultTopK.
-    public int DefaultPageSize
-    {
-        get => DefaultTopK;
-        set => DefaultTopK = value;
-    }
-
     // Timeout seconds for search
     public int DefaultTimeoutSeconds { get; set; } = 10;
 

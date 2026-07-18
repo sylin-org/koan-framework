@@ -12,15 +12,12 @@ public static class Constants
         {
             public const string Database = Constants.Section + ":Database";
             public const string AltDatabase = "Koan:Data:Database";
-            public const string DefaultPageSize = Constants.Section + ":DefaultPageSize";
-            public const string AltDefaultPageSize = "Koan:Data:DefaultPageSize";
             public const string EnsureCreatedSupported = nameof(EnsureCreatedSupported);
         }
     }
 
     public static class Bootstrap
     {
-        public const string DefaultPageSize = "data.redis.defaultPageSize";
         public const string EnsureCreatedSupported = "EnsureCreatedSupported";
     }
 

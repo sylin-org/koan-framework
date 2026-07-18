@@ -8,7 +8,6 @@ namespace Koan.Data.Connector.Redis.Infrastructure;
 internal static class RedisProvenanceItems
 {
     private const string DatabaseKey = Constants.Configuration.Keys.Database;
-    private const string DefaultPageSizeKey = Constants.Configuration.Keys.DefaultPageSize;
     private const string EnsureCreatedSupportedKey = Constants.Configuration.Section_Data + ":" + Constants.Configuration.Keys.EnsureCreatedSupported;
 
     private static readonly RedisOptions Defaults = new();
@@ -20,7 +19,7 @@ internal static class RedisProvenanceItems
         "Koan.Data.Connector.Redis.RedisRepository"
     };
 
-    private static readonly IReadOnlyCollection<string> PagingConsumers = new[]
+    private static readonly IReadOnlyCollection<string> AdapterConsumers = new[]
     {
         "Koan.Data.Connector.Redis.RedisAdapterFactory"
     };
@@ -37,14 +36,7 @@ internal static class RedisProvenanceItems
         "EnsureCreated Supported",
         "Indicates whether the adapter supports Create/EnsureCreated semantics.",
         DefaultValue: BoolString(true),
-        DefaultConsumers: PagingConsumers);
-
-    internal static readonly ProvenanceItem DefaultPageSize = new(
-        DefaultPageSizeKey,
-        "Default Page Size",
-        "Default batch size used when paging Redis query results.",
-        DefaultValue: Defaults.DefaultPageSize.ToString(CultureInfo.InvariantCulture),
-        DefaultConsumers: PagingConsumers);
+        DefaultConsumers: AdapterConsumers);
 
     private static string BoolString(bool value) => value ? "true" : "false";
 }

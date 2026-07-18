@@ -40,11 +40,6 @@ public sealed class RedisDataModule : KoanModule
             defaults.Database,
             Infrastructure.Constants.Configuration.Keys.Database,
             $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:Database");
-        var defaultPageSize = Configuration.ReadFirstWithSource(
-            configuration,
-            defaults.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:DefaultPageSize");
         var ensureCreated = Configuration.ReadFirstWithSource(
             configuration,
             true,
@@ -53,6 +48,5 @@ public sealed class RedisDataModule : KoanModule
 
         module.PublishConfigValue(RedisItems.Database, database);
         module.PublishConfigValue(RedisItems.EnsureCreatedSupported, ensureCreated);
-        module.PublishConfigValue(RedisItems.DefaultPageSize, defaultPageSize);
     }
 }

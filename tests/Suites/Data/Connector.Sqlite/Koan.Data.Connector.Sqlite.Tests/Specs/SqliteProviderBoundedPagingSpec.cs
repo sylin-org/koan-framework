@@ -7,6 +7,25 @@ namespace Koan.Data.Connector.Sqlite.Tests.Specs;
 public sealed class SqliteProviderBoundedPagingSpec(SqliteFixture fixture, ITestOutputHelper output)
     : KoanDataSpec<SqliteFixture>(fixture, output)
 {
+    [Fact(DisplayName = "Sqlite: raw predicates stay unbounded unless shaping requests a page")]
+    public async Task Raw_predicates_do_not_invent_a_default_page()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        using var _ = Lease(NewPartition("raw-pagination-intent"));
+
+        await PagingProbe.UpsertMany(Enumerable.Range(1, 75)
+            .Select(rank => new PagingProbe { Rank = rank }));
+
+        var all = await Data<PagingProbe, string>.QueryRaw("1 = 1");
+        var page = await Data<PagingProbe, string>.QueryRaw(
+            "1 = 1",
+            shaping: QueryDefinition.All.WithPagination(page: 2, pageSize: 7));
+
+        all.Should().HaveCount(75);
+        page.Should().HaveCount(7);
+    }
+
     [Fact(DisplayName = "Sqlite: provider paging is bounded, count-free by default, and gated by total sort handling")]
     public async Task Provider_paging_reports_only_the_work_it_performed()
     {

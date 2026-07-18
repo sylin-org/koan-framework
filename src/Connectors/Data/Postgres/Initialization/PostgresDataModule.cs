@@ -72,12 +72,6 @@ public sealed class PostgresDataModule : KoanModule, IKoanAspireResources
             defaultOptions.SearchPath ?? "public",
             Infrastructure.Constants.Configuration.Keys.SearchPath);
 
-        var defaultPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-
         var namingStyle = Configuration.ReadFirstWithSource(
             cfg,
             defaultOptions.NamingStyle,
@@ -129,7 +123,6 @@ public sealed class PostgresDataModule : KoanModule, IKoanAspireResources
         module.PublishConfigValue(PostgresItems.NamingStyle, namingStyle);
         module.PublishConfigValue(PostgresItems.Separator, separator);
         module.PublishConfigValue(PostgresItems.EnsureCreatedSupported, ensureCreated);
-        module.PublishConfigValue(PostgresItems.DefaultPageSize, defaultPageSize);
     }
 
     private static string BuildPostgresFallback(PostgresOptions defaults)

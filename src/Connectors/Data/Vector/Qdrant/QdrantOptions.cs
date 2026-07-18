@@ -95,12 +95,5 @@ public sealed class QdrantOptions : IAdapterOptions
     public int DefaultTopK { get; set; } = 10;
     public int MaxTopK { get; set; } = 200;
 
-    // IAdapterOptions implementation — default-only fallback aliased to DefaultTopK.
-    public int DefaultPageSize
-    {
-        get => DefaultTopK;
-        set => DefaultTopK = value;
-    }
-
     public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();
 }
