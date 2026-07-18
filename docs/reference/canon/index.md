@@ -4,19 +4,19 @@ domain: canon
 title: "Canon Pillar Reference"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-17
-framework_version: v0.17.0
+last_updated: 2026-07-18
+framework_version: source-first
 validation:
-  date_last_tested: 2026-07-17
+  date_last_tested: 2026-07-18
   status: tested
-  scope: Canon unit 37/37, integration 6/6, non-Web bootstrap 1/1, CustomerCanon host 1/1
+  scope: Canon unit 35/35, integration 7/7, CustomerCanon host 1/1
 ---
 
 # Canon pillar reference
 
-Canon turns messy arrivals into one trusted Entity. Application code owns identity and business rules;
-Koan owns discovery, deterministic phase execution, metadata, convergence, persistence, inspection, and
-optional HTTP projection.
+Canon turns imperfect arrivals into one trusted Entity. Application code owns identity and business
+rules; Koan owns discovery, deterministic phase execution, metadata, convergence, persistence,
+inspection, and optional HTTP projection.
 
 ## Reach for Canon when
 
@@ -30,7 +30,7 @@ an event store, workflow engine, message transport, distributed lock, or univers
 
 ## Shortest Web path
 
-Reference `Sylin.Koan.Canon.Web`, `Sylin.Koan.Data.Connector.Json`, and the usual Koan Web packages, then:
+Reference `Sylin.Koan.Canon.Web`, `Sylin.Koan.Data.Connector.Json`, and the usual Koan Web packages:
 
 ```csharp
 using Koan.Canon;
@@ -50,7 +50,7 @@ public sealed class Customer : CanonEntity<Customer>
 ```
 
 The customer is available at `/api/canon/customer`, and `/api/canon/models` explains why. No controller,
-registrar, application module, or explicit `AddCanonRuntime()` is required.
+registrar, application module, or Canon-specific registration call is required.
 
 ## Add a business rule
 
@@ -69,20 +69,21 @@ public sealed class NormalizeCustomer : ICanonPipelineContributor<Customer>
 }
 ```
 
-Koan discovers it from source-generated metadata. Ordering is phase, optional `Order`, then type name.
-A contributor returning a failed or parked event terminates before later phases, indexing, or canonical
-persistence. Web maps those outcomes to 422 and 202 respectively.
+Koan discovers the contributor from source-generated metadata. Ordering is phase, optional `Order`,
+then type name. The first failed or parked contributor terminates before later contributors, phases,
+indexing, audit, or canonical persistence. Web maps those outcomes to 422 and 202.
+
+Models without application contributors still receive the built-in aggregation and policy phases.
 
 ## Package boundaries
 
 | Package | Responsibility |
 |---|---|
-| `Sylin.Koan.Canon.Contracts` | Inert models, metadata, annotations, results, and extension contracts. |
-| `Sylin.Koan.Canon` | Functional activation, discovery, pipeline execution, defaults, persistence, and audit. |
-| `Sylin.Koan.Canon.Web` | Optional generated HTTP, model catalog, rebuild, and inspection surfaces. |
+| `Sylin.Koan.Canon` | Canon models and metadata, functional activation, one host composition plan, pipeline execution, persistence, and audit. |
+| `Sylin.Koan.Canon.Web` | Optional projection of that plan into Canon-aware Entity routes and model inspection. |
 
-Modules that merely describe Canon-aware types may reference Contracts without activating Canon. Any
-reference to the functional package makes `AddKoan()` activate the runtime.
+Any reference to Canon activates the functional runtime. Web adds no second domain model or pipeline
+authority.
 
 ## Runtime surfaces
 
@@ -90,31 +91,45 @@ reference to the functional package makes `AddKoan()` activate the runtime.
 |---|---|
 | `entity.Canonize(...)` | Canonize one Entity through the active host. |
 | `ICanonRuntime.Canonize<T>(...)` | Execute the compiled pipeline directly. |
-| `RebuildViews<T>(...)` | Reload a canonical snapshot and run requested projections. |
-| `RegisterObserver(...)` | Observe phase boundaries and errors until registration disposal. |
-| `Replay(...)` | Read bounded process-local result snapshots. |
-| `AddCanonRuntime(...)` | Advanced explicit pipeline/runtime override; unnecessary for normal use. |
+| `ICanonRuntime.RebuildViews<T>(...)` | Reload a canonical snapshot and run requested projections from application code. |
+| `ICanonPersistence` | Replace canonical, stage, and aggregation-index storage as one decision. |
+| `ICanonAuditSink` | Replace audit delivery independently of canonical storage. |
+| `ICanonPipelineCatalog` | Read compiled pipeline metadata; Canon Web uses this for inspection. |
 
-The default `ICanonPersistence` uses the selected Koan Data provider for canonical snapshots, stages,
-and aggregation indexes. Replacing it is a complete storage decision. The runtime, discovery catalog,
-configuration, and defaults are host-owned singletons.
+The default persistence and audit implementations use the selected Koan Data provider. The runtime,
+plan, pipeline catalog, persistence, and audit sink are host-owned singletons.
+
+## Commit and failure contract
+
+After all phases succeed, the default runtime writes in this order:
+
+1. canonical Entity;
+2. aggregation indexes;
+3. audit entries.
+
+The sequence is not an atomic transaction across all providers. A canonical failure attempts neither
+indexes nor audit. An index failure can leave canonical state and a prefix of indexes durable, and
+skips audit. An audit failure occurs after canonical state and indexes are durable. The exception names
+the failed checkpoint and preserves the provider exception; Canon provides no rollback or blind-retry
+safety.
 
 ## Operational honesty
 
-- Replay records do not survive restart and are not event sourcing.
 - `CanonizationEvent` is a phase result, not Koan Communication transport.
-- Canon currently runs in-process; distributed delivery, locking, retry, and recovery need explicit
-  application or adapter capability.
-- Provider concurrency, transaction, and durability guarantees come from the selected Data/persistence
+- Stage-only arrivals persist as stages and return parked. Failed and parked pipeline outcomes remain
+  non-canonical.
+- Canon currently runs in-process; distributed delivery, locking, durable replay, retry, and recovery
+  require explicit application or adapter capability.
+- Provider concurrency, transaction, and durability guarantees come from the selected persistence
   implementation.
-- Generated admin routes require deployment-appropriate authorization.
+- Canon Web generates model and inspection routes only; it has no admin, replay, rebuild, or value-object
+  route family. The host's ordinary ASP.NET authorization policy applies.
 
 ## Evidence
 
-- [Contracts source](../../../src/Koan.Canon.Contracts/)
 - [Runtime source](../../../src/Koan.Canon/)
 - [Web source](../../../src/Koan.Canon.Web/)
 - [CustomerCanon golden sample](../../../samples/applications/CustomerCanon/README.md)
 - [Canon unit suite](../../../tests/Suites/Canon/Unit/)
 - [Canon integration suite](../../../tests/Suites/Canon/Integration/)
-- [ARCH-0058 — Canon runtime architecture](../../decisions/ARCH-0058-canon-runtime-architecture.md)
+- [ARCH-0058 — historical Canon runtime architecture](../../decisions/ARCH-0058-canon-runtime-architecture.md)

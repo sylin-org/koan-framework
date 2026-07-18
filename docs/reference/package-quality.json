@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 103,
+    "packages": 102,
     "repairRequired": 6,
-    "reviewRequired": 21,
-    "structurallyReady": 76,
-    "ownedReadmes": 97,
-    "technicalCompanions": 92,
-    "findings": 77
+    "reviewRequired": 18,
+    "structurallyReady": 78,
+    "ownedReadmes": 96,
+    "technicalCompanions": 91,
+    "findings": 71
   },
   "findingDefinitions": [
     {
@@ -497,59 +497,32 @@
       "projectPath": "src/Koan.Canon/Koan.Canon.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Functional Koan Canon runtime with automatic model and pipeline composition.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
-        "Sylin.Koan.Canon.Contracts",
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Koan.Canon/README.md",
       "technicalDocumentation": "src/Koan.Canon/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
-    },
-    {
-      "packageId": "Sylin.Koan.Canon.Contracts",
-      "projectPath": "src/Koan.Canon.Contracts/Koan.Canon.Contracts.csproj",
-      "shape": "library",
-      "role": "contracts",
-      "status": "review-required",
-      "description": "Inert Entity, metadata, pipeline, persistence, and runtime contracts for Koan Canon.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Core"
-      ],
-      "readme": "src/Koan.Canon.Contracts/README.md",
-      "technicalDocumentation": "src/Koan.Canon.Contracts/TECHNICAL.md",
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Canon.Web",
       "projectPath": "src/Koan.Canon.Web/Koan.Canon.Web.csproj",
       "shape": "library",
       "role": "projection",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Generated ASP.NET Core and inspection surfaces for discovered Koan Canon models.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Canon",
-        "Sylin.Koan.Canon.Contracts",
         "Sylin.Koan.Core",
         "Sylin.Koan.Web",
         "Sylin.Koan.Web.Extensions"
@@ -557,10 +530,7 @@
       "readme": "src/Koan.Canon.Web/README.md",
       "technicalDocumentation": "src/Koan.Canon.Web/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Classification",

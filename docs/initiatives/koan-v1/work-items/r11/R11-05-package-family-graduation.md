@@ -4,12 +4,12 @@ domain: framework
 title: "R11-05 - Graduate Package Families"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-18
 framework_version: source-first
 validation:
-  date_last_tested: 2026-07-17
+  date_last_tested: 2026-07-18
   status: in-progress
-  scope: dependency-ordered family assessment, coalescence, package prose, and focused consumer evidence
+  scope: dependency-ordered family graduation; Canon implementation and focused package proof complete
 ---
 
 # R11-05 — Graduate package families
@@ -3146,6 +3146,232 @@ repository canonical icon and current direct/transitive NuGet audits report no k
 truth contains 103 packages: 6 repair-required, 21 review-required, and 76 structurally ready across 26 claims. Both
 Classification packages have zero objective quality findings; the public documentation truth gate passes 234 current
 files / 40 navigation targets.
+
+### Canon family discovery and architecture checkpoint
+
+**Task:** Graduate the post-R10 Canon family by giving every discovered canonical Entity one compiled decision,
+removing package and public surfaces that do not carry an independent V1 intent, and stating the exact storage and Web
+failure boundary without rebuilding CustomerCanon or Canon's automatic contributor architecture.
+
+**Application intent:** “Turn imperfect arrivals into one trusted Entity through automatically discovered business
+rules and deterministic convergence; reject invalid arrivals with useful reasons, and expose the same compiled model
+decision through HTTP only when I reference Canon Web.”
+
+**Public expression:** The already-passed expression remains unchanged. A headless application references
+`Sylin.Koan.Canon` and a Data provider, keeps its existing `AddKoan()`, and defines a canonical Entity. A Web
+application references `Sylin.Koan.Canon.Web` instead and keeps the standard four-line host:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan().AsWebApi();
+var app = builder.Build();
+await app.RunAsync();
+```
+
+```csharp
+public sealed class Customer : CanonEntity<Customer>
+{
+    [AggregationKey]
+    public string Email { get; set; } = "";
+}
+```
+
+An `ICanonPipelineContributor<Customer>` remains optional business policy. When present it is discovered
+automatically; when absent the model still receives Canon's built-in aggregation and policy pipeline. There is no
+direct Contracts-package reference, Canon registrar, runtime builder, application module, generated-admin setup, or
+sample-specific controller in the supported expression.
+
+**Guarantee/correction:** Every discovered `CanonEntity<T>` receives exactly one immutable host-owned model/pipeline
+decision, including built-in aggregation and policy contributors even when no custom contributor exists. Runtime,
+startup, facts, and Web consume that decision rather than rediscovering models. A duplicate HTTP slug rejects host
+composition with both conflicting CLR types. Within a phase, the first failed or parked contributor terminates
+immediately; a later contributor cannot overwrite or run after that terminal business decision.
+
+Failed and parked business outcomes retain R10's proven non-persistence guarantee. Successful canonization returns
+only after canonical persistence, every pending aggregation-index write, and required audit writes complete. The
+default Data-backed implementation deliberately orders canonical state before indexes and audit so it never publishes
+an index to a missing canonical Entity. Those writes are not one provider transaction: an index failure can leave an
+unindexed canonical snapshot, and an audit failure can leave canonical state plus indexes. The original exception must
+propagate with a corrective operation/checkpoint message; Canon does not claim rollback, atomic convergence, safe
+blind retry, durable replay, or automatic recovery. A custom `ICanonPersistence` remains the explicit owner when an
+application requires a stronger storage contract.
+
+**Complete intent surface:** Package reference, existing `AddKoan()`, `CanonEntity<T>`, at least one
+`[AggregationKey]`, ordinary Entity/Data runtime prerequisites, and optional discovered contributors are the complete
+headless surface. Referencing Canon Web additionally mounts only model inspection and Canon-aware Entity routes;
+ordinary host authentication/fallback authorization governs those business routes. Rebuild remains an injected
+runtime/application operation that an application may place behind its own authorized workflow. Canon Web will no
+longer manufacture a privileged admin/replay control plane.
+
+**Public concepts:** `CanonEntity<T>` declares governed canonical state; `[AggregationKey]` declares convergence
+identity; `[AggregationPolicy]` and `[Canon(audit: true)]` declare real conflict/audit decisions;
+`ICanonPipelineContributor<T>`, phase/status/event/context, and operation options/results carry application business
+rules and outcomes; `ICanonRuntime`, `ICanonPersistence`, and `ICanonAuditSink` remain the narrow standard-DI runtime,
+complete-storage, and audit customization seams. These concepts require the active Canon capability and therefore
+belong in functional Canon. A read-only Canon composition plan is a family/module contract consumed by Canon Web and
+facts, not a second application registration surface.
+
+**Already completed by R10-11:** Preserve the automatic generated-registry contributor discovery, functional/Web
+activation split, one `CanonModule`, deterministic phase/order/type ordering, four-line CustomerCanon host, generated
+Canon Entity controller, successful customer convergence, 422 failure projection, and failed/parked termination before
+canonical/index persistence. CustomerCanon's model, policy, contributors, and golden test are evidence to retain, not
+an architecture to rebuild.
+
+**New R11 corrections:** Current source leaves seven distinct post-R10 gaps: contributor-free models never enter
+`CanonPipelineBuilder<T>` and therefore bypass default aggregation/policy; Web rediscovers models into a second
+catalog; duplicate slugs overwrite silently; Contracts activates functional Data Core and its `CanonEntity<T>` uses
+ambient `AppHost`; the optimization subsystem is disconnected from execution; generated admin/replay routes are
+unauthenticated; and successful commits are ordered but non-transactional and untested under write failure. The
+within-phase last-event-wins rule and the legacy process-global `FlowPillarManifest` are additional current-code
+ownership defects. None is a pre-R10 sample-registration or failure-persistence defect.
+
+**Docs read:** `CLAUDE.md` establishes references + `AddKoan()` + Entity as the golden grammar and requires genuine
+contract isolation; `docs/engineering/index.md` requires Entity-first data, controller-only HTTP, standard
+constants/options, package companions, and focused proof; `docs/architecture/principles.md` requires one host-owned
+compiled authority and corrective semantic honesty; the root README states the four-line host and unified runtime
+facts contract; `docs/toc.yml` shows Canon is not currently in the public navigation set; `samples/CATALOG.md` defers
+sample authority to the graduated portfolio; the current Canon reference/guide and three package companions describe
+the R10 result but overclaim contributor-free defaults and an inert Contracts boundary, and delegate generated-admin
+security to each application; R10-11 is passed evidence and explicitly forbids returning to the former registrar,
+controller, or Web-owned activation architecture.
+
+**Code read:** `CanonPipelineDiscovery` groups only discovered contributor bindings, so models without contributors
+never receive a descriptor; `CanonPipelineBuilder<T>.Build` already supplies the correct built-in aggregation/policy
+steps once invoked; `CanonRuntime` owns the correct R10 terminal-outcome gate but lets later contributors overwrite an
+earlier terminal event and persists canonical → indexes → audit without an atomic guarantee; `CanonWebModule` performs
+a second `ICanonModel` registry walk, derives routes independently, and registers a mutable-looking duplicate catalog;
+`CanonModelCatalog` silently replaces a prior slug; `CanonAdminController` exposes process records and reflective
+rebuild with no authorization; `CanonEntity<T>.Canonize()` proves Contracts is functional by resolving
+`ICanonRuntime` from ambient `AppHost`; `FlowPillarManifest` is Canon's only activation call into its legacy static
+catalog and still claims the retired Flow name plus Orchestration namespaces; Classification's module/composition fact
+is the closest graduated startup/facts pattern because one owner reports one exact guarantee and its exclusions.
+
+**Scoped inventory:** Existing stable Web route constants, aggregation context keys, operation options, metadata,
+attributes, default contributors, persistence/audit seams, generic controllers, standard DI, generated registry, and
+Core composition facts are reusable. Canon has no typed host-options family that the supported promise needs. The
+only Canon optimization options are disconnected and should be deleted. The Web response/request records are
+controller-local. No inline endpoint exists. No source package references Canon Contracts independently of functional
+Canon/Web; its only direct project consumers are those two packages and Canon's own test projects. No source consumer
+outside Canon tests uses the runtime builder/configuration/observer/replay surfaces, `CanonValueObject<T>`, or the
+optimization subsystem.
+
+**Reusing:** R10's generated discovery marker, `KoanRegistry`, `CanonPipelineBuilder<T>` built-in construction law,
+aggregation metadata cache, contributors, runtime context, `ICanonPersistence`, `ICanonAuditSink`, Entity/Data
+chokepoints, Web generic-controller composition, standard ASP.NET fallback authorization, Core
+`KoanCompositionBuilder`, Classification's startup/facts proof shape, and the CustomerCanon cumulative host test.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| immutable Canon composition/model plan | `src/Koan.Canon/Composition/` | Compile all discovered Canon models, built-ins, and custom contributors once at the functional owner; runtime, Web, startup, and facts consume it. |
+| Canon composition compiler | `src/Koan.Canon/Composition/CanonCompositionCompiler.cs` | Keep generated-registry reflection and validation at one boot-time owner rather than runtime or Web. |
+| diagnostics/constants additions | `src/Koan.Canon/Infrastructure/Constants.cs` | Centralize stable capability, correction, and composition-fact identifiers; absorb scattered internal context identifiers that survive. |
+| Web projection plan/catalog rebuild | `src/Koan.Canon.Web/Catalog/` | Derive routes from the Canon plan once, reject slug ambiguity, and register controllers without rediscovering models. |
+| composition/commit focused specs | existing Canon unit and integration projects | Prove contributor-free defaults, host isolation, first-terminal-wins, exact partial-write ordering, and corrective exceptions without a broad release run. |
+| Web composition/security specs | Canon integration project plus CustomerCanon golden test | Prove one shared model decision, duplicate-slug boot rejection, absence of generated admin/replay routes, and preservation of the R10 HTTP journey. |
+| package/current-doc companions | surviving Canon and Canon Web project roots plus current Canon reference/guide/product truth | State the two-package reference intent, smallest result, exact commit/security limits, and retired surfaces. |
+
+**Coalescence:** Closest pattern: Classification's active functional package plus one immutable composition/facts
+authority, combined with the accepted Identity/Tenancy functional-Web split where Web projects an already-owned
+domain service and secures or omits privileged operations. Specificity is Canon-family composition in functional
+Canon, HTTP route identity in Canon Web, generic facts law in Core, and persistence mechanics in the selected Data or
+custom Canon persistence owner.
+
+Disposition proposal: `keep` `Sylin.Koan.Canon`; `merge` `Sylin.Koan.Canon.Contracts` into it; `keep`
+`Sylin.Koan.Canon.Web`. Absorb model vocabulary, contributor/runtime contracts, and metadata into functional Canon
+because every useful consumer requires Canon activation and the current package cannot be inert. Rebuild the existing
+runtime configuration into the one model/composition plan and make Web a projection of it. Retire the disconnected
+optimization folder and isolated tests; generated `CanonAdminController`, process replay records/capacity, mutable
+observer registration, public manual `AddCanonRuntime`/builder/configuration machinery, unproved
+`CanonValueObject<T>` auto-CRUD, and `FlowPillarManifest`. Keep runtime `RebuildViews` as a headless application
+operation but delete its generated unauthenticated HTTP route. No compatibility package or alias survives.
+
+Functional Canon is the one correct owner because it defines canonical model eligibility, default pipeline meaning,
+terminal outcomes, and commit order. Core is too wide to know Canon phases or aggregation. Web is too narrow to
+discover/compile domain models. Contracts is not an honest narrower owner because its useful types inherit functional
+Entity behavior, resolve the runtime, and have no independent module consumer. An adapter is too narrow to coordinate
+canonical state, indexes, and audit semantics.
+
+**Ergonomics:** Human and coding-model code keeps the R10 business sentence and loses a direct package choice plus
+advanced setup branches. IntelliSense begins with `CanonEntity<T>`, aggregation attributes, optional contributors,
+and `Canonize`; it no longer advertises a manual runtime builder, disconnected optimization controls, process replay,
+or value-object CRUD that the product does not complete. Operators see the discovered models, built-in/custom pipeline
+posture, Data-backed non-atomic commit boundary, and exclusions from one fact source. Reviewers inspect one compiler,
+one immutable plan, one runtime chokepoint, and one Web projection instead of two discovery catalogs and a global
+pillar mutation.
+
+**Constraints satisfied:**
+
+- Entity statics and `CanonEntity<T>` remain the application data/semantic language; CustomerCanon is not rebuilt.
+- All HTTP remains controller-owned; retiring the admin controller removes routes rather than replacing them inline.
+- Stable identifiers move to project-scoped constants; no new host option or magic activation metadata is invented.
+- Standard DI owns persistence/audit overrides; `AddKoan()` remains the only framework bootstrap expression.
+- Structural discovery and pipeline construction run once per host; runtime operations consume an immutable plan.
+- The default write boundary is documented and tested without claiming unsupported provider transactions or retry.
+- Current companions, product/package truth, and R11-02 dispositions will change with implementation; ADRs remain
+  dated history.
+- Focused Canon owner/Web/sample/build/pack/documentation proof only; no Tenancy/Classification rerun or R11-07
+  release ratchet without an affected dependency.
+
+**Risks:** Merging Contracts and deleting advanced public surfaces is intentionally breaking before 1.0 and changes
+the package count/product claim. A read-only plan shared from functional Canon to Canon Web must remain a family
+projection contract rather than becoming application registration ceremony. The default persistence path cannot
+provide cross-Entity atomicity on every Data provider; implementation must preserve truthful ordered failure and may
+not invent rollback. Removing `CanonValueObject<T>` is justified by current source—its comment promises canonization,
+runtime cannot canonize it, Web exposes only generic CRUD, and no sample/source consumer exists—but it is included in
+this checkpoint because it materially narrows the public promise. Stage-only/parked behavior and headless rebuild are
+retained; durable sweep/recovery, distributed locking, delivery, and transaction capability remain outside V1 unless
+separately designed and evidenced.
+
+**Architecture checkpoint:** No production edit follows this record until the maintainer accepts or adjusts the three
+terminal dispositions and the proposed promise reductions: Contracts merge; retirement of manual builder/replay/
+observer/optimization/value-object/admin surfaces; and an explicitly ordered, fail-loud but non-atomic default commit
+guarantee. R10-11's automatic contributor architecture and CustomerCanon result are not under reconsideration.
+
+### Canon implementation closure (2026-07-18)
+
+The maintainer accepted the checkpoint without adjustment. The implementation followed the recorded topology and did
+not reopen R10-11: CustomerCanon remains the same four-line host, application contributors remain automatically
+discovered, functional/Web ownership remains split, and failed/parked pipeline outcomes remain non-canonical.
+
+**Implemented R11 corrections:**
+
+- `CanonCompositionCompiler` now produces one immutable host plan for every discovered `CanonEntity<T>`, including
+  contributor-free models. Runtime registration, pipeline metadata, startup/facts, and Canon Web consume that plan;
+  Web no longer performs an independent model discovery pass.
+- Every planned model receives built-in aggregation and policy contributors. Custom contributors remain ordered by
+  phase, `Order`, and CLR name. The first failed or parked contributor stops its phase and the operation, so a later
+  contributor cannot overwrite a terminal result.
+- The default commit now exposes exact fail-loud checkpoints in the existing order: canonical Entity, aggregation
+  indexes, audit. Provider exceptions remain inner exceptions. Canon attempts no later checkpoint after failure and
+  makes no rollback, atomicity, blind-retry, or recovery claim; index failure explicitly admits a durable prefix.
+- Canon Web projects routes from the shared plan, rejects duplicate slugs with both CLR type names, and retains only
+  Canon-aware Entity routes plus `/api/canon/models`. Generated admin/replay/rebuild and value-object routes are gone;
+  headless `ICanonRuntime.RebuildViews<T>` remains available to application code.
+- `Sylin.Koan.Canon.Contracts` was merged into `Sylin.Koan.Canon` and removed from the solution, project references,
+  sample lockfile, generated package truth, and verified product claim. There is no compatibility package.
+- Public manual runtime builder/configuration, observer/replay records and capacity, disconnected optimization types,
+  `CanonValueObject<T>`, and `FlowPillarManifest` were retired. `ICanonRuntime`, `ICanonPersistence`,
+  `ICanonAuditSink`, contributors, options, results, and read-only pipeline metadata remain the earned public surface.
+
+**Focused evidence:**
+
+- Canon unit suite: 35/35, including contributor-free default composition, standard-DI persistence replacement,
+  first-terminal-wins, and canonical/index/audit checkpoint failure behavior.
+- Canon integration suite: 7/7, including exact Web projection of the host plan, duplicate-slug rejection, and absence
+  of the admin controller.
+- CustomerCanon real-host golden path: 1/1, including same-id convergence, invalid non-persistence, admin-route 404,
+  and composition facts that disclose the ordered non-atomic commit.
+- `Sylin.Koan.Canon` and `Sylin.Koan.Canon.Web` built and packed in Release with package-owned README, canonical icon,
+  XML documentation, build-transitive props, symbol package, and exact evaluated dependencies. Neither nupkg references
+  the retired Contracts identity. Current direct/transitive vulnerability audit reports no known vulnerable packages.
+- Generated package quality and product surface were regenerated: 102 evaluated packages, 6 repair-required, 18
+  review-required, 78 structurally ready, and 26 claims. Both Canon survivors are structurally ready with no findings;
+  the verified Canon claim contains exactly those two packages.
+
+R11-02 now records `keep` Canon, implemented `merge` Contracts, and `keep` Canon Web. Full solution/release
+certification, publication, tagging, and remote mutation remain intentionally deferred to R11-07.
 
 ## Acceptance
 

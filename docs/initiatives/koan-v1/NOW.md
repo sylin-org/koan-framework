@@ -5,246 +5,125 @@ title: "Koan V1 Reorganization Current Handoff"
 audience: [maintainers, ai-agents]
 status: current
 last_updated: 2026-07-18
-framework_version: v0.20.0
+framework_version: source-first
 validation:
   date_last_tested: 2026-07-18
-  status: in-progress
-  scope: R11-05 through Web edge projection graduation
+  status: tested
+  scope: R11-05 Canon package-family graduation implemented and focused-proof green
 ---
 
 # Koan V1 reorganization current handoff
 
 Replace this file at every handoff. It is a restart point, not a diary.
 
-## Current state
+## Outcome so far
 
-- R00 through R07 are passed.
-- [R09 — Compile the Semantic Composition Kernel](work-items/R09-semantic-composition-kernel.md) is passed.
-  All nine children pass; [ARCH-0115](../../decisions/ARCH-0115-semantic-contribution-compilation.md)
-  and [ARCH-0116](../../decisions/ARCH-0116-one-module-lifecycle.md) record the resulting constitution.
-- R09 leaves one host-owned semantic model, one typed contribution compiler, one shared provider catalog,
-  pillar-owned immutable plans, hard Tenancy coverage, canonical guarantee/explanation evidence, and one
-  retained `KoanModule` lifecycle per functional implementation assembly.
-- The initializer/auto-registrar compatibility kernel is deleted. Cross-module contracts live in isolated
-  contract assemblies. Ordinary references carry activation; there is no `Inert`, `Required`, or equivalent
-  project-reference activation metadata.
-- Focused Core/bootstrap/package/journey/current-sample evidence is green. The unrelated SQLite discovery
-  test-double compile drift is preserved as PMC-028 in [POST-CYCLE-TODO.md](POST-CYCLE-TODO.md).
-- [R08 — Make Koan V1 responsibly releasable](work-items/R08-v1-release-readiness.md) is locally prepared and pending.
-  R08-01's Git-owned package intent, exact release-wave escrow, resumable prior-wave promotion, and six
-  least-privilege workflow boundaries remain the protected baseline. No package, tag, or GitHub Release was
-  published or observed.
-- [R08-02 — Safe connector telemetry](work-items/r08/R08-02-safe-connector-telemetry.md) is passed.
-  `Redaction` is the single credential grammar; `KoanLog` is the single structured safety boundary;
-  shared adapter/discovery/orchestration chokepoints own repetitive narration; PMC-019 is resolved.
-- Focused evidence is green: 28 Core redaction/discovery cells, one repository bypass-policy cell, and
-  17 affected connector builds. Release certification was intentionally not run.
-- [R08-03 — Canonical product surface](work-items/r08/R08-03-canonical-product-surface.md) is passed.
-  One compiler now derives 109 package shapes/platforms/dependencies from standard project facts and joins
-  them to 15 conservative claims. Thirty-six missing owned READMEs and 86 unassessed packages remain
-  visible; no support promotion is implied. PMC-010 is resolved.
-- The obsolete `KoanPackageKind` taxonomy and release-manifest field are deleted. Checked-in JSON and
-  Markdown projections byte-match regeneration; focused compiler/graph/planner/release-bundle proof passes 43/43.
-- [R08-04 — Package-first templates](work-items/r08/R08-04-package-first-templates.md) is passed.
-  One exact 108-package candidate proved release-derived template bands, direct-pack refusal, both generated
-  template shapes, and package-only FirstUse/GoldenJourney. The first clean checkout also removed two hidden
-  ambient-state assumptions from template tests and repository package discovery.
-- PMC-029's responsible repair is implemented through
-  [ARCH-0119](../../decisions/ARCH-0119-one-console-host-lifecycle.md). `StartKoan()` is now a one-line facade over
-  the standard Generic Host instead of a partial raw provider: standard environment/lifetime services, hosted
-  Communication/health startup, graceful disposal, and truthful startup evidence share one lifecycle. Focused
-  owner/consumer proof passes 8/8 and a source-equivalent console completes Entity work without either false
-  collection failure. Exact package repetition remains a next-candidate assertion, not a second 108-package run.
-- [R10 — Graduate the golden sample portfolio](work-items/R10-golden-samples.md) is passed by architect mandate.
-  Every maintained sample must become an executable golden example of current Koan semantics and .NET practice;
-  solution compilation alone is insufficient. [R10-01](work-items/r10/R10-01-gardencoop.md) now passes and the
-  [golden-sample standard](work-items/r10/GOLDEN-SAMPLE-GRADUATION.md) records its reusable evidence bar.
-- GardenCoop is a four-line host with one earned application module and one cumulative business/HTTP/facts proof.
-  Its win-x64 NativeAOT executable serves the same result. Dogfood also repaired Lifecycle predecessor timing and
-  AOT facts serialization centrally; native output is documented as a deployment directory, not a false single file.
-- [R10-02](work-items/r10/R10-02-portfolio-inventory.md) passes with an exact 27-project physical inventory and
-  explicit graduation/incubation/archive-or-delete queues. [R10-03](work-items/r10/R10-03-s1-web.md) passes:
-  TaskGraph is now the minimal deterministic AddKoan/Entity/EntityController relationship/cache rung with one
-  cumulative dashboard/business/HTTP/facts proof.
-- [R10-04](work-items/r10/R10-04-s0-console-json.md) passes. LocalChecklist is now one foundation reference, one owned
-  standard host, one Entity/business method, and one deterministic materialized JSON result. The real process,
-  JSON file, composition report, and shutdown are contract-backed; the public template shares ordinary `using var`.
-- The architect strengthened R10 into an all-active-samples mandate. `Assess` and `incubate` are temporary migration
-  states only; every project still presented as V1 curriculum must graduate or leave the active portfolio.
-- [R10-05](work-items/r10/R10-05-s10-devportal.md) passes. DevPortal is now one Article Entity and a four-line host:
-  approved local content publishes idempotently through typed named channels backed by SQLite, Mongo, or Postgres.
-  Local and real-container evidence agree with readiness/facts; demo services, switching, benchmarking, random graph,
-  AngularJS, helper/container scaffolds, and false claims are gone.
-- [R10-06](work-items/r10/R10-06-g1c2-gardencoop-embedded.md) passes. GardenCoop Chapter 2 adds one local semantic-search story:
-  the four-line host seeds five Produce Entities after AI composition, `[Embedding]` indexes them through referenced
-  ONNX/sqlite-vec providers, and `ripe red tomato` ranks Heirloom Tomatoes first. Strict source and self-contained
-  folder runs agree with readiness/facts. Dogfood also coalesced AI contribution startup, made invalid configured
-  AI intent reject host startup, closed vector repository lifetime, and removed a single-file-unsafe Core diagnostic.
-- [R10-08](work-items/r10/R10-08-public-documentation.md) passes. The public product surface is now one
-  greenfield curriculum: root/agent front doors, 36 product-only navigation targets, graduated samples,
-  current architecture/references, and 174 package/current companion files agree. A merge-gated truth
-  check rejects removed activation/Messaging vocabulary, stale routes/versions/samples, non-awaited hosts,
-  invalid package recipes, non-product navigation, and ADR edits. Product-surface proof passes 7/7 and
-  the real FirstUse source contract passes 1/1; ADRs remain untouched.
-- [R10-09](work-items/r10/R10-09-semantic-sample-portfolio.md) passes. Samples now live under semantic
-  `fundamentals`, `journeys`, and `applications` identities; unrelated global numbers and non-earning projects are
-  gone. GardenCoop Chapter 2 is a strict runnable superset of Chapter 1, while OpenGraph's automatic web-pipeline
-  contribution lets DevPortal own the Article social-card story without changing its four-line host.
-- Focused retained evidence is green: OpenGraph 39/39, DevPortal 1/1, GardenCoop C1 1/1, GardenCoop C2 1/1,
-  LocalChecklist 1/1, TaskGraph 5 pass plus 2 intentional skips, OrderIntake 1/1, SnapVault 34/34, and CustomerCanon
-  1/1. The public truth gate passes across 178 current files and 36 navigation targets.
-- [R10-10](work-items/r10/R10-10-snapvault.md) passes. SnapVault is a local-first photo studio with SQLite/local
-  storage, durable HTTP ingest, media serving, scoped client sharing, optional AI/vector enrichment, and
-  participation-owned readiness. Its strict build, 34/34 focused suite, manual startup, facts, docs, and clean stop
-  agree.
-- [R10-11](work-items/r10/R10-11-customer-canon.md) passes. Canon is split into inert Contracts, one functional
-  module, and optional Web projection; generated registry discovery compiles host-owned pipelines automatically.
-  Failed/parked phases stop before canonical/index commit. CustomerCanon is a four-line local-first host with one
-  canonical Entity, one policy owner, two thin phase adapters, generated HTTP/inspection, and a cumulative host proof.
-- The final R10 boundary builds all ten published applications with zero warnings/errors. Eight sample-owned suites
-  pass 45 tests with 2 intentional TaskGraph skips and no failures. Public truth passes across 178 current files and
-  36 navigation targets; the product surface contains 15 claims and 109 packages.
-- [R11 — Graduate the NuGet product surface](work-items/R11-package-product-quality.md) is active by architect
-  approval. A package is now treated as a product promise: every survivor must earn a distinct reference intent,
-  explain its smallest meaningful result, and pass role-proportional artifact, documentation, consumer, operator,
-  and agent evidence before the exact R08-05 candidate.
-- [R11-01](work-items/r11/R11-01-quality-contract-and-compiler.md) is passed. `Koan.Packaging` remains the one
-  evaluated package owner; the new read-only quality projection derives roles and objective repair signals without
-  project attributes, a maintained package list, release mutation, or a support promotion. R11-02 will hold only
-  irreducible keep/merge/split/rename/retire judgments.
-- The real baseline contains all 109 packages exactly once: 37 require objective repair, 72 require review, none is
-  inferred graduated, 73 own a README, and 63 have technical companions. JSON/Markdown regenerate byte-for-byte;
-  11 focused compiler cells and the warning-clean packaging-tool Release build pass. R11-02's opening matrix contains
-  the same 109 identities exactly once in temporary `assess` state.
-- R11-01 also corrected one shared evaluated-facts defect: empty `TargetFrameworks` previously hid every normal
-  project's single `TargetFramework`. Both generated references now report the actual target for all 109 packages.
-- R11-03 and R11-04 pass: the canonical mascot and package identity substrate are compiled once, the two entry
-  bundles plus Templates are structurally ready, and the zero-configuration package-first golden journey proves the
-  AddKoan/Entity/EntityController path.
-- R11-05's foundation and contract-isolation families pass. Core Adapters and CLI Core were merged into their real
-  owners; ZenGarden was renamed to an inert Contracts boundary; AI and Vector contracts shed functional leakage;
-  Storage gained one necessary inert Abstractions package; and functional `MediaEntity<TEntity>` moved to Media Core
-  under the application namespace `Koan.Media`.
-- The Storage provider subfamily now passes. One compiled plan owns profile validation, exact pins, placement
-  election, replication, capability truth, and receipts; adapters own physical IO and `StorageService` executes the
-  chosen route. Unsupported registration/fallback/capability shapes and the obsolete Local suite are deleted.
-- The Cache family now passes. One immutable topology owns Local/Remote provider election, pins, capabilities,
-  receipts, and executable tier semantics. Memory and SQLite remain thin stores; SQLite proves exact tags, sliding
-  expiry, schema migration, and restart persistence. Unsupported registration, per-policy provider pins, duplicate
-  registries, false stale-revalidation language, and the Cache-specific analyzer/helper are gone.
-- The Redis family now passes. `Sylin.Koan.Redis` is the single backend owner for endpoint discovery,
-  orchestration, connection pooling, and disposal; Data Redis and Cache Redis own only their pillar semantics.
-  Cache no longer activates Data, both consumers share the standard default `IConnectionMultiplexer`, and
-  `IRedisConnectionProvider` lives in an inert contract package. `IKoanAspireResources` likewise moved to isolated
-  Aspire contracts so contributors do not activate the functional runtime.
-- The relational provider family now passes. One functional relational owner executes immutable route-local schema
-  policy; contracts and Npgsql mechanics are module-free; Cockroach no longer activates PostgreSQL; dead Dapper and
-  storage-shape surfaces are retired. Focused owner and real SQLite/PostgreSQL/Cockroach/SQL Server paths pass.
-- The local Data provider family now passes. JSON is truthfully the automatic inspectable floor; InMemory is a direct,
-  host-scoped ephemeral provider. Dead manual JSON registration/page-size surfaces and public InMemory store controls
-  are gone, while JSON naming stays inside the already-selected provider route. JSON passes 21/21 and InMemory 56/56.
-- The document Data provider family now passes. Mongo and Couchbase consume selected-factory naming, share one
-  immutable route monitor, and participate in readiness only when selected. Mongo passes 68/68; Couchbase passes three
-  connection-free participation cells and one real-container CRUD cell. Couchbase first use remains observably slow
-  (about 64 seconds in the focused cell), and its full suite is intentionally not claimed as certified here.
-- The search-engine vector provider family now passes. One transitive SearchEngine owner centralizes configuration,
-  discovery, authenticated HTTP, participation health, startup reporting, selected-provider naming, and common REST
-  mechanics; Elasticsearch and OpenSearch retain their independent provider identities and native kNN dialects.
-  Each real-container matrix passes 29 with 4 honest capability skips; each AODB path passes 4/4, including exact
-  Endpoint binding and connection-free unused health. The unrelated stale test-project reference is PMC-032.
-- The local vector provider family now passes. InMemory is a real priority -100 automatic floor and sqlite-vec is the
-  embedded durable step up; both provider references bring Vector, both consume selected-provider naming, and
-  sqlite-vec owns one route decision across construction, health, and boot reporting. InMemory passes 34/34 and
-  sqlite-vec 5/5. GardenCoop's unrelated eager Storage activation is retained as PMC-033.
-- The external vector provider family now passes. One `VectorQueryOptions` contract owns Top-K default/validation and
-  adapters preserve explicit intent; Qdrant, Milvus, and Weaviate consume selected-provider naming and exact endpoint
-  placement. First writes derive dimension instead of guessing a model, Weaviate's inert knob is gone, and Milvus
-  discovery speaks the same REST contract as its repository. Real matrices pass 39/41, 25/33, and 34/34 respectively,
-  with every skip matching an explicitly unclaimed capability.
-- Data pagination is now caller-owned end to end. `All()` means the complete visible set; adapters have no row-page
-  default and append paging only for explicit shaping. SQLite, PostgreSQL/shared Npgsql, and SQL Server regressions each
-  prove 75 unpaged rows versus an explicitly requested page of 7.
-- The AI runtime and local-inference provider family now passes. One host-compiled provider plan replaces mutable
-  contributor callbacks and adapter registration. Provider references bring functional AI; Ollama and LM Studio use
-  one Core discovery/AI source law; ONNX native lifetime is DI-owned; explicit intent fails correctively; layered Zen
-  Garden capability requirements use one neutral discovery contract. AI Unit passes 160/160, AI Integration 49/49,
-  clean-host activation 2/2, and Zen Garden discovery 3/3. Data.AI's ten host-start failures remain the recorded
-  PMC-033 unused-Storage activation rather than an AI regression.
-- The AI semantic-input and HTTP-projection family now passes. Prompt values moved to inert AI Contracts, so ordinary
-  AI no longer activates Entity/Data; the optional Prompt package owns only named/versioned Entity catalog behavior.
-  AI Web now activates controllers from reference plus `AddKoan()` and no longer duplicates AI health or requires a
-  registration extension. Prompt/catalog passes 26/26, prompt integration 7/7, AI Unit 160/160, and the isolated real
-  Web host 1/1. Four packages pack and audit cleanly.
-- The providerless AI Training facade and the reverse Zen Garden AI connector are retired. Shared lifecycle contracts
-  remain inert; no compatibility package or production-registry mutation was restored. AI Models and both dependent
-  test hosts build warning-clean, and the corrected EndToEnd adapter-resolution cell passes 7/7.
-- The misleading local-only AI Compute facade is also retired after read-only committed Zen Garden inspection confirmed
-  the real hardware/resource owner. Its sole test consumer is gone; the surviving EndToEnd host builds warning-clean,
-  while dependency-free compute exchange contracts remain and pass 9/9.
-- The surviving AI topology is terminal without a premature cut: Koan keeps semantic inference, Entity-first Data.AI,
-  Prompt/Web, and Ollama/LM Studio/ONNX. Agents/Orchestration/Eval/Review remain only until Agyo destinations are green;
-  Models/Hugging Face remain only until the Zen Garden port is green. They receive no Koan V1 polish or support claim.
-- The MCP family now passes as three earned boundaries: Core agent projection/runtime, optional human Explorer, and
-  explicitly enabled governed Operations. `McpModule` is the only activation/endpoint owner; unsupported manual
-  registration/mapping APIs are gone. Focused suites pass 75/75, 16/16, 5/5, and Code Mode 27/27; exact packages and
-  current vulnerability results are clean.
-- The Web projection family now passes as three earned boundaries. Extensions owns per-host optional Entity HTTP
-  realizations; OpenAPI owns one document/UI policy and fail-closed non-Development UI; SSE owns one stream/result
-  model used by controllers and framework transports. Focused owner/consumer evidence and exact artifacts are clean.
-- The Web edge projection family now passes. Media Web automatically selects the sole concrete media Entity while
-  preserving an explicit ambiguity/custom-source decision; OpenGraph declarations and lifecycle closures are
-  host-owned; the unsupported Web Backup control plane is retired while Data Backup remains. Focused suites pass
-  7/7, 39/39, and 7/7, with SnapVault and DevPortal golden paths each passing 1/1. Exact retained artifacts and
-  current vulnerability checks are clean.
-- Current generated truth contains 107 packages: 16 repair-required, 29 review-required, 62 structurally ready across
-  24 claims. Public truth passes across 222 current files and 40 navigation targets.
-  Redis Cache 6/6 and Redis Data 12/12 pass; seven affected packages and their dependency boundaries were inspected,
-  and the three new packages have no known vulnerable direct or transitive packages. Earlier Storage evidence remains
-  green. Seven relational packages also inspect cleanly, with clear current vulnerability checks for the two new
-  packages and Cockroach. S3 engine conformance remains an honestly stated evidence gap rather than an inferred
-  compatibility claim.
-- No package, tag, GitHub Release, branch, or remote configuration was published or mutated. Initial coherent
-  public observation and a later real public-to-candidate upgrade/rollback remain separate gates.
+- R00 through R07, R09, and R10 are passed. R08 is locally prepared but publication remains deliberately gated.
+- R11-01 through R11-04 pass. R11-05 is active and graduates package families in dependency order before the single
+  R11-07 release-certification boundary.
+- Foundation, package identity, templates, Storage, Cache, Redis, relational/Data providers, Vector, AI, MCP, Web,
+  Media, OpenGraph, Identity, Tenancy, Classification, and now Canon have completed their current R11 family slices.
+- The current evaluated product graph contains 102 packages and 26 claims. Generated package quality reports 6
+  repair-required, 18 review-required, and 78 structurally ready packages.
+
+The accepted architecture remains business intent first: Entity-first application language, references express
+capability intent, `AddKoan()` compiles one host-owned semantic constitution, pillars own meaning and runtime
+chokepoints, adapters own mechanics, and applications own business rules. Cross-module contract packages survive only
+when they are genuinely inert and independently consumed.
+
+## Most recent completed slice: Canon
+
+R10-11 was not restarted. Its four-line CustomerCanon host, automatic contributor discovery, functional/Web split,
+same-id convergence, and failed/parked non-persistence remain the application contract.
+
+R11-05 implemented the accepted topology:
+
+- `Sylin.Koan.Canon` — `keep`;
+- `Sylin.Koan.Canon.Contracts` — `merge` into Canon, implemented without a compatibility package;
+- `Sylin.Koan.Canon.Web` — `keep`.
+
+One immutable `CanonCompositionPlan` now owns every discovered `CanonEntity<T>`, including contributor-free models.
+Runtime, startup/facts, pipeline inspection, and Web project that same decision. Built-in aggregation/policy always
+participates; the first failed or parked contributor is terminal; duplicate HTTP slugs reject composition.
+
+The default commit is explicit and tested: canonical Entity → aggregation indexes → audit. It is fail-loud and not
+atomic across all Data providers. A failed checkpoint may leave earlier checkpoints durable; Canon does not claim
+rollback, blind-retry safety, durable replay, distributed locking/delivery, or automatic recovery.
+
+The public manual builder/configuration, observer/replay records, record capacity, disconnected optimization subsystem,
+`CanonValueObject<T>` auto-CRUD, generated admin/rebuild routes, and `FlowPillarManifest` were retired. Headless
+`ICanonRuntime.RebuildViews<T>`, standard-DI `ICanonPersistence`/`ICanonAuditSink` replacement, contributors, options,
+results, and read-only pipeline metadata remain.
+
+## Focused Canon proof
+
+- Canon unit: 35/35.
+- Canon integration: 7/7.
+- CustomerCanon real-host golden path: 1/1.
+- Both surviving packages built and packed in Release with one DLL/XML pair, build-transitive props, package-owned
+  README, canonical icon, symbol package, exact dependencies, and no Contracts dependency.
+- Current direct/transitive vulnerability audit: no known vulnerable packages for either survivor.
+- Generated package-quality and product-surface truth regenerated; both Canon packages are structurally ready with no
+  findings, and the verified claim names exactly Canon and Canon Web.
+- No full solution/release ratchet ran; that remains R11-07 work.
+
+## Current repository state
+
+- Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
+- Branch: `dev` at `1e91e2c10`; local is 140 commits ahead of `origin/dev` and 0 behind.
+- The Canon implementation, R11 discovery/closure, topology, package truth, and docs are intentionally uncommitted.
+- `tmp/` remains untracked scratch/evaluator material and must never be staged.
+- The CustomerCanon lockfile was refreshed by the focused real-host build and no longer contains Canon Contracts.
+- No push, publication, tag, release, deployment, remote mutation, private downstream inspection, or full release
+  certification occurred.
+
+## Resume here
+
+1. Verify `git status`, `HEAD`, and this Canon evidence before committing or starting another family.
+2. Review the complete Canon discovery, accepted checkpoint, implementation closure, and exact focused evidence in
+   [R11-05](work-items/r11/R11-05-package-family-graduation.md).
+3. Review Canon's implemented dispositions and the 102-row active matrix in
+   [R11-02](work-items/r11/R11-02-package-topology-inventory.md).
+4. If the Canon slice is accepted for commit, keep architecture and public/package truth logically reviewable and do
+   not stage `tmp/`.
+5. Continue R11-05 with the next dependency-ordered `assess` family. The first unresolved active row is
+   `Sylin.Koan.Communication.Connector.RabbitMq`; begin with fresh exploration rather than presuming its disposition.
+
+## Remaining temporary dispositions
+
+Communication RabbitMQ; Data Access, Backup, and SoftDelete; Jobs; Observability; the remaining Orchestration CLI,
+Aspire, generator, container-provider, and Compose renderer family; Security Trust; Testing, Containers, and Hosting;
+Web Admin; and ZenGarden still require terminal R11-02 decisions.
+
+## Do not redo
+
+- Do not reopen R10-11's historical Canon assessment or rebuild CustomerCanon.
+- Do not rerun Classification, Tenancy, or earlier family suites without an affected dependency.
+- Do not run the full release ratchet before R11-07.
+- Do not stage `tmp/`, inspect private dogfood applications, or use private identities in public docs.
+- Do not push, tag, publish, release, deploy, or mutate remote configuration without separate authorization.
+- Do not preserve a legacy surface solely for compatibility, but do not remove a current public concept without proving
+  that it lacks an earned V1 intent.
 
 ## Accepted design laws
 
-- Design from the application inward: business sentence, smallest honest C# expression, exact guarantee,
-  corrective failure, then internal types.
-- `AddKoan()` / `Entity<T>` / `EntityController<T>` remains the golden business-to-code comparison. Extra
-  public concepts must express a real business decision, guarantee, or deliberate override.
-- Complexity is centralized at typed responsibility chokepoints. Core owns generic law; pillars own meaning
-  and policy; adapters own mechanics; applications own business intent.
-- Standard .NET/package structure is the first language. A functional assembly derives identity and exposes
-  one domain-named `KoanModule`; shared vocabulary belongs in `*.Core`, `*.Abstractions`, or `*.Contracts`.
-- Structural composition runs once per host/shape. Runtime operations execute immutable plans and bind ambient
-  values without contributor discovery, reflection, or provider negotiation.
-- Startup, facts, health, errors, HTTP/MCP, tests, and future tooling project canonical decisions; no
-  projection becomes a second authority.
-- Break-and-rebuild remains preferred where compatibility would preserve duplicate owners or crutches.
-- The neutral operation model remains a V1.1 target and is outside the current release-readiness slice.
-
-## Next safe action
-
-Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the Identity and Web Auth vertical. Begin
-from its smallest application security intent, distinguish identity-domain policy from HTTP authentication and
-external-provider mechanics, and look for one host-owned decision model before polishing individual packages. Keep
-cross-repository AI handoff packages untouched and do not run release certification.
-
-Keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared. Do not mutate remote settings, push,
-tag, release, or publish until package polish is accepted and separate remote-operation authorization is renewed.
-
-Do not call the proven local feed a public upgrade. It is exact candidate evidence only.
+- Design from the application inward: business sentence, smallest honest C# expression, exact guarantee, corrective
+  failure, then internal types.
+- `AddKoan()` / `Entity<T>` / `EntityController<T>` is the golden business-to-code comparison. Extra public concepts
+  must express a real business decision, guarantee, or deliberate override.
+- Complexity is centralized at typed responsibility chokepoints. Core owns generic law; pillars own meaning and policy;
+  adapters own mechanics; applications own business intent.
+- Standard .NET hosting, DI, options, assembly, MSBuild, and NuGet concepts come before Koan-specific parts.
+- Structural composition runs once per host/shape. Runtime operations consume immutable plans without contributor
+  discovery, reflection, or provider negotiation.
+- Startup, facts, health, errors, HTTP/MCP, tests, and future tooling project canonical decisions; no projection becomes
+  a second authority.
+- Break-and-rebuild is preferred when compatibility would preserve duplicate owners or crutches, but every rebuild is
+  justified against current code, not remembered history.
+- The neutral operation model remains a V1.1 target outside this release-readiness slice.
 
 ## Validation economy
 
-- Start every R11 family slice with focused exploration and coalescence assessment.
-- Run only the named owner/consumer, package, documentation, and security cells during implementation.
-- Run the complete public-release ratchet only at an explicit release-certification boundary.
-
-## Repository boundary
-
-- Branch `dev`; R08 kickoff baseline `546817ee0d3a`.
-- Preserve intentional and unrelated working-tree changes.
-- Never stage scratch/evaluator material under `tmp/`.
-- Do not inspect or name private downstream applications.
-- Do not publish, push, tag, release, or mutate remote configuration without a separate request.
+- Start every new R11 family slice with focused exploration and coalescence assessment.
+- Run only affected owner/consumer, package, documentation, and security cells during implementation.
+- Run the complete public-release ratchet only at the explicit R11-07 certification boundary.

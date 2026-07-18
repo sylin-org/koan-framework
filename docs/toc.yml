@@ -18,6 +18,8 @@
       href: guides/data/entity-access-and-streaming.md
     - name: Cache Entity state
       href: reference/data/cache.md
+    - name: Build a canonical Entity
+      href: guides/canon-capabilities-howto.md
     - name: Store Entity-backed files
       href: reference/storage/index.md
     - name: Add AI capabilities
@@ -51,6 +53,8 @@
       href: reference/core/index.md
     - name: Entity data
       href: reference/data/index.md
+    - name: Canon
+      href: reference/canon/index.md
     - name: Web and HTTP
       href: reference/web/index.md
     - name: HTTP API

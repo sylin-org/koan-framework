@@ -229,9 +229,9 @@
     {
       "id": "canonical-entities",
       "title": "Canonical Entity pipelines",
-      "summary": "Canon discovers Entity-first validation and convergence rules, compiles deterministic host-owned pipelines, and optionally projects them through inspectable HTTP surfaces.",
+      "summary": "Canon discovers every canonical Entity, compiles one deterministic host-owned pipeline plan, commits canonical state, indexes, and audit in an explicit non-atomic order, and optionally projects the same plan through inspectable HTTP surfaces.",
       "maturity": "verified",
-      "packages": ["Sylin.Koan.Canon.Contracts", "Sylin.Koan.Canon", "Sylin.Koan.Canon.Web"],
+      "packages": ["Sylin.Koan.Canon", "Sylin.Koan.Canon.Web"],
       "documentation": ["docs/reference/canon/index.md", "docs/guides/canon-capabilities-howto.md"],
       "evidence": ["tests/Suites/Canon", "tests/Suites/Samples/Koan.Samples.CustomerCanon.Tests", "samples/applications/CustomerCanon"]
     }

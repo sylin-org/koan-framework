@@ -46,8 +46,8 @@ generated package-quality and product-surface references.
 
 R11-01 opened with 109 packages: 37 required an objective repair, 72 required review, and none was inferred
 graduated. Subsequent family work retired unearned identities and introduced only independently useful contract or
-shared-mechanism boundaries. The current evaluated graph contains 107 packages: 16 repair-required, 29
-review-required, and 62 structurally ready across 24 claims. The active matrix contains only present package projects;
+shared-mechanism boundaries. The current evaluated graph contains 102 packages: 6 repair-required, 18
+review-required, and 78 structurally ready across 26 claims. The active matrix contains only present package projects;
 implemented retirements remain in the disposition tables as release-lineage decisions.
 
 ## Exact active matrix
@@ -79,9 +79,8 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Cache.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Cache.Adapter.Redis` | `provider` | `keep` |
 | `Sylin.Koan.Cache.Adapter.Sqlite` | `provider` | `keep` |
-| `Sylin.Koan.Canon` | `capability` | `assess` |
-| `Sylin.Koan.Canon.Contracts` | `contracts` | `assess` |
-| `Sylin.Koan.Canon.Web` | `projection` | `assess` |
+| `Sylin.Koan.Canon` | `capability` | `keep` (implemented) |
+| `Sylin.Koan.Canon.Web` | `projection` | `keep` (implemented) |
 | `Sylin.Koan.Classification` | `capability` | `keep` |
 | `Sylin.Koan.Classification.Contracts` | `contracts` | `keep` (introduced by R11-05 contract isolation) |
 | `Sylin.Koan.Communication` | `capability` | `keep` |
@@ -116,9 +115,6 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Data.Vector.Connector.SqliteVec` | `provider` | `keep` |
 | `Sylin.Koan.Data.Vector.Connector.Weaviate` | `provider` | `keep` |
 | `Sylin.Koan.Identity` | `capability` | `keep` |
-| `Sylin.Koan.Identity.Credentials` | `capability` | `retire` (implemented) |
-| `Sylin.Koan.Identity.Mfa` | `capability` | `retire` (implemented) |
-| `Sylin.Koan.Identity.Passwords` | `capability` | `retire` (implemented) |
 | `Sylin.Koan.Identity.Tenancy` | `capability` | `keep (implemented)` |
 | `Sylin.Koan.Identity.Web` | `projection` | `keep` |
 | `Sylin.Koan.Jobs` | `capability` | `assess` |
@@ -157,12 +153,8 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Web.Auth.Connector.Discord` | `provider` | `keep` |
 | `Sylin.Koan.Web.Auth.Connector.Google` | `provider` | `keep` |
 | `Sylin.Koan.Web.Auth.Connector.Microsoft` | `provider` | `keep` |
-| `Sylin.Koan.Web.Auth.Connector.Oidc` | `provider` | `retire (implemented: generic OIDC is configuration-native in Web Auth)` |
 | `Sylin.Koan.Web.Auth.Connector.Test` | `provider` | `keep` |
-| `Sylin.Koan.Web.Auth.Roles` | `projection` | `retire (implemented)` |
 | `Sylin.Koan.Web.Auth.Server` | `projection` | `keep` |
-| `Sylin.Koan.Web.Auth.Services` | `projection` | `retire (implemented)` |
-| `Sylin.Koan.Web.Backup` | `projection` | `retire` (implemented) |
 | `Sylin.Koan.Web.Extensions` | `capability` | `keep` |
 | `Sylin.Koan.Web.OpenApi` | `projection` | `keep` |
 | `Sylin.Koan.Web.OpenGraph` | `projection` | `keep` |
@@ -320,6 +312,18 @@ artifact, documentation, and current vulnerability evidence. Base `Sylin.Koan.We
 Media Web and OpenGraph retain distinct reference value and focused owner/consumer evidence. Web Backup's removal
 reduces the active package graph without deleting the independent backup/restore domain capability or manufacturing
 a compatibility package.
+
+## Canon family dispositions
+
+Canon's R10-11 business journey and automatic contributor discovery remain intact. R11-05 removed a
+source boundary that did not express independent reference intent and narrowed unproved runtime/Web
+surfaces without rebuilding CustomerCanon.
+
+| Package | Disposition | Distinct reference intent and implemented boundary work |
+|---|---|---|
+| `Sylin.Koan.Canon.Contracts` | `merge` (implemented) | No source package consumed it independently, and its `CanonEntity<T>` vocabulary already resolved the functional runtime and depended on Data. Its useful model, metadata, annotation, contributor, persistence, runtime-result, and audit vocabulary now belongs to functional Canon; the package project and identity are retired with no compatibility shim. |
+| `Sylin.Koan.Canon` | `keep` (implemented) | One reference states canonical-Entity intent. The package owns one immutable host composition plan for every discovered model, built-in/custom pipelines, first-terminal-wins execution, stage behavior, headless rebuild, persistence/audit seams, and a fail-loud canonical → indexes → audit commit whose non-atomic and partial-write boundary is explicit. Manual builder/configuration, observer/replay, disconnected optimization, value-object auto-CRUD, and the legacy pillar mutation were retired. |
+| `Sylin.Koan.Canon.Web` | `keep` (implemented) | Optional HTTP projection is independently useful. It consumes Canon's exact host plan, rejects ambiguous route slugs, and exposes Canon-aware Entity plus model-inspection routes. It does not rediscover models or generate admin, replay, rebuild, or value-object routes. |
 
 ## Acceptance
 

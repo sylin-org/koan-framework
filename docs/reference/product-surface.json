@@ -122,11 +122,10 @@
     {
       "id": "canonical-entities",
       "title": "Canonical Entity pipelines",
-      "summary": "Canon discovers Entity-first validation and convergence rules, compiles deterministic host-owned pipelines, and optionally projects them through inspectable HTTP surfaces.",
+      "summary": "Canon discovers every canonical Entity, compiles one deterministic host-owned pipeline plan, commits canonical state, indexes, and audit in an explicit non-atomic order, and optionally projects the same plan through inspectable HTTP surfaces.",
       "maturity": "verified",
       "packages": [
         "Sylin.Koan.Canon",
-        "Sylin.Koan.Canon.Contracts",
         "Sylin.Koan.Canon.Web"
       ],
       "documentation": [
@@ -879,31 +878,12 @@
         "net10.0"
       ],
       "dependencies": [
-        "Sylin.Koan.Canon.Contracts",
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Koan.Canon/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Canon/TECHNICAL.md",
-      "claims": [
-        "canonical-entities"
-      ]
-    },
-    {
-      "packageId": "Sylin.Koan.Canon.Contracts",
-      "shape": "library",
-      "description": "Inert Entity, metadata, pipeline, persistence, and runtime contracts for Koan Canon.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Core"
-      ],
-      "readme": "src/Koan.Canon.Contracts/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": "src/Koan.Canon.Contracts/TECHNICAL.md",
       "claims": [
         "canonical-entities"
       ]
@@ -917,7 +897,6 @@
       ],
       "dependencies": [
         "Sylin.Koan.Canon",
-        "Sylin.Koan.Canon.Contracts",
         "Sylin.Koan.Core",
         "Sylin.Koan.Web",
         "Sylin.Koan.Web.Extensions"

@@ -41,5 +41,6 @@ durable JSON storage, `422` rejection, no invalid persistence, and public facts:
 dotnet test tests/Suites/Samples/Koan.Samples.CustomerCanon.Tests
 ```
 
-Canon replay remains process-local, generated admin routes require deployment authorization, and this
-sample does not claim distributed ingestion, locking, or delivery guarantees.
+The test also proves that no admin/replay route is generated and that facts disclose Canon's ordered,
+non-atomic commit. This sample does not claim distributed ingestion, locking, delivery, rollback,
+blind-retry safety, or automatic recovery.

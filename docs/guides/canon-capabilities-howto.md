@@ -4,10 +4,10 @@ domain: canon
 title: "Build a trusted canonical Entity"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-17
-framework_version: v0.17.0
+last_updated: 2026-07-18
+framework_version: source-first
 validation:
-  date_last_tested: 2026-07-17
+  date_last_tested: 2026-07-18
   status: tested
   scope: CustomerCanon real-host golden path
 related_guides:
@@ -16,9 +16,9 @@ related_guides:
 
 # Build a trusted canonical Entity
 
-Use Canon when multiple or imperfect arrivals must converge into trusted business state. The application
-defines identity and rules. Koan discovers them and owns pipeline composition, persistence, and optional
-Web exposure.
+Use Canon when multiple or imperfect arrivals must converge into trusted business state. The
+application defines identity and rules. Koan discovers them and owns pipeline composition,
+persistence, and optional Web exposure.
 
 ## 1. Add the capability
 
@@ -38,8 +38,8 @@ var app = builder.Build();
 await app.RunAsync();
 ```
 
-Referencing Canon is intent. Do not add a Canon registrar, application module, controller, or explicit
-`AddCanonRuntime()` for the common path.
+Referencing Canon is intent. Do not add a Canon registrar, application module, controller, or custom
+runtime-registration call.
 
 ## 2. Define canonical identity
 
@@ -92,17 +92,10 @@ public sealed class CustomerValidation : ICanonPipelineContributor<Customer>
 }
 ```
 
-Contributor discovery is automatic. Koan runs phases in this order:
-
-1. `Intake`
-2. `Validation`
-3. `Aggregation`
-4. `Policy`
-5. `Projection`
-6. `Distribution`
-
-Within a phase, optional `Order` then type name make ordering deterministic. A failed or parked phase
-stops before later phases, aggregation indexing, and canonical persistence.
+Contributor discovery is automatic. Koan runs `Intake`, `Validation`, `Aggregation`, `Policy`,
+`Projection`, then `Distribution`. Within a phase, optional `Order` then type name make ordering
+deterministic. The first failed or parked contributor stops the operation before later work or commit.
+A model with no application contributor still receives built-in aggregation and policy behavior.
 
 ## 4. Use and inspect it
 
@@ -123,21 +116,22 @@ Content-Type: application/json
 - `202` means the pipeline parked the arrival.
 - `422` means a contributor rejected it; the response includes phase events and reasons.
 
-Inspect `/api/canon/models` for discovered models, routes, pipelines, and aggregation keys. Inspect
-`/.well-known/Koan/facts` and startup reporting for the activated runtime, Web projection, and selected
-Data provider.
+Inspect `/api/canon/models` for the exact host model plan and `/.well-known/Koan/facts` for the runtime,
+Web projection, selected Data provider, and non-atomic commit posture. For non-Web code, call
+`await customer.Canonize()` within an active Koan host.
 
-For non-Web code, call `await customer.Canonize()` within an active Koan host.
+## Failure and operational boundaries
 
-## Advanced boundaries
-
-- Replace `ICanonPersistence` only when taking ownership of canonical reads/writes, stages, and indexes
-  as one unit.
-- Use explicit `AddCanonRuntime(...)` only when discovery is insufficient and a model pipeline truly
-  needs host-owned programmatic override.
-- Runtime replay is bounded and process-local. It is not a durable event log.
+- Successful default commits write canonical Entity, aggregation indexes, then audit. This sequence is
+  ordered and fail-loud, but not atomic across all providers.
+- A failed checkpoint can leave the earlier checkpoints durable. Canon names the checkpoint and does
+  not promise rollback, blind-retry safety, or automatic recovery.
+- Replace `ICanonPersistence` only when taking ownership of canonical, stage, and index operations as
+  one unit. Replace `ICanonAuditSink` for audit delivery.
 - A Canon phase event is not a Communication event or transport message.
-- Secure generated admin and rebuild routes for the deployment.
+- Canon Web generates model and inspection routes only. Headless rebuild is an application operation;
+  replay, admin, rebuild, and value-object routes are not generated.
+- The host's normal ASP.NET authentication and authorization policy applies to generated routes.
 
 The complete runnable example is [CustomerCanon](../../samples/applications/CustomerCanon/README.md).
 For all supported surfaces and limits, see the [Canon pillar reference](../reference/canon/index.md).
