@@ -26,7 +26,6 @@
     <ProjectReference Include="..\..\src\Koan.AI.Review\Koan.AI.Review.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI.Agents\Koan.AI.Agents.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI.Prompt\Koan.AI.Prompt.csproj" />
-    <ProjectReference Include="..\..\src\Koan.AI.Compute\Koan.AI.Compute.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
   </ItemGroup>
 </Project>
