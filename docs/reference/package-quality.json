@@ -3,12 +3,12 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 105,
-    "repairRequired": 16,
+    "repairRequired": 15,
     "reviewRequired": 21,
-    "structurallyReady": 68,
-    "ownedReadmes": 89,
-    "technicalCompanions": 84,
-    "findings": 97
+    "structurallyReady": 69,
+    "ownedReadmes": 90,
+    "technicalCompanions": 85,
+    "findings": 95
   },
   "findingDefinitions": [
     {
@@ -2127,7 +2127,7 @@
       "projectPath": "src/Koan.Web.Auth.Server/Koan.Web.Auth.Server.csproj",
       "shape": "library",
       "role": "projection",
-      "status": "repair-required",
+      "status": "structurally-ready",
       "description": "SEC-0006 embedded OAuth 2.1 Authorization Server for Koan: the MCP auth on-ramp. Mints asymmetric (ES256) access tokens for OAuth clients via Authorization Code \u002B PKCE and the Device Authorization Grant, advertises itself per the MCP authorization spec, and reuses the trust fabric for issuance. Opt-in leaf (Reference = Intent).",
       "targetFrameworks": [
         "net10.0"
@@ -2140,13 +2140,10 @@
         "Sylin.Koan.Web.Auth",
         "Sylin.Koan.Web.Auth.Abstractions"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Web.Auth.Server/README.md",
+      "technicalDocumentation": "src/Koan.Web.Auth.Server/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Web.Extensions",

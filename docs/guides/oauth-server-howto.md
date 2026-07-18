@@ -4,12 +4,12 @@ domain: web
 title: "Embedded OAuth 2.1 Authorization Server (the MCP auth on-ramp)"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-06-20
-framework_version: v0.17
+last_updated: 2026-07-18
+framework_version: source-first
 validation:
-  date_last_tested: 2026-06-20
+  date_last_tested: 2026-07-18
   status: verified
-  scope: end-to-end against Koan.Web.Auth.Server.IntegrationTests (43 specs)
+  scope: end-to-end against Koan.Web.Auth.Server.IntegrationTests (50 specs)
   notes: "The full Authorization Code + PKCE, Device, refresh, discovery, and DCR flows are exercised by the real-host AS integration suite."
 related_guides:
   - mcp-http-sse-howto.md
@@ -105,6 +105,24 @@ A conformant client never needs hand-holding — it discovers and drives these i
 
 ### Dynamic Client Registration (RFC 7591)
 `POST /oauth/register` is open by default (Claude Desktop has no pre-shared `client_id`) but **zero-trust**: every dynamic client is forced public (no secret), constrained to **loopback** redirect URIs (RFC 8252), rate-limited, and TTL-expired. Disable it for a hardened deployment with `Koan:Web:Auth:Server:AllowDynamicRegistration=false`.
+
+All supported clients are public; confidential clients and client secrets are not implemented. When DCR is disabled,
+pre-register known clients through the Entity model:
+
+```csharp
+using Koan.Web.Auth.Server.Protocol;
+
+await new OAuthClient
+{
+    Id = "operations-console",
+    ClientName = "Operations Console",
+    RedirectUris = ["https://console.example.com/oauth/callback"],
+    CreatedUtc = DateTimeOffset.UtcNow
+}.Save();
+```
+
+Dynamic clients remain loopback-only. A pre-registered client may declare a deliberate non-loopback redirect, which
+the server matches exactly.
 
 ### Authorization Code + PKCE (desktop clients)
 `GET /oauth/authorize?response_type=code&client_id=…&redirect_uri=…&code_challenge=…&code_challenge_method=S256&resource=…&state=…` → consent → `POST /oauth/token` (grant `authorization_code`). PKCE-S256 is **mandatory**; the code is bound to `(client_id, redirect_uri, code_challenge, scope, subject, resource)`, re-verified at the token endpoint, and single-use.

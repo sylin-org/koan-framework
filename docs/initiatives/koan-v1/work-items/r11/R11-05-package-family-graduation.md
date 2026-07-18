@@ -2414,6 +2414,86 @@ A future governed role catalog is not prohibited. Its admission bar is a golden 
 validate grants, drive actual authorization policy, produce a safe assignment/admin flow, and remain inspectable; it
 should then live with Identity's person/access domain rather than reappear as a disconnected Web Auth projection.
 
+### Embedded authorization-server discovery
+
+**Task:** Graduate `Sylin.Koan.Web.Auth.Server` without changing its exercised OAuth 2.1 wire contract, and remove its
+known exception to Koan's controller-surfaced HTTP architecture.
+
+**Application intent:** “Reference the authorization-server leaf and let an OAuth/MCP client obtain an audience-bound
+token through standard discovery, Authorization Code + PKCE or Device flow.” The application keeps its existing
+`AddKoan()` and owns only the consent and terminal pages. No endpoint mapping, bearer wiring, issuer construction, or
+protocol service registration belongs in application code.
+
+**Public expression:** Package reference + `AddKoan()` activates `/oauth/...` and `/.well-known/...`. Optional typed
+configuration under `Koan:Web:Auth:Server` supplies canonical issuer, app-page paths, lifetimes, DCR, development,
+refresh, and key-lifecycle choices. Existing current guidance already teaches this exact expression and remains the
+public route contract.
+
+**Guarantee/correction:** Keep the complete exercised protocol surface, ES256 issuance/JWKS, persisted rotating production
+keys, fail-closed ephemeral-key guard, PKCE-S256, browser-bound consent, audience binding, loopback-only/rate-limited
+DCR, device polling protections, rotating refresh/reuse detection, grant revocation, Development-only token/client
+affordances, and request-host/explicit-issuer behavior. The current 50-spec real-host suite is the executable boundary.
+
+**Docs and code read:** The complete project/source inventory, `AuthServerModule`, typed options, all endpoint handlers,
+current OAuth guide, Web/Auth/MCP consumers, 50-spec suite, package-quality/product records, engineering guardrails,
+and closest Test-provider/controller patterns were inspected. The package has a real independent result and strong
+tests, but no package-owned README/TECHNICAL and currently registers five `IKoanEndpointContributor` instances.
+
+**Reusing:** Existing protocol handlers, Entity-backed OAuth artifacts, `IAsymmetricIssuer`, persisted key store and
+rotation, `AddKoanControllersFrom`, attribute routing, options, module lifecycle/reporting, and the integration suite
+remain authoritative. No protocol DTO, repository layer, middleware, or application hook is introduced.
+
+**Creating new:** One `OAuthServerController` declares every framework-owned protocol route and delegates to the
+existing handlers; one `AuthServerRoutes` constants owner supplies both attribute templates and advertised URLs.
+Package-owned README/TECHNICAL companions describe activation, meaningful result, route/configuration/security
+contracts, inspectability, and unsupported public-IdP/federation scenarios.
+
+**Coalescence:** Remove the five endpoint-contributor registrations and their `Map` methods. Routing belongs at one MVC
+chokepoint; protocol complexity remains in concern-specific handlers. Centralize the stable route strings currently
+duplicated across mappers, metadata, cookies, and reporting. This is a net reduction in lifecycle mechanisms and keeps
+the controller thin rather than moving 600 lines of OAuth mechanics into transport code.
+
+**Ergonomics:** Developers and agents continue to get “reference + AddKoan” with no changed application code.
+Maintainers can inspect the complete HTTP surface in one controller and the complete URL vocabulary in one constants
+type. Operators keep the same startup posture and discovery documents; package presentation finally states the
+production key and app-page obligations before installation.
+
+**Risks:** Attribute routing must preserve exact methods/templates, raw form/JSON handling, response headers, status
+codes, cookies, redirects, and API-explorer exclusion. The real-host suite is therefore the acceptance proof; no broad
+release certification runs in this slice.
+
+### Embedded authorization-server implementation
+
+Status: `keep with focused proof complete`.
+
+- Replaced five endpoint-contributor registrations and five distributed `Map` methods with one
+  `OAuthServerController`. The controller is now the complete route/method inventory and delegates directly to the
+  existing concern-specific handlers; OAuth mechanics did not move into the HTTP boundary.
+- Added one internal `AuthServerRoutes` vocabulary. Attribute routes, advertised metadata, browser-binding cookie
+  paths, and startup reporting now consume the same constants instead of repeating protocol paths.
+- Removed `OAuthClient.IsPublic`, a write-only flag that implied unsupported confidential-client behavior. The model,
+  metadata, DCR, tests, and public docs now agree: every supported client is public, token endpoint authentication is
+  `none`, and client secrets are unsupported. Entity-first pre-registration remains the deliberate path for known
+  clients and non-loopback redirects.
+- Added package-owned README and TECHNICAL companions covering reference-only activation, the two-page application
+  seam, route and configuration ownership, Entity-backed persistence, production key posture, inspectability, and
+  unsupported federation/confidential-client scenarios. The current public guide now records the Entity-first
+  pre-registration expression and the verified 50-spec boundary.
+- `Koan.Web.Auth.Server.IntegrationTests` passes 50/50 against a real host after the routing and model changes. The
+  proof covers discovery, JWKS, Authorization Code + PKCE, Device, DCR, refresh rotation/reuse, keys, host/issuer,
+  cookies, redirects, and hardening without a broad release-certification run.
+- Canonical generated truth remains 105 packages and 24 product claims: Auth Server moves from repair-required to
+  structurally ready, producing 15 repair-required, 21 review-required, and 69 structurally ready packages. The
+  verified authentication/authorization claim now names the package, its current guide, and its 50-spec evidence
+  instead of leaving a proved capability unassessed. The packed artifact contains the expected DLL/XML, owned README,
+  icon, build-transitive props, and six direct Koan dependencies.
+- Public documentation truth passes across 220 current files and 40 navigation targets; structural docs lint reports
+  zero errors. The package builds with zero warnings and `git diff --check` is clean.
+
+The result preserves the application expression—package reference plus the existing `AddKoan()`—while reducing five
+activation/routing moving parts to one conventional MVC chokepoint and making the supported security boundary
+explicit to developers, agents, and operators.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

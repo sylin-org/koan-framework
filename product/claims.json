@@ -174,12 +174,12 @@
     },
     {
       "id": "authentication-authorization",
-      "title": "Authentication and authorization",
-      "summary": "Identity and web authorization compose through referenced modules while external providers require separate proof.",
+      "title": "Authentication, authorization, and client token issuance",
+      "summary": "Identity and web sign-in compose through referenced modules; the embedded OAuth server issues audience-bound public-client tokens through its verified protocol boundary, while external provider behavior remains connector-specific.",
       "maturity": "verified",
-      "packages": ["Sylin.Koan.Identity", "Sylin.Koan.Web.Auth"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
-      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Identity", "src/Koan.Web.Auth"]
+      "packages": ["Sylin.Koan.Identity", "Sylin.Koan.Web.Auth", "Sylin.Koan.Web.Auth.Server"],
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md", "docs/guides/authentication-setup.md", "docs/guides/oauth-server-howto.md"],
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Identity", "src/Koan.Web.Auth", "tests/Suites/Auth/Koan.Web.Auth.Server.IntegrationTests"]
     },
     {
       "id": "testing-local-infrastructure",

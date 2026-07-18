@@ -22,7 +22,7 @@ This report separates objective package repairs from human review. `structurally
 
 | Packages | Repair required | Review required | Structurally ready | Owned READMEs | Technical companions | Findings |
 |---:|---:|---:|---:|---:|---:|---:|
-| 105 | 16 | 21 | 68 | 89 | 84 | 97 |
+| 105 | 15 | 21 | 69 | 90 | 85 | 95 |
 
 ## Packages
 
@@ -126,7 +126,7 @@ This report separates objective package repairs from human review. `structurally
 | `Sylin.Koan.Web.Auth.Connector.Google`<br>[`src/Connectors/Web/Auth/Google/Koan.Web.Auth.Connector.Google.csproj`](../../src/Connectors/Web/Auth/Google/Koan.Web.Auth.Connector.Google.csproj) | provider / library<br>net10.0 | `structurally-ready` | [README](../../src/Connectors/Web/Auth/Google/README.md)<br>[TECHNICAL](../../src/Connectors/Web/Auth/Google/TECHNICAL.md) | none |
 | `Sylin.Koan.Web.Auth.Connector.Microsoft`<br>[`src/Connectors/Web/Auth/Microsoft/Koan.Web.Auth.Connector.Microsoft.csproj`](../../src/Connectors/Web/Auth/Microsoft/Koan.Web.Auth.Connector.Microsoft.csproj) | provider / library<br>net10.0 | `structurally-ready` | [README](../../src/Connectors/Web/Auth/Microsoft/README.md)<br>[TECHNICAL](../../src/Connectors/Web/Auth/Microsoft/TECHNICAL.md) | none |
 | `Sylin.Koan.Web.Auth.Connector.Test`<br>[`src/Connectors/Web/Auth/Test/Koan.Web.Auth.Connector.Test.csproj`](../../src/Connectors/Web/Auth/Test/Koan.Web.Auth.Connector.Test.csproj) | provider / library<br>net10.0 | `structurally-ready` | [README](../../src/Connectors/Web/Auth/Test/README.md)<br>[TECHNICAL](../../src/Connectors/Web/Auth/Test/TECHNICAL.md) | none |
-| `Sylin.Koan.Web.Auth.Server`<br>[`src/Koan.Web.Auth.Server/Koan.Web.Auth.Server.csproj`](../../src/Koan.Web.Auth.Server/Koan.Web.Auth.Server.csproj) | projection / library<br>net10.0 | `repair-required` | root README fallback | `docs.readme.owned.missing` (error): The package falls back to the framework root README.<br>`docs.technical.missing` (warning): No package-owned technical companion describes runtime or build ownership. |
+| `Sylin.Koan.Web.Auth.Server`<br>[`src/Koan.Web.Auth.Server/Koan.Web.Auth.Server.csproj`](../../src/Koan.Web.Auth.Server/Koan.Web.Auth.Server.csproj) | projection / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Web.Auth.Server/README.md)<br>[TECHNICAL](../../src/Koan.Web.Auth.Server/TECHNICAL.md) | none |
 | `Sylin.Koan.Web.Extensions`<br>[`src/Koan.Web.Extensions/Koan.Web.Extensions.csproj`](../../src/Koan.Web.Extensions/Koan.Web.Extensions.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Web.Extensions/README.md)<br>[TECHNICAL](../../src/Koan.Web.Extensions/TECHNICAL.md) | none |
 | `Sylin.Koan.Web.OpenApi`<br>[`src/Koan.Web.OpenApi/Koan.Web.OpenApi.csproj`](../../src/Koan.Web.OpenApi/Koan.Web.OpenApi.csproj) | projection / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Web.OpenApi/README.md)<br>[TECHNICAL](../../src/Koan.Web.OpenApi/TECHNICAL.md) | none |
 | `Sylin.Koan.Web.OpenGraph`<br>[`src/Koan.Web.OpenGraph/Koan.Web.OpenGraph.csproj`](../../src/Koan.Web.OpenGraph/Koan.Web.OpenGraph.csproj) | projection / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Web.OpenGraph/README.md)<br>[TECHNICAL](../../src/Koan.Web.OpenGraph/TECHNICAL.md) | none |
