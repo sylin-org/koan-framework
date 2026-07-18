@@ -15,10 +15,6 @@
       "version": "0.17"
     },
     {
-      "id": "Koan.AI.Prompt",
-      "version": "0.17"
-    },
-    {
       "id": "Koan.Cache.Abstractions",
       "version": "0.18"
     },
@@ -53,6 +49,10 @@
     {
       "id": "Koan.Data.Relational",
       "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Relational.Abstractions",
+      "version": "0.18"
     },
     {
       "id": "Koan.Data.Vector",

@@ -120,7 +120,7 @@ public static class UploadProgressProjection
         {
             Snapshot snap;
             // A client disconnect (or the safety cap) cancels the read — end the iterator cleanly, don't surface an
-            // OperationCanceledException up through SseActionResult on every normal browser close.
+            // OperationCanceledException through SseResult on every normal browser close.
             try { snap = await SnapshotAsync(batchId, token); }
             catch (OperationCanceledException) { yield break; }
 

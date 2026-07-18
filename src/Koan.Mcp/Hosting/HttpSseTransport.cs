@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Koan.Core;
 using Koan.Mcp.Options;
 using Koan.Web.Sse;
-using Koan.Web.Sse.Results;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -124,7 +123,7 @@ public sealed class HttpSseTransport
             }.ToString(Formatting.None)));
             getStream.EnqueueRaw(new SseEnvelope("endpoint", endpointUrl));
 
-            var result = SseResults.StreamEnvelopes(getStream.Read(context.RequestAborted));
+            var result = Sse.Stream(getStream.Read(context.RequestAborted));
             await result.ExecuteAsync(context);
         }
         catch (OperationCanceledException)

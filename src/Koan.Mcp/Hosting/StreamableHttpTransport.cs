@@ -8,7 +8,6 @@ using Koan.Core;
 using Koan.Mcp.Options;
 using Koan.Web.Sse;
 using Koan.Web.Sse.Formatting;
-using Koan.Web.Sse.Results;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -164,7 +163,7 @@ public sealed class StreamableHttpTransport
         if (rpcResponse is not null) stream.EnqueueMessage(rpcResponse);
         session.CompleteRequestStream(stream);
 
-        var result = SseResults.StreamEnvelopes(stream.Read(context.RequestAborted));
+        var result = Sse.Stream(stream.Read(context.RequestAborted));
         await result.ExecuteAsync(context);
     }
 

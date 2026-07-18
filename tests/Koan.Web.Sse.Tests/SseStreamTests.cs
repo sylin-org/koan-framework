@@ -1,14 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Text;
-using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Web.Sse;
 using Koan.Web.Sse.Formatting;
-using Koan.Web.Sse.Mvc;
 using Koan.Web.Sse.Options;
-using Koan.Web.Sse.Results;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;
@@ -18,45 +12,41 @@ using Xunit;
 
 namespace Koan.Web.Sse.Tests;
 
-public sealed class SseResultsTests
+public sealed class SseStreamTests
 {
     [Fact]
-    public async Task StreamJson_WritesFrames_WithDefaultEvent()
+    public async Task Typed_stream_writes_json_frames_with_the_configured_default_event()
     {
-        var context = CreateHttpContext(static options =>
-        {
-            options.DefaultEvent = "delta";
-        });
+        var context = CreateHttpContext(options => options.DefaultEvent = "delta");
 
-        var source = GetNumbers();
-        var result = SseResults.StreamJson(source);
-
+        var result = Sse.Stream(GetNumbers());
         await result.ExecuteAsync(context);
-        var payload = await ReadBody(context);
 
+        var payload = await ReadBody(context);
         payload.Should().Contain("event: delta");
         payload.Should().Contain("data: {\"Value\":1}");
         context.Response.Headers["X-Accel-Buffering"].ToString().Should().Be("no");
     }
 
     [Fact]
-    public async Task StreamText_HonorsExplicitEventName()
+    public async Task Text_stream_honors_the_explicit_event_name_without_json_quoting()
     {
         var context = CreateHttpContext();
-        var source = GetStrings();
-        var result = SseResults.StreamText(source, eventName: "token");
 
+        var result = Sse.Stream(GetStrings(), eventName: "token");
         await result.ExecuteAsync(context);
-        var payload = await ReadBody(context);
 
+        var payload = await ReadBody(context);
         payload.Should().Contain("event: token");
         payload.Should().Contain("data: first");
+        payload.Should().NotContain("data: \"first\"");
     }
 
     [Fact]
-    public void Formatter_SplitsMultiLinePayload()
+    public void Formatter_splits_multiline_payloads()
     {
         var envelope = new SseEnvelope("message", "one\ntwo");
+
         var formatted = SseFormatter.ToWireFormat(envelope);
 
         formatted.Should().Contain("data: one\n");
@@ -64,26 +54,23 @@ public sealed class SseResultsTests
     }
 
     [Fact]
-    public async Task ActionResult_StreamText_WritesResponse()
+    public async Task The_same_result_executes_through_mvc()
     {
         var context = CreateHttpContext();
-        var action = SseActionResult.StreamText(GetStrings(), eventName: "delta");
-        var actionContext = new ActionContext(context, new RouteData(), new ActionDescriptor());
+        var result = Sse.Stream(GetStrings(), eventName: "delta");
+        IActionResult action = result;
 
-        await action.ExecuteResultAsync(actionContext);
+        await action.ExecuteResultAsync(new ActionContext(context, new RouteData(), new ActionDescriptor()));
 
-        var payload = await ReadBody(context);
-        payload.Should().Contain("event: delta");
-        payload.Should().Contain("data: first");
+        (await ReadBody(context)).Should().Contain("event: delta").And.Contain("data: first");
     }
 
     [Fact]
-    public async Task StreamEnvelopes_UsesDefaultEventForMissingNames()
+    public async Task Envelope_stream_preserves_explicit_events_and_fills_missing_names()
     {
-        var context = CreateHttpContext(static options => options.DefaultEvent = "heartbeat");
-        var envelopes = GetMixedEnvelopes();
+        var context = CreateHttpContext(options => options.DefaultEvent = "heartbeat");
 
-        var result = SseResults.StreamEnvelopes(envelopes);
+        var result = Sse.Stream(GetMixedEnvelopes());
         await result.ExecuteAsync(context);
 
         var payload = await ReadBody(context);
@@ -95,17 +82,9 @@ public sealed class SseResultsTests
     {
         var services = new ServiceCollection();
         services.AddOptions();
-        if (configure is not null)
-        {
-            services.Configure(configure);
-        }
-        else
-        {
-            services.Configure<KoanSseOptions>(_ => { });
-        }
+        services.Configure(configure ?? (_ => { }));
 
-        var provider = services.BuildServiceProvider();
-        var context = new DefaultHttpContext { RequestServices = provider };
+        var context = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
         context.Response.Body = new MemoryStream();
         return context;
     }
@@ -114,14 +93,14 @@ public sealed class SseResultsTests
     {
         context.Response.Body.Seek(0, SeekOrigin.Begin);
         using var reader = new StreamReader(context.Response.Body, Encoding.UTF8, leaveOpen: true);
-        return await reader.ReadToEndAsync();
+        return await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
     }
 
     private static async IAsyncEnumerable<TestMessage> GetNumbers()
     {
-        for (var i = 1; i <= 2; i++)
+        for (var value = 1; value <= 2; value++)
         {
-            yield return new TestMessage { Value = i };
+            yield return new TestMessage { Value = value };
             await Task.Yield();
         }
     }

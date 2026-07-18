@@ -7,7 +7,7 @@ using Koan.AI.Contracts;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Routing;
-using Koan.Web.Sse.Mvc;
+using Koan.Web.Sse;
 
 namespace Koan.AI.Web.Controllers;
 
@@ -117,7 +117,7 @@ public sealed class AiController : ControllerBase
 
     [HttpPost(Constants.Routes.ChatStream)]
     public IActionResult ChatStream([FromBody] AiChatRequest request, CancellationToken ct)
-        => SseActionResult.StreamText(StreamDeltas(request, ct));
+        => Sse.Stream(StreamDeltas(request, ct));
 
     private async IAsyncEnumerable<string> StreamDeltas(
         AiChatRequest request,

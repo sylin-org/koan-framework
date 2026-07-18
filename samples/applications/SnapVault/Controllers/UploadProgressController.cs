@@ -1,4 +1,4 @@
-using Koan.Web.Sse.Mvc;
+using Koan.Web.Sse;
 using Microsoft.AspNetCore.Mvc;
 using SnapVault.Progress;
 
@@ -28,5 +28,5 @@ public sealed class UploadProgressController : ControllerBase
 {
     [HttpGet("progress/{batchId}")]
     public IActionResult Progress(string batchId)
-        => SseActionResult.StreamEnvelopes(UploadProgressProjection.StreamAsync(batchId, HttpContext.RequestAborted));
+        => Sse.Stream(UploadProgressProjection.StreamAsync(batchId, HttpContext.RequestAborted));
 }
