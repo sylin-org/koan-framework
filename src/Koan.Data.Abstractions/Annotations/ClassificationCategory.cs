@@ -2,9 +2,8 @@ namespace Koan.Data.Abstractions.Annotations;
 
 /// <summary>
 /// A single data-classification category token — the FACT an entity declares about a property
-/// (<c>[Pii]</c>, <c>[Phi]</c>, …) and against which solution/tenant policy later resolves HANDLING
-/// (encrypt / tokenize / mask). The <see cref="Name"/> is a stable lowercase token so it serializes into
-/// policy config and self-report payloads as-is.
+/// (<c>[Pii]</c>, <c>[Phi]</c>, …). The <see cref="Name"/> is a stable lowercase token for diagnostics and future
+/// handling policy.
 /// <para>
 /// The four well-known categories are statics; the raw-string constructor is the extension escape hatch
 /// (an app may declare its own, e.g. <c>new("trade-secret")</c>) — classification is "one extensible axis,
@@ -19,7 +18,7 @@ public readonly record struct ClassificationCategory
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("A classification category name must be a non-empty string.", nameof(name));
-        Name = name;
+        Name = name.Trim().ToLowerInvariant();
     }
 
     /// <summary>The stable lowercase token, e.g. <c>"pii"</c>. Equality is by this value.</summary>
@@ -28,13 +27,13 @@ public readonly record struct ClassificationCategory
     /// <summary>Personally Identifiable Information — name, email, address, government id.</summary>
     public static readonly ClassificationCategory Pii = new("pii");
 
-    /// <summary>Protected Health Information (HIPAA) — the strictest co-location / residency posture.</summary>
+    /// <summary>Protected Health Information (HIPAA).</summary>
     public static readonly ClassificationCategory Phi = new("phi");
 
     /// <summary>Payment Card Industry data — PAN, CVV (PCI-DSS).</summary>
     public static readonly ClassificationCategory Pci = new("pci");
 
-    /// <summary>A secret value — API keys, credentials. Write-only / masked-read (the strongest sensitivity).</summary>
+    /// <summary>A secret value — API keys or credentials.</summary>
     public static readonly ClassificationCategory Secret = new("secret");
 
     /// <inheritdoc />

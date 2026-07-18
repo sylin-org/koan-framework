@@ -6,6 +6,8 @@ using Koan.Classification.Tests.Support;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Core.Diagnostics;
+using Koan.Tenancy;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -15,15 +17,16 @@ namespace Koan.Classification.Tests;
 /// <summary>
 /// ARCH-0098 phase 3 — the flagship classification round-trip through a real <c>AddKoan()</c> boot (ARCH-0079) on
 /// the no-Docker SQLite adapter with <c>Koan.Classification</c> referenced (auto-registrar discovered, transform
-/// wired). Proves: at-rest is ciphertext (raw read + crypto-shred), every read path decrypts (Get, Get-many,
+/// wired). Proves: at-rest is ciphertext (raw read + lost-custody failure), every read path decrypts (Get, Get-many,
 /// All/Query, QueryRaw), every write path encrypts (Save, UpsertMany, Batch — Blocker 1), the caller keeps
-/// plaintext (clone-then-encrypt), non-classified fields are untouched, and classification-off is zero regression.
+/// plaintext (clone-then-encrypt), non-classified fields are untouched, and classified cache entries are excluded.
 /// </summary>
 public sealed class ClassificationIntegrationSpec
 {
     // A fresh storage partition per test isolates each test's rows from others sharing the engine (ARCH-0091).
     private static IDisposable Isolate() => EntityContext.Partition("p" + Guid.CreateVersion7().ToString("n"));
 
+    [HostScoped]
     public sealed class Patient : Entity<Patient>
     {
         [Pii] public string Name { get; set; } = "";
@@ -31,11 +34,39 @@ public sealed class ClassificationIntegrationSpec
         public string Ward { get; set; } = "";
     }
 
-    [Cacheable(300)]
+    [HostScoped, Cacheable(300)]
     public sealed class CachedPatient : Entity<CachedPatient>
     {
         [Pii] public string Name { get; set; } = "";
         public string Ward { get; set; } = "";
+    }
+
+    public sealed class TenantPatient : Entity<TenantPatient>
+    {
+        [Pii] public string Name { get; set; } = "";
+    }
+
+    private sealed class RecordingKeyProvider : IClassificationKeyProvider
+    {
+        private readonly Dictionary<string, ClassificationDataKey> _byScope = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, ClassificationDataKey> _byId = new(StringComparer.Ordinal);
+
+        public IReadOnlyCollection<string> Scopes => _byScope.Keys;
+
+        public ClassificationDataKey GetActiveKey(string scope)
+        {
+            if (_byScope.TryGetValue(scope, out var existing)) return existing;
+            var created = new ClassificationDataKey(Guid.NewGuid().ToString("N"),
+                System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+            _byScope.Add(scope, created);
+            _byId.Add(created.KeyId, created);
+            return created;
+        }
+
+        public ClassificationDataKey GetForDecrypt(string keyId)
+            => _byId.TryGetValue(keyId, out var key)
+                ? key
+                : throw new ClassificationKeyUnavailableException(keyId);
     }
 
     /// <summary>Reads every user table's Json column directly, bypassing the facade — the at-rest truth.</summary>
@@ -117,8 +148,8 @@ public sealed class ClassificationIntegrationSpec
         atRest.Should().Contain("B-12");                      // a non-classified field is stored as-is
     }
 
-    [Fact(DisplayName = "at rest is ciphertext: crypto-shredding the key makes the value unrecoverable on read")]
-    public async Task At_rest_is_ciphertext_proven_by_shred()
+    [Fact(DisplayName = "lost key custody fails loudly rather than returning ciphertext or hiding the failure")]
+    public async Task Lost_key_custody_fails_loudly()
     {
         await using var fx = await ClassificationRuntimeFixture.CreateAsync();
         fx.ResetEntityCaches();
@@ -126,13 +157,11 @@ public sealed class ClassificationIntegrationSpec
 
         var p = await new Patient { Name = "to be forgotten", Ward = "A-1" }.Save();
 
-        // Destroy the host-bucket key (no tenancy in this app). Were the value plaintext at rest, this would be a no-op.
-        await fx.Services.GetRequiredService<IKeyProvider>().DestroyKeyAsync(null);
+        fx.Services.GetRequiredService<IClassificationKeyProvider>().Should()
+            .BeOfType<EphemeralClassificationKeyProvider>().Which.Dispose();
 
-        var loaded = await Patient.Get(p.Id);
-        loaded.Should().NotBeNull();
-        loaded!.Name.Should().BeNull();    // the classified value is unrecoverable → tombstone
-        loaded.Ward.Should().Be("A-1");    // the non-classified field survives the shred
+        var read = async () => await Patient.Get(p.Id);
+        await read.Should().ThrowAsync<ObjectDisposedException>();
     }
 
     [Fact(DisplayName = "every read path decrypts: Get, Get-many, All/Query, QueryRaw")]
@@ -192,14 +221,15 @@ public sealed class ClassificationIntegrationSpec
         var p = await new CachedPatient { Name = "cached-secret", Ward = "C-9" }.Save();
         (await CachedPatient.Get(p.Id))!.Name.Should().Be("cached-secret");   // populates the cache iff NOT excluded
 
-        // Destroy the key. The store value is now unrecoverable; a CACHED copy (plaintext) would survive.
-        await fx.Services.GetRequiredService<IKeyProvider>().DestroyKeyAsync(null);
+        // Lose local key custody. A cached plaintext copy would survive and return; an excluded Entity re-enters Data
+        // and fails at the key boundary.
+        fx.Services.GetRequiredService<IClassificationKeyProvider>().Should()
+            .BeOfType<EphemeralClassificationKeyProvider>().Which.Dispose();
 
         // If the entity were cached, this would be a cache HIT returning the stale PLAINTEXT — the L2 leak. Because it
-        // is excluded, the read goes to the store, the key is gone, and the classified value is a null tombstone.
-        var after = await CachedPatient.Get(p.Id);
-        after!.Name.Should().BeNull();
-        after.Ward.Should().Be("C-9");
+        // is excluded, the read goes to the store and fails at the missing key boundary.
+        var read = async () => await CachedPatient.Get(p.Id);
+        await read.Should().ThrowAsync<ObjectDisposedException>();
     }
 
     [Fact(DisplayName = "an empty store and unclassified data are unaffected (no false positives)")]
@@ -214,5 +244,53 @@ public sealed class ClassificationIntegrationSpec
 
         loaded!.Ward.Should().Be("plain-ward");   // unclassified — never transformed
         loaded.Diagnosis.Should().BeNull();        // null classified — stays null
+    }
+
+    [Fact(DisplayName = "Tenancy automatically partitions Classification key scope without Classification configuration")]
+    public async Task Tenancy_automatically_partitions_key_scope()
+    {
+        var keys = new RecordingKeyProvider();
+        await using var fx = await ClassificationRuntimeFixture.CreateAsync(
+            configureServices: services => services.AddSingleton<IClassificationKeyProvider>(keys));
+        fx.ResetEntityCaches();
+        string tenantAId;
+        string tenantBId;
+
+        using (Tenant.Use("tenant-a"))
+            tenantAId = (await new TenantPatient { Name = "Ada" }.Save()).Id;
+
+        using (Tenant.Use("tenant-b"))
+            tenantBId = (await new TenantPatient { Name = "Grace" }.Save()).Id;
+
+        keys.Scopes.Should().HaveCount(2);
+        keys.Scopes.Should().OnlyContain(scope => scope.StartsWith("seg:", StringComparison.Ordinal));
+
+        using (Tenant.Use("tenant-a"))
+        {
+            (await TenantPatient.Get(tenantAId))!.Name.Should().Be("Ada");
+            (await TenantPatient.Get(tenantBId)).Should().BeNull();
+        }
+        using (Tenant.Use("tenant-b"))
+        {
+            (await TenantPatient.Get(tenantBId))!.Name.Should().Be("Grace");
+            (await TenantPatient.Get(tenantAId)).Should().BeNull();
+        }
+    }
+
+    [Fact(DisplayName = "startup facts state the active guarantee, provider, scope ownership, and exclusions")]
+    public async Task Startup_facts_are_exact_and_value_free()
+    {
+        await using var fx = await ClassificationRuntimeFixture.CreateAsync();
+
+        var fact = fx.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts.Should()
+            .ContainSingle(item => item.Code == Infrastructure.Constants.Diagnostics.CapabilityCode)
+            .Which;
+        fact.Subject.Should().Be("classification:field-at-rest");
+        fact.ReasonCode.Should().Be("compiled-field-transform");
+        fact.Summary.Should().Contain("AES-256-GCM")
+            .And.Contain(typeof(EphemeralClassificationKeyProvider).FullName!)
+            .And.Contain("compiled segmentation")
+            .And.Contain("No search, masking, backfill, redaction, or erasure")
+            .And.NotContain("tenant-a");
     }
 }

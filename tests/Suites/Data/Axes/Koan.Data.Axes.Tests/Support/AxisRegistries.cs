@@ -16,7 +16,6 @@ internal static class AxisRegistries
         ManagedFieldRegistry.Reset();
         StorageNameParticleRegistry.Reset();
         OperationOverrideRegistry.Reset();
-        StorageFieldTransformRegistry.Reset();
         DatabaseRouteRegistry.Reset();
         DataAxisExpander.ResetForTesting();
     }

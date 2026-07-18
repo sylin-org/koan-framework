@@ -1,58 +1,86 @@
 using System.Collections.Concurrent;
+using Koan.Data.Abstractions.Pipeline;
 
 namespace Koan.Data.Core.Pipeline;
 
 /// <summary>
-/// The per-type set of <see cref="IFieldTransform"/>s for an entity (ARCH-0098 §0) — composed once per type from
-/// the registered contributors and memoized at the Type plane. The facade calls <see cref="CloneForWrite"/> before
-/// persist (clone + protect, so the caller keeps plaintext) and <see cref="ApplyOnRead"/> on every entity returned
-/// from a read (restore plaintext in place). When the registry is empty the plan is empty and the facade skips it
-/// entirely — byte-identical to pre-change.
+/// The host-owned compiler for round-trip stored-field transforms. Contributors are fixed by DI composition and each
+/// Entity-type plan is built once; runtime operations consume only the immutable compiled plan.
 /// </summary>
-internal sealed class StorageFieldTransformPlan
+internal sealed class StorageFieldTransformPlan : IFieldTransformInspector
 {
-    private static readonly ConcurrentDictionary<Type, StorageFieldTransformPlan> Cache = new();
+    private readonly IFieldTransformContributor[] _contributors;
+    private readonly ConcurrentDictionary<Type, Compiled> _plans = new();
 
-    private readonly IFieldTransform[] _transforms;
-
-    private StorageFieldTransformPlan(IFieldTransform[] transforms) => _transforms = transforms;
-
-    /// <summary>Whether this type has any field transform — the hot-path short-circuit.</summary>
-    public bool HasTransforms => _transforms.Length > 0;
-
-    public static StorageFieldTransformPlan For(Type entityType) => Cache.GetOrAdd(entityType, static t => Build(t));
-
-    /// <summary>Drop the per-type plan memo. Called when a contributor registration changes (boot-only ⇒ rare).</summary>
-    internal static void InvalidateCache() => Cache.Clear();
-
-    private static StorageFieldTransformPlan Build(Type entityType)
+    public StorageFieldTransformPlan(IEnumerable<IFieldTransformContributor> contributors)
     {
-        if (StorageFieldTransformRegistry.IsEmpty)
-            return new StorageFieldTransformPlan(Array.Empty<IFieldTransform>());
+        _contributors = contributors
+            .OrderBy(contributor => contributor.Order)
+            .ThenBy(contributor => contributor.Id, StringComparer.Ordinal)
+            .ToArray();
 
-        var list = new List<IFieldTransform>();
-        foreach (var contributor in StorageFieldTransformRegistry.All)
+        var duplicate = _contributors
+            .GroupBy(contributor => contributor.Id, StringComparer.Ordinal)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicate is not null)
+            throw new InvalidOperationException($"Field-transform contributor id '{duplicate.Key}' is registered more than once.");
+    }
+
+    public Compiled For(Type entityType)
+        => _plans.GetOrAdd(
+            entityType ?? throw new ArgumentNullException(nameof(entityType)),
+            Build);
+
+    public bool HasTransformsFor(Type entityType) => For(entityType).HasTransforms;
+
+    public IReadOnlyList<string> ContributorIdsFor(Type entityType) => For(entityType).ContributorIds;
+
+    private Compiled Build(Type entityType)
+    {
+        if (_contributors.Length == 0) return Compiled.Empty;
+
+        var transforms = new List<IFieldTransform>(_contributors.Length);
+        var ids = new List<string>(_contributors.Length);
+        foreach (var contributor in _contributors)
         {
             var transform = contributor.Build(entityType);
-            if (transform is not null) list.Add(transform);
+            if (transform is null) continue;
+            transforms.Add(transform);
+            ids.Add(contributor.Id);
         }
-        return new StorageFieldTransformPlan(list.ToArray());
+
+        return transforms.Count == 0
+            ? Compiled.Empty
+            : new Compiled(transforms.ToArray(), ids.ToArray());
     }
 
-    /// <summary>
-    /// Clone <paramref name="entity"/> and apply every write transform to the clone (encrypt the protected fields),
-    /// returning the clone to persist. The caller's <paramref name="entity"/> is never mutated.
-    /// </summary>
-    public object CloneForWrite(object entity)
+    internal sealed class Compiled
     {
-        var clone = EntityCloner.ShallowClone(entity);
-        foreach (var t in _transforms) t.ApplyOnWrite(clone);
-        return clone;
-    }
+        internal static Compiled Empty { get; } = new([], []);
 
-    /// <summary>Apply every read transform to <paramref name="entity"/> in place (restore plaintext).</summary>
-    public void ApplyOnRead(object entity)
-    {
-        foreach (var t in _transforms) t.ApplyOnRead(entity);
+        private readonly IFieldTransform[] _transforms;
+
+        internal Compiled(IFieldTransform[] transforms, IReadOnlyList<string> contributorIds)
+        {
+            _transforms = transforms;
+            ContributorIds = contributorIds;
+        }
+
+        public bool HasTransforms => _transforms.Length > 0;
+
+        public IReadOnlyList<string> ContributorIds { get; }
+
+        public object CloneForWrite(object entity)
+        {
+            var clone = EntityCloner.ShallowClone(entity);
+            foreach (var transform in _transforms) transform.ApplyOnWrite(clone);
+            return clone;
+        }
+
+        public void ApplyOnRead(object entity)
+        {
+            for (var index = _transforms.Length - 1; index >= 0; index--)
+                _transforms[index].ApplyOnRead(entity);
+        }
     }
 }

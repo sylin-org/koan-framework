@@ -11,11 +11,11 @@ namespace Koan.Classification.Crypto;
 /// adapter's value serialization and the read-reverse can cheaply tell ciphertext from a legacy plaintext value
 /// (<see cref="TryParse"/>).
 /// </summary>
-/// <param name="KeyId">The id of the key this value was encrypted under (maps to its owning tenant).</param>
+/// <param name="KeyId">The opaque id of the key this value was encrypted under.</param>
 /// <param name="Nonce">The per-message nonce (96-bit for GCM); never reused under one key.</param>
 /// <param name="Ciphertext">The encrypted bytes (same length as the plaintext).</param>
 /// <param name="Tag">The AES-GCM authentication tag (128-bit); decrypt fails closed if it does not verify.</param>
-public sealed record FieldCipherEnvelope(string KeyId, byte[] Nonce, byte[] Ciphertext, byte[] Tag)
+internal sealed record FieldCipherEnvelope(string KeyId, byte[] Nonce, byte[] Ciphertext, byte[] Tag)
 {
     /// <summary>The version magic identifying a Koan field-encryption v1 envelope. Plaintext won't start with this.</summary>
     public const string Magic = "kfe1:";
@@ -50,7 +50,9 @@ public sealed record FieldCipherEnvelope(string KeyId, byte[] Nonce, byte[] Ciph
     /// <summary>
     /// Whether <paramref name="value"/> is a serialized envelope, and if so the parsed form. Cheap prefix check
     /// first (a legacy plaintext value returns <c>false</c> without allocating). Bounds-checked: malformed input
-    /// after the prefix returns <c>false</c> rather than throwing.
+    /// first (a legacy plaintext value returns <c>false</c> without allocating). Once the reserved prefix is
+    /// present, malformed input fails loudly: silently treating a damaged protected value as plaintext would
+    /// weaken the at-rest guarantee.
     /// </summary>
     public static bool TryParse(string? value, out FieldCipherEnvelope envelope)
     {
@@ -60,34 +62,39 @@ public sealed record FieldCipherEnvelope(string KeyId, byte[] Nonce, byte[] Ciph
         {
             var blob = Convert.FromBase64String(value[Magic.Length..]);
             var span = blob.AsSpan();
-            if (span.Length < 2) return false;
+            if (span.Length < 2) throw Malformed();
 
             var keyIdLen = BinaryPrimitives.ReadUInt16BigEndian(span[..2]);
             var off = 2;
-            if (keyIdLen is 0 or > MaxKeyIdBytes || off + keyIdLen > span.Length) return false;
+            if (keyIdLen is 0 or > MaxKeyIdBytes || off + keyIdLen > span.Length) throw Malformed();
             var keyId = Encoding.UTF8.GetString(span.Slice(off, keyIdLen)); off += keyIdLen;
 
-            if (off >= span.Length) return false;
+            if (off >= span.Length) throw Malformed();
             int nonceLen = span[off++];
-            if (nonceLen is 0 or > MaxNonceBytes || off + nonceLen > span.Length) return false;
+            if (nonceLen is 0 or > MaxNonceBytes || off + nonceLen > span.Length) throw Malformed();
             var nonce = span.Slice(off, nonceLen).ToArray(); off += nonceLen;
 
-            if (off >= span.Length) return false;
+            if (off >= span.Length) throw Malformed();
             int tagLen = span[off++];
-            if (tagLen is 0 or > MaxTagBytes || off + tagLen > span.Length) return false;
+            if (tagLen is 0 or > MaxTagBytes || off + tagLen > span.Length) throw Malformed();
             var tag = span.Slice(off, tagLen).ToArray(); off += tagLen;
 
             var ciphertext = span[off..].ToArray();   // may be empty (encryption of an empty string)
             envelope = new FieldCipherEnvelope(keyId, nonce, ciphertext, tag);
             return true;
         }
-        catch (FormatException)
+        catch (Exception exception) when (exception is FormatException or ArgumentOutOfRangeException)
         {
-            return false;   // not valid base64 after the prefix
+            throw new ClassificationIntegrityException("Classified field envelope is malformed.", exception);
         }
+
+        static ClassificationIntegrityException Malformed()
+            => new("Classified field envelope is malformed.");
     }
 
     /// <summary>Parse or throw — for callers that already know the value is an envelope.</summary>
     public static FieldCipherEnvelope Parse(string value)
-        => TryParse(value, out var e) ? e : throw new FormatException("Not a valid FieldCipherEnvelope.");
+        => TryParse(value, out var e)
+            ? e
+            : throw new ClassificationIntegrityException("Stored classified field is not a protected envelope.");
 }

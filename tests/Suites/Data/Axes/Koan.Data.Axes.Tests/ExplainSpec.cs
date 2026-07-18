@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using AwesomeAssertions;
 using Koan.Data.Abstractions.Filtering;
+using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Axes.Tests.Support;
 using Koan.Data.Core.Axes;
 using Koan.Data.Core.Pipeline;
@@ -96,11 +97,12 @@ public sealed class ExplainSpec : IDisposable
     {
         // CacheExcluded must mirror CachedRepository's THREE legs — a [Classified]/encrypted field transform excludes
         // from cache even with no managed axis and no excluding contributor (the security-sensitive shape).
-        StorageFieldTransformRegistry.Register(new FieldTransformContributor(
-            "test-transform", t => t == typeof(Doc) ? new NoopTransform() : null));
-
-        using var sp = ExpandAndBuild();
+        var services = new ServiceCollection();
+        services.AddSingleton<IFieldTransformInspector>(new TestTransformInspector(typeof(Doc)));
+        using var sp = services.BuildServiceProvider();
         DataAxis.Explain(sp, typeof(Doc)).CacheExcluded.Should().BeTrue();
+        DataAxis.Explain(sp, typeof(Doc)).Planes.Should().ContainSingle(plane =>
+            plane.Plane == "field-transform" && plane.Key == "test-transform");
         DataAxis.Explain(sp, typeof(Plain)).CacheExcluded.Should().BeFalse();
     }
 
@@ -147,10 +149,11 @@ public sealed class ExplainSpec : IDisposable
     private sealed class ScopedEntity : Koan.Data.Abstractions.IEntity<string> { public string Id { get; set; } = ""; }
     private sealed class PlainEntity : Koan.Data.Abstractions.IEntity<string> { public string Id { get; set; } = ""; }
 
-    private sealed class NoopTransform : Koan.Data.Core.Pipeline.IFieldTransform
+    private sealed class TestTransformInspector(Type applicable) : IFieldTransformInspector
     {
-        public void ApplyOnWrite(object entity) { }
-        public void ApplyOnRead(object entity) { }
+        public bool HasTransformsFor(Type entityType) => entityType == applicable;
+        public IReadOnlyList<string> ContributorIdsFor(Type entityType)
+            => entityType == applicable ? ["test-transform"] : [];
     }
 
     private sealed class ThrowingDataService : Koan.Data.Core.IDataService

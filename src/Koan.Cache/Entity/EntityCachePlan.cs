@@ -13,6 +13,7 @@ namespace Koan.Cache.Entity;
 /// </summary>
 internal sealed class EntityCachePlan(
     ICachePolicyRegistry policyRegistry,
+    IFieldTransformInspector fieldTransforms,
     IEnumerable<IReadFilterContributor> readContributors)
 {
     private readonly IReadOnlyList<IReadFilterContributor> _readContributors = readContributors.ToArray();
@@ -69,7 +70,7 @@ internal sealed class EntityCachePlan(
 
     private string? ResolveExclusion(Type entityType)
     {
-        if (StorageFieldTransformRegistry.HasTransformsFor(entityType))
+        if (fieldTransforms.HasTransformsFor(entityType))
         {
             return "its stored representation is transformed before the Data facade restores it";
         }

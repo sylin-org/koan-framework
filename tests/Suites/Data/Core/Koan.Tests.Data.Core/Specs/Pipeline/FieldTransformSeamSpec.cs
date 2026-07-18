@@ -1,25 +1,14 @@
-using System;
 using AwesomeAssertions;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Pipeline;
 using Xunit;
 
 namespace Koan.Tests.Data.Core.Specs.Pipeline;
 
-/// <summary>
-/// ARCH-0098 phase 3a — the generic round-trip field-transform seam (the classification axis is its first
-/// consumer, but this is validated axis-free). Pins: the off-gate (empty plan, byte-identical), per-type
-/// applicability, clone-on-write (the original is never mutated; the persisted clone is), reverse-on-read
-/// (in place), the public <c>HasTransformsFor</c> probe the cache uses, idempotent registration, and the
-/// shallow-clone primitive.
-/// </summary>
-[Collection("field-transform-registry")]   // serialize: the registry + plan memo are process-global static state
-public sealed class FieldTransformSeamSpec : IDisposable
+public sealed class FieldTransformSeamSpec
 {
-    public FieldTransformSeamSpec() => StorageFieldTransformRegistry.Reset();
-    public void Dispose() => StorageFieldTransformRegistry.Reset();
-
     private sealed class Doc : Entity<Doc, string>
     {
         [Identifier] public override string Id { get; set; } = default!;
@@ -31,96 +20,109 @@ public sealed class FieldTransformSeamSpec : IDisposable
         [Identifier] public override string Id { get; set; } = default!;
     }
 
-    /// <summary>Upper-cases Body on write, lower-cases it on read — so the round-trip direction is observable.</summary>
     private sealed class UpcaseTransform : IFieldTransform
     {
-        public void ApplyOnWrite(object entity) { if (entity is Doc d) d.Body = d.Body.ToUpperInvariant(); }
-        public void ApplyOnRead(object entity) { if (entity is Doc d) d.Body = d.Body.ToLowerInvariant(); }
+        public void ApplyOnWrite(object entity) { if (entity is Doc doc) doc.Body = doc.Body.ToUpperInvariant(); }
+        public void ApplyOnRead(object entity) { if (entity is Doc doc) doc.Body = doc.Body.ToLowerInvariant(); }
     }
 
-    private static void RegisterForDoc()
-        => StorageFieldTransformRegistry.Register(new FieldTransformContributor(
-            "upcase", t => t == typeof(Doc) ? new UpcaseTransform() : null));
-
-    [Fact]
-    public void Off_path_is_an_empty_plan()
+    private sealed class Contributor(string id = "upcase") : IFieldTransformContributor
     {
-        StorageFieldTransformRegistry.IsEmpty.Should().BeTrue();
-        StorageFieldTransformPlan.For(typeof(Doc)).HasTransforms.Should().BeFalse();
-        StorageFieldTransformRegistry.HasTransformsFor(typeof(Doc)).Should().BeFalse();
+        public string Id => id;
+        public IFieldTransform? Build(Type entityType) => entityType == typeof(Doc) ? new UpcaseTransform() : null;
     }
 
-    [Fact]
-    public void A_registered_transform_is_picked_up()
+    private sealed class RecordingTransform(string id, ICollection<string> calls) : IFieldTransform
     {
-        RegisterForDoc();
-        StorageFieldTransformPlan.For(typeof(Doc)).HasTransforms.Should().BeTrue();
-        StorageFieldTransformRegistry.HasTransformsFor(typeof(Doc)).Should().BeTrue();
+        public void ApplyOnWrite(object entity) => calls.Add($"write:{id}");
+        public void ApplyOnRead(object entity) => calls.Add($"read:{id}");
     }
 
-    [Fact]
-    public void A_contributor_returns_null_for_an_inapplicable_type()
+    private sealed class RecordingContributor(string id, int order, ICollection<string> calls) : IFieldTransformContributor
     {
-        RegisterForDoc();   // applies only to Doc
-        StorageFieldTransformRegistry.HasTransformsFor(typeof(Other)).Should().BeFalse();
+        public string Id => id;
+        public int Order => order;
+        public IFieldTransform? Build(Type entityType)
+            => entityType == typeof(Doc) ? new RecordingTransform(id, calls) : null;
     }
 
     [Fact]
-    public void CloneForWrite_transforms_a_clone_and_leaves_the_original_plaintext()
+    public void No_contributor_produces_an_empty_plan()
     {
-        RegisterForDoc();
+        var plan = new StorageFieldTransformPlan([]);
+        plan.For(typeof(Doc)).HasTransforms.Should().BeFalse();
+        plan.HasTransformsFor(typeof(Doc)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Applicable_contributor_is_compiled_once_for_its_type()
+    {
+        var plan = new StorageFieldTransformPlan([new Contributor()]);
+        plan.HasTransformsFor(typeof(Doc)).Should().BeTrue();
+        plan.HasTransformsFor(typeof(Other)).Should().BeFalse();
+        plan.ContributorIdsFor(typeof(Doc)).Should().Equal("upcase");
+        plan.For(typeof(Doc)).Should().BeSameAs(plan.For(typeof(Doc)));
+    }
+
+    [Fact]
+    public void Clone_for_write_transforms_only_the_clone()
+    {
+        var compiled = new StorageFieldTransformPlan([new Contributor()]).For(typeof(Doc));
         var original = new Doc { Body = "ada" };
-
-        var payload = (Doc)StorageFieldTransformPlan.For(typeof(Doc)).CloneForWrite(original);
-
-        payload.Should().NotBeSameAs(original);   // a distinct instance is persisted
-        payload.Body.Should().Be("ADA");          // the clone is transformed (encrypted)
-        original.Body.Should().Be("ada");         // the caller's instance is untouched
+        var payload = (Doc)compiled.CloneForWrite(original);
+        payload.Should().NotBeSameAs(original);
+        payload.Body.Should().Be("ADA");
+        original.Body.Should().Be("ada");
     }
 
     [Fact]
-    public void ApplyOnRead_transforms_in_place()
+    public void Read_reverse_transforms_in_place()
     {
-        RegisterForDoc();
-        var entity = new Doc { Body = "ENCRYPTED" };
-        StorageFieldTransformPlan.For(typeof(Doc)).ApplyOnRead(entity);
-        entity.Body.Should().Be("encrypted");     // restored in place on the returned entity
+        var compiled = new StorageFieldTransformPlan([new Contributor()]).For(typeof(Doc));
+        var entity = new Doc { Body = "PROTECTED" };
+        compiled.ApplyOnRead(entity);
+        entity.Body.Should().Be("protected");
     }
 
     [Fact]
-    public void Registration_is_idempotent_by_id()
+    public void Multiple_transforms_write_forward_and_read_in_reverse_order()
     {
-        RegisterForDoc();
-        RegisterForDoc();   // duplicate id → no-op
-        StorageFieldTransformRegistry.All.Count.Should().Be(1);
+        var calls = new List<string>();
+        var compiled = new StorageFieldTransformPlan([
+            new RecordingContributor("last", 20, calls),
+            new RecordingContributor("first", 10, calls),
+        ]).For(typeof(Doc));
+
+        compiled.CloneForWrite(new Doc());
+        compiled.ApplyOnRead(new Doc());
+
+        calls.Should().Equal("write:first", "write:last", "read:last", "read:first");
     }
 
     [Fact]
-    public void Registration_invalidates_the_plan_memo()
+    public void Plans_are_host_owned_and_do_not_share_contributors()
     {
-        StorageFieldTransformPlan.For(typeof(Doc)).HasTransforms.Should().BeFalse();   // built + memoized empty
-        RegisterForDoc();
-        StorageFieldTransformPlan.For(typeof(Doc)).HasTransforms.Should().BeTrue();    // memo invalidated
+        var firstHost = new StorageFieldTransformPlan([new Contributor()]);
+        var secondHost = new StorageFieldTransformPlan([]);
+        firstHost.HasTransformsFor(typeof(Doc)).Should().BeTrue();
+        secondHost.HasTransformsFor(typeof(Doc)).Should().BeFalse();
     }
 
     [Fact]
-    public void Register_rejects_an_empty_id()
+    public void Duplicate_contributor_ids_fail_composition()
     {
-        var act = () => StorageFieldTransformRegistry.Register(new FieldTransformContributor("", _ => null));
-        act.Should().Throw<ArgumentException>();
+        var act = () => new StorageFieldTransformPlan([new Contributor(), new Contributor()]);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*upcase*more than once*");
     }
 
     [Fact]
-    public void EntityCloner_produces_a_distinct_shallow_copy()
+    public void Entity_cloner_produces_a_distinct_shallow_copy()
     {
         var original = new Doc { Id = "1", Body = "abc" };
         var clone = (Doc)EntityCloner.ShallowClone(original);
-
         clone.Should().NotBeSameAs(original);
         clone.Id.Should().Be("1");
-        clone.Body.Should().Be("abc");
-
-        clone.Body = "changed";            // reassigning the clone's field never touches the original
+        clone.Body = "changed";
         original.Body.Should().Be("abc");
     }
 }

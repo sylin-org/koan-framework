@@ -55,6 +55,9 @@ public static class ServiceCollectionExtensions
         // Pipeline.IReadFilterContributor; the facade AND-folds the union. Absent every axis ⇒ the registry is empty
         // ⇒ this contributor returns null ⇒ the read fold is a no-op (structural absence).
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Pipeline.IReadFilterContributor, Pipeline.ManagedEqualityReadContributor>());
+        services.TryAddSingleton<Pipeline.StorageFieldTransformPlan>();
+        services.TryAddSingleton<Koan.Data.Abstractions.Pipeline.IFieldTransformInspector>(sp =>
+            sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>());
 
         // ARCH-0101 §7: the [DataAxis] premium authoring layer. Discover every IDataAxis, declare it, and EXPAND it to
         // the exact raw Phase A/B/C seams (managed field / read-filter / name particle / operation override)

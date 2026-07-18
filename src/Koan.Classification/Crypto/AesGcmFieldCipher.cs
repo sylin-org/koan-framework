@@ -7,11 +7,12 @@ namespace Koan.Classification.Crypto;
 /// message and a 128-bit tag. Stateless and thread-safe (each call constructs and disposes its own
 /// <see cref="AesGcm"/>). Decrypt fails closed on any tag mismatch.
 ///
-/// <para><b>Nonce budget (§3a):</b> a random 96-bit nonce has a birthday bound — the <c>IKeyProvider</c> must
+/// <para><b>Nonce budget (§3a):</b> a random 96-bit nonce has a birthday bound — the
+/// <c>IClassificationKeyProvider</c> must
 /// rotate a key well before ~2³² encryptions under it. This cipher is the per-message primitive; the count-aware
 /// rotation lives in the key provider.</para>
 /// </summary>
-public sealed class AesGcmFieldCipher : IFieldCipher
+internal sealed class AesGcmFieldCipher : IFieldCipher
 {
     /// <summary>96-bit nonce — the GCM standard / interoperable size.</summary>
     public const int NonceSize = 12;
@@ -22,7 +23,7 @@ public sealed class AesGcmFieldCipher : IFieldCipher
     /// <summary>256-bit key — AES-256.</summary>
     public const int KeySize = 32;
 
-    public FieldCipherEnvelope Encrypt(ReadOnlySpan<byte> plaintext, FieldDataKey key)
+    public FieldCipherEnvelope Encrypt(ReadOnlySpan<byte> plaintext, ClassificationDataKey key)
     {
         var keyBytes = key.Key.Span;
         if (keyBytes.Length != KeySize)
@@ -39,7 +40,7 @@ public sealed class AesGcmFieldCipher : IFieldCipher
         return new FieldCipherEnvelope(key.KeyId, nonce, ciphertext, tag);
     }
 
-    public byte[] Decrypt(FieldCipherEnvelope envelope, FieldDataKey key)
+    public byte[] Decrypt(FieldCipherEnvelope envelope, ClassificationDataKey key)
     {
         ArgumentNullException.ThrowIfNull(envelope);
         var keyBytes = key.Key.Span;
@@ -52,10 +53,11 @@ public sealed class AesGcmFieldCipher : IFieldCipher
             using var aes = new AesGcm(keyBytes, TagSize);
             aes.Decrypt(envelope.Nonce, envelope.Ciphertext, envelope.Tag, plaintext);
         }
-        catch (CryptographicException)
+        catch (CryptographicException exception)
         {
-            // Tag mismatch: wrong key, tampered value, or a crypto-shredded key. Fail closed.
-            throw new FieldDecryptionException(envelope.KeyId);
+            throw new ClassificationIntegrityException(
+                $"Classified field envelope under key '{envelope.KeyId}' failed authenticated decryption.",
+                exception);
         }
         return plaintext;
     }

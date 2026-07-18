@@ -16,7 +16,7 @@ public sealed class AesGcmFieldCipherSpec
 {
     private readonly IFieldCipher _cipher = new AesGcmFieldCipher();
 
-    private static FieldDataKey NewKey(string id = "k1")
+    private static ClassificationDataKey NewKey(string id = "k1")
         => new(id, RandomNumberGenerator.GetBytes(AesGcmFieldCipher.KeySize));
 
     private static byte[] Utf8(string s) => Encoding.UTF8.GetBytes(s);
@@ -64,7 +64,7 @@ public sealed class AesGcmFieldCipherSpec
         var wrong = NewKey("k1");   // same id, different material
 
         var act = () => _cipher.Decrypt(envelope, wrong);
-        act.Should().Throw<FieldDecryptionException>();
+        act.Should().Throw<ClassificationIntegrityException>();
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public sealed class AesGcmFieldCipherSpec
         envelope.Ciphertext[0] ^= 0xFF;
 
         var act = () => _cipher.Decrypt(envelope, key);
-        act.Should().Throw<FieldDecryptionException>();
+        act.Should().Throw<ClassificationIntegrityException>();
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public sealed class AesGcmFieldCipherSpec
         envelope.Tag[0] ^= 0xFF;
 
         var act = () => _cipher.Decrypt(envelope, key);
-        act.Should().Throw<FieldDecryptionException>();
+        act.Should().Throw<ClassificationIntegrityException>();
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class AesGcmFieldCipherSpec
         envelope.Nonce[0] ^= 0xFF;
 
         var act = () => _cipher.Decrypt(envelope, key);
-        act.Should().Throw<FieldDecryptionException>();
+        act.Should().Throw<ClassificationIntegrityException>();
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public sealed class AesGcmFieldCipherSpec
     [InlineData(33)]
     public void A_wrong_key_size_is_rejected(int size)
     {
-        var badKey = new FieldDataKey("k", RandomNumberGenerator.GetBytes(size));
+        var badKey = new ClassificationDataKey("k", RandomNumberGenerator.GetBytes(size));
         var encrypt = () => _cipher.Encrypt(Utf8("x"), badKey);
         encrypt.Should().Throw<ArgumentException>();
     }

@@ -50,11 +50,19 @@ public static partial class DataAxis
         if (OperationOverrideRegistry.ForDelete(entityType) is { } ov)
             planes.Add(new AxisPlane("operation-override", ov.Field, $"OnDelete = {ov.OnDeleteValue}"));
 
+        // Round-trip stored-field transforms (classification is the first consumer).
+        var fieldTransforms = services.GetService<IFieldTransformInspector>();
+        foreach (var contributorId in fieldTransforms?.ContributorIdsFor(entityType) ?? [])
+            planes.Add(new AxisPlane(
+                "field-transform",
+                contributorId,
+                "stored value differs from materialized value; distributed cache excluded"));
+
         // Read-filter contributor plane (non-equality predicates; the built-in equality is folded via the managed fields).
         var contributors = services.GetServices<IReadFilterContributor>().ToArray();
         // The cache-exclusion mirrors CachedRepository EXACTLY (the diagnostic must not drift): a field transform
         // ([Classified]/encrypted), a non-equality managed field (AutoReadFilter==false), OR a contributor that excludes.
-        var cacheExcluded = StorageFieldTransformRegistry.HasTransformsFor(entityType)
+        var cacheExcluded = (fieldTransforms?.HasTransformsFor(entityType) ?? false)
             || managed.Any(d => !d.AutoReadFilter);   // a non-equality managed field excludes from cache (DATA-0106 §5)
         foreach (var c in contributors)
         {

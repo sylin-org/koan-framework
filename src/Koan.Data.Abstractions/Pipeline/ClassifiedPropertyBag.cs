@@ -8,8 +8,7 @@ namespace Koan.Data.Abstractions.Pipeline;
 /// Caches classification metadata for one entity type: scans once for <c>[Classified]</c> properties (incl. the
 /// <c>[Pii]</c> / <c>[Phi]</c> / <c>[Pci]</c> / <c>[Secret]</c> sugar) and Expression-compiles a getter/setter per
 /// property — the classification analog of <c>TimestampPropertyBag</c>, which it deliberately mirrors, plus the
-/// round-trip the timestamp bag lacks. Built once per entity type and memoized by
-/// <see cref="ClassifiedFieldRegistry.ForType"/>. ARCH-0098 §1.
+/// round-trip the timestamp bag lacks. The host-owned transform plan memoizes one bag per applicable Entity type.
 /// </summary>
 public sealed class ClassifiedPropertyBag
 {
@@ -38,7 +37,6 @@ public sealed class ClassifiedPropertyBag
             descriptors.Add(new ClassifiedFieldDescriptor(
                 property,
                 attribute.Category,
-                attribute.Searchable,
                 CompileGetter(entityType, property),
                 CompileSetter(entityType, property)));
         }

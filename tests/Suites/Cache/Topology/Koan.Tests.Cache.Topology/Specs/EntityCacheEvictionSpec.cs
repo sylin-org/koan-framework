@@ -7,6 +7,7 @@ using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Entity;
 using Koan.Cache.Identity;
 using Koan.Core.Context;
+using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Pipeline;
@@ -201,11 +202,18 @@ public sealed class EntityCacheEvictionSpec
     {
         var plan = new EntityCachePlan(
             new StubPolicyRegistry(policies),
+            new NoFieldTransforms(),
             Array.Empty<IReadFilterContributor>());
         return new EntityCacheEvictionCoordinator(
             new IdentityWriter(writer),
             plan,
             new KoanContextCarrierRegistry(Array.Empty<IKoanContextCarrier>()));
+    }
+
+    private sealed class NoFieldTransforms : IFieldTransformInspector
+    {
+        public bool HasTransformsFor(Type entityType) => false;
+        public IReadOnlyList<string> ContributorIdsFor(Type entityType) => [];
     }
 
     private sealed class IdentityWriter(ICacheWriter inner) : ICacheSubjectClient

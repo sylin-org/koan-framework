@@ -9,7 +9,7 @@ namespace Koan.Classification.Tests.Crypto;
 /// <summary>
 /// ARCH-0098 phase 2a — the ciphertext envelope's storage encoding. The serialized form must round-trip every
 /// field exactly, survive a multibyte key id, and — critically for the read-reverse — distinguish a ciphertext
-/// value from a legacy plaintext value cheaply and safely (no throw on malformed input). End-to-end: a serialized
+/// value from legacy plaintext while malformed protected envelopes fail loudly. End-to-end: a serialized
 /// envelope re-parses and still decrypts.
 /// </summary>
 public sealed class FieldCipherEnvelopeSpec
@@ -39,8 +39,6 @@ public sealed class FieldCipherEnvelopeSpec
     [InlineData("")]                              // empty
     [InlineData("kfe1")]                          // prefix-ish but not the magic
     [InlineData("not base64 @@@ even after the prefix")]
-    [InlineData("kfe1:!!!not-base64!!!")]         // magic but invalid base64
-    [InlineData("kfe1:AAAA")]                      // magic + valid base64 but too short to be a header
     public void TryParse_rejects_non_envelope_values_without_throwing(string value)
     {
         FieldCipherEnvelope.TryParse(value, out _).Should().BeFalse();
@@ -49,6 +47,15 @@ public sealed class FieldCipherEnvelopeSpec
     [Fact]
     public void TryParse_rejects_null()
         => FieldCipherEnvelope.TryParse(null, out _).Should().BeFalse();
+
+    [Theory]
+    [InlineData("kfe1:!!!not-base64!!!")]
+    [InlineData("kfe1:AAAA")]
+    public void Malformed_protected_envelopes_fail_loudly(string value)
+    {
+        var act = () => FieldCipherEnvelope.TryParse(value, out _);
+        act.Should().Throw<ClassificationIntegrityException>();
+    }
 
     [Fact]
     public void A_multibyte_key_id_survives_serialization()
@@ -72,7 +79,7 @@ public sealed class FieldCipherEnvelopeSpec
     public void End_to_end_a_serialized_envelope_decrypts()
     {
         var cipher = new AesGcmFieldCipher();
-        var key = new FieldDataKey("k1", RandomNumberGenerator.GetBytes(AesGcmFieldCipher.KeySize));
+        var key = new ClassificationDataKey("k1", RandomNumberGenerator.GetBytes(AesGcmFieldCipher.KeySize));
         var plaintext = Encoding.UTF8.GetBytes("4111 1111 1111 1111");
 
         var stored = cipher.Encrypt(plaintext, key).Serialize();   // what lands in the column

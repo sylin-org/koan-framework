@@ -44,7 +44,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 {
     private readonly IDataRepository<TEntity, TKey> _inner;
     private readonly StorageWritePlan _writePlan;
-    private readonly StorageFieldTransformPlan _fieldTransform;
+    private readonly StorageFieldTransformPlan.Compiled _fieldTransform;
     private readonly IStorageGuard[] _guards;
     private readonly IReadFilterContributor[] _readContributors;
     private readonly IReadOnlyList<ManagedFieldDescriptor> _managed;
@@ -62,13 +62,14 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         IStorageGuard[]? guards = null,
         IReadFilterContributor[]? readContributors = null,
         EntityLifecyclePlan<TEntity, TKey>? lifecycle = null,
-        DataSegmentationPlan.DataSegmentationScope? segmentation = null)
+        DataSegmentationPlan.DataSegmentationScope? segmentation = null,
+        StorageFieldTransformPlan.Compiled? fieldTransform = null)
     {
         _inner = inner;
         _guards = guards ?? Array.Empty<IStorageGuard>();
         _readContributors = readContributors ?? Array.Empty<IReadFilterContributor>();
         _writePlan = StorageWritePlan.For(typeof(TEntity));
-        _fieldTransform = StorageFieldTransformPlan.For(typeof(TEntity));
+        _fieldTransform = fieldTransform ?? StorageFieldTransformPlan.Compiled.Empty;
         _managed = ManagedFieldRegistry.ForType(typeof(TEntity));
         _segmentation = segmentation ?? DataSegmentationPlan.DataSegmentationScope.Empty;
         _idField = AggregateMetadata.GetIdSpec(typeof(TEntity))?.Prop.Name ?? "Id";

@@ -60,7 +60,9 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         var readContributors = sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
         var lifecycle = sp.GetService<Lifecycle.EntityLifecyclePlan<TEntity, TKey>>();
         var segmentation = sp.GetRequiredService<Semantics.DataSegmentationPlan>().For(typeof(TEntity));
-        var facade = new RepositoryFacade<TEntity, TKey>(decorated, guards, readContributors, lifecycle, segmentation);
+        var fieldTransforms = sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>().For(typeof(TEntity));
+        var facade = new RepositoryFacade<TEntity, TKey>(
+            decorated, guards, readContributors, lifecycle, segmentation, fieldTransforms);
 
         // Repository construction is the activation boundary: inspection and route description remain pure, while
         // any runtime path that actually asks for a repository makes that provider/source visible to readiness.
@@ -91,7 +93,9 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         var readContributors = sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
         var lifecycle = sp.GetService<Lifecycle.EntityLifecyclePlan<TEntity, TKey>>();
         var segmentation = sp.GetRequiredService<Semantics.DataSegmentationPlan>().For(typeof(TEntity));
-        return new RepositoryFacade<TEntity, TKey>(repo, guards, readContributors, lifecycle, segmentation);
+        var fieldTransforms = sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>().For(typeof(TEntity));
+        return new RepositoryFacade<TEntity, TKey>(
+            repo, guards, readContributors, lifecycle, segmentation, fieldTransforms);
     }
 
     /// <inheritdoc />
