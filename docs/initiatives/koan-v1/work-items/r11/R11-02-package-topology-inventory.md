@@ -60,19 +60,19 @@ in the family disposition tables, not as phantom active-package rows.
 | Package | Derived role | Current disposition |
 |---|---|---|
 | `Sylin.Koan` | `entry` | `keep` |
-| `Sylin.Koan.AI` | `capability` | `assess` |
-| `Sylin.Koan.AI.Agents` | `capability` | `assess` |
-| `Sylin.Koan.AI.Connector.HuggingFace` | `provider` | `assess` |
-| `Sylin.Koan.AI.Connector.LMStudio` | `provider` | `assess` |
-| `Sylin.Koan.AI.Connector.Ollama` | `provider` | `assess` |
-| `Sylin.Koan.AI.Connector.Onnx` | `provider` | `assess` |
+| `Sylin.Koan.AI` | `capability` | `keep` |
+| `Sylin.Koan.AI.Agents` | `capability` | `retire` (handoff pending) |
+| `Sylin.Koan.AI.Connector.HuggingFace` | `provider` | `retire` (handoff pending) |
+| `Sylin.Koan.AI.Connector.LMStudio` | `provider` | `keep` |
+| `Sylin.Koan.AI.Connector.Ollama` | `provider` | `keep` |
+| `Sylin.Koan.AI.Connector.Onnx` | `provider` | `keep` |
 | `Sylin.Koan.AI.Contracts` | `contracts` | `keep` |
 | `Sylin.Koan.AI.Contracts.Shared` | `contracts` | `keep` |
-| `Sylin.Koan.AI.Eval` | `capability` | `assess` |
-| `Sylin.Koan.AI.Models` | `capability` | `assess` |
-| `Sylin.Koan.AI.Orchestration` | `capability` | `assess` |
+| `Sylin.Koan.AI.Eval` | `capability` | `retire` (handoff pending) |
+| `Sylin.Koan.AI.Models` | `capability` | `retire` (handoff pending) |
+| `Sylin.Koan.AI.Orchestration` | `capability` | `retire` (handoff pending) |
 | `Sylin.Koan.AI.Prompt` | `capability` | `keep` |
-| `Sylin.Koan.AI.Review` | `capability` | `assess` |
+| `Sylin.Koan.AI.Review` | `capability` | `retire` (handoff pending) |
 | `Sylin.Koan.AI.Web` | `projection` | `keep` |
 | `Sylin.Koan.App` | `entry` | `keep` |
 | `Sylin.Koan.Cache` | `capability` | `keep` |
@@ -88,7 +88,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Core` | `foundation` | `keep` |
 | `Sylin.Koan.Data.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Data.Access` | `capability` | `assess` |
-| `Sylin.Koan.Data.AI` | `capability` | `assess` |
+| `Sylin.Koan.Data.AI` | `capability` | `keep` |
 | `Sylin.Koan.Data.Backup` | `capability` | `assess` |
 | `Sylin.Koan.Data.Connector.Cockroach` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Couchbase` | `provider` | `keep` |
@@ -260,10 +260,29 @@ but its prose and executable surface require a focused truth audit before R11 ca
 | `Sylin.Koan.AI.Connector.ZenGarden` | `retire` (implemented) | The untested connector was already outside the solution and reversed orchestration ownership back into Koan. Zen Garden owns its model/resource orchestration boundary; Koan retains only independently consumed inert integration contracts. |
 | `Sylin.Koan.AI.Compute` | `retire` (implemented) | The package advertised fleet discovery and placement but only guessed one local resource, hard-coded network/model absence, and returned an unsatisfied fallback as the selected target. Committed Zen Garden resource/hardware domains own this concern; inert exchange vocabulary remains in AI Contracts Shared. |
 
-The two survivors pass focused source behavior and inspected artifact evidence. The two retirements are proven by
-their absence from the evaluated package graph, solution, and surviving project references. Remaining AI vertical and
-external provider packages retain separate terminal assessments because their accepted cross-repository topology is
-not implied by these decisions.
+The two survivors pass focused source behavior and inspected artifact evidence. The three implemented retirements are
+proven by their absence from the evaluated package graph, solution, and surviving project references. The remaining
+AI vertical and external provider packages receive separate terminal handoff dispositions below.
+
+## AI runtime, provider, and handoff dispositions
+
+| Package | Disposition | Distinct reference intent or exit gate |
+|---|---|---|
+| `Sylin.Koan.AI` | `keep` | Provider-neutral semantic inference, immutable provider-plan composition, capability-aware routing, health, and facts. It owns no model catalog, compute fleet, agent loop, evaluation workflow, or human review queue. |
+| `Sylin.Koan.Data.AI` | `keep` | Entity-first embedding/media-analysis/search integration is Koan's business-data seam. Its functional Data dependency and Entity semantics prevent an honest move to the application-tooling or ML-substrate products. |
+| `Sylin.Koan.AI.Connector.Ollama` | `keep` | One reference elects an Ollama inference provider with shared source/discovery law and layered Zen Garden discovery requirements. |
+| `Sylin.Koan.AI.Connector.LMStudio` | `keep` | One reference elects an LM Studio inference provider with independent placement and OpenAI-compatible local inference mechanics. |
+| `Sylin.Koan.AI.Connector.Onnx` | `keep` | One reference elects process-local ONNX embedding inference with DI-owned native lifetime; this is an inference battery, not model lifecycle management. |
+| `Sylin.Koan.AI.Agents` | `retire` (handoff pending) | Fold into `Agyo.Rag` only after equivalent agent/tool behavior is green there. Agyo currently has substantial Rag mechanics but no migrated agent loop, so deletion now would lose real capability. |
+| `Sylin.Koan.AI.Orchestration` | `retire` (handoff pending) | Fold typed chain/RAG composition into `Agyo.Rag` with Agents. Koan removal waits for destination behavior and consumers to be re-pointed. |
+| `Sylin.Koan.AI.Eval` | `retire` (handoff pending) | Move quality gates, metrics, drift, and regression behavior to `Sylin.Agyo.Eval`. No destination package exists yet. |
+| `Sylin.Koan.AI.Review` | `retire` (handoff pending) | Move Entity-backed human review queues and actions to `Sylin.Agyo.Review`. No destination package exists yet. |
+| `Sylin.Koan.AI.Models` | `retire` (handoff pending) | Port model lifecycle to Zen Garden and decouple `ModelEntry` from Koan Entity persistence before removal. This is a Rust/product-boundary migration, not a local rename. |
+| `Sylin.Koan.AI.Connector.HuggingFace` | `retire` (handoff pending) | Travels with Models after Zen Garden owns equivalent Hub search/metadata/download behavior. It has no independent consumer or Koan-core intent. |
+
+These are terminal architecture dispositions, not permission to delete unported capability. The five handoff groups
+remain visible but receive no R11 package polish or support promotion. R08-05 cannot publish them as Koan V1 products;
+their exit gate is destination behavior, destination tests, consumer re-pointing, then ordinary package retirement.
 
 ## Acceptance
 

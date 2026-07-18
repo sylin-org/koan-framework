@@ -1689,6 +1689,27 @@ Hugging Face await the larger Zen Garden port.
 The accepted Compute cut passes this R11-05 slice. The safe local retirements are complete; the remaining vertical
 must wait for evidenced Agyo/Zen Garden destination work rather than being deleted or polished prematurely.
 
+## AI cross-repository handoff gate
+
+The remaining AI topology is now terminal without pretending the migration is complete:
+
+- Koan keeps provider-neutral semantic inference, Entity-first Data.AI, prompt values/catalog, HTTP projection, and
+  the Ollama, LM Studio, and ONNX inference batteries.
+- Agents plus Orchestration retire only after their behavior is green inside `Agyo.Rag`.
+- Eval and Review retire only after `Sylin.Agyo.Eval` and `Sylin.Agyo.Review` exist with their current behavior and
+  tests. Read-only inspection confirms neither destination exists today.
+- Models plus Hugging Face retire only after Zen Garden owns equivalent model lifecycle and Hub behavior and the
+  Entity-backed catalog boundary has been deliberately decoupled.
+
+The Agyo repository is clean and already contains substantial Rag abstractions, ingestion, retrieval, evaluation,
+health, jobs, tools, and tests, but no migrated Koan agent loop or standalone Eval/Review package. Zen Garden remains
+dirty and untouched. Therefore no remaining vertical code is deleted, documented as a permanent Koan V1 product, or
+support-promoted in this cycle. R08-05 treats these package identities as a release blocker, not as review debt.
+
+This handoff gate prevents two equally harmful outcomes: losing real capability before its destination exists, or
+spending Koan product-polish effort on packages already assigned to another product. Future work resumes from the
+destination evidence, not from another Koan-side architecture assessment.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

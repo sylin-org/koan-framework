@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-18
   status: in-progress
-  scope: R11-05 through AI retired-topology correction
+  scope: R11-05 through terminal AI topology and handoff gates
 ---
 
 # Koan V1 reorganization current handoff
@@ -181,6 +181,9 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - The misleading local-only AI Compute facade is also retired after read-only committed Zen Garden inspection confirmed
   the real hardware/resource owner. Its sole test consumer is gone; the surviving EndToEnd host builds warning-clean,
   while dependency-free compute exchange contracts remain and pass 9/9.
+- The surviving AI topology is terminal without a premature cut: Koan keeps semantic inference, Entity-first Data.AI,
+  Prompt/Web, and Ollama/LM Studio/ONNX. Agents/Orchestration/Eval/Review remain only until Agyo destinations are green;
+  Models/Hugging Face remain only until the Zen Garden port is green. They receive no Koan V1 polish or support claim.
 - Current generated truth contains 108 packages: 21 repair-required, 33 review-required, 54 structurally ready across
   22 claims. Public truth passes across 212 current files and 40 navigation targets.
   Redis Cache 6/6 and Redis Data 12/12 pass; seven affected packages and their dependency boundaries were inspected,
@@ -210,11 +213,10 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the surviving AI vertical as an explicit
-disposition slice: reconcile Agents, Orchestration, Eval, Review, Models, and Hugging Face with the accepted Agyo/Zen
-Garden ownership plan. The safe local cuts are complete; do not delete real capability until its destination is green,
-and do not polish transitional facades into permanent Koan products. Keep sibling repositories read-only and do not
-run release certification.
+Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the MCP family. Assess Core, Explorer, and
+Operations as one agent-facing product progression before package prose: determine whether the two add-ons earn
+separate reference intent, coalesce duplicated tooling/inspection mechanics, and preserve the zero-configuration
+Entity/MCP path. Keep the cross-repository AI handoff packages untouched and do not run release certification.
 
 Keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared. Do not mutate remote settings, push,
 tag, release, or publish until package polish is accepted and separate remote-operation authorization is renewed.
