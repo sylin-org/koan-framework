@@ -1,45 +1,36 @@
-# Koan.Storage Technical Notes
+# Sylin.Koan.Storage technical contract
 
-Contract
-- IStorageService orchestrates provider lookup and object lifecycle.
-- Composition: this assembly exposes one `StorageModule : KoanModule`. Referencing the package lets `AddKoan()` bind `Koan:Storage` and register `IStorageService` when no application replacement exists.
-- Constants: Configuration paths are centralized under Storage.Infrastructure.Constants per ARCH-0040.
-- Providers implement IStorageProvider and optional capabilities:
-  - IStatOperations.HeadAsync → ObjectStat
-  - IServerSideCopy.CopyAsync → server-side copy
-  - IPresignOperations.PresignRead/Write → presigned URLs
+## Runtime ownership
 
-Routing and fallbacks
-- Profiles map logical names to a provider+container.
-- DefaultProfile (optional) is used when callers omit the profile.
-- FallbackMode governs behavior if DefaultProfile is not set:
-  - SingleProfileOnly: allow implicit fallback only when a single profile exists; otherwise throw.
-  - Disabled / NamedDefault: require explicit profile or configure DefaultProfile.
-- ValidateOnStart enforces invariants at startup (providers exist, containers set, default exists if provided).
+`StorageModule` binds `Koan:Storage`, registers one `IStorageService`, validates profiles, and reports effective
+configuration. Provider/service/object vocabulary lives in inert `Sylin.Koan.Storage.Abstractions`; this package owns
+functional routing, physical identity, segmentation, replication, transfer fallback, and Entity helpers.
 
-Hashing and metadata
-- For seekable uploads, SHA-256 is computed by the orchestrator.
-- HeadAsync returns lightweight ObjectStat when the provider supports it; otherwise the service may fall back to a short open-read.
+## Routing and validation
 
-Copy/Move semantics
-- TransferToProfileAsync(source, container, key, target, targetContainer?, deleteSource=false) is the core operation.
-- Helpers:
-  - CopyTo(...) → deleteSource=false
-  - MoveTo(...) → deleteSource=true
-- If both profiles use the same provider and it implements IServerSideCopy, server-side copy is used; otherwise the service streams from source to target.
+Profiles map a logical name to provider, container, and optional mode. Explicit provider/profile choices are exact.
+When the provider is omitted, the runtime classifies registered local/remote providers and resolves Local, Remote, or
+Replicated mode. `ValidateOnStart` rejects empty profiles, missing containers, unknown explicit providers, and invalid
+defaults. `SingleProfileOnly` is the bounded implicit fallback; it never resolves among several profiles.
 
-Presign
-- PresignRead/Write calls are routed only when the provider implements IPresignOperations; otherwise NotSupported is thrown.
+## Identity and segmentation
 
-Safety & performance
-- Local provider sanitizes keys, uses temp+rename for atomic writes, supports range reads.
-- For large downloads, prefer ReadRangeAsync and set appropriate HTTP headers in web controllers.
+`ScopedStorageService` is the physical-identity chokepoint. It composes the immutable Storage identity plan with the
+operation's Entity/host scope, runs storage guards, maps logical keys to physical keys, and projects results back
+without leaking composed keys into Entity identity. Cross-cutting modules contribute generic segmentation; Storage
+does not contain tenant-specific branches.
 
-Testing
-- Unit tests cover write/read/range/delete, exists/head, transfer, onboarding from file/URL, and copy/move helpers.
+## Transfers and optional capabilities
 
-References
-- docs/reference/storage.md
-- docs/decisions/STOR-0001-storage-module-and-contracts.md
-- docs/decisions/STOR-0006-storage-default-routing-and-fallbacks.md
-- docs/decisions/STOR-0007-storage-dx-helpers.md
+`StorageService` uses `IServerSideCopy` only for the same provider; otherwise it streams source to target and deletes
+the source only after a successful write when move was requested. `IStatOperations`, `IListOperations`, and
+`IPresignOperations` remain optional and fail honestly when unavailable. A best-effort stat fallback may open the
+object and can return unknown length/content metadata.
+
+## Resource and consistency posture
+
+Seekable uploads are hashed with SHA-256 while preserving the caller stream position. Non-seekable uploads are
+buffered once so they can be hashed and replayed to a provider; their reported size remains unknown (`0`) unless the
+provider can establish it. Storage does not claim an atomic commit across provider bytes and Data Entity rows.
+Replication/cache consistency is governed by the selected mode and provider behavior, not normalized into a stronger
+framework guarantee.

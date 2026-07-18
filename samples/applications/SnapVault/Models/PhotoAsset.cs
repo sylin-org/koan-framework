@@ -1,5 +1,5 @@
-using Koan.Media.Abstractions.Model;
-using Koan.Storage.Infrastructure;
+using Koan.Media;
+using Koan.Storage;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.AI.Attributes;
 using Koan.Data.Core.Relationships;

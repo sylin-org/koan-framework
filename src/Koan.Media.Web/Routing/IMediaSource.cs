@@ -4,7 +4,7 @@ namespace Koan.Media.Web.Routing;
 
 /// <summary>
 /// Resolves a media id to the source bytes. The MediaController
-/// depends on this abstraction (not on <see cref="Koan.Media.Abstractions.Model.MediaEntity{T}"/>
+/// depends on this abstraction (not on <see cref="Koan.Media.MediaEntity{T}"/>
 /// or <see cref="Koan.Storage.Abstractions.IStorageService"/> directly)
 /// so the controller is testable against in-memory fixtures and any
 /// app can plug in alternative storage backends.

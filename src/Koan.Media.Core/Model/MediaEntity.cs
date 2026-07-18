@@ -1,10 +1,11 @@
 using System.Security.Cryptography;
 using Koan.Storage.Abstractions;
 
-namespace Koan.Media.Abstractions.Model;
+namespace Koan.Media;
 
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Media.Abstractions.Model;
 using Koan.Storage;
 
 // CRTP model for media with first-class statics, layered over StorageEntity for placement/URLs
@@ -122,8 +123,8 @@ public abstract class MediaEntity<TEntity> : Koan.Storage.Model.StorageEntity<TE
         var inst = Get(key);
         // Resolve binding from the model type; prefer instance Container override when present
         var attr = typeof(TEntity)
-            .GetCustomAttributes(typeof(Koan.Storage.Infrastructure.StorageBindingAttribute), inherit: false)
-            .OfType<Koan.Storage.Infrastructure.StorageBindingAttribute>()
+            .GetCustomAttributes(typeof(StorageBindingAttribute), inherit: false)
+            .OfType<StorageBindingAttribute>()
             .FirstOrDefault();
         var profile = attr?.Profile ?? "";
         var container = inst.Container ?? attr?.Container ?? "";

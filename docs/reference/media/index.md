@@ -28,7 +28,7 @@ dotnet add package Sylin.Koan.Media.Web
 
 ```csharp
 using Koan.Core;
-using Koan.Media.Abstractions.Model;
+using Koan.Media;
 using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Web.Routing;
 using Koan.Web.Extensions;
@@ -59,8 +59,8 @@ registration loop is required.
 
 | Package | Owns |
 |---|---|
-| `Sylin.Koan.Media.Abstractions` | `MediaEntity<TEntity>`, recipes, steps, pipeline contracts, output values |
-| `Sylin.Koan.Media.Core` | recipe discovery/configuration, startup validation/facts, image engine |
+| `Sylin.Koan.Media.Abstractions` | inert recipes, steps, pipeline/media contracts, output values |
+| `Sylin.Koan.Media.Core` | `MediaEntity<TEntity>`, recipe discovery/configuration, startup validation/facts, image engine |
 | `Sylin.Koan.Media.Web` | Entity source, recipe controller, request bounds, format negotiation, HTTP diagnostics |
 
 `Sylin.Koan.Media.Web` brings the other two packages transitively. Applications still reference concrete Data

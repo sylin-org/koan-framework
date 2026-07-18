@@ -10,7 +10,7 @@ namespace Koan.Media.Web.Controllers;
 
 /// <summary>
 /// CRTP-style base controller that streams stored bytes for a
-/// <see cref="Koan.Media.Abstractions.Model.MediaEntity{TEntity}"/>-derived type with full
+/// <see cref="Koan.Media.MediaEntity{TEntity}"/>-derived type with full
 /// HTTP semantics: HEAD, GET, Range, ETag / If-None-Match,
 /// If-Modified-Since, Content-Disposition, Cache-Control.
 ///

@@ -8,7 +8,7 @@ derivatives.
 
 ```csharp
 using Koan.Core;
-using Koan.Media.Abstractions.Model;
+using Koan.Media;
 using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Web.Routing;
 using Koan.Web.Extensions;

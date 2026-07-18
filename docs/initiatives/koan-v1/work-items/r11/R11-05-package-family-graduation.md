@@ -39,7 +39,7 @@ and generated quality report. It does not run the complete release ratchet.
 | Family | Scope | Status |
 |---|---|---|
 | foundation runtime | Core, Data contracts/runtime, JSON, SQLite, Web, Communication | passed |
-| contract isolation | ZenGarden, AI contracts, Vector/Media abstractions, Orchestration CLI contracts | in progress |
+| contract isolation | ZenGarden, AI contracts, Vector/Media/Storage abstractions, Orchestration CLI contracts | passed |
 | provider families | Data, Vector, AI, Cache, Storage, Auth, Orchestration providers | pending |
 | semantic capabilities | Jobs, MCP, AI, Cache, Tenancy, Identity, Canon, Media, Classification, Security | pending |
 | projections and tools | Web add-ons, testing, analyzers, generators, CLI and operator surfaces | pending |
@@ -112,8 +112,51 @@ into a support claim.
   shared test-kit chokepoint; production composition remains owned by Data Core.
 - generated truth after Vector contract graduation: 107 packages, 33 repair-required, 53 review-required, 21
   structurally ready, and 216 findings. Both retained Vector packages now have zero structural findings.
-- Storage and Media boundaries remain under assessment; neither is graduated merely because its name says
-  `Contracts` or `Abstractions`.
+
+### Storage and Media discovery
+
+**Application intent:** a module or provider author can consume Storage/Media vocabulary without activating either
+engine, while an application still expresses an Entity-backed media model as `Photo : MediaEntity<Photo>`.
+
+**Complete expression:** provider authors reference `Sylin.Koan.Storage.Abstractions`; ordinary applications
+reference Storage/Media functional packages or their higher bundles. `MediaEntity<TEntity>` moves to the application
+namespace `Koan.Media`; no new startup call, decoration, configuration, context, or runtime prerequisite is added.
+
+**Guarantee and correction:** contract-only references register nothing. Storage remains the owner of routing,
+segmentation, provider IO, and object lifecycle; Media Core remains the owner of Entity-backed upload/dedup/read,
+recipe discovery, and pipeline execution. A missing runtime or provider continues to fail at the owning functional
+chokepoint rather than being simulated by a contracts assembly.
+
+**Coalescence decision:** create one necessary `Sylin.Koan.Storage.Abstractions` boundary from the SPI already embedded
+in Storage, including the service result and binding vocabulary needed across modules. Keep Storage as the runtime;
+rebuild Media Abstractions as inert media/recipe vocabulary; absorb `MediaEntity<TEntity>` into Media Core; remove the
+AI runtime's unused Storage and Media references. No compatibility shim or parallel namespace survives.
+
+**Ergonomics:** application code reads `using Koan.Media; public sealed class Photo : MediaEntity<Photo>;` instead of
+importing an `Abstractions.Model` namespace to obtain functional behavior. Package names, IntelliSense, runtime
+activation, and agent-readable dependency intent consequently agree.
+
+### Storage and Media evidence
+
+- `Sylin.Koan.Storage.Abstractions` is the new inert boundary for the existing service/provider/object/binding SPI;
+  its packed dependency graph contains only `Sylin.Koan.Data.Abstractions`. Storage runtime, both providers, Data
+  Backup, and Media consumers now declare the exact contract dependency they compile against.
+- `MediaEntity<TEntity>` moved from Media Abstractions to Media Core and the application namespace `Koan.Media`.
+  Media Abstractions now depends only on Data/Storage contracts; AI dropped two unused functional dependencies.
+- focused builds: Storage contracts/runtime, Local, S3, Data Backup, Media contracts/runtime/Web, AI, and the
+  SnapVault dogfood application compile. The Data Backup build's stale restored `Core.Adapters` warning disappears
+  after graph restore and is not a source dependency.
+- focused behavior: Storage Core 3/3, Media Core 562/562, Media Web 4/4, and Storage tenant-isolation 12/12 pass.
+  The legacy Local connector test project still targets obsolete option/profile/capability shapes and is assigned to
+  the provider-family repair; the shipping provider itself builds warning-free. This is not concealed as provider
+  graduation.
+- package artifacts: Storage Abstractions, Storage, Media Abstractions, and Media Core pack with owned README and
+  canonical icon; nuspec inspection confirms the two contracts packages do not depend on functional assemblies.
+- generated truth: 108 packages, 33 repair-required, 50 review-required, 25 structurally ready, and 208 findings.
+  All four retained Storage/Media boundaries in this slice have zero structural findings.
+
+The contract-isolation family passes. Provider prose and the stale Local connector suite remain explicit work in the
+next family; no full release certification ran here.
 
 ## Acceptance
 

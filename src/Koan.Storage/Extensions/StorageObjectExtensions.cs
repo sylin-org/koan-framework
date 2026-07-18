@@ -51,8 +51,8 @@ public static class StorageObjectExtensions
     {
         using var _scope = Scope(obj);   // compose the source key with the source type's axes (same-scope tiering)
         var targetType = typeof(TTarget);
-        var binding = targetType.GetCustomAttributes(typeof(Infrastructure.StorageBindingAttribute), false)
-                                 .OfType<Infrastructure.StorageBindingAttribute>()
+        var binding = targetType.GetCustomAttributes(typeof(StorageBindingAttribute), false)
+                                 .OfType<StorageBindingAttribute>()
                                  .FirstOrDefault();
         var profile = binding?.Profile ?? "";
         var container = binding?.Container ?? "";
@@ -65,8 +65,8 @@ public static class StorageObjectExtensions
     {
         using var _scope = Scope(obj);
         var targetType = typeof(TTarget);
-        var binding = targetType.GetCustomAttributes(typeof(Infrastructure.StorageBindingAttribute), false)
-                                 .OfType<Infrastructure.StorageBindingAttribute>()
+        var binding = targetType.GetCustomAttributes(typeof(StorageBindingAttribute), false)
+                                 .OfType<StorageBindingAttribute>()
                                  .FirstOrDefault();
         var profile = binding?.Profile ?? "";
         var container = binding?.Container ?? "";
@@ -102,8 +102,8 @@ public static class StorageObjectExtensions
     {
         // If the runtime type has a StorageBindingAttribute, use it; otherwise fall back to obj.Provider/Container
         var t = obj.GetType();
-        var attr = t.GetCustomAttributes(typeof(Infrastructure.StorageBindingAttribute), false)
-                     .OfType<Infrastructure.StorageBindingAttribute>()
+        var attr = t.GetCustomAttributes(typeof(StorageBindingAttribute), false)
+                     .OfType<StorageBindingAttribute>()
                      .FirstOrDefault();
         var profile = attr?.Profile ?? obj.Provider ?? "";
         var container = attr?.Container ?? obj.Container ?? "";

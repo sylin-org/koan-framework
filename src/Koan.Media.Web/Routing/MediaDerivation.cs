@@ -1,4 +1,4 @@
-using Koan.Storage.Infrastructure;
+using Koan.Storage;
 using Koan.Storage.Model;
 
 namespace Koan.Media.Web.Routing;

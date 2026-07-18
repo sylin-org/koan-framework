@@ -32,6 +32,7 @@
 
     <!-- Storage -->
     <ProjectReference Include="..\..\..\src\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
 
     <!-- AI/vector semantics. Add provider connector references when enrichment is desired. -->

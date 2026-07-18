@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\Koan.ZenGarden.Contracts\Koan.ZenGarden.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>

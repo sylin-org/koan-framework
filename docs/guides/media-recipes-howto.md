@@ -66,7 +66,7 @@ Useful intent verbs include:
 ## 3. Make the original an Entity
 
 ```csharp
-using Koan.Media.Abstractions.Model;
+using Koan.Media;
 
 public sealed class Photo : MediaEntity<Photo>
 {

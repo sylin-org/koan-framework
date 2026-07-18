@@ -6,7 +6,7 @@ namespace Koan.Storage.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
 using Koan.Data.Core.Model;
-using Koan.Storage.Infrastructure;
+using Koan.Storage;
 using Koan.Storage.Keys;
 using System.Text;
 using Newtonsoft.Json;

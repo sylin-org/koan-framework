@@ -287,9 +287,7 @@
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.AI.Prompt",
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Media.Abstractions",
-        "Sylin.Koan.Storage"
+        "Sylin.Koan.Core"
       ],
       "readme": "src/Koan.AI/README.md",
       "ownsReadme": true,
@@ -863,7 +861,8 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Storage"
+        "Sylin.Koan.Storage",
+        "Sylin.Koan.Storage.Abstractions"
       ],
       "readme": "src/Koan.Data.Backup/README.md",
       "ownsReadme": true,
@@ -1453,14 +1452,13 @@
     {
       "packageId": "Sylin.Koan.Media.Abstractions",
       "shape": "library",
-      "description": "Entity-backed media, recipe, and pipeline contracts for Koan.",
+      "description": "Inert Koan media contracts for immutable recipes, pipeline intent, media metadata, output shapes, and registries.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
-        "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Storage"
+        "Sylin.Koan.Storage.Abstractions"
       ],
       "readme": "src/Koan.Media.Abstractions/README.md",
       "ownsReadme": true,
@@ -1470,14 +1468,15 @@
     {
       "packageId": "Sylin.Koan.Media.Core",
       "shape": "library",
-      "description": "Media recipe discovery and image pipelines with startup validation and runtime facts.",
+      "description": "Koan media runtime for Entity-backed originals, recipe discovery, validated image pipelines, rendering, and runtime facts.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Media.Abstractions",
-        "Sylin.Koan.Storage"
+        "Sylin.Koan.Storage",
+        "Sylin.Koan.Storage.Abstractions"
       ],
       "readme": "src/Koan.Media.Core/README.md",
       "ownsReadme": true,
@@ -1498,6 +1497,7 @@
         "Sylin.Koan.Media.Abstractions",
         "Sylin.Koan.Media.Core",
         "Sylin.Koan.Storage",
+        "Sylin.Koan.Storage.Abstractions",
         "Sylin.Koan.Web"
       ],
       "readme": "src/Koan.Media.Web/README.md",
@@ -1644,18 +1644,34 @@
     {
       "packageId": "Sylin.Koan.Storage",
       "shape": "library",
-      "description": "Storage core for Koan: contracts, orchestrator, routing, and options.",
+      "description": "Koan storage runtime for Entity-backed objects, provider routing, segmentation, replication, validation, transfer, and lifecycle helpers.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core"
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Storage.Abstractions"
       ],
       "readme": "src/Koan.Storage/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Storage/TECHNICAL.md",
+      "claims": []
+    },
+    {
+      "packageId": "Sylin.Koan.Storage.Abstractions",
+      "shape": "library",
+      "description": "Inert Koan storage contracts for providers, services, objects, capabilities, listing, stat, copy, presign, and model binding.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Data.Abstractions"
+      ],
+      "readme": "src/Koan.Storage.Abstractions/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Storage.Abstractions/TECHNICAL.md",
       "claims": []
     },
     {
@@ -1666,7 +1682,8 @@
         "net10.0"
       ],
       "dependencies": [
-        "Sylin.Koan.Storage"
+        "Sylin.Koan.Storage",
+        "Sylin.Koan.Storage.Abstractions"
       ],
       "readme": "src/Connectors/Storage/Local/README.md",
       "ownsReadme": true,
@@ -1682,6 +1699,7 @@
       ],
       "dependencies": [
         "Sylin.Koan.Storage",
+        "Sylin.Koan.Storage.Abstractions",
         "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": null,

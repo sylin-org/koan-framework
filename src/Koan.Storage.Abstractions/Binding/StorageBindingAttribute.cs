@@ -1,4 +1,4 @@
-namespace Koan.Storage.Infrastructure;
+namespace Koan.Storage;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
 public sealed class StorageBindingAttribute : Attribute

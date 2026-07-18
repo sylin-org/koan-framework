@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: R11-01 passed; R11-02 exact package topology dispositions
+  scope: R11-05 dependency-ordered package-family graduation
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,8 +22,8 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T7B — package-product graduation before public observation`
 - Active work item: [R11 — Graduate the NuGet product surface](work-items/R11-package-product-quality.md)
-- Active child: [R11-02 — Reconcile package topology](work-items/r11/R11-02-package-topology-inventory.md)
-- Most recently passed child: [R11-01 — Compile package quality](work-items/r11/R11-01-quality-contract-and-compiler.md)
+- Active child: [R11-05 — Graduate package families](work-items/r11/R11-05-package-family-graduation.md)
+- Most recently passed child: [R11-04 — Prove the golden package journey](work-items/r11/R11-04-golden-package-journey.md)
 - Pending release item: [R08-05 — Initial coherent public observation](work-items/r08/R08-05-initial-public-observation.md);
   its local contract is prepared, but R10 graduation and separate remote authorization come first
 - V1 readiness: `not ready`; public observation, later upgrade/rollback proof,
@@ -44,7 +44,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R08 | [Make Koan V1 responsibly releasable](work-items/R08-v1-release-readiness.md) | T7B | pending | R09; R10 and R11 guard R08-05 | Codex · 2026-07-17 | R08-01 through R08-04 passed locally and R08-05 is prepared but unauthorized. R10 graduated the maintained sample portfolio; R11 now graduates the package product surface before public observation. |
 | R09 | [Compile the Semantic Composition Kernel](work-items/R09-semantic-composition-kernel.md) | T7A | passed | R07; protects R08-01 | Codex · 2026-07-17 | R09-01 through R09-09 passed. One retained module lifecycle, compiled semantic constitution, typed contribution/election mechanics, hard capability overlays, canonical evidence, contract isolation, and legacy-kernel deletion are proved. ARCH-0115 and ARCH-0116 record the result. |
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
-| R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | in-progress | R09; R10; guards R08-05 | Architect + Codex · 2026-07-17 | R11-01 passes: deterministic quality projection covers 109 packages with 11 focused cells and byte-stable outputs. R11-02 holds the exact 109-row topology queue before shared polish. |
+| R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | in-progress | R09; R10; guards R08-05 | Architect + Codex · 2026-07-17 | R11-01 through R11-04 pass. R11-05 foundation and contract-isolation families pass after four false boundaries were merged/renamed/split and retained packages received focused behavior/artifact proof. Current truth: 108 packages, 25 structurally ready, 208 findings. Provider families are next. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -64,7 +64,7 @@ item should normally be `in-progress`.
 | R08 | pending | R08-01 through R08-04 passed locally. R08-05's preparation checklist is complete; R10 sample graduation, remote trust setup/public observation, and later real upgrade/rollback remain separate gates. Publication remains unauthorized. |
 | R09 | passed | All nine children pass. Functional assemblies use one module lifecycle, contracts are isolated without activation metadata, the duplicate bootstrap kernel is deleted, and focused source/package journeys remain meaningful. |
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
-| R11 | in-progress | R11-01 passes. R11-02 must replace all 109 temporary `assess` rows with terminal topology dispositions before family prose graduation. |
+| R11 | in-progress | R11-01 through R11-04 pass. R11-05 foundation and contract-isolation families pass; provider, semantic-capability, and projection/tool families still require terminal topology, prose, and focused evidence before R11-07. |
 
 ## Divergence and risk log
 

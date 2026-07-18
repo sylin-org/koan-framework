@@ -130,8 +130,8 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Mcp` | `capability` | `assess` |
 | `Sylin.Koan.Mcp.Explorer` | `capability` | `assess` |
 | `Sylin.Koan.Mcp.Operations` | `capability` | `assess` |
-| `Sylin.Koan.Media.Abstractions` | `contracts` | `assess` |
-| `Sylin.Koan.Media.Core` | `capability` | `assess` |
+| `Sylin.Koan.Media.Abstractions` | `contracts` | `keep` |
+| `Sylin.Koan.Media.Core` | `capability` | `keep` |
 | `Sylin.Koan.Media.Web` | `projection` | `assess` |
 | `Sylin.Koan.Observability` | `capability` | `assess` |
 | `Sylin.Koan.Orchestration.Abstractions` | `contracts` | `keep` |
@@ -142,7 +142,8 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Orchestration.Generators` | `analyzer` | `assess` |
 | `Sylin.Koan.Orchestration.Renderers.Connector.Compose` | `provider` | `assess` |
 | `Sylin.Koan.Security.Trust` | `capability` | `assess` |
-| `Sylin.Koan.Storage` | `capability` | `assess` |
+| `Sylin.Koan.Storage` | `capability` | `keep` |
+| `Sylin.Koan.Storage.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Storage.Connector.Local` | `provider` | `assess` |
 | `Sylin.Koan.Storage.Connector.S3` | `provider` | `assess` |
 | `Sylin.Koan.Templates` | `template` | `keep` |
@@ -203,6 +204,10 @@ terminal package decisions; the listed boundary repairs happen before graduation
 | `Sylin.Koan.AI.Contracts.Shared` | `keep` | Dependency-free lifecycle exchange vocabulary retained for model, dataset, compute, job, evaluation, and lineage extensions, including the accepted cross-repository transition boundary. It activates no runtime. |
 | `Sylin.Koan.Data.Vector.Abstractions` | `keep` | Inert provider/query/schema SPI independently consumed by connectors and projections. Runtime election, memoization, DI, physical naming, and isolation mechanics moved out, removing the false Data Core dependency. |
 | `Sylin.Koan.Data.Vector` | `keep` | Entity-first vector runtime and the single owner of provider election, memoized repository resolution, isolation-aware naming, active participation, health, and application facades. It activates no backend by itself. |
+| `Sylin.Koan.Storage.Abstractions` | `split` (implemented) | Inert provider/service/object/binding vocabulary independently consumed by providers and modules. It was extracted from functional Storage so contract references no longer activate routing, segmentation, replication, or IO. |
+| `Sylin.Koan.Storage` | `keep` | Entity-first object-storage runtime and the single owner of profile routing, physical identity, segmentation, validation, replication, transfer fallback, and lifecycle helpers. |
+| `Sylin.Koan.Media.Abstractions` | `keep` | Inert recipe, pipeline, registry, output, and media-object vocabulary. Functional `MediaEntity<TEntity>` moved out; the package now depends only on Data and Storage contract assemblies. |
+| `Sylin.Koan.Media.Core` | `keep` | Functional owner of Entity-backed originals, content-addressed storage semantics, recipe discovery/validation, image planning/execution, and Media runtime facts. The application type now lives in the honest `Koan.Media` namespace. |
 | `Sylin.Koan.Data.Abstractions` | `keep` | Entity and repository vocabulary independently consumed by providers, projections, and modules without selecting a data runtime or backend. Its legacy ASP.NET JSON Patch dependency and duplicate object-shaped patch path were removed; the boundary now exposes one provider-neutral `PatchPayload`. |
 | `Sylin.Koan.Data.Core` | `keep` | Entity data runtime and provider election. It owns data-specific adapter policy after the `Core.Adapters` redistribution. |
 | `Sylin.Koan.Data.Connector.Json` | `keep` | Bounded, file-backed local provider that gives the foundation bundle an immediate meaningful result. Its package page must state its concurrency and deployment limits plainly. |

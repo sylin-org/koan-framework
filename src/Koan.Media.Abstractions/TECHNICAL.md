@@ -1,27 +1,26 @@
-# Koan.Media.Abstractions — technical contract
+# Sylin.Koan.Media.Abstractions technical contract
 
-## Ownership
+## Boundary
 
-This package owns portable Media types. It contains no controller, hosted worker, provider election, or
-image engine. `MediaEntity<TEntity>` composes Data and Storage contracts; Core supplies execution and Web
-supplies negotiated HTTP rendering.
+This assembly owns portable Media vocabulary. It contains no `KoanModule`, dependency injection, configuration
+binding, Entity implementation, ambient host access, controller, hosted worker, provider selection, decoder, or
+encoder. Its project dependencies are the inert Data and Storage contract packages required by
+`IMediaObject : IStorageObject : IEntity<string>`.
 
 ## Recipe invariants
 
 - recipes are immutable after `Build()`;
-- steps execute in canonical stage order, independent of declaration order;
+- steps carry canonical pipeline stages independent of declaration order;
 - `Fingerprint()` hashes version plus canonical steps and is the recipe half of derivative identity;
-- `AllowedMutators` defines which request-time overrides a named recipe accepts;
-- `AllowedOutputFormats` is an allowlist, not an encoder promise; Core rejects unproducible formats.
+- `AllowedMutators` defines which request-time overrides a named recipe accepts; and
+- `AllowedOutputFormats` is an allowlist, not an encoder promise—functional runtimes validate producibility.
 
-## Resource posture
+## Pipeline contract
 
-The pipeline contract supports stream-writing terminals, but image decoding may still require full decoded
-pixel state. `MediaEntity.Store(Stream, ...)` currently buffers the source. Callers must enforce appropriate
-upload and decode bounds at their ingress.
+`IMediaPipeline` is lazy until `ProbeAsync`, `WriteToAsync`, `ToBytesAsync`, or `MaterializeAsync`. Prefer the
+stream-writing terminal for production output. Implementations may require complete decoded pixel state even when
+encoded output streams, so the functional ingress owner remains responsible for source bounds.
 
-## Compatibility boundary
-
-The package is pre-1.0. There is no eager/prewarm flag: no supported upload-time execution contract exists.
-Future lifecycle or Entity-facet APIs require a real coordinator and consumer evidence rather than symmetry
-with other pillars.
+`IMediaRecipeRegistry`, `IOverlayResolver`, `MediaOutput`, `MediaBundle`, recipe steps, and media-kind metadata are
+cross-module contracts. Runtime discovery, planning, execution, startup facts, and Entity-backed originals belong to
+Media Core; request parsing, access-gated source resolution, negotiation, and HTTP diagnostics belong to Media Web.

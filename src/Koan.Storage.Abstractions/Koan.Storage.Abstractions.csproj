@@ -4,11 +4,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Description>Inert Koan media contracts for immutable recipes, pipeline intent, media metadata, output shapes, and registries.</Description>
-    <PackageTags>$(CommonPackageTags);media;abstractions;contracts;images;recipes;pipelines</PackageTags>
+    <Description>Inert Koan storage contracts for providers, services, objects, capabilities, listing, stat, copy, presign, and model binding.</Description>
+    <PackageTags>$(CommonPackageTags);storage;abstractions;contracts;providers;objects;blobs</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
-    <ProjectReference Include="..\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
   </ItemGroup>
 </Project>

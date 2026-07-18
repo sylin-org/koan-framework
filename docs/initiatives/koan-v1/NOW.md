@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: R11-01 passed; R11-02 exact package topology dispositions
+  scope: R11-05 foundation and contract-isolation families passed; provider families next
 ---
 
 # Koan V1 reorganization current handoff
@@ -118,6 +118,18 @@ Replace this file at every handoff. It is a restart point, not a diary.
   the same 109 identities exactly once in temporary `assess` state.
 - R11-01 also corrected one shared evaluated-facts defect: empty `TargetFrameworks` previously hid every normal
   project's single `TargetFramework`. Both generated references now report the actual target for all 109 packages.
+- R11-03 and R11-04 pass: the canonical mascot and package identity substrate are compiled once, the two entry
+  bundles plus Templates are structurally ready, and the zero-configuration package-first golden journey proves the
+  AddKoan/Entity/EntityController path.
+- R11-05's foundation and contract-isolation families pass. Core Adapters and CLI Core were merged into their real
+  owners; ZenGarden was renamed to an inert Contracts boundary; AI and Vector contracts shed functional leakage;
+  Storage gained one necessary inert Abstractions package; and functional `MediaEntity<TEntity>` moved to Media Core
+  under the application namespace `Koan.Media`.
+- Current generated truth contains 108 packages: 33 repair-required, 50 review-required, 25 structurally ready, and
+  208 findings. Focused Storage/Media behavior passes 3/3 + 562/562 + 4/4 + 12/12 isolation; the four affected package
+  artifacts contain owned README/icon assets and honest functional/contract dependency graphs.
+- The Local Storage connector's legacy test project compiles against obsolete option/profile/capability shapes. It
+  remains an explicit provider-family repair and is not represented as graduated; the shipping provider builds clean.
 - No package, tag, GitHub Release, branch, or remote configuration was published or mutated. Initial coherent
   public observation and a later real public-to-candidate upgrade/rollback remain separate gates.
 
@@ -140,9 +152,9 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Execute [R11-02](work-items/r11/R11-02-package-topology-inventory.md) in dependency/user-value order. Begin with the
-foundation and entry package family; replace temporary `assess` rows with evidenced keep/merge/split/rename/retire
-decisions before changing shared metadata or writing package prose.
+Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with provider families. Start each provider
+pillar with focused topology/coalescence discovery, repair the Local Storage conformance project as part of its real
+provider review, then graduate package prose and artifacts only after the boundary and guarantees are executable.
 
 Keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared. Do not mutate remote settings, push,
 tag, release, or publish until package polish is accepted and separate remote-operation authorization is renewed.

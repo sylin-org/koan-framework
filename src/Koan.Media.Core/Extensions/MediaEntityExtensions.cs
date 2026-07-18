@@ -4,6 +4,7 @@ namespace Koan.Media.Core.Extensions;
 
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
+using Koan.Media;
 using Koan.Media.Abstractions;
 using Koan.Media.Abstractions.Model;
 using Koan.Storage;
@@ -39,8 +40,8 @@ public static class MediaEntityExtensions
     private static (string Profile, string? Container) ResolveBinding<TEntity>(string? instanceContainer)
     {
         var t = typeof(TEntity);
-        var attr = t.GetCustomAttributes(typeof(Storage.Infrastructure.StorageBindingAttribute), inherit: false)
-            .OfType<Storage.Infrastructure.StorageBindingAttribute>().FirstOrDefault();
+        var attr = t.GetCustomAttributes(typeof(StorageBindingAttribute), inherit: false)
+            .OfType<StorageBindingAttribute>().FirstOrDefault();
         var profile = attr?.Profile ?? "";
         var container = instanceContainer ?? attr?.Container ?? "";
         return (profile, container);

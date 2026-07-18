@@ -48,7 +48,7 @@ EXISTING seams; invent no new ones:
   ParticlePosition position, string? separator)`; `ParticlePosition.Leading` = `value{sep}anchor`.
   `CompositionPolicy(string separator, IParticleFormatter formatter, int? maxBytes=null)`. `IParticleFormatter`
   = `string? Format(string? value)`.
-- **`IStorageService`** (`src/Koan.Storage/Abstractions/IStorageService.cs`): `Put/Read/ReadRange/Delete/Exists/
+- **`IStorageService`** (`src/Koan.Storage.Abstractions/Contracts/IStorageService.cs`): `Put/Read/ReadRange/Delete/Exists/
   Head/TransferToProfile/PresignRead/PresignWrite/ListObjects` — all keyed by `(profile, container, key)` (List by
   `prefix`, Transfer by `key` + target). Registered `AddSingleton<IStorageService, StorageService>()` in
   `src/Koan.Storage/Extensions/StorageServiceCollectionExtensions.cs:19` AND

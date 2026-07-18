@@ -37,6 +37,7 @@
     <ProjectReference Include="..\..\..\..\src\Koan.Data.SoftDelete\Koan.Data.SoftDelete.csproj" />
     <!-- STOR-0011: the storage blob-key tenant-isolation proof (Local provider, no Docker). -->
     <ProjectReference Include="..\..\..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
     <!-- STOR-0011: the MediaEntity surface (OpenRead override) isolation proof — the surface SnapVault's PhotoAsset uses. -->
     <ProjectReference Include="..\..\..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />

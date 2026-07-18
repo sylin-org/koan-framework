@@ -3,12 +3,14 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Media recipe discovery and image pipelines with startup validation and runtime facts.</Description>
-    <PackageTags>$(CommonPackageTags);media;images;video;pdf;pipeline;derivative</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>Koan media runtime for Entity-backed originals, recipe discovery, validated image pipelines, rendering, and runtime facts.</Description>
+    <PackageTags>$(CommonPackageTags);media;runtime;images;recipes;pipeline;derivative</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
   </ItemGroup>
   <ItemGroup>

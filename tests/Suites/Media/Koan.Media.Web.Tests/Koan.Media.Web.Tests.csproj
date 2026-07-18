@@ -22,6 +22,8 @@
   <ItemGroup>
     <!-- The surface under test: MediaEntitySource<T> + the MediaDerivation cache. -->
     <ProjectReference Include="..\..\..\..\src\Koan.Media.Web\Koan.Media.Web.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
     <!-- SEC-0008 access axis (the moat MediaEntitySource inherits) + real AddKoan hosting (ARCH-0079). -->
     <ProjectReference Include="..\..\..\..\src\Koan.Data.Access\Koan.Data.Access.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />

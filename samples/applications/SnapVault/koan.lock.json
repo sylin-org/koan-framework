@@ -95,6 +95,10 @@
       "version": "0.17"
     },
     {
+      "id": "Koan.Storage.Abstractions",
+      "version": "0.17"
+    },
+    {
       "id": "Koan.Storage.Connector.Local",
       "version": "0.17"
     },
@@ -183,6 +187,10 @@
     {
       "kind": "project",
       "id": "Koan.Storage"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Storage.Abstractions"
     },
     {
       "kind": "project",

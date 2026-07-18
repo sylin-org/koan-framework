@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 107,
+    "packages": 108,
     "repairRequired": 33,
-    "reviewRequired": 53,
-    "structurallyReady": 21,
-    "ownedReadmes": 74,
-    "technicalCompanions": 64,
-    "findings": 216
+    "reviewRequired": 50,
+    "structurallyReady": 25,
+    "ownedReadmes": 75,
+    "technicalCompanions": 65,
+    "findings": 208
   },
   "findingDefinitions": [
     {
@@ -90,9 +90,7 @@
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.AI.Prompt",
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Media.Abstractions",
-        "Sylin.Koan.Storage"
+        "Sylin.Koan.Core"
       ],
       "readme": "src/Koan.AI/README.md",
       "technicalDocumentation": "src/Koan.AI/TECHNICAL.md",
@@ -845,7 +843,8 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Storage"
+        "Sylin.Koan.Storage",
+        "Sylin.Koan.Storage.Abstractions"
       ],
       "readme": "src/Koan.Data.Backup/README.md",
       "technicalDocumentation": "src/Koan.Data.Backup/TECHNICAL.md",
@@ -1603,47 +1602,40 @@
       "projectPath": "src/Koan.Media.Abstractions/Koan.Media.Abstractions.csproj",
       "shape": "library",
       "role": "contracts",
-      "status": "review-required",
-      "description": "Entity-backed media, recipe, and pipeline contracts for Koan.",
+      "status": "structurally-ready",
+      "description": "Inert Koan media contracts for immutable recipes, pipeline intent, media metadata, output shapes, and registries.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
-        "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Storage"
+        "Sylin.Koan.Storage.Abstractions"
       ],
       "readme": "src/Koan.Media.Abstractions/README.md",
       "technicalDocumentation": "src/Koan.Media.Abstractions/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.install.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Media.Core",
       "projectPath": "src/Koan.Media.Core/Koan.Media.Core.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
-      "description": "Media recipe discovery and image pipelines with startup validation and runtime facts.",
+      "status": "structurally-ready",
+      "description": "Koan media runtime for Entity-backed originals, recipe discovery, validated image pipelines, rendering, and runtime facts.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Media.Abstractions",
-        "Sylin.Koan.Storage"
+        "Sylin.Koan.Storage",
+        "Sylin.Koan.Storage.Abstractions"
       ],
       "readme": "src/Koan.Media.Core/README.md",
       "technicalDocumentation": "src/Koan.Media.Core/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Media.Web",
@@ -1660,6 +1652,7 @@
         "Sylin.Koan.Media.Abstractions",
         "Sylin.Koan.Media.Core",
         "Sylin.Koan.Storage",
+        "Sylin.Koan.Storage.Abstractions",
         "Sylin.Koan.Web"
       ],
       "readme": "src/Koan.Media.Web/README.md",
@@ -1861,24 +1854,39 @@
       "projectPath": "src/Koan.Storage/Koan.Storage.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
-      "description": "Storage core for Koan: contracts, orchestrator, routing, and options.",
+      "status": "structurally-ready",
+      "description": "Koan storage runtime for Entity-backed objects, provider routing, segmentation, replication, validation, transfer, and lifecycle helpers.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core"
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Storage.Abstractions"
       ],
       "readme": "src/Koan.Storage/README.md",
       "technicalDocumentation": "src/Koan.Storage/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Storage.Abstractions",
+      "projectPath": "src/Koan.Storage.Abstractions/Koan.Storage.Abstractions.csproj",
+      "shape": "library",
+      "role": "contracts",
+      "status": "structurally-ready",
+      "description": "Inert Koan storage contracts for providers, services, objects, capabilities, listing, stat, copy, presign, and model binding.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Data.Abstractions"
+      ],
+      "readme": "src/Koan.Storage.Abstractions/README.md",
+      "technicalDocumentation": "src/Koan.Storage.Abstractions/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Storage.Connector.Local",
@@ -1891,7 +1899,8 @@
         "net10.0"
       ],
       "dependencies": [
-        "Sylin.Koan.Storage"
+        "Sylin.Koan.Storage",
+        "Sylin.Koan.Storage.Abstractions"
       ],
       "readme": "src/Connectors/Storage/Local/README.md",
       "technicalDocumentation": "src/Connectors/Storage/Local/TECHNICAL.md",
@@ -1916,6 +1925,7 @@
       ],
       "dependencies": [
         "Sylin.Koan.Storage",
+        "Sylin.Koan.Storage.Abstractions",
         "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": null,

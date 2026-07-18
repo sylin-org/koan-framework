@@ -1,7 +1,7 @@
 # Module Inventory Ledger
 
 ### Koan.AI
-- Depends on: Koan.AI.Contracts, Koan.AI.Prompt, Koan.Core, Koan.Media.Abstractions, Koan.Storage
+- Depends on: Koan.AI.Contracts, Koan.AI.Prompt, Koan.Core
 - Depended by: Koan.AI.Agents, Koan.AI.Eval, Koan.AI.Models, Koan.AI.Orchestration, Koan.AI.Training, Koan.AI.Web, Koan.Data.AI
 - Documentation: README ✅ · TECHNICAL ✅
 
@@ -152,7 +152,7 @@
 
 ### Koan.Data.Abstractions
 - Depends on: Koan.Core
-- Depended by: Koan.Cache, Koan.Classification, Koan.Communication, Koan.Data.Access, Koan.Data.AI, Koan.Data.Backup, Koan.Data.Connector.Cockroach, Koan.Data.Connector.Couchbase, Koan.Data.Connector.ElasticSearch, Koan.Data.Connector.InMemory, Koan.Data.Connector.Json, Koan.Data.Connector.Mongo, Koan.Data.Connector.OpenSearch, Koan.Data.Connector.Postgres, Koan.Data.Connector.Redis, Koan.Data.Connector.Sqlite, Koan.Data.Connector.SqlServer, Koan.Data.Core, Koan.Data.Relational, Koan.Data.SearchEngine, Koan.Data.SoftDelete, Koan.Data.Vector.Abstractions, Koan.Data.Vector.Connector.InMemory, Koan.Data.Vector.Connector.Milvus, Koan.Data.Vector.Connector.Qdrant, Koan.Data.Vector.Connector.SqliteVec, Koan.Data.Vector.Connector.Weaviate, Koan.Jobs, Koan.Media.Abstractions, Koan.Storage, Koan.Tenancy, Koan.Testing, Koan.Web, Koan.Web.Backup, Koan.Web.Extensions
+- Depended by: Koan.Cache, Koan.Classification, Koan.Communication, Koan.Data.Access, Koan.Data.AI, Koan.Data.Backup, Koan.Data.Connector.Cockroach, Koan.Data.Connector.Couchbase, Koan.Data.Connector.ElasticSearch, Koan.Data.Connector.InMemory, Koan.Data.Connector.Json, Koan.Data.Connector.Mongo, Koan.Data.Connector.OpenSearch, Koan.Data.Connector.Postgres, Koan.Data.Connector.Redis, Koan.Data.Connector.Sqlite, Koan.Data.Connector.SqlServer, Koan.Data.Core, Koan.Data.Relational, Koan.Data.SearchEngine, Koan.Data.SoftDelete, Koan.Data.Vector.Abstractions, Koan.Data.Vector.Connector.InMemory, Koan.Data.Vector.Connector.Milvus, Koan.Data.Vector.Connector.Qdrant, Koan.Data.Vector.Connector.SqliteVec, Koan.Data.Vector.Connector.Weaviate, Koan.Jobs, Koan.Media.Abstractions, Koan.Storage, Koan.Storage.Abstractions, Koan.Tenancy, Koan.Testing, Koan.Web, Koan.Web.Backup, Koan.Web.Extensions
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Data.Access
@@ -166,7 +166,7 @@
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Data.Backup
-- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Storage
+- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Storage, Koan.Storage.Abstractions
 - Depended by: Koan.Web.Backup
 - Documentation: README ✅ · TECHNICAL ✅
 
@@ -336,17 +336,17 @@
 - Documentation: README ❌ · TECHNICAL ❌
 
 ### Koan.Media.Abstractions
-- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Storage
-- Depended by: Koan.AI, Koan.Media.Core, Koan.Media.Web
+- Depends on: Koan.Data.Abstractions, Koan.Storage.Abstractions
+- Depended by: Koan.Media.Core, Koan.Media.Web
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Media.Core
-- Depends on: Koan.Data.Core, Koan.Media.Abstractions, Koan.Storage
+- Depends on: Koan.Data.Core, Koan.Media.Abstractions, Koan.Storage, Koan.Storage.Abstractions
 - Depended by: Koan.Media.Web
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Media.Web
-- Depends on: Koan.Data.Core, Koan.Media.Abstractions, Koan.Media.Core, Koan.Storage, Koan.Web
+- Depends on: Koan.Data.Core, Koan.Media.Abstractions, Koan.Media.Core, Koan.Storage, Koan.Storage.Abstractions, Koan.Web
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
@@ -396,17 +396,22 @@
 - Documentation: README ❌ · TECHNICAL ❌
 
 ### Koan.Storage
-- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core
-- Depended by: Koan.AI, Koan.Data.Backup, Koan.Media.Abstractions, Koan.Media.Core, Koan.Media.Web, Koan.Storage.Connector.Local, Koan.Storage.Connector.S3
+- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Storage.Abstractions
+- Depended by: Koan.Data.Backup, Koan.Media.Core, Koan.Media.Web, Koan.Storage.Connector.Local, Koan.Storage.Connector.S3
+- Documentation: README ✅ · TECHNICAL ✅
+
+### Koan.Storage.Abstractions
+- Depends on: Koan.Data.Abstractions
+- Depended by: Koan.Data.Backup, Koan.Media.Abstractions, Koan.Media.Core, Koan.Media.Web, Koan.Storage, Koan.Storage.Connector.Local, Koan.Storage.Connector.S3
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Storage.Connector.Local
-- Depends on: Koan.Storage
+- Depends on: Koan.Storage, Koan.Storage.Abstractions
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Storage.Connector.S3
-- Depends on: Koan.Storage, Koan.ZenGarden.Contracts
+- Depends on: Koan.Storage, Koan.Storage.Abstractions, Koan.ZenGarden.Contracts
 - Depended by: –
 - Documentation: README ❌ · TECHNICAL ❌
 

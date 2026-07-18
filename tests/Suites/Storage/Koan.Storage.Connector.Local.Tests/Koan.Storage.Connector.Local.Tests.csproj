@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>
 </Project>

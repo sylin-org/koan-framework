@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Koan.Data.Core;
+using Koan.Media;
 using Koan.Media.Abstractions.Model;
 using Koan.Media.Abstractions.Recipes;
 using Microsoft.Extensions.DependencyInjection;

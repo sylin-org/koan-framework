@@ -1,5 +1,12 @@
 # Koan.Media.Core — technical contract
 
+## Entity runtime
+
+`Koan.Media.MediaEntity<TEntity>` is functional behavior and therefore lives here, not in the contracts package. It
+composes `StorageEntity<TEntity>` with media lineage plus caller-named upload, content-addressed store/dedup, and
+scope-aware original reads. Data and Storage remain the owners of row persistence, physical bytes, routing, and
+segmentation.
+
 ## Startup
 
 `Koan.Media.Core.Initialization.MediaCoreModule` is the package's `KoanModule`. Registration binds the
@@ -23,7 +30,7 @@ throws from the change callback; it does not roll forward a partially rebuilt ca
 ## Pipeline posture
 
 The pipeline is lazy until `ProbeAsync`, `WriteToAsync`, `ToBytesAsync`, or `MaterializeAsync`. Prefer
-`WriteToAsync` for output; `ToBytesAsync` is a buffered compatibility terminal. Source limits supplied by Web
+`WriteToAsync` for output; `ToBytesAsync` is the explicitly buffered terminal. Source limits supplied by Web
 are checked before full decode, while direct Core callers own their ingress bounds.
 
 ## Inspection
