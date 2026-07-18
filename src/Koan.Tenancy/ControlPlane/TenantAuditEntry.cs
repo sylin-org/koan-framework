@@ -8,11 +8,9 @@ using Koan.Data.Core.Model;
 namespace Koan.Tenancy;
 
 /// <summary>
-/// The append-only control-plane audit trail (ARCH-0099 / ARCH-0104) — a dogfooded <c>[HostScoped]</c>
-/// <see cref="Entity{T}"/> that records every operator mutation of the tenant fleet: <c>actor / action /
-/// tenant / summary / at</c>. It is the "explicit + audited cross-tenant" guardrail made structural — an
-/// operator action that is not written here did not happen. Lives in the root/host scope alongside the other
-/// control-plane rows, so it is never tenant-scoped.
+/// A control-plane audit entry — a dogfooded <c>[HostScoped]</c> <see cref="Entity{T}"/> written by every supported
+/// operator mutation: <c>actor / action / tenant / summary / at</c>. It is an application-owned integrity record,
+/// not an append-only or externally attested ledger. It lives in host scope and is never tenant-scoped.
 /// </summary>
 [HostScoped]
 public sealed class TenantAuditEntry : Entity<TenantAuditEntry>
@@ -20,7 +18,7 @@ public sealed class TenantAuditEntry : Entity<TenantAuditEntry>
     /// <summary>Who performed the action — the operator principal (subject/name), or <c>system</c> for automated ops.</summary>
     public string Actor { get; set; } = "";
 
-    /// <summary>The action verb, e.g. <c>tenant.created</c> / <c>tenant.suspended</c> / <c>membership.revoked</c> / <c>tenant.erase.requested</c>.</summary>
+    /// <summary>The action verb, e.g. <c>tenant.created</c>, <c>tenant.renamed</c>, or <c>membership.revoked</c>.</summary>
     public string Action { get; set; } = "";
 
     /// <summary>The tenant the action targeted (a <see cref="TenantRecord"/> id); null for a fleet-wide action.
@@ -36,8 +34,7 @@ public sealed class TenantAuditEntry : Entity<TenantAuditEntry>
     public DateTimeOffset At { get; set; }
 
     /// <summary>
-    /// Record an audit entry (one append-only row). The convenience path every lifecycle action funnels through so
-    /// the "audited by construction" guardrail cannot be forgotten.
+    /// Record one audit entry. The supported administration chokepoint funnels every mutation through this method.
     /// </summary>
     public static Task<TenantAuditEntry> Record(string actor, string action, string? tenantId, string summary, CancellationToken ct = default)
         => new TenantAuditEntry

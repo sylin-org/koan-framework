@@ -71,7 +71,7 @@ public sealed class IdentityTenancyModule : KoanModule
 
         if (!subdomainLive)
             logger?.LogInformation(
-                "Koan.Identity.Tenancy: the subdomain carrier is inert (no Koan:Data:Tenancy:Resolution:BaseHosts configured) — " +
+                "Koan.Identity.Tenancy: the subdomain carrier is inert (no Koan:Tenancy:Resolution:BaseHosts configured) — " +
                 "subdomain-routed deployments must set BaseHosts or every request resolves no tenant.");
 
         return Task.CompletedTask;

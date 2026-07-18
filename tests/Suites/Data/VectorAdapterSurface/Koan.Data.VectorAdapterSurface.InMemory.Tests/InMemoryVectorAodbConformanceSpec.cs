@@ -24,7 +24,7 @@ public sealed class InMemoryVectorAodbConformanceSpec : VectorAodbConformanceSpe
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
-            ["Koan:Data:Tenancy:Posture"] = "Closed",
+            ["Koan:Tenancy:Posture"] = "Closed",
             // The Database-mode route resolves the source from the AMBIENT shard (DatabaseRouteRegistry), not from this
             // registry — InMemoryVector then folds that source key into its store name, so these entries are INERT for
             // the InMemory vector path. Kept to mirror VectorDatabaseRoutingSpec, where a name-folding-free adapter

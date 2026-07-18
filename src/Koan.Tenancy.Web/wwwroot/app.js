@@ -1,214 +1,149 @@
-// ARCH-0104 — Koan Tenancy operator console. Vanilla JS over /api/tenancy/admin (relative to /tenancy/).
 "use strict";
 
 const API = "../api/tenancy/admin";
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+}[character]));
 
-let selected = null; // currently-open tenant id
-let actingAs = null; // { id, name } or null
+let selected = null;
 
 async function api(method, path, body) {
-  const res = await fetch(`${API}${path}`, {
+  const response = await fetch(`${API}${path}`, {
     method,
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) {
-    let msg = `${res.status} ${res.statusText}`;
-    try { const j = await res.json(); if (j && j.error) msg = j.error; } catch { /* ignore */ }
-    throw new Error(msg);
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`;
+    try {
+      const payload = await response.json();
+      if (payload?.error) message = payload.error;
+    } catch { /* response has no JSON error body */ }
+    throw new Error(message);
   }
-  return res.status === 204 ? null : res.json();
+  return response.status === 204 ? null : response.json();
 }
 
-function toast(msg, isError) {
-  const t = $("toast");
-  t.textContent = msg;
-  t.className = "toast" + (isError ? " error" : "");
-  t.hidden = false;
-  setTimeout(() => { t.hidden = true; }, 3200);
+function toast(message, isError = false) {
+  const target = $("toast");
+  target.textContent = message;
+  target.className = "toast" + (isError ? " error" : "");
+  target.hidden = false;
+  setTimeout(() => { target.hidden = true; }, 3200);
 }
 
-// --- Fleet roster ---
 async function loadFleet() {
   const roster = await api("GET", "/tenants");
   $("posture").textContent = roster.posture;
   $("posture").className = "badge " + (roster.posture === "Open" ? "warn" : "ok");
   $("operator").textContent = roster.operator ? `as ${roster.operator}` : "";
+
   const body = $("fleet-body");
-  if (!roster.tenants.length) {
-    body.innerHTML = `<tr><td colspan="5" class="muted">No tenants yet. Create one to begin.</td></tr>`;
-    return;
-  }
-  body.innerHTML = roster.tenants.map((t) => `
-    <tr data-id="${esc(t.id)}" class="${t.id === selected ? "sel" : ""}">
-      <td>${esc(t.name)}</td>
-      <td>${t.code ? esc(t.code) : '<span class="muted">—</span>'}</td>
-      <td><span class="badge ${t.status === "Active" ? "ok" : "warn"}">${esc(t.status)}</span></td>
-      <td class="num">${t.seatCount}</td>
-      <td class="num">${t.pendingInvites}</td>
-    </tr>`).join("");
-  body.querySelectorAll("tr[data-id]").forEach((tr) => tr.addEventListener("click", () => openDetail(tr.dataset.id)));
+  body.innerHTML = roster.tenants.length ? roster.tenants.map((tenant) => `
+    <tr data-id="${esc(tenant.id)}" class="${tenant.id === selected ? "sel" : ""}">
+      <td>${esc(tenant.name)}</td>
+      <td>${tenant.code ? esc(tenant.code) : '<span class="muted">—</span>'}</td>
+      <td class="num">${tenant.seatCount}</td>
+    </tr>`).join("") : '<tr><td colspan="3" class="muted">No tenants yet.</td></tr>';
+  body.querySelectorAll("tr[data-id]").forEach((row) =>
+    row.addEventListener("click", () => openDetail(row.dataset.id)));
 }
 
-// --- Tenant detail ---
 async function openDetail(id) {
   selected = id;
-  const d = await api("GET", `/tenants/${encodeURIComponent(id)}`);
-  const t = d.tenant;
+  const detail = await api("GET", `/tenants/${encodeURIComponent(id)}`);
   $("detail").hidden = false;
-  $("detail-name").textContent = t.name;
-  $("detail-id").textContent = t.id;
-  $("detail-status").textContent = t.status;
-  $("detail-status").className = "badge " + (t.status === "Active" ? "ok" : "warn");
+  $("detail-name").textContent = detail.tenant.name;
+  $("detail-id").textContent = detail.tenant.id;
 
-  const suspendBtn = t.status === "Active"
-    ? `<button data-act="suspend">Suspend</button>`
-    : `<button data-act="reactivate">Reactivate</button>`;
-  $("detail-actions").innerHTML = `
-    <button data-act="rename">Rename</button>
-    ${suspendBtn}
-    <button data-act="invite">Invite…</button>
-    <button data-act="act-as">Act-as</button>
-    <button class="danger" data-act="erase">Erase…</button>`;
-  $("detail-actions").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => action(b.dataset.act, t)));
-
-  $("members-body").innerHTML = d.members.length ? d.members.map((m) => `
+  const body = $("members-body");
+  body.innerHTML = detail.memberships.length ? detail.memberships.map((membership) => `
     <tr>
-      <td>${esc(m.identityId)}</td>
-      <td>${(m.roles || []).map((r) => `<span class="chip">${esc(r)}</span>`).join(" ") || '<span class="muted">—</span>'}</td>
-      <td class="right"><button class="link danger" data-revoke-m="${esc(m.id)}">revoke</button></td>
-    </tr>`).join("") : `<tr><td colspan="3" class="muted">No members.</td></tr>`;
-  $("members-body").querySelectorAll("[data-revoke-m]").forEach((b) =>
-    b.addEventListener("click", () => revokeMembership(b.dataset.revokeM)));
-
-  $("invites-body").innerHTML = d.invites.length ? d.invites.map((i) => `
-    <tr>
-      <td>${esc(i.email)}</td><td>${esc(i.role)}</td>
-      <td><span class="badge ${i.status === "Pending" ? "ok" : "warn"}">${esc(i.status)}</span></td>
-      <td class="right">${i.status === "Pending" ? `<button class="link danger" data-revoke-i="${esc(i.id)}">revoke</button>` : ""}</td>
-    </tr>`).join("") : `<tr><td colspan="4" class="muted">No invites.</td></tr>`;
-  $("invites-body").querySelectorAll("[data-revoke-i]").forEach((b) =>
-    b.addEventListener("click", () => revokeInvite(b.dataset.revokeI)));
-
+      <td>${esc(membership.identityId)}</td>
+      <td>${(membership.roles || []).map((role) => `<span class="chip">${esc(role)}</span>`).join(" ")}</td>
+      <td class="right"><button class="link danger" data-revoke="${esc(membership.id)}">revoke</button></td>
+    </tr>`).join("") : '<tr><td colspan="3" class="muted">No memberships.</td></tr>';
+  body.querySelectorAll("[data-revoke]").forEach((button) =>
+    button.addEventListener("click", () => revokeMembership(button.dataset.revoke)));
   await loadFleet();
 }
 
-async function action(act, t) {
+$("detail-actions").addEventListener("click", async (event) => {
+  const action = event.target?.dataset?.act;
+  if (!action || !selected) return;
   try {
-    if (act === "rename") {
-      const name = prompt(`Rename '${t.name}' to:`, t.name);
+    if (action === "rename") {
+      const name = prompt("New tenant name:", $("detail-name").textContent);
       if (!name) return;
-      await api("POST", `/tenants/${encodeURIComponent(t.id)}/rename`, { name });
-      toast("Renamed.");
-    } else if (act === "suspend" || act === "reactivate") {
-      await api("POST", `/tenants/${encodeURIComponent(t.id)}/${act}`);
-      toast(act === "suspend" ? "Suspended." : "Reactivated.");
-    } else if (act === "invite") {
-      const email = prompt("Invite email:");
-      if (!email) return;
-      const role = prompt("Role:", "member") || "member";
-      await api("POST", `/tenants/${encodeURIComponent(t.id)}/invites`, { email, role });
-      toast("Invite created.");
-    } else if (act === "act-as") {
-      const r = await api("POST", `/tenants/${encodeURIComponent(t.id)}/act-as`);
-      setActingAs({ id: r.tenantId, name: r.tenantName });
-      toast(`Now acting as ${r.tenantName}.`);
-    } else if (act === "erase") {
-      const confirmName = prompt(`ERASE '${t.name}' (control-plane). This removes all memberships & invites.\nType the tenant name to confirm:`);
-      if (!confirmName) return;
-      await api("POST", `/tenants/${encodeURIComponent(t.id)}/erase`, { confirm: true, confirmName });
-      toast("Erase submitted.");
-      $("detail").hidden = true;
-      selected = null;
+      await api("POST", `/tenants/${encodeURIComponent(selected)}/rename`, { name });
+      toast("Tenant renamed.");
+    }
+    if (action === "grant") {
+      const identityId = prompt("Known subject or durable identity ID:");
+      if (!identityId) return;
+      const roleInput = prompt("Comma-separated tenant roles:", "member") || "member";
+      const roles = roleInput.split(",").map((role) => role.trim()).filter(Boolean);
+      await api("POST", `/tenants/${encodeURIComponent(selected)}/memberships`, { identityId, roles });
+      toast("Membership granted.");
     }
     await refresh();
-  } catch (e) {
-    toast(e.message, true);
+  } catch (error) {
+    toast(error.message, true);
   }
-}
-
-async function revokeMembership(id) {
-  if (!confirm("Revoke this membership seat?")) return;
-  try { await api("POST", `/memberships/${encodeURIComponent(id)}/revoke`); toast("Seat revoked."); if (selected) await openDetail(selected); }
-  catch (e) { toast(e.message, true); }
-}
-
-async function revokeInvite(id) {
-  try { await api("POST", `/invites/${encodeURIComponent(id)}/revoke`); toast("Invite revoked."); if (selected) await openDetail(selected); }
-  catch (e) { toast(e.message, true); }
-}
-
-// --- Act-as banner ---
-function setActingAs(tenant) {
-  actingAs = tenant;
-  const banner = $("scope-banner");
-  if (tenant) {
-    $("scope-tenant").textContent = tenant.name;
-    banner.hidden = false;
-  } else {
-    banner.hidden = true;
-  }
-}
-$("scope-stop").addEventListener("click", async () => {
-  if (!actingAs) return;
-  try { await api("POST", `/tenants/${encodeURIComponent(actingAs.id)}/act-as/stop`); } catch { /* best-effort */ }
-  setActingAs(null);
-  toast("Stopped acting-as.");
-  await refresh();
 });
 
-// --- New tenant ---
+async function revokeMembership(id) {
+  if (!confirm("Revoke this membership?")) return;
+  try {
+    await api("DELETE", `/memberships/${encodeURIComponent(id)}`);
+    toast("Membership revoked.");
+    await refresh();
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
 $("new-tenant").addEventListener("click", async () => {
   const name = prompt("New tenant name:");
   if (!name) return;
-  const code = prompt("Routing slug (optional):") || null;
-  try { const t = await api("POST", "/tenants", { name, code }); toast("Tenant created."); await refresh(); await openDetail(t.id); }
-  catch (e) { toast(e.message, true); }
+  const code = prompt("Routing code (optional):") || null;
+  try {
+    const tenant = await api("POST", "/tenants", { name, code });
+    toast("Tenant created.");
+    await refresh();
+    await openDetail(tenant.id);
+  } catch (error) {
+    toast(error.message, true);
+  }
 });
-$("detail-close").addEventListener("click", () => { $("detail").hidden = true; selected = null; loadFleet(); });
 
-// --- Feeds ---
-async function loadOperations() {
-  const ops = await api("GET", "/operations");
-  $("operations-body").innerHTML = ops.length ? ops.map((o) => `
-    <tr>
-      <td>${fmt(o.requestedAt)}</td><td>${esc(o.tenantId)}</td><td>${esc(o.action)}</td>
-      <td><span class="badge ${o.status === "Completed" ? "ok" : o.status === "Failed" ? "err" : "warn"}">${esc(o.status)}</span></td>
-      <td>${o.status === "Completed" ? `−${o.removedMemberships} seats, −${o.removedInvites} invites` : (o.error ? esc(o.error) : "…")}</td>
-      <td>${esc(o.requestedBy)}</td>
-    </tr>`).join("") : `<tr><td colspan="6" class="muted">No operations.</td></tr>`;
-}
+$("detail-close").addEventListener("click", () => {
+  $("detail").hidden = true;
+  selected = null;
+  loadFleet();
+});
+
 async function loadAudit() {
-  const rows = await api("GET", "/audit");
-  $("audit-body").innerHTML = rows.length ? rows.map((a) => `
+  const entries = await api("GET", "/audit");
+  $("audit-body").innerHTML = entries.length ? entries.map((entry) => `
     <tr>
-      <td>${fmt(a.at)}</td><td>${esc(a.actor)}</td><td>${esc(a.action)}</td>
-      <td>${a.tenantId ? esc(a.tenantId) : '<span class="muted">—</span>'}</td><td>${esc(a.summary)}</td>
-    </tr>`).join("") : `<tr><td colspan="5" class="muted">No audit entries.</td></tr>`;
+      <td>${formatDate(entry.at)}</td><td>${esc(entry.actor)}</td><td>${esc(entry.action)}</td>
+      <td>${entry.tenantId ? esc(entry.tenantId) : '<span class="muted">—</span>'}</td>
+      <td>${esc(entry.summary)}</td>
+    </tr>`).join("") : '<tr><td colspan="5" class="muted">No audit entries.</td></tr>';
 }
 
-document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => {
-  document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-  tab.classList.add("active");
-  const which = tab.dataset.tab;
-  $("tab-operations").hidden = which !== "operations";
-  $("tab-audit").hidden = which !== "audit";
-  (which === "operations" ? loadOperations : loadAudit)();
-}));
-
-function fmt(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return isNaN(d) ? esc(iso) : d.toLocaleString();
+function formatDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? esc(value) : date.toLocaleString();
 }
 
 async function refresh() {
   await loadFleet();
-  await loadOperations();
-  if (!$("tab-audit").hidden) await loadAudit();
+  await loadAudit();
   if (selected && !$("detail").hidden) await openDetail(selected);
 }
 
-refresh().catch((e) => toast(e.message, true));
+refresh().catch((error) => toast(error.message, true));

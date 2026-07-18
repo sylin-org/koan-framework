@@ -17,8 +17,6 @@ namespace Koan.Identity.Tenancy;
 /// the request path, re-evaluated every request, so a removed membership stops scoping (and stops conferring its
 /// roles) at the very next request. A resolved-but-unauthorized or unresolved request proceeds <i>unscoped</i> — any
 /// tenant-scoped read/write fails closed downstream rather than leaking, and we never 403 (no tenant-existence oracle).
-/// <para>Note: tenant <i>lifecycle</i> status (<c>TenantStatus.Suspended</c>) is NOT enforced here — that is
-/// ARCH-0099 P3 (and read-permissive by design); a member of a suspended tenant is still scoped in for now.</para>
 /// <para>App code must read the active tenant from <c>Tenant.Current</c> (the authorized ambient axis) — never
 /// re-derive it from the raw path segment or host label, which are unauthenticated client-asserted strings.</para>
 /// </summary>

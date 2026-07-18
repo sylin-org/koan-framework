@@ -13,7 +13,7 @@ namespace SnapVault.Models;
 /// explicit studio grant; consumed by the guest read path to narrow every PhotoAsset read to the granted events.
 /// The grant itself is the filter.
 /// <para>
-/// [HostScoped] (like <c>Invite</c>/<c>Membership</c>) so it is resolvable from the read-path hook without an ambient
+/// [HostScoped] (like <c>Membership</c>) so it is resolvable from the read-path hook without an ambient
 /// studio tenant; <see cref="StudioTenantId"/> carries the scope explicitly. Revocation is immediate — the hook
 /// re-reads grants per request, so removing this row fail-closes the next read.
 /// </para>

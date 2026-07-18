@@ -6,21 +6,18 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Koan.Tenancy.Web</AssemblyName>
     <RootNamespace>Koan.Tenancy.Web</RootNamespace>
-    <Description>ARCH-0104 — the tenancy control-plane operator console (Reference = Intent). Referencing this package auto-mounts the host-face operator API + a bundled UI over the [HostScoped] control-plane entities (TenantRecord/Membership/Invite): fleet roster, tenant drill-in, guarded lifecycle actions (suspend/reactivate, invite/revoke, revoke-seat, control-plane erase), an operations feed, an audit log, and an audited act-as. Gated on the explicit host role koan:tenancy-operator (no master backdoor); dev-open posture makes it just-work in dev, prod fails closed.</Description>
-    <PackageTags>$(CommonPackageTags);tenancy;multi-tenant;operator;console;control-plane;admin</PackageTags>
+    <Description>Reference-mounted tenant registry and membership administration for Koan: a bundled operator UI and API with separated exposure/authority controls, idempotent seat grants, and mutation audit.</Description>
+    <PackageTags>$(CommonPackageTags);tenancy;multi-tenant;operator;console;membership;admin</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
-    <!-- ARCH-0104 — the console references Koan.Web (controllers/authorization) + Koan.Tenancy (the control-plane
-         entities) + Koan.Jobs (the resumable/audited lifecycle operation). It does NOT reference Koan.Identity:
-         Membership.IdentityId is a string soft-FK, so the layering stays clean (parallel to Koan.Identity.Web). -->
+    <!-- The console projects Koan.Tenancy through Koan.Web. Membership.IdentityId is a string subject key, so
+         Identity integration stays optional and the core layering remains clean. -->
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj"
                       />
     <ProjectReference Include="..\Koan.Tenancy\Koan.Tenancy.csproj"
-                      />
-    <ProjectReference Include="..\Koan.Jobs\Koan.Jobs.csproj"
                       />
   </ItemGroup>
   <ItemGroup>

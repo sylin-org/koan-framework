@@ -6,7 +6,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Koan.Tenancy</AssemblyName>
     <RootNamespace>Koan.Tenancy</RootNamespace>
-    <Description>First-class multi-tenancy for Koan: Tenant.Use/.WithTenant/None, [HostScoped], trusted context carriage, and one hard tenant segmentation contribution compiled independently by active framework pillars under Reference = Intent.</Description>
+    <Description>Local-first multi-tenancy for Koan: ambient Tenant.Use/None scope, [HostScoped] exceptions, durable context carriage, and one hard segmentation contribution compiled independently by active framework pillars.</Description>
     <PackageTags>$(CommonPackageTags);tenancy;multitenant;isolation;saas</PackageTags>
   </PropertyGroup>
   <ItemGroup>

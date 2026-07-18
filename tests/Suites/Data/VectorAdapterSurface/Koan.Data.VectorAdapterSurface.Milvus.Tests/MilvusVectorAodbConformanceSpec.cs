@@ -86,7 +86,7 @@ public sealed class MilvusVectorAodbConformanceSpec : VectorAodbConformanceSpecs
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
-            ["Koan:Data:Tenancy:Posture"] = "Closed",
+            ["Koan:Tenancy:Posture"] = "Closed",
             ["Koan:Data:Milvus:Endpoint"] = endpoint,
             ["Koan:Data:Milvus:Dimension"] = "8",
             ["Koan:Data:Milvus:Metric"] = "COSINE",

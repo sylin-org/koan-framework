@@ -6,10 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
-using Koan.Core.Concurrency;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
-using Koan.Core.Ordering;
 using Koan.Core.Provenance;
 using Koan.Tenancy.Web.Authorization;
 using Koan.Tenancy.Web.Controllers;
@@ -22,11 +20,9 @@ namespace Koan.Tenancy.Web.Initialization;
 
 /// <summary>
 /// ARCH-0104 — Reference = Intent: referencing <c>Koan.Tenancy.Web</c> auto-mounts the host-face tenancy
-/// control-plane console (operator API + bundled UI) over the control-plane entities. The headless tenancy core
-/// keeps working without it; adding this package lights up the operator surface. Ordered <c>[After]</c> the
-/// tenancy core so <see cref="TenancyRuntime"/> and the control-plane registrations exist first.
+/// registry and membership console (operator API + bundled UI) over the control-plane entities. The headless tenancy
+/// core keeps working without it; adding this package lights up the operator surface.
 /// </summary>
-[After(typeof(Koan.Tenancy.Initialization.TenancyModule))]
 public sealed class KoanTenancyWebModule : KoanModule
 {
     public override void Register(IServiceCollection services)
@@ -39,10 +35,7 @@ public sealed class KoanTenancyWebModule : KoanModule
         services.AddKoanOptions<TenancyConsoleOptions>(TenancyConsoleOptions.SectionPath);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanWebPipelineContributor, TenancyConsoleExposureContributor>());
 
-        // The lifecycle actions (audited by construction). The keyed lease gate serializes per-tenant owner-seat
-        // revocations (Reference = Intent — idempotent registration).
-        services.AddKoanKeyedLeaseGate();
-        services.TryAddSingleton<TenantLifecycleService>();
+        services.TryAddSingleton<TenantAdministrationService>();
 
         // The posture-aware operator gate (dev-open just-works; prod-closed requires the explicit host role and
         // fails closed). The handler registration is idempotent (TryAddEnumerable), and the policy is added only if
@@ -55,24 +48,30 @@ public sealed class KoanTenancyWebModule : KoanModule
             if (options.GetPolicy(TenancyWebPolicies.Operator) is null)
                 options.AddPolicy(TenancyWebPolicies.Operator, policy => policy.AddRequirements(new OperatorRequirement()));
         });
+
+        services.AddOptions<TenancyConsoleOptions>()
+            .Validate(options => options.AuditPageSize > 0, "AuditPageSize must be greater than zero.")
+            .Validate(options => options.MaxAuditPageSize >= options.AuditPageSize,
+                "MaxAuditPageSize must be greater than or equal to AuditPageSize.")
+            .ValidateOnStart();
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
         module.AddTool("Tenancy — Operator console", TenancyConsolePaths.UiPath,
-            "Fleet roster, tenant lifecycle (suspend/reactivate, invite/revoke, erase), operations feed & audit log",
+            "Tenant registry, membership grants and audit",
             capability: "tenancy.operator");
         module.AddTool("Tenancy — Operator API", TenancyConsolePaths.ApiPath,
-            "Host-face control-plane projection + guarded lifecycle actions", capability: "tenancy.operator");
+            "Host-authorized tenant registry and membership administration", capability: "tenancy.operator");
 
         // Self-announce the RESOLVED activation so "how do I make it appear?" is a boot-report line, not a support
         // ticket (read from config with no Binder dependency — indexer + GetChildren are always available).
         var section = TenancyConsoleOptions.SectionPath;
         var enabled = !string.Equals(cfg[$"{section}:Enabled"], "false", StringComparison.OrdinalIgnoreCase);
-        // Report the RESOLVED posture the gate actually uses (honoring the Koan:Data:Tenancy:Posture override), not a
+        // Report the RESOLVED posture the gate actually uses (honoring the Koan:Tenancy:Posture override), not a
         // naive env check — otherwise a dev host with Posture=Closed would announce "just-works" while the gate 403s.
-        var postureOverride = Enum.TryParse<TenancyPosture>(cfg["Koan:Data:Tenancy:Posture"], ignoreCase: true, out var p)
+        var postureOverride = Enum.TryParse<TenancyPosture>(cfg[$"{TenancyOptions.SectionPath}:Posture"], ignoreCase: true, out var p)
             ? (TenancyPosture?)p : null;
         var posture = TenancyPostureResolver.Resolve(env.IsDevelopment(), postureOverride) == TenancyPosture.Open
             ? "Open (dev — just-works)"
@@ -86,6 +85,7 @@ public sealed class KoanTenancyWebModule : KoanModule
             ? $"host={(hosts.Length == 0 ? "any" : string.Join(",", hosts))}{(string.IsNullOrWhiteSpace(header) ? "" : $" · header={header}")}"
             : "DISABLED (kill-switch)";
         module.SetSetting("Tenancy console activation", b => b.Value(
-            $"{TenancyConsolePaths.UiPath} · posture={posture} · exposure={exposure} · operators-configured={operators} (grant = allow-list ∪ role)"));
+            $"{TenancyConsolePaths.UiPath} · posture={posture} · exposure={exposure} · " +
+            $"operators-configured={operators} (grant = allow-list ∪ role) · audit-page={cfg[$"{section}:AuditPageSize"] ?? "100"}"));
     }
 }

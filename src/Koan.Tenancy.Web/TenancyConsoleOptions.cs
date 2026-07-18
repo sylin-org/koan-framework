@@ -11,7 +11,7 @@ namespace Koan.Tenancy.Web;
 /// </summary>
 public sealed class TenancyConsoleOptions
 {
-    public const string SectionPath = "Koan:Tenancy:Console";
+    public const string SectionPath = TenancyOptions.SectionPath + ":Console";
 
     /// <summary>Kill-switch: when false the console API + UI are not served at all (404). Default true (Reference = Intent).</summary>
     public bool Enabled { get; set; } = true;
@@ -28,6 +28,12 @@ public sealed class TenancyConsoleOptions
     /// (preserves the plain dev-open just-works behavior).
     /// </summary>
     public bool RequireLoopbackForOpenPosture { get; set; }
+
+    /// <summary>Default number of newest audit entries returned by the operator API.</summary>
+    public int AuditPageSize { get; set; } = 100;
+
+    /// <summary>Largest audit page accepted from a caller.</summary>
+    public int MaxAuditPageSize { get; set; } = 500;
 }
 
 /// <summary>The exposure (routing) layer. All conditions must match for the console to respond; an unmatched request
@@ -63,4 +69,7 @@ public static class TenancyConsolePaths
 
     /// <summary>The operator API base path.</summary>
     public const string ApiPath = "/api/tenancy/admin";
+
+    /// <summary>The attribute-routing form of <see cref="ApiPath"/>.</summary>
+    public const string ApiRoute = "api/tenancy/admin";
 }

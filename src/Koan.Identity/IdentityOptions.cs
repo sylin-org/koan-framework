@@ -16,8 +16,7 @@ public sealed class IdentityOptions
     public bool SeedDevUsers { get; set; } = true;
 
     /// <summary>
-    /// The primary dev person's id; defaults to <c>Koan:Data:Tenancy:DevUser</c> ?? the machine user, so the seeded
-    /// person reconciles with the tenancy dev membership (<c>Membership.IdentityId</c>).
+    /// The primary local person's id; defaults to the current machine user.
     /// </summary>
     public string? DevUser { get; set; }
 

@@ -28,7 +28,7 @@ namespace Koan.Tenancy.Tests;
 public sealed class CacheEvictKeyConvergenceSpec
 {
     private static IReadOnlyDictionary<string, string?> Posture(string posture)
-        => new Dictionary<string, string?> { ["Koan:Data:Tenancy:Posture"] = posture };
+        => new Dictionary<string, string?> { ["Koan:Tenancy:Posture"] = posture };
 
     private static CacheKey BaseKey<T>(string partition, object id)
         => new($"{CacheKey.EntityTypeName(typeof(T))}:{partition}:{id}");

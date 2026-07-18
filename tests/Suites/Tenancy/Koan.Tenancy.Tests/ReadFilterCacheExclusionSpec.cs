@@ -115,7 +115,7 @@ public sealed class ReadFilterCacheExclusionSpec : IDisposable
     public async Task Cacheable_with_a_non_equality_axis_is_excluded_and_does_not_leak()
     {
         await using var runtime = await TenancyRuntimeFixture.CreateAsync(
-            extraSettings: new Dictionary<string, string?> { ["Koan:Data:Tenancy:Posture"] = "Closed" },
+            extraSettings: new Dictionary<string, string?> { ["Koan:Tenancy:Posture"] = "Closed" },
             configureServices: s => s.AddSingleton<IReadFilterContributor>(new VisReadContributor()));
         RegisterAxis();
         runtime.ResetEntityCaches();
@@ -139,7 +139,7 @@ public sealed class ReadFilterCacheExclusionSpec : IDisposable
         // registry. Without that signal the entity is cached by id with no scope segment and viewer B hits viewer A's
         // entry (adversarial-review HIGH #2).
         await using var runtime = await TenancyRuntimeFixture.CreateAsync(
-            extraSettings: new Dictionary<string, string?> { ["Koan:Data:Tenancy:Posture"] = "Closed" },
+            extraSettings: new Dictionary<string, string?> { ["Koan:Tenancy:Posture"] = "Closed" },
             configureServices: s => s.AddSingleton<IReadFilterContributor>(new PredVisReadContributor()));
         runtime.ResetEntityCaches();
         using var _iso = Isolate();

@@ -8,9 +8,6 @@ namespace Koan.Tenancy;
 /// <see cref="KoanContext"/>. The raw <see cref="TenantContext"/> stays behind this business vocabulary, and Core
 /// remains unaware of what the value means.
 ///
-/// <para>Lifecycle verbs (<c>Provision</c>/<c>Relocate</c>/<c>Erase</c>/<c>Rename</c>) and the rich
-/// registry-backed current-tenant projection (<c>{Id, Codes, Name}</c>) arrive in later slices; this slice is
-/// the scoping surface only.</para>
 /// </summary>
 public static class Tenant
 {
@@ -19,8 +16,8 @@ public static class Tenant
 
     /// <summary>
     /// Scope subsequent entity operations to <paramref name="tenantId"/> for the lifetime of the returned
-    /// scope; disposing restores the previous ambient tenant. The explicit, fluent verb. Use for admin, jobs,
-    /// tests, and support act-as. Other ambient dimensions (source/adapter/partition/transaction) carry over.
+    /// scope; disposing restores the previous ambient tenant. The explicit, fluent verb. Use for trusted admin,
+    /// jobs, tests, and support workflows. Other ambient dimensions carry over.
     /// </summary>
     /// <exception cref="ArgumentException">The id is null, empty, or whitespace.</exception>
     public static IDisposable WithTenant(string tenantId) => KoanContext.Push(TenantContext.For(tenantId));

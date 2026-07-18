@@ -18,7 +18,7 @@ namespace Koan.Tenancy.Tests;
 public sealed class TenantEnforcementSpec
 {
     private static IReadOnlyDictionary<string, string?> Posture(string posture)
-        => new Dictionary<string, string?> { ["Koan:Data:Tenancy:Posture"] = posture };
+        => new Dictionary<string, string?> { ["Koan:Tenancy:Posture"] = posture };
 
     [Fact]
     public async Task Closed_blocks_a_tenant_scoped_write_with_no_tenant_in_scope()
@@ -29,7 +29,7 @@ public sealed class TenantEnforcementSpec
         var act = async () => await ScopedThing.Upsert(new ScopedThing { Title = "x" });
 
         await act.Should().ThrowAsync<SegmentationRequiredException>()
-            .WithMessage("*requires isolation context 'tenant'*Tenant.Use*ITenantResolver*[HostScoped]*");
+            .WithMessage("*requires isolation context 'tenant'*Tenant.Use*inbound resolution capability*[HostScoped]*");
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public sealed class TenantEnforcementSpec
         var act = async () => await ScopedThing.All();
 
         await act.Should().ThrowAsync<SegmentationRequiredException>()
-            .WithMessage("*requires isolation context 'tenant'*Tenant.Use*ITenantResolver*[HostScoped]*");
+            .WithMessage("*requires isolation context 'tenant'*Tenant.Use*inbound resolution capability*[HostScoped]*");
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public sealed class TenantEnforcementSpec
         var act = async () => await ScopedThing.Upsert(new ScopedThing { Title = "x" });
 
         await act.Should().ThrowAsync<SegmentationRequiredException>()
-            .WithMessage("*requires isolation context 'tenant'*Tenant.Use*ITenantResolver*[HostScoped]*");
+            .WithMessage("*requires isolation context 'tenant'*Tenant.Use*inbound resolution capability*[HostScoped]*");
     }
 
     private sealed class ScopedThing : Entity<ScopedThing, string>

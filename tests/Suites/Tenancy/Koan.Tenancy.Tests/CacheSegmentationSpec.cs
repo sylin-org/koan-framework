@@ -11,7 +11,7 @@ namespace Koan.Tenancy.Tests;
 public sealed class CacheSegmentationSpec
 {
     private static IReadOnlyDictionary<string, string?> Closed()
-        => new Dictionary<string, string?> { ["Koan:Data:Tenancy:Posture"] = "Closed" };
+        => new Dictionary<string, string?> { ["Koan:Tenancy:Posture"] = "Closed" };
 
     [Fact]
     public async Task Generic_keys_singleflight_and_tags_are_tenant_local()

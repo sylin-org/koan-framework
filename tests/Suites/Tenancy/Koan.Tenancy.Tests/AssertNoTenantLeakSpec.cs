@@ -27,7 +27,7 @@ namespace Koan.Tenancy.Tests;
 public sealed class AssertNoTenantLeakSpec
 {
     private static IReadOnlyDictionary<string, string?> Posture(string posture)
-        => new Dictionary<string, string?> { ["Koan:Data:Tenancy:Posture"] = posture };
+        => new Dictionary<string, string?> { ["Koan:Tenancy:Posture"] = posture };
 
     // A fresh storage partition per test isolates each test's rows from other tests/runs sharing the engine
     // (ARCH-0091); the tenant axis is orthogonal and still does the in-test isolation.

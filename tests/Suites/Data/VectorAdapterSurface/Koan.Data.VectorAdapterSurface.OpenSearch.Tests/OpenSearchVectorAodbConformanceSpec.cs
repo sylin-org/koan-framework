@@ -51,7 +51,7 @@ public sealed class OpenSearchVectorAodbConformanceSpec : VectorAodbConformanceS
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
-            ["Koan:Data:Tenancy:Posture"] = "Closed",
+            ["Koan:Tenancy:Posture"] = "Closed",
             ["Koan:Data:OpenSearch:Endpoint"] = endpoint,
             ["Koan:Data:OpenSearch:ConnectionString"] = endpoint,
             ["Koan:Data:OpenSearch:Dimension"] = "8",

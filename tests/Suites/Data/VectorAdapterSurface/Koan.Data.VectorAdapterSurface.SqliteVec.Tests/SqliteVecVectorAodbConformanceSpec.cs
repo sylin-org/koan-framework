@@ -41,7 +41,7 @@ public sealed class SqliteVecVectorAodbConformanceSpec : VectorAodbConformanceSp
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
-            ["Koan:Data:Tenancy:Posture"] = "Closed",
+            ["Koan:Tenancy:Posture"] = "Closed",
             // The Default source (Shared + Container cells) — keep it off-disk too.
             ["Koan:Data:SqliteVec:ConnectionString"] = Memory,
             // Database cell: each source exercises both the shared source name-fold and a separately routed connection.

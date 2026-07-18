@@ -23,7 +23,7 @@ namespace Koan.Tenancy.Tests;
 public sealed class TenantSoftDeleteSpec
 {
     private static IReadOnlyDictionary<string, string?> Posture(string posture)
-        => new Dictionary<string, string?> { ["Koan:Data:Tenancy:Posture"] = posture };
+        => new Dictionary<string, string?> { ["Koan:Tenancy:Posture"] = posture };
 
     private static IDisposable Isolate() => EntityContext.Partition("p" + Guid.CreateVersion7().ToString("n"));
 
@@ -88,17 +88,14 @@ public sealed class TenantSoftDeleteSpec
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*does not announce*");
     }
 
-    private sealed class FakeResolver : ITenantResolver { public string Name => "fake"; }
-
     [Fact(DisplayName = "ARCH-0101 §8: a soft-delete entity on a non-isolating adapter REFUSES boot in Production (the deploy-time safety net)")]
     public async Task Soft_delete_on_a_non_isolating_adapter_refuses_boot_in_production()
     {
         // The Production half of the §8 posture: the SAME soft-delete-on-JSON leak that merely warns in Development is a
-        // hard boot refusal in Production. A resolver is injected so tenancy's own pre-flight passes — the refusal here
-        // is the data-axis pre-flight (DataAxisLeakException), naming the leaky [SoftDelete] entities.
+        // hard boot refusal in Production. The refusal is the data-axis pre-flight (DataAxisLeakException), naming
+        // the leaky [SoftDelete] entities; headless Tenancy itself has no HTTP-resolver prerequisite.
         var act = async () => await TenancyRuntimeFixture.CreateAsync(
-            environment: "Production", adapter: "fake-noniso",
-            configureServices: s => s.AddSingleton<ITenantResolver, FakeResolver>());
+            environment: "Production", adapter: "fake-noniso");
 
         (await act.Should().ThrowAsync<Koan.Data.Core.Axes.DataAxisLeakException>())
             .Which.Leaks.Should().NotBeEmpty();

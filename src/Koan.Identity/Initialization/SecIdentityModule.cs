@@ -83,9 +83,7 @@ public sealed class SecIdentityModule : KoanModule
         if (ShouldSeedDevUsers(env.IsDevelopment(), posture, options.SeedDevUsers))
         {
             var reconciler = services.GetService<IIdentityReconciler>() ?? new IdentityReconciler();
-            // The primary dev person's id matches the tenancy dev membership so Membership.IdentityId reconciles.
-            // Trim to mirror tenancy's dev-user normalization (TenancyDevSeed) so the two ids line up exactly.
-            var devUser = (options.DevUser ?? cfg["Koan:Data:Tenancy:DevUser"] ?? Environment.UserName).Trim();
+            var devUser = (options.DevUser ?? Environment.UserName).Trim();
             await SeedDevUsersAsync(reconciler, devUser, ct).ConfigureAwait(false);
             logger?.LogInformation(
                 "Koan.Identity dev-open: seeded dev person '{DevUser}' + alice@example.com + bob@example.com (offline).", devUser);

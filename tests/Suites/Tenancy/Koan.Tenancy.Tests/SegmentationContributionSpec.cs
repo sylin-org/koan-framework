@@ -31,7 +31,7 @@ public sealed class SegmentationContributionSpec
 
         plan.Dimensions.Should().ContainSingle();
         plan.Dimensions[0].Id.Should().Be("tenant");
-        plan.Dimensions[0].Owner.Should().Be("Koan.Tenancy");
+        plan.Dimensions[0].Owner.Should().Be("Sylin.Koan.Tenancy");
         plan.For(typeof(TenantRecord)).DimensionIds.Should().Equal("tenant");
         plan.For(typeof(ControlRecord)).IsEmpty.Should().BeTrue();
 
@@ -82,6 +82,7 @@ public sealed class SegmentationContributionSpec
 
         facts.Select(fact => fact.Subject).Should().Equal(
             "segmentation:cache",
+            "segmentation:communication",
             "segmentation:data",
             "segmentation:storage");
         facts.Should().OnlyContain(fact =>

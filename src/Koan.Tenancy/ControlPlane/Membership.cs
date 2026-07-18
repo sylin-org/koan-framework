@@ -8,11 +8,11 @@ using Koan.Data.Core.Model;
 namespace Koan.Tenancy;
 
 /// <summary>
-/// The bridge between a global identity and a tenant (ARCH-0099 §2) — <b>roles live here, on the membership</b>
+/// The bridge between a subject and a tenant — <b>roles live here, on the membership</b>
 /// (the StackExchange model: one identity, N tenants, a role per tenant), never global. A dogfooded
-/// <c>[HostScoped]</c> control-plane row, queried by <see cref="TenantId"/>. The first user to claim a tenant
-/// gets <see cref="TenancyRoles.Owner"/> — full authority over <i>their own</i> tenant, zero cross-tenant reach
-/// (not the rejected tenant-zero backdoor).
+/// <c>[HostScoped]</c> control-plane row, queried by <see cref="TenantId"/>. Roles grant authority only inside that
+/// tenant; there is no tenant-zero or implicit owner. Identity lifecycle enforcement is supplied by the optional
+/// Identity Tenancy bridge.
 /// </summary>
 [HostScoped]
 public sealed class Membership : Entity<Membership>
@@ -37,9 +37,8 @@ public sealed class Membership : Entity<Membership>
     public bool HasRole(string role) => Roles.Contains(role);
 
     /// <summary>
-    /// The deterministic id for a <c>(tenantId, identityId)</c> seat — one membership per person per tenant. Concurrent
-    /// creates of the same seat (e.g. a double-submitted invite accept, or a racing owner claim) converge to <b>one</b>
-    /// upserted row instead of racing two duplicates. Creation sites set this id; queries stay by field.
+    /// The deterministic id for a <c>(tenantId, identityId)</c> seat — one membership per subject per tenant. Repeated
+    /// grants converge to one row. Creation sites set this id; queries stay by field.
     /// </summary>
     public static string KeyFor(string tenantId, string identityId) => DeterministicId.From(tenantId, identityId);
 }

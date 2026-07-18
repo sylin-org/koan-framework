@@ -43,6 +43,9 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
         var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["Koan:Environment"] = environment,
+            // Some cells deliberately boot a Production host before later per-host fixtures. Relational DDL still
+            // reads KoanEnv's process snapshot, so permit schema creation inside this disposable test database.
+            ["Koan:AllowMagicInProduction"] = "true",
             ["Koan:Data:Sources:Default:Adapter"] = adapter,
             // Pin Standalone so a Development boot (used to exercise the dev-open posture) never arms the
             // self-orchestration heuristic; the tenancy suite references no orchestration adapter, so this is inert
@@ -55,16 +58,20 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
             settings["Koan:Data:Json:DirectoryPath"] = root;
         // "fake-noniso" needs no extra settings — the source Adapter key (above) selects the registered fake factory.
 
+        // The test assembly references Storage + Local for the storage-isolation facts. Their current package-level
+        // activation validates and compiles routing for every composed host, so every fixture receives one isolated
+        // local profile. Layered Storage activation itself remains owned by PMC-033.
+        var storageDir = Path.Combine(root, "storage");
+        settings["Koan:Storage:Providers:Local:BasePath"] = storageDir;
+        settings["Koan:Storage:DefaultProfile"] = "test";
+        settings["Koan:Storage:Profiles:test:Provider"] = "local";
+        settings["Koan:Storage:Profiles:test:Container"] = "blobs";
+
         if (withLocalStorage)
         {
             // STOR-0011: a no-Docker Local storage profile rooted under the per-fixture temp dir, so the storage
             // blob-key tenant-isolation proof runs through a real provider.
-            var storageDir = Path.Combine(root, "storage");
             Directory.CreateDirectory(storageDir);
-            settings["Koan:Storage:Providers:Local:BasePath"] = storageDir;
-            settings["Koan:Storage:DefaultProfile"] = "test";
-            settings["Koan:Storage:Profiles:test:Provider"] = "local";
-            settings["Koan:Storage:Profiles:test:Container"] = "blobs";
         }
 
         if (extraSettings is not null)
@@ -73,9 +80,7 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
                 settings[kv.Key] = kv.Value;
         }
 
-        // The per-host IHostEnvironment drives the prod-boot pre-flight (ARCH-0099 §1); default "Test" is
-        // non-production. A test can boot environment: "Production" to exercise the boot-refusal, and inject an
-        // ITenantResolver via configureServices to satisfy it.
+        // The per-host IHostEnvironment drives posture and provider safety checks; default "Test" is non-development.
         var builder = KoanIntegrationHost.Configure()
             .WithEnvironment(environment)
             .WithSettings(settings)

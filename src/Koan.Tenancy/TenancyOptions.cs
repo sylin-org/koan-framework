@@ -1,7 +1,7 @@
 namespace Koan.Tenancy;
 
 /// <summary>
-/// Tenancy configuration (ARCH-0099). Bound from <c>Koan:Data:Tenancy</c>. There is no cross-environment "off"
+/// Tenancy configuration. Bound from <c>Koan:Tenancy</c>. There is no cross-environment "off"
 /// switch — ARCH-0099 §1 retired <c>TenancyMode.Off</c>: referencing <c>Koan.Tenancy</c> activates tenancy
 /// (Reference = Intent) and the <see cref="TenancyPosture"/>, derived from the environment, decides how strict
 /// it is. The only knob here is an explicit posture <b>override</b> (a testing aid), default <c>null</c> =
@@ -10,8 +10,11 @@ namespace Koan.Tenancy;
 /// </summary>
 public sealed class TenancyOptions
 {
+    /// <summary>The standard configuration section for the Tenancy pillar.</summary>
+    public const string SectionPath = "Koan:Tenancy";
+
     /// <summary>
-    /// Explicit posture override (default <c>null</c> = derived from <see cref="Koan.Core.KoanEnv.IsDevelopment"/>).
+    /// Explicit posture override (default <c>null</c> = derived from the current host environment).
     /// Set <see cref="TenancyPosture.Closed"/> to exercise production behavior locally. Setting
     /// <see cref="TenancyPosture.Open"/> while the environment is Production is refused at boot (ARCH-0099 §1 —
     /// a dev-open flag in prod is the exact mistake the pre-flight exists to catch).

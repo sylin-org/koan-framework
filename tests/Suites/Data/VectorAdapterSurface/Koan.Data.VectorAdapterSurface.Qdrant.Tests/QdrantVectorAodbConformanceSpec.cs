@@ -52,7 +52,7 @@ public sealed class QdrantVectorAodbConformanceSpec : VectorAodbConformanceSpecs
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
-            ["Koan:Data:Tenancy:Posture"] = "Closed",
+            ["Koan:Tenancy:Posture"] = "Closed",
             ["Koan:Data:Qdrant:Endpoint"] = endpoint,
             ["Koan:Data:Qdrant:Dimension"] = "8",
             ["Koan:Data:Qdrant:WaitForResult"] = "true",          // read-your-writes: deterministic test reads

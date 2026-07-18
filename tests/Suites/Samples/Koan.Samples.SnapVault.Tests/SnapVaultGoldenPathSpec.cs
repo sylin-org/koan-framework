@@ -18,6 +18,8 @@ namespace Koan.Samples.SnapVault.Tests;
 [Collection("snapvault")]
 public sealed class SnapVaultGoldenPathSpec(SnapVaultHostFixture fixture)
 {
+    private const string LocalDevelopmentTenant = "dev";
+
     [Fact]
     public async Task Fresh_development_host_accepts_and_serves_one_photo_without_external_services()
     {
@@ -43,7 +45,7 @@ public sealed class SnapVaultGoldenPathSpec(SnapVaultHostFixture fixture)
         for (var attempt = 0; attempt < 5; attempt++)
         {
             await orchestrator.DrainAsync(ct);
-            using (Tenant.Use(TenancyDevSeed.DevTenantId))
+            using (Tenant.Use(LocalDevelopmentTenant))
             {
                 var work = await PhotoProcessingJob.Query(job => job.BatchJobId == batchId, ct);
                 if (work.Count == 1 && await PhotoProcessingJob.Jobs.Status(work[0].Id, ct) == JobStatus.Completed)
@@ -52,7 +54,7 @@ public sealed class SnapVaultGoldenPathSpec(SnapVaultHostFixture fixture)
         }
 
         PhotoAsset photo;
-        using (Tenant.Use(TenancyDevSeed.DevTenantId))
+        using (Tenant.Use(LocalDevelopmentTenant))
         using (Subject.System())
         {
             var matches = await PhotoAsset.Query(candidate => candidate.OriginalFileName == fileName, ct);

@@ -51,7 +51,7 @@ public sealed class ElasticSearchVectorAodbConformanceSpec : VectorAodbConforman
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
-            ["Koan:Data:Tenancy:Posture"] = "Closed",
+            ["Koan:Tenancy:Posture"] = "Closed",
             ["Koan:Data:ElasticSearch:Endpoint"] = endpoint,
             ["Koan:Data:ElasticSearch:ConnectionString"] = endpoint,
             ["Koan:Data:ElasticSearch:Dimension"] = "8",

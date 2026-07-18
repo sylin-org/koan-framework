@@ -31,7 +31,7 @@ namespace Koan.Tenancy.Tests;
 public sealed class StorageTenantIsolationSpec
 {
     private static IReadOnlyDictionary<string, string?> Posture(string p)
-        => new Dictionary<string, string?> { ["Koan:Data:Tenancy:Posture"] = p };
+        => new Dictionary<string, string?> { ["Koan:Tenancy:Posture"] = p };
 
     [StorageBinding(Profile = "test", Container = "blobs")]
     public sealed class TenantBlob : StorageEntity<TenantBlob> { }

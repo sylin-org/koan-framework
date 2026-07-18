@@ -60,7 +60,7 @@ public sealed class WeaviateVectorAodbConformanceSpec : VectorAodbConformanceSpe
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
-            ["Koan:Data:Tenancy:Posture"] = "Closed",
+            ["Koan:Tenancy:Posture"] = "Closed",
             ["Koan:Data:Weaviate:Endpoint"] = endpoint,
             ["Koan:Data:Weaviate:Metric"] = "cosine",
             ["Koan:Data:Weaviate:DisableAutoDetection"] = "true",

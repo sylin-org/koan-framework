@@ -31,7 +31,7 @@ namespace Koan.Tenancy.Tests;
 public sealed class VectorTenantIsolationSpec
 {
     private static IReadOnlyDictionary<string, string?> Posture(string p)
-        => new Dictionary<string, string?> { ["Koan:Data:Tenancy:Posture"] = p };
+        => new Dictionary<string, string?> { ["Koan:Tenancy:Posture"] = p };
 
     [VectorAdapter("inmemory")]
     public sealed class VecDoc : Entity<VecDoc> { public string Title { get; set; } = ""; }
