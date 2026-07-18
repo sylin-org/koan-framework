@@ -9,13 +9,14 @@ source: src/Connectors/Data/InMemory/
 
 ## Contract
 
-`InMemoryAdapterFactory` registers provider `inmemory` with priority `-100`. `memory` is a compatible
-provider alias. Selection follows Data.Core's normal context, Entity attribute, configured source, and
-reference-priority order; the connector adds no separate registration API.
+`InMemoryAdapterFactory` registers direct provider `inmemory` with priority `-100`. `memory` is a compatible
+provider alias. It does not declare itself an automatic floor. Selection follows Data.Core's normal context, Entity
+attribute, configured source, direct-reference, automatic-floor, and priority rules; the connector adds no separate
+registration API.
 
 `InMemoryRepository<TEntity,TKey>` is a thin backend over the shared key-value store contract. Its
-singleton `InMemoryDataStore` partitions physical dictionaries by routed source, Entity type, and
-ambient partition. Process exit discards every dictionary.
+host-owned singleton store partitions physical dictionaries by routed source, Entity type, and ambient partition.
+The store is internal implementation state; process exit discards every dictionary.
 
 ## Capabilities
 

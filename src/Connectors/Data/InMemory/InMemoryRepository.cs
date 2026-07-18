@@ -7,7 +7,7 @@ using Koan.Data.Core.KeyValue;
 namespace Koan.Data.Connector.InMemory;
 
 /// <summary>
-/// In-memory key-value adapter — the zero-infrastructure floor and the cross-adapter convergence oracle. Built on the
+/// In-memory key-value adapter — the zero-infrastructure conformance oracle. Built on the
 /// <see cref="KeyValueStore{TEntity,TKey}"/> family base (ARCH-0103 §9), so it inherits all three AODB modes: Shared
 /// (the object-graph sidecar — the store holds <see cref="KvRecord{TEntity}"/> envelopes so the managed discriminator is
 /// filtered without mutating the POCO), Container (a distinct store per ambient partition), and Database (a distinct
@@ -22,7 +22,7 @@ internal sealed class InMemoryRepository<TEntity, TKey> : KeyValueStore<TEntity,
     private readonly InMemoryDataStore _dataStore;
     private readonly string _source;
 
-    public InMemoryRepository(InMemoryDataStore dataStore, string source)
+    internal InMemoryRepository(InMemoryDataStore dataStore, string source)
     {
         _dataStore = dataStore;
         _source = source;

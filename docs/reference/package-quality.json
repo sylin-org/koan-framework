@@ -4,11 +4,11 @@
   "summary": {
     "packages": 111,
     "repairRequired": 26,
-    "reviewRequired": 47,
-    "structurallyReady": 38,
+    "reviewRequired": 46,
+    "structurallyReady": 39,
     "ownedReadmes": 85,
     "technicalCompanions": 75,
-    "findings": 183
+    "findings": 181
   },
   "findingDefinitions": [
     {
@@ -902,7 +902,7 @@
       "projectPath": "src/Connectors/Data/InMemory/Koan.Data.Connector.InMemory.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "In-memory data provider for Koan: thread-safe repository for testing, development, and ephemeral storage scenarios.",
       "targetFrameworks": [
         "net10.0"
@@ -915,10 +915,7 @@
       "readme": "src/Connectors/Data/InMemory/README.md",
       "technicalDocumentation": "src/Connectors/Data/InMemory/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Json",

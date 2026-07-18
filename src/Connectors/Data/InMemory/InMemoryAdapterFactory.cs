@@ -2,19 +2,19 @@ using Koan.Data.Abstractions;
 using Koan.Core;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
+using Koan.Data.Connector.InMemory.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.InMemory;
 
 /// <summary>
-/// Data adapter factory for in-memory storage.
-/// Priority: -100 (lowest) to act as fallback when no other adapter is configured.
+/// Data adapter factory for explicitly ephemeral, process-local storage.
 /// </summary>
-[ProviderPriority(-100)]
+[ProviderPriority(Constants.Provider.Priority)]
 public sealed class InMemoryAdapterFactory : IDataAdapterFactory
 {
-    public string Provider => "inmemory";
-    public IReadOnlyCollection<string> Aliases => ["memory"];
+    public string Provider => Constants.Provider.Name;
+    public IReadOnlyCollection<string> Aliases => [Constants.Provider.Alias];
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,

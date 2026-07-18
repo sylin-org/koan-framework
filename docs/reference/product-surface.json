@@ -157,6 +157,24 @@
       ]
     },
     {
+      "id": "local-data-providers",
+      "title": "Local JSON and InMemory Entity persistence",
+      "summary": "JSON supplies Koan\u0027s inspectable automatic local floor while InMemory supplies an explicitly ephemeral host-scoped provider and conformance oracle.",
+      "maturity": "verified",
+      "packages": [
+        "Sylin.Koan.Data.Connector.InMemory",
+        "Sylin.Koan.Data.Connector.Json"
+      ],
+      "documentation": [
+        "src/Connectors/Data/InMemory/README.md",
+        "src/Connectors/Data/Json/README.md"
+      ],
+      "evidence": [
+        "tests/Suites/Data/Connector.InMemory",
+        "tests/Suites/Data/Connector.Json"
+      ]
+    },
+    {
       "id": "mcp-agent-surface",
       "title": "MCP and agent-facing surfaces",
       "summary": "Koan exposes application tools and self-description to coding and runtime agents through MCP.",
@@ -929,7 +947,9 @@
       "readme": "src/Connectors/Data/InMemory/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Data/InMemory/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "local-data-providers"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Json",
@@ -946,7 +966,9 @@
       "readme": "src/Connectors/Data/Json/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Data/Json/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "local-data-providers"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Mongo",

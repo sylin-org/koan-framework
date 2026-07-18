@@ -33,12 +33,6 @@ public sealed class JsonModule : KoanModule
             $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.DirectoryPath}",
             $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.DirectoryPath}");
 
-        var defaultPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.DefaultPageSize,
-            $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.DefaultPageSize}",
-            $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.DefaultPageSize}");
-
         module.AddSetting(
             Constants.Bootstrap.DirectoryPath,
             directory.Value,
@@ -49,16 +43,6 @@ public sealed class JsonModule : KoanModule
                 "Koan.Data.Connector.Json.JsonAdapterFactory"
             },
             sourceKey: directory.ResolvedKey);
-
-        module.AddSetting(
-            Constants.Bootstrap.DefaultPageSize,
-            defaultPageSize.Value.ToString(),
-            source: defaultPageSize.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Json.JsonAdapterFactory"
-            },
-            sourceKey: defaultPageSize.ResolvedKey);
     }
 }
 

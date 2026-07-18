@@ -625,6 +625,110 @@ of this bounded stable-base slice.
 The relational provider family passes this R11-05 slice. The complete release ratchet remains reserved for R11-07;
 the shared parallel-host bootstrap defect remains separately visible and is not misreported as relational evidence.
 
+### Local Data provider-family discovery
+
+**Task:** graduate the JSON and InMemory Data connectors by making their zero-infrastructure roles explicit,
+removing alternate registration/configuration surfaces that bypass the Data pillar, and keeping physical naming inside
+the already-elected provider route.
+
+**Application intent:** “Define an Entity and use normal Entity verbs. With the foundation bundle, persist an
+inspectable local result automatically through JSON. When a test or deliberately ephemeral application references
+InMemory directly, keep its state inside that host and lose it at process exit.”
+
+**Public expression:** the application retains one `AddKoan()` and its Entity definition. JSON requires no provider
+code when it is the available automatic floor. InMemory requires only its package reference when it is the intended
+direct provider; `Koan:Data:Sources:{source}:Adapter` or `[DataAdapter]` remains available only when an application
+with several eligible providers must pin placement. There is no per-Entity `AddJsonData<TEntity,TKey>` registration.
+
+**Guarantee/correction:** JSON is the deliberate automatic floor (`IsAutomaticFloor`); InMemory is a low-priority
+direct provider, not a hidden fallback. Selection still follows Data's reference provenance, source, Entity, and
+application-default rules. InMemory data is owned by one host singleton and isolated by routed source, Entity type,
+and ambient partition. JSON physical names are resolved by the factory already selected for that repository; an Entity
+operation must not re-enter provider election merely to name its file. Invalid JSON remains corrective and neither
+provider claims provider-bounded streaming.
+
+**Complete intent surface:** package reference, `AddKoan()`, Entity definition, optional source/provider pin, JSON
+directory configuration, and ordinary Entity verbs. JSON's unused `DefaultPageSize` setting is not part of repository
+behavior and is removed rather than documented. The InMemory store manager and reset methods are implementation
+details, not application or test APIs; conformance tests own isolation through fresh hosts.
+
+**Public concepts:** JSON means inspectable, single-process local persistence and is the bundle's automatic floor.
+InMemory means host-scoped ephemeral storage and a provider-neutral conformance oracle. A provider priority orders
+already-eligible direct candidates; it does not by itself create fallback eligibility. Data owns selection,
+participation diagnostics, repository caching, semantic guards, and naming composition; adapters own only their
+storage mechanics and naming constraints.
+
+**Docs read:** `docs/engineering/index.md`, `docs/architecture/principles.md`, `docs/reference/data/index.md`, and
+`docs/guides/data/entity-access-and-streaming.md` establish Entity-first expression, reference-driven availability,
+deterministic provider selection, and honest streaming limits. Both connector README/TECHNICAL companions were read
+in full. Current InMemory prose incorrectly calls priority `-100` a fallback and disagrees with current public evidence
+on 55 versus 56 tests; JSON documents its real automatic-floor/readiness behavior but does not expose the unused
+page-size setting it still reports at boot.
+
+**Code read:** `DataProviderCatalog.SelectAutomaticCore` grants automatic eligibility only to directly referenced
+providers and `IsAutomaticFloor` candidates; priority orders that eligible set. `DataService` caches the selected
+repository by Entity/key/provider/source. `JsonAdapterFactory`, `JsonRepository`, JSON options/configuration/health,
+and the full live usage search show that `AddJsonData` has no consumer and bypasses factory election, source routing,
+health participation, and the semantic facade. `DefaultPageSize` is configured and reported but never read by the
+repository. `JsonRepository.ComputePhysicalName` calls `AdapterNaming`, which re-runs route selection after the
+factory was already selected. `InMemoryDataStore` is host-singleton implementation state; its two public reset methods
+have no live consumer. Redis and InMemory Vector confirm the closest correct naming pattern: retain the selected
+factory/naming provider and resolve the ambient partition through it.
+
+**Reusing:** Data's existing provider catalog, source routing, repository cache/facade, diagnostics, common key-value
+family, `INamingProvider.ResolveStorage`, `StorageNameGenerator`, ambient partition, standard .NET DI/options, and the
+existing JSON/InMemory connector suites. No new application abstraction or registration mechanism is needed.
+
+**Creating new:** one provider-local constants owner in InMemory for its stable provider ID, alias, priority, and boot
+report keys. These values already form public/configuration vocabulary and otherwise remain duplicated magic literals.
+No new runtime service, contract, option, attribute, or application API is introduced.
+
+**Coalescence:** delete the JSON manual-registration extension and dead page-size option/reporting branch. Pass the
+already-selected JSON factory and host services into its repository for naming, matching the existing provider-owned
+naming model and eliminating recursive election from the operation path. Internalize the InMemory store and delete its
+unused reset surface. Preserve the common key-value family and Data facade as the meaningful shared chokepoints; do not
+invent a local-provider base class because file persistence and resident dictionaries have materially different
+lifecycle and concurrency mechanics.
+
+**Ergonomics:** application code does not grow. Developers and models see one truthful story: JSON happens
+automatically for a first local result; referencing InMemory means intentionally ephemeral state. IntelliSense loses
+an unsupported `AddJsonData` branch and an internal store manager. Startup facts stop calling InMemory a fallback and
+stop reporting a setting with no effect. Operators retain selected-provider/source participation and JSON readiness.
+
+**Constraints satisfied:** Entity statics remain the only application data path; no controller/HTTP surface changes;
+provider identifiers remain stable; no large-source or durability claim grows; the automatic JSON floor is preserved;
+current public docs and generated package truth update together; ADRs remain untouched historical records; only the
+two connector suites/builds/packages and documentation checks run before R11-07.
+
+**Risks:** changing JSON naming construction must preserve ambient partition files and configured source directories;
+removing a public but unused registration extension is intentionally breaking under the greenfield mandate; internal
+tests that construct `JsonRepository` directly need the same selected naming owner explicitly; package-quality counts
+must be regenerated rather than hand-edited. No cross-provider selection behavior is changed.
+
+### Local Data provider-family evidence
+
+- JSON remains Data's explicit `IsAutomaticFloor`; InMemory remains a direct provider at priority `-100`. Public and
+  startup prose now distinguish eligibility from priority instead of calling both mechanisms “fallback.”
+- `JsonRepository` retains the selected factory's `INamingProvider` and resolves the ambient partition through it. It
+  no longer calls `AdapterNaming` and therefore cannot re-enter provider/source election from its file-operation path.
+- The unused public `AddJsonData<TEntity,TKey>` bypass is deleted. JSON's unused `DefaultPageSize` option,
+  configurator branch, constants, and startup setting are also deleted; paging remains owned by the shared Entity/Data
+  contract rather than an inert adapter knob.
+- `InMemoryDataStore` is internal host-owned state. Its unused public reset methods are deleted, while source, Entity,
+  and partition isolation continue through the common key-value family and fresh test hosts.
+- Focused connector suites pass JSON 21/21 and InMemory 56/56. Both provider and test projects build warning-clean
+  after a current restore. The existing JSON partition and persistence cells prove naming/file behavior through the
+  selected provider path, including corrective corrupt-store handling.
+- Both Release packages contain their DLL/XML, package-owned README, canonical icon, symbols, and build-transitive
+  composition metadata. Package-quality now reports both connectors structurally ready with no findings.
+- The canonical product surface adds one verified local-provider claim backed by the two package companions and
+  connector suites. Generated truth now contains 111 packages: 26 repair-required, 46 review-required, and 39
+  structurally ready across 16 claims. Public documentation truth passes across 204 current files and 38 navigation
+  targets.
+
+The local Data provider family passes this R11-05 slice. No release candidate, full certification run, package feed,
+or remote state was created; the complete release ratchet remains the single R11-07 boundary.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

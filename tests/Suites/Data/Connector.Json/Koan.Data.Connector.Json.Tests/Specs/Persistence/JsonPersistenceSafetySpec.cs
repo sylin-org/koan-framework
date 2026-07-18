@@ -35,7 +35,16 @@ public sealed class JsonPersistenceSafetySpec
     private static JsonRepository<PersistenceProbe, string> Repository(string root) =>
         new(
             Options.Create(new JsonDataOptions { DirectoryPath = root }),
-            new DataSegmentationPlan(SegmentationPlan.Empty));
+            new DataSegmentationPlan(SegmentationPlan.Empty),
+            new JsonAdapterFactory(),
+            EmptyServiceProvider.Instance);
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        internal static readonly EmptyServiceProvider Instance = new();
+
+        public object? GetService(Type serviceType) => null;
+    }
 
     private sealed class PersistenceProbe : Entity<PersistenceProbe>;
 }

@@ -120,7 +120,7 @@ not itself promote a product claim: compatibility boundaries remain pre-V1 work.
   inside opaque drivers. The surface is pre-1.0.
 - **Current T6 boundary:** SQLite is the durable Level-1 application provider (35/35 plus both
   executable journeys); InMemory is the ephemeral conformance oracle (56/56); JSON is the bundled
-  zero-infrastructure fallback (20/20), not a durable application claim. The canonical
+  automatic zero-infrastructure floor (21/21), not a durable application claim. The canonical
   [Data foundation reference](../../reference/data/index.md) publishes selection, inspection, and
   unsupported scenarios without promoting public package maturity.
 - **Current R07-01 evidence:** R07-01 passes after migrating Data, Tenancy, Access, Jobs, and Data.AI to
@@ -379,7 +379,7 @@ not itself promote a product claim: compatibility boundaries remain pre-V1 work.
   test-kit APIs.
 - **R06 graduation result:** the testing portion of the foundation ring was internally verified: the
   parallel-enabled meta-suite passes 12 with 3 explicit capability/trait skips, and local connector
-  suites pass InMemory 55/55, SQLite 15/15, and JSON 14/14. The row remains `demonstrated` because the
+  suites pass InMemory 56/56, SQLite 15/15, and JSON 21/21. The row remains `demonstrated` because the
   public package path and stable test-kit compatibility boundary are not yet established.
 - **Open risks:** publish the foundation ring's exact support boundary; keep every skipped capability
   reason explicit; consolidate provider-specific runners without accidentally starting infrastructure

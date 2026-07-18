@@ -11,9 +11,22 @@ explicitly ephemeral development workflows.
 
 Do not choose it for durable application state, cross-process sharing, or production recovery.
 
-## Reference = availability
+## Install
 
-Reference the connector from one coherent Koan package set, then use ordinary Entity operations:
+```powershell
+dotnet add package Sylin.Koan.Data.Connector.InMemory
+```
+
+The direct package reference expresses intent to use the ephemeral provider. Keep the application's ordinary Koan
+bootstrap; there is no provider-specific registration:
+
+```csharp
+builder.Services.AddKoan();
+```
+
+## Meaningful result
+
+Define an Entity and use its normal persistence verbs:
 
 ```csharp
 public sealed class Todo : Entity<Todo>
@@ -25,9 +38,15 @@ var saved = await new Todo { Title = "Prove the rule" }.Save();
 var same = await Todo.Get(saved.Id);
 ```
 
-The provider identity is `inmemory` (`memory` is also recognized). It has priority `-100`, so a
-higher-priority referenced provider wins unless the Entity, context, source, or application default
-selects InMemory explicitly.
+The saved value is available to every repository in the same Koan host and disappears when that host exits. No files,
+container, or remote service are created.
+
+## Selection
+
+The provider identity is `inmemory` (`memory` is also recognized). It is a direct provider with priority `-100`, not
+an automatic fallback. A direct InMemory reference wins over a merely bundle-provided automatic floor. If several Data
+connectors are referenced directly, Koan applies the normal deterministic selection rules; pin the intended provider
+when application durability must not change as references grow:
 
 ```json
 {

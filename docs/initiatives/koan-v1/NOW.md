@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: R11-05 through Cache, Redis, and shared-backend provider-family graduation; remaining providers next
+  scope: R11-05 through relational and local Data provider-family graduation; remaining document/search providers next
 ---
 
 # Koan V1 reorganization current handoff
@@ -140,7 +140,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - The relational provider family now passes. One functional relational owner executes immutable route-local schema
   policy; contracts and Npgsql mechanics are module-free; Cockroach no longer activates PostgreSQL; dead Dapper and
   storage-shape surfaces are retired. Focused owner and real SQLite/PostgreSQL/Cockroach/SQL Server paths pass.
-- Current generated truth contains 111 packages: 26 repair-required, 47 review-required, 38 structurally ready.
+- The local Data provider family now passes. JSON is truthfully the automatic inspectable floor; InMemory is a direct,
+  host-scoped ephemeral provider. Dead manual JSON registration/page-size surfaces and public InMemory store controls
+  are gone, while JSON naming stays inside the already-selected provider route. JSON passes 21/21 and InMemory 56/56.
+- Current generated truth contains 111 packages: 26 repair-required, 46 review-required, 39 structurally ready across
+  16 claims.
   Redis Cache 6/6 and Redis Data 12/12 pass; seven affected packages and their dependency boundaries were inspected,
   and the three new packages have no known vulnerable direct or transitive packages. Earlier Storage evidence remains
   green. Seven relational packages also inspect cleanly, with clear current vulnerability checks for the two new

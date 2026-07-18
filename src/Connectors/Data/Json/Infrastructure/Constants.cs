@@ -15,17 +15,12 @@ public static class Constants
         public static class Keys
         {
             public const string DirectoryPath = nameof(DirectoryPath);
-            public const string DefaultPageSize = nameof(DefaultPageSize);
-            public const string ConnectionString = nameof(ConnectionString);
-            public const string Source = nameof(Source);
-            public const string Enabled = nameof(Enabled);
         }
     }
 
     public static class Bootstrap
     {
         public const string DirectoryPath = "data.json.directory";
-        public const string DefaultPageSize = "data.json.defaultPageSize";
     }
 }
 

@@ -40,6 +40,8 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
     private readonly JsonSerializer _serializer;
     private readonly IReadOnlyList<DataSegmentationField> _segmentationFields;
     private readonly string _baseDir;
+    private readonly INamingProvider _naming;
+    private readonly IServiceProvider _services;
     // Per-physical-name (partition) stores + file paths so different partitions are isolated within this source's dir.
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<TKey, KvRecord<TEntity>>> _stores = new();
     private readonly ConcurrentDictionary<string, string> _files = new();
@@ -48,12 +50,18 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
     // in-memory store stays the read source of truth; this just serializes the write-through snapshots per file.
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _writeGates = new();
 
-    public JsonRepository(IOptions<JsonDataOptions> options, DataSegmentationPlan segmentation)
+    internal JsonRepository(
+        IOptions<JsonDataOptions> options,
+        DataSegmentationPlan segmentation,
+        INamingProvider naming,
+        IServiceProvider services)
     {
         _baseDir = options.Value.DirectoryPath;
         Directory.CreateDirectory(_baseDir);
         _serializer = JsonSerializer.Create(_json);
         _segmentationFields = segmentation.For(typeof(TEntity)).Fields;
+        _naming = naming;
+        _services = services;
     }
 
     // ==================== Backend primitives ====================
@@ -229,17 +237,9 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
     private static string SanitizeFileName(string physicalName)
         => physicalName.Replace(':', '.');
 
-    private static string ComputePhysicalName()
-    {
-        var sp = Koan.Core.Hosting.App.AppHost.Current;
-        if (sp is not null)
-        {
-            // Delegate to adapter naming (factory owns the cache and partition composition).
-            return Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(sp);
-        }
-        // No host yet (early init / direct construction): still route through the resolver with this adapter's
-        // announced convention so a generic entity name is grammar-correct (not the mangled typeof(T).Name).
-        return StorageNameResolver.Resolve(typeof(TEntity),
-            new StorageNameResolver.Convention(StorageNamingStyle.EntityType, "_", NameCasing.AsIs));
-    }
+    private string ComputePhysicalName()
+        => _naming.ResolveStorage(
+            typeof(TEntity),
+            EntityContext.Current?.Partition,
+            _services);
 }

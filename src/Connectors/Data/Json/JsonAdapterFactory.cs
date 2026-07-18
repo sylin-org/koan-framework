@@ -43,7 +43,9 @@ public sealed class JsonAdapterFactory : IDataAdapterFactory
 
         return new JsonRepository<TEntity, TKey>(
             Microsoft.Extensions.Options.Options.Create(sourceOpts),
-            sp.GetRequiredService<Koan.Data.Core.Semantics.DataSegmentationPlan>());
+            sp.GetRequiredService<Koan.Data.Core.Semantics.DataSegmentationPlan>(),
+            this,
+            sp);
     }
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)

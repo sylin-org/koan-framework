@@ -20,6 +20,15 @@
       "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "tests/Suites/Data"]
     },
     {
+      "id": "local-data-providers",
+      "title": "Local JSON and InMemory Entity persistence",
+      "summary": "JSON supplies Koan's inspectable automatic local floor while InMemory supplies an explicitly ephemeral host-scoped provider and conformance oracle.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Data.Connector.Json", "Sylin.Koan.Data.Connector.InMemory"],
+      "documentation": ["src/Connectors/Data/Json/README.md", "src/Connectors/Data/InMemory/README.md"],
+      "evidence": ["tests/Suites/Data/Connector.Json", "tests/Suites/Data/Connector.InMemory"]
+    },
+    {
       "id": "backend-negotiation",
       "title": "Backend discovery and negotiation",
       "summary": "Referenced adapters participate in capability-aware selection with inspectable decisions and corrective rejection.",

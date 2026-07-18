@@ -99,7 +99,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Data.Connector.Cockroach` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Couchbase` | `provider` | `assess` |
 | `Sylin.Koan.Data.Connector.ElasticSearch` | `provider` | `assess` |
-| `Sylin.Koan.Data.Connector.InMemory` | `provider` | `assess` |
+| `Sylin.Koan.Data.Connector.InMemory` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Json` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Mongo` | `provider` | `assess` |
 | `Sylin.Koan.Data.Connector.OpenSearch` | `provider` | `assess` |

@@ -40,7 +40,7 @@ observed from public feeds.
 
 The maintained Level-1 application references:
 
-- `Sylin.Koan.App` for Core, Entity data, the JSON fallback, and controller-based Web composition;
+- `Sylin.Koan.App` for Core, Entity data, the automatic JSON floor, and controller-based Web composition;
 - `Sylin.Koan.Data.Connector.Sqlite` for the selected durable local provider; and
 - only the capability packages the application actually needs.
 
@@ -58,8 +58,8 @@ The providers below are deliberately not described as interchangeable.
 | Provider | Role in the foundation | Current evidence | Explicit limits |
 |---|---|---|---|
 | SQLite | Durable local/single-node application path | connector 35/35; FirstUse 8-step and GoldenJourney 11-step source/package proofs | No claim for multi-node writes, every transaction shape, production migration policy, or remote-database behavior. |
-| InMemory | Fast conformance oracle and ephemeral test/development store | connector 55/55; Koan.Testing 12 passed with 3 capability/trait skips | Process-local and non-durable; never a production persistence claim. |
-| JSON | Zero-infrastructure fallback carried by `Sylin.Koan` | connector 14/14; selection-aware readiness 19/19 | File-backed, limited concurrency, and not the durable V1 application proof. |
+| InMemory | Fast conformance oracle and ephemeral test/development store | connector 56/56; Koan.Testing 12 passed with 3 capability/trait skips | Process-local and non-durable; never a production persistence claim. |
+| JSON | Automatic zero-infrastructure floor carried by `Sylin.Koan` | connector 21/21, including selection-aware readiness and persistence safety | File-backed, limited concurrency, and not the durable V1 application proof. |
 
 Postgres, SQL Server, MongoDB, Couchbase, Redis, and other providers are valuable extensions. Each
 needs its own current conformance, operations, packaging, and compatibility evidence; their existence
