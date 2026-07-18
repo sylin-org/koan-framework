@@ -71,10 +71,10 @@ internal sealed class RabbitMqCommunicationAdapter(
             var factory = new ConnectionFactory
             {
                 Uri = new Uri(endpoint),
-                ClientProvidedName = $"koan.communication.{Topology.Slug(host.MeshId)}",
+                ClientProvidedName = $"{Constants.Broker.ClientNamePrefix}.{Topology.Slug(host.MeshId)}",
                 AutomaticRecoveryEnabled = true,
                 TopologyRecoveryEnabled = true,
-                NetworkRecoveryInterval = TimeSpan.FromSeconds(5),
+                NetworkRecoveryInterval = Constants.Broker.NetworkRecoveryInterval,
                 ConsumerDispatchConcurrency = 1
             };
             _userId = factory.UserName;
@@ -289,18 +289,13 @@ internal sealed class RabbitMqCommunicationAdapter(
 
     private async Task<string> ResolveEndpoint(CancellationToken ct)
     {
-        var configured = options.Value.ConnectionString?.Trim();
-        if (!string.IsNullOrWhiteSpace(configured)
-            && !string.Equals(configured, "auto", StringComparison.OrdinalIgnoreCase))
-            return configured;
-
         var result = await discovery.DiscoverService(
                 Constants.Broker.ServiceName,
                 new DiscoveryContext
                 {
                     OrchestrationMode = KoanEnv.OrchestrationMode,
                     RequireHealthValidation = true,
-                    HealthCheckTimeout = TimeSpan.FromSeconds(5)
+                    HealthCheckTimeout = Constants.Broker.DiscoveryHealthTimeout
                 },
                 ct)
             .ConfigureAwait(false);
@@ -316,7 +311,7 @@ internal sealed class RabbitMqCommunicationAdapter(
             throw new InvalidOperationException(
                 "RabbitMQ cannot authenticate Koan context without MeshTrustKey or an authenticated broker credential.");
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(material));
-        return hmac.ComputeHash(Encoding.UTF8.GetBytes($"koan.communication.rabbitmq.v1:{meshId}"));
+        return hmac.ComputeHash(Encoding.UTF8.GetBytes($"{Constants.Broker.TrustDerivationPrefix}:{meshId}"));
     }
 
     private byte[] Sign(ReadOnlySpan<byte> body)
@@ -369,7 +364,7 @@ internal sealed class RabbitMqCommunicationAdapter(
     internal static class Topology
     {
         internal static string Exchange(string meshId)
-            => $"{Constants.Broker.ExchangePrefix}.{Slug(meshId)}.v3";
+            => $"{Constants.Broker.ExchangePrefix}.{Slug(meshId)}.{Constants.Broker.ExchangeGeneration}";
 
         internal static string Queue(string meshId, CommunicationAdapterBinding binding)
             => $"{Exchange(meshId)}.{Lane(binding.Lane)}.channel.{Hash(binding.Channel)}.group." +
@@ -379,7 +374,7 @@ internal sealed class RabbitMqCommunicationAdapter(
             => $"{Lane(lane)}.channel.{Hash(channel)}.contract.{Hash(contractId)}";
 
         internal static string MessageType(CommunicationLane lane)
-            => $"{Constants.Broker.MessageTypePrefix}.{Lane(lane)}.v2";
+            => $"{Constants.Broker.MessageTypePrefix}.{Lane(lane)}.{Constants.Broker.MessageGeneration}";
 
         private static string Lane(CommunicationLane lane) => lane.ToString().ToLowerInvariant();
 
@@ -389,7 +384,7 @@ internal sealed class RabbitMqCommunicationAdapter(
                 .Select(static ch => char.IsLetterOrDigit(ch) ? ch : '-')
                 .ToArray();
             var normalized = new string(chars).Trim('-');
-            return string.IsNullOrWhiteSpace(normalized) ? "koan-app" : normalized;
+            return string.IsNullOrWhiteSpace(normalized) ? Constants.Broker.DefaultApplicationSlug : normalized;
         }
 
         private static string Hash(string value)

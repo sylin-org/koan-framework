@@ -8,7 +8,7 @@ using Constants = Koan.Communication.Connector.RabbitMq.Infrastructure.Constants
 namespace Koan.Communication.Connector.RabbitMq.Discovery;
 
 /// <summary>Canonical RabbitMQ discovery, including an actual AMQP connection probe.</summary>
-public sealed class RabbitMqDiscoveryAdapter(
+internal sealed class RabbitMqDiscoveryAdapter(
     IConfiguration configuration,
     ILogger<RabbitMqDiscoveryAdapter> logger)
     : ServiceDiscoveryAdapterBase(configuration, logger)
@@ -28,17 +28,12 @@ public sealed class RabbitMqDiscoveryAdapter(
     }
 
     protected override string? ReadExplicitConfiguration()
-        => Concrete(_configuration[Constants.Configuration.ConnectionString])
-           ?? _configuration[Constants.Configuration.LegacyConnectionString]
-           ?? _configuration[Constants.Configuration.LegacyFallbackConnectionString]
-           ?? _configuration.GetConnectionString("rabbitmq")
-           ?? _configuration.GetConnectionString("RabbitMQ");
+        => Concrete(_configuration.GetConnectionString(Constants.Configuration.ConnectionStringName));
 
     protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
     {
         var candidates = new List<DiscoveryCandidate>();
         Add(candidates, Environment.GetEnvironmentVariable(Constants.Broker.EnvironmentUrl), "environment-rabbitmq-url");
-        Add(candidates, Environment.GetEnvironmentVariable(Constants.Broker.KoanEnvironmentUrl), "environment-koan-rabbitmq-url");
         return candidates;
     }
 

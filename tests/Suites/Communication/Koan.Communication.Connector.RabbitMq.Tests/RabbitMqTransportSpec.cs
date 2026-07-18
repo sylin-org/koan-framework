@@ -238,7 +238,7 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
         await using var host = await KoanIntegrationHost.Configure()
             .WithEnvironment("Test")
             .WithSetting("Koan:Application:Code", "rabbit-spec-" + Guid.NewGuid().ToString("N"))
-            .WithSetting("Koan:Communication:RabbitMq:ConnectionString", rabbit.ConnectionString)
+            .WithSetting("ConnectionStrings:RabbitMq", rabbit.ConnectionString)
             .WithSetting("Koan:Communication:TransportProvider", "in-process")
             .WithSetting("Koan:Communication:FrameworkSignalsProvider", "in-process")
             .WithSetting("Koan:Communication:FrameworkBroadcastsProvider", "in-process")
@@ -278,7 +278,7 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
         => KoanIntegrationHost.Configure()
             .WithEnvironment("Test")
             .WithSetting("Koan:Application:Code", mesh)
-            .WithSetting("Koan:Communication:RabbitMq:ConnectionString", connectionString)
+            .WithSetting("ConnectionStrings:RabbitMq", connectionString)
             .ConfigureServices(services =>
             {
                 services.AddSingleton(state);

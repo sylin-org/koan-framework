@@ -40,7 +40,7 @@ public sealed class RabbitMqModule : KoanModule
     {
         module.Describe(Version);
         module.AddSetting("Provider", Constants.ProviderId);
-        module.AddSetting("Claims", "Transport/default, FrameworkSignals/default, FrameworkBroadcasts/default");
+        module.AddSetting("Candidate lanes", "Transport, FrameworkSignals, FrameworkBroadcasts");
         module.AddSetting("Assurance", "durably-acknowledged publication");
         module.AddNote("Candidacy is inert unless direct application intent or an explicit provider binding elects it.");
     }

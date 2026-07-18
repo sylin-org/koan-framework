@@ -10,13 +10,13 @@ using Constants = Koan.Communication.Connector.RabbitMq.Infrastructure.Constants
 namespace Koan.Communication.Connector.RabbitMq.Orchestration;
 
 /// <summary>Provisions RabbitMQ when the Communication connector is directly intended or explicitly configured.</summary>
-public sealed class RabbitMqOrchestrationEvaluator(
+internal sealed class RabbitMqOrchestrationEvaluator(
     KoanApplicationReferenceManifest references,
     ILogger<RabbitMqOrchestrationEvaluator>? logger = null)
     : BaseOrchestrationEvaluator(logger)
 {
     public override string ServiceName => Constants.Broker.ServiceName;
-    public override int StartupPriority => 250;
+    public override int StartupPriority => Constants.Broker.StartupPriority;
 
     protected override bool IsServiceEnabled(IConfiguration configuration)
         => HasExplicitConfiguration(configuration)
@@ -24,23 +24,15 @@ public sealed class RabbitMqOrchestrationEvaluator(
            || references.Contains(KoanReferenceKind.Project, Constants.ProjectReference);
 
     protected override bool HasExplicitConfiguration(IConfiguration configuration)
-        => !string.IsNullOrWhiteSpace(Configuration.ReadFirst(
-            configuration,
-            [
-                Constants.Configuration.ConnectionString,
-                Constants.Configuration.LegacyConnectionString,
-                Constants.Configuration.LegacyFallbackConnectionString,
-                "ConnectionStrings:rabbitmq",
-                "ConnectionStrings:RabbitMQ"
-            ]));
+        => !string.IsNullOrWhiteSpace(
+            configuration.GetConnectionString(Constants.Configuration.ConnectionStringName));
 
-    protected override int GetDefaultPort() => 5672;
+    protected override int GetDefaultPort() => Constants.Broker.AmqpPort;
 
     protected override string[] GetAdditionalHostCandidates(IConfiguration configuration)
         => new[]
             {
-                Environment.GetEnvironmentVariable(Constants.Broker.EnvironmentUrl),
-                Environment.GetEnvironmentVariable(Constants.Broker.KoanEnvironmentUrl)
+                Environment.GetEnvironmentVariable(Constants.Broker.EnvironmentUrl)
             }
             .Where(static value => !string.IsNullOrWhiteSpace(value))
             .Select(static value => GetHost(value!))
@@ -54,7 +46,7 @@ public sealed class RabbitMqOrchestrationEvaluator(
     {
         try
         {
-            var endpoint = hostResult.HostEndpoint ?? "localhost:5672";
+            var endpoint = hostResult.HostEndpoint ?? $"localhost:{Constants.Broker.AmqpPort}";
             var username = configuration[Constants.Configuration.Username] ?? Constants.Broker.DefaultUsername;
             var password = configuration[Constants.Configuration.Password] ?? Constants.Broker.DefaultPassword;
             var factory = new ConnectionFactory { Uri = new Uri($"amqp://{username}:{password}@{endpoint}") };
@@ -76,19 +68,23 @@ public sealed class RabbitMqOrchestrationEvaluator(
         return Task.FromResult(new DependencyDescriptor
         {
             Name = ServiceName,
-            Image = "rabbitmq:3.13-management",
-            Port = 5672,
-            Ports = new Dictionary<int, int> { [5672] = 5672, [15672] = 15672 },
+            Image = Constants.Broker.ContainerImageReference,
+            Port = Constants.Broker.AmqpPort,
+            Ports = new Dictionary<int, int>
+            {
+                [Constants.Broker.AmqpPort] = Constants.Broker.AmqpPort,
+                [Constants.Broker.ManagementPort] = Constants.Broker.ManagementPort
+            },
             StartupPriority = StartupPriority,
-            HealthTimeout = TimeSpan.FromSeconds(30),
-            HealthCheckCommand = "rabbitmq-diagnostics -q ping",
+            HealthTimeout = Constants.Broker.OrchestrationHealthTimeout,
+            HealthCheckCommand = Constants.Broker.HealthCheckCommand,
             Environment = new Dictionary<string, string>(context.EnvironmentVariables)
             {
-                ["KOAN_DEPENDENCY_TYPE"] = Constants.Broker.ServiceName,
-                ["RABBITMQ_DEFAULT_USER"] = username,
-                ["RABBITMQ_DEFAULT_PASS"] = password
+                [Constants.Broker.DependencyTypeEnvironment] = Constants.Broker.ServiceName,
+                [Constants.Broker.DefaultUserEnvironment] = username,
+                [Constants.Broker.DefaultPasswordEnvironment] = password
             },
-            Volumes = [$"koan-rabbitmq-{context.SessionId}:/var/lib/rabbitmq"]
+            Volumes = [$"koan-rabbitmq-{context.SessionId}:{Constants.Broker.DataPath}"]
         });
     }
 

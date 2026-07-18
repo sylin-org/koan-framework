@@ -1,11 +1,12 @@
 using Koan.Core.Services;
+using Constants = Koan.Communication.Connector.RabbitMq.Infrastructure.Constants;
 
 namespace Koan.Communication.Connector.RabbitMq;
 
-[KoanService(ServiceKind.Messaging, shortCode: "rabbitmq", name: "RabbitMQ",
-    ContainerImage = "rabbitmq",
-    DefaultTag = "3.13-management",
-    DefaultPorts = [5672, 15672],
-    Scheme = "amqp", Host = "rabbitmq", EndpointPort = 5672,
-    LocalScheme = "amqp", LocalHost = "localhost", LocalPort = 5672)]
+[KoanService(ServiceKind.Messaging, shortCode: Constants.Broker.ServiceName, name: "RabbitMQ",
+    ContainerImage = Constants.Broker.ContainerImage,
+    DefaultTag = Constants.Broker.ContainerTag,
+    DefaultPorts = [Constants.Broker.AmqpPort, Constants.Broker.ManagementPort],
+    Scheme = "amqp", Host = Constants.Broker.ServiceName, EndpointPort = Constants.Broker.AmqpPort,
+    LocalScheme = "amqp", LocalHost = "localhost", LocalPort = Constants.Broker.AmqpPort)]
 internal sealed class RabbitMqServiceDescriptor;

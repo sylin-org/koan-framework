@@ -3,9 +3,6 @@ namespace Koan.Communication.Connector.RabbitMq;
 /// <summary>RabbitMQ Transport connection, flow-control, and mesh-integrity options.</summary>
 public sealed class RabbitMqCommunicationOptions
 {
-    /// <summary>AMQP endpoint or <c>auto</c> for Koan service discovery.</summary>
-    public string ConnectionString { get; set; } = "auto";
-
     /// <summary>Credential used for automatically discovered endpoints that do not include user information.</summary>
     public string Username { get; set; } = "koan";
 
