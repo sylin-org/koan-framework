@@ -151,12 +151,13 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Testing.Hosting` | `capability` | `assess` |
 | `Sylin.Koan.Web` | `capability` | `keep` |
 | `Sylin.Koan.Web.Admin` | `projection` | `assess` |
-| `Sylin.Koan.Web.Auth` | `projection` | `assess` |
-| `Sylin.Koan.Web.Auth.Connector.Discord` | `provider` | `assess` |
-| `Sylin.Koan.Web.Auth.Connector.Google` | `provider` | `assess` |
-| `Sylin.Koan.Web.Auth.Connector.Microsoft` | `provider` | `assess` |
+| `Sylin.Koan.Web.Auth` | `projection` | `keep` |
+| `Sylin.Koan.Web.Auth.Abstractions` | `contracts` | `keep` |
+| `Sylin.Koan.Web.Auth.Connector.Discord` | `provider` | `keep` |
+| `Sylin.Koan.Web.Auth.Connector.Google` | `provider` | `keep` |
+| `Sylin.Koan.Web.Auth.Connector.Microsoft` | `provider` | `keep` |
 | `Sylin.Koan.Web.Auth.Connector.Oidc` | `provider` | `retire (implemented: generic OIDC is configuration-native in Web Auth)` |
-| `Sylin.Koan.Web.Auth.Connector.Test` | `provider` | `assess` |
+| `Sylin.Koan.Web.Auth.Connector.Test` | `provider` | `keep` |
 | `Sylin.Koan.Web.Auth.Roles` | `projection` | `retire (implemented)` |
 | `Sylin.Koan.Web.Auth.Server` | `projection` | `assess` |
 | `Sylin.Koan.Web.Auth.Services` | `projection` | `retire (implemented)` |
