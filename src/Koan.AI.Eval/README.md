@@ -73,4 +73,4 @@ var drift = await Eval.Drift(currentMetrics, baselineMetrics);
 ## Reference
 
 - **ADR**: `docs/decisions/AI-0021-category-driven-ai-with-convention-defaults.md`
-- **Related**: `Koan.AI.Review` (HITL gates), `Koan.AI.Models` (deployment lifecycle), `Koan.AI.Training`
+- **Related**: `Koan.AI.Review` (HITL gates), `Koan.AI.Models` (deployment lifecycle)

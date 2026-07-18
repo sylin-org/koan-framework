@@ -555,24 +555,6 @@
       ]
     },
     {
-      "packageId": "Sylin.Koan.AI.Connector.ZenGarden",
-      "shape": "library",
-      "description": "Zen Garden AI Orchestrator connector \u2014 routes all AI capabilities through the unified orchestrator.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.AI",
-        "Sylin.Koan.AI.Contracts",
-        "Sylin.Koan.Core",
-        "Sylin.Koan.ZenGarden.Contracts"
-      ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
-      "claims": []
-    },
-    {
       "packageId": "Sylin.Koan.AI.Contracts",
       "shape": "library",
       "description": "Inert Koan AI contracts for provider adapters, routing, model selection, prompts, and multimodal request and result shapes.",
@@ -690,25 +672,6 @@
         "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Koan.AI.Review/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": null,
-      "claims": []
-    },
-    {
-      "packageId": "Sylin.Koan.AI.Training",
-      "shape": "library",
-      "description": "Training orchestration and dataset management for Koan AI: fine-tune models from entity data with 4-level escape hatches.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.AI",
-        "Sylin.Koan.AI.Contracts",
-        "Sylin.Koan.AI.Contracts.Shared",
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Core"
-      ],
-      "readme": "src/Koan.AI.Training/README.md",
       "ownsReadme": true,
       "technicalDocumentation": null,
       "claims": []

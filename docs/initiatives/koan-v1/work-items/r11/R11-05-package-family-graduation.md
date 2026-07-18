@@ -1561,6 +1561,71 @@ and production-edge guarantees Koan AI Web does not currently supply.
 The AI semantic-input and HTTP-projection family passes this R11-05 slice. No release candidate, full certification
 run, package feed, or remote state was created; the complete release ratchet remains the single R11-07 boundary.
 
+## AI retired-topology discovery
+
+**Task:** implement the already accepted AI topology for the two boundaries that have no earned Koan V1 product
+intent: the providerless Training facade and the legacy Zen Garden AI connector.
+
+**Application intent:** no application should reference a package that advertises training while having no training
+runtime, or a Koan-side connector for orchestration mechanics now owned by the external Zen Garden product. Removing
+both false choices makes package selection smaller and semantically honest.
+
+**Docs read:** the greenfield package mandate requires a distinct, meaningful reference intent and current executable
+proof. The accepted AI topology assigns training/evaluation workflows to Agyo and model/resource orchestration to Zen
+Garden. Historical assessments and ADRs remain evidence and are not rewritten as current product guidance.
+
+**Code read:** `Sylin.Koan.AI.Training` has no in-repository `ITrainingRuntime` implementation or behavior consumer;
+its list path returns an empty result and its estimates/runtime paths are placeholders. Its only external references
+are unused project references in two broad AI test hosts. `Sylin.Koan.AI.Connector.ZenGarden` has no tests or source
+consumer and is already absent from the solution; its adapter forwards all AI capabilities to orchestration mechanics
+owned by the sibling Zen Garden repository.
+
+**Constants/options/DTO inventory:** AI Contracts Shared retains dependency-free lifecycle exchange vocabulary because
+that is an accepted cross-repository contract. Capability tokens are not deleted in this slice. No replacement Koan
+runtime, compatibility facade, forwarding package, deprecation attribute, or inert activation mechanism is justified.
+
+**Closest pattern:** the implemented `Core.Adapters`, Cache analyzer, relational Dapper, and CLI Core retirements remove
+an unearned package identity, references, solution membership, generated inventory, and current public claims while
+preserving dated architecture evidence.
+
+**Coalescence and placement:** training workflow ownership belongs outside Koan rather than behind an empty facade.
+Zen Garden owns its own orchestration boundary rather than requiring a reverse connector in Koan. The remaining Koan
+AI runtime stays provider-neutral; shared lifecycle contracts remain inert at the existing contracts boundary.
+
+**Ergonomics:** developers and agents see fewer install choices and cannot mistake a compilable facade for a supported
+workflow. Operators no longer receive a provider identity whose operational contract belongs to another product.
+Future integrations must enter through an explicit, evidenced cross-repository contract rather than resurrecting
+either retired package.
+
+**Constraints satisfied:** no sibling repository mutation; no new package or compatibility mechanism; no ADR edits;
+only focused dependent builds and generated-truth checks during the slice; release certification remains reserved for
+R11-07.
+
+**Risks:** removal is intentionally source- and package-breaking under the Koan 1.0 greenfield mandate. Current README
+cross-links and one model-service error mention Training and must be corrected so no surviving surface directs users
+to an absent API. Generated inventories must prove both package IDs disappear.
+
+**Dependent-test correction:** the focused EndToEnd compile exposed a stale fixture that still attempted to mutate the
+now read-only production `IAiAdapterRegistry`. The fixture now supplies its mutable fake through standard DI before
+`AddKoan()` and keeps mutation on that test-owned concrete type. Production provider-plan ownership remains immutable;
+no compatibility method was restored to make an obsolete test compile.
+
+### AI retired-topology evidence
+
+- `Sylin.Koan.AI.Training` and `Sylin.Koan.AI.Connector.ZenGarden` are absent from source project ownership, the
+  solution, active ProjectReferences, and the regenerated quality/product-surface inventories. No forwarding or
+  compatibility package replaces them.
+- Shared lifecycle DTOs remain in inert AI Contracts Shared. Surviving model behavior no longer tells users to call
+  the absent Training facade; unsupported LoRA merge instead requests a model adapter that declares merge support.
+- AI Models, the AI Integration host, and the AI EndToEnd host build warning-clean. The corrected EndToEnd adapter
+  resolution cell passes 7/7 using a DI-supplied test registry without reopening production mutation.
+- Generated truth contains 109 packages: 21 repair-required, 34 review-required, and 54 structurally ready across 22
+  claims. Public documentation truth passes across 213 current files and 40 navigation targets. No release candidate,
+  artifact, package feed, sibling-repository mutation, or full certification run was created.
+
+The two accepted retirements pass this R11-05 slice. The remaining AI vertical still requires explicit terminal
+topology and cross-repository ownership decisions before any package prose is polished.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

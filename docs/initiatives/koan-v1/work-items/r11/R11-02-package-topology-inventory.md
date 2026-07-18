@@ -4,10 +4,10 @@ domain: framework
 title: "R11-02 - Reconcile Package Topology"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-18
 framework_version: source-first
 validation:
-  date_last_tested: 2026-07-17
+  date_last_tested: 2026-07-18
   status: pending
   scope: exact evaluated package inventory and terminal architecture dispositions
 ---
@@ -45,13 +45,10 @@ judgment and evidence. Do not paste descriptions, tags, framework targets, or de
 generated package-quality and product-surface references.
 
 R11-01 opened with 109 packages: 37 required an objective repair, 72 required review, and none was inferred
-graduated. The first terminal coalescence retired `Sylin.Koan.Core.Adapters`; the current evaluated graph contains 108
-packages. R11-03 removed the shared presentation noise and R11-04 graduated the two entry bundles and Templates,
-leaving 36 repair-required, 62 review-required, 10 structurally ready for human review, 72 owned READMEs, 62
-technical companions, and 240 findings. R11-05's first family then graduated the seven foundation boundaries, leaving
-36 repair-required, 57 review-required, 15 structurally ready, and 231 findings. The 36 missing
-package owners are now reported honestly rather than falling back to the root README. These are repair inputs, not
-240 independent work items.
+graduated. Subsequent family work retired unearned identities and introduced only independently useful contract or
+shared-mechanism boundaries. The current evaluated graph again contains 109 packages: 21 repair-required, 34
+review-required, and 54 structurally ready across 22 claims. The active matrix contains only present package projects;
+implemented retirements remain in the disposition tables as release-lineage decisions.
 
 ## Exact active matrix
 
@@ -70,7 +67,6 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.AI.Connector.LMStudio` | `provider` | `assess` |
 | `Sylin.Koan.AI.Connector.Ollama` | `provider` | `assess` |
 | `Sylin.Koan.AI.Connector.Onnx` | `provider` | `assess` |
-| `Sylin.Koan.AI.Connector.ZenGarden` | `provider` | `assess` |
 | `Sylin.Koan.AI.Contracts` | `contracts` | `keep` |
 | `Sylin.Koan.AI.Contracts.Shared` | `contracts` | `keep` |
 | `Sylin.Koan.AI.Eval` | `capability` | `assess` |
@@ -78,7 +74,6 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.AI.Orchestration` | `capability` | `assess` |
 | `Sylin.Koan.AI.Prompt` | `capability` | `keep` |
 | `Sylin.Koan.AI.Review` | `capability` | `assess` |
-| `Sylin.Koan.AI.Training` | `capability` | `assess` |
 | `Sylin.Koan.AI.Web` | `projection` | `keep` |
 | `Sylin.Koan.App` | `entry` | `keep` |
 | `Sylin.Koan.Cache` | `capability` | `keep` |
@@ -110,7 +105,6 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Data.Core` | `capability` | `keep` |
 | `Sylin.Koan.Data.Relational` | `capability` | `keep` |
 | `Sylin.Koan.Data.Relational.Abstractions` | `contracts` | `keep` |
-| `Sylin.Koan.Data.Relational.Dapper` | `capability` | `retire` |
 | `Sylin.Koan.Data.Relational.Npgsql` | `capability` | `keep` |
 | `Sylin.Koan.Data.SearchEngine` | `capability` | `keep` |
 | `Sylin.Koan.Data.SoftDelete` | `capability` | `assess` |
@@ -263,10 +257,13 @@ but its prose and executable surface require a focused truth audit before R11 ca
 |---|---|---|
 | `Sylin.Koan.AI.Prompt` | `keep` | Optional Entity-backed identity and version lookup for prompt values. Prompt composition itself moved to inert AI Contracts so ordinary AI no longer activates Data; unproved rollout selection was removed. |
 | `Sylin.Koan.AI.Web` | `keep` | Provider-neutral HTTP projection over the compiled AI runtime. Its module owns controller discovery and startup tooling; it owns no provider election, health duplication, authorization, quotas, retry, or application registration ceremony. |
+| `Sylin.Koan.AI.Training` | `retire` (implemented) | The facade had no runtime provider or behavior consumer and advertised placeholder/empty behavior as a package capability. Training workflow ownership belongs outside Koan; inert lifecycle exchange vocabulary remains in AI Contracts Shared. |
+| `Sylin.Koan.AI.Connector.ZenGarden` | `retire` (implemented) | The untested connector was already outside the solution and reversed orchestration ownership back into Koan. Zen Garden owns its model/resource orchestration boundary; Koan retains only independently consumed inert integration contracts. |
 
-Both boundaries pass focused source behavior and inspected artifact evidence. The remaining AI vertical and external
-provider packages retain separate terminal assessments because their accepted cross-repository/retirement topology is
-not implied by these two survivor decisions.
+The two survivors pass focused source behavior and inspected artifact evidence. The two retirements are proven by
+their absence from the evaluated package graph, solution, and surviving project references. Remaining AI vertical and
+external provider packages retain separate terminal assessments because their accepted cross-repository topology is
+not implied by these decisions.
 
 ## Acceptance
 

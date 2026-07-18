@@ -78,4 +78,4 @@ services.AddReviewEventHandler<ArticleSummary, SummaryFeedbackHandler>();
 
 ## Reference
 
-- **Related**: `Koan.AI.Training` (consume feedback as training data), `Koan.AI.Eval` (automated quality gates), `Koan.Data.Core` (entity persistence)
+- **Related**: `Koan.AI.Eval` (automated quality gates), `Koan.Data.Core` (entity persistence)

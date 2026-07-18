@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-18
   status: in-progress
-  scope: R11-05 through AI semantic-input and HTTP-projection graduation
+  scope: R11-05 through AI retired-topology correction
 ---
 
 # Koan V1 reorganization current handoff
@@ -175,8 +175,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
   AI Web now activates controllers from reference plus `AddKoan()` and no longer duplicates AI health or requires a
   registration extension. Prompt/catalog passes 26/26, prompt integration 7/7, AI Unit 160/160, and the isolated real
   Web host 1/1. Four packages pack and audit cleanly.
-- Current generated truth contains 111 packages: 22 repair-required, 35 review-required, 54 structurally ready across
-  22 claims. Public truth passes across 214 current files and 40 navigation targets.
+- The providerless AI Training facade and the reverse Zen Garden AI connector are retired. Shared lifecycle contracts
+  remain inert; no compatibility package or production-registry mutation was restored. AI Models and both dependent
+  test hosts build warning-clean, and the corrected EndToEnd adapter-resolution cell passes 7/7.
+- Current generated truth contains 109 packages: 21 repair-required, 34 review-required, 54 structurally ready across
+  22 claims. Public truth passes across 213 current files and 40 navigation targets.
   Redis Cache 6/6 and Redis Data 12/12 pass; seven affected packages and their dependency boundaries were inspected,
   and the three new packages have no known vulnerable direct or transitive packages. Earlier Storage evidence remains
   green. Seven relational packages also inspect cleanly, with clear current vulnerability checks for the two new
@@ -204,11 +207,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the remaining AI topology as an explicit
-disposition slice: reconcile the accepted Agyo/Zen Garden migration plan with the greenfield V1 package surface, then
-retire only unsupported local facades that can leave safely and record cross-repository moves without polishing them
-as permanent Koan products. Keep Hugging Face and the Zen Garden AI connector separate inside that assessment. Start
-with focused topology/coalescence discovery and do not run release certification.
+Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the surviving AI vertical as an explicit
+disposition slice: reconcile Agents, Orchestration, Eval, Review, Compute, Models, and Hugging Face with the accepted
+Agyo/Zen Garden ownership plan. Prefer removal or a narrow inert boundary over polishing transitional facades into
+permanent Koan products. Keep sibling repositories read-only, start with focused topology/coalescence discovery, and
+do not run release certification.
 
 Keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared. Do not mutate remote settings, push,
 tag, release, or publish until package polish is accepted and separate remote-operation authorization is renewed.

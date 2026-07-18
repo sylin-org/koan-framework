@@ -76,4 +76,4 @@ Cached → Loaded → Deployed → Standby
 ## Reference
 
 - **ADR**: `docs/decisions/AI-0023-model-catalog-and-lifecycle.md`
-- **Related**: `Koan.AI.Compute` (deployment routing), `Koan.AI.Training` (fine-tuning), `Koan.AI.Eval` (quality gates)
+- **Related**: `Koan.AI.Compute` (deployment routing), `Koan.AI.Eval` (quality gates)

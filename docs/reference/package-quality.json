@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 111,
-    "repairRequired": 22,
-    "reviewRequired": 35,
+    "packages": 109,
+    "repairRequired": 21,
+    "reviewRequired": 34,
     "structurallyReady": 54,
-    "ownedReadmes": 89,
+    "ownedReadmes": 88,
     "technicalCompanions": 80,
-    "findings": 151
+    "findings": 145
   },
   "findingDefinitions": [
     {
@@ -236,30 +236,6 @@
       "findings": []
     },
     {
-      "packageId": "Sylin.Koan.AI.Connector.ZenGarden",
-      "projectPath": "src/Connectors/AI/ZenGarden/Koan.AI.Connector.ZenGarden.csproj",
-      "shape": "library",
-      "role": "provider",
-      "status": "repair-required",
-      "description": "Zen Garden AI Orchestrator connector \u2014 routes all AI capabilities through the unified orchestrator.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.AI",
-        "Sylin.Koan.AI.Contracts",
-        "Sylin.Koan.Core",
-        "Sylin.Koan.ZenGarden.Contracts"
-      ],
-      "readme": null,
-      "technicalDocumentation": null,
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
-    },
-    {
       "packageId": "Sylin.Koan.AI.Contracts",
       "projectPath": "src/Koan.AI.Contracts/Koan.AI.Contracts.csproj",
       "shape": "library",
@@ -409,33 +385,6 @@
         "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Koan.AI.Review/README.md",
-      "technicalDocumentation": null,
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "docs.technical.missing"
-      ]
-    },
-    {
-      "packageId": "Sylin.Koan.AI.Training",
-      "projectPath": "src/Koan.AI.Training/Koan.AI.Training.csproj",
-      "shape": "library",
-      "role": "capability",
-      "status": "review-required",
-      "description": "Training orchestration and dataset management for Koan AI: fine-tune models from entity data with 4-level escape hatches.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.AI",
-        "Sylin.Koan.AI.Contracts",
-        "Sylin.Koan.AI.Contracts.Shared",
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Core"
-      ],
-      "readme": "src/Koan.AI.Training/README.md",
       "technicalDocumentation": null,
       "packageIcon": "icon.png",
       "findings": [
