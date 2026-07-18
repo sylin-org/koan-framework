@@ -1,5 +1,5 @@
 using Koan.AI.Connector.HuggingFace.Infrastructure;
-using Koan.AI.Contracts.Adapters;
+using Koan.AI.Providers;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Koan.Core.Semantics.Contributions;
 
 namespace Koan.AI.Connector.HuggingFace.Initialization;
 
@@ -14,17 +15,17 @@ namespace Koan.AI.Connector.HuggingFace.Initialization;
 /// Auto-registers the HuggingFace Hub adapter when this package is referenced.
 /// Follows the Reference = Intent pattern.
 /// </summary>
-public sealed class HuggingFaceAiModule : KoanModule
+public sealed class HuggingFaceAiModule : KoanModule, IContributeTo<AiProviderContributionTarget>
 {
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<HuggingFaceOptions>(ConfigurationConstants.Section);
         services.TryAddSingleton<HuggingFaceClient>();
         services.TryAddSingleton<HuggingFaceAdapter>();
-
-        // Register as an adapter contributor that adds itself to the registry
-        services.AddSingleton<IAiAdapterContributor, HuggingFaceAdapterContributor>();
     }
+
+    public void Contribute(AiProviderContributionTarget target) =>
+        target.Add<HuggingFaceAdapterContributor>("huggingface");
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {

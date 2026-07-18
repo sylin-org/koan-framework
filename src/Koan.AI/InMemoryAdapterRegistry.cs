@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Routing;
 
 namespace Koan.AI;
@@ -8,82 +9,87 @@ namespace Koan.AI;
 internal sealed class InMemoryAdapterRegistry : IAiAdapterRegistry
 {
     private readonly object _gate = new();
-    private readonly List<AiAdapterRegistration> _registrations = new();
+    private IReadOnlyList<IAiAdapter> _all = [];
+    private IReadOnlyDictionary<string, IAiAdapter> _byId =
+        new Dictionary<string, IAiAdapter>(StringComparer.OrdinalIgnoreCase);
+    private bool _compiled;
 
-    public IReadOnlyList<Contracts.Adapters.IAiAdapter> All
+    public IReadOnlyList<IAiAdapter> All
     {
         get
         {
-            lock (_gate)
-            {
-                return _registrations.Select(r => r.Adapter).ToArray();
-            }
+            lock (_gate) return _all;
         }
     }
 
-    public IReadOnlyList<AiAdapterRegistration> Registrations
+    internal void Compile(IEnumerable<IAiAdapter> adapters)
     {
-        get
-        {
-            lock (_gate)
-            {
-                return _registrations.ToArray();
-            }
-        }
-    }
-
-    public void Add(Contracts.Adapters.IAiAdapter adapter)
-    {
-        if (adapter is null) throw new ArgumentNullException(nameof(adapter));
-
+        ArgumentNullException.ThrowIfNull(adapters);
         lock (_gate)
         {
-            if (_registrations.Any(a => string.Equals(a.Adapter.Id, adapter.Id, StringComparison.OrdinalIgnoreCase)))
+            if (_compiled)
             {
-                return;
+                throw new InvalidOperationException(
+                    "The AI adapter registry is already compiled for this host and cannot be changed.");
             }
 
-            var descriptor = adapter.GetType().GetCustomAttributes(typeof(Contracts.Adapters.AiAdapterDescriptorAttribute), inherit: true)
-                .FirstOrDefault() as Contracts.Adapters.AiAdapterDescriptorAttribute;
-
-            var weight = Math.Max(1, descriptor?.Weight ?? 1);
-            var registration = new AiAdapterRegistration
+            var ordered = adapters
+                .Select(adapter => adapter ?? throw new InvalidOperationException(
+                    "AI provider activation returned a null adapter."))
+                .OrderBy(static adapter => adapter.Id, StringComparer.Ordinal)
+                .ToArray();
+            var byId = new Dictionary<string, IAiAdapter>(StringComparer.OrdinalIgnoreCase);
+            foreach (var adapter in ordered)
             {
-                Adapter = adapter,
-                Priority = descriptor?.Priority ?? 0,
-                Weight = weight,
-                RegisteredAt = DateTimeOffset.UtcNow
-            };
+                if (string.IsNullOrWhiteSpace(adapter.Id))
+                {
+                    throw new InvalidOperationException(
+                        $"AI adapter '{adapter.GetType().FullName}' has an empty provider identity.");
+                }
 
-            _registrations.Add(registration);
-            _registrations.Sort(static (left, right) =>
-            {
-                var priorityCompare = right.Priority.CompareTo(left.Priority);
-                if (priorityCompare != 0) return priorityCompare;
-                var typeCompare = string.Compare(left.Adapter.GetType().FullName, right.Adapter.GetType().FullName, StringComparison.Ordinal);
-                if (typeCompare != 0) return typeCompare;
-                return left.RegisteredAt.CompareTo(right.RegisteredAt);
-            });
+                if (!byId.TryAdd(adapter.Id.Trim(), adapter))
+                {
+                    throw new InvalidOperationException(
+                        $"AI adapter identity '{adapter.Id}' is activated more than once. " +
+                        "One provider identity must resolve to exactly one adapter.");
+                }
+            }
+
+            _all = ordered;
+            _byId = byId;
+            _compiled = true;
         }
     }
 
-    public bool Remove(string id)
+    /// <summary>Internal pre-start builder seam used by focused routing tests.</summary>
+    internal void Add(IAiAdapter adapter)
     {
-        if (string.IsNullOrWhiteSpace(id)) return false;
-
+        ArgumentNullException.ThrowIfNull(adapter);
         lock (_gate)
         {
-            return _registrations.RemoveAll(a => string.Equals(a.Adapter.Id, id, StringComparison.OrdinalIgnoreCase)) > 0;
+            if (_compiled)
+            {
+                throw new InvalidOperationException(
+                    "The AI adapter registry is already compiled for this host and cannot be changed.");
+            }
+
+            if (_byId.ContainsKey(adapter.Id))
+            {
+                throw new InvalidOperationException(
+                    $"AI adapter identity '{adapter.Id}' is activated more than once.");
+            }
+
+            var next = _all.Append(adapter)
+                .OrderBy(static candidate => candidate.Id, StringComparer.Ordinal)
+                .ToArray();
+            _all = next;
+            _byId = next.ToDictionary(static candidate => candidate.Id, StringComparer.OrdinalIgnoreCase);
         }
     }
 
-    public Contracts.Adapters.IAiAdapter? Get(string id)
+    public IAiAdapter? Get(string id)
     {
         if (string.IsNullOrWhiteSpace(id)) return null;
-
-        lock (_gate)
-        {
-            return _registrations.FirstOrDefault(a => string.Equals(a.Adapter.Id, id, StringComparison.OrdinalIgnoreCase))?.Adapter;
-        }
+        lock (_gate) return _byId.GetValueOrDefault(id.Trim());
     }
 }

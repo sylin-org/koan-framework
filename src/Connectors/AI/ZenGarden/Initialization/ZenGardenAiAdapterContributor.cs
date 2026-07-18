@@ -1,163 +1,156 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using Koan.AI.Connector.ZenGarden.Infrastructure;
-using Koan.AI.Contracts.Adapters;
-using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
-using Koan.AI.Contracts;
+using Koan.AI.Connector.ZenGarden.Infrastructure;
+using Koan.AI.Providers;
 using Koan.Core.Logging;
 using Koan.ZenGarden;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Koan.AI.Connector.ZenGarden.Initialization;
 
-/// <summary>
-/// Discovers the Zen Garden AI Orchestrator via Zen Garden offering resolution,
-/// queries its capability set, and registers the unified adapter.
-/// </summary>
-internal sealed class ZenGardenAiAdapterContributor : IAiAdapterContributor
+/// <summary>Activates the layered Zen Garden AI provider only when its functional engine resolves an orchestrator.</summary>
+internal sealed class ZenGardenAiAdapterContributor : IAiProviderActivator
 {
-    public async ValueTask Contribute(IServiceProvider services, CancellationToken cancellationToken)
+    public async ValueTask<AiProviderActivation?> Activate(
+        IServiceProvider services,
+        CancellationToken cancellationToken)
     {
-        var adapterRegistry = services.GetRequiredService<IAiAdapterRegistry>();
-        var sourceRegistry = services.GetRequiredService<IAiSourceRegistry>();
-        var logger = services.GetService<ILogger<ZenGardenAiAdapterContributor>>()
-            ?? NullLogger<ZenGardenAiAdapterContributor>.Instance;
+        var sources = services.GetRequiredService<IAiSourceRegistry>();
+        var logger = services.GetRequiredService<ILogger<ZenGardenAiAdapterContributor>>();
 
-        // Skip if ZenGarden AI source already registered (explicit config)
-        if (sourceRegistry.HasSource(Constants.Discovery.WellKnownServiceName))
+        if (sources.TryGetSource(Constants.Adapter.Id, out var existing))
         {
-            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "skipped",
-                ("reason", "source-already-registered"));
-            return;
-        }
-
-        // Resolve orchestrator endpoint via Zen Garden offering
-        var zenGardenProvider = services.GetService<IZenGardenInitializationProvider>();
-        if (zenGardenProvider is null)
-        {
-            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "skipped",
-                ("reason", "provider-unavailable"));
-            return;
-        }
-
-        string? endpoint = null;
-        try
-        {
-            var intent = ZenGardenConnectionIntent.ForOffering(Constants.Discovery.OfferingName);
-            var resolved = await zenGardenProvider.Resolve(intent, cancellationToken);
-            endpoint = resolved?.GetUri("http", "https");
-        }
-        catch (Exception ex)
-        {
-            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "resolution-failed",
-                ("error", ex));
-        }
-
-        if (string.IsNullOrWhiteSpace(endpoint))
-        {
-            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "not-found");
-            return;
-        }
-
-        // Probe the orchestrator
-        var http = new HttpClient
-        {
-            BaseAddress = new Uri(endpoint),
-            Timeout = TimeSpan.FromSeconds(10)
-        };
-
-        try
-        {
-            var healthResp = await http.GetAsync(Constants.Endpoints.Health, cancellationToken);
-            if (!healthResp.IsSuccessStatusCode)
+            ValidateExistingSource(existing!);
+            var endpoint = FirstEndpoint(existing!)!;
+            var capabilities = SourceCapabilities(existing!);
+            if (capabilities.Count == 0)
             {
-                KoanLog.BootDebug(logger, Constants.Logging.Discovery, "unhealthy",
-                    ("endpoint", endpoint),
-                    ("status", (int)healthResp.StatusCode));
-                return;
-            }
-        }
-        catch (Exception ex)
-        {
-            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "unreachable",
-                ("endpoint", endpoint),
-                ("error", ex));
-            return;
-        }
-
-        // Discover capabilities
-        var capabilities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        try
-        {
-            var capsResp = await http.GetFromJsonAsync<JsonElement>(
-                Constants.Endpoints.Capabilities, cancellationToken);
-
-            if (capsResp.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var cap in capsResp.EnumerateArray())
-                {
-                    var name = cap.GetString();
-                    if (!string.IsNullOrWhiteSpace(name))
-                        capabilities.Add(name);
-                }
+                capabilities = await ReadCapabilities(endpoint, cancellationToken).ConfigureAwait(false)
+                    ?? throw new InvalidOperationException(
+                        "AI source 'zen-garden' is explicit, but its endpoint did not publish a usable capability catalog.");
             }
 
-            KoanLog.BootInfo(logger, Constants.Logging.Discovery, "capabilities-discovered",
-                ("endpoint", endpoint),
-                ("count", capabilities.Count),
-                ("capabilities", string.Join(", ", capabilities)));
-        }
-        catch (Exception ex)
-        {
-            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "capabilities-fallback",
-                ("error", ex));
-            // Assume full capability set if query fails (orchestrator may not have /v1/capabilities yet)
-            capabilities = [
-                AiCapability.Chat, AiCapability.Embed, AiCapability.Ocr, AiCapability.Vision,
-                AiCapability.Streaming, AiCapability.Tools, AiCapability.Imagine,
-                AiCapability.Transcribe, AiCapability.Speak, AiCapability.Edit,
-                AiCapability.Rerank, AiCapability.Render, AiCapability.Translate,
-                AiCapability.Moderate, AiCapability.Pull, AiCapability.ModelList,
-            ];
+            return Configure(services, endpoint, capabilities);
         }
 
-        // Register source
-        var member = new AiMemberDefinition
+        var zenGarden = services.GetService<IZenGardenInitializationProvider>();
+        if (zenGarden is null)
         {
-            Name = $"{Constants.Discovery.WellKnownServiceName}::orchestrator",
-            ConnectionString = endpoint,
-            Order = 0,
-            Origin = "zen-garden",
-            IsAutoDiscovered = true,
-        };
+            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "inactive",
+                ("reason", "zen-garden-engine-unavailable"));
+            return null;
+        }
 
-        var source = new AiSourceDefinition
+        var intent = ZenGardenConnectionIntent.ForOffering(Constants.Discovery.OfferingName);
+        var resolution = await zenGarden.Resolve(intent, cancellationToken).ConfigureAwait(false);
+        var resolvedEndpoint = resolution?.GetUri("http", "https");
+        if (string.IsNullOrWhiteSpace(resolvedEndpoint))
         {
-            Name = Constants.Discovery.WellKnownServiceName,
-            Provider = Constants.Adapter.Type,
-            Priority = 50,
-            Policy = "Fallback",
-            Members = [member],
-            Capabilities = capabilities.ToDictionary(
-                c => c,
-                _ => new AiCapabilityConfig { Model = "" }),
-            Origin = "zen-garden",
-            IsAutoDiscovered = true,
+            KoanLog.BootDebug(logger, Constants.Logging.Discovery, "inactive",
+                ("reason", "offering-unavailable"));
+            return null;
+        }
+
+        var discoveredCapabilities = await ReadCapabilities(resolvedEndpoint, cancellationToken).ConfigureAwait(false);
+        if (discoveredCapabilities is null || discoveredCapabilities.Count == 0)
+        {
+            KoanLog.BootWarning(logger, Constants.Logging.Discovery, "inactive",
+                ("reason", "capability-catalog-unavailable"));
+            return null;
+        }
+
+        var source = AiProviderSources.Create(
+            Constants.Adapter.Id,
+            [resolvedEndpoint],
+            discoveredCapabilities.ToDictionary(
+                static capability => capability,
+                static _ => new AiCapabilityConfig { Model = string.Empty },
+                StringComparer.OrdinalIgnoreCase),
+            "zen-garden",
+            isAutoDiscovered: true);
+
+        var activation = Configure(services, resolvedEndpoint, discoveredCapabilities);
+        KoanLog.BootInfo(logger, Constants.Logging.Discovery, "ready",
+            ("capabilities", discoveredCapabilities.Count));
+        return activation with { Sources = [source] };
+    }
+
+    private static AiProviderActivation Configure(
+        IServiceProvider services,
+        string endpoint,
+        IReadOnlySet<string> capabilities)
+    {
+        services.GetRequiredService<ZenGardenAiRuntime>().Configure(endpoint, capabilities);
+        return new AiProviderActivation
+        {
+            Adapter = services.GetRequiredService<ZenGardenAiAdapter>()
         };
+    }
 
-        sourceRegistry.RegisterSource(source);
+    private static void ValidateExistingSource(AiSourceDefinition source)
+    {
+        if (!string.Equals(source.Provider, Constants.Adapter.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"AI source '{Constants.Adapter.Id}' is reserved for provider '{Constants.Adapter.Id}', " +
+                $"but names provider '{source.Provider}'.");
+        }
 
-        // Register adapter
-        http.Timeout = TimeSpan.FromMinutes(10); // Increase for generation workloads
-        var adapter = new ZenGardenAiAdapter(http, logger as ILogger<ZenGardenAiAdapter>
-            ?? NullLogger<ZenGardenAiAdapter>.Instance, capabilities);
-        adapterRegistry.Add(adapter);
+        if (FirstEndpoint(source) is null)
+        {
+            throw new InvalidOperationException(
+                "AI source 'zen-garden' is explicit but has no HTTP endpoint member.");
+        }
+    }
 
-        KoanLog.BootInfo(logger, Constants.Logging.Discovery, "registered",
-            ("endpoint", endpoint),
-            ("count", capabilities.Count));
+    private static string? FirstEndpoint(AiSourceDefinition source) =>
+        source.Members
+            .OrderBy(static member => member.Order)
+            .Select(static member => member.ConnectionString)
+            .FirstOrDefault(static endpoint =>
+                Uri.TryCreate(endpoint, UriKind.Absolute, out var uri)
+                && uri.Scheme is "http" or "https");
+
+    private static HashSet<string> SourceCapabilities(AiSourceDefinition source) =>
+        source.Capabilities.Keys
+            .Concat(source.Members.SelectMany(static member => member.Capabilities?.Keys ?? []))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static async Task<HashSet<string>?> ReadCapabilities(
+        string endpoint,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var http = new HttpClient
+            {
+                BaseAddress = new Uri(endpoint),
+                Timeout = TimeSpan.FromSeconds(10)
+            };
+            using var health = await http.GetAsync(Constants.Endpoints.Health, cancellationToken)
+                .ConfigureAwait(false);
+            if (!health.IsSuccessStatusCode) return null;
+
+            var payload = await http.GetFromJsonAsync<JsonElement>(
+                Constants.Endpoints.Capabilities,
+                cancellationToken).ConfigureAwait(false);
+            if (payload.ValueKind != JsonValueKind.Array) return null;
+
+            return payload.EnumerateArray()
+                .Select(static item => item.GetString())
+                .Where(static capability => !string.IsNullOrWhiteSpace(capability))
+                .Select(static capability => capability!)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

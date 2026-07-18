@@ -9,6 +9,7 @@
     <PackageTags>$(CommonPackageTags);ai;embeddings;onnx;inproc;embedded;local</PackageTags>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\..\..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>

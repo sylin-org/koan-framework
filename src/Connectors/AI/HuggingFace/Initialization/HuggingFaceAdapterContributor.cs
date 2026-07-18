@@ -1,19 +1,16 @@
-using Koan.AI.Contracts.Adapters;
-using Koan.AI.Contracts.Routing;
+using Koan.AI.Providers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.AI.Connector.HuggingFace.Initialization;
 
 /// <summary>
-/// Registers the HuggingFace adapter into the adapter registry at startup.
+/// Activates the DI-owned Hugging Face adapter for the host's compiled provider plan.
 /// </summary>
-internal sealed class HuggingFaceAdapterContributor : IAiAdapterContributor
+internal sealed class HuggingFaceAdapterContributor : IAiProviderActivator
 {
-    public ValueTask Contribute(IServiceProvider services, CancellationToken cancellationToken)
+    public ValueTask<AiProviderActivation?> Activate(IServiceProvider services, CancellationToken cancellationToken)
     {
-        var registry = services.GetRequiredService<IAiAdapterRegistry>();
         var adapter = services.GetRequiredService<HuggingFaceAdapter>();
-        registry.Add(adapter);
-        return ValueTask.CompletedTask;
+        return ValueTask.FromResult<AiProviderActivation?>(new AiProviderActivation { Adapter = adapter });
     }
 }

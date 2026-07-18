@@ -29,12 +29,17 @@ public sealed class ZenGardenServiceDiscoveryContributionSpec
 
         using var provider = services.BuildServiceProvider();
         var coordinator = provider.GetRequiredService<IServiceDiscoveryCoordinator>();
-        var result = await coordinator.DiscoverService("mongo", new DiscoveryContext());
+        var result = await coordinator.DiscoverService("mongo", new DiscoveryContext
+        {
+            RequiredCapabilities = ["tenant-segmented", "model-x"]
+        });
 
         result.IsSuccessful.Should().BeTrue();
         result.ServiceUrl.Should().Be(Endpoint);
         result.DiscoveryMethod.Should().Be(Constants.Composition.SourceId);
         source.Selectors.Should().Equal("mongo", "mongodb");
+        source.CapabilityRequests.Should().OnlyContain(request =>
+            request.SequenceEqual(new[] { "tenant-segmented", "model-x" }));
     }
 
     [Theory]
@@ -103,12 +108,14 @@ public sealed class ZenGardenServiceDiscoveryContributionSpec
         bool throwOnResolve = false) : IZenGardenInitializationProvider
     {
         public List<string> Selectors { get; } = [];
+        public List<IReadOnlyList<string>> CapabilityRequests { get; } = [];
 
         public ValueTask<ZenGardenOfferingResolution?> Resolve(
             ZenGardenConnectionIntent intent,
             CancellationToken cancellationToken = default)
         {
             Selectors.Add(intent.Offering);
+            CapabilityRequests.Add(intent.Capabilities);
             if (throwOnResolve)
             {
                 throw new InvalidOperationException("topology unavailable");

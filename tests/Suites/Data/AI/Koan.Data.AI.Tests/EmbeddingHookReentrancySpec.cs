@@ -34,6 +34,7 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
 {
     private IntegrationHost? _host;
     private readonly FakeEmbedAdapter _embedder = new();
+    private readonly MutableTestAdapterRegistry _adapters = new();
     private int _asyncDomainUpserts;
 
     public async ValueTask InitializeAsync()
@@ -48,6 +49,7 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
             .ConfigureServices(s =>
             {
                 s.AddLogging();
+                s.AddSingleton<IAiAdapterRegistry>(_adapters);
                 s.AddKoan(() =>
                     AsyncEmbeddingDoc.Lifecycle.AfterUpsert(_ => Interlocked.Increment(ref _asyncDomainUpserts)));
             })
@@ -59,7 +61,7 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
         {
             ["Embedding"] = new AiCapabilityConfig { Model = "test-embed", AutoDownload = false },
         };
-        _host.Services.GetRequiredService<IAiAdapterRegistry>().Add(_embedder);
+        _adapters.Add(_embedder);
         _host.Services.GetRequiredService<IAiSourceRegistry>().RegisterSource(new AiSourceDefinition
         {
             Name = "fake",
@@ -73,6 +75,23 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
             Capabilities = caps,
             Origin = "in-process",
         });
+    }
+
+    private sealed class MutableTestAdapterRegistry : IAiAdapterRegistry
+    {
+        private readonly List<IAiAdapter> _adapters = [];
+
+        public IReadOnlyList<IAiAdapter> All => _adapters.ToArray();
+
+        public IAiAdapter? Get(string id) => _adapters.FirstOrDefault(adapter =>
+            string.Equals(adapter.Id, id, StringComparison.OrdinalIgnoreCase));
+
+        public void Add(IAiAdapter adapter)
+        {
+            if (Get(adapter.Id) is not null)
+                throw new InvalidOperationException($"Duplicate test adapter '{adapter.Id}'.");
+            _adapters.Add(adapter);
+        }
     }
 
     public async ValueTask DisposeAsync()

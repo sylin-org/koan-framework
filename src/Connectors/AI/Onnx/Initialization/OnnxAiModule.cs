@@ -1,7 +1,8 @@
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
-using Koan.AI.Contracts.Adapters;
+using Koan.AI.Providers;
+using Koan.Core.Semantics.Contributions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,13 +14,16 @@ namespace Koan.AI.Connector.Onnx.Initialization;
 /// Auto-registers the in-process ONNX embedding contributor (Reference = Intent). It only produces an
 /// adapter when a model is configured, so referencing the package is safe even before a model is supplied.
 /// </summary>
-public sealed class OnnxAiModule : KoanModule
+public sealed class OnnxAiModule : KoanModule, IContributeTo<AiProviderContributionTarget>
 {
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<OnnxOptions>(OnnxOptions.Section);
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAiAdapterContributor, OnnxAdapterContributor>());
+        services.TryAddSingleton(sp => OnnxAdapterContributor.CreateAdapter(sp));
     }
+
+    public void Contribute(AiProviderContributionTarget target) =>
+        target.Add<OnnxAdapterContributor>("onnx");
 
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {

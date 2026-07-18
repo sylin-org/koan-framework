@@ -4,9 +4,11 @@ using System.Linq;
 using Koan.AI.Contracts.Options;
 using Koan.AI.Infrastructure;
 using Koan.AI.Pillars;
+using Koan.AI.Providers;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Provenance;
+using Koan.Core.Semantics.Contributions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -19,15 +21,30 @@ public sealed class AiModule : KoanModule
     public override void Register(IServiceCollection services)
     {
         AiPillarManifest.EnsureRegistered();
-        // Bind options if IConfiguration is present later; AddAi also binds when config is provided.
+
+        var planBuilder = new AiProviderPlanBuilder();
+        SemanticContributionPlans.Schedule<AiProviderContributionTarget, AiProviderPlan>(
+            services,
+            planBuilder.ForOwner,
+            planBuilder.Build,
+            static (collection, plan) =>
+            {
+                collection.Replace(ServiceDescriptor.Singleton(plan));
+                foreach (var provider in plan.Providers)
+                {
+                    collection.TryAdd(ServiceDescriptor.Singleton(provider.ActivatorType, provider.ActivatorType));
+                }
+            });
+
+        services.TryAddSingleton(AiProviderPlan.Empty);
         services.AddAi();
-        services.TryAddSingleton<AiAdapterContributorInitializer>();
+        services.TryAddSingleton<AiProviderPlanInitializer>();
         services.TryAddSingleton<AiProvenancePublisher>();
     }
 
     public override async Task Start(IServiceProvider services, CancellationToken ct)
     {
-        await services.GetRequiredService<AiAdapterContributorInitializer>()
+        await services.GetRequiredService<AiProviderPlanInitializer>()
             .Initialize(ct)
             .ConfigureAwait(false);
         await services.GetRequiredService<AiProvenancePublisher>()
@@ -53,7 +70,6 @@ public sealed class AiModule : KoanModule
         DescribeConfiguredSources(module, configuration);
         DescribeCategoryRouting(module, configuration);
         DescribeActiveRecipe(module, configuration);
-        DescribeLegacyOllama(module, configuration);
 
         module.AddNote("AI pipeline registered via Microsoft.Extensions.AI (default chat + embeddings bridged to existing adapters).");
     }
@@ -180,38 +196,5 @@ public sealed class AiModule : KoanModule
         });
     }
 
-    private static void DescribeLegacyOllama(ProvenanceModuleWriter module, IConfiguration configuration)
-    {
-        var baseUrl = Configuration.ReadWithSource(configuration, ConfigurationConstants.Ollama.BaseUrl, "");
-        var defaultModel = Configuration.ReadWithSource(configuration, ConfigurationConstants.Ollama.DefaultModel, "");
-
-        if (!string.IsNullOrWhiteSpace(baseUrl.Value) || !baseUrl.UsedDefault)
-        {
-            module.PublishConfigValue(KoanAiProvenanceItems.LegacyOllamaBaseUrl, baseUrl);
-        }
-
-        if (!string.IsNullOrWhiteSpace(defaultModel.Value) || !defaultModel.UsedDefault)
-        {
-            module.PublishConfigValue(KoanAiProvenanceItems.LegacyOllamaDefaultModel, defaultModel);
-        }
-
-        var capabilitySection = configuration.GetSection(ConfigurationConstants.Ollama.Capabilities);
-        if (capabilitySection.Exists())
-        {
-            var capabilitySummaries = capabilitySection.GetChildren()
-                .Select(capability =>
-                {
-                    var model = capability["Model"] ?? "(missing model)";
-                    var autoDownload = capability.GetValue("AutoDownload", true) ? "auto-download" : "manual";
-                    return $"{capability.Key}: model={model}, {autoDownload}";
-                })
-                .ToArray();
-
-            if (capabilitySummaries.Length > 0)
-            {
-                module.AddNote("Legacy Ollama capabilities → " + string.Join("; ", capabilitySummaries));
-            }
-        }
-    }
 }
 

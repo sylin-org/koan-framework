@@ -38,7 +38,9 @@ internal sealed class ZenGardenDiscoverySource : IDiscoveryCandidateSource
         foreach (var selector in request.ServiceSelectors)
         {
             var candidates = await Resolve(
-                    ZenGardenConnectionIntent.ForOffering(selector),
+                    ZenGardenConnectionIntent.ForOffering(
+                        selector,
+                        capabilities: request.Context.RequiredCapabilities),
                     request.ServiceName,
                     cancellationToken)
                 .ConfigureAwait(false);

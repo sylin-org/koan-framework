@@ -1,125 +1,43 @@
-using System;
-using System.Collections.Generic;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
-using Koan.AI.Contracts.Adapters;
 using Koan.AI.Connector.LMStudio.Discovery;
 using Koan.AI.Connector.LMStudio.Infrastructure;
 using Koan.AI.Connector.LMStudio.Options;
-using Koan.AI.Connector.LMStudio.Orchestration;
+using Koan.AI.Providers;
 using Koan.Core;
-using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
-using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
-using Koan.Core.Provenance;
-using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
-using KoanConfiguration = Koan.Core.Configuration;
+using Koan.Core.Semantics.Contributions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Koan.AI.Connector.LMStudio.Initialization;
 
-public sealed class LMStudioAiModule : KoanModule
+public sealed class LMStudioAiModule : KoanModule, IContributeTo<AiProviderContributionTarget>
 {
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<LMStudioOptions>(Constants.Section);
-        services.AddSingleton<IConfigureOptions<LMStudioOptions>, LMStudioOptionsConfigurator>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, LMStudioDiscoveryAdapter>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, LMStudioOrchestrationEvaluator>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAiAdapterContributor, LMStudioAdapterContributor>());
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, LMStudioDiscoveryAdapter>());
+        services.TryAddSingleton(sp => new LMStudioAdapter(
+            new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(
+                    sp.GetRequiredService<IOptionsMonitor<LMStudioOptions>>()
+                        .CurrentValue.RequestTimeoutSeconds)
+            },
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LMStudioAdapter>>(),
+            sp.GetService<IOptions<Core.Adapters.AdaptersReadinessOptions>>()?.Value,
+            sp.GetRequiredService<IOptionsMonitor<LMStudioOptions>>().CurrentValue));
     }
 
-    public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
-    {
-        module.Describe(Version);
-        module.AddNote("LM Studio discovery handled by autonomous LMStudioDiscoveryAdapter");
+    public void Contribute(AiProviderContributionTarget target) =>
+        target.Add<LMStudioAdapterContributor>(Constants.Adapter.Type);
 
-        var defaults = new LMStudioOptions();
-
-        var connection = KoanConfiguration.ReadFirstWithSource(
-                cfg,
-                defaults.ConnectionString,
-                Constants.Configuration.Keys.ConnectionString,
-                Constants.Configuration.Keys.AltConnectionString,
-                "ConnectionStrings:LMStudio",
-                "ConnectionStrings:Default");
-
-        var baseUrl = KoanConfiguration.ReadFirstWithSource(
-                cfg,
-                defaults.BaseUrl,
-                Constants.Configuration.Keys.BaseUrl,
-                Constants.Configuration.Keys.AltBaseUrl);
-
-        var defaultModel = KoanConfiguration.ReadFirstWithSource(
-                cfg,
-                defaults.DefaultModel ?? "none",
-                Constants.Configuration.Keys.DefaultModel,
-                Constants.Configuration.Keys.AltDefaultModel);
-
-        var apiKey = KoanConfiguration.ReadFirstWithSource(
-                cfg,
-                defaults.ApiKey ?? "",
-                Constants.Configuration.Keys.ApiKey,
-                Constants.Discovery.EnvKey);
-
-        module.PublishConfigValue(LMStudioProvenanceItems.ConnectionString, connection);
-        module.PublishConfigValue(LMStudioProvenanceItems.BaseUrl, baseUrl, displayOverride: ResolveDisplayBase(cfg, connection, baseUrl, defaults));
-        module.PublishConfigValue(LMStudioProvenanceItems.DefaultModel, defaultModel);
-        module.PublishConfigValue(LMStudioProvenanceItems.ApiKey, apiKey, sanitizeOverride: true);
-    }
-
-    private static object ResolveDisplayBase(
+    public override void Report(
+        Core.Provenance.ProvenanceModuleWriter module,
         IConfiguration cfg,
-        ConfigurationValue<string> connection,
-        ConfigurationValue<string> baseUrl,
-        LMStudioOptions defaults)
-    {
-        var needsFallback = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
-        if (!needsFallback)
-        {
-            return baseUrl.Value ?? defaults.BaseUrl;
-        }
-
-        var adapter = new LMStudioDiscoveryAdapter(cfg, NullLogger<LMStudioDiscoveryAdapter>.Instance);
-        var resolved = ServiceDiscoveryReporting.ResolveConnectionString(
-            cfg,
-            adapter,
-            null,
-            () => defaults.BaseUrl);
-
-        return resolved;
-    }
+        Microsoft.Extensions.Hosting.IHostEnvironment env) =>
+        module.Describe(Version);
 }
-
-internal static class LMStudioProvenanceItems
-{
-    public static readonly ProvenanceItem ConnectionString = new(
-        "Koan.AI.LMStudio.ConnectionString",
-        "Connection string",
-        "LM Studio endpoint or discovery directive (auto).",
-        DefaultValue: "auto");
-
-    public static readonly ProvenanceItem BaseUrl = new(
-        "Koan.AI.LMStudio.BaseUrl",
-        "Base URL",
-        "LM Studio base URL when discovery resolves to localhost.",
-        DefaultValue: "http://localhost:1234");
-
-    public static readonly ProvenanceItem DefaultModel = new(
-        "Koan.AI.LMStudio.DefaultModel",
-        "Default model",
-        "Model alias used when requests omit an explicit model.");
-
-    public static readonly ProvenanceItem ApiKey = new(
-        "Koan.AI.LMStudio.ApiKey",
-        "API key",
-        "LM Studio Bearer token for secured endpoints.",
-        IsSecret: true,
-        MustSanitize: true,
-        DocumentationLink: "https://lmstudio.ai");
-}
-

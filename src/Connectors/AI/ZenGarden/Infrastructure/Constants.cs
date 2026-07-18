@@ -11,7 +11,6 @@ internal static class Constants
 
     internal static class Discovery
     {
-        public const string WellKnownServiceName = "zen-garden-ai";
         public const string OfferingName = "zen-garden.ai.orchestrator";
     }
 

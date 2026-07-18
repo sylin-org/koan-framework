@@ -30,10 +30,8 @@ public sealed class AiSourceRegistry : IAiSourceRegistry
         // 1. Discover explicit sources from Koan:Ai:Sources
         DiscoverExplicitSources(config, logger);
 
-        // 2. Handle backward-compatible Koan:Ai:Ollama config (creates "Default" source if configured)
-        DiscoverLegacyOllamaConfig(config, logger);
-
-        // NO implicit "Default" source creation - ADR-0015 requires election
+        // Provider packages own provider configuration and publish their default sources during
+        // the compiled activation pass. The concern registry only owns explicitly named sources.
     }
 
     private void DiscoverExplicitSources(IConfiguration config, ILogger? logger)
@@ -120,77 +118,6 @@ public sealed class AiSourceRegistry : IAiSourceRegistry
                 priority,
                 members.Count);
         }
-    }
-
-    private void DiscoverLegacyOllamaConfig(IConfiguration config, ILogger? logger)
-    {
-        var ollamaSection = config.GetSection(ConfigurationConstants.Ollama.Section);
-        if (!ollamaSection.Exists())
-        {
-            return;
-        }
-
-        var defaultModel = ollamaSection["DefaultModel"];
-        var baseUrl = ollamaSection["BaseUrl"];
-
-        // Check if we already have an "ollama" source from explicit config
-        if (_sources.ContainsKey("ollama"))
-        {
-            logger?.LogDebug("Skipping legacy Ollama config - 'ollama' source already exists from explicit config");
-            return;
-        }
-
-        // Parse capability-specific models
-        var capabilities = ParseCapabilities(ollamaSection.GetSection("Capabilities"), logger);
-
-        // If no capability-specific config but DefaultModel is set, use for all capabilities
-        if (capabilities.Count == 0 && !string.IsNullOrWhiteSpace(defaultModel))
-        {
-            capabilities = new Dictionary<string, AiCapabilityConfig>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Chat"] = new AiCapabilityConfig { Model = defaultModel },
-                ["Embedding"] = new AiCapabilityConfig { Model = defaultModel }
-            };
-        }
-
-        if (capabilities.Count == 0 && string.IsNullOrWhiteSpace(baseUrl))
-        {
-            // No useful configuration
-            return;
-        }
-
-        // Create legacy "Default" source only if user explicitly configured Ollama
-        // This maintains backward compatibility
-        var members = new List<AiMemberDefinition>();
-
-        if (!string.IsNullOrWhiteSpace(baseUrl))
-        {
-            members.Add(new AiMemberDefinition
-            {
-                Name = "Default::legacy",
-                ConnectionString = baseUrl,
-                Order = 0,
-                Origin = "legacy-config",
-                IsAutoDiscovered = false
-            });
-        }
-
-        RegisterSource(new AiSourceDefinition
-        {
-            Name = "Default", // Legacy name for backward compat
-            Provider = "ollama",
-            Priority = 50,
-            Policy = "Fallback",
-            Members = members,
-            Capabilities = (IReadOnlyDictionary<string, AiCapabilityConfig>)capabilities,
-            Origin = "legacy-config",
-            IsAutoDiscovered = false
-        });
-
-        logger?.LogDebug(
-            "Created 'Default' AI source from legacy Koan:Ai:Ollama config with {CapabilityCount} capabilities, {MemberCount} members",
-            capabilities.Count,
-            members.Count);
     }
 
     private static Dictionary<string, AiCapabilityConfig> ParseCapabilities(

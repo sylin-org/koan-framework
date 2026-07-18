@@ -14,7 +14,6 @@ namespace Koan.AI.Connector.ZenGarden;
 /// Implements every Protocol adapter interface — the orchestrator handles native API dispatch
 /// to individual services (Ollama, ComfyUI, whisper.cpp, Infinity, etc.).
 /// </summary>
-[AiAdapterDescriptor(priority: 0)]
 internal sealed class ZenGardenAiAdapter :
     IChatAdapter,
     IEmbedAdapter,
@@ -31,23 +30,13 @@ internal sealed class ZenGardenAiAdapter :
     private readonly HashSet<string> _discoveredCapabilities;
 
     public ZenGardenAiAdapter(
-        HttpClient http,
-        ILogger<ZenGardenAiAdapter> logger,
-        IReadOnlySet<string>? discoveredCapabilities = null)
+        ZenGardenAiRuntime runtime,
+        ILogger<ZenGardenAiAdapter> logger)
     {
-        _http = http ?? throw new ArgumentNullException(nameof(http));
+        ArgumentNullException.ThrowIfNull(runtime);
+        _http = runtime.Client;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _discoveredCapabilities = discoveredCapabilities is not null
-            ? new HashSet<string>(discoveredCapabilities, StringComparer.OrdinalIgnoreCase)
-            : new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                AiCapability.Chat, AiCapability.Embed, AiCapability.Ocr,
-                AiCapability.Vision, AiCapability.Streaming, AiCapability.Tools,
-                AiCapability.Imagine, AiCapability.Transcribe, AiCapability.Speak,
-                AiCapability.Edit, AiCapability.Rerank, AiCapability.Render,
-                AiCapability.Translate, AiCapability.Moderate,
-                AiCapability.Pull, AiCapability.ModelList,
-            };
+        _discoveredCapabilities = new HashSet<string>(runtime.Capabilities, StringComparer.OrdinalIgnoreCase);
     }
 
     // ── Identity ──────────────────────────────────────────────────
@@ -129,9 +118,10 @@ internal sealed class ZenGardenAiAdapter :
         await using var stream = await resp.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream);
 
-        while (!reader.EndOfStream && !ct.IsCancellationRequested)
+        while (!ct.IsCancellationRequested)
         {
             var line = await reader.ReadLineAsync(ct);
+            if (line is null) break;
             if (string.IsNullOrEmpty(line)) continue;
 
             using var doc = JsonDocument.Parse(line);
@@ -388,10 +378,10 @@ internal sealed class ZenGardenAiAdapter :
                 {
                     role = m.Role,
                     content = m.Content,
-                    images = m.Parts
+                    images = (object?)m.Parts
                         .Where(p => p.Type == "image" && p.Data is byte[])
                         .Select(p => Convert.ToBase64String((byte[])p.Data!))
-                        .ToArray() as object
+                        .ToArray()
                 };
             }
             return new { role = m.Role, content = m.Content, images = (object?)null };

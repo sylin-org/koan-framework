@@ -47,7 +47,8 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IHealthContributor, AiSourcesHealthContributor>();
 
         // Register infrastructure
-        services.TryAddSingleton<IAiAdapterRegistry, InMemoryAdapterRegistry>();
+        services.TryAddSingleton<InMemoryAdapterRegistry>();
+        services.TryAddSingleton<IAiAdapterRegistry>(sp => sp.GetRequiredService<InMemoryAdapterRegistry>());
         services.TryAddSingleton<IAiRecipeProvider>(sp =>
         {
             var configuration = sp.GetRequiredService<IConfiguration>();

@@ -1,180 +1,76 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
+using Koan.AI.Connector.LMStudio.Infrastructure;
+using Koan.Core.Orchestration;
+using Koan.Core.Orchestration.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
-using Koan.AI.Connector.LMStudio.Infrastructure;
-using Koan.Core;
-using Koan.Core.Orchestration;
-using Koan.Core.Orchestration.Abstractions;
-using Koan.Core.Services;
 
 namespace Koan.AI.Connector.LMStudio.Discovery;
 
-internal sealed class LMStudioDiscoveryAdapter : ServiceDiscoveryAdapterBase
+internal sealed class LMStudioDiscoveryAdapter(
+    IConfiguration configuration,
+    ILogger<LMStudioDiscoveryAdapter> logger)
+    : ServiceDiscoveryAdapterBase(configuration, logger)
 {
-    public LMStudioDiscoveryAdapter(IConfiguration configuration, ILogger<LMStudioDiscoveryAdapter> logger)
-        : base(configuration, logger)
-    {
-    }
-
-    public override string ServiceName => Infrastructure.Constants.Discovery.WellKnownServiceName;
-
-    public override string[] Aliases => new[] { "lm-studio", "openai-compatible", "lmstudio" };
+    public override string ServiceName => Constants.Adapter.Type;
+    public override string[] Aliases => ["lm-studio"];
 
     protected override Type GetFactoryType() => typeof(LMStudioServiceDescriptor);
 
-    protected override IEnumerable<DiscoveryCandidate> BuildRuntimeCandidates(KoanServiceAttribute attribute)
-    {
-        var candidates = new List<DiscoveryCandidate>();
-
-        if (KoanEnv.InContainer)
-        {
-            if (!string.IsNullOrWhiteSpace(attribute.LocalHost))
-            {
-                var hostUrl = $"{attribute.LocalScheme}://{attribute.LocalHost}:{attribute.LocalPort}";
-                candidates.Add(new DiscoveryCandidate(
-                    hostUrl,
-                    "host-first",
-                    DiscoveryCandidatePriority.Automatic));
-            }
-
-            if (!string.IsNullOrWhiteSpace(attribute.Host))
-            {
-                var containerUrl = $"{attribute.Scheme}://{attribute.Host}:{attribute.EndpointPort}";
-                candidates.Add(new DiscoveryCandidate(
-                    containerUrl,
-                    "container-fallback",
-                    DiscoveryCandidatePriority.HostGateway));
-            }
-        }
-        else
-        {
-            if (!string.IsNullOrWhiteSpace(attribute.LocalHost))
-            {
-                var localUrl = $"{attribute.LocalScheme}://{attribute.LocalHost}:{attribute.LocalPort}";
-                candidates.Add(new DiscoveryCandidate(
-                    localUrl,
-                    "local",
-                    DiscoveryCandidatePriority.Automatic));
-            }
-        }
-
-        return candidates;
-    }
+    protected override string? ReadExplicitConfiguration() =>
+        _configuration.GetConnectionString("LMStudio");
 
     protected override string? ReadAspireServiceDiscovery() =>
-        _configuration[$"services:{ServiceName}:default:0"] ??
-        _configuration[$"services:{ServiceName}-ai:default:0"];
+        _configuration[$"services:{ServiceName}:default:0"];
 
-    protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
+    protected override async Task<bool> ValidateServiceHealth(
+        string serviceUrl,
+        DiscoveryContext context,
+        CancellationToken cancellationToken)
     {
-        using var httpClient = new HttpClient { Timeout = context.HealthCheckTimeout };
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(context.HealthCheckTimeout);
+        using var client = new HttpClient { Timeout = context.HealthCheckTimeout };
+        var endpoint = new Uri(
+            new Uri(serviceUrl.TrimEnd('/') + "/"),
+            Constants.Discovery.ModelsPath.TrimStart('/'));
+        using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
 
-        var baseUri = new Uri(serviceUrl.TrimEnd('/'));
-        var modelsUri = new Uri(baseUri, Infrastructure.Constants.Discovery.ModelsPath);
+        if (context.Parameters?.TryGetValue("apiKey", out var keyValue) == true
+            && keyValue is string apiKey
+            && !string.IsNullOrWhiteSpace(apiKey))
+        {
+            request.Headers.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+        }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, modelsUri);
-        AttachAuthHeader(context, request);
-
-        var response = await httpClient.SendAsync(request, cts.Token);
+        using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode) return false;
 
-        var payload = await response.Content.ReadAsStringAsync(cts.Token);
-        if (context.Parameters != null &&
-            context.Parameters.TryGetValue("requiredModel", out var requiredModelObj) &&
-            requiredModelObj is string requiredModel &&
-            !string.IsNullOrWhiteSpace(requiredModel))
+        if (context.Parameters?.TryGetValue("requiredModel", out var modelValue) != true
+            || modelValue is not string requiredModel
+            || string.IsNullOrWhiteSpace(requiredModel))
         {
-            if (!EndpointHasModel(payload, requiredModel))
-            {
-                return false;
-            }
+            return true;
         }
 
-        return true;
-    }
-
-    protected override string? ReadExplicitConfiguration()
-    {
-        return _configuration.GetConnectionString("LMStudio") ??
-            _configuration[Constants.Configuration.Keys.ConnectionString] ??
-            _configuration[$"{Constants.Section}:BaseUrl"];
-    }
-
-    protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
-    {
-        var candidates = new List<DiscoveryCandidate>();
-
-        var baseUrl = Environment.GetEnvironmentVariable(Constants.Discovery.EnvBaseUrl);
-        if (!string.IsNullOrWhiteSpace(baseUrl))
-        {
-            candidates.Add(new DiscoveryCandidate(
-                baseUrl,
-                "env-base-url",
-                DiscoveryCandidatePriority.Environment));
-        }
-
-        var list = Environment.GetEnvironmentVariable(Constants.Discovery.EnvList);
-        if (!string.IsNullOrWhiteSpace(list))
-        {
-            candidates.AddRange(list.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(url => new DiscoveryCandidate(
-                    url.Trim(),
-                    "env-list",
-                    DiscoveryCandidatePriority.Environment)));
-        }
-
-        return candidates;
+        var payload = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        return EndpointHasModel(payload, requiredModel);
     }
 
     private static bool EndpointHasModel(string payload, string requiredModel)
     {
         try
         {
-            var json = JToken.Parse(payload);
-            var data = json["data"] as JArray;
-            if (data is null) return false;
-
-            foreach (var model in data)
-            {
-                var id = model?["id"]?.ToString();
-                if (string.IsNullOrWhiteSpace(id)) continue;
-
-                if (string.Equals(id, requiredModel, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-
-                var basename = id.Split(':')[0];
-                if (string.Equals(basename, requiredModel, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
+            return JToken.Parse(payload)["data"] is JArray models
+                && models.Any(model => ModelMatches(model?["id"]?.ToString(), requiredModel));
         }
         catch
         {
             return false;
         }
-
-        return false;
     }
 
-    private static void AttachAuthHeader(DiscoveryContext context, HttpRequestMessage request)
-    {
-        if (context.Parameters != null &&
-            context.Parameters.TryGetValue("apiKey", out var keyObj) &&
-            keyObj is string apiKey &&
-            !string.IsNullOrWhiteSpace(apiKey))
-        {
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
-        }
-    }
+    private static bool ModelMatches(string? candidate, string requiredModel) =>
+        !string.IsNullOrWhiteSpace(candidate)
+        && (string.Equals(candidate, requiredModel, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(candidate.Split(':')[0], requiredModel, StringComparison.OrdinalIgnoreCase));
 }

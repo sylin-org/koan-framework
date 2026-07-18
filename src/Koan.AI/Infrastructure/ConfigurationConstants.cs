@@ -44,14 +44,6 @@ internal static class ConfigurationConstants
         public const string Section = ConfigurationConstants.Section + ":Sources";
     }
 
-    public static class Ollama
-    {
-        public const string Section = ConfigurationConstants.Section + ":Ollama";
-        public const string BaseUrl = Ollama.Section + ":BaseUrl";
-        public const string DefaultModel = Ollama.Section + ":DefaultModel";
-        public const string Capabilities = Ollama.Section + ":Capabilities";
-    }
-
     /// <summary>
     /// Builds full configuration path: "Koan:Ai:{key}".
     /// </summary>

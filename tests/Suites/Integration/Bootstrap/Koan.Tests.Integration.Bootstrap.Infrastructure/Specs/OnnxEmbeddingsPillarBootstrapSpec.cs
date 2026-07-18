@@ -108,20 +108,19 @@ public sealed class OnnxEmbeddingsPillarBootstrapSpec
     }
 
     [Fact(Explicit = true)]
-    public async Task Misconfigured_model_path_degrades_cleanly_without_registering()
+    public async Task Misconfigured_model_path_fails_boot_with_corrective_error()
     {
-        // A configured-but-missing model must not silently register a broken embedder. The contributor
-        // fails loud; the AI initializer's swallow-and-warn policy turns that into "no adapter", never a
-        // wrong one.
-        await using var host = await KoanIntegrationHost.Configure()
+        // Explicit configuration is intent. A missing model must fail boot rather than silently removing
+        // the provider the application asked Koan to activate.
+        var builder = KoanIntegrationHost.Configure()
             .WithSetting("Koan:Environment", "Test")
             .WithSetting("Koan:Ai:Onnx:ModelPath", "does-not-exist.onnx")
-            .ConfigureServices(services => services.AddKoan())
-            .StartAsync();
+            .ConfigureServices(services => services.AddKoan());
 
-        var registry = host.Services.GetRequiredService<IAiAdapterRegistry>();
-        registry.All.OfType<IEmbedAdapter>().Any(a => a.Type == "onnx")
-            .Should().BeFalse("a missing model must yield no ONNX adapter, not a broken one");
+        var start = async () => await builder.StartAsync();
+
+        await start.Should().ThrowAsync<FileNotFoundException>()
+            .WithMessage("*ONNX embedding model not found*Koan:Ai:Onnx:ModelPath*");
     }
 
     private static double Cosine(float[] a, float[] b)

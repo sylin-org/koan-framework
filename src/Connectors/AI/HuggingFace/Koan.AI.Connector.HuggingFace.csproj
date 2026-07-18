@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\Koan.AI.Models\Koan.AI.Models.csproj" />
+    <ProjectReference Include="..\..\..\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\..\..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Koan.AI.Contracts.Shared\Koan.AI.Contracts.Shared.csproj" />
   </ItemGroup>

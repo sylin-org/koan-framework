@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
 using FastBertTokenizer;
-using Koan.AI.Contracts.Adapters;
-using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
+using Koan.AI.Providers;
 using Koan.Core.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -19,25 +18,41 @@ namespace Koan.AI.Connector.Onnx.Initialization;
 /// embedder with no model is meaningless. A configured-but-missing model/vocab fails loud — silent
 /// no-embedding would be worse than a clear boot error.
 /// </summary>
-internal sealed class OnnxAdapterContributor : IAiAdapterContributor
+internal sealed class OnnxAdapterContributor : IAiProviderActivator
 {
-    public async ValueTask Contribute(IServiceProvider services, CancellationToken cancellationToken)
+    public ValueTask<AiProviderActivation?> Activate(IServiceProvider services, CancellationToken cancellationToken)
     {
         var options = services.GetService<IOptions<OnnxOptions>>()?.Value ?? new OnnxOptions();
-        var registry = services.GetRequiredService<IAiAdapterRegistry>();
-        var sourceRegistry = services.GetRequiredService<IAiSourceRegistry>();
         var logger = services.GetService<ILogger<OnnxAdapterContributor>>() ?? NullLogger<OnnxAdapterContributor>.Instance;
 
         if (string.IsNullOrWhiteSpace(options.ModelPath))
         {
             KoanLog.BootInfo(logger, LogAction, "inactive",
                 ("reason", "model-not-configured"));
-            return;
+            return ValueTask.FromResult<AiProviderActivation?>(null);
         }
 
-        // Relative paths resolve against the app base dir, so a bundled model (copied next to the exe)
-        // works the same whether run from the project, published, or single-file.
-        var modelPath = Resolve(options.ModelPath);
+        var adapter = services.GetRequiredService<OnnxEmbeddingAdapter>();
+        var source = BuildSource(adapter);
+
+        KoanLog.BootInfo(logger, LogAction, "ready",
+            ("model", options.ModelName),
+            ("dimension", adapter.Dimension),
+            ("path", Resolve(options.ModelPath)));
+
+        return ValueTask.FromResult<AiProviderActivation?>(new AiProviderActivation
+        {
+            Adapter = adapter,
+            Sources = [source]
+        });
+    }
+
+    internal static OnnxEmbeddingAdapter CreateAdapter(IServiceProvider services)
+    {
+        var options = services.GetRequiredService<IOptions<OnnxOptions>>().Value;
+        var configuredModelPath = options.ModelPath
+            ?? throw new InvalidOperationException("Koan:Ai:Onnx:ModelPath is required when the ONNX provider activates.");
+        var modelPath = Resolve(configuredModelPath);
         if (!File.Exists(modelPath))
             throw new FileNotFoundException(
                 $"ONNX embedding model not found at '{modelPath}'. Set Koan:Ai:Onnx:ModelPath to a valid ONNX sentence-embedding model.",
@@ -53,18 +68,11 @@ internal sealed class OnnxAdapterContributor : IAiAdapterContributor
 
         var tokenizer = new BertTokenizer();
         using (var reader = File.OpenText(vocabPath))
-            await tokenizer.LoadVocabularyAsync(reader, convertInputToLowercase: options.LowercaseInput).ConfigureAwait(false);
+            tokenizer.LoadVocabularyAsync(reader, convertInputToLowercase: options.LowercaseInput)
+                .GetAwaiter().GetResult();
 
         var session = new InferenceSession(modelPath);
-        var adapter = new OnnxEmbeddingAdapter(options, session, tokenizer);
-        registry.Add(adapter);
-
-        RegisterSource(sourceRegistry, adapter);
-
-        KoanLog.BootInfo(logger, LogAction, "registered",
-            ("model", options.ModelName),
-            ("dimension", adapter.Dimension),
-            ("path", modelPath));
+        return new OnnxEmbeddingAdapter(options, session, tokenizer);
     }
 
     /// <summary>
@@ -77,7 +85,7 @@ internal sealed class OnnxAdapterContributor : IAiAdapterContributor
     /// exactly as Ollama carries its default model. The single member's connection string is a placeholder:
     /// an in-process adapter needs no endpoint.
     /// </summary>
-    private static void RegisterSource(IAiSourceRegistry sourceRegistry, OnnxEmbeddingAdapter adapter)
+    private static AiSourceDefinition BuildSource(OnnxEmbeddingAdapter adapter)
     {
         var capabilities = new Dictionary<string, AiCapabilityConfig>(StringComparer.OrdinalIgnoreCase)
         {
@@ -110,7 +118,7 @@ internal sealed class OnnxAdapterContributor : IAiAdapterContributor
             IsAutoDiscovered = false,
         };
 
-        sourceRegistry.RegisterSource(source);
+        return source;
     }
 
     private static string Resolve(string path)
