@@ -1073,7 +1073,7 @@
     {
       "packageId": "Sylin.Koan.Data.Connector.Redis",
       "shape": "library",
-      "description": "Redis-backed key/value repository adapter for Koan: simple CRUD, paging guardrails, and options binding.",
+      "description": "Redis-backed key/value Entity persistence for Koan with explicit caller paging, source routing, shared connection pooling, and participation-aware health.",
       "targetFrameworks": [
         "net10.0"
       ],

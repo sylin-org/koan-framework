@@ -60,7 +60,6 @@ source: src/Koan.Data.Connector.SqlServer/
 
 ## References
 
-- DATA-0044 paging guardrails: `/docs/decisions/DATA-0044-paging-guardrails-and-tracing-must.md`
 - [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
 - [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
 

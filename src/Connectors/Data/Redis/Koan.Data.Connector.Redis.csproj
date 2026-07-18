@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Description>Redis-backed key/value repository adapter for Koan: simple CRUD, paging guardrails, and options binding.</Description>
+    <Description>Redis-backed key/value Entity persistence for Koan with explicit caller paging, source routing, shared connection pooling, and participation-aware health.</Description>
     <PackageTags>$(CommonPackageTags);data;redis;keyvalue;repository</PackageTags>
   </PropertyGroup>
   <ItemGroup>
