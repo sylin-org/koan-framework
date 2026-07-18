@@ -16,13 +16,6 @@ public sealed class AuthLifecycleOptions
     public RoleListFileOptions RoleListFile { get; set; } = new();
 
     /// <summary>
-    /// Options for the optional <c>AdminBootstrapContributor</c>. Controls one-shot
-    /// admin elevation modes (<c>FirstUser</c> / <c>ClaimMatch</c>). Default <c>Mode=None</c>
-    /// disables the contributor.
-    /// </summary>
-    public AdminBootstrapOptions AdminBootstrap { get; set; } = new();
-
-    /// <summary>
     /// Email-keyed role list read from a JSON file at sign-in. Operations are explicit:
     /// <c>allow</c> adds roles to the principal; <c>revoke</c> strips roles (runs after the rest
     /// of the contributor pipeline so it overrides upstream contributors). An email not present
@@ -45,14 +38,5 @@ public sealed class AuthLifecycleOptions
 
         /// <summary>How often the contributor may <c>stat()</c> the file to pick up edits. mtime-based reload.</summary>
         public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(30);
-    }
-
-    /// <summary>One-shot admin elevation. Modes: <c>None</c> (default) | <c>FirstUser</c> | <c>ClaimMatch</c>.</summary>
-    public sealed class AdminBootstrapOptions
-    {
-        public string Mode { get; set; } = "None";
-        public string[] AdminEmails { get; set; } = [];
-        public string ClaimType { get; set; } = System.Security.Claims.ClaimTypes.Email;
-        public string[] ClaimValues { get; set; } = [];
     }
 }

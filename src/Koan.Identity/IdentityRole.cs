@@ -7,9 +7,9 @@ using Koan.Data.Core.Relationships;
 namespace Koan.Identity;
 
 /// <summary>
-/// SEC-0007 D3 / Layer 2 — the GLOBAL user↔role binding (the no-tenancy case) over the one role catalog
-/// (<c>Koan.Web.Auth.Roles</c>). Per-tenant binding stays <c>Membership.Roles</c>; one catalog, bound globally OR
-/// per-membership, never two. A deterministic id keeps a re-grant idempotent.
+/// SEC-0007 D3 / Layer 2 — the GLOBAL user↔role binding (the no-tenancy case) over standard .NET role keys.
+/// Per-tenant binding stays <c>Membership.Roles</c>; one vocabulary is bound globally or per membership.
+/// A deterministic id keeps a re-grant idempotent.
 /// </summary>
 public sealed class IdentityRole : Entity<IdentityRole>, IAmbientExempt
 {

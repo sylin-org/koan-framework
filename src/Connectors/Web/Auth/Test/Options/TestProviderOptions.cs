@@ -13,8 +13,8 @@ public sealed class TestProviderOptions
     public string[] AllowedRedirectUris { get; init; } = [];
 
     // Caps and DX knobs
-    public int MaxRoles { get; init; } = 256; // align with Koan.Web.Auth.Roles default
-    public int MaxPermissions { get; init; } = 1024; // align with Koan.Web.Auth.Roles default
+    public int MaxRoles { get; init; } = 256;
+    public int MaxPermissions { get; init; } = 1024;
     public int MaxCustomClaimTypes { get; init; } = 64;
     public int MaxValuesPerClaimType { get; init; } = 32;
 
