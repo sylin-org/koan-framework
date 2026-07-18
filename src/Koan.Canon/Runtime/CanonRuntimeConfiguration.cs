@@ -7,15 +7,14 @@ namespace Koan.Canon;
 /// <summary>
 /// Immutable configuration container for the canon runtime.
 /// </summary>
-public sealed class CanonRuntimeConfiguration
+internal sealed class CanonRuntimeConfiguration : ICanonPipelineCatalog
 {
     public CanonRuntimeConfiguration(
         CanonizationOptions defaultOptions,
         IDictionary<Type, ICanonPipelineDescriptor> pipelines,
         IDictionary<Type, CanonPipelineMetadata> pipelineMetadata,
-        int recordCapacity,
-    ICanonPersistence persistence,
-    ICanonAuditSink auditSink)
+        ICanonPersistence persistence,
+        ICanonAuditSink auditSink)
     {
         if (defaultOptions is null)
         {
@@ -32,18 +31,12 @@ public sealed class CanonRuntimeConfiguration
             throw new ArgumentNullException(nameof(pipelineMetadata));
         }
 
-        if (recordCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(recordCapacity), recordCapacity, "Record capacity must be greater than zero.");
-        }
-
         Persistence = persistence ?? throw new ArgumentNullException(nameof(persistence));
         AuditSink = auditSink ?? throw new ArgumentNullException(nameof(auditSink));
 
         DefaultOptions = defaultOptions.Copy();
         Pipelines = new Dictionary<Type, ICanonPipelineDescriptor>(pipelines);
         PipelineMetadata = new Dictionary<Type, CanonPipelineMetadata>(pipelineMetadata);
-        RecordCapacity = recordCapacity;
     }
 
     /// <summary>
@@ -62,11 +55,6 @@ public sealed class CanonRuntimeConfiguration
     public IReadOnlyDictionary<Type, CanonPipelineMetadata> PipelineMetadata { get; }
 
     /// <summary>
-    /// Maximum number of canonization records retained for replay.
-    /// </summary>
-    public int RecordCapacity { get; }
-
-    /// <summary>
     /// Persistence strategy used by the runtime.
     /// </summary>
     public ICanonPersistence Persistence { get; }
@@ -75,4 +63,10 @@ public sealed class CanonRuntimeConfiguration
     /// Audit sink used to persist canonical audit entries.
     /// </summary>
     public ICanonAuditSink AuditSink { get; }
+
+    public bool TryGetMetadata(Type modelType, out CanonPipelineMetadata? metadata)
+    {
+        ArgumentNullException.ThrowIfNull(modelType);
+        return PipelineMetadata.TryGetValue(modelType, out metadata);
+    }
 }

@@ -8,38 +8,37 @@ namespace Koan.Canon;
 /// <summary>
 /// ServiceCollection helpers for wiring the canon runtime using DI.
 /// </summary>
-public static class CanonRuntimeServiceCollectionExtensions
+internal static class CanonRuntimeServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the canon runtime and allows optional configurators to contribute pipelines.
     /// </summary>
-    public static IServiceCollection AddCanonRuntime(this IServiceCollection services, Action<CanonRuntimeBuilder>? configure = null)
+    internal static IServiceCollection AddCanonRuntime(this IServiceCollection services)
     {
         if (services is null)
         {
             throw new ArgumentNullException(nameof(services));
         }
 
-        if (configure is not null)
-        {
-            services.AddSingleton(new RuntimeConfigurationAction(configure));
-        }
-
+        services.TryAddSingleton<ICanonPersistence, DefaultCanonPersistence>();
         services.TryAddSingleton<ICanonAuditSink, DefaultCanonAuditSink>();
 
         services.TryAddSingleton<CanonRuntimeConfiguration>(sp =>
         {
             var builder = new CanonRuntimeBuilder();
+            var persistence = sp.GetRequiredService<ICanonPersistence>();
             var auditSink = sp.GetRequiredService<ICanonAuditSink>();
+            builder.UsePersistence(persistence);
             builder.UseAuditSink(auditSink);
-            CanonPipelineDiscovery.Configure(builder, sp);
-            foreach (var contribution in sp.GetServices<RuntimeConfigurationAction>())
-            {
-                contribution.Configure(builder);
-            }
-
+            CanonCompositionCompiler.Configure(
+                builder,
+                sp,
+                sp.GetRequiredService<CanonCompositionPlan>());
             return builder.BuildConfiguration();
         });
+
+        services.TryAddSingleton<ICanonPipelineCatalog>(sp =>
+            sp.GetRequiredService<CanonRuntimeConfiguration>());
 
         services.TryAddSingleton<ICanonRuntime>(sp =>
         {
@@ -48,25 +47,5 @@ public static class CanonRuntimeServiceCollectionExtensions
         });
 
         return services;
-    }
-
-    private sealed class RuntimeConfigurationAction
-    {
-        private readonly Action<CanonRuntimeBuilder> _configure;
-
-        public RuntimeConfigurationAction(Action<CanonRuntimeBuilder> configure)
-        {
-            _configure = configure ?? throw new ArgumentNullException(nameof(configure));
-        }
-
-        public void Configure(CanonRuntimeBuilder builder)
-        {
-            if (builder is null)
-            {
-                throw new ArgumentNullException(nameof(builder));
-            }
-
-            _configure(builder);
-        }
     }
 }

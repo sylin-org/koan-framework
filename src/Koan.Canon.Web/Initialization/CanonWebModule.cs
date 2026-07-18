@@ -7,9 +7,7 @@ using Koan.Canon.Web.Controllers;
 using Koan.Canon.Web.Infrastructure;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
-using Koan.Core.Hosting.Registry;
 using Koan.Web.Extensions;
-using Koan.Web.Controllers;
 using Koan.Web.Extensions.GenericControllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,17 +23,19 @@ public sealed class CanonWebModule : KoanModule
     {
         services.AddKoanControllersFrom<CanonWebModule>();
 
-        var modelDescriptors = DiscoverDescriptors(includeValueObjects: true).ToList();
+        var plan = services
+            .LastOrDefault(static descriptor => descriptor.ServiceType == typeof(CanonCompositionPlan))
+            ?.ImplementationInstance as CanonCompositionPlan
+            ?? throw new InvalidOperationException(
+                "Canon Web requires the host-owned Canon composition plan. Reference Sylin.Koan.Canon.Web and use AddKoan(); " +
+                "do not register Canon Web independently.");
+
+        var modelDescriptors = ProjectDescriptors(plan);
         services.AddSingleton<ICanonModelCatalog>(_ => new CanonModelCatalog(modelDescriptors));
 
-        foreach (var descriptor in modelDescriptors.Where(d => !d.IsValueObject))
+        foreach (var descriptor in modelDescriptors)
         {
             RegisterGenericController(services, descriptor.ModelType, typeof(CanonEntitiesController<>), descriptor.Route);
-        }
-
-        foreach (var descriptor in modelDescriptors.Where(d => d.IsValueObject))
-        {
-            RegisterGenericController(services, descriptor.ModelType, typeof(EntityController<>), descriptor.Route);
         }
     }
 
@@ -48,26 +48,10 @@ public sealed class CanonWebModule : KoanModule
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
             consumers: new[] { "Koan.Canon.Web.Catalog" });
         module.AddSetting(
-            "routes.admin",
-            WebConstants.Routes.Admin,
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
-            consumers: new[] { "Koan.Canon.Web.AdminSurface" });
-        module.AddSetting(
             "routes.canon",
             WebConstants.Routes.CanonPrefix + "/{model}",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
             consumers: new[] { "Koan.Canon.Web.EntitiesController" });
-        module.AddSetting(
-            "routes.valueObjects",
-            WebConstants.Routes.ValueObjectPrefix + "/{type}",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
-            consumers: new[] { "Koan.Canon.Web.ValueObjectController" });
-
-        module.AddTool(
-            "Canon Admin",
-            WebConstants.Routes.Admin,
-            "Auto-generated admin surface for Canon models",
-            capability: "canon.admin");
     }
 
     private static void RegisterGenericController(IServiceCollection services, Type modelType, Type controllerDefinition, string route)
@@ -76,41 +60,32 @@ public sealed class CanonWebModule : KoanModule
         _ = method.Invoke(null, new object?[] { services, controllerDefinition, route });
     }
 
-    private static IEnumerable<CanonModelDescriptor> DiscoverDescriptors(bool includeValueObjects)
+    private static IReadOnlyList<CanonModelDescriptor> ProjectDescriptors(CanonCompositionPlan plan)
     {
-        var descriptors = new List<CanonModelDescriptor>();
-        foreach (var modelType in KoanRegistry.GetDiscoveredImplementors(typeof(ICanonModel)))
+        var descriptors = plan.Models.Select(model =>
         {
-            var isEntity = IsClosedSubclass(modelType, typeof(CanonEntity<>));
-            var isValueObject = IsClosedSubclass(modelType, typeof(CanonValueObject<>));
-            if (!isEntity && (!includeValueObjects || !isValueObject))
-            {
-                continue;
-            }
-
+            var modelType = model.ModelType;
             var slug = ToSlug(modelType.Name);
-            var route = isValueObject
-                ? $"{WebConstants.Routes.ValueObjectPrefix}/{slug}"
-                : $"{WebConstants.Routes.CanonPrefix}/{slug}";
-            descriptors.Add(new CanonModelDescriptor(modelType, slug, modelType.Name, route, isValueObject));
-        }
+            return new CanonModelDescriptor(
+                modelType,
+                slug,
+                modelType.Name,
+                $"{WebConstants.Routes.CanonPrefix}/{slug}");
+        }).ToArray();
 
-        return descriptors
-            .GroupBy(descriptor => descriptor.ModelType)
-            .Select(group => group.First());
-    }
-
-    private static bool IsClosedSubclass(Type type, Type openGenericBase)
-    {
-        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        var collision = descriptors
+            .GroupBy(static descriptor => descriptor.Slug, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(static group => group.Count() > 1);
+        if (collision is not null)
         {
-            if (current.IsGenericType && current.GetGenericTypeDefinition() == openGenericBase)
-            {
-                return true;
-            }
+            var types = string.Join(", ", collision
+                .Select(static descriptor => descriptor.ModelType.FullName ?? descriptor.ModelType.Name)
+                .OrderBy(static name => name, StringComparer.Ordinal));
+            throw new InvalidOperationException(
+                $"Canon Web slug '{collision.Key}' is ambiguous for model types: {types}. Rename one model before AddKoan() composes routes.");
         }
 
-        return false;
+        return descriptors;
     }
 
     private static string ToSlug(string value)

@@ -1,58 +1,70 @@
 ---
 uid: reference.modules.Koan.canon
 title: Koan.Canon - Technical Reference
-description: Functional Canon activation, discovery, pipeline, persistence, and host ownership.
+description: Canon model composition, deterministic pipelines, persistence, and commit ownership.
 since: source-first
 packages: [Sylin.Koan.Canon]
 source: src/Koan.Canon/
-last_updated: 2026-07-17
+last_updated: 2026-07-18
 framework_version: pre-1.0
 validation:
-  date_last_tested: 2026-07-17
+  date_last_tested: 2026-07-18
   status: tested
-  scope: Canon unit 37/37, integration 6/6, non-Web bootstrap 1/1, CustomerCanon host 1/1
+  scope: Canon unit 35/35, integration 7/7, CustomerCanon host 1/1
 ---
 
 # Koan.Canon technical reference
 
-## Composition
+## Composition contract
 
-`CanonModule` activates by package reference during `AddKoan()`. It discovers concrete
-`ICanonPipelineContributor<T>` implementations from Koan's generated registry, registers each once,
-and compiles deterministic model pipelines once per host. Explicit `AddCanonRuntime(...)` configuration
-remains an advanced override and is not part of normal application startup.
+`CanonModule` activates by package reference during `AddKoan()`. It reads Koan's generated registry once,
+discovers concrete `CanonEntity<T>` models and `ICanonPipelineContributor<T>` implementations, validates
+their bindings, and registers one immutable `CanonCompositionPlan` for the host. Every discovered model
+receives a pipeline; custom contributors are optional.
 
-Contracts live in `Sylin.Koan.Canon.Contracts`; the functional assembly owns only activation, pipeline
-compilation, defaults, runtime execution, and default persistence/audit implementations.
+The functional package owns the public Canon model, metadata, annotation, contributor, runtime,
+persistence, and audit vocabulary. There is no separate Contracts package and no application-facing
+runtime builder or configuration step.
 
 ## Runtime law
 
 Phases run as `Intake`, `Validation`, `Aggregation`, `Policy`, `Projection`, and `Distribution`.
-Contributors within a phase use `Order`, then type name. One context carries the entity, metadata,
-options, services, persistence, stage, and operation-local items.
+Contributors within a phase use `Order`, then type name. The first failed or parked contributor stops
+that phase and the operation; later contributors and phases do not run. Failed and parked operations do
+not enter the canonical commit.
 
-- `Failed` terminates with `CanonizationOutcome.Failed`; later phases, indexing, and canonical writes do
-  not run.
-- `Parked` terminates with `CanonizationOutcome.Parked`.
-- An unconfigured application model still receives the built-in aggregation/policy behavior and default
-  persistence.
-- Explicit pipeline configuration replaces the discovered descriptor for that model.
+Built-in aggregation and policy contributors are present even when the application provides no custom
+contributor. One operation context carries the Entity, metadata, options, services, persistence, stage,
+and operation-local items.
 
-## Host and storage ownership
+## Storage and commit ownership
 
-The runtime, configuration, contributor catalog, persistence, and audit sink are host-owned singletons.
-There is no process-wide contributor snapshot. Entity terminal methods resolve the active Koan host;
-service-provider overloads establish and restore their host flow for the full asynchronous operation.
+The runtime, plan, pipeline catalog, persistence, and audit sink are host-owned singletons. Entity
+terminal methods resolve the active Koan host; service-provider overloads establish and restore host
+flow for the asynchronous operation.
 
-`DefaultCanonPersistence` lowers the complete `ICanonPersistence` contract to Koan Entity/Data. Replacing
-that contract replaces canonical reads/writes, stage writes, and aggregation-index operations together.
-The default audit sink also uses Koan Data.
+`DefaultCanonPersistence` lowers all `ICanonPersistence` operations to Koan Entity/Data. Replacing that
+contract replaces canonical reads/writes, stage writes, and aggregation-index operations together. The
+default audit sink also uses Koan Data.
+
+The successful default commit is ordered:
+
+1. persist canonical Entity;
+2. upsert aggregation indexes;
+3. write audit entries.
+
+This is deliberately fail-loud and not claimed as atomic. Exceptions identify the failed checkpoint
+and retain the provider exception as their inner exception. Canon performs no rollback or automatic
+retry. An index failure may leave a prefix of indexes durable, and an audit failure occurs after the
+canonical Entity and indexes are durable.
 
 ## Operational limits
 
-- Runtime replay is a bounded process-local queue (default 1024), not durable event sourcing.
-- Canon is currently in-process. Distributed locking, delivery, retries, and recovery are not implied.
-- Authorization belongs at the application or Web projection boundary.
-- Concurrency and transaction guarantees come from the selected persistence implementation.
+- Stage-only input is persisted and returned as parked. Failed and parked non-stage pipeline outcomes
+  remain non-canonical.
+- `RebuildViews<T>` is a headless application operation; Canon Web does not generate a rebuild route.
+- Distributed locking, delivery, durable replay, retry policy, and recovery are outside this package.
+- Concurrency, transaction, and durability guarantees come from the selected persistence provider.
+- Authorization belongs at the application or optional Web projection boundary.
 
-See the [public pillar reference](../../docs/reference/canon/index.md).
+See the [public Canon reference](../../docs/reference/canon/index.md).

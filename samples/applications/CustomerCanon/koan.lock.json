@@ -15,10 +15,6 @@
       "version": "0.18"
     },
     {
-      "id": "Koan.Canon.Contracts",
-      "version": "0.18"
-    },
-    {
       "id": "Koan.Canon.Web",
       "version": "0.17"
     },

@@ -1,11 +1,13 @@
 # Sylin.Koan.Canon
 
-Entity-first canonicalization for Koan applications. Define a canonical entity and small contributors;
-referencing the package makes `AddKoan()` discover and compose the pipeline.
+Entity-first canonicalization for Koan applications. Referencing the package makes `AddKoan()` discover
+every concrete `CanonEntity<T>` and its optional contributors, then compile one host-owned plan.
 
 ```powershell
 dotnet add package Sylin.Koan.Canon
 ```
+
+## Meaningful result
 
 ```csharp
 using Koan.Canon;
@@ -38,9 +40,24 @@ public sealed class NormalizeCustomer : ICanonPipelineContributor<Customer>
 }
 ```
 
-Contributors are ordered by phase, optional `Order`, then type name. A failed or parked phase stops the
-pipeline before later phases and canonical persistence. With no application contributor, Canon still
-uses its default aggregation and policy behavior and persists through the selected Koan Data provider.
+Contributors are ordered by phase, optional `Order`, then type name. The first failed or parked event
+terminates its phase and the operation. A contributor-free model still receives built-in aggregation
+and policy behavior and persists through the selected Koan Data provider.
 
-Use `Sylin.Koan.Canon.Web` when the models should also receive automatic HTTP surfaces. See the
-[technical reference](TECHNICAL.md) and [CustomerCanon sample](../../samples/applications/CustomerCanon/README.md).
+## Requirements and limits
+
+- `CanonEntity<T>` is the supported canonical model shape; `AddKoan()` is the only registration step.
+- Default commit order is canonical Entity, aggregation indexes, then audit. That sequence is not an
+  atomic transaction across all Data providers.
+- A canonical-write failure attempts neither indexes nor audit. An index failure can leave canonical
+  state and some indexes durable; audit is skipped. An audit failure occurs after canonical state and
+  indexes are durable. Canon reports the failed checkpoint and does not claim rollback or blind-retry
+  safety.
+- Canon is in-process. It does not provide distributed locking, transport delivery, durable replay, or
+  automatic recovery.
+- `ICanonPersistence` and `ICanonAuditSink` are the replacement seams. A custom persistence owns
+  canonical, stage, and aggregation-index operations together.
+
+Reference `Sylin.Koan.Canon.Web` only when Canon models should also receive automatic HTTP surfaces.
+See the [technical reference](TECHNICAL.md) and
+[CustomerCanon sample](../../samples/applications/CustomerCanon/README.md).

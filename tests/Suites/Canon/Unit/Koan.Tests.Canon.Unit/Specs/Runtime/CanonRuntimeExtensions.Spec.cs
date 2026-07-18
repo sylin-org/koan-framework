@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using Koan.Core.Hosting.App;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -71,29 +70,8 @@ public sealed class CanonRuntimeExtensionsSpec
             RebuildProvider = AppHost.Current;
         }
 
-        public IAsyncEnumerable<CanonizationRecord> Replay(
-            DateTimeOffset? from = null,
-            DateTimeOffset? to = null,
-            CancellationToken cancellationToken = default)
-            => Empty(cancellationToken);
-
-        public IDisposable RegisterObserver(ICanonPipelineObserver observer)
-            => NoopRegistration.Instance;
-
-        private static async IAsyncEnumerable<CanonizationRecord> Empty(
-            [EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            await Task.CompletedTask;
-            cancellationToken.ThrowIfCancellationRequested();
-            yield break;
-        }
     }
 
     private sealed class ExtensionCanon : CanonEntity<ExtensionCanon>;
 
-    private sealed class NoopRegistration : IDisposable
-    {
-        public static NoopRegistration Instance { get; } = new();
-        public void Dispose() { }
-    }
 }

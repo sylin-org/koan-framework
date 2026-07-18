@@ -100,37 +100,6 @@ public sealed class CanonRuntimeFlowSpec
         behavior.Should().Be(CanonStageBehavior.StageOnly.ToString());
     }
 
-    [Fact]
-    public async Task Replay_returns_canonization_records_in_phase_order()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        ConfigureServices(services);
-        await using var sp = services.BuildServiceProvider();
-
-        ICanonRuntime runtime;
-        using (var scope = sp.CreateScope())
-        {
-            runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
-        }
-
-        var executionId = Guid.CreateVersion7();
-        await ExecuteCanonization(runtime, executionId, CanonStageBehavior.Immediate, "replay-1");
-        await ExecuteCanonization(runtime, executionId, CanonStageBehavior.Immediate, "replay-2");
-
-        var records = new List<CanonizationRecord>();
-        await foreach (var record in runtime.Replay(cancellationToken: CancellationToken.None))
-        {
-            records.Add(record);
-        }
-
-        records.Should().NotBeEmpty();
-        records.Should().BeInAscendingOrder(r => r.OccurredAt);
-        records.Should().AllSatisfy(record => record.Event.Should().NotBeNull());
-        var phases = records.Select(r => r.Event!.Phase).ToList();
-        phases.Should().OnlyContain(phase => Enum.IsDefined(typeof(CanonPipelinePhase), phase));
-    }
-
     private static void ConfigureServices(IServiceCollection services)
     {
         services.AddLogging();

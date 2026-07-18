@@ -5,7 +5,7 @@ namespace Koan.Canon;
 /// <summary>
 /// Common abstraction for pipeline descriptors regardless of the canonical entity type.
 /// </summary>
-public interface ICanonPipelineDescriptor
+internal interface ICanonPipelineDescriptor
 {
     /// <summary>
     /// CLR type of the canonical entity associated with the descriptor.

@@ -92,7 +92,6 @@ public sealed class CanonProjectionFlowSpec
             var builder = new CanonRuntimeBuilder();
             builder.UsePersistence(harness);
             builder.UseAuditSink(audit);
-            builder.SetRecordCapacity(64);
             builder.ConfigureDefaultOptions(options => options with { SkipDistribution = true });
             builder.ConfigurePipeline<CustomerCanon>(pipeline =>
             {

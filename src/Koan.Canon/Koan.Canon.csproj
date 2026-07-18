@@ -7,7 +7,6 @@
     <PackageTags>$(CommonPackageTags);canon;canonization;runtime;pipeline;entity</PackageTags>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Koan.Canon.Contracts\Koan.Canon.Contracts.csproj" />
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
   </ItemGroup>

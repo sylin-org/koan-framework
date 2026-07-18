@@ -17,9 +17,6 @@ public sealed class CanonRelationshipMetadataSpec
         parent.PropertyName.Should().Be(nameof(OrderLine.OrderId));
         parent.ParentType.Should().Be(typeof(Order));
 
-        var valueObjectParents = service.GetParentRelationships(typeof(OrderAddress));
-        valueObjectParents.Should().ContainSingle();
-        valueObjectParents[0].ParentType.Should().Be(typeof(Order));
     }
 
     [Fact]
@@ -50,9 +47,4 @@ public sealed class CanonRelationshipMetadataSpec
         public string OrderId { get; set; } = "";
     }
 
-    private sealed class OrderAddress : CanonValueObject<OrderAddress>
-    {
-        [Parent(typeof(Order))]
-        public string OrderId { get; set; } = "";
-    }
 }

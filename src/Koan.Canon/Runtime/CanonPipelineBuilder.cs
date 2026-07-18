@@ -10,7 +10,7 @@ namespace Koan.Canon;
 /// Fluent builder for configuring canonization pipeline contributors for a canonical entity.
 /// </summary>
 /// <typeparam name="TModel">Canonical entity type.</typeparam>
-public sealed class CanonPipelineBuilder<TModel>
+internal sealed class CanonPipelineBuilder<TModel>
     where TModel : CanonEntity<TModel>, new()
 {
     private readonly Dictionary<CanonPipelinePhase, List<ICanonPipelineContributor<TModel>>> _contributors = new();

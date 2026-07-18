@@ -8,11 +8,10 @@ namespace Koan.Canon;
 /// <summary>
 /// Builder that composes pipelines and default behaviours for the canon runtime.
 /// </summary>
-public sealed class CanonRuntimeBuilder
+internal sealed class CanonRuntimeBuilder
 {
     private CanonizationOptions _defaultOptions = CanonizationOptions.Default;
     private readonly Dictionary<Type, ICanonPipelineDescriptor> _descriptors = new();
-    private int _recordCapacity = 1024;
     private ICanonPersistence _persistence = new DefaultCanonPersistence();
     private ICanonAuditSink _auditSink = new DefaultCanonAuditSink();
 
@@ -67,27 +66,13 @@ public sealed class CanonRuntimeBuilder
     }
 
     /// <summary>
-    /// Sets the in-memory canonization record retention capacity.
-    /// </summary>
-    public CanonRuntimeBuilder SetRecordCapacity(int capacity)
-    {
-        if (capacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(capacity), capacity, "Record capacity must be greater than zero.");
-        }
-
-        _recordCapacity = capacity;
-        return this;
-    }
-
-    /// <summary>
     /// Builds the runtime configuration object that can be registered in DI.
     /// </summary>
     public CanonRuntimeConfiguration BuildConfiguration()
     {
         var descriptors = new Dictionary<Type, ICanonPipelineDescriptor>(_descriptors);
         var metadata = descriptors.ToDictionary(static pair => pair.Key, static pair => pair.Value.Metadata);
-        return new CanonRuntimeConfiguration(_defaultOptions.Copy(), descriptors, metadata, _recordCapacity, _persistence, _auditSink);
+        return new CanonRuntimeConfiguration(_defaultOptions.Copy(), descriptors, metadata, _persistence, _auditSink);
     }
 
     /// <summary>

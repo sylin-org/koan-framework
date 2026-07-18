@@ -13,7 +13,6 @@ public sealed class CanonRuntimeBuilderSpec
             var updated = options.WithOrigin("default-origin").WithStageBehavior(CanonStageBehavior.StageOnly);
             return updated with { SkipDistribution = true };
         });
-        builder.SetRecordCapacity(512);
         builder.ConfigurePipeline<TestCanon>(pipeline =>
         {
             pipeline.AddStep(CanonPipelinePhase.Intake, (context, cancellationToken) =>
@@ -25,7 +24,6 @@ public sealed class CanonRuntimeBuilderSpec
 
         var configuration = builder.BuildConfiguration();
 
-        configuration.RecordCapacity.Should().Be(512);
         configuration.DefaultOptions.Origin.Should().Be("default-origin");
         configuration.DefaultOptions.StageBehavior.Should().Be(CanonStageBehavior.StageOnly);
         configuration.DefaultOptions.SkipDistribution.Should().BeTrue();
@@ -41,14 +39,6 @@ public sealed class CanonRuntimeBuilderSpec
         metadata.AggregationPolicies.Should().ContainKey("Key").WhoseValue.Should().Be(AggregationPolicyKind.SourceOfTruth);
         metadata.AggregationPolicyDetails.Should().ContainKey("Key");
         metadata.AggregationPolicyDetails["Key"].AuthoritativeSources.Should().Contain("crm");
-    }
-
-    [Fact]
-    public void SetRecordCapacity_rejects_non_positive_values()
-    {
-        var builder = new CanonRuntimeBuilder();
-        Action act = () => builder.SetRecordCapacity(0);
-        act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
     [Fact]

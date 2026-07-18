@@ -141,6 +141,38 @@ public sealed class CanonRuntimeSpec
     }
 
     [Fact]
+    public async Task First_terminal_contributor_stops_the_phase_immediately()
+    {
+        var persistence = new InMemoryCanonPersistence();
+        var laterContributorRuns = 0;
+        var builder = new CanonRuntimeBuilder()
+            .UsePersistence(persistence)
+            .UseAuditSink(new NoopAuditSink());
+        builder.ConfigurePipeline<ContactCanon>(pipeline =>
+        {
+            pipeline.AddStep(CanonPipelinePhase.Validation, (context, cancellationToken) =>
+                ValueTask.FromResult<CanonizationEvent?>(new CanonizationEvent
+                {
+                    Phase = CanonPipelinePhase.Validation,
+                    StageStatus = CanonStageStatus.Failed,
+                    Message = "terminal validation"
+                }));
+            pipeline.AddStep(CanonPipelinePhase.Validation, (context, cancellationToken) =>
+            {
+                laterContributorRuns++;
+                return ValueTask.CompletedTask;
+            });
+        });
+
+        var result = await builder.Build().Canonize(new ContactCanon { Email = "terminal@example.com" });
+
+        result.Outcome.Should().Be(CanonizationOutcome.Failed);
+        result.Events.Should().ContainSingle().Which.Message.Should().Be("terminal validation");
+        laterContributorRuns.Should().Be(0);
+        persistence.CanonicalEntities.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Rebuild_views_loads_from_the_configured_persistence()
     {
         var (persistence, runtime) = BuildRuntime();

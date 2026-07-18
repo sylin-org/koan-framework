@@ -22,7 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Canon.Contracts\Koan.Canon.Contracts.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Canon\Koan.Canon.csproj" />
   </ItemGroup>
 </Project>

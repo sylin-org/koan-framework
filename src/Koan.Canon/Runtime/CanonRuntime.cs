@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Canon;
@@ -13,13 +11,10 @@ namespace Koan.Canon;
 /// <summary>
 /// Default implementation of <see cref="ICanonRuntime"/> that executes configured pipeline contributors.
 /// </summary>
-public sealed class CanonRuntime : ICanonRuntime
+internal sealed class CanonRuntime : ICanonRuntime
 {
-    private readonly ConcurrentDictionary<ICanonPipelineObserver, byte> _observers = new();
-    private readonly ConcurrentQueue<CanonizationRecord> _records = new();
     private readonly Dictionary<Type, ICanonPipelineDescriptor> _pipelines;
     private readonly CanonizationOptions _defaultOptions;
-    private readonly int _recordCapacity;
     private readonly ICanonPersistence _persistence;
     private readonly IServiceProvider? _services;
     private readonly ICanonAuditSink _auditSink;
@@ -35,7 +30,6 @@ public sealed class CanonRuntime : ICanonRuntime
         }
 
         _defaultOptions = configuration.DefaultOptions.Copy();
-        _recordCapacity = configuration.RecordCapacity;
         _pipelines = new Dictionary<Type, ICanonPipelineDescriptor>(configuration.Pipelines);
         _persistence = configuration.Persistence;
         _services = services;
@@ -74,8 +68,6 @@ public sealed class CanonRuntime : ICanonRuntime
         }
 
         var context = new CanonPipelineContext<T>(entity, metadata, effectiveOptions, _persistence, _services);
-        var observers = SnapshotObservers();
-
         if (effectiveOptions.StageBehavior == CanonStageBehavior.StageOnly)
         {
             var stage = await CreateStageAsync(context, cancellationToken);
@@ -89,95 +81,118 @@ public sealed class CanonRuntime : ICanonRuntime
                 Detail = $"stage:{stage.Id}"
             };
 
-            await NotifyBeforePhase(CanonPipelinePhase.Intake, context, observers, cancellationToken);
-            await NotifyAfterPhase(CanonPipelinePhase.Intake, context, stageEvent, observers, cancellationToken);
-
-            AppendRecord(context, stageEvent, CanonizationOutcome.Parked);
             return new CanonizationResult<T>(entity, CanonizationOutcome.Parked, metadata.Clone(), new[] { stageEvent }, reprojectionTriggered: false, distributionSkipped: true);
         }
 
         if (descriptor is null || !descriptor.HasSteps)
         {
             entity.Metadata = metadata.Clone();
-            var canonical = await _persistence.PersistCanonicalAsync(entity, cancellationToken);
-            var resultMetadata = canonical.Metadata.Clone();
-            return new CanonizationResult<T>(canonical, CanonizationOutcome.Canonized, resultMetadata, [], effectiveOptions.ForceRebuild, effectiveOptions.SkipDistribution);
+            var directCanonical = await _persistence.PersistCanonicalAsync(entity, cancellationToken);
+            var directMetadata = directCanonical.Metadata.Clone();
+            return new CanonizationResult<T>(directCanonical, CanonizationOutcome.Canonized, directMetadata, [], effectiveOptions.ForceRebuild, effectiveOptions.SkipDistribution);
         }
 
         var events = new List<CanonizationEvent>(descriptor.Phases.Count);
-        CanonPipelinePhase? currentPhase = null;
+        foreach (var phase in descriptor.Phases)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CanonizationEvent? overrideEvent = null;
+            foreach (var contributor in descriptor.GetContributors(phase))
+            {
+                var evt = await contributor.Execute(context, cancellationToken);
+                if (evt is not null)
+                {
+                    overrideEvent = evt;
+                    if (evt.StageStatus is CanonStageStatus.Failed or CanonStageStatus.Parked)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            var phaseEvent = NormalizeEvent(overrideEvent, phase, context);
+            events.Add(phaseEvent);
+
+            var terminalOutcome = phaseEvent.StageStatus switch
+            {
+                CanonStageStatus.Failed => CanonizationOutcome.Failed,
+                CanonStageStatus.Parked => CanonizationOutcome.Parked,
+                _ => (CanonizationOutcome?)null
+            };
+
+            if (terminalOutcome is { } terminal)
+            {
+                entity.Metadata = context.Metadata.Clone();
+                return new CanonizationResult<T>(
+                    entity,
+                    terminal,
+                    context.Metadata.Clone(),
+                    events,
+                    reprojectionTriggered: false,
+                    distributionSkipped: true);
+            }
+
+        }
+
+        entity.Metadata = context.Metadata.Clone();
+        if (!entity.Metadata.HasCanonicalId)
+        {
+            entity.Metadata.AssignCanonicalId(entity.Id);
+        }
+
+        T canonical;
+        try
+        {
+            canonical = await _persistence.PersistCanonicalAsync(entity, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw CommitFailure(
+                Infrastructure.Constants.Commit.Canonical,
+                "Canonical persistence did not complete; no index or audit write was attempted.",
+                exception);
+        }
 
         try
         {
-            foreach (var phase in descriptor.Phases)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                currentPhase = phase;
-
-                await NotifyBeforePhase(phase, context, observers, cancellationToken);
-
-                CanonizationEvent? overrideEvent = null;
-                foreach (var contributor in descriptor.GetContributors(phase))
-                {
-                    var evt = await contributor.Execute(context, cancellationToken);
-                    if (evt is not null)
-                    {
-                        overrideEvent = evt;
-                    }
-                }
-
-                var phaseEvent = NormalizeEvent(overrideEvent, phase, context);
-                events.Add(phaseEvent);
-
-                await NotifyAfterPhase(phase, context, phaseEvent, observers, cancellationToken);
-                var terminalOutcome = phaseEvent.StageStatus switch
-                {
-                    CanonStageStatus.Failed => CanonizationOutcome.Failed,
-                    CanonStageStatus.Parked => CanonizationOutcome.Parked,
-                    _ => (CanonizationOutcome?)null
-                };
-
-                if (terminalOutcome is { } terminal)
-                {
-                    AppendRecord(context, phaseEvent, terminal);
-                    entity.Metadata = context.Metadata.Clone();
-                    return new CanonizationResult<T>(
-                        entity,
-                        terminal,
-                        context.Metadata.Clone(),
-                        events,
-                        reprojectionTriggered: false,
-                        distributionSkipped: true);
-                }
-
-                AppendRecord(context, phaseEvent, CanonizationOutcome.Canonized);
-            }
-
-            entity.Metadata = context.Metadata.Clone();
-            if (!entity.Metadata.HasCanonicalId)
-            {
-                entity.Metadata.AssignCanonicalId(entity.Id);
-            }
-
-            var canonical = await _persistence.PersistCanonicalAsync(entity, cancellationToken);
             await CommitIndexesAsync(context, cancellationToken);
-            var outcome = ResolveOutcome(context);
-            var resultMetadata = context.Metadata.Clone();
-            var reprojectionTriggered = effectiveOptions.ForceRebuild || (effectiveOptions.RequestedViews?.Length > 0);
-
-            await EmitAuditAsync(context, cancellationToken);
-
-            return new CanonizationResult<T>(canonical, outcome, resultMetadata, events, reprojectionTriggered, effectiveOptions.SkipDistribution);
         }
-        catch (Exception ex)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            var phase = currentPhase ?? CanonPipelinePhase.Intake;
-            await NotifyError(phase, context, ex, observers, cancellationToken);
-            var errorEvent = BuildErrorEvent(phase, context, ex);
-            AppendRecord(context, errorEvent, CanonizationOutcome.Failed);
-            throw;
+            throw CommitFailure(
+                Infrastructure.Constants.Commit.Indexes,
+                "Canonical state is durable; zero or more aggregation indexes may be durable. Audit was not attempted. " +
+                "Do not assume rollback or blindly retry with a new arrival.",
+                exception);
         }
+
+        var outcome = ResolveOutcome(context);
+        var resultMetadata = context.Metadata.Clone();
+        var reprojectionTriggered = effectiveOptions.ForceRebuild || (effectiveOptions.RequestedViews?.Length > 0);
+
+        try
+        {
+            await EmitAuditAsync(context, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw CommitFailure(
+                Infrastructure.Constants.Commit.Audit,
+                "Canonical state and aggregation indexes are durable; audit completion is unknown. " +
+                "Do not assume rollback or blind-retry safety.",
+                exception);
+        }
+
+        return new CanonizationResult<T>(canonical, outcome, resultMetadata, events, reprojectionTriggered, effectiveOptions.SkipDistribution);
     }
+
+    private static InvalidOperationException CommitFailure(
+        string checkpoint,
+        string correction,
+        Exception innerException)
+        => new(
+            $"Canon commit failed at checkpoint '{checkpoint}'. {correction}",
+            innerException);
 
     private static async Task CommitIndexesAsync<T>(CanonPipelineContext<T> context, CancellationToken cancellationToken)
         where T : CanonEntity<T>, new()
@@ -243,34 +258,6 @@ public sealed class CanonRuntime : ICanonRuntime
         await Canonize(entity, options, cancellationToken);
     }
 
-    /// <inheritdoc />
-    public async IAsyncEnumerable<CanonizationRecord> Replay(DateTimeOffset? from = null, DateTimeOffset? to = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        var snapshot = _records
-            .Where(record => (!from.HasValue || record.OccurredAt >= from.Value) && (!to.HasValue || record.OccurredAt <= to.Value))
-            .OrderBy(record => record.OccurredAt)
-            .ToArray();
-
-        foreach (var record in snapshot)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            yield return record;
-            await Task.Yield();
-        }
-    }
-
-    /// <inheritdoc />
-    public IDisposable RegisterObserver(ICanonPipelineObserver observer)
-    {
-        if (observer is null)
-        {
-            throw new ArgumentNullException(nameof(observer));
-        }
-
-        _observers.TryAdd(observer, 0);
-        return new ObserverHandle(this, observer);
-    }
-
     private CanonPipelineDescriptor<T>? GetDescriptorOrDefault<T>()
         where T : CanonEntity<T>, new()
     {
@@ -323,18 +310,6 @@ public sealed class CanonRuntime : ICanonRuntime
             Message = $"Completed {phase} phase."
         };
 
-    private static CanonizationEvent BuildErrorEvent<T>(CanonPipelinePhase phase, CanonPipelineContext<T> context, Exception exception)
-        where T : CanonEntity<T>, new()
-        => new()
-        {
-            Phase = phase,
-            StageStatus = context.Stage?.Status ?? CanonStageStatus.Failed,
-            CanonState = context.Entity.State,
-            OccurredAt = DateTimeOffset.UtcNow,
-            Message = $"Phase {phase} failed with {exception.GetType().Name}.",
-            Detail = exception.Message
-        };
-
     private static CanonizationOutcome ResolveOutcome<T>(CanonPipelineContext<T> context)
         where T : CanonEntity<T>, new()
     {
@@ -380,87 +355,10 @@ public sealed class CanonRuntime : ICanonRuntime
             stage.Metadata[tag.Key] = tag.Value;
         }
 
-        stage.Metadata["runtime:stage-behavior"] = context.Options.StageBehavior.ToString();
+        stage.Metadata[Infrastructure.Constants.Context.StageBehavior] = context.Options.StageBehavior.ToString();
         stage = await _persistence.PersistStageAsync(stage, cancellationToken);
         context.AttachStage(stage);
         return stage;
     }
 
-    private void AppendRecord<TModel>(CanonPipelineContext<TModel> context, CanonizationEvent @event, CanonizationOutcome outcome)
-        where TModel : CanonEntity<TModel>, new()
-    {
-        var record = new CanonizationRecord
-        {
-            CanonicalId = context.Entity.Id,
-            EntityType = typeof(TModel).FullName ?? typeof(TModel).Name,
-            Phase = @event.Phase,
-            StageStatus = @event.StageStatus,
-            Outcome = outcome,
-            OccurredAt = @event.OccurredAt,
-            CorrelationId = context.Options.CorrelationId,
-            Metadata = context.Metadata.Clone(),
-            Event = new CanonizationEvent
-            {
-                Phase = @event.Phase,
-                StageStatus = @event.StageStatus,
-                CanonState = (@event.CanonState ?? context.Entity.State).Copy(),
-                OccurredAt = @event.OccurredAt,
-                Message = @event.Message,
-                Detail = @event.Detail
-            }
-        };
-
-        _records.Enqueue(record);
-        TrimRecords();
-    }
-
-    private void TrimRecords()
-    {
-        while (_records.Count > _recordCapacity && _records.TryDequeue(out _))
-        {
-        }
-    }
-
-    private static Task NotifyBeforePhase(CanonPipelinePhase phase, ICanonPipelineContext context, IReadOnlyList<ICanonPipelineObserver> observers, CancellationToken cancellationToken)
-        => NotifyObservers(observers, observer => observer.BeforePhase(phase, context, cancellationToken));
-
-    private static Task NotifyAfterPhase(CanonPipelinePhase phase, ICanonPipelineContext context, CanonizationEvent @event, IReadOnlyList<ICanonPipelineObserver> observers, CancellationToken cancellationToken)
-        => NotifyObservers(observers, observer => observer.AfterPhase(phase, context, @event, cancellationToken));
-
-    private static Task NotifyError(CanonPipelinePhase phase, ICanonPipelineContext context, Exception exception, IReadOnlyList<ICanonPipelineObserver> observers, CancellationToken cancellationToken)
-        => NotifyObservers(observers, observer => observer.OnError(phase, context, exception, cancellationToken));
-
-    private static async Task NotifyObservers(IReadOnlyList<ICanonPipelineObserver> observers, Func<ICanonPipelineObserver, ValueTask> callback)
-    {
-        for (var i = 0; i < observers.Count; i++)
-        {
-            await callback(observers[i]);
-        }
-    }
-
-    private List<ICanonPipelineObserver> SnapshotObservers()
-        => _observers.Count == 0 ? new List<ICanonPipelineObserver>(0) : _observers.Keys.ToList();
-
-    private sealed class ObserverHandle : IDisposable
-    {
-        private readonly CanonRuntime _runtime;
-        private ICanonPipelineObserver? _observer;
-
-        public ObserverHandle(CanonRuntime runtime, ICanonPipelineObserver observer)
-        {
-            _runtime = runtime;
-            _observer = observer;
-        }
-
-        public void Dispose()
-        {
-            if (_observer is null)
-            {
-                return;
-            }
-
-            _runtime._observers.TryRemove(_observer, out _);
-            _observer = null;
-        }
-    }
 }

@@ -15,7 +15,7 @@ namespace Koan.Canon.Internal;
 internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContributor<TModel>
     where TModel : CanonEntity<TModel>, new()
 {
-    internal const string AuditEntriesContextKey = "canon:audit-entries";
+    internal const string AuditEntriesContextKey = Infrastructure.Constants.Context.AuditEntries;
 
     private readonly CanonModelAggregationMetadata _metadata;
     private readonly string _entityType;

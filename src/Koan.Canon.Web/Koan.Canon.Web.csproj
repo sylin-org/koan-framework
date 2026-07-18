@@ -13,7 +13,6 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Koan.Canon.Contracts\Koan.Canon.Contracts.csproj" />
     <ProjectReference Include="..\Koan.Canon\Koan.Canon.csproj" />
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />

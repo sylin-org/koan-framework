@@ -16,10 +16,10 @@ namespace Koan.Canon.Internal;
 internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineContributor<TModel>
     where TModel : CanonEntity<TModel>, new()
 {
-    internal const string ExistingEntityContextKey = "canon:existing-entity";
-    internal const string ExistingMetadataContextKey = "canon:existing-metadata";
-    internal const string ArrivalTokenContextKey = "canon:arrival-token";
-    internal const string PendingIndexesContextKey = "canon:pending-indexes";
+    internal const string ExistingEntityContextKey = Infrastructure.Constants.Context.ExistingEntity;
+    internal const string ExistingMetadataContextKey = Infrastructure.Constants.Context.ExistingMetadata;
+    internal const string ArrivalTokenContextKey = Infrastructure.Constants.Context.ArrivalToken;
+    internal const string PendingIndexesContextKey = Infrastructure.Constants.Context.PendingIndexes;
 
     private readonly CanonModelAggregationMetadata _metadata;
     private readonly string _entityType;

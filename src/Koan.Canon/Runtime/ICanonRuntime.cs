@@ -19,13 +19,4 @@ public interface ICanonRuntime
     Task RebuildViews<T>(string canonicalId, string[]? views = null, CancellationToken cancellationToken = default)
         where T : CanonEntity<T>, new();
 
-    /// <summary>
-    /// Streams canonization records for replay or analytics.
-    /// </summary>
-    IAsyncEnumerable<CanonizationRecord> Replay(DateTimeOffset? from = null, DateTimeOffset? to = null, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Registers an observer for pipeline telemetry.
-    /// </summary>
-    IDisposable RegisterObserver(ICanonPipelineObserver observer);
 }

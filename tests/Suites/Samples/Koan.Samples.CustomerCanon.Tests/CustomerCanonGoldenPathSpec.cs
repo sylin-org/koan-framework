@@ -57,6 +57,8 @@ public sealed class CustomerCanonGoldenPathSpec
             customerModel.GetProperty("aggregationKeys").EnumerateArray()
                 .Select(static value => value.GetString()).Should().ContainSingle().Which.Should().Be("Email");
 
+            (await client.GetAsync("/api/canon/admin/records")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
             var arrival = new
             {
                 email = " Alice@Example.COM ",
@@ -105,6 +107,9 @@ public sealed class CustomerCanonGoldenPathSpec
             Directory.EnumerateFiles(root, "*.json", SearchOption.AllDirectories).Should().NotBeEmpty();
             var facts = await client.GetStringAsync("/.well-known/Koan/facts");
             facts.Should().Contain("Koan.Canon");
+            facts.Should().Contain("canon:canonical-entities");
+            facts.Should().Contain("commit order is canonical");
+            facts.Should().Contain("is not atomic");
             facts.Should().Contain("koan.semantic.component.active");
             facts.Should().Contain("complete");
 

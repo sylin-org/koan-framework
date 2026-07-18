@@ -1,32 +1,44 @@
 ---
 uid: reference.modules.Koan.canon.web
 title: Koan.Canon.Web - Technical Reference
-description: Generated HTTP and inspection surfaces for discovered Canon models.
+description: ASP.NET projection and inspection surfaces for the Canon host composition plan.
 since: source-first
 packages: [Sylin.Koan.Canon.Web]
 source: src/Koan.Canon.Web/
-last_updated: 2026-07-17
+last_updated: 2026-07-18
 framework_version: pre-1.0
+validation:
+  date_last_tested: 2026-07-18
+  status: tested
+  scope: Canon integration 7/7 and CustomerCanon host 1/1
 ---
 
 # Koan.Canon.Web technical reference
 
-`CanonWebModule` owns only Web projection. Functional activation and pipeline compilation belong to
-`Sylin.Koan.Canon`; shared vocabulary belongs to `Sylin.Koan.Canon.Contracts`.
+`CanonWebModule` owns only HTTP projection. Functional activation, model eligibility, pipeline
+compilation, persistence, and commit semantics belong to `Sylin.Koan.Canon`.
 
-The module reads Koan's generated model registry once during host composition, builds a host-owned model
-catalog, and registers generic controllers for each concrete Canon entity or value object. It performs
-no AppDomain scan and does not activate the runtime itself.
+## Composition contract
+
+During host composition, the module reads the immutable `CanonCompositionPlan` already registered by
+Canon. It projects each plan model into one catalog descriptor and one generic
+`CanonEntitiesController<T>`. It does not perform a second registry or AppDomain scan. Duplicate route
+slugs reject composition with a corrective exception naming every conflicting CLR type.
 
 ## Routes
 
-- `/api/canon/{model}`: Canon-aware entity endpoints; single and bulk writes enter `ICanonRuntime`.
-- `/api/canon/value-objects/{type}`: generic Entity endpoints for Canon value objects.
+- `/api/canon/{model}`: inherited Entity reads plus Canon-aware single and bulk writes.
 - `/api/canon/models`: model, route, pipeline, aggregation, policy, and audit metadata.
-- `/api/canon/admin/records`: bounded process-local runtime records.
-- `/api/canon/admin/{slug}/rebuild`: rebuild a discovered canonical model.
 
-Single writes map `Failed` to 422 and `Parked` to 202. Query/header options can supply origin,
-correlation, stage behavior, rebuild/distribution flags, requested views, and tags.
+Single writes map `Failed` to 422 and `Parked` to 202. Query and header options can supply origin,
+correlation, stage behavior, rebuild/distribution flags, requested views, and tags. Bulk writes execute
+sequentially and return one result per input.
 
-Apply authentication and authorization at the host boundary, especially for admin routes.
+## Boundaries
+
+The module generates no admin, process-record, replay, value-object, or rebuild endpoint. Headless
+rebuild remains available through `ICanonRuntime`. Routes participate in the host's ordinary ASP.NET
+authentication and authorization setup; the package does not add a separate privileged policy.
+
+Canon's canonical-to-index-to-audit commit remains non-atomic and fail-loud. HTTP projection does not
+add transactions, rollback, retry, distributed delivery, or recovery.
