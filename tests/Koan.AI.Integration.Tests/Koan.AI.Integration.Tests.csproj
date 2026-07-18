@@ -22,7 +22,6 @@
     <ProjectReference Include="..\..\src\Koan.AI.Models\Koan.AI.Models.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI.Orchestration\Koan.AI.Orchestration.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI.Eval\Koan.AI.Eval.csproj" />
-    <ProjectReference Include="..\..\src\Koan.AI.Training\Koan.AI.Training.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI.Review\Koan.AI.Review.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI.Agents\Koan.AI.Agents.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI.Prompt\Koan.AI.Prompt.csproj" />

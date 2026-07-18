@@ -14,6 +14,8 @@ namespace Koan.AI.EndToEnd.Tests;
 /// </summary>
 public sealed class KoanTestFixture : IDisposable
 {
+    private readonly TestAdapterRegistry _testAdapters = new();
+
     public IServiceProvider Services { get; }
     public IAiAdapterRegistry AdapterRegistry { get; }
 
@@ -31,6 +33,7 @@ public sealed class KoanTestFixture : IDisposable
         services.AddSingleton<IConfiguration>(configuration);
         services.AddSingleton<IHostApplicationLifetime>(new NoopHostApplicationLifetime());
         services.AddLogging();
+        services.AddSingleton<IAiAdapterRegistry>(_testAdapters);
 
         // Boot Koan framework -- this triggers all auto-registrars
         services.AddKoan();
@@ -58,7 +61,7 @@ public sealed class KoanTestFixture : IDisposable
     public void RegisterAdapter(string id, params string[] capabilities)
     {
         var adapter = new TestCapableAdapter(id, capabilities);
-        AdapterRegistry.Add(adapter);
+        _testAdapters.Add(adapter);
     }
 
     public void Dispose()

@@ -335,8 +335,8 @@ internal sealed class ModelService(IAiAdapterRegistry registry) : IModelService
 
     public Task<ModelEntry> Merge(string baseModelId, string adapterId, string? outputName, CancellationToken ct)
     {
-        throw new InvalidOperationException(
-            "LoRA merge requires a training runtime. Use Training.Run() with a merge script.");
+        throw new NotSupportedException(
+            "LoRA merge is not provided by the current model adapter. Use a model adapter that declares merge support.");
     }
 
     // ── Deployment (via adapter with Serve.* capability) ──
