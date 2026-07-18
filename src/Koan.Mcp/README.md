@@ -1,4 +1,4 @@
-# Koan.Mcp
+# Sylin.Koan.Mcp
 
 ## Contract
 
@@ -11,10 +11,16 @@
 - **Success criteria**: an agent discovers only usable capabilities, receives structured failures,
   and can inspect the same runtime facts as an operator.
 
-## Shortest supported path
+## Install and shortest supported path
 
 The repository demonstrates this contract from source and from staged clean-room artifacts; the
-coherent candidate wave has not yet been published and observed from public feeds. Add `Koan.Mcp` to the
+coherent candidate wave has not yet been published and observed from public feeds.
+
+```powershell
+dotnet add package Sylin.Koan.Mcp
+```
+
+Add MCP to the
 application closure (`Sylin.Koan.Mcp` is the package identity), annotate the entity, and keep the
 normal Koan bootstrap:
 
@@ -101,11 +107,27 @@ produce startup warnings; add `[McpDescription]` only when richer agent guidance
 - `koan://facts` returns the same versioned, redacted runtime-fact envelope as startup, health, and
   `/.well-known/Koan/facts`. Check `complete` and branch on stable fact codes rather than prose.
 
+## Guarantees and boundaries
+
+- Package reference plus `AddKoan()` is the only supported registration path. MCP service composition and endpoint
+  mapping are framework internals.
+- Entity tools reuse Koan Web's governed endpoint pipeline; MCP does not create a second authorization, filtering,
+  relationship, or mutation implementation.
+- HTTP authentication defaults on in production and containers, but transport authentication is not application
+  authorization. Declare Entity access and custom-tool scopes for business authority.
+- STDIO is a trusted local process-owner transport. Do not expose its streams through a remote shell or relay and
+  infer HTTP-style identity guarantees.
+- Code Mode executes Jint JavaScript under bounded CPU, memory, recursion, code-length, and SDK-call controls. It is
+  not an operating-system sandbox and exposes only the Koan SDK bindings supplied by the package.
+- Session limits, resumable stream state, and dry-run projection do not provide exactly-once effects, distributed
+  session durability, or rollback for arbitrary custom-tool side effects.
+
 ## Related packages
 
 - `Koan.Core` — composition, startup reporting, and runtime facts.
 - `Koan.Data.Core` — Entity persistence and query semantics.
 - `Koan.Web` — governed REST and Streamable HTTP hosting.
 - `Koan.Mcp.Explorer` — an optional human inspection surface over the same projection.
+- `Koan.Mcp.Operations` — optional, explicitly enabled Jobs/Cache control-plane tools with grants and audit.
 
 See [TECHNICAL.md](TECHNICAL.md) for composition and transport details.

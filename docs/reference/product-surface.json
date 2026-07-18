@@ -1561,22 +1561,22 @@
     {
       "packageId": "Sylin.Koan.Mcp.Explorer",
       "shape": "library",
-      "description": "MCP Explorer Console (WEB-0072): a Reference=Intent, Swagger-like human surface for a Koan MCP app \u2014 describe the tools, try them in-process as yourself, and read the per-caller capability map. Honest about authorization (Verb / Door / Wall).",
+      "description": "Human inspection console for Koan MCP: caller-visible tools, governed try-it, and fail-closed access-map diagnostics.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Mcp"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Mcp.Explorer/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Mcp.Explorer/TECHNICAL.md",
       "claims": []
     },
     {
       "packageId": "Sylin.Koan.Mcp.Operations",
       "shape": "library",
-      "description": "Operational MCP toolsets (P3.2): framework-shipped, governed agent ops verbs \u2014 koan.jobs.{trigger,cancel,status} and koan.cache.{flush,flushAll}. Reference = Intent; each toolset is opt-in via Koan:Mcp:Operations (default OFF), grant-gated (@ops:jobs / @ops:cache AgentGrant), destructive verbs require confirm:true, every mutation audited (AgentAction).",
+      "description": "Governed MCP operations for Koan Jobs and Cache, with explicit enablement, exact grants, destructive confirmation, and mutation audit.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1585,9 +1585,9 @@
         "Sylin.Koan.Jobs",
         "Sylin.Koan.Mcp"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Mcp.Operations/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Mcp.Operations/TECHNICAL.md",
       "claims": []
     },
     {

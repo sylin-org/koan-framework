@@ -1710,6 +1710,75 @@ This handoff gate prevents two equally harmful outcomes: losing real capability 
 spending Koan product-polish effort on packages already assigned to another product. Future work resumes from the
 destination evidence, not from another Koan-side architecture assessment.
 
+## MCP family discovery
+
+**Task:** graduate MCP Core, Explorer, and Operations as one agent-facing progression, first deciding whether the two
+leaf packages earn separate reference intent and whether any public/internal ceremony should coalesce.
+
+**Application intent:** “Reference MCP and describe an Entity or business tool; `AddKoan()` exposes a caller-honest
+agent surface. Optionally reference Explorer for a human console over that same projection, or Operations for
+explicitly enabled, grant-gated Jobs/Cache control-plane verbs.”
+
+**Public expression:** `[McpEntity]` and `[McpTool]` remain the business declarations. The package reference plus
+`AddKoan()` is the only application registration path. Explorer is a reference-selected human projection with a
+Development-safe default. Operations is layered availability: reference makes its dangerous toolsets available,
+configuration explicitly enables each one, an `AgentGrant` authorizes the caller, and `confirm:true` settles a
+destructive invocation.
+
+**Guarantee/correction:** tool listing, `koan://self`, Explorer, and dispatch share one caller-aware projection and the
+same governed Entity endpoint seam. Explorer's privileged access map fails closed outside Development. Operations
+tools are absent while disabled, fail loudly without the exact grant, dry-run destructive calls without confirmation,
+and audit mutations. STDIO remains trusted local transport for ordinary tools but cannot invent an operational
+subject/grant.
+
+**Complete intent surface:** Entity and custom tools, schemas, resources, caller-specific visibility, dry-run,
+Code Mode, STDIO and Streamable HTTP, explicit legacy transport, sessions/auth/resource identity, Explorer map/try-it,
+and Jobs/Cache operational verbs. Manual service registration, endpoint mapping, duplicate transport policy, and
+package-internal discovery are not application decisions.
+
+**Docs read:** current MCP public guides correctly teach reference plus `AddKoan()` and forbid `AddKoanMcp()`, but the
+method remains public and multiple tests still use it. Core's package page lacks the exact package title/install and a
+recognized limitations section. Explorer and Operations have no owned README or technical companion. Operations'
+project description calls reference intent while also saying every feature defaults off, without explaining layered
+security activation. Core boot reporting ends with a permanent “diagnostics unavailable” note; Explorer reports only
+its version; Operations reports enabled toolsets but not the available/default-off posture.
+
+**Code read:** MCP Core is a substantial, evidenced runtime with conformance, streamable transport, relationship,
+auth, custom-tool, and code-mode suites plus the GoldenJourney consumer. Explorer owns only embedded human UI,
+caller-map, privileged access-map, and in-process try-it projection. Operations alone pulls Jobs and Cache and owns the
+grant/confirm/audit control-plane policy. Merging either leaf into Core would add unrelated UI or operational weight
+to the shortest agent path. The only duplicate registration owner is public `AddKoanMcp()`, called by `McpModule` and
+test fixtures despite being explicitly unsupported for applications.
+
+**Constants/options/DTO inventory:** `McpServerOptions` already owns transport, exposure, code-mode, entity policy,
+and generic operational-toolset enablement. Explorer owns only its enabled/admin options. No new options hierarchy,
+provider engine, identifier attribute, or package is needed. Existing `KoanModule`, DI, endpoint-contributor,
+provenance, and package-owned docs patterns are sufficient.
+
+**Closest patterns:** AI Web removed its public manual registration extension and made its module the one activation
+owner. Optional Web projections remain separate when their reference adds real surface/dependencies. Layered provider
+capabilities may be available by reference but inactive until the dangerous mechanism is deliberately enabled.
+
+**Coalescence and placement:** keep all three packages. Make `McpModule` the only public activation owner and reduce
+the old extension to internal service composition with no configuration override path. Keep one Core options/policy
+owner; keep Explorer and Operations thin projections. Improve each module's report rather than creating a second
+facts registry.
+
+**Ergonomics:** application code becomes exactly reference + declaration + `AddKoan()`, matching public guidance and
+agent expectations. Explorer communicates whether/where it is live and who can inspect walls. Operations communicates
+available versus enabled toolsets and the grant/confirmation posture. Package pages give developers and agents one
+smallest result plus honest production/security boundaries.
+
+**Constraints satisfied:** no package merge/split/new identifier; no weaker operational default; standard .NET DI and
+configuration remain the mechanism; one module lifecycle per assembly; Core owns MCP policy while leaves own their
+projection; focused family tests only; no release certification.
+
+**Risks:** isolated test fixtures must move from the deleted public helper to canonical `AddKoan()` without silently
+changing behavior. Explorer defaults depend on environment/container posture and must be reported truthfully.
+Operations prose must distinguish package availability, configuration enablement, grants, and confirmation rather
+than collapsing them into “reference equals execution.” Code Mode remains in Core for this slice; a split would add a
+new install decision and is not justified without a measured size/security/use-case comparison.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;
