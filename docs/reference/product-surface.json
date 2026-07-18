@@ -3,6 +3,27 @@
   "source": "product/claims.json",
   "claims": [
     {
+      "id": "ai-prompt-and-http-projection",
+      "title": "AI prompt semantics and HTTP projection",
+      "summary": "Inspectable prompt values remain inert until used, optional Entity-backed prompt versions resolve deliberately, and a Web package reference projects the compiled AI runtime without registration ceremony.",
+      "maturity": "demonstrated",
+      "packages": [
+        "Sylin.Koan.AI.Contracts",
+        "Sylin.Koan.AI.Prompt",
+        "Sylin.Koan.AI.Web"
+      ],
+      "documentation": [
+        "docs/reference/ai/index.md",
+        "src/Koan.AI.Prompt/README.md",
+        "src/Koan.AI.Web/README.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "tests/Koan.AI.Prompt.Tests",
+        "tests/Suites/AI/Web/Koan.AI.Web.Tests"
+      ]
+    },
+    {
       "id": "ai-vector-semantics",
       "title": "AI, vector, and semantic capabilities",
       "summary": "AI and vector modules add provider-neutral semantic model capabilities; individual provider guarantees are stated separately.",
@@ -410,7 +431,6 @@
       ],
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
-        "Sylin.Koan.AI.Prompt",
         "Sylin.Koan.Core"
       ],
       "readme": "src/Koan.AI/README.md",
@@ -563,7 +583,9 @@
       "readme": "src/Koan.AI.Contracts/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.AI.Contracts/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "ai-prompt-and-http-projection"
+      ]
     },
     {
       "packageId": "Sylin.Koan.AI.Contracts.Shared",
@@ -640,7 +662,7 @@
     {
       "packageId": "Sylin.Koan.AI.Prompt",
       "shape": "library",
-      "description": "Uri-inspired prompt primitive for Koan AI: parse, build, version, and A/B test prompts with entity-backed storage.",
+      "description": "Optional Entity-backed catalog for storing and resolving versioned Koan AI prompts.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -651,8 +673,10 @@
       ],
       "readme": "src/Koan.AI.Prompt/README.md",
       "ownsReadme": true,
-      "technicalDocumentation": null,
-      "claims": []
+      "technicalDocumentation": "src/Koan.AI.Prompt/TECHNICAL.md",
+      "claims": [
+        "ai-prompt-and-http-projection"
+      ]
     },
     {
       "packageId": "Sylin.Koan.AI.Review",
@@ -692,19 +716,22 @@
     {
       "packageId": "Sylin.Koan.AI.Web",
       "shape": "library",
-      "description": "Koan AI Web: optional AI controllers/endpoints (chat, embeddings, health) for ASP.NET Core without coupling Koan.Web to AI.",
+      "description": "Provider-neutral HTTP projection for Koan AI chat, embeddings, model inventory, and capability inspection.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.AI",
         "Sylin.Koan.AI.Contracts",
+        "Sylin.Koan.Web",
         "Sylin.Koan.Web.Sse"
       ],
       "readme": "src/Koan.AI.Web/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.AI.Web/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "ai-prompt-and-http-projection"
+      ]
     },
     {
       "packageId": "Sylin.Koan.App",

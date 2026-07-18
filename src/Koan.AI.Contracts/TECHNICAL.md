@@ -13,6 +13,7 @@ Its only external dependency is Newtonsoft.Json for the existing `AiPromptOption
 - `.Routing` and `.Sources`: registry, source/member, health-state, and capability-configuration vocabulary.
 - `.Models`: prompt, conversation, request/response, streaming, provenance, route-hint, and result shapes.
 - `.Options` and `.Categories`: typed operation and category configuration.
+- `Koan.AI.Prompt`: immutable prompt parsing/composition, examples, interpolation, and output-shape description.
 
 The AI-specific capability catalog and model-selection SPIs live here rather than in `Sylin.Koan.Core`; applications
 that do not reference AI therefore do not carry AI vocabulary in their mandatory framework substrate.
@@ -26,6 +27,10 @@ and register one of these contracts without activating AI; behavior appears only
 
 `IAiAdapter.Capabilities` is string-based by design. `AiCapability` supplies interoperable in-box identifiers while
 allowing providers to declare additional capabilities without changing this package.
+
+The prompt value lives here because `Client.Chat(Prompt)` and higher-level modules share it across the public AI
+boundary. The optional `Sylin.Koan.AI.Prompt` package adds Entity-backed persistence; the AI runtime never references
+that functional Data concern.
 
 ## Failure and compatibility boundaries
 

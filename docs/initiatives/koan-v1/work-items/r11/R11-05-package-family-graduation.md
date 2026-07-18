@@ -1446,6 +1446,121 @@ capture a stale endpoint. Maturity cannot exceed focused behavior observed in th
 The AI runtime and local-inference provider family passes this R11-05 slice. No release candidate, full certification
 run, package feed, or remote state was created; the complete release ratchet remains the single R11-07 boundary.
 
+### AI semantic-input and HTTP-projection discovery
+
+**Task:** graduate the prompt semantic and AI Web projection after separating the always-available prompt value from
+the optional Entity-backed catalog, then make a Web package reference fully express endpoint availability without an
+extra registration call.
+
+**Application intent:** “Compose an inspectable prompt and send it through Koan AI without activating Data. If the
+application deliberately references the prompt-catalog package, store and resolve versioned prompts as Entities. If it
+references the Web projection, expose the provider-neutral AI HTTP surface through ordinary Koan Web composition.”
+
+**Public expression:** `Prompt.Parse(...)` and `Prompt.Create(...)` remain the in-memory semantic value used by
+`Client.Chat(...)`. `Sylin.Koan.AI.Prompt` earns a narrower, optional reference intent for `PromptEntry` and catalog
+resolution. `Sylin.Koan.AI.Web` plus `AddKoan()` makes its controllers and health participation available; no
+`AddKoanAiWeb()` ceremony is an application responsibility.
+
+**Guarantee/correction:** functional AI depends only on inert AI contracts for its prompt value and never activates
+Entity/Data merely because chat is available. Catalog lookup is owned by the optional catalog package and fails with
+the requested prompt identity when no active/versioned entry exists. AI Web registers its controller application part
+and health participant exactly once through its `KoanModule`; HTTP operations use the same compiled provider registry
+and pipeline as in-process calls. Provider exceptions are not silently converted into invented success or capability.
+
+**Complete intent surface:** raw and structured prompts, variables/defaults, constraints, examples, structured-output
+shape, immutable modification, optional catalog name/version/selection, AI HTTP health/capabilities/models/chat/
+stream/embed/OCR/model-management routes, cancellation, startup facts, and provider-native failure. Assembly placement,
+manual hosted-service registration, MVC application-part mechanics, and a transitive Data runtime are not application
+decisions.
+
+**Public concepts:** a prompt is an immutable AI request semantic; a prompt entry is an Entity-backed application
+record; a catalog resolves deliberate persisted identity; AI Web is a provider-neutral projection. These are separate
+DDD/SoC spaces even when the same application uses all three.
+
+**Docs read:** architecture and engineering guidance require business-intent APIs, reference-as-availability, inert
+contracts, standard .NET composition, one owner per decision, and truthful package-owned docs. The current prompt page
+mixes value construction and unproved random rollout/version storage, shows nonexistent overloads and `{{variable}}`
+syntax, and makes AI transitively reference Data. The current AI Web README is only an install fragment; its technical
+page promises configurable route bases, quotas, CORS, authentication codes, timeouts, and backpressure that no code or
+options implement. The current public AI reference page is marked current while teaching nonexistent package IDs,
+APIs, options, and provider behavior, and is not navigated from the public TOC.
+
+**Code read:** four prompt value files are BCL-only, but they share an assembly with `PromptEntry : Entity<>`,
+`PromptStrategy`, and catalog lookup. `Koan.AI` references that functional package solely for `Client.Chat(Prompt)`, so
+every AI provider inherits Data Core. Catalog loading has no direct behavior test; random A/B/canary selection has no
+stickiness or routing context. AI Web has no `KoanModule`, controller-discovery registration, or owned tests; its only
+extension registers a hosted health subscriber and must be called manually despite the framework's reference-intent
+law. Its controller catches all model-list failures and its technical prose describes options and guarantees absent
+from the assembly. The closest correct projection pattern is `MediaWebModule`/`CanonWebModule` using
+`AddKoanControllersFrom<T>()` and provenance from the same module.
+
+**Constants/options/DTO inventory:** AI request/result/provider DTOs and route-hint contracts already live in
+`Sylin.Koan.AI.Contracts`; the prompt value needs no Data or runtime service. AI Web owns one internal route vocabulary
+and consumes existing AI DTOs. No route-options type, provider registry, prompt-contract package, or new application
+registration extension is justified.
+
+**Reusing:** existing prompt value/builder/output types and unit/integration cases; `PromptEntry` Entity semantics;
+AI contracts, pipeline, adapter registry, health aggregator, `KoanModule`, `AddKoanControllersFrom<T>()`, provenance,
+the isolated provider host pattern, package compiler, and public truth gate.
+
+**Creating new:** one catalog facade in the existing optional Prompt package and one `AiWebModule` in the existing Web
+package. Both replace misplaced/static registration ownership; neither creates a package or parallel mechanism.
+
+**Coalescence:** move the BCL-only prompt semantic into AI Contracts while retaining its public namespace, remove the
+functional Prompt reference from AI, and make the optional package own only Entity catalog behavior. Replace
+`AddKoanAiWeb()` with a module that registers controllers and health participation once. Delete or rebuild stale public
+AI guidance from the surviving code contract; do not preserve rollout claims, knobs, or error mappings that have no
+implementation.
+
+**Ergonomics:** ordinary AI code remains prompt construction plus `Client.Chat`; applications that never persist
+prompts lose an accidental Data dependency. Catalog users add one package and call one intent-named catalog surface.
+Web users add one package and keep only `AddKoan()`. IntelliSense groups value composition, persistence, and projection
+at their real boundaries; agents do not infer setup calls or configuration that do not exist; operators see one
+module-owned route/participation report.
+
+**Constraints satisfied:** no new package or bespoke identifier; contracts remain inert; Entity is used only for the
+optional persisted concern; Web is a thin projection over the AI runtime; standard MVC/DI/module mechanics are reused;
+ADRs remain dated and untouched; focused proof only during the slice; no release certification before R11-07.
+
+**Risks:** moving types between assemblies changes binary ownership even when namespaces stay stable; removing static
+`Prompt.Load` and random rollout helpers is intentionally breaking under the greenfield mandate; catalog tests must
+use one isolated Data host because Entity resolution is process-global; Web tests must prove real controller discovery,
+not direct controller construction. Public docs must distinguish exposed HTTP transport from authorization, quota,
+and production-edge guarantees Koan AI Web does not currently supply.
+
+### AI semantic-input and HTTP-projection evidence
+
+- The BCL-only `Prompt`, builder, examples, and output-shape types now live in inert AI Contracts with their public
+  namespace preserved. Functional AI no longer references the Entity-backed Prompt package: its release artifact
+  depends only on AI Contracts, Core, and standard Microsoft extensions, so chat availability does not activate Data.
+- `Sylin.Koan.AI.Prompt` now has one earned reference intent: optional Entity-backed named/versioned storage.
+  `PromptCatalog.Load(name)` resolves the newest active entry; the exact-version overload is deliberate and status
+  neutral. Blank identity, invalid version, and missing entries reject correctively. Unproved random A/B/canary
+  selection and the static `Prompt.Load` fusion are deleted. Prompt value/catalog proof passes 26/26 through a real
+  `AddKoan()` host and InMemory Entity provider; focused prompt integration passes 7/7.
+- `AiWebModule` is the single Web activation owner and uses the standard controller application-part seam. The manual
+  `AddKoanAiWeb()` extension and duplicate health subscriber are deleted; AI Core remains the health owner. A package
+  reference plus `AddKoan()` exposes the real controller surface, and a providerless host reports the projection as
+  `Inactive` rather than unhealthy. The isolated TestServer proof passes 1/1.
+- Adapter/capability inspection now projects each adapter's declared capability set. Model inventory returns explicit
+  provider failures alongside partial results instead of swallowing every exception. Public prose no longer promises
+  authentication codes, quotas, route options, backpressure, retry, budget, fallback, OpenAI providers, or error
+  normalization absent from current code.
+- AI Unit remains green at 160/160 and the dependent Orchestration build is warning-clean after its catalog call moves
+  to `PromptCatalog`. Prompt and Web are terminal `keep` boundaries: the former owns optional persisted identity; the
+  latter owns HTTP projection; neither duplicates AI runtime/provider policy.
+- Release packs for AI Contracts, AI, Prompt, and AI Web contain their DLL/XML, package-owned README, canonical icon,
+  and build-transitive composition metadata. Inspected nuspecs prove AI shed its Prompt/Data dependency while Prompt
+  owns AI Contracts/Core/Data Core and Web owns AI/Contracts/Web/SSE explicitly. Current NuGet audit reports no known
+  vulnerable direct or transitive package for all four.
+- Prompt and AI Web are structurally ready with zero objective findings. Generated truth contains 111 packages: 22
+  repair-required, 35 review-required, and 54 structurally ready across 22 claims. Public documentation truth passes
+  across 214 current files and 40 navigation targets; the stale current AI pillar and agentic-code-generation pages
+  were replaced or removed rather than patched around legacy APIs.
+
+The AI semantic-input and HTTP-projection family passes this R11-05 slice. No release candidate, full certification
+run, package feed, or remote state was created; the complete release ratchet remains the single R11-07 boundary.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

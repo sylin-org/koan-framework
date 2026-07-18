@@ -237,66 +237,30 @@ public sealed class DatabaseHealthCheck : IHealthContributor
 
 ### Provider Connectivity
 
-- Ollama: `curl http://localhost:11434/api/tags` should return available models.
-- Hosted providers: verify API keys and endpoints in configuration.
+- Start with the startup report: it distinguishes a referenced provider, an inactive automatic candidate, and rejected
+  explicit configuration.
+- For Ollama, `curl http://localhost:11434/api/tags` should return available models.
+- When the runtime is not at its conventional endpoint, configure one exact placement:
 
 ```json
 {
   "Koan": {
-    "AI": {
-      "DefaultProvider": "Ollama",
+    "Ai": {
       "Ollama": {
-        "BaseUrl": "http://localhost:11434",
-        "DefaultModel": "llama3"
+        "Endpoints": ["http://ollama.internal:11434"],
+        "DefaultModel": "llama3.2"
       }
     }
   }
 }
 ```
 
-### Embeddings & Semantic Search
+`ConnectionStrings:Ollama` is the single-endpoint alternative. Do not configure both forms. Invalid explicit
+placement fails startup; an absent automatically discovered local runtime remains normal inactivity.
 
-- Annotate vector-bearing properties with `[VectorField]`:
-
-  ```csharp
-  public class Document : Entity<Document>
-  {
-      public string Content { get; set; } = "";
-
-      [VectorField]
-      public float[] ContentEmbedding { get; set; } = [];
-  }
-  ```
-
-- Validate dimensions before saving:
-  ```csharp
-  var embedding = await _ai.EmbedAsync(new AiEmbeddingRequest { Input = doc.Content });
-  var vector = embedding.Embeddings.FirstOrDefault()?.Vector ?? Array.Empty<float>();
-  Guard.Against.InvalidLength(vector.Length, expected: 1536);
-  doc.ContentEmbedding = vector;
-  await doc.Save();
-  ```
-- For heavy application-owned workloads on a `ProviderBoundedPaging` adapter, stream the source with
-  `Entity.AllStream(...)`. InMemory, JSON, and Redis reject Entity streams; application batching,
-  concurrency, and rate limits remain separate from the data-source page bound.
-
-### Cost & Rate Limits
-
-Set provider budgets and retry envelopes:
-
-```json
-{
-  "Koan": {
-    "AI": {
-      "Budget": {
-        "MaxTokensPerRequest": 4000,
-        "MaxRequestsPerMinute": 60,
-        "MaxCostPerDay": 50.0
-      }
-    }
-  }
-}
-```
+Koan AI does not currently provide a universal budget, retry, rate-limit, or provider-fallback configuration. Apply
+those policies through the selected provider or the application's owning resilience boundary. See the
+[AI reference](../reference/ai/index.md) and provider package page for exact supported options.
 
 ---
 

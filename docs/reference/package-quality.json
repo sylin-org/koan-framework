@@ -4,11 +4,11 @@
   "summary": {
     "packages": 111,
     "repairRequired": 22,
-    "reviewRequired": 37,
-    "structurallyReady": 52,
+    "reviewRequired": 35,
+    "structurallyReady": 54,
     "ownedReadmes": 89,
-    "technicalCompanions": 79,
-    "findings": 157
+    "technicalCompanions": 80,
+    "findings": 151
   },
   "findingDefinitions": [
     {
@@ -89,7 +89,6 @@
       ],
       "dependencies": [
         "Sylin.Koan.AI.Contracts",
-        "Sylin.Koan.AI.Prompt",
         "Sylin.Koan.Core"
       ],
       "readme": "src/Koan.AI/README.md",
@@ -380,8 +379,8 @@
       "projectPath": "src/Koan.AI.Prompt/Koan.AI.Prompt.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
-      "description": "Uri-inspired prompt primitive for Koan AI: parse, build, version, and A/B test prompts with entity-backed storage.",
+      "status": "structurally-ready",
+      "description": "Optional Entity-backed catalog for storing and resolving versioned Koan AI prompts.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -391,14 +390,9 @@
         "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Koan.AI.Prompt/README.md",
-      "technicalDocumentation": null,
+      "technicalDocumentation": "src/Koan.AI.Prompt/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI.Review",
@@ -456,23 +450,21 @@
       "projectPath": "src/Koan.AI.Web/Koan.AI.Web.csproj",
       "shape": "library",
       "role": "projection",
-      "status": "review-required",
-      "description": "Koan AI Web: optional AI controllers/endpoints (chat, embeddings, health) for ASP.NET Core without coupling Koan.Web to AI.",
+      "status": "structurally-ready",
+      "description": "Provider-neutral HTTP projection for Koan AI chat, embeddings, model inventory, and capability inspection.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.AI",
         "Sylin.Koan.AI.Contracts",
+        "Sylin.Koan.Web",
         "Sylin.Koan.Web.Sse"
       ],
       "readme": "src/Koan.AI.Web/README.md",
       "technicalDocumentation": "src/Koan.AI.Web/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.App",

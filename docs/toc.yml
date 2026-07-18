@@ -20,6 +20,8 @@
       href: reference/data/cache.md
     - name: Store Entity-backed files
       href: reference/storage/index.md
+    - name: Add AI capabilities
+      href: reference/ai/index.md
     - name: Run durable jobs
       href: reference/cards/jobs.md
     - name: Use Entity Events and Transport
@@ -59,6 +61,8 @@
       href: reference/cards/jobs.md
     - name: Communication
       href: reference/communication/index.md
+    - name: AI
+      href: reference/ai/index.md
     - name: MCP
       href: reference/cards/mcp.md
 - name: Architecture

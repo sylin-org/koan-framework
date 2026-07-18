@@ -76,10 +76,10 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.AI.Eval` | `capability` | `assess` |
 | `Sylin.Koan.AI.Models` | `capability` | `assess` |
 | `Sylin.Koan.AI.Orchestration` | `capability` | `assess` |
-| `Sylin.Koan.AI.Prompt` | `capability` | `assess` |
+| `Sylin.Koan.AI.Prompt` | `capability` | `keep` |
 | `Sylin.Koan.AI.Review` | `capability` | `assess` |
 | `Sylin.Koan.AI.Training` | `capability` | `assess` |
-| `Sylin.Koan.AI.Web` | `projection` | `assess` |
+| `Sylin.Koan.AI.Web` | `projection` | `keep` |
 | `Sylin.Koan.App` | `entry` | `keep` |
 | `Sylin.Koan.Cache` | `capability` | `keep` |
 | `Sylin.Koan.Cache.Abstractions` | `contracts` | `keep` |
@@ -256,6 +256,17 @@ instead of silently treating it as empty. This closes the first review-order gro
 
 `Web.Extensions` remains a provisional survivor only in the quality sense: its distinct optional intent is earned,
 but its prose and executable surface require a focused truth audit before R11 can graduate it.
+
+## AI semantic-input and projection dispositions
+
+| Package | Disposition | Distinct reference intent and required boundary work |
+|---|---|---|
+| `Sylin.Koan.AI.Prompt` | `keep` | Optional Entity-backed identity and version lookup for prompt values. Prompt composition itself moved to inert AI Contracts so ordinary AI no longer activates Data; unproved rollout selection was removed. |
+| `Sylin.Koan.AI.Web` | `keep` | Provider-neutral HTTP projection over the compiled AI runtime. Its module owns controller discovery and startup tooling; it owns no provider election, health duplication, authorization, quotas, retry, or application registration ceremony. |
+
+Both boundaries pass focused source behavior and inspected artifact evidence. The remaining AI vertical and external
+provider packages retain separate terminal assessments because their accepted cross-repository/retirement topology is
+not implied by these two survivor decisions.
 
 ## Acceptance
 

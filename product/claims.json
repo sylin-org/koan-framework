@@ -110,6 +110,15 @@
       "evidence": ["tests/Suites/AI/Unit/Koan.Tests.AI.Unit", "tests/Suites/AI/ProviderActivation/Koan.AI.ProviderActivation.Tests", "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap.Infrastructure/Specs/OnnxEmbeddingsPillarBootstrapSpec.cs", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
     },
     {
+      "id": "ai-prompt-and-http-projection",
+      "title": "AI prompt semantics and HTTP projection",
+      "summary": "Inspectable prompt values remain inert until used, optional Entity-backed prompt versions resolve deliberately, and a Web package reference projects the compiled AI runtime without registration ceremony.",
+      "maturity": "demonstrated",
+      "packages": ["Sylin.Koan.AI.Contracts", "Sylin.Koan.AI.Prompt", "Sylin.Koan.AI.Web"],
+      "documentation": ["docs/reference/ai/index.md", "src/Koan.AI.Prompt/README.md", "src/Koan.AI.Web/README.md"],
+      "evidence": ["tests/Koan.AI.Prompt.Tests", "tests/Suites/AI/Web/Koan.AI.Web.Tests", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
+    },
+    {
       "id": "search-engine-vector-providers",
       "title": "Elasticsearch and OpenSearch vector providers",
       "summary": "Elasticsearch and OpenSearch execute Koan vector semantics through one shared runtime while preserving native kNN dialects, selected-provider naming, and participation-owned readiness within stated limits.",

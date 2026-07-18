@@ -39,6 +39,21 @@ string answer = await Client.Chat("Which orders need attention?");
 float[] meaning = await Client.Embed("priority customer escalation");
 ```
 
+Prompts are inspectable, immutable values and do not activate Data:
+
+```csharp
+using Koan.AI.Prompt;
+
+var prompt = Prompt.Create(p => p
+    .System("You summarize orders for an operations team.")
+    .Instruct("Summarize order {orderId} in one sentence.")
+    .Constrain("State uncertainty explicitly."));
+
+string summary = await Client.Chat(prompt, new { orderId = order.Id });
+```
+
+Reference `Sylin.Koan.AI.Prompt` only when the application needs an Entity-backed catalog of named versions.
+
 Category configuration can constrain source or model without leaking provider mechanics into business code. Named
 sources under `Koan:Ai:Sources` are the advanced routing surface; ordinary applications normally need only a provider
 reference and, when conventions cannot locate it, that provider's exact endpoint configuration.

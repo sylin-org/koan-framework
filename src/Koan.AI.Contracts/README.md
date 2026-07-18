@@ -1,7 +1,7 @@
 # Sylin.Koan.AI.Contracts
 
 Inert vocabulary for building on Koan AI: provider adapters, capability identifiers, model-selection seams, routing
-registries, prompt options, and multimodal request/result shapes. Referencing this package alone starts no runtime,
+registries, immutable prompt values/options, and multimodal request/result shapes. Referencing this package alone starts no runtime,
 selects no provider, and performs no network or model operation.
 
 ## Install
@@ -33,10 +33,25 @@ pipeline consumes the advisor; otherwise the contract remains dormant.
 Provider authors implement the narrow interfaces under `Koan.AI.Contracts.Adapters` and declare supported operations
 with `AiCapability` values. Custom capability strings remain valid so providers are not limited to the in-box catalog.
 
+Libraries can also compose a prompt without activating AI or Data:
+
+```csharp
+using Koan.AI.Prompt;
+
+Prompt prompt = Prompt.Create(p => p
+    .Instruct("Classify {text}")
+    .OutputAs<Classification>());
+```
+
+Persisted prompt catalogs are optional functionality in `Sylin.Koan.AI.Prompt`; they are not part of this inert
+boundary.
+
 ## Guarantees and boundaries
 
 - This package owns shapes and SPIs only. Provider discovery, adapter election, retries, health, and execution belong
   to `Sylin.Koan.AI` and the referenced provider packages.
+- Prompt parsing, interpolation, and structured-output description are deterministic in-memory operations. Prompt
+  storage, rollout assignment, authorization, and content policy are outside this package.
 - An `AiCapability` value describes support; it does not guarantee that a model is installed, reachable, or healthy.
 - Adapter implementations are expected to be concurrency-safe and to honor cancellation, but those guarantees belong
   to the implementation selected at runtime.

@@ -1,7 +1,7 @@
 # Module Inventory Ledger
 
 ### Koan.AI
-- Depends on: Koan.AI.Contracts, Koan.AI.Prompt, Koan.Core
+- Depends on: Koan.AI.Contracts, Koan.Core
 - Depended by: Koan.AI.Agents, Koan.AI.Eval, Koan.AI.Models, Koan.AI.Orchestration, Koan.AI.Training, Koan.AI.Web, Koan.Data.AI
 - Documentation: README ✅ · TECHNICAL ✅
 
@@ -67,8 +67,8 @@
 
 ### Koan.AI.Prompt
 - Depends on: Koan.AI.Contracts, Koan.Core, Koan.Data.Core
-- Depended by: Koan.AI, Koan.AI.Orchestration
-- Documentation: README ✅ · TECHNICAL ❌
+- Depended by: Koan.AI.Orchestration
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.AI.Review
 - Depends on: Koan.Core, Koan.Data.Core
@@ -81,7 +81,7 @@
 - Documentation: README ✅ · TECHNICAL ❌
 
 ### Koan.AI.Web
-- Depends on: Koan.AI, Koan.AI.Contracts, Koan.Web.Sse
+- Depends on: Koan.AI, Koan.AI.Contracts, Koan.Web, Koan.Web.Sse
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
