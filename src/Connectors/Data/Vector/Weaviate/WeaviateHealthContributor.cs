@@ -15,7 +15,7 @@ public sealed class WeaviateHealthContributor(
 {
     protected override async Task ProbeSource(string source, CancellationToken ct)
     {
-        var http = httpFactory.CreateClient("weaviate");
+        var http = httpFactory.CreateClient(Infrastructure.Constants.HttpClientName);
         http.BaseAddress = new Uri(options.Value.Endpoint);
         var readyPath = "/.well-known/ready";
         var full = new Uri(http.BaseAddress!, readyPath).AbsoluteUri;

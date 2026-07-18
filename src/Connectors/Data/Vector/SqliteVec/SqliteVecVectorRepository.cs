@@ -202,7 +202,7 @@ internal sealed class SqliteVecVectorRepository<TEntity, TKey>
     public async Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(options);
-        var topK = options.TopK ?? 10;
+        var topK = options.TopK;
         await _lock.WaitAsync(ct).ConfigureAwait(false);
         try
         {

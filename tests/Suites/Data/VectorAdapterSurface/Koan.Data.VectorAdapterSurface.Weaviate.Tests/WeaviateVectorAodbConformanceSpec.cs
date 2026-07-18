@@ -62,25 +62,13 @@ public sealed class WeaviateVectorAodbConformanceSpec : VectorAodbConformanceSpe
             ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
             ["Koan:Data:Tenancy:Posture"] = "Closed",
             ["Koan:Data:Weaviate:Endpoint"] = endpoint,
-            ["Koan:Data:Weaviate:ConnectionString"] = endpoint,
-            ["Koan:Data:Weaviate:Dimension"] = "8",
             ["Koan:Data:Weaviate:Metric"] = "cosine",
             ["Koan:Data:Weaviate:DisableAutoDetection"] = "true",
         };
 
         var host = await KoanIntegrationHost.Configure()
             .WithSettings(settings)
-            .ConfigureServices(s =>
-            {
-                s.AddKoan();
-                s.PostConfigure<WeaviateOptions>(o =>
-                {
-                    o.ConnectionString = endpoint;
-                    o.Endpoint = endpoint;
-                    o.Dimension = 8;
-                    o.Metric = "cosine";
-                });
-            })
+            .ConfigureServices(s => s.AddKoan())
             .StartAsync()
             .ConfigureAwait(false);
 

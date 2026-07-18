@@ -106,6 +106,49 @@ public sealed class VectorAdapterResolutionSpec
     }
 
     [Fact]
+    public void Vector_query_contract_owns_the_default_top_k()
+    {
+        var options = new VectorQueryOptions([1f]);
+
+        options.TopK.Should().Be(VectorQueryOptions.DefaultTopK);
+        options.TopK.Should().Be(10);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Vector_query_contract_rejects_non_positive_top_k(int topK)
+    {
+        var act = () => new VectorQueryOptions([1f], TopK: topK);
+        var baseline = new VectorQueryOptions([1f]);
+        var cloneAct = () => baseline with { TopK = topK };
+
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .WithParameterName(nameof(VectorQueryOptions.TopK));
+        cloneAct.Should().Throw<ArgumentOutOfRangeException>()
+            .WithParameterName(nameof(VectorQueryOptions.TopK));
+    }
+
+    [Fact]
+    public async Task Vector_pipeline_preserves_the_callers_explicit_top_k()
+    {
+        var services = NewServices();
+        services.AddKoanDataCore();
+        services.AddKoanDataVector();
+        services.AddSingleton<IDataService, DataService>();
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("json"));
+        await using var provider = services.BuildServiceProvider();
+
+        var repository = provider.GetRequiredService<IVectorService>()
+            .TryGetRepository<EntityWithSourceOnly, string>();
+        await repository!.Search(new VectorQueryOptions([1f], TopK: 250));
+
+        var inner = (FakeVectorRepo<EntityWithSourceOnly, string>)
+            ((IDecoratedVectorRepository)repository).InnerRepository;
+        inner.LastTopK.Should().Be(250);
+    }
+
+    [Fact]
     public async Task Explicit_vector_attribute_never_falls_through_to_an_unrelated_provider()
     {
         var services = NewServices();
@@ -176,6 +219,7 @@ public sealed class VectorAdapterResolutionSpec
         }
 
         public string ProviderName { get; }
+        public int? LastTopK { get; private set; }
 
         public Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
             => Task.CompletedTask;
@@ -190,7 +234,10 @@ public sealed class VectorAdapterResolutionSpec
             => Task.FromResult(0);
 
         public Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
-            => Task.FromResult(new VectorQueryResult<TKey>(Array.Empty<VectorMatch<TKey>>(), null));
+        {
+            LastTopK = options.TopK;
+            return Task.FromResult(new VectorQueryResult<TKey>(Array.Empty<VectorMatch<TKey>>(), null));
+        }
     }
 
     private sealed class FakeVectorFactory : IVectorAdapterFactory

@@ -54,7 +54,6 @@ public sealed class QdrantVectorAodbConformanceSpec : VectorAodbConformanceSpecs
             ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
             ["Koan:Data:Tenancy:Posture"] = "Closed",
             ["Koan:Data:Qdrant:Endpoint"] = endpoint,
-            ["Koan:Data:Qdrant:ConnectionString"] = endpoint,
             ["Koan:Data:Qdrant:Dimension"] = "8",
             ["Koan:Data:Qdrant:WaitForResult"] = "true",          // read-your-writes: deterministic test reads
             ["Koan:Data:Qdrant:DisableAutoDetection"] = "true",   // never let discovery find a stray local Qdrant
@@ -62,24 +61,12 @@ public sealed class QdrantVectorAodbConformanceSpec : VectorAodbConformanceSpecs
 
         var host = await KoanIntegrationHost.Configure()
             .WithSettings(settings)
-            // Pin the endpoint deterministically AFTER the connector's configurator (PostConfigure runs last) so a stray
-            // local Qdrant (e.g. a dev container on :6333) can never be discovered/used instead of THIS container.
-            .ConfigureServices(s =>
-            {
-                s.AddKoan();
-                s.PostConfigure<QdrantOptions>(o =>
-                {
-                    o.ConnectionString = endpoint;
-                    o.Endpoint = endpoint;
-                    o.Dimension = 8;
-                    o.WaitForResult = true;
-                });
-            })
+            .ConfigureServices(s => s.AddKoan())
             .StartAsync()
             .ConfigureAwait(false);
 
         // Defense-in-depth: confirm the adapter resolved to THIS Testcontainers Qdrant, not a stray local one on :6333
-        // (the PostConfigure pin + DisableAutoDetection enforce it; this verifies the pin actually held).
+        // (the exact Endpoint setting + DisableAutoDetection enforce it; this verifies the public setting held).
         host.Services.GetRequiredService<IOptions<QdrantOptions>>().Value.Endpoint
             .Should().Be(endpoint, "the adapter must target THIS Testcontainers Qdrant, not a stray local one");
         return (host, null);

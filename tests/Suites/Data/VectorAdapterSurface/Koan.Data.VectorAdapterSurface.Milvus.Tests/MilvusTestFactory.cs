@@ -29,8 +29,8 @@ namespace Koan.Data.VectorAdapterSurface.Milvus.Tests;
 /// </para>
 ///
 /// <para>
-/// Operational defaults: <see cref="MilvusOptions.Dimension"/> defaults to 1536 (OpenAI ada-002
-/// / text-embedding-3-small size). Users with other embedding models override.
+/// <see cref="MilvusOptions.Dimension"/> is only needed when a test pre-creates a collection;
+/// otherwise the adapter derives it from the first embedding.
 /// </para>
 /// </summary>
 public sealed class MilvusTestFactory : IVectorAdapterTestFactory

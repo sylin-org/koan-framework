@@ -20,8 +20,8 @@ namespace Koan.Data.VectorAdapterSurface.Qdrant.Tests;
 /// mapping.
 ///
 /// <para>
-/// Operational defaults: <see cref="QdrantOptions.Dimension"/> defaults to 1536 (OpenAI ada-002
-/// / text-embedding-3-small size). <see cref="QdrantOptions.WaitForResult"/> is true, which
+/// <see cref="QdrantOptions.Dimension"/> is only needed when a test pre-creates a collection;
+/// otherwise the adapter derives it from the first embedding. <see cref="QdrantOptions.WaitForResult"/> is true, which
 /// means writes block until visible to subsequent reads — that's what gives this adapter its
 /// <see cref="SupportsDeleteImmediatelyVisibleToSearch"/> = true claim.
 /// </para>

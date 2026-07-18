@@ -58,10 +58,9 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         // Read Weaviate-specific configuration
         var endpoint = ReadProviderConfiguration(options.Endpoint, WeaviateItems.EndpointKeys);
 
-        // User-explicit endpoint always beats auto-discovery.
-        // If the user configured an endpoint that differs from the default, it is authoritative.
-        var hasUserExplicitEndpoint = !string.IsNullOrWhiteSpace(endpoint)
-            && !string.Equals(endpoint, new WeaviateOptions().Endpoint, StringComparison.OrdinalIgnoreCase);
+        // Presence in configuration expresses intent even when the chosen value happens to equal the default.
+        var hasUserExplicitEndpoint = WeaviateItems.EndpointKeys
+            .Any(key => !string.IsNullOrWhiteSpace(Configuration[key]));
 
         var apiKey = ReadProviderConfiguration(options.ApiKey ?? "", WeaviateItems.ApiKeyKeys);
 
@@ -120,9 +119,6 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         }
 
         // Configure Weaviate-specific options
-        options.DefaultTopK = ReadProviderConfiguration(options.DefaultTopK, WeaviateItems.DefaultTopKKeys);
-        options.MaxTopK = ReadProviderConfiguration(options.MaxTopK, WeaviateItems.MaxTopKKeys);
-        options.Dimension = ReadProviderConfiguration(options.Dimension, WeaviateItems.DimensionKeys);
         options.Metric = ReadProviderConfiguration(options.Metric, WeaviateItems.MetricKeys);
         options.DefaultTimeoutSeconds = ReadProviderConfiguration(options.DefaultTimeoutSeconds, WeaviateItems.TimeoutKeys);
 
@@ -135,7 +131,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
 
     private string ResolveAutonomousConnection()
     {
-        const string fallback = "http://localhost:8080";
+        const string fallback = Infrastructure.Constants.DefaultEndpoint;
         try
         {
             if (IsAutoDetectionDisabled())

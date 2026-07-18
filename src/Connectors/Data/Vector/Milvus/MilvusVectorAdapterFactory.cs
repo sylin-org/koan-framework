@@ -1,4 +1,3 @@
-using System.Text;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Core;
@@ -41,7 +40,7 @@ public sealed class MilvusVectorAdapterFactory : IVectorAdapterFactory
             ?? throw new InvalidOperationException("IHttpClientFactory not registered; call services.AddHttpClient().");
         var options = (IOptions<MilvusOptions>?)sp.GetService(typeof(IOptions<MilvusOptions>))
             ?? throw new InvalidOperationException("MilvusOptions not configured; bind Koan:Data:Milvus.");
-        return new MilvusVectorRepository<TEntity, TKey>(httpFactory, options, sp);
+        return new MilvusVectorRepository<TEntity, TKey>(httpFactory, options, sp, this, source);
     }
 
     // Milvus collection names accept only [A-Za-z0-9_] and reject '#', so the partition separator is '_'

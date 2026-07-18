@@ -31,6 +31,8 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private readonly HttpClient _http;
     private readonly WeaviateOptions _options;
     private readonly IServiceProvider _sp;
+    private readonly WeaviateVectorAdapterFactory _factory;
+    private readonly string _source;
     private readonly ILogger<WeaviateVectorRepository<TEntity, TKey>>? _logger;
     private readonly VectorSchemaDescriptor _schemaDescriptor;
     private volatile bool _schemaEnsured;
@@ -41,11 +43,18 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         .Add(VectorCaps.Hybrid).Add(VectorCaps.NativeContinuation).Add(VectorCaps.DynamicCollections);
 
 
-    public WeaviateVectorRepository(IHttpClientFactory httpFactory, IOptions<WeaviateOptions> options, IServiceProvider sp)
+    public WeaviateVectorRepository(
+        IHttpClientFactory httpFactory,
+        IOptions<WeaviateOptions> options,
+        IServiceProvider sp,
+        WeaviateVectorAdapterFactory factory,
+        string source)
     {
-        _http = httpFactory.CreateClient("weaviate");
+        _http = httpFactory.CreateClient(Infrastructure.Constants.HttpClientName);
         _options = options.Value;
         _sp = sp;
+        _factory = factory;
+        _source = source;
         _logger = (ILogger<WeaviateVectorRepository<TEntity, TKey>>?)sp.GetService(typeof(ILogger<WeaviateVectorRepository<TEntity, TKey>>));
         var registry = (VectorSchemaRegistry?)sp.GetService(typeof(VectorSchemaRegistry));
         _schemaDescriptor = registry?.Get<TEntity, TKey>() ?? VectorSchemaDescriptor.CreateFallback(typeof(TEntity));
@@ -60,7 +69,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         {
             // DATA-0086: vector naming routes to WeaviateVectorAdapterFactory.ResolveStorage,
             // which owns its own cache and applies partition composition.
-            return SanitizeClassName(VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_sp));
+            return SanitizeClassName(VectorAdapterNaming.GetOrCompute<TEntity>(_sp, _factory, _source));
         }
     }
 
@@ -106,18 +115,9 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private async Task EnsureSchema(CancellationToken ct)
     {
         if (_schemaEnsured) return;
-
-        // For backward compatibility, use configured dimension if no dimension discovered yet
-        var effectiveDimension = _discoveredDimension > 0 ? _discoveredDimension : _options.Dimension;
-        await EnsureSchema(effectiveDimension, ct);
-    }
-
-    private async Task EnsureSchema(int dimension, CancellationToken ct)
-    {
-        if (_schemaEnsured) return;
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.index.ensureCreated");
         var cls = ClassName;
-        _logger?.LogDebug("Weaviate: ensure schema base={Base} class={Class} (resolved from {EntityType}) dimension={Dimension}", _http.BaseAddress, cls, typeof(TEntity).Name, dimension);
+        _logger?.LogDebug("Weaviate: ensure schema base={Base} class={Class} (resolved from {EntityType})", _http.BaseAddress, cls, typeof(TEntity).Name);
         // Probe class
         var probe = await _http.GetAsync($"/v1/schema/{Uri.EscapeDataString(cls)}", ct);
         _logger?.LogDebug("Weaviate: GET /v1/schema/{Class} -> {Status}", cls, (int)probe.StatusCode);
@@ -228,12 +228,9 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             _logger?.LogInformation("Weaviate: discovered embedding dimension {Dimension} from first vector for class {Class}", _discoveredDimension, ClassName);
         }
         else if (_discoveredDimension > 0 && embedding.Length > 0 && _discoveredDimension != embedding.Length)
-        {
-            _logger?.LogWarning("Weaviate: dimension conflict detected! Previously discovered {PreviousDimension}, current embedding {CurrentDimension} for class {Class}. Updating discovery.", _discoveredDimension, embedding.Length, ClassName);
-            _discoveredDimension = embedding.Length;
-            // Reset schema to be recreated with new dimensions
-            _schemaEnsured = false;
-        }
+            throw new ArgumentException(
+                $"Embedding dimension {embedding.Length} does not match the established Weaviate dimension {_discoveredDimension}.",
+                nameof(embedding));
 
         await EnsureSchema(ct);
         ValidateEmbedding(embedding);
@@ -563,8 +560,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
         await EnsureSchema(ct);
         ValidateEmbedding(options.Query);
-        var topK = options.TopK ?? _options.DefaultTopK;
-        if (topK > _options.MaxTopK) topK = _options.MaxTopK;
+        var topK = options.TopK;
 
         // Build optional filters using shared AST + dedicated translator
         string whereClause = WeaviateFilterTranslator.TranslateWhereClause(options.Filter);
@@ -846,13 +842,11 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
     private void ValidateEmbedding(float[] embedding)
     {
-        // Use discovered dimension if available, otherwise fall back to configured dimension
-        var expectedDimension = _discoveredDimension > 0 ? _discoveredDimension : _options.Dimension;
+        var expectedDimension = _discoveredDimension;
 
         if (expectedDimension > 0 && embedding.Length != expectedDimension)
         {
-            var source = _discoveredDimension > 0 ? "discovered" : "configured";
-            throw new ArgumentException($"Embedding dimension {embedding.Length} does not match {source} {expectedDimension}.");
+            throw new ArgumentException($"Embedding dimension {embedding.Length} does not match established dimension {expectedDimension}.");
         }
     }
 

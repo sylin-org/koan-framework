@@ -256,7 +256,7 @@ public sealed class SearchEngineVectorRepository<TEntity, TKey> :
         var dimension = EnsureDimension(options.Query.Length);
         await EnsureIndex(dimension, ct);
 
-        var topK = Math.Max(1, options.TopK ?? 10);
+        var topK = options.TopK;
         var request = BuildSearchRequest(options, topK);
         var url = $"/{Uri.EscapeDataString(IndexName)}/_search";
         var resp = await _http.PostAsync(url, new StringContent(request.ToString(Formatting.None), Encoding.UTF8, "application/json"), ct);

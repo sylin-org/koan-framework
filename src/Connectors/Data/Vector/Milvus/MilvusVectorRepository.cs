@@ -44,17 +44,23 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
     private readonly HttpClient _http;
     private readonly MilvusOptions _options;
     private readonly IServiceProvider _services;
+    private readonly MilvusVectorAdapterFactory _factory;
+    private readonly string _source;
     private readonly ILogger<MilvusVectorRepository<TEntity, TKey>>? _logger;
     private readonly ConcurrentDictionary<string, byte> _ensuredCollections = new(StringComparer.Ordinal);
 
     public MilvusVectorRepository(
         IHttpClientFactory httpFactory,
         IOptions<MilvusOptions> options,
-        IServiceProvider services)
+        IServiceProvider services,
+        MilvusVectorAdapterFactory factory,
+        string source)
     {
         _http = httpFactory.CreateClient(Infrastructure.Constants.HttpClientName);
         _options = options.Value;
         _services = services;
+        _factory = factory;
+        _source = source;
         _logger = (ILogger<MilvusVectorRepository<TEntity, TKey>>?)services.GetService(typeof(ILogger<MilvusVectorRepository<TEntity, TKey>>));
         ConfigureHttpClient();
     }
@@ -76,7 +82,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         {
             throw new InvalidOperationException(
                 "Milvus vector dimension is unknown. Configure Koan:Data:Milvus:Dimension " +
-                "(defaults to 1536 when unset) or call Upsert first to seed it.");
+                "when pre-creating a collection, or write a vector first so its dimension is known.");
         }
         await EnsureCollection(dimension, ct);
     }
@@ -205,7 +211,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         using var _ = MilvusTelemetry.Activity.StartActivity("vector.search");
         await EnsureCollection(options.Query.Length, ct);
 
-        var topK = Math.Max(1, options.TopK ?? _options.DefaultTopK);
+        var topK = options.TopK;
         var filter = MilvusFilterTranslator.Translate(options.Filter, _options.MetadataFieldName);
 
         // Milvus 2.4 search body:
@@ -278,7 +284,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         get
         {
             if (string.IsNullOrWhiteSpace(_options.CollectionName))
-                return VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services);
+                return VectorAdapterNaming.GetOrCompute<TEntity>(_services, _factory, _source);
             // A pinned CollectionName bypasses the partition+source name-fold — warn once if that defeats active isolation.
             VectorAdapterNaming.WarnIfPinnedNameDefeatsIsolation<TEntity>(_options.CollectionName!, "CollectionName");
             return _options.CollectionName!;

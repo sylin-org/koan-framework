@@ -88,7 +88,6 @@ public sealed class MilvusVectorAodbConformanceSpec : VectorAodbConformanceSpecs
             ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
             ["Koan:Data:Tenancy:Posture"] = "Closed",
             ["Koan:Data:Milvus:Endpoint"] = endpoint,
-            ["Koan:Data:Milvus:ConnectionString"] = endpoint,
             ["Koan:Data:Milvus:Dimension"] = "8",
             ["Koan:Data:Milvus:Metric"] = "COSINE",
             ["Koan:Data:Milvus:ConsistencyLevel"] = "Strong",
@@ -97,18 +96,7 @@ public sealed class MilvusVectorAodbConformanceSpec : VectorAodbConformanceSpecs
 
         var host = await KoanIntegrationHost.Configure()
             .WithSettings(settings)
-            .ConfigureServices(s =>
-            {
-                s.AddKoan();
-                s.PostConfigure<MilvusOptions>(o =>
-                {
-                    o.ConnectionString = endpoint;
-                    o.Endpoint = endpoint;
-                    o.Dimension = 8;
-                    o.Metric = "COSINE";
-                    o.ConsistencyLevel = "Strong";
-                });
-            })
+            .ConfigureServices(s => s.AddKoan())
             .StartAsync()
             .ConfigureAwait(false);
 

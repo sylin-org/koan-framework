@@ -157,7 +157,6 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
         {
             o.ConnectionString = _endpoint;
             o.Endpoint = _endpoint;
-            o.Dimension = EmbeddingDimension;
             o.Metric = "cosine";
         });
         services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();

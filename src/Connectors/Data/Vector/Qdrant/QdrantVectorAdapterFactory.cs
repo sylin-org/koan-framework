@@ -1,4 +1,3 @@
-using System.Text;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Core;
@@ -36,7 +35,7 @@ public sealed class QdrantVectorAdapterFactory : IVectorAdapterFactory
             ?? throw new InvalidOperationException("IHttpClientFactory not registered; call services.AddHttpClient().");
         var options = (IOptions<QdrantOptions>?)sp.GetService(typeof(IOptions<QdrantOptions>))
             ?? throw new InvalidOperationException("QdrantOptions not configured; bind Koan:Data:Qdrant.");
-        return new QdrantVectorRepository<TEntity, TKey>(httpFactory, options, sp);
+        return new QdrantVectorRepository<TEntity, TKey>(httpFactory, options, sp, this, source);
     }
 
     // Qdrant collection names accept [A-Za-z0-9_-] and reject '#', so the partition separator is '_' (as

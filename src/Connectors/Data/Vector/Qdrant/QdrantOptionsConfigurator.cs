@@ -57,15 +57,20 @@ internal sealed class QdrantOptionsConfigurator : AdapterOptionsConfigurator<Qdr
 
         var explicitConnectionString = ReadProviderConfiguration("",
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-            "ConnectionStrings:Qdrant",
-            "ConnectionStrings:qdrant");
+            "ConnectionStrings:Qdrant");
+        var explicitEndpoint = Configuration[Infrastructure.Constants.Configuration.Keys.Endpoint];
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
             LogConfiguration(LogLevel.Information, "explicit");
             options.ConnectionString = explicitConnectionString;
             options.Endpoint = explicitConnectionString;
+        }
+        else if (!string.IsNullOrWhiteSpace(explicitEndpoint))
+        {
+            LogConfiguration(LogLevel.Information, "endpoint-explicit");
+            options.ConnectionString = endpoint;
+            options.Endpoint = endpoint;
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
@@ -141,14 +146,14 @@ internal sealed class QdrantOptionsConfigurator : AdapterOptionsConfigurator<Qdr
         {
             if (IsAutoDetectionDisabled())
             {
-                LogDiscovery(LogLevel.Information, "disabled", ("fallback", "http://localhost:6333"));
-                return "http://localhost:6333";
+                LogDiscovery(LogLevel.Information, "disabled", ("fallback", Infrastructure.Constants.DefaultEndpoint));
+                return Infrastructure.Constants.DefaultEndpoint;
             }
 
             if (_discoveryCoordinator == null)
             {
-                LogDiscovery(LogLevel.Warning, "coordinator-missing", ("fallback", "http://localhost:6333"));
-                return "http://localhost:6333";
+                LogDiscovery(LogLevel.Warning, "coordinator-missing", ("fallback", Infrastructure.Constants.DefaultEndpoint));
+                return Infrastructure.Constants.DefaultEndpoint;
             }
 
             var context = new DiscoveryContext
@@ -170,13 +175,13 @@ internal sealed class QdrantOptionsConfigurator : AdapterOptionsConfigurator<Qdr
                 return result.ServiceUrl;
             }
 
-            LogDiscovery(LogLevel.Warning, "fallback", ("reason", result.ErrorMessage), ("fallback", "http://localhost:6333"));
-            return "http://localhost:6333";
+            LogDiscovery(LogLevel.Warning, "fallback", ("reason", result.ErrorMessage), ("fallback", Infrastructure.Constants.DefaultEndpoint));
+            return Infrastructure.Constants.DefaultEndpoint;
         }
         catch (Exception ex)
         {
-            LogDiscovery(LogLevel.Error, "exception", ("error", ex), ("fallback", "http://localhost:6333"));
-            return "http://localhost:6333";
+            LogDiscovery(LogLevel.Error, "exception", ("error", ex), ("fallback", Infrastructure.Constants.DefaultEndpoint));
+            return Infrastructure.Constants.DefaultEndpoint;
         }
     }
 

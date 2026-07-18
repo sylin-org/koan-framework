@@ -47,7 +47,6 @@ public sealed class QdrantVectorModule : KoanModule
             cfg,
             defaultOptions.ConnectionString,
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
             "ConnectionStrings:Qdrant");
 
         var endpoint = Configuration.ReadWithSource(
@@ -140,7 +139,7 @@ public sealed class QdrantVectorModule : KoanModule
     {
         if (string.IsNullOrWhiteSpace(endpoint))
         {
-            return "http://localhost:6333";
+            return Infrastructure.Constants.DefaultEndpoint;
         }
 
         if (Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))

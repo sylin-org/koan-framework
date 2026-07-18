@@ -1,4 +1,3 @@
-using System.Text;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Core;
@@ -45,7 +44,7 @@ public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
             ?? throw new InvalidOperationException("IHttpClientFactory not registered; call services.AddHttpClient().");
         var options = (IOptions<WeaviateOptions>?)sp.GetService(typeof(IOptions<WeaviateOptions>))
             ?? throw new InvalidOperationException("WeaviateOptions not configured; bind Koan:Data:Weaviate.");
-        return new WeaviateVectorRepository<TEntity, TKey>(httpFactory, options, sp);
+        return new WeaviateVectorRepository<TEntity, TKey>(httpFactory, options, sp, this, source);
     }
 
     // Weaviate class names are GraphQL types: FullNamespace + '_' separator, and the partition uses '_'

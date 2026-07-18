@@ -48,17 +48,23 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
     private readonly HttpClient _http;
     private readonly QdrantOptions _options;
     private readonly IServiceProvider _services;
+    private readonly QdrantVectorAdapterFactory _factory;
+    private readonly string _source;
     private readonly ILogger<QdrantVectorRepository<TEntity, TKey>>? _logger;
     private readonly ConcurrentDictionary<string, byte> _ensuredCollections = new(StringComparer.Ordinal);
 
     public QdrantVectorRepository(
         IHttpClientFactory httpFactory,
         IOptions<QdrantOptions> options,
-        IServiceProvider services)
+        IServiceProvider services,
+        QdrantVectorAdapterFactory factory,
+        string source)
     {
         _http = httpFactory.CreateClient(Infrastructure.Constants.HttpClientName);
         _options = options.Value;
         _services = services;
+        _factory = factory;
+        _source = source;
         _logger = (ILogger<QdrantVectorRepository<TEntity, TKey>>?)services.GetService(typeof(ILogger<QdrantVectorRepository<TEntity, TKey>>));
         ConfigureHttpClient();
     }
@@ -80,7 +86,7 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
         {
             throw new InvalidOperationException(
                 "Qdrant vector dimension is unknown. Configure Koan:Data:Qdrant:Dimension " +
-                "(defaults to 1536 when unset) or call Upsert first to seed it.");
+                "when pre-creating a collection, or write a vector first so its dimension is known.");
         }
         await EnsureCollection(dimension, ct);
     }
@@ -238,7 +244,7 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
         using var _ = QdrantTelemetry.Activity.StartActivity("vector.search");
         await EnsureCollection(options.Query.Length, ct);
 
-        var topK = Math.Max(1, options.TopK ?? _options.DefaultTopK);
+        var topK = options.TopK;
         var filter = QdrantFilterTranslator.Translate(options.Filter, _options.MetadataField);
 
         // Qdrant search body. `vector` can be a bare array (single unnamed vector slot) or an
@@ -371,7 +377,7 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
         get
         {
             if (string.IsNullOrWhiteSpace(_options.CollectionName))
-                return VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services);
+                return VectorAdapterNaming.GetOrCompute<TEntity>(_services, _factory, _source);
             // A pinned CollectionName bypasses the partition+source name-fold — warn once if that defeats active isolation.
             VectorAdapterNaming.WarnIfPinnedNameDefeatsIsolation<TEntity>(_options.CollectionName!, "CollectionName");
             return _options.CollectionName!;

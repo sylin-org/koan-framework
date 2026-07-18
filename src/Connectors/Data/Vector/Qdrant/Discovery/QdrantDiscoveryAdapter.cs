@@ -50,8 +50,7 @@ internal sealed class QdrantDiscoveryAdapter : ServiceDiscoveryAdapterBase
     {
         return _configuration.GetConnectionString("Qdrant") ??
                _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
-               _configuration[Infrastructure.Constants.Configuration.Keys.Endpoint] ??
-               _configuration[Infrastructure.Constants.Configuration.Keys.AltConnectionString];
+               _configuration[Infrastructure.Constants.Configuration.Keys.Endpoint];
     }
 
     protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()

@@ -113,7 +113,7 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey>
     {
         var bucket = Bucket();
         var query = options.Query;
-        var topK = options.TopK ?? 10;
+        var topK = options.TopK;
         var offset = ParseOffset(options.ContinuationToken);
 
         // Filters: apply the metadata predicate BEFORE ranking (the convergence oracle), so this

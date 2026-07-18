@@ -10,17 +10,11 @@ public sealed class WeaviateOptions : IAdapterOptions
     public string ConnectionString { get; set; } = "auto"; // DX-first: auto-detect by default
 
     [Required]
-    public string Endpoint { get; set; } = "http://localhost:8085"; // default local dev or docker mapped
+    public string Endpoint { get; set; } = Infrastructure.Constants.DefaultEndpoint;
     public string? ApiKey { get; set; }
 
     // Index defaults
-    public int Dimension { get; set; } = 384; // typical small model; must match embeddings
     public string Metric { get; set; } = "cosine"; // cosine|dot|l2
-
-    // Vector-search domain knobs (NOT row-page caps). MaxTopK stays — it's a real cost
-    // bound for nearest-neighbour scoring.
-    public int DefaultTopK { get; set; } = 10;
-    public int MaxTopK { get; set; } = 200;
 
     // Timeout seconds for search
     public int DefaultTimeoutSeconds { get; set; } = 10;

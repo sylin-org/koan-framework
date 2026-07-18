@@ -109,6 +109,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
 
     public Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(options);
         var segmented = _segmentation.Bind("vector search").ReadFilter;
         RunGuards();
         // ARCH-0102 §3: the vector index write-stamps ambient fields but never runs an operation (e.g. soft-delete),

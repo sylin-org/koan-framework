@@ -38,7 +38,7 @@ public sealed class WeaviateVectorModule : KoanModule
         // Adding Koan.Data.Vector.Connector.Weaviate automatically enables Weaviate discovery capabilities
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, WeaviateDiscoveryAdapter>());
         services.AddSingleton<IVectorAdapterFactory, WeaviateVectorAdapterFactory>();
-        services.AddHttpClient("weaviate");
+        services.AddHttpClient(Infrastructure.Constants.HttpClientName);
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
@@ -59,21 +59,6 @@ public sealed class WeaviateVectorModule : KoanModule
             cfg,
             defaultOptions.Endpoint,
             WeaviateItems.EndpointKeys);
-
-        var defaultTopK = Configuration.ReadWithSource(
-            cfg,
-            WeaviateItems.DefaultTopK.Key,
-            defaultOptions.DefaultTopK);
-
-        var maxTopK = Configuration.ReadWithSource(
-            cfg,
-            WeaviateItems.MaxTopK.Key,
-            defaultOptions.MaxTopK);
-
-        var dimension = Configuration.ReadWithSource(
-            cfg,
-            WeaviateItems.Dimension.Key,
-            defaultOptions.Dimension);
 
         var metric = Configuration.ReadWithSource(
             cfg,
@@ -117,27 +102,6 @@ public sealed class WeaviateVectorModule : KoanModule
             usedDefault: endpoint.UsedDefault);
 
         module.AddSetting(
-            WeaviateItems.DefaultTopK,
-            ProvenanceModes.FromConfigurationValue(defaultTopK),
-            defaultTopK.Value,
-            sourceKey: defaultTopK.ResolvedKey,
-            usedDefault: defaultTopK.UsedDefault);
-
-        module.AddSetting(
-            WeaviateItems.MaxTopK,
-            ProvenanceModes.FromConfigurationValue(maxTopK),
-            maxTopK.Value,
-            sourceKey: maxTopK.ResolvedKey,
-            usedDefault: maxTopK.UsedDefault);
-
-        module.AddSetting(
-            WeaviateItems.Dimension,
-            ProvenanceModes.FromConfigurationValue(dimension),
-            dimension.Value,
-            sourceKey: dimension.ResolvedKey,
-            usedDefault: dimension.UsedDefault);
-
-        module.AddSetting(
             WeaviateItems.Metric,
             ProvenanceModes.FromConfigurationValue(metric),
             metric.Value,
@@ -164,7 +128,7 @@ public sealed class WeaviateVectorModule : KoanModule
     {
         if (string.IsNullOrWhiteSpace(endpoint))
         {
-            return "http://localhost:8085";
+            return Infrastructure.Constants.DefaultEndpoint;
         }
 
         if (Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))

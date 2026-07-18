@@ -69,15 +69,20 @@ internal sealed class MilvusOptionsConfigurator : AdapterOptionsConfigurator<Mil
 
         var explicitConnectionString = ReadProviderConfiguration("",
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-            "ConnectionStrings:Milvus",
-            "ConnectionStrings:milvus");
+            "ConnectionStrings:Milvus");
+        var explicitEndpoint = Configuration[Infrastructure.Constants.Configuration.Keys.Endpoint];
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
             LogConfiguration(LogLevel.Information, "explicit");
             options.ConnectionString = explicitConnectionString;
             options.Endpoint = explicitConnectionString; // For backward compatibility
+        }
+        else if (!string.IsNullOrWhiteSpace(explicitEndpoint))
+        {
+            LogConfiguration(LogLevel.Information, "endpoint-explicit");
+            options.ConnectionString = endpoint;
+            options.Endpoint = endpoint;
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
@@ -154,14 +159,14 @@ internal sealed class MilvusOptionsConfigurator : AdapterOptionsConfigurator<Mil
         {
             if (IsAutoDetectionDisabled())
             {
-                LogDiscovery(LogLevel.Information, "disabled", ("fallback", "http://localhost:19530"));
-                return "http://localhost:19530";
+                LogDiscovery(LogLevel.Information, "disabled", ("fallback", Infrastructure.Constants.DefaultEndpoint));
+                return Infrastructure.Constants.DefaultEndpoint;
             }
 
             if (_discoveryCoordinator == null)
             {
-                LogDiscovery(LogLevel.Warning, "coordinator-missing", ("fallback", "http://localhost:19530"));
-                return "http://localhost:19530";
+                LogDiscovery(LogLevel.Warning, "coordinator-missing", ("fallback", Infrastructure.Constants.DefaultEndpoint));
+                return Infrastructure.Constants.DefaultEndpoint;
             }
 
             // Create discovery context with Milvus-specific parameters
@@ -192,14 +197,14 @@ internal sealed class MilvusOptionsConfigurator : AdapterOptionsConfigurator<Mil
             }
             else
             {
-                LogDiscovery(LogLevel.Warning, "fallback", ("reason", result.ErrorMessage), ("fallback", "http://localhost:19530"));
-                return "http://localhost:19530";
+                LogDiscovery(LogLevel.Warning, "fallback", ("reason", result.ErrorMessage), ("fallback", Infrastructure.Constants.DefaultEndpoint));
+                return Infrastructure.Constants.DefaultEndpoint;
             }
         }
         catch (Exception ex)
         {
-            LogDiscovery(LogLevel.Error, "exception", ("error", ex), ("fallback", "http://localhost:19530"));
-            return "http://localhost:19530";
+            LogDiscovery(LogLevel.Error, "exception", ("error", ex), ("fallback", Infrastructure.Constants.DefaultEndpoint));
+            return Infrastructure.Constants.DefaultEndpoint;
         }
     }
 

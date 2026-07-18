@@ -51,7 +51,6 @@ public sealed class MilvusVectorModule : KoanModule
             cfg,
             defaultOptions.ConnectionString,
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
             "ConnectionStrings:Milvus");
 
         var endpoint = Configuration.ReadWithSource(
@@ -200,7 +199,7 @@ public sealed class MilvusVectorModule : KoanModule
     {
         var endpoint = !string.IsNullOrWhiteSpace(configuredEndpoint)
             ? configuredEndpoint
-            : defaults.Endpoint ?? "http://localhost:19530";
+            : defaults.Endpoint;
 
         return NormalizeMilvusEndpoint(endpoint);
     }
@@ -209,18 +208,13 @@ public sealed class MilvusVectorModule : KoanModule
     {
         if (string.IsNullOrWhiteSpace(endpoint))
         {
-            return "milvus://localhost:19530";
-        }
-
-        if (endpoint.StartsWith("milvus://", StringComparison.OrdinalIgnoreCase))
-        {
-            return endpoint;
+            return Infrastructure.Constants.DefaultEndpoint;
         }
 
         if (Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
         {
-            var port = uri.IsDefaultPort ? 19530 : uri.Port;
-            return $"milvus://{uri.Host}:{port}";
+            var port = uri.IsDefaultPort ? Infrastructure.Constants.DefaultPort : uri.Port;
+            return $"{uri.Scheme}://{uri.Host}:{port}";
         }
 
         return endpoint;

@@ -5,7 +5,6 @@ using DotNet.Testcontainers.Containers;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
-using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
@@ -86,18 +85,16 @@ public sealed class WeaviateOverlayFixture : IAsyncLifetime
         // Development environment so its fallback context is available; this synthetic Data-local __disc overlay
         // remains independently scoped by its own descriptor.
         services.AddSingleton<IHostEnvironment>(new DevHostEnvironment());
+        // Data Core composes every referenced Koan module. The Weaviate reference supplies the vector pillar,
+        // options, naming, and provider; this fixture only supplies its test-specific option values.
         services.AddKoanDataCore();
-        services.AddKoanDataVector();
         services.AddSingleton<IDataService, DataService>();
         services.AddOptions<WeaviateOptions>().Configure(o =>
         {
             o.ConnectionString = endpoint;
             o.Endpoint = endpoint;
-            o.Dimension = Dim;
             o.Metric = "cosine";
         });
-        services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.AddSingleton<IVectorAdapterFactory, WeaviateVectorAdapterFactory>();
 
         Services = services.BuildServiceProvider();
         AppHost.Current = Services;
