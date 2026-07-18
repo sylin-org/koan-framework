@@ -21,7 +21,7 @@ validation:
 
 1. **Analyzer input** – The generator scans the compilation for:
    - Classes annotated with `KoanServiceAttribute`, `ServiceIdAttribute`, `ContainerDefaultsAttribute`, `EndpointDefaultsAttribute`, `HealthEndpointDefaultsAttribute`, and `AppEnvDefaultsAttribute`.
-   - Assembly-level attributes `AuthProviderDescriptorAttribute` and `OrchestrationServiceManifestAttribute`.
+   - Assembly-level `OrchestrationServiceManifestAttribute` values.
    - Classes implementing `IKoanManifest` or decorated with `KoanAppAttribute` (used to emit app metadata).
 2. **Diagnostics** – As symbols are processed, the generator reports diagnostics when rules are violated:
    - `Koan0049B` – Invalid short code (length/character constraints).
@@ -37,7 +37,6 @@ validation:
 4. **Manifest synthesis** – Service, app, and auth provider data feeds into a JSON structure:
    - `schemaVersion` (currently `1`).
    - Optional `app` section (code, name, default public port, description).
-   - `authProviders` array when `AuthProviderDescriptorAttribute` is present.
    - `services` array with both legacy fields (`id`, `image`, `ports`, `env`, `type`) and ARCH-0049 unified fields (`shortCode`, `containerImage`, `defaultTag`, `kind`, `capabilities`, etc.).
 5. **Generated output** – JSON is embedded in `__KoanOrchestrationManifest.g.cs` under the `Koan.Orchestration` namespace:
    ```csharp
@@ -51,7 +50,6 @@ validation:
 ## App metadata & auth providers
 
 - `KoanAppAttribute` and `IKoanManifest` implementations produce a minimal app entry (shortCode, name, default port, capabilities) so planners treat the primary app as declared.
-- Assembly-level `AuthProviderDescriptorAttribute` values are surfaced through `ManifestAuthProviders`, allowing the CLI to list available authentication providers during `inspect`.
 
 ## Error resilience
 

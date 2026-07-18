@@ -26,7 +26,6 @@ public sealed class PostgresAdapter { /* ... */ }
 
 - Generated type: `Koan.Orchestration.__KoanOrchestrationManifest` with a `Json` constant consumed by planners/CLI.
 - Includes the app section when `KoanAppAttribute` or `IKoanManifest` is present.
-- Aggregates assembly-level `AuthProviderDescriptorAttribute` values so the CLI can list auth providers.
 
 ## Diagnostics
 

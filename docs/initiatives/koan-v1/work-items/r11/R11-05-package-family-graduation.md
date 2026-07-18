@@ -2082,6 +2082,193 @@ The Web edge projection slice passes. Media Web and OpenGraph remain separate, m
 composition and host-owned decisions; Web Backup no longer turns an unsupported route collection into a product
 promise.
 
+### Identity and authentication foundation discovery
+
+**Task:** Straighten the Identity/Web Auth vertical in dependency order, beginning with the shared sign-in contracts
+and provider decision owner before assessing durable identity factors, roles, the OAuth server, or service-auth leaves.
+
+**Application intent:** “Reference one real authentication provider, configure only its credentials, and keep the
+application's existing `AddKoan()`; Koan should expose provider discovery and controller-owned challenge/sign-out
+flows, choose the only eligible default, establish a secure session, and explain every availability/selection
+decision. In Development, referencing the Test connector should supply the same complete flow locally.”
+
+**Public expression:** The ordinary expression is the provider package reference plus the provider's credentials under
+`Koan:Web:Auth:Providers:{id}` and the application's existing `AddKoan()`. No `AddKoanWebAuth`, middleware call, route
+mapping, scheme registration, or provider descriptor attribute belongs in application code. `PreferredProviderId`
+is the meaningful override when several eligible providers exist and the application wants a particular default;
+explicit `/auth/{provider}/challenge` remains the provider-specific intent. Referencing `Koan.Identity` alone must
+remain useful in a non-Web host and must not activate the functional Web Auth runtime merely to borrow contracts.
+
+**Guarantee/correction:** A referenced connector describes availability; it becomes eligible only when its required
+configuration is complete, except for an explicitly automatic local provider such as the Development Test connector.
+One host-owned immutable plan is the authority for scheme seeding, default election, controllers, startup/facts, and
+the OAuth server's provider projection. Explicit incomplete/unknown intent fails during composition with the missing
+fields and a correction; an unconfigured optional connector stays visible but inert and cannot displace a working
+provider. Sign-in, principal-validation, bootstrap, challenge, and denied-flow handler failures fail closed instead
+of silently issuing or retaining a session; sign-out cleanup remains best-effort after the framework clears identity.
+
+**Complete intent surface:** Beyond the package reference, existing `AddKoan()`, and provider credentials, no user
+action is required. Multiple eligible providers may be challenged explicitly; `PreferredProviderId` changes only the
+default challenge. Test auth requires only its reference in Development and remains unavailable outside Development
+unless deliberately enabled. Durable identities, MFA/password factors, the embedded OAuth server, roles, and
+service-to-service authentication remain separately referenced decisions and are not implied by Web Auth core.
+
+**Public concepts:** `AuthProviderDefinition` is isolated module-to-pillar vocabulary describing protocol defaults and
+automatic-vs-configured activation; it is not application ceremony. `IAuthProviderCatalog` is the isolated read-only
+cross-module projection required by the OAuth server. `IKoanAuthFlowHandler` and its contexts are the existing
+module-extension seam and move intact to the inert contracts boundary. `IUserStore`, `IExternalIdentityStore`, and
+their small data contracts likewise move because Identity implements them without owning Web Auth activation.
+`PreferredProviderId` remains because it expresses a real application choice. The duplicate descriptor attribute,
+public manual registration call, scoped registry/election pair, and generic OIDC connector do not express distinct
+business decisions and will not survive.
+
+**Docs read:**
+
+- `docs/architecture/principles.md` requires Reference = Intent, inert cross-module contracts, one host-owned compiled
+  decision, corrective failures, and one runtime explanation; it is binding for the cut.
+- `docs/engineering/index.md` requires controller-owned HTTP, typed options/constants, package companions, and focused
+  evidence; the Test connector and later OAuth Server slices must remove endpoint-mapping exceptions.
+- `docs/architecture/koan-identity-design.md` explains the person/sign-in/tenancy composition thesis but is explicitly
+  superseded and cannot be used as current capability truth.
+- `docs/decisions/SEC-0007-koan-identity-module.md` makes durable Identity a headless Entity capability that composes
+  with sign-in rather than duplicating it; current source violates that separation by referencing functional Web Auth
+  for borrowed contracts.
+- `docs/decisions/WEB-0051-auth-provider-discovery-and-election.md` preserves provider availability/election intent,
+  while its bespoke registry/reflection/report mechanisms are superseded by the later generic provider substrate.
+- `docs/decisions/WEB-0066-auth-flow-handler-pipeline.md` preserves the single lifecycle seam but its fail-open error
+  policy is unsafe for reconciliation, session revocation, and step-up enforcement.
+- `src/Koan.Web.Auth/README.md`, `TECHNICAL.md`, and `docs/guides/authentication-setup.md` materially understate Koan's
+  automatic path while teaching manual ASP.NET wiring, nonexistent routes/options/SAML, hand-built user entities,
+  unsafe token parsing, and zero-config service-token claims; they require a greenfield truth rewrite after code proof.
+
+**Code read:**
+
+- `AuthModule`, `ProviderRegistry`, `AuthProviderElection`, and `AuthSchemeSeeder` currently compose the same provider
+  set through reflection, scoped DI, lazy election, and startup seeding, while `Report` independently reconstructs it;
+  they are the duplicated decision owners to replace.
+- `ServiceCollectionExtensions` owns cookie/auth lifecycle wiring correctly but exposes unsupported manual activation,
+  registers provider decisions per scope, and adds a second startup filter even though base Web already owns
+  authentication/authorization middleware order.
+- Google/Microsoft/Discord modules contribute small useful defaults, but each also carries two dead duplicate assembly
+  descriptors. The OIDC connector contributes no defaults or mechanics because Web Auth core already supports any
+  explicitly configured OIDC provider; it has no independent reference result.
+- The Test connector has real local OAuth/OIDC behavior but repeats activation between advertisement and a startup
+  filter, retains an unused configurable route base, and maps conventional controller routes after startup instead of
+  letting attribute-routed controllers own the stable local protocol surface.
+- `SecIdentityModule` and `IdentityAuthFlowHandler` prove that durable Identity is an Entity-first consumer of auth
+  contracts. Its functional Web Auth dependency is accidental coupling; dispatcher exception swallowing can issue a
+  cookie after reconciliation/session failure or retain a principal after validation failure.
+- Core `ProviderCatalog<TProvider>` plus Storage's provider catalog/routing/composition pattern is the closest current
+  mechanism: typed identities compile once, pillar policy owns eligibility/election, runtime consumers share the same
+  immutable plan, and composition facts project the actual receipt.
+- Focused baselines pass Auth 32/32, real Test OAuth/OIDC round-trip 4/4, Identity 114/114, and OAuth Server 50/50.
+  All exposed stale removed-Core.Adapters restore warnings; Identity Web also has one current member-hiding warning.
+  Roles and Auth Services have no owned behavior suite or real application consumer and remain explicit later
+  disposition questions rather than inherited support claims.
+
+**Reusing:** `ProviderCatalog<TProvider>`, `ProviderSelectionReceipt`, standard DI/options/authentication handlers,
+`KoanCompositionBuilder`, `KoanModule.Start`/`ReportComposition`, `KoanRegistry`'s one-time flow-handler discovery,
+the current cookie/return-url/userinfo mechanics, controller discovery, and the four focused suites already exist.
+Existing auth route/config constants and typed options remain authoritative where runtime actually honors them.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| Inert auth contract package and companions | `src/Koan.Web.Auth.Abstractions/` | Hold every cross-module auth contract without activating Web Auth; preserve existing namespaces where useful and use ordinary .NET project identity. |
+| `AuthProviderDefinition` / `IAuthProviderCatalog` | `src/Koan.Web.Auth.Abstractions/Providers/` | Give thin connectors one immutable standard-DI declaration and give optional consumers one safe read-only runtime projection. |
+| `AuthProviderPlan` | `src/Koan.Web.Auth/Providers/AuthProviderPlan.cs` | Compile definitions, configuration, eligibility, default election, reasons, and corrections once per host over Core's generic catalog. |
+| Auth composition projection | `src/Koan.Web.Auth/Composition/AuthCompositionFacts.cs` | Project the exact provider plan into canonical facts instead of recomputing it in module reporting. |
+| Provider/fail-closed specifications | `tests/Koan.Web.Auth.Tests/AuthProviderPlanTests.cs` and `AuthFlowDispatcherTests.cs` | Prove inert unconfigured references, explicit corrections, deterministic/default behavior, host isolation, and security failure posture. |
+
+**Coalescence:** Closest pattern is Storage's `ProviderCatalog` → immutable pillar plan → composition facts. Specificity
+is the Web Auth pillar: Core already owns identity/ranking mechanics but cannot know credential completeness,
+interactive protocols, Development-only activation, or challenge semantics; individual connectors are too narrow and
+must not elect/report themselves. Rebuild the scoped registry/election pair and reflective `Report` copy into one
+singleton `AuthProviderPlan`; make modules register thin definitions through standard DI; seed schemes eagerly from
+that plan in the retained module lifecycle; project the same decisions through facts. Split cross-module contracts
+into `Koan.Web.Auth.Abstractions` so headless Identity becomes genuinely layered. Delete the public
+`AddKoanWebAuth`, second auth startup filter, descriptor attribute and ten duplicate assembly declarations, Test
+startup filter/conventional route mapper/configurable route base, and behaviorless OIDC connector. Keep the three real
+external defaults and the Test simulator as separate provider references. Defer Roles/Server/Services dispositions
+and Auth Server's inline-endpoint rebuild to their own focused slices after this foundation is stable.
+
+**Ergonomics:** A human or model reads “provider reference + credentials” directly from the project/configuration;
+there is no framework wiring branch. An unconfigured connector no longer hijacks Development login, while an explicit
+mistake points to the exact missing provider fields at startup. IntelliSense shows only the deliberate provider choice
+and stable auth flow extension seam. Operators and agents see available, inactive, eligible, and default providers
+from one receipt, with no disagreement between startup, discovery, facts, and OAuth projection. Module authors write a
+normal `KoanModule` and register one immutable provider definition; no descriptor attributes, reflection rules, or
+parallel election/report code are required.
+
+**Constraints satisfied:**
+
+- Entity-first access remains in durable Identity and OAuth entities; this foundation introduces no repository layer.
+- Test-provider routes become attribute-routed controllers. Auth Server's existing inline protocol endpoints are an
+  observed violation reserved for its separately proved slice; no new inline route is added here.
+- Stable auth/Test routes remain project constants and tunables remain typed options; the unused route-base knob is
+  deleted rather than retained as false configurability.
+- Cross-module contracts move to one inert package with no functional module or activation metadata.
+- Provider discovery/composition/election runs once per host; request handlers consume the immutable plan.
+- No large Entity read or stream path is introduced.
+- Package README/TECHNICAL pages, current auth guides, generated topology, and the disposition matrix will be aligned
+  after focused code proof. ADRs remain dated records.
+
+**Risks:** Dynamic scheme registration must still occur before the Web pipeline handles a request; resolving/seeding
+the plan in `AuthModule.Start` uses Koan's existing one-module lifecycle and requires a real-host regression. Existing
+configuration-only provider IDs must remain supported without resurrecting the empty OIDC package. Moving public
+types between assemblies preserves namespaces but is a binary package break, intentionally acceptable for V1; every
+dependent project and exact artifact closure must update together. Fail-closed dispatcher behavior is security-correct
+but may reveal handlers that relied on swallowed failures; focused Identity and real-host tests must exercise it.
+
+### Identity and authentication foundation implementation
+
+Status: `implemented and focused-proof complete`; Roles, Auth Services, Identity Web coalescence, and Auth Server's
+inline protocol surface remain separately bounded follow-on slices.
+
+- Added inert `Sylin.Koan.Web.Auth.Abstractions` and moved every shared lifecycle, provider, store, DTO, and projection
+  contract there without a module or activation metadata. Headless `Koan.Identity` now references that boundary and
+  no longer depends on functional Web Auth; its existing access/JIT code declares its direct `Koan.Web` dependency.
+- Rebuilt provider composition around one singleton `AuthProviderPlan` over Core's `ProviderCatalog<T>`. Connector
+  definitions, application overlays, eligibility, exact corrections, explicit/default priority, scheme seeding,
+  discovery, OAuth Server projection, startup logging, and composition facts now consume one host-owned decision.
+- Reduced Google, Microsoft, and Discord to one ordinary-DI `AuthProviderDefinition` each. Removed contributor
+  interfaces, scoped registry/election, descriptor attributes/assembly copies, reflection-backed module reporting,
+  duplicated provenance, dead production gating, unused `SecretRef`, and the second Web Auth startup filter.
+- Retired `Sylin.Koan.Web.Auth.Connector.Oidc`: config-only OIDC/OAuth2 is a native Web Auth capability and the package
+  produced no independent behavior. Removed the corresponding dead auth-provider projection from the orchestration
+  source generator so static manifests cannot disagree with the runtime plan.
+- Rebuilt the Test connector around stable attribute-routed `/.testoauth` controllers and two immutable automatic
+  definitions. Removed its startup-order attribute, startup filter, conventional endpoint mapper, configurable route
+  base, and separate discovery contributor. One `IsActive` predicate now gates every local protocol controller and
+  provider availability.
+- Changed security-bearing lifecycle failures to fail closed: bootstrap/sign-in/challenge/denied errors propagate,
+  validation errors reject the principal, explicit sign-in rejection prevents cookie issuance, missing external
+  subject and identity-link failures reject authentication, while sign-out cleanup alone remains best-effort.
+- Rewrote Web Auth, all surviving connectors, both current public auth guides, and the Auth reference card to the
+  greenfield expression: connector reference + credentials + `AddKoan()`. Public docs now state exact routes,
+  automatic-vs-explicit election, config-only providers, corrections, inspectability, and unsupported SAML/secret-ref/
+  provider-token-store scenarios. Public truth lint passes `222` current files and `40` navigation targets.
+
+Focused proof after the rebuild:
+
+| Proof | Result |
+|---|---:|
+| `Koan.Web.Auth.Tests` (provider plan, lifecycle, helpers) | 39/39 |
+| local OAuth2/OIDC HTTP integration, discovery, and facts agreement | 5/5 |
+| embedded OAuth Server integration | 50/50 |
+| durable Identity integration | 114/114 |
+| AddKoan auth catalog registration | 1/1 |
+| orchestration generator and four surviving connector builds | 0 errors |
+| affected NuGet artifacts (Abstractions, Web Auth, four connectors, Identity) | 7/7 packed; dependency boundaries inspected |
+| generated package quality | 107 packages: 16 repair, 23 review, 68 structurally ready |
+| generated product surface | 24 claims across 107 packages |
+
+Identity still has two independently visible polish items: the pre-existing `ImpersonationController.Request`
+member-hiding warning, and its package's pre-existing missing NuGet README warning. Both belong to the separately
+bounded Identity package-graduation slice rather than being hidden or superficially papered over here. The inspected
+Identity nuspec now depends on `Core`, `Data.Core`, `Web`, and inert `Web.Auth.Abstractions`—not functional Web Auth.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

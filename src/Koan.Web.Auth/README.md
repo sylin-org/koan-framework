@@ -1,52 +1,78 @@
 # Sylin.Koan.Web.Auth
 
-Authentication scaffolding and shared components for Koan Web.
-
-- Target framework: net10.0
-- License: Apache-2.0
-
-## Capabilities
-
-- Multi-protocol auth (OIDC/OAuth2)
-- Discovery and health integration
-- Provider adapters shipped as separate modules
+Koan's external sign-in runtime for ASP.NET Core. Reference a provider connector, supply credentials, and
+`AddKoan()` compiles the provider plan, registers maintained OAuth2/OIDC handlers, maps the framework endpoints, and
+reports the result at startup.
 
 ## Install
 
+Use a connector when one matches your provider; it brings Web Auth transitively:
+
 ```powershell
-dotnet add package Sylin.Koan.Web.Auth
+dotnet add package Sylin.Koan.Web.Auth.Connector.Google
 ```
 
-## Usage - quick notes
-
-- Configure providers via typed Options; avoid inline endpoints.
-- Use MVC controllers with attribute routing for auth callbacks.
-
-Dev/testing tip
-
-- When using Koan.Web.Auth.Connector.Test in Development, its userinfo may include `roles[]`, `permissions[]`, and `claims{}`. These are mapped into the cookie principal (roles → ClaimTypes.Role, permissions → `Koan.permission`, claims{} → 1:1) so you can exercise authorization flows end-to-end.
-
-Sign-out (controller)
-
-```csharp
-[ApiController]
-[Route("auth")]
-public sealed class SignOutController : ControllerBase
+```json
 {
-	[HttpPost("signout")]
-	[ValidateAntiForgeryToken]
-	public async Task<IActionResult> SignOutApp([FromForm] string? returnUrl)
-	{
-		await HttpContext.SignOutAsync();
-		// Validate returnUrl before redirecting
-		return LocalRedirect(string.IsNullOrEmpty(returnUrl) ? "/" : returnUrl);
-	}
+  "Koan": {
+    "Web": {
+      "Auth": {
+        "Providers": {
+          "google": {
+            "ClientId": "{GOOGLE_CLIENT_ID}",
+            "ClientSecret": "{GOOGLE_CLIENT_SECRET}"
+          }
+        }
+      }
+    }
+  }
 }
 ```
 
-See [`TECHNICAL.md`](TECHNICAL.md) for contracts and configuration.
+No authentication-specific registration or middleware call is required:
 
-## References
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
+var app = builder.Build();
+await app.RunAsync();
+```
 
-- Decisions: `/docs/decisions/WEB-0043-auth-multi-protocol-oauth-oidc-saml.md`, `/docs/decisions/WEB-0044-web-auth-discovery-and-health.md`, `/docs/decisions/WEB-0045-auth-provider-adapters-separate-projects.md`
+Register `https://your-app/auth/google/callback` with Google. Start sign-in at
+`GET /auth/google/challenge?return=/`.
 
+## Meaningful behavior
+
+- `GET /.well-known/auth/providers` returns eligible providers only.
+- `GET /auth/{provider}/challenge` starts a maintained OAuth2/OIDC code flow with PKCE.
+- `/auth/{provider}/callback` is consumed by the corresponding ASP.NET authentication handler.
+- `GET /me` projects the current cookie principal; `GET|POST /auth/logout` removes the local session.
+- Explicitly configured providers outrank automatic local defaults. `PreferredProviderId` selects among eligible
+  providers.
+- Startup logs and Koan composition facts report provider state, eligibility, default election, reason, and correction
+  without exposing credentials.
+
+Web Auth can also run a configuration-only OIDC/OAuth2 provider. No generic connector package is needed; set `Type`,
+provider endpoints or `Authority`, `ClientId`, and `ClientSecret` under `Koan:Web:Auth:Providers:{id}`.
+
+## Guarantees and failure posture
+
+- Connector references declare availability; they do not silently enable an unconfigured real provider.
+- Explicit but incomplete provider intent fails startup with the exact missing fields and configuration path.
+- Unknown or ineligible `PreferredProviderId` values fail startup instead of silently selecting something else.
+- Missing external subject identifiers, identity-link persistence failures, and security-bearing lifecycle-handler
+  failures reject the sign-in flow.
+- Cookie validation failures reject the principal. Sign-out cleanup alone is best-effort.
+
+## Boundaries
+
+- Supports OAuth2 and OIDC interactive sign-in. SAML is not supported.
+- Web Auth signs users into this application; `Sylin.Koan.Web.Auth.Server` is the separate opt-in capability that
+  issues OAuth tokens to clients.
+- Referencing `Sylin.Koan.Web.Auth` alone does not add a simulated provider. Use
+  `Sylin.Koan.Web.Auth.Connector.Test` for local OAuth/OIDC flows.
+- Secrets are ordinary configuration values today; use your deployment platform's configuration provider. A
+  `SecretRef` indirection is not implemented.
+
+See [TECHNICAL.md](TECHNICAL.md) and the public
+[authentication guide](../../docs/guides/authentication-setup.md).

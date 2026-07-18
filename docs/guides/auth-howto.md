@@ -4,10 +4,10 @@ domain: web
 title: "Authentication & Identity How-To"
 audience: [developers, architects, security-engineers]
 status: current
-last_updated: 2026-06-20
-framework_version: 0.17.x
+last_updated: 2026-07-18
+framework_version: source-first
 validation:
-  date_last_tested: 2026-06-20
+  date_last_tested: 2026-07-18
   status: verified
   scope: Auth fabric covered by Koan.Security.Trust.IntegrationTests (HTTP e2e)
 related_guides:
@@ -20,16 +20,16 @@ related_guides:
 
 This guide walks you through Koan's identity story—from a public-by-default app, to logging in as any profile you like in dev, to roles, real logins, service-to-service tokens, and what changes in production. Think of it as a conversation with a colleague who's wired this up a few times: we'll start with the simplest thing that works and add one idea at a time.
 
-A note on scope. This guide is about **identity**—*who is making this request?* Its sibling, the [Authorization How-To](authorization-howto.md), is about **authorization**—*what may they do?* We'll hand off cleanly when we get there. For the full provider/OAuth/SAML configuration reference, see [Authentication Setup](authentication-setup.md).
+A note on scope. This guide is about **identity**—*who is making this request?* Its sibling, the [Authorization How-To](authorization-howto.md), is about **authorization**—*what may they do?* We'll hand off cleanly when we get there. For the supported OAuth2/OIDC provider configuration, see [Authentication Setup](authentication-setup.md).
 
 ---
 
 ## 0. The thirty-second version: public by default, log in when you want a profile
 
-Reference = intent. Add the auth package:
+Reference = intent. Add the local OAuth/OIDC simulator; it brings Web Auth transitively:
 
 ```xml
-<PackageReference Include="Koan.Web.Auth" Version="0.17.*" />
+<PackageReference Include="Sylin.Koan.Web.Auth.Connector.Test" />
 ```
 
 Boot the runtime as usual—no auth configuration:
@@ -38,40 +38,25 @@ Boot the runtime as usual—no auth configuration:
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
 var app = builder.Build();
-app.Run();
+await app.RunAsync();
 ```
 
-Now add a tiny endpoint that reports who you are:
+Run it in Development and `GET /me`: the response is **401** because the fresh application is anonymous. That's the
+point: nothing is auto-signed-in.
 
-```csharp
-[ApiController]
-public sealed class MeController : ControllerBase
-{
-    [HttpGet("/me")]
-    public IActionResult Me() => Ok(new
-    {
-        Identity.Current.IsAuthenticated,
-        Identity.Current.Id,
-        Identity.Current.Roles,
-    });
-}
+To become someone, start the automatic local OIDC provider:
+
+```text
+GET /auth/test-oidc/challenge?return=/
 ```
 
-Run it in Development and `GET /me`:
+The browser lands on the connector's login page, where you set a **subject, roles, permissions, and claims**. Submit
+and the maintained OIDC callback establishes a real signed session; `GET /me` now returns its projection.
+`GET /.well-known/auth/providers` is the machine-readable eligible-provider list.
 
-```json
-{ "isAuthenticated": false, "id": null, "roles": [] }
-```
-
-You're **anonymous** — and that's the point. Your app renders its **public** interface, which is what you want to evaluate the vast majority of the time. Nothing is auto-signed-in.
-
-To become someone, you **log in** — and in Development that's zero-config too. Koan ships a built-in **test login page** (the TestProvider):
-
-- `GET /.well-known/auth/providers` lists **Test (Local)** in Development;
-- send the browser there, pick it, and you land on a page where you set your **subject, roles, and claims**;
-- submit, and you're redirected back with a **real signed session** — now `/me` reflects that profile.
-
-> **Mentor note.** A framework that auto-signs you in as an admin is convenient for a toy and wrong for a real app: real UX changes by profile, and you almost always want the *public* view first. So the default is anonymous, and *logging in* is an explicit act that picks a profile and walks the real session path — no auth bug can hide behind a synthetic admin. (And it's fail-closed: the dev login is **gone in production**, §8.)
+> **Mentor note.** A framework that auto-signs you in as an admin is convenient for a toy and wrong for a real app.
+> The default is anonymous, and logging in walks the actual session path. The local connector is automatic only in
+> Development and is not a production identity system.
 
 ---
 
@@ -148,9 +133,14 @@ Roles are deliberately coarse—they belong *in the credential* (the cookie or t
 
 ## 5. Real logins — OAuth providers (and the dev TestProvider)
 
-Your dev login (§0) is the built-in TestProvider. Real *users* sign in through a real provider — and in Koan that's configuration, not code.
+Your dev login (§0) comes from the referenced Test connector. Real *users* sign in through a deployment provider —
+in Koan that is a connector reference plus configuration, not application bootstrap code.
 
 **OAuth (Google, Microsoft, GitHub, …):**
+
+```xml
+<PackageReference Include="Sylin.Koan.Web.Auth.Connector.Google" />
+```
 
 ```json
 {
@@ -160,15 +150,20 @@ Your dev login (§0) is the built-in TestProvider. Real *users* sign in through 
 }
 ```
 
-That's it—`/.well-known/auth/providers` now lists Google, the challenge/callback flow runs, and a cookie session is established. (Multiple providers, SAML, and account linking are covered in [Authentication Setup](authentication-setup.md).)
+Complete configuration makes Google eligible; `/.well-known/auth/providers` lists it and
+`/auth/google/challenge` starts the maintained flow. Configuration without a matching first-party connector is also
+supported for generic OAuth2/OIDC. SAML is not supported. See [Authentication Setup](authentication-setup.md).
 
-The **TestProvider** you logged in with at §0 is exactly this: a built-in fake identity provider with its own login page and token endpoint. It's available **zero-config in Development**; to expose it anywhere else (a shared demo, say) opt in explicitly:
+The **TestProvider** you logged in with at §0 is a referenced, self-hosted protocol simulator. It is available
+zero-config in Development; to expose it in a controlled non-production test environment, opt in explicitly:
 
 ```json
 { "Koan": { "Web": { "Auth": { "TestProvider": { "Enabled": true } } } } }
 ```
 
-> **Mentor note.** Two dev paths, two jobs. The **TestProvider login** (§0) walks the real challenge → callback → cookie flow and mints a real session — use it to build and test the actual login experience, set roles/claims, and see the profile-specific UX. The **`?_as=` override** (§3) is the transient, no-click path for scripted tests. Neither exists in production.
+> **Mentor note.** Two dev paths, two jobs. The TestProvider walks the real challenge → callback → cookie flow. The
+> `?_as=` override is transient and no-click. `?_as=` is structurally Development-only; the Test connector is inactive
+> outside Development unless explicitly enabled, and should never be enabled in production.
 
 ---
 
@@ -212,10 +207,11 @@ The one-line bridge: **identity** (this guide) establishes *who you are*; **auth
 
 Two things change the moment the environment isn't Development, and you don't have to remember to do either:
 
-1. **The dev conveniences disappear.** No `?_as=` personas and no zero-config TestProvider login. Real users authenticate through your providers; services through `Koan.bearer`. An unauthenticated request *stays* unauthenticated — `[Authorize]` means it.
+1. **The dev conveniences are inactive.** No `?_as=` personas and no automatic TestProvider login. Real users authenticate through configured providers; services through `Koan.bearer`. Do not explicitly enable the Test connector in production.
 2. **The default insecure key is refused.** In dev, an app with no `Koan:Security:Trust:Key` runs on the public default secret — with a very loud warning banner on every boot. In **Production or Staging**, Koan **refuses to start** on that key: set a real secret first (or, for a throwaway box, `Koan:Security:Trust:AllowInsecureKeyInProduction=true`). No quiet fallback.
 
-> **Mentor note.** The design goal is that you *cannot accidentally ship the dev conveniences*. They're loud in Development and absent—by construction—in Production. "Everyone is admin" can't leak past your environment boundary.
+> **Mentor note.** The design goal is a fail-closed default: dev conveniences are loud in Development and inactive
+> elsewhere. Explicitly overriding those gates remains an operator decision and should be reviewed as such.
 
 ---
 
@@ -246,5 +242,5 @@ A complete, runnable example lives in `tests/Suites/Security/Koan.Security.Trust
 ## Where to go next
 
 - **What may they do?** → [Authorization How-To](authorization-howto.md)
-- **Provider/OAuth/SAML reference** → [Authentication Setup](authentication-setup.md)
+- **Provider OAuth2/OIDC reference** → [Authentication Setup](authentication-setup.md)
 - **Building the API around it** → [Building APIs](building-apis.md)

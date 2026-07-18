@@ -4,61 +4,64 @@ domain: web
 title: "Authentication Setup with Koan"
 audience: [developers, security-engineers, ai-agents]
 status: current
-last_updated: 2025-11-09
+last_updated: 2026-07-18
 framework_version: source-first
 validation:
-  date_last_tested: 2025-11-09
+  date_last_tested: 2026-07-18
   status: verified
-  scope: all-examples-tested
+  scope: provider-plan unit tests, local OAuth/OIDC HTTP tests, authorization-server integration tests
 related_guides:
   - auth-howto.md
   - authorization-howto.md
-  - building-apis.md
-  - entity-capabilities-howto.md
-  - mcp-http-sse-howto.md
-  - aspire-integration.md
+  - oauth-server-howto.md
 ---
-
-> **New to Koan auth?** Start with the progressive **[Authentication & Identity How-To](auth-howto.md)** (zero-config
-> dev identity → roles → real logins → service tokens → production). This page is the **provider/configuration
-> reference** it links back to.
 
 # Authentication Setup with Koan
 
-**Document Type**: GUIDE
-**Target Audience**: Developers, Security Engineers
-**Last Updated**: 2025-01-17
-**Framework Version**: v0.2.18+
+Koan treats authentication as a composed capability: the package reference states intent, configuration supplies
+deployment-specific values, and `AddKoan()` owns the mechanics. Applications do not register schemes, middleware,
+callbacks, or provider services themselves.
 
----
+## Shortest meaningful local path
 
-## Local Development (No Setup)
+Add the local provider:
 
-```bash
-dotnet add package Koan.Web.Auth
+```powershell
+dotnet add package Sylin.Koan.Web.Auth.Connector.Test
 ```
 
+Keep the application bootstrap ordinary:
+
 ```csharp
-// Program.cs - that's it
+var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
+
+var app = builder.Build();
+await app.RunAsync();
 ```
 
-In Development you start out **anonymous** — your app renders its public interface, which is what you usually
-want to evaluate. To log in, Koan ships a built-in **test login page** (the TestProvider), available zero-config
-in Development: visit `/.well-known/auth/providers`, pick **Test (Local)**, and set your subject / roles / claims
-→ you're returned with a real signed session. For scripted testing, step into a transient persona per request
-with `?_as=<subject>&_roles=a,b` (no login page); omit `?_as` for anonymous. All of this is Development-only and
-**fails closed in Production**.
+In Development, visit:
 
-Service-to-service auth also works zero-config: every Koan service self-mints bearer tokens with a default shared
-secret and trusts the others. The default is loudly insecure (`super-insecure-shared-secret-replace-asap`) and is
-**refused in Production/Staging** — set `Koan:Security:Trust:Key` to a real secret before deploying. See the
-progressive [Authentication & Identity How-To](auth-howto.md) for the full story.
+```text
+/auth/test-oidc/challenge?return=/
+```
 
-## Google OAuth (2 Lines)
+Choose a subject, roles, permissions, and custom claims. The simulator completes a real OIDC code flow through the
+same ASP.NET handler, application cookie, identity-link store, and lifecycle pipeline used by deployment providers.
+`GET /me` shows the current projection. `GET /.well-known/auth/providers` lists the eligible providers.
 
-1. Get credentials from [Google Cloud Console](https://console.cloud.google.com/)
-2. Add configuration:
+The Test connector is not built into `Sylin.Koan.Web.Auth`; it activates only when referenced. It is a local protocol
+simulator and must not be enabled in production.
+
+## Add a deployment provider
+
+For Google, reference the connector:
+
+```powershell
+dotnet add package Sylin.Koan.Web.Auth.Connector.Google
+```
+
+Supply only the deployment values the connector cannot know:
 
 ```json
 {
@@ -77,139 +80,21 @@ progressive [Authentication & Identity How-To](auth-howto.md) for the full story
 }
 ```
 
-Done. Google login works automatically.
+Register `https://your-app/auth/google/callback` in Google. Start sign-in with
+`GET /auth/google/challenge?return=/`.
 
-## Protecting Endpoints
+Microsoft and Discord follow the same shape using
+`Sylin.Koan.Web.Auth.Connector.Microsoft` and `Sylin.Koan.Web.Auth.Connector.Discord`. Their IDs are `microsoft` and
+`discord`; their callbacks are `/auth/microsoft/callback` and `/auth/discord/callback`.
 
-```csharp
-[Route("api/[controller]")]
-[Authorize]
-public class OrdersController : EntityController<Order>
-{
-    [HttpGet]
-    public Task<Order[]> GetMyOrders()
-    {
-        var userEmail = User.FindFirst(ClaimTypes.Email)?.Value;
-        return Order.Query(o => o.CustomerEmail == userEmail);
-    }
+Referencing a real connector only makes the capability available. It remains inactive until complete explicit
+configuration exists, so adding a package cannot unexpectedly replace a working local login. Once configured, explicit
+intent outranks automatic local providers.
 
-    [HttpPost]
-    public async Task<IActionResult> CreateOrder([FromBody] CreateOrderRequest request)
-    {
-        var order = new Order
-        {
-            CustomerEmail = User.FindFirst(ClaimTypes.Email)?.Value,
-            Total = request.Total
-        };
+## Configuration-only OIDC or OAuth2
 
-        await order.Save();
-        return Ok(order);
-    }
-}
-```
-
-User info available in `User.Claims` automatically.
-
-## User Management
-
-```csharp
-public class User : Entity<User>
-{
-    public string Email { get; set; } = "";
-    public string Name { get; set; } = "";
-    public string Provider { get; set; } = "";
-    public string ProviderId { get; set; } = "";
-    public bool IsActive { get; set; } = true;
-    public DateTimeOffset LastLogin { get; set; }
-
-    public static async Task<User> FindOrCreate(string email, string name, string provider, string providerId)
-    {
-        var user = await Query().FirstOrDefaultAsync(u => u.Email == email);
-        if (user == null)
-        {
-            user = new User
-            {
-                Email = email,
-                Name = name,
-                Provider = provider,
-                ProviderId = providerId
-            };
-            await user.Save();
-        }
-
-        user.LastLogin = DateTimeOffset.UtcNow;
-        await user.Save();
-        return user;
-    }
-}
-```
-
-Automatic user creation on first login.
-
-## Custom Login Flow
-
-```csharp
-[Route("api/auth")]
-public class AuthController : ControllerBase
-{
-    [HttpPost("login")]
-    public IActionResult Login([FromBody] LoginRequest request)
-    {
-        // Redirect to provider
-        var redirectUrl = $"/auth/challenge/{request.Provider}";
-        return Ok(new { redirectUrl });
-    }
-
-    [HttpGet("user")]
-    [Authorize]
-    public async Task<IActionResult> GetCurrentUser()
-    {
-        var email = User.FindFirst(ClaimTypes.Email)?.Value;
-        var user = await User.Query().FirstOrDefaultAsync(u => u.Email == email);
-        return Ok(user);
-    }
-
-    [HttpPost("logout")]
-    [Authorize]
-    public IActionResult Logout()
-    {
-        return Ok(new { logoutUrl = "/auth/logout" });
-    }
-}
-```
-
-Custom endpoints with provider redirects.
-
-## Multiple Providers
-
-```json
-{
-  "Koan": {
-    "Web": {
-      "Auth": {
-        "Providers": {
-          "google": {
-            "ClientId": "{GOOGLE_CLIENT_ID}",
-            "ClientSecret": "{GOOGLE_CLIENT_SECRET}"
-          },
-          "microsoft": {
-            "ClientId": "{MS_CLIENT_ID}",
-            "ClientSecret": "{MS_CLIENT_SECRET}"
-          },
-          "github": {
-            "ClientId": "{GITHUB_CLIENT_ID}",
-            "ClientSecret": "{GITHUB_CLIENT_SECRET}"
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-All providers work simultaneously. Users choose at login.
-
-## Enterprise SAML
+The protocol engines live in Web Auth, so a generic connector package is unnecessary. Reference
+`Sylin.Koan.Web.Auth` and configure a provider ID directly:
 
 ```json
 {
@@ -218,10 +103,12 @@ All providers work simultaneously. Users choose at login.
       "Auth": {
         "Providers": {
           "corporate": {
-            "Type": "saml",
-            "EntityId": "https://myapp.com/saml/metadata",
-            "IdpMetadataUrl": "https://sso.company.com/metadata",
-            "DisplayName": "Corporate SSO"
+            "Type": "oidc",
+            "DisplayName": "Corporate SSO",
+            "Authority": "https://identity.example.com",
+            "ClientId": "{CLIENT_ID}",
+            "ClientSecret": "{CLIENT_SECRET}",
+            "Scopes": [ "openid", "profile", "email" ]
           }
         }
       }
@@ -230,219 +117,115 @@ All providers work simultaneously. Users choose at login.
 }
 ```
 
-SAML integration with corporate identity providers.
+OIDC requires `Authority`, `ClientId`, and `ClientSecret`. OAuth2 requires `AuthorizationEndpoint`, `TokenEndpoint`,
+`UserInfoEndpoint`, `ClientId`, and `ClientSecret`. SAML is not supported.
 
-## Role-Based Authorization
+## Multiple providers and default election
 
-```csharp
-public class User : Entity<User>
-{
-    public string Email { get; set; } = "";
-    public string[] Roles { get; set; } = [];
+Every eligible provider appears in discovery and can be challenged by ID. Default election is deterministic:
 
-    public bool HasRole(string role) => Roles.Contains(role);
-    public bool IsAdmin() => HasRole("Admin");
-}
-
-[Route("api/[controller]")]
-public class AdminController : ControllerBase
-{
-    [HttpGet("users")]
-    [Authorize(Policy = "AdminOnly")]
-    public Task<User[]> GetAllUsers() => User.All();
-
-    [HttpPost("users/{id}/roles")]
-    [Authorize(Policy = "AdminOnly")]
-    public async Task<IActionResult> AssignRole(string id, [FromBody] string role)
-    {
-    var user = await User.Get(id);
-        if (user == null) return NotFound();
-
-        user.Roles = user.Roles.Append(role).Distinct().ToArray();
-        await user.Save();
-        return Ok();
-    }
-}
-
-// Startup.cs
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("AdminOnly", policy =>
-        policy.RequireAssertion(context =>
-            context.User.FindFirst("role")?.Value == "Admin"));
-});
-```
-
-Custom authorization policies.
-
-## Account Linking
-
-```csharp
-public class UserProvider : Entity<UserProvider>
-{
-    public string UserId { get; set; } = "";
-    public string Provider { get; set; } = "";
-    public string ProviderId { get; set; } = "";
-    public string Email { get; set; } = "";
-}
-
-public class User : Entity<User>
-{
-    public string PrimaryEmail { get; set; } = "";
-
-    public async Task LinkProvider(string provider, string providerId, string email)
-    {
-        var existing = await UserProvider.Query()
-            .FirstOrDefaultAsync(up => up.Provider == provider && up.ProviderId == providerId);
-
-        if (existing == null)
-        {
-            await new UserProvider
-            {
-                UserId = Id,
-                Provider = provider,
-                ProviderId = providerId,
-                Email = email
-            }.Save();
-        }
-    }
-
-    public Task<UserProvider[]> GetLinkedProviders() =>
-        UserProvider.Query(up => up.UserId == Id);
-}
-```
-
-Users can link multiple social accounts.
-
-## JWT Token Validation
-
-```csharp
-[Route("api/[controller]")]
-public class TokenController : ControllerBase
-{
-    [HttpPost("validate")]
-    public async Task<IActionResult> ValidateToken([FromBody] string token)
-    {
-        try
-        {
-            var handler = new JwtSecurityTokenHandler();
-            var jwt = handler.ReadJwtToken(token);
-
-            var email = jwt.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
-            var user = await User.Query().FirstOrDefaultAsync(u => u.Email == email);
-
-            return Ok(new { valid = true, user });
-        }
-        catch
-        {
-            return Ok(new { valid = false });
-        }
-    }
-}
-```
-
-Token-based API access.
-
-## Rate Limiting
+1. an eligible `PreferredProviderId`, when specified;
+2. explicit application configuration before automatic local defaults;
+3. provider priority;
+4. stable provider ID.
 
 ```json
 {
   "Koan": {
     "Web": {
       "Auth": {
-        "RateLimit": {
-          "LoginAttemptsPerMinute": 5,
-          "CallbackFailuresPerHour": 10
-        }
+        "PreferredProviderId": "microsoft"
       }
     }
   }
 }
 ```
 
-Automatic protection against brute force attacks.
+A preferred provider is required intent. Unknown, disabled, unavailable, or incomplete choices stop startup with a
+correction instead of silently selecting something else.
 
-## Development vs Production
+## Protect application behavior
 
-```json
-{
-  "Koan": {
-    "Web": {
-      "Auth": {
-        "Development": {
-          "EnableTestProvider": true,
-          "BypassEmailVerification": true
-        },
-        "Production": {
-          "RequireHttps": true,
-          "SecureHeaders": true
-        }
-      }
-    }
-  }
-}
-```
-
-Environment-specific security settings.
-
-## Testing
+Use stock ASP.NET authorization on custom controllers:
 
 ```csharp
-[Test]
-public async Task Should_Require_Authentication()
+[ApiController]
+[Route("api/reports")]
+public sealed class ReportsController : ControllerBase
 {
-    // Arrange
-    var client = _factory.CreateClient();
-
-    // Act
-    var response = await client.GetAsync("/api/orders");
-
-    // Assert
-    Assert.AreEqual(HttpStatusCode.Unauthorized, response.StatusCode);
-}
-
-[Test]
-public async Task Should_Allow_Authenticated_User()
-{
-    // Arrange
-    var client = _factory.WithAuthentication("test@example.com").CreateClient();
-
-    // Act
-    var response = await client.GetAsync("/api/orders");
-
-    // Assert
-    Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+    [Authorize(Roles = "admin")]
+    [HttpPost("rebuild")]
+    public IActionResult Rebuild() => NoContent();
 }
 ```
 
-Testable authentication flows.
+Use Koan's gate/constrain/project model for entity surfaces:
 
-## OAuth Authorization Server (issuing tokens)
+```csharp
+[Access(read: "authenticated", write: "is:editor", remove: "is:admin")]
+public sealed class Article : Entity<Article>
+{
+    public string Title { get; set; } = "";
+}
 
-The provider endpoints above sign a **user** in via an external IdP. Koan can also **issue** tokens: reference the opt-in leaf **`Koan.Web.Auth.Server`** and an embedded OAuth 2.1 Authorization Server activates under `AddKoan()` (no ceremony — no `AddKoanMcp()` / `UseAuthentication()`). It lives at its own root `/oauth/…` — distinct from `/auth/{provider}/` login: it issues tokens to **clients** (e.g. an MCP client like Claude Desktop), it is **not** a login provider. The app owns only two render-only pages (`Koan:Web:Auth:Server:ConsentPath` / `DonePath`); the framework owns the protocol. Full walkthrough: [oauth-server-howto.md](oauth-server-howto.md) ([SEC-0006](../decisions/SEC-0006-embedded-oauth-authorization-server.md)).
+public sealed class ArticlesController : EntityController<Article> { }
+```
 
-## Built-in Endpoints
+External roles map to `ClaimTypes.Role`; permissions from the local simulator map to `Koan.permission`. Row-level
+ownership and agent grants are authorization concerns, documented in the [Auth pillar map](../reference/cards/auth.md).
 
-Provider sign-in (always present):
+## Built-in application endpoints
 
-- `GET /.well-known/auth/providers` - Available providers
-- `POST /auth/challenge/{provider}` - Start login
-- `POST /auth/callback` - Handle provider callback
-- `POST /auth/logout` - Sign out
-- `GET /auth/user` - Current user info
+- `GET /.well-known/auth/providers` — eligible provider discovery;
+- `GET /auth/{provider}/challenge?return=/path` — begin sign-in;
+- `/auth/{provider}/callback` — handler-owned callback registered with the provider;
+- `GET /me` — current-user projection, or 401;
+- `GET|POST /auth/logout?return=/path` — local sign-out.
 
-OAuth Authorization Server (when `Koan.Web.Auth.Server` is referenced):
+Return URLs are checked against Web Auth's return-url policy before redirect. Do not create a second callback controller
+or manually parse provider tokens.
 
-- `GET /.well-known/oauth-authorization-server` · `GET /.well-known/jwks.json` - discovery (RFC 8414) + public ES256 keys
-- `GET /oauth/authorize` · `POST /oauth/token` - Authorization Code + PKCE (and the `refresh_token` / `device_code` grants)
-- `POST /oauth/device` - device authorization request (RFC 8628)
-- `POST /oauth/register` - dynamic client registration (RFC 7591)
-- `GET /oauth/request/{rid}` (+ `…/approve`, `…/deny`) - the consent seam your page consumes
-- `GET /oauth/dev-token` - Development-only token for the current cookie user
+## Startup failures and inspectability
 
-All endpoints work automatically with any configured provider; the `/oauth/…` set is active once `Koan.Web.Auth.Server` is referenced.
+The provider plan is compiled once per host. Startup logs show total providers, eligible count, elected default, and
+reason. Koan composition facts add one credential-free observation per provider plus the election receipt; public
+discovery returns eligible providers only.
 
----
+Explicit incomplete providers fail startup and name the missing fields and exact configuration path. Missing external
+subject identifiers, identity-link persistence failures, and authentication lifecycle failures reject sign-in. Cookie
+validation failures reject the principal. Only sign-out cleanup handlers are best-effort.
 
-**Last Validation**: 2025-01-17 by Framework Specialist
-**Framework Version Tested**: v0.2.18+
+Secrets are standard .NET configuration values. Supply them through your environment or configuration provider; Koan
+does not currently resolve a `SecretRef` abstraction or rotate provider credentials.
+
+## Extending the lifecycle from a module
+
+A module author references `Sylin.Koan.Web.Auth.Abstractions` and implements only the events it owns:
+
+```csharp
+public sealed class SuspendedUserGuard : IKoanAuthFlowHandler
+{
+    public Task OnSignIn(AuthSignInContext context, CancellationToken ct)
+    {
+        if (context.Identity.HasClaim("account_status", "suspended"))
+            context.Reject("account is suspended");
+        return Task.CompletedTask;
+    }
+}
+```
+
+The implementation is discovered automatically and runs as a scoped service. Lower `Priority` values run first. A
+module should not reference functional Web Auth only to consume these contracts.
+
+## Issuing tokens is a separate capability
+
+External providers sign a user into this application. To issue OAuth tokens to clients, reference the opt-in
+`Sylin.Koan.Web.Auth.Server` package. It activates its `/oauth/...` authorization-server surface under `AddKoan()`;
+see the [OAuth server guide](oauth-server-howto.md). It is not an external login provider.
+
+## Current boundaries
+
+- OAuth2 and OIDC interactive code flows are supported; SAML is not.
+- Provider-console registration, redirect URLs, consent, tenant allow-lists, and secret rotation are deployment duties.
+- Third-party access/refresh tokens are not exposed as a general application token store.
+- The local Test provider is single-process and in-memory; restarting the application clears its protocol state.

@@ -4,10 +4,10 @@ domain: web
 title: "Auth — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-06-20
+last_updated: 2026-07-18
 framework_version: source-first
 validation:
-  date_last_tested: 2026-06-20
+  date_last_tested: 2026-07-18
   status: verified
   scope: docs/reference/cards/auth.md
 ---
@@ -66,7 +66,7 @@ Provider roles map onto `ClaimTypes.Role`, so `[Authorize(Roles = "admin")]` and
 | `[Access(read:, write:, remove:)]` | The per-action **gate** on `Entity<T>` (SEC-0004) — a token bag per action (`anyone` / `authenticated` / `is:role` / `has:scope:x` / `owner`), allow-by-default, enforced on every surface. |
 | `EntityAccess<T>` | The **constrain** realization — `Owner` declared once + `Constrain(q, action)` (`q.Where(...)` / `q.Stamp(...)`) for row-level ownership. |
 | `[Authorize]` / `[Authorize(Roles = "admin")]` | ASP.NET gate for custom (non-entity) controller actions; also lowers into the entity gate as sugar when placed on `Entity<T>`. |
-| `[AuthProviderDescriptor("id", "Name", "OIDC")]` | Assembly-level (connector authors) — declares a provider's id, display name, and protocol for discovery. |
+| `IKoanAuthFlowHandler` | Optional module seam for sign-in, sign-out, validation, challenge, denied, and bootstrap behavior; implement only the events owned by the module. |
 
 The old `CanRead` / `CanWrite` / `CanRemove` virtuals on `EntityController<T>` were **removed** (ARCH-0092) — use `[Access(...)]` for the gate and `EntityAccess<T>` for row scope.
 
@@ -78,7 +78,14 @@ Beyond signing users in, Koan can **issue** tokens — an embedded OAuth 2.1 Aut
 
 ## The escape hatch
 
-When no first-party connector fits, reference the generic **`Koan.Web.Auth.Connector.Oidc`** package (disabled by default — `Defaults.Enabled = false`, it ships handler wiring with no provider defaults). Add a provider entry under `Koan:Web:Auth:Providers` with its `Authority` / `ClientId` / `ClientSecret` and the dynamic-scheme seeder wires a real `OpenIdConnectHandler` for it. To contribute provider defaults from your own package instead, implement **`IAuthProviderContributor`** (`Koan.Web.Auth.Providers`) and return `ProviderOptions` keyed by id — the same seam the built-in connectors use.
+When no first-party connector fits, reference **`Sylin.Koan.Web.Auth`** and add a provider directly under
+`Koan:Web:Auth:Providers` with `Type: "oidc"`, `Authority`, `ClientId`, and `ClientSecret`. OAuth2/OIDC mechanics
+already belong to Web Auth; there is no generic OIDC connector package.
+
+A reusable connector module registers one immutable `AuthProviderDefinition` through ordinary DI. It supplies only
+stable provider knowledge (ID, protocol endpoints/authority, display metadata, scopes, and priority); Web Auth overlays
+application configuration and alone owns activation, eligibility, election, scheme creation, and evidence. Cross-module
+contracts live in the inert `Sylin.Koan.Web.Auth.Abstractions` package.
 
 ## Where it is exercised
 

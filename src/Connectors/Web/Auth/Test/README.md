@@ -1,21 +1,38 @@
 # Sylin.Koan.Web.Auth.Connector.Test
 
-A test/dummy auth provider useful for local and CI scenarios.
-
-## Install
+A self-hosted OAuth2/OIDC simulator for meaningful local and integration testing. Reference it and `AddKoan()` makes
+two automatic providers available in Development: `test` and `test-oidc`.
 
 ```powershell
 dotnet add package Sylin.Koan.Web.Auth.Connector.Test
 ```
 
-## Notes
-- Issues a deterministic ClaimsPrincipal for testing flows.
-- Dev login UI at `/.testoauth/login.html` lets you set roles, permissions, and arbitrary claims; persists to LocalStorage (persona export/import supported).
-- You can also pass extras via query: `roles=admin,author&perms=content:write&claim.department=ENG&claim.scope=read&claim.scope=write`.
-- Use only in non-production environments.
+Start the maintained OIDC flow at:
 
-### Prompts and cookies
-- To force the login UI even if a previous TestProvider session exists, add `prompt=login` (or `prompt=select_account`) to the authorize request.
-- Logging out from the app clears the development `_tp_user` cookie so subsequent auth flows won't auto-approve.
+```text
+GET /auth/test-oidc/challenge?return=/
+```
 
-See [`TECHNICAL.md`](TECHNICAL.md) for details.
+The local login page lets a developer choose a subject, roles, permissions, and custom claims. The resulting cookie
+travels through the same Web Auth scheme, callback, claim mapping, external-identity link, and lifecycle pipeline used
+by real providers.
+
+## Useful surfaces
+
+- login UI: `/.testoauth/login.html`;
+- OIDC discovery: `/.testoauth/.well-known/openid-configuration`;
+- OAuth2 authorize/token/userinfo: `/.testoauth/authorize`, `/token`, `/userinfo`;
+- JWKS: `/.testoauth/jwks`.
+
+Use `prompt=login` or `prompt=select_account` to force persona selection. Application logout also clears the local
+persona cookie.
+
+## Guarantees and boundaries
+
+- Automatic only when `TestProviderOptions.IsActive` is true: Development by default, or explicit enablement outside
+  Development.
+- Stable attribute-routed protocol endpoints; no configurable route base or startup-order dependency.
+- The provider is a protocol simulator, not a security or production identity system. Do not enable it in production.
+- Personas persisted in browser LocalStorage are developer convenience, not durable identity data.
+
+See [TECHNICAL.md](TECHNICAL.md).
