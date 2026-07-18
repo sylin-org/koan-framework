@@ -20,9 +20,7 @@ internal static class IdentityAuditHooks
         Hook<Identity>("Identity", e => e.Id);
         Hook<IdentityEmail>("IdentityEmail", e => e.IdentityId);
         Hook<ExternalIdentityLink>("ExternalIdentityLink", e => e.IdentityId);
-        Hook<Group>("Group", e => e.Id);
         Hook<Session>("Session", e => e.IdentityId);
-        Hook<ApiToken>("ApiToken", e => e.IdentityId);
         Hook<IdentityRole>("IdentityRole", e => e.IdentityId);
         Hook<Impersonation.ImpersonationGrant>("ImpersonationGrant", e => e.Target);
     }

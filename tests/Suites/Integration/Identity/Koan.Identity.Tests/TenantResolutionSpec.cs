@@ -166,22 +166,29 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
         await new TenantRecord { Id = "tr-backdoor", Name = "Backdoor", Code = "backdoor" }.Save();
         // A membership that somehow carries the HOST operator role (e.g. a bad seed/import/direct save) alongside a
         // legit tenant role — the projection must strip the host role (ARCH-0104 "no master backdoor").
-        await new Membership { TenantId = "tr-backdoor", IdentityId = "backdoor-user", Roles = { TenancyRoles.Operator, "koan:member" } }.Save();
+        await new Membership
+        {
+            TenantId = "tr-backdoor",
+            IdentityId = "backdoor-user",
+            Roles = { TenancyRoles.Operator, IdentityRoles.Operator, "koan:member" }
+        }.Save();
 
-        bool operatorInside = true, memberInside = false;
+        bool tenancyOperatorInside = true, identityOperatorInside = true, memberInside = false;
         var ctx = new DefaultHttpContext { RequestServices = _fx.Services };
         SignedIn(ctx, "backdoor-user");
         ctx.Request.Headers["X-Koan-Tenant"] = "backdoor";
         var mw = new TenantResolutionMiddleware(c =>
         {
-            operatorInside = c.User.IsInRole(TenancyRoles.Operator);
+            tenancyOperatorInside = c.User.IsInRole(TenancyRoles.Operator);
+            identityOperatorInside = c.User.IsInRole(IdentityRoles.Operator);
             memberInside = c.User.IsInRole("koan:member");
             return Task.CompletedTask;
         });
         await mw.InvokeAsync(ctx, _fx.Services.GetServices<ITenantResolver>(),
             _fx.Services.GetRequiredService<IOptions<TenancyResolutionOptions>>());
 
-        operatorInside.Should().BeFalse("a tenant membership must NEVER project a HOST role onto the request principal");
+        tenancyOperatorInside.Should().BeFalse("a tenant membership must never project fleet operator authority");
+        identityOperatorInside.Should().BeFalse("a tenant membership must never project global identity authority");
         memberInside.Should().BeTrue("legit tenant roles still project");
     }
 

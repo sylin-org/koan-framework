@@ -30,9 +30,8 @@ public sealed class SecIdentityModule : KoanModule
         services.AddKoanOptions<IdentityOptions>(IdentityOptions.SectionPath);
         services.TryAddSingleton<IIdentityReconciler, IdentityReconciler>();
 
-        // Layer 1 — management services (offline-capable; the web consoles expose them).
+        // Layer 1 — management services (offline-capable; the optional Web package exposes them as APIs).
         services.TryAddSingleton<Management.SessionService>();
-        services.TryAddSingleton<Management.ApiTokenService>();
         services.TryAddSingleton<Management.IdentityLifecycleService>();
         services.TryAddSingleton<Management.IdentityLinkService>(); // D5 — explicit account-linking
 
@@ -56,8 +55,8 @@ public sealed class SecIdentityModule : KoanModule
         services.TryAddSingleton<Audit.AuditChain>();
         Audit.IdentityAuditHooks.Register();
 
-        // Replace the in-memory stubs (registered by AddKoanWebAuth) with durable Entity<>-backed stores.
-        // Ordered after the auth registrar (see [After]) so Replace finds and supersedes the defaults.
+        // Replace the in-memory stubs with durable Entity<>-backed stores. This is order-independent: Web Auth uses
+        // TryAdd, so it cannot overwrite these registrations when its functional package is also present.
         services.Replace(ServiceDescriptor.Singleton<IUserStore, IdentityUserStore>());
         services.Replace(ServiceDescriptor.Singleton<IExternalIdentityStore, IdentityExternalIdentityStore>());
 
@@ -123,8 +122,9 @@ public sealed class SecIdentityModule : KoanModule
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
-        var posture = IdentityPostureResolver.Resolve(env.IsDevelopment(), cfg["Koan:Identity:Posture"]);
-        var source = string.IsNullOrWhiteSpace(cfg["Koan:Identity:Posture"]) ? (env.IsDevelopment() ? "dev-open" : "closed") : "override";
+        var configured = cfg.GetValue<IdentityPosture?>($"{IdentityOptions.SectionPath}:Posture");
+        var posture = IdentityPostureResolver.Resolve(env.IsDevelopment(), configured);
+        var source = configured is null ? (env.IsDevelopment() ? "dev-open" : "closed") : "override";
         module.SetSetting("Identity", b => b.Value(
             $"posture={posture} ({source}); durable person + IUserStore/IExternalIdentityStore reconciliation; no per-MAU axis (SEC-0007 D2)"));
     }

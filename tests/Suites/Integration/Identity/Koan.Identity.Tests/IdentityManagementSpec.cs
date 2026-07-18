@@ -1,8 +1,8 @@
 using System.Security.Claims;
 using AwesomeAssertions;
 using Koan.Data.Core;
+using Koan.Identity.Impersonation;
 using Koan.Identity.Management;
-using Koan.Tenancy;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -10,8 +10,8 @@ namespace Koan.Identity.Tests;
 
 /// <summary>
 /// SEC-0007 P1 / Layer-1 acceptance (ARCH-0079 — real <c>AddKoan()</c>, offline): audit-by-construction over the
-/// lifecycle seam, sessions + "sign out everywhere-else", API-token issue/rotate/revoke, bulk lifecycle with one
-/// audit batch, lifecycle-aware delete, and nestable ambient-exempt groups.
+/// lifecycle seam, sessions + "sign out everywhere-else", bulk lifecycle with one audit batch, and complete
+/// core-owned dependent deletion.
 /// </summary>
 [Collection("identity")]
 public sealed class IdentityManagementSpec : IdentityHostScopedSpec
@@ -20,7 +20,6 @@ public sealed class IdentityManagementSpec : IdentityHostScopedSpec
     public IdentityManagementSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     private SessionService Sessions => _fx.Services.GetRequiredService<SessionService>();
-    private ApiTokenService Tokens => _fx.Services.GetRequiredService<ApiTokenService>();
     private IdentityLifecycleService Lifecycle => _fx.Services.GetRequiredService<IdentityLifecycleService>();
 
     [Fact]
@@ -92,28 +91,6 @@ public sealed class IdentityManagementSpec : IdentityHostScopedSpec
         }, "test"));
 
     [Fact]
-    public async Task Api_token_issue_rotate_revoke()
-    {
-        const string id = "token-owner";
-        await new Identity { Id = id, DisplayName = "Token Owner" }.Save();
-
-        var issued = await Tokens.IssueAsync(id, "ci", new[] { "read", "deploy" });
-        issued.Secret.Should().NotBeNullOrEmpty("the secret is returned exactly once at issue");
-        issued.Token.SecretHash.Should().Be(ApiTokenService.Hash(issued.Secret)).And.NotBe(issued.Secret, "only the hash is stored");
-        issued.Token.IsActive(DateTimeOffset.UtcNow).Should().BeTrue();
-
-        var rotated = await Tokens.RotateAsync(issued.Token.Id);
-        rotated.Should().NotBeNull();
-        rotated!.Token.RotatedFromId.Should().Be(issued.Token.Id, "rotation records provenance");
-        rotated.Token.Scopes.Should().BeEquivalentTo(new[] { "read", "deploy" }, "scopes survive rotation");
-        (await ApiToken.Get(issued.Token.Id))!.Revoked.Should().BeTrue("the prior token is revoked on rotation");
-        rotated.Token.IsActive(DateTimeOffset.UtcNow).Should().BeTrue();
-
-        (await Tokens.RevokeAsync(rotated.Token.Id)).Should().BeTrue();
-        (await ApiToken.Get(rotated.Token.Id))!.IsActive(DateTimeOffset.UtcNow).Should().BeFalse();
-    }
-
-    [Fact]
     public async Task Bulk_suspend_is_partial_failure_tolerant_with_one_audit_batch()
     {
         await new Identity { Id = "bulk-a", DisplayName = "A" }.Save();
@@ -138,35 +115,26 @@ public sealed class IdentityManagementSpec : IdentityHostScopedSpec
         await new Identity { Id = id, DisplayName = "Delete Me" }.Save();
         await new IdentityEmail { Id = IdentityEmail.KeyFor(id, "del@example.com"), IdentityId = id, Address = "del@example.com", Verified = true, Primary = true }.Save();
         await Sessions.RecordAsync(id, "Laptop", "Firefox", "Linux", null);
-        await Tokens.IssueAsync(id, "tok", new[] { "read" });
         await new ExternalIdentityLink { Id = ExternalIdentityLink.KeyFor(id, "google", "H"), IdentityId = id, Provider = "google", ProviderKeyHash = "H" }.Save();
+        await new IdentityRole { Id = IdentityRole.KeyFor(id, "koan:admin"), IdentityId = id, RoleKey = "koan:admin" }.Save();
+        await new ImpersonationGrant { Actor = id, Target = "target", Reason = "actor dependent" }.Save();
+        await new ImpersonationGrant { Actor = "other", Target = id, Reason = "target dependent" }.Save();
 
         var report = await Lifecycle.DeleteWithDependentsAsync(id);
 
         report.Emails.Should().Be(1);
         report.Sessions.Should().Be(1);
-        report.Tokens.Should().Be(1);
         report.ExternalLinks.Should().Be(1);
+        report.GlobalRoles.Should().Be(1);
+        report.ImpersonationGrants.Should().Be(2);
 
         (await Identity.Get(id)).Should().BeNull("the person is removed");
         (await IdentityEmail.Query(e => e.IdentityId == id)).Should().BeEmpty("emails cascade");
         (await Session.Query(s => s.IdentityId == id)).Should().BeEmpty("sessions cascade");
-        (await ApiToken.Query(t => t.IdentityId == id)).Should().BeEmpty("tokens cascade");
         (await ExternalIdentityLink.Query(l => l.IdentityId == id)).Should().BeEmpty("external links cascade");
-    }
-
-    [Fact]
-    public async Task Groups_are_nestable_and_ambient_exempt()
-    {
-        TenantScopeMetadata.IsHostScopedType(typeof(Group)).Should().BeTrue("groups are global, not tenant-scoped");
-        TenantScopeMetadata.IsHostScopedType(typeof(Session)).Should().BeTrue();
-        TenantScopeMetadata.IsHostScopedType(typeof(ApiToken)).Should().BeTrue();
-
-        var parent = new Group { Name = "Engineering" };
-        await parent.Save();
-        var child = new Group { Name = "Backend", ParentGroupId = parent.Id, MemberIdentityIds = { "alice@example.com" } };
-        await child.Save();
-
-        (await Group.Get(child.Id))!.ParentGroupId.Should().Be(parent.Id, "groups nest via a self [Parent]");
+        (await IdentityRole.Query(r => r.IdentityId == id)).Should().BeEmpty("global roles cascade");
+        (await ImpersonationGrant.Query(g => g.Actor == id || g.Target == id)).Should().BeEmpty(
+            "acting and target-side impersonation grants cascade");
+        (await AuditEvent.Query(a => a.Subject == id)).Should().NotBeEmpty("audit evidence is retained");
     }
 }

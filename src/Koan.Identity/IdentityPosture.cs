@@ -12,14 +12,9 @@ public enum IdentityPosture
     Open = 1,
 }
 
-/// <summary>Pure posture resolution: an explicit override wins; otherwise Development → Open, else Closed.</summary>
+/// <summary>Pure posture resolution: an explicit typed override wins; otherwise Development → Open, else Closed.</summary>
 internal static class IdentityPostureResolver
 {
-    public static IdentityPosture Resolve(bool isDevelopment, string? overrideValue)
-    {
-        if (!string.IsNullOrWhiteSpace(overrideValue) &&
-            Enum.TryParse<IdentityPosture>(overrideValue, ignoreCase: true, out var parsed))
-            return parsed;
-        return isDevelopment ? IdentityPosture.Open : IdentityPosture.Closed;
-    }
+    public static IdentityPosture Resolve(bool isDevelopment, IdentityPosture? overridePosture = null)
+        => overridePosture ?? (isDevelopment ? IdentityPosture.Open : IdentityPosture.Closed);
 }

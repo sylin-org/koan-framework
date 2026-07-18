@@ -10,7 +10,7 @@ public sealed class IdentityOptions
     /// Explicit posture override (<c>Open</c> / <c>Closed</c>); <see langword="null"/> derives from the environment
     /// (Development → Open, otherwise Closed). A forced <c>Open</c> outside Development refuses to boot.
     /// </summary>
-    public string? Posture { get; set; }
+    public IdentityPosture? Posture { get; set; }
 
     /// <summary>Seed offline dev users at boot (Development + Open only). Default <see langword="true"/>.</summary>
     public bool SeedDevUsers { get; set; } = true;

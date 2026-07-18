@@ -143,7 +143,7 @@ public sealed class IdentityAccessSpec : IdentityHostScopedSpec
     }
 
     [Fact]
-    public async Task Expired_agent_grants_are_excluded_from_the_console_preview()
+    public async Task Expired_agent_grants_are_excluded_from_the_access_preview()
     {
         const string id = "expiry-user";
         await new Identity { Id = id, DisplayName = "Exp" }.Save();

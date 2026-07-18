@@ -5,13 +5,11 @@ using Koan.Data.Core.Model;
 namespace Koan.Identity;
 
 /// <summary>
-/// SEC-0007 — the canonical append-only audit channel for identity/access mutations: <c>actor / action / target /
+/// SEC-0007 — the canonical audit channel for identity/access mutations: <c>actor / action / target /
 /// before → after / context / occurred_at</c>.
 /// <para>
-/// <b>P0 scope is the entity declaration only.</b> Lifecycle-seam auto-emit (audit-by-construction) lands in P1,
-/// and append-only enforcement + hash-chaining + SIEM streaming land in P3. The richer field set (vs SEC-0005's
-/// <c>AgentAction</c>) is deliberate; whether <c>AuditEvent</c> supersedes <c>AgentAction</c> is an open
-/// convergence question tracked in the ADR.
+/// Identity lifecycle hooks emit best-effort records. Optional hash chaining detects later edits, reordering, or
+/// removal; storage-level append-only enforcement and SIEM delivery are not provided.
 /// </para>
 /// </summary>
 public sealed class AuditEvent : Entity<AuditEvent>, IAmbientExempt

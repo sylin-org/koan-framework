@@ -8,12 +8,12 @@ using Koan.Identity.Impersonation;
 namespace Koan.Identity.Web;
 
 /// <summary>
-/// SEC-0007 D8 / Layer 3 — the operator impersonation console: request (reason+ticket) → approve (a DIFFERENT
+/// SEC-0007 D8 / Layer 3 — the operator impersonation API: request (reason+ticket) → approve (a DIFFERENT
 /// approver, time-boxed) → revoke, plus the "who can act as <c>{target}</c>" view. The structural safety (no
 /// God-mode) lives in <see cref="ImpersonationGuard"/> + the actor-claim model, not here.
 /// </summary>
 [ApiController]
-[Authorize(Roles = IdentityWebRoles.Operator)]
+[Authorize(Roles = IdentityRoles.Operator)]
 [Route("api/identity/admin/impersonation")]
 public sealed class ImpersonationController : ControllerBase
 {
@@ -31,7 +31,7 @@ public sealed class ImpersonationController : ControllerBase
     public sealed record RequestBody(string Target, string Reason, string? Ticket);
 
     [HttpPost("request")]
-    public async Task<ActionResult<ImpersonationGrant>> Request([FromBody] RequestBody body, CancellationToken ct)
+    public async Task<ActionResult<ImpersonationGrant>> RequestImpersonation([FromBody] RequestBody body, CancellationToken ct)
     {
         if (Actor is null) return Unauthorized();
         if (ImpersonationGuard.IsBlocked(User, "impersonate.start")) return StatusCode(403, new { error = "nested impersonation is blocked" });

@@ -11,24 +11,23 @@ using Xunit;
 namespace Koan.Identity.Tests;
 
 /// <summary>
-/// SEC-0007 P1 / Layer-1 console acceptance — the Reference = Intent dual consoles. Exercises the controllers'
-/// own security (subject-scoping + token ownership + secret-never-leaked) directly against the real services on the
+/// SEC-0007 P1 / Layer-1 API acceptance — the Reference = Intent management surfaces. Exercises the controllers'
+/// own subject-scoping directly against the real services on the
 /// shared offline host; ASP.NET's <c>[Authorize]</c> gate is framework-enforced and not re-proven here.
 /// </summary>
 [Collection("identity")]
-public sealed class IdentityConsoleSpec : IdentityHostScopedSpec
+public sealed class IdentityManagementApiSpec : IdentityHostScopedSpec
 {
     private readonly IdentityHostFixture _fx;
-    public IdentityConsoleSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
+    public IdentityManagementApiSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
     private IdentitySelfServiceController SelfService(string subject)
         => WithUser(new IdentitySelfServiceController(
             _fx.Services.GetRequiredService<SessionService>(),
-            _fx.Services.GetRequiredService<ApiTokenService>(),
             _fx.Services.GetRequiredService<IdentityLinkService>()), subject);
 
     private IdentityAdminController Admin()
-        => WithUser(new IdentityAdminController(_fx.Services.GetRequiredService<IdentityLifecycleService>()), "operator", IdentityWebRoles.Operator);
+        => WithUser(new IdentityAdminController(_fx.Services.GetRequiredService<IdentityLifecycleService>()), "operator", IdentityRoles.Operator);
 
     private static T WithUser<T>(T controller, string subject, params string[] roles) where T : ControllerBase
     {
@@ -47,11 +46,11 @@ public sealed class IdentityConsoleSpec : IdentityHostScopedSpec
     [Fact]
     public async Task Self_service_profile_is_scoped_to_the_caller()
     {
-        await new Identity { Id = "console-me", DisplayName = "Console Me" }.Save();
+        await new Identity { Id = "api-me", DisplayName = "API Me" }.Save();
 
-        var me = Value(await SelfService("console-me").Profile(default));
+        var me = Value(await SelfService("api-me").Profile(default));
         me.Should().NotBeNull();
-        me!.Id.Should().Be("console-me");
+        me!.Id.Should().Be("api-me");
 
         // A different caller never sees this person through their own profile route.
         var other = await SelfService("someone-else").Profile(default);
@@ -61,7 +60,7 @@ public sealed class IdentityConsoleSpec : IdentityHostScopedSpec
     [Fact]
     public async Task Self_service_sign_out_others_revokes_via_the_controller()
     {
-        const string id = "console-sessions";
+        const string id = "api-sessions";
         await new Identity { Id = id, DisplayName = "C" }.Save();
         var ctrl = SelfService(id);
         var sessions = _fx.Services.GetRequiredService<SessionService>();
@@ -76,34 +75,7 @@ public sealed class IdentityConsoleSpec : IdentityHostScopedSpec
     }
 
     [Fact]
-    public async Task Self_service_token_issue_never_leaks_the_hash_and_enforces_ownership()
-    {
-        const string owner = "console-token-owner";
-        await new Identity { Id = owner, DisplayName = "Owner" }.Save();
-
-        var issueResult = await SelfService(owner).IssueToken(
-            new IdentitySelfServiceController.IssueTokenRequest("ci", new() { "read" }, null), default);
-        var body = (issueResult.Result as OkObjectResult)!.Value!;
-        var json = Newtonsoft.Json.JsonConvert.SerializeObject(body);
-        json.Should().Contain("secret", "the one-time secret is returned at issue");
-        json.Should().NotContain("SecretHash", "the stored hash is never projected to the client");
-
-        var tokenId = (await _fx.Services.GetRequiredService<ApiTokenService>().ListAsync(owner)).Single().Id;
-
-        // A different caller cannot rotate or revoke the owner's token.
-        var foreignRotate = await SelfService("intruder").RotateToken(tokenId, default);
-        foreignRotate.Result.Should().BeOfType<NotFoundResult>("token ownership is enforced");
-        var foreignRevoke = await SelfService("intruder").RevokeToken(tokenId, default);
-        foreignRevoke.Should().BeOfType<NotFoundResult>();
-
-        // The owner can rotate.
-        var rotate = await SelfService(owner).RotateToken(tokenId, default);
-        (rotate.Result as OkObjectResult).Should().NotBeNull();
-        (await ApiToken.Get(tokenId))!.Revoked.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task Operator_console_lists_suspends_and_deletes()
+    public async Task Operator_api_lists_suspends_and_deletes()
     {
         await new Identity { Id = "op-target", DisplayName = "Op Target" }.Save();
 

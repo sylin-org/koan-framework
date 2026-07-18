@@ -6,8 +6,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Koan.Identity.Web</AssemblyName>
     <RootNamespace>Koan.Identity.Web</RootNamespace>
-    <Description>SEC-0007 — the Reference = Intent dual consoles over Koan.Identity: the operator admin API and the end-user self-service API, generated over the identity entities. Referencing this package auto-mounts both surfaces.</Description>
-    <PackageTags>$(CommonPackageTags);identity;console;admin;self-service;web</PackageTags>
+    <Description>Reference-activated authenticated HTTP management for Koan.Identity: subject-scoped self-service, role-gated operator lifecycle and access APIs, and dual-control impersonation.</Description>
+    <PackageTags>$(CommonPackageTags);identity;admin;self-service;web;impersonation</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

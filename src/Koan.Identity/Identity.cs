@@ -26,9 +26,6 @@ public sealed class Identity : Entity<Identity>, IAmbientExempt
     /// <summary>Lifecycle status. <see cref="IdentityStatus.Deactivated"/> / <see cref="IdentityStatus.Suspended"/> = cannot act.</summary>
     public IdentityStatus Status { get; set; } = IdentityStatus.Active;
 
-    /// <summary>Revocation epoch (SEC-0001): bumping it invalidates all tokens minted before the bump.</summary>
-    public int Epoch { get; set; }
-
     /// <summary>Set once, on creation.</summary>
     [Timestamp]
     public DateTimeOffset CreatedAt { get; set; }

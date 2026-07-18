@@ -22,7 +22,7 @@ internal sealed class AgentGrantAccessContributor : IEffectiveAccessContributor
             return Array.Empty<AccessFact>();
         }
 
-        // Match the production gate (AgentGrantStore.ActiveCapabilities filters on IsActive) so the console preview
+        // Match the production gate (AgentGrantStore.ActiveCapabilities filters on IsActive) so the access preview
         // never shows an expired grant as live access.
         var now = DateTimeOffset.UtcNow;
         return grants

@@ -11,7 +11,7 @@ namespace Koan.Identity.Web.Initialization;
 
 /// <summary>
 /// SEC-0007 Layer 1 — Reference = Intent: referencing <c>Koan.Identity.Web</c> auto-mounts the operator and
-/// self-service consoles over the identity entities (no manual controller wiring). The headless core
+/// self-service APIs over the identity entities (no manual controller wiring). The headless core
 /// (<c>Koan.Identity</c>) keeps working without this package; adding it lights up the surfaces.
 /// </summary>
 public sealed class SecIdentityWebModule : KoanModule
@@ -33,8 +33,8 @@ public sealed class SecIdentityWebModule : KoanModule
     {
         module.Describe(Version);
         module.AddTool("Identity — Self-service", "/api/identity/me",
-            "Profile, sessions & devices, API tokens, connected accounts", capability: "identity.self-service");
+            "Profile, sessions & devices, connected accounts", capability: "identity.self-service");
         module.AddTool("Identity — Operator", "/api/identity/admin",
-            "User list, bulk lifecycle, lifecycle-aware delete, groups", capability: "identity.operator");
+            "User list, bulk lifecycle, lifecycle-aware delete, access, impersonation", capability: "identity.operator");
     }
 }

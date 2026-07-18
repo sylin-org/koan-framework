@@ -67,7 +67,6 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
         var normal = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, "t") }, "x"));
 
         ImpersonationGuard.IsBlocked(impersonating, "identity.delete").Should().BeTrue();
-        ImpersonationGuard.IsBlocked(impersonating, "apitoken.issue").Should().BeTrue();
         ImpersonationGuard.IsBlocked(impersonating, "profile.read").Should().BeFalse("safe verbs are allowed while impersonating");
         ImpersonationGuard.IsBlocked(normal, "identity.delete").Should().BeFalse("a normal session can perform its own dangerous verbs");
     }
@@ -83,22 +82,6 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
         new ImpersonationBannerFilter().OnActionExecuting(ctx);
 
         http.Response.Headers[ImpersonationClaims.BannerHeader].ToString().Should().Be("the-actor", "the banner advertises who is really acting");
-    }
-
-    [Fact]
-    public async Task Self_service_token_issue_is_403_while_impersonating()
-    {
-        var ctrl = new IdentitySelfServiceController(
-            _fx.Services.GetRequiredService<SessionService>(),
-            _fx.Services.GetRequiredService<ApiTokenService>(),
-            _fx.Services.GetRequiredService<IdentityLinkService>());
-        ctrl.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(ImpersonationClaims.BuildImpersonatedIdentity("imp-t2", "imp-a2", Array.Empty<string>())) },
-        };
-
-        var result = await ctrl.IssueToken(new IdentitySelfServiceController.IssueTokenRequest("ci", new() { "read" }, null), default);
-        (result.Result as ObjectResult)?.StatusCode.Should().Be(403, "issuing a token AS the impersonated user is blocked by construction (no God-mode)");
     }
 
     [Fact]
@@ -178,7 +161,7 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
         // Worst case: impersonating a TARGET who holds the operator role — [Authorize(Roles=Operator)] would pass,
         // so the guard (not the role gate) must be what blocks the destructive verb.
         var impersonatingOperator = new ClaimsPrincipal(
-            ImpersonationClaims.BuildImpersonatedIdentity("imp-t3", "imp-op3", new[] { IdentityWebRoles.Operator }));
+            ImpersonationClaims.BuildImpersonatedIdentity("imp-t3", "imp-op3", new[] { IdentityRoles.Operator }));
 
         var admin = new IdentityAdminController(_fx.Services.GetRequiredService<IdentityLifecycleService>());
         admin.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = impersonatingOperator } };

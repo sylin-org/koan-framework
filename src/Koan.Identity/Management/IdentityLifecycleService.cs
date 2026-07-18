@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using Koan.Data.Core;
+using Koan.Identity.Impersonation;
 
 namespace Koan.Identity.Management;
 
@@ -11,7 +12,13 @@ namespace Koan.Identity.Management;
 public sealed class IdentityLifecycleService
 {
     public sealed record BulkResult(IReadOnlyList<string> Succeeded, IReadOnlyList<string> Failed);
-    public sealed record DeleteReport(string IdentityId, int Emails, int Sessions, int Tokens, int ExternalLinks);
+    public sealed record DeleteReport(
+        string IdentityId,
+        int Emails,
+        int Sessions,
+        int ExternalLinks,
+        int GlobalRoles,
+        int ImpersonationGrants);
 
     public Task<BulkResult> SuspendAsync(IEnumerable<string> identityIds, CancellationToken ct = default)
         => SetStatusAsync(identityIds, IdentityStatus.Suspended, "identity.bulk_suspend", ct);
@@ -51,24 +58,27 @@ public sealed class IdentityLifecycleService
     }
 
     /// <summary>
-    /// Delete a person and every dependent (emails, sessions, tokens, external links) — detect-then-cascade, so a
-    /// dependent is never left to raise a raw FK error. Returns a report of what was removed.
+    /// Delete a person and every core-owned dependent. Audit evidence is deliberately retained. Optional modules own
+    /// their own deprovisioning contributors/services. Returns a report of what was removed.
     /// </summary>
     public async Task<DeleteReport> DeleteWithDependentsAsync(string identityId, CancellationToken ct = default)
     {
         var emails = await IdentityEmail.Query(e => e.IdentityId == identityId, ct).ConfigureAwait(false);
         var sessions = await Session.Query(s => s.IdentityId == identityId, ct).ConfigureAwait(false);
-        var tokens = await ApiToken.Query(t => t.IdentityId == identityId, ct).ConfigureAwait(false);
         var links = await ExternalIdentityLink.Query(l => l.IdentityId == identityId, ct).ConfigureAwait(false);
+        var roles = await IdentityRole.Query(r => r.IdentityId == identityId, ct).ConfigureAwait(false);
+        var impersonation = await ImpersonationGrant.Query(
+            g => g.Actor == identityId || g.Target == identityId, ct).ConfigureAwait(false);
 
         foreach (var e in emails) await e.Remove(ct).ConfigureAwait(false);
         foreach (var s in sessions) await s.Remove(ct).ConfigureAwait(false);
-        foreach (var t in tokens) await t.Remove(ct).ConfigureAwait(false);
         foreach (var l in links) await l.Remove(ct).ConfigureAwait(false);
+        foreach (var r in roles) await r.Remove(ct).ConfigureAwait(false);
+        foreach (var g in impersonation) await g.Remove(ct).ConfigureAwait(false);
 
         var person = await Identity.Get(identityId, ct).ConfigureAwait(false);
         if (person is not null) await person.Remove(ct).ConfigureAwait(false);
 
-        return new DeleteReport(identityId, emails.Count, sessions.Count, tokens.Count, links.Count);
+        return new DeleteReport(identityId, emails.Count, sessions.Count, links.Count, roles.Count, impersonation.Count);
     }
 }

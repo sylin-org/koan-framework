@@ -7,11 +7,11 @@ using Koan.Identity.Management;
 namespace Koan.Identity.Web;
 
 /// <summary>
-/// SEC-0007 Layer 1 — the operator console. Gated on the operator role (the SEC-0004 capability floor constrains
-/// further). User list / search, bulk suspend &amp; reactivate (suspend ≠ delete), lifecycle-aware delete, and groups.
+/// SEC-0007 Layer 1 — the operator management API. Gated on the operator role (the SEC-0004 capability floor constrains
+/// further). User list / search, bulk suspend &amp; reactivate (suspend ≠ delete), and lifecycle-aware delete.
 /// </summary>
 [ApiController]
-[Authorize(Roles = IdentityWebRoles.Operator)]
+[Authorize(Roles = IdentityRoles.Operator)]
 [Route("api/identity/admin")]
 public sealed class IdentityAdminController : ControllerBase
 {
@@ -59,8 +59,4 @@ public sealed class IdentityAdminController : ControllerBase
         if (ImpersonationGuard.IsBlocked(User, "identity.delete")) return StatusCode(403, new { error = "deleting identities is blocked while impersonating" });
         return Ok(await _lifecycle.DeleteWithDependentsAsync(id, ct));
     }
-
-    [HttpGet("groups")]
-    public async Task<ActionResult<IReadOnlyList<Group>>> Groups(CancellationToken ct)
-        => Ok(await Group.All(ct));
 }

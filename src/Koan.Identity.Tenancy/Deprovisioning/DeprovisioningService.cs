@@ -12,9 +12,7 @@ namespace Koan.Identity.Tenancy.Deprovisioning;
 /// <see cref="RemoveFromTenantAsync"/> deletes the tenant <c>Membership</c>, so the tenant-resolution middleware can
 /// no longer scope the person in and the fail-closed axis seals their tenant data. Each emits a verifiable
 /// <see cref="DeprovisioningReceipt"/> as the durable proof.
-/// <para>The revocation <c>Epoch</c> bump is <b>recorded</b> for SEC-0001's future bearer-token revocation, but is
-/// NOT yet read on any request path (mint-epoch-into-tokens + validate-against-current is a deferred Trust change,
-/// SEC-0001 Phase 3). The live closure for a deactivated person is <c>Status</c> + session revocation (cookie path);
+/// <para>The live closure for a deactivated person is <c>Status</c> + session revocation (cookie path);
 /// an already-issued bearer token remains valid until its natural expiry — the receipt's <c>Surfaces</c> deliberately
 /// do not list "tokens".</para>
 /// </summary>
@@ -32,8 +30,6 @@ public sealed class DeprovisioningService
         if (person is not null && person.Status != IdentityStatus.Deactivated)
         {
             person.Status = IdentityStatus.Deactivated;
-            person.Epoch++; // SEC-0001 revocation epoch — RECORDED for a future bearer-token check; not yet read on any
-                            // request path (deferred to SEC-0001 Phase 3). Live closure = Status + the session revoke below.
             await person.Save(ct).ConfigureAwait(false);
             statusSet = nameof(IdentityStatus.Deactivated);
         }

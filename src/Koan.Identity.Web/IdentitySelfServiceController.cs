@@ -2,15 +2,14 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Koan.Data.Core;
-using Koan.Identity.Impersonation;
 using Koan.Identity.Management;
 
 namespace Koan.Identity.Web;
 
 /// <summary>
-/// SEC-0007 Layer 1 — the end-user self-service console. Every action is scoped to the calling principal's subject
+/// SEC-0007 Layer 1 — the end-user self-service API. Every action is scoped to the calling principal's subject
 /// (the security boundary): profile, verified emails, connected accounts, sessions &amp; devices + "sign out
-/// everywhere-else", and personal access tokens (issue/rotate/revoke; ownership-checked).
+/// everywhere-else".
 /// </summary>
 [ApiController]
 [Authorize]
@@ -18,13 +17,11 @@ namespace Koan.Identity.Web;
 public sealed class IdentitySelfServiceController : ControllerBase
 {
     private readonly SessionService _sessions;
-    private readonly ApiTokenService _tokens;
     private readonly IdentityLinkService _links;
 
-    public IdentitySelfServiceController(SessionService sessions, ApiTokenService tokens, IdentityLinkService links)
+    public IdentitySelfServiceController(SessionService sessions, IdentityLinkService links)
     {
         _sessions = sessions;
-        _tokens = tokens;
         _links = links;
     }
 
@@ -69,47 +66,4 @@ public sealed class IdentitySelfServiceController : ControllerBase
         return Ok(new { revoked });
     }
 
-    [HttpGet("tokens")]
-    public async Task<ActionResult<IEnumerable<object>>> Tokens(CancellationToken ct)
-    {
-        if (Subject is null) return Unauthorized();
-        var tokens = await _tokens.ListAsync(Subject, ct);
-        return Ok(tokens.Select(Project));
-    }
-
-    public sealed record IssueTokenRequest(string Name, List<string>? Scopes, DateTimeOffset? ExpiresAt);
-
-    [HttpPost("tokens")]
-    public async Task<ActionResult<object>> IssueToken([FromBody] IssueTokenRequest req, CancellationToken ct)
-    {
-        if (Subject is null) return Unauthorized();
-        if (ImpersonationGuard.IsBlocked(User, "apitoken.issue")) return StatusCode(403, new { error = "issuing tokens is blocked while impersonating" });
-        var issued = await _tokens.IssueAsync(Subject, req.Name, req.Scopes ?? new(), req.ExpiresAt, ct);
-        return Ok(new { token = Project(issued.Token), secret = issued.Secret });
-    }
-
-    [HttpPost("tokens/{id}/rotate")]
-    public async Task<ActionResult<object>> RotateToken([FromRoute] string id, CancellationToken ct)
-    {
-        if (Subject is null) return Unauthorized();
-        if (ImpersonationGuard.IsBlocked(User, "apitoken.rotate")) return StatusCode(403, new { error = "rotating tokens is blocked while impersonating" });
-        var existing = await ApiToken.Get(id, ct);
-        if (existing is null || existing.IdentityId != Subject) return NotFound(); // never rotate another person's token
-        var rotated = await _tokens.RotateAsync(id, ct);
-        return rotated is null ? NotFound() : Ok(new { token = Project(rotated.Token), secret = rotated.Secret });
-    }
-
-    [HttpDelete("tokens/{id}")]
-    public async Task<IActionResult> RevokeToken([FromRoute] string id, CancellationToken ct)
-    {
-        if (Subject is null) return Unauthorized();
-        var existing = await ApiToken.Get(id, ct);
-        if (existing is null || existing.IdentityId != Subject) return NotFound();
-        await _tokens.RevokeAsync(id, ct);
-        return NoContent();
-    }
-
-    // Project the token WITHOUT the secret hash — the secret itself is only ever returned once, at issue/rotate.
-    private static object Project(ApiToken t)
-        => new { t.Id, t.Name, t.Scopes, t.ExpiresAt, t.LastUsedAt, t.Revoked, t.CreatedAt, t.RotatedFromId };
 }

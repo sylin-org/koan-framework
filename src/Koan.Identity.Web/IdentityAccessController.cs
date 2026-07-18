@@ -7,12 +7,12 @@ using Koan.Identity.Management;
 namespace Koan.Identity.Web;
 
 /// <summary>
-/// SEC-0007 Layer 2 — the operator access console: the effective-access view ("X can do A,B,C"), the bidirectional
+/// SEC-0007 Layer 2 — the operator access API: the effective-access view ("X can do A,B,C"), the bidirectional
 /// explainer (forward "can X do Y on Z?" via the real engine; reverse "why does X have access to Z?" → the exact
 /// contributing rows), and global role grant/revoke.
 /// </summary>
 [ApiController]
-[Authorize(Roles = IdentityWebRoles.Operator)]
+[Authorize(Roles = IdentityRoles.Operator)]
 [Route("api/identity/admin/identities/{id}/access")]
 public sealed class IdentityAccessController : ControllerBase
 {

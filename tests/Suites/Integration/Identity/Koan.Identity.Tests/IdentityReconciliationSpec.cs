@@ -45,9 +45,9 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
     [Theory]
     [InlineData(true, null, "Open")]
     [InlineData(false, null, "Closed")]
-    [InlineData(false, "Open", "Open")]
-    [InlineData(true, "Closed", "Closed")]
-    public void Posture_resolves_dev_open_prod_closed(bool isDevelopment, string? over, string expected)
+    [InlineData(false, IdentityPosture.Open, "Open")]
+    [InlineData(true, IdentityPosture.Closed, "Closed")]
+    public void Posture_resolves_dev_open_prod_closed(bool isDevelopment, IdentityPosture? over, string expected)
         => IdentityPostureResolver.Resolve(isDevelopment, over).ToString().Should().Be(expected);
 
     [Fact]
@@ -320,5 +320,25 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
         await new Identity { Id = probeId, DisplayName = "Fixture Still Selected" }.Save();
         (await Identity.Get(probeId)).Should().NotBeNull(
             "the surrounding fact scope must keep selecting the shared fixture after nested host cleanup");
+    }
+
+    [Fact]
+    public async Task Invalid_posture_configuration_refuses_to_boot_with_the_configuration_path()
+    {
+        var act = async () =>
+        {
+            await using var host = KoanIntegrationHost.Configure()
+                .WithEnvironment("Test")
+                .WithSetting("Koan:Orchestration:EnableSelfOrchestration", "false")
+                .WithSetting("Koan:Identity:Posture", "Typo")
+                .ConfigureServices(s => s.AddKoan())
+                .Build();
+
+            using var hostScope = AppHost.PushScope(host.Services);
+            await host.StartAsync(TestContext.Current.CancellationToken);
+        };
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Koan:Identity*Posture*");
     }
 }

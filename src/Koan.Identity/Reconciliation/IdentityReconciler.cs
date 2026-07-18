@@ -41,7 +41,7 @@ internal sealed class IdentityReconciler : IIdentityReconciler
         }
 
         // Save-if-changed: a returning person with nothing to backfill is NOT re-written, so a concurrent lifecycle
-        // write (e.g. a just-issued Deactivation that flips Status / bumps Epoch) cannot be reverted by a stale
+        // write (e.g. a just-issued Deactivation that flips Status) cannot be reverted by a stale
         // full-row replace from this sign-in path. The reconciler never sets Status, so it can only ever lose a
         // lifecycle change via that clobber — skipping the redundant write removes the race in the common case.
         if (changed)
