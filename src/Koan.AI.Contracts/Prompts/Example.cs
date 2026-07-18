@@ -1,7 +1,7 @@
 namespace Koan.AI.Prompt;
 
 /// <summary>
-/// A few-shot example for in-context learning.
+/// A few-shot example carried by a structured prompt value.
 /// </summary>
 public sealed record Example(string Input, string Output)
 {

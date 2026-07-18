@@ -111,30 +111,6 @@ public sealed class Prompt
         return builder.Build();
     }
 
-    // ── Construction: from entity catalog ──
-
-    /// <summary>Load the active prompt with the given name from the PromptEntry catalog.</summary>
-    public static async Task<Prompt> Load(string name, CancellationToken ct = default)
-    {
-        var entry = await PromptEntry.FindActive(name, ct);
-        return entry?.ToPrompt() ?? throw new PromptNotFoundException(name);
-    }
-
-    /// <summary>Load a specific version of a prompt from the catalog.</summary>
-    public static async Task<Prompt> Load(string name, int version, CancellationToken ct = default)
-    {
-        var entry = await PromptEntry.FindVersion(name, version, ct);
-        return entry?.ToPrompt() ?? throw new PromptNotFoundException(name, version);
-    }
-
-    /// <summary>Load a prompt using a strategy (A/B test, canary, pinned).</summary>
-    public static async Task<Prompt> Load(
-        string name, PromptStrategy strategy, CancellationToken ct = default)
-    {
-        var entry = await strategy.Resolve(name, ct);
-        return entry?.ToPrompt() ?? throw new PromptNotFoundException(name);
-    }
-
     // ── Resolution ──
 
     /// <summary>

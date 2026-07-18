@@ -167,7 +167,7 @@ internal sealed class ChainExecutor : IChainExecutor
     private static async Task ExecutePrompt(
         ChainStep step, ChainContext context, CancellationToken ct)
     {
-        var prompt = await Koan.AI.Prompt.Prompt.Load(step.Value, ct);
+        var prompt = await Koan.AI.Prompt.PromptCatalog.Load(step.Value, ct);
         var resolved = prompt.Resolve(context.VariablesAsObject());
 
         // If the prompt has a system directive, use it

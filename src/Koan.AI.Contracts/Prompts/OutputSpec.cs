@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace Koan.AI.Prompt;
 
 /// <summary>
-/// Describes expected output structure. Used to generate JSON schema constraints
+/// Describes expected prompt output structure. Used to generate JSON schema constraints
 /// sent to the model and to validate/parse responses.
 /// </summary>
 public sealed record OutputSpec

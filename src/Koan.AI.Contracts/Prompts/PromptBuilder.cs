@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace Koan.AI.Prompt;
 
 /// <summary>
-/// Fluent builder for constructing structured prompts.
+/// Fluent builder for composing structured prompt values.
 ///
 /// <code>
 /// var prompt = Prompt.Create(p => p
