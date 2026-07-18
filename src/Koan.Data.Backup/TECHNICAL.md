@@ -92,7 +92,8 @@ Per-operation options (`BackupOptions`, `GlobalBackupOptions`, `RestoreOptions`,
 ## Diagnostics & integration
 
 - Boot report settings include default storage profile, batch size, maintenance flags, and advertised capabilities (`AutoEntityDiscovery`, `StreamingBackup`, `SchemaSnapshots`, etc.).
-- In-progress backups/restores expose `BackupProgress` / `RestoreProgress` via in-memory dictionaries for quick polling (e.g., Web controllers in `Koan.Web.Backup`).
+- In-progress backups/restores expose `BackupProgress` / `RestoreProgress` through process-local service state for
+  application-owned orchestration. Koan ships no backup HTTP control plane.
 - Logging uses structured messages (entity type, duration, counts) and emits warnings for partial failures (deserialization issues, missing entity types).
 - Manifests capture performance metrics (`BackupPerformanceInfo`) for later analysis of throughput and resource usage.
 

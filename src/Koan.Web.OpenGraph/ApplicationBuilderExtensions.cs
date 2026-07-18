@@ -5,15 +5,15 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Web.OpenGraph;
 
-public static class ApplicationBuilderExtensions
+internal static class ApplicationBuilderExtensions
 {
     /// <summary>
     /// Inserts the OpenGraph head-injection middleware. Koan contributes this automatically when the
-    /// package is referenced; this method remains public for non-Koan pipeline hosts. On an HTML
+    /// package is referenced; this is the package-internal pipeline primitive. On an HTML
     /// navigation it injects the per-route card into the shell and short-circuits; everything else
     /// (assets, <c>/api</c>, non-html, disabled) passes through untouched.
     /// </summary>
-    public static IApplicationBuilder UseOpenGraphCards(this IApplicationBuilder app)
+    internal static IApplicationBuilder UseOpenGraphCards(this IApplicationBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 

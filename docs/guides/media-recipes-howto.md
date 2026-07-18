@@ -116,13 +116,11 @@ manual invalidation when the recipe meaning changes.
 
 ```csharp
 using Koan.Core;
-using Koan.Media.Web.Routing;
 using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddKoan().AsWebApi();
-builder.Services.AddMediaSource<Photo>();
 
 var app = builder.Build();
 await app.RunAsync();
@@ -142,6 +140,10 @@ named recipes may negotiate among their allowed/producible formats.
 
 `MediaEntitySource<Photo>` resolves the source through the Entity data path before derivative lookup. Active
 tenant and access restrictions therefore gate both a cold render and a stored warm result.
+
+One concrete `MediaEntity<T>` is selected automatically. If the application defines several media Entity types,
+select the owner of the bare route with `builder.Services.AddMediaSource<Photo>()`; a custom `IMediaSource` is the
+equivalent non-Entity override.
 
 ## 6. Let operations override a recipe
 

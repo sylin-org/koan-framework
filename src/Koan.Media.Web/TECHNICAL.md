@@ -1,10 +1,12 @@
-# Koan.Media.Web — technical contract
+# Sylin.Koan.Media.Web — technical contract
 
 ## Composition
 
-Reference activates controller discovery. `AddMediaSource<TEntity>()` selects the application Entity type for
-the bare Media route. `MediaController` consumes the Core recipe registry, one `IMediaSource`, Web options, and
-optional overlay/font services.
+Reference activates controller discovery and compiles one source choice. Exactly one concrete `MediaEntity<T>` is the
+automatic default. An already registered `IMediaSource` dominates discovery; `AddMediaSource<T>()` replaces the
+automatic choice regardless of module order. Zero or several candidates without an override fail host startup with a
+corrective error. `MediaController` consumes the Core recipe registry, the selected source, Web options, and optional
+overlay/font services.
 
 ## Request flow
 
@@ -17,9 +19,12 @@ optional overlay/font services.
 7. execute the pipeline on a miss and attempt a best-effort derivative write; and
 8. emit ETag, cache, negotiation, and `X-Koan-Media-*` diagnostic headers.
 
-The default `MediaEntitySource<TEntity>` performs step 4 through `Data<TEntity,string>.Get`, preserving active
+The default `MediaEntitySource<TEntity>` performs step 4 through `Entity<TEntity,string>.Get`, preserving active
 Entity read axes. Its derivative records are framework-owned `MediaDerivation` entities stored separately from
 the source Entity.
+
+Discovery uses Koan's already compiled assembly closure once during composition. Request execution performs no type
+scan or source election. Startup reporting states the candidate/default posture.
 
 ## Options
 

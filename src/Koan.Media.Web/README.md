@@ -1,21 +1,23 @@
-# Koan.Media.Web
+# Sylin.Koan.Media.Web
 
-Recipe-driven HTTP rendering for an application's `MediaEntity<TEntity>` originals. The package supplies the
-controller, conditional/cache headers, bounded request parsing, format negotiation, and optional persisted
-derivatives.
+Serve an application's `MediaEntity<T>` originals and named recipes through controller-owned HTTP routes. The
+reference supplies discovery, conditional/cache headers, bounded request parsing, format negotiation, and optional
+persisted derivatives.
 
-## Minimal application code
+```bash
+dotnet add package Sylin.Koan.Media.Web
+```
+
+## Smallest meaningful result
 
 ```csharp
 using Koan.Core;
 using Koan.Media;
 using Koan.Media.Abstractions.Recipes;
-using Koan.Media.Web.Routing;
 using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan().AsWebApi();
-builder.Services.AddMediaSource<Photo>();
 
 var app = builder.Build();
 await app.RunAsync();
@@ -32,8 +34,18 @@ public static class PhotoRecipes
 }
 ```
 
-The application still needs selected Data and Storage providers for its `Photo` Entity. No application
-rendering controller is required.
+One concrete `MediaEntity<T>` is selected automatically. The application still needs Data and Storage providers for
+its `Photo` Entity; no registration helper or application rendering controller is required.
+
+When the application has several media Entity types, select the one that owns the bare route deliberately:
+
+```csharp
+builder.Services.AddMediaSource<Photo>();
+builder.Services.AddKoan().AsWebApi();
+```
+
+A custom `IMediaSource` is the equivalent override for a non-Entity source. Zero or several candidates without an
+override reject host startup with that correction.
 
 ## Routes
 
@@ -48,8 +60,8 @@ so active tenancy and access axes gate both cold and warm requests.
 
 ## Current limits
 
-- one bare `/media/{id}` route has one `IMediaSource`; applications with multiple media Entity types must own
-  a discriminating router;
+- one bare `/media/{id}` route has one `IMediaSource`; applications with multiple media Entity types must choose one
+  source or own a discriminating custom source;
 - the default source buffers a completed render before persisting its derivative;
 - derivative writes are best-effort and source deletion does not automatically reclaim derivative storage;
 - there is no upload-time prewarm, signed route, or content-addressed route shape; and

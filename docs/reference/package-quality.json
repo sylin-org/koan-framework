@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 108,
-    "repairRequired": 17,
-    "reviewRequired": 31,
-    "structurallyReady": 60,
+    "packages": 107,
+    "repairRequired": 16,
+    "reviewRequired": 29,
+    "structurallyReady": 62,
     "ownedReadmes": 91,
-    "technicalCompanions": 85,
-    "findings": 125
+    "technicalCompanions": 86,
+    "findings": 116
   },
   "findingDefinitions": [
     {
@@ -1496,7 +1496,7 @@
       "projectPath": "src/Koan.Media.Web/Koan.Media.Web.csproj",
       "shape": "library",
       "role": "projection",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Recipe-driven HTTP rendering and Entity-backed media serving for Koan.",
       "targetFrameworks": [
         "net10.0"
@@ -1512,11 +1512,7 @@
       "readme": "src/Koan.Media.Web/README.md",
       "technicalDocumentation": "src/Koan.Media.Web/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Observability",
@@ -2214,33 +2210,6 @@
       ]
     },
     {
-      "packageId": "Sylin.Koan.Web.Backup",
-      "projectPath": "src/Koan.Web.Backup/Koan.Web.Backup.csproj",
-      "shape": "library",
-      "role": "projection",
-      "status": "review-required",
-      "description": "ASP.NET Core Web API controllers for Koan Data Backup/Restore operations with polling-based progress tracking and comprehensive management endpoints.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Backup",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Web"
-      ],
-      "readme": "src/Koan.Web.Backup/README.md",
-      "technicalDocumentation": null,
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "docs.technical.missing"
-      ]
-    },
-    {
       "packageId": "Sylin.Koan.Web.Extensions",
       "projectPath": "src/Koan.Web.Extensions/Koan.Web.Extensions.csproj",
       "shape": "library",
@@ -2285,8 +2254,8 @@
       "projectPath": "src/Koan.Web.OpenGraph/Koan.Web.OpenGraph.csproj",
       "shape": "library",
       "role": "projection",
-      "status": "repair-required",
-      "description": "Declarative OpenGraph and Twitter social cards for Koan SPA shells: a type-keyed card registry, a crawler-path head-injection middleware, and a cacheable card snapshot entity.",
+      "status": "structurally-ready",
+      "description": "Host-owned Entity social-card projection and automatic OpenGraph/Twitter metadata injection for Koan SPA shells.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -2296,13 +2265,10 @@
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Web"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Web.OpenGraph/README.md",
+      "technicalDocumentation": "src/Koan.Web.OpenGraph/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Web.Sse",

@@ -3,11 +3,11 @@ type: REFERENCE
 domain: media
 title: "Media Pillar Reference"
 audience: [developers, architects, support-engineers, ai-agents]
-last_updated: 2026-07-16
+last_updated: 2026-07-18
 framework_version: v0.18.0
 status: current
 validation:
-  date_last_tested: 2026-07-16
+  date_last_tested: 2026-07-18
   status: verified
   scope: recipe discovery, configuration, startup facts, pipeline, Entity source, and HTTP rendering
 ---
@@ -30,12 +30,10 @@ dotnet add package Sylin.Koan.Media.Web
 using Koan.Core;
 using Koan.Media;
 using Koan.Media.Abstractions.Recipes;
-using Koan.Media.Web.Routing;
 using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan().AsWebApi();
-builder.Services.AddMediaSource<Photo>();
 
 var app = builder.Build();
 await app.RunAsync();
@@ -52,8 +50,8 @@ public static class PhotoRecipes
 }
 ```
 
-The resulting useful surface is `GET /media/{photoId}/card`. No application rendering controller or recipe
-registration loop is required.
+The resulting useful surface is `GET /media/{photoId}/card`. The only concrete `MediaEntity<T>` becomes the default
+source; no application registration helper, rendering controller, or recipe loop is required.
 
 ## Package responsibilities
 
@@ -181,9 +179,11 @@ Routes are currently fixed under `/media`.
 
 ## Source and derivative behavior
 
-`AddMediaSource<Photo>()` selects one Entity type for the bare route. `MediaEntitySource<TEntity>` resolves the
-source through `Data<TEntity,string>.Get` before derivative lookup; warm results cannot bypass active tenant or
-access filters.
+Exactly one concrete `MediaEntity<T>` is selected automatically for the bare route. With several media Entity types,
+`AddMediaSource<Photo>()` expresses the required choice; a custom `IMediaSource` owns non-Entity routing. Zero or
+several candidates without an override reject host startup with that correction. `MediaEntitySource<TEntity>` resolves
+through `Entity<TEntity,string>.Get` before derivative lookup; warm results cannot bypass active tenant or access
+filters.
 
 The default source persists completed derivatives as separate framework-owned `MediaDerivation` records keyed
 by source id and recipe fingerprint. Persistence is best-effort. A source implementation may decline derivative
@@ -195,7 +195,8 @@ storage by relying on the default `IMediaSource` methods; requests then render e
 
 - recipe and producible-shortcut counts;
 - each recipe's code/config source, version, fingerprint, and step count; and
-- accepted mutators and output-format posture.
+- accepted mutators and output-format posture; and
+- the discovered/default media-source posture.
 
 The same facts are available to startup reporting, well-known/operator projections, and agent-facing inspection.
 The HTTP recipe endpoints read the same registry.
@@ -216,8 +217,8 @@ context-free sweep: it cannot safely infer source absence across every tenant/ac
 ## Evidence
 
 - Media Core suite: recipe grammar, pipeline, formats, negotiation, limits, derivation behavior, and errors.
-- Media Web hosted suite: Entity access gating, persisted derivative round-trip, code/config recipe startup facts,
-  and invalid-configuration boot failure.
+- Media Web hosted suite: 7/7 for automatic/explicit/ambiguous source selection, Entity access gating, persisted
+  derivative round-trip, code/config recipe startup facts, and invalid-configuration boot failure.
 - Maintained photo sample: one original Entity, named on-demand recipes, HTTP serving, direct in-process rendering,
   and explicit targeted deletion cleanup.
 

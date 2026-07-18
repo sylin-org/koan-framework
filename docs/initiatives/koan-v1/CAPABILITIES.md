@@ -279,16 +279,16 @@ not itself promote a product claim: compatibility boundaries remain pre-V1 work.
 ### Media processing and serving
 
 - **Outcome and shortest path:** in a Koan web app with Data and Storage providers, reference
-  `Sylin.Koan.Media.Web`, derive one `MediaEntity<TEntity>`, declare a `[MediaRecipe]`, and call
-  `AddMediaSource<TEntity>()`; Koan serves `/media/{id}/{recipe}` without an application rendering controller.
-- **Entry point and owner:** [`MediaEntity<TEntity>`](../../../src/Koan.Media.Abstractions/Model/MediaEntity.cs),
+  `Sylin.Koan.Media.Web`, derive one `MediaEntity<TEntity>`, and declare a `[MediaRecipe]`; Koan automatically selects
+  the only media Entity and serves `/media/{id}/{recipe}` without registration or an application rendering controller.
+- **Entry point and owner:** [`MediaEntity<TEntity>`](../../../src/Koan.Media.Core/Model/MediaEntity.cs),
   [`MediaRecipe`](../../../src/Koan.Media.Abstractions/Recipes/MediaRecipe.cs), the
   [Core registry/pipeline](../../../src/Koan.Media.Core/README.md), and the
   [Web source/controller](../../../src/Koan.Media.Web/README.md).
 - **Executable evidence:** Media Core passes 562/562 across recipe grammar, pipeline, formats,
   negotiation, limits, derivative persistence, and failure paths. The real hosted Media Web suite passes
-  4/4 for Entity access gating, persisted derivative round-trip, code/config recipe startup facts, and
-  invalid-configuration boot failure. The maintained photo sample exercises on-demand HTTP rendering,
+  7/7 for source selection, Entity access gating, persisted derivative round-trip, code/config recipe startup facts,
+  and invalid-configuration boot failure. The maintained photo sample exercises on-demand HTTP rendering,
   direct in-process rendering, and targeted source-deletion cleanup.
 - **Inspection and failure:** `KoanModule.Start` materializes recipes before traffic; invalid declarations
   stop host startup. Shared runtime facts and HTTP recipe endpoints read the same registry and report recipe

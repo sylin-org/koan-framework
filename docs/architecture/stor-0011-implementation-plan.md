@@ -314,7 +314,7 @@ base (preferred), or wrap its `svc.Read(...)` in `using StorageScope.For(typeof(
 `src/Koan.Media.Core/Extensions/MediaEntityExtensions.cs` for `Url`/presign/`Store` paths that call `IStorageService`
 directly and wrap them in `StorageScope.For(typeof(TEntity))` too. Report every site you touched.
 
-**2c. Infra exemptions.** Grep `grep -rn "IStorageService" src/Koan.Data.Backup src/Koan.Web.Backup --include=*.cs`.
+**2c. Infra exemptions.** Grep `grep -rn "IStorageService" src/Koan.Data.Backup --include=*.cs`.
 The backup services consume `IStorageService` raw with a host `backups` container — wrap their blob ops in
 `using Koan.Storage.Keys.StorageScope.HostScoped()` (backups are cross-tenant infrastructure — ADR §2). Report each.
 

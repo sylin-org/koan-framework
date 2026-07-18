@@ -88,8 +88,8 @@
       "summary": "Media recipes describe transformation and HTTP-serving behavior over storage-backed assets.",
       "maturity": "verified",
       "packages": ["Sylin.Koan.Media.Core", "Sylin.Koan.Media.Web"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
-      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Media.Core"]
+      "documentation": ["docs/reference/media/index.md", "src/Koan.Media.Core/README.md", "src/Koan.Media.Web/README.md"],
+      "evidence": ["tests/Suites/Media", "tests/Suites/Samples/Koan.Samples.SnapVault.Tests", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
     },
     {
       "id": "ai-vector-semantics",
@@ -162,6 +162,15 @@
       "packages": ["Sylin.Koan.Web.Extensions", "Sylin.Koan.Web.OpenApi", "Sylin.Koan.Web.Sse"],
       "documentation": ["docs/reference/web/index.md", "src/Koan.Web.Extensions/README.md", "src/Koan.Web.OpenApi/README.md", "src/Koan.Web.Sse/README.md"],
       "evidence": ["tests/Suites/Web/Koan.Web.Extensions.Tests", "tests/Suites/Web/Koan.Web.OpenApi.Tests", "tests/Koan.Web.Sse.Tests", "tests/Suites/Mcp/Koan.Mcp.Conformance.Tests"]
+    },
+    {
+      "id": "entity-social-card-projection",
+      "title": "Entity social-card projection",
+      "summary": "A host-owned Entity declaration projects encoded OpenGraph, Twitter, title, and canonical metadata into SPA navigations without manual middleware or SSR.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Web.OpenGraph"],
+      "documentation": ["docs/guides/opengraph-howto.md", "src/Koan.Web.OpenGraph/README.md"],
+      "evidence": ["tests/Koan.Web.OpenGraph.Tests", "tests/Suites/Samples/Koan.Samples.DevPortal.Tests", "samples/applications/DevPortal"]
     },
     {
       "id": "authentication-authorization",

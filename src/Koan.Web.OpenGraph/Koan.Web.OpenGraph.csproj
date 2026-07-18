@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Declarative OpenGraph and Twitter social cards for Koan SPA shells: a type-keyed card registry, a crawler-path head-injection middleware, and a cacheable card snapshot entity.</Description>
+    <Description>Host-owned Entity social-card projection and automatic OpenGraph/Twitter metadata injection for Koan SPA shells.</Description>
     <PackageTags>$(CommonPackageTags);web;aspnetcore;opengraph;twitter-cards;seo;social</PackageTags>
   </PropertyGroup>
   <ItemGroup>

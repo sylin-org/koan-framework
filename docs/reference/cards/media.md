@@ -4,10 +4,10 @@ domain: media
 title: "Media Capability Card"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-07-16
+last_updated: 2026-07-18
 framework_version: v0.18.0
 validation:
-  date_last_tested: 2026-07-16
+  date_last_tested: 2026-07-18
   status: verified
   scope: shortest path, routes, inspection, and unsupported lifecycle behavior
 ---
@@ -31,7 +31,6 @@ public static MediaRecipe Card() => MediaRecipe.New()
     .Build();
 
 builder.Services.AddKoan().AsWebApi();
-builder.Services.AddMediaSource<Photo>();
 ```
 
 Result: `GET /media/{id}/card`.
@@ -48,7 +47,7 @@ Result: `GET /media/{id}/card`.
 ## Important limits
 
 - no prewarm workflow or generic Media Entity facet;
-- one `IMediaSource` per bare route;
+- one automatically selected `IMediaSource` per bare route; multiple media Entity types require an explicit choice;
 - default derivative writes buffer the rendered output and are best-effort;
 - source deletion needs targeted derivative cleanup; and
 - no signed/content-addressed route or configurable route prefix.

@@ -182,6 +182,24 @@
       ]
     },
     {
+      "id": "entity-social-card-projection",
+      "title": "Entity social-card projection",
+      "summary": "A host-owned Entity declaration projects encoded OpenGraph, Twitter, title, and canonical metadata into SPA navigations without manual middleware or SSR.",
+      "maturity": "verified",
+      "packages": [
+        "Sylin.Koan.Web.OpenGraph"
+      ],
+      "documentation": [
+        "docs/guides/opengraph-howto.md",
+        "src/Koan.Web.OpenGraph/README.md"
+      ],
+      "evidence": [
+        "samples/applications/DevPortal",
+        "tests/Koan.Web.OpenGraph.Tests",
+        "tests/Suites/Samples/Koan.Samples.DevPortal.Tests"
+      ]
+    },
+    {
       "id": "external-vector-providers",
       "title": "Qdrant, Milvus, and Weaviate vector providers",
       "summary": "Qdrant, Milvus, and Weaviate preserve Koan\u0027s Entity vector intent while owning their native schema, filter, consistency, discovery, and wire guarantees; query cardinality, selected-provider naming, and participation readiness remain framework-owned.",
@@ -311,11 +329,14 @@
         "Sylin.Koan.Media.Web"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md"
+        "docs/reference/media/index.md",
+        "src/Koan.Media.Core/README.md",
+        "src/Koan.Media.Web/README.md"
       ],
       "evidence": [
-        "docs/initiatives/koan-v1/R02-EVIDENCE.md",
-        "src/Koan.Media.Core"
+        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "tests/Suites/Media",
+        "tests/Suites/Samples/Koan.Samples.SnapVault.Tests"
       ]
     },
     {
@@ -2214,25 +2235,6 @@
       "claims": []
     },
     {
-      "packageId": "Sylin.Koan.Web.Backup",
-      "shape": "library",
-      "description": "ASP.NET Core Web API controllers for Koan Data Backup/Restore operations with polling-based progress tracking and comprehensive management endpoints.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Backup",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Web"
-      ],
-      "readme": "src/Koan.Web.Backup/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": null,
-      "claims": []
-    },
-    {
       "packageId": "Sylin.Koan.Web.Extensions",
       "shape": "library",
       "description": "Entity-first REST exposure plus optional moderation, audit, soft-delete, and capability-policy controllers for Koan web applications.",
@@ -2273,7 +2275,7 @@
     {
       "packageId": "Sylin.Koan.Web.OpenGraph",
       "shape": "library",
-      "description": "Declarative OpenGraph and Twitter social cards for Koan SPA shells: a type-keyed card registry, a crawler-path head-injection middleware, and a cacheable card snapshot entity.",
+      "description": "Host-owned Entity social-card projection and automatic OpenGraph/Twitter metadata injection for Koan SPA shells.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -2283,10 +2285,12 @@
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Web"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
-      "claims": []
+      "readme": "src/Koan.Web.OpenGraph/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Web.OpenGraph/TECHNICAL.md",
+      "claims": [
+        "entity-social-card-projection"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Web.Sse",
