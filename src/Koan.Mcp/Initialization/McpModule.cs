@@ -4,7 +4,6 @@ using System.Linq;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Provenance;
-using Koan.Mcp.Extensions;
 using Koan.Mcp.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +17,7 @@ public sealed class McpModule : KoanModule
 {
     public override void Register(IServiceCollection services)
     {
-        services.AddKoanMcp();
+        services.AddMcpServices();
         // WEB-0069: map MCP endpoints via the typed endpoint-contributor seam (replaces KoanWebStartupFilter's
         // reflection into this assembly). Self-gates on EnableHttpSseTransport.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Web.Hosting.IKoanEndpointContributor, McpEndpointContributor>());
@@ -144,7 +143,6 @@ public sealed class McpModule : KoanModule
                 usedDefault: maxRecursion.UsedDefault);
         }
 
-        module.AddNote("CodeMode: diagnostics_unavailable reason=NoServiceProvider");
     }
 
     private static ConfigurationArrayValue ReadStringArray(IConfiguration configuration, string key)

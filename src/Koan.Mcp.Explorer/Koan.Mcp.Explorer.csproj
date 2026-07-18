@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>MCP Explorer Console (WEB-0072): a Reference=Intent, Swagger-like human surface for a Koan MCP app — describe the tools, try them in-process as yourself, and read the per-caller capability map. Honest about authorization (Verb / Door / Wall).</Description>
+    <Description>Human inspection console for Koan MCP: caller-visible tools, governed try-it, and fail-closed access-map diagnostics.</Description>
     <PackageTags>$(CommonPackageTags);mcp;explorer;console;agent;devex</PackageTags>
   </PropertyGroup>
   <ItemGroup>

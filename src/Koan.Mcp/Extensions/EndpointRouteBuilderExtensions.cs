@@ -11,11 +11,11 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace Koan.Mcp.Extensions;
+namespace Koan.Mcp.Initialization;
 
-public static class EndpointRouteBuilderExtensions
+internal static class McpEndpointMapping
 {
-    public static IEndpointRouteBuilder MapKoanMcpEndpoints(this IEndpointRouteBuilder endpoints)
+    internal static IEndpointRouteBuilder MapMcpEndpoints(this IEndpointRouteBuilder endpoints)
     {
         if (endpoints is null) throw new ArgumentNullException(nameof(endpoints));
 

@@ -1,13 +1,11 @@
 using Koan.Core;
 using Koan.Mcp;
-using Koan.Mcp.Extensions;
 using Koan.Mcp.Options;
 using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddKoan().AsProxiedApi();
-builder.Services.AddKoanMcp(builder.Configuration);
 builder.Services.AddKoanWeb();
 
 // Force code mode full exposure for tests
@@ -19,7 +17,6 @@ builder.Services.Configure<McpServerOptions>(o =>
 
 var app = builder.Build();
 
-app.MapKoanMcpEndpoints();
 app.MapControllers();
 
 await app.RunAsync();

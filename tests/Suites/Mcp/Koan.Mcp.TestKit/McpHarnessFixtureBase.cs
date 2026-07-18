@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Mcp;
-using Koan.Mcp.Extensions;
 using Koan.Mcp.Hosting;
 using Koan.Mcp.Options;
 using Koan.Web.Endpoints;
@@ -71,7 +70,6 @@ public abstract class McpHarnessFixtureBase : IAsyncLifetime
                 {
                     AppHost.Current = null;
                     services.AddKoan(ConfigureKoan).AsProxiedApi();
-                    services.AddKoanMcp();
                     services.AddKoanWeb();
 
                     // Drop the StdioTransport hosted service: it reads from stdin (dead in the test host)
@@ -94,7 +92,6 @@ public abstract class McpHarnessFixtureBase : IAsyncLifetime
                     app.UseRouting();
                     app.UseEndpoints(endpoints =>
                     {
-                        endpoints.MapKoanMcpEndpoints();
                         endpoints.MapControllers();
                     });
                 });

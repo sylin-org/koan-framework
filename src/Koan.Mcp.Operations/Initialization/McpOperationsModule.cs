@@ -28,10 +28,8 @@ public sealed class McpOperationsModule : KoanModule
         ArgumentNullException.ThrowIfNull(module);
 
         var enabled = EnabledToolsets(configuration);
-        // Boot report: "mcp.ops: jobs,cache · grants required · audited" (or "(none enabled)").
-        var line = enabled.Count == 0
-            ? "mcp.ops: (none enabled)"
-            : $"mcp.ops: {string.Join(",", enabled)} · grants required · audited";
+        var active = enabled.Count == 0 ? "(none)" : string.Join(",", enabled);
+        var line = $"mcp.ops: available jobs,cache · enabled {active} · grants required · destructive confirm";
         module.Describe(Version, line);
     }
 

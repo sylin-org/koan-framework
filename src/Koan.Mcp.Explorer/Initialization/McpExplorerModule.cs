@@ -27,6 +27,25 @@ public sealed class McpExplorerModule : KoanModule
     public override void Report(ProvenanceModuleWriter module, IConfiguration configuration, IHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(module);
-        module.Describe(Version);
+
+        var configured = configuration.GetValue<bool?>("Koan:Mcp:Explorer:Enabled");
+        var enabled = configured ?? (!environment.IsProduction() && !KoanEnv.InContainer);
+        if (!enabled)
+        {
+            module.Describe(Version, "mcp.explorer: inactive");
+            return;
+        }
+
+        var route = configuration["Koan:Mcp:HttpSseRoute"];
+        route = string.IsNullOrWhiteSpace(route) ? "/mcp" : route.TrimEnd('/');
+        var role = configuration["Koan:Mcp:Explorer:AdminRole"];
+        var scope = configuration["Koan:Mcp:Explorer:AdminScope"];
+        var accessMap = environment.IsDevelopment()
+            ? "development"
+            : !string.IsNullOrWhiteSpace(role) || !string.IsNullOrWhiteSpace(scope)
+                ? "admin-gated"
+                : "unavailable";
+
+        module.Describe(Version, $"mcp.explorer: {route} · access-map {accessMap}");
     }
 }

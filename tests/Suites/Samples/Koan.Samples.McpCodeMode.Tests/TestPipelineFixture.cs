@@ -1,6 +1,5 @@
 using Koan.Mcp.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
 using Koan.Mcp.Options;
 using Koan.Core;
@@ -27,7 +26,6 @@ public class TestPipelineFixture : TestHostFixtureBase
     protected override void ConfigureTestServices(IServiceCollection services)
     {
         services.AddKoan().AsProxiedApi();
-        services.AddKoanMcp();
         services.AddKoanWeb();
 
         var stdioService = services.FirstOrDefault(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(Koan.Mcp.Hosting.StdioTransport));
@@ -91,7 +89,6 @@ public class TestPipelineFixture : TestHostFixtureBase
                 ctx.Response.ContentType = "application/json";
                 await ctx.Response.WriteAsync(payload, ctx.RequestAborted);
             });
-            endpoints.MapKoanMcpEndpoints();
             endpoints.MapControllers();
         });
     }

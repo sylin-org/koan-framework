@@ -9,26 +9,18 @@ using Koan.Mcp.Hosting;
 using Koan.Mcp.Infrastructure;
 using Koan.Mcp.Options;
 using Koan.Mcp.Schema;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace Koan.Mcp.Extensions;
+namespace Koan.Mcp.Initialization;
 
-public static class ServiceCollectionExtensions
+internal static class McpServiceRegistration
 {
-    public static IServiceCollection AddKoanMcp(this IServiceCollection services, IConfiguration? configuration = null)
+    internal static IServiceCollection AddMcpServices(this IServiceCollection services)
     {
         if (services is null) throw new ArgumentNullException(nameof(services));
 
-        if (configuration is not null)
-        {
-            services.AddOptions<McpServerOptions>().Bind(configuration.GetSection(ConfigurationConstants.Section));
-        }
-        else
-        {
-            services.AddOptions<McpServerOptions>().BindConfiguration(ConfigurationConstants.Section);
-        }
+        services.AddOptions<McpServerOptions>().BindConfiguration(ConfigurationConstants.Section);
 
         services.TryAddSingleton<SchemaBuilder>();
         services.TryAddSingleton<DescriptorMapper>();
@@ -66,9 +58,9 @@ public static class ServiceCollectionExtensions
 
         services.AddCors();
 
-    // Code mode services
-    // JSON facade (Newtonsoft-backed) for code-mode dynamic operations
-    services.AddCodeModeJson();
+        // Code mode services
+        // JSON facade (Newtonsoft-backed) for code-mode dynamic operations
+        services.AddCodeModeJson();
         services.AddOptions<CodeModeOptions>().BindConfiguration(ConfigurationConstants.CodeMode.Section);
         services.AddOptions<SandboxOptions>().BindConfiguration(ConfigurationConstants.CodeMode.Sandbox.Section);
         services.AddOptions<TypeScriptSdkOptions>().BindConfiguration(ConfigurationConstants.CodeMode.TypeScript.Section);
@@ -76,7 +68,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<TypeScriptSdkGenerator>();
         services.TryAddSingleton<TypeScriptSdkProvider>();
         services.TryAddSingleton<ITypeScriptSdkProvider>(sp => sp.GetRequiredService<TypeScriptSdkProvider>());
-    services.TryAddScoped<KoanSdkBindings>();
+        services.TryAddScoped<KoanSdkBindings>();
         // SEC-0004 Phase 3.3: per-scope holder for the code-mode caller principal (set at the execution-scope
         // boundary by JintCodeExecutor, read by the SDK entity proxy).
         services.TryAddScoped<McpCallContext>();

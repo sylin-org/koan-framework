@@ -1,6 +1,5 @@
 using Koan.Mcp.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
 using Koan.Mcp.Options;
 using Microsoft.AspNetCore.Builder;
@@ -27,7 +26,6 @@ public class StrictQuotaTestPipelineFixture : TestHostFixtureBase
     {
         services.AddKoan().AsProxiedApi();
         services.AddKoanWeb();
-        services.AddKoanMcp();
 
         var stdioService = services.FirstOrDefault(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(Koan.Mcp.Hosting.StdioTransport));
         if (stdioService != null)
@@ -54,7 +52,6 @@ public class StrictQuotaTestPipelineFixture : TestHostFixtureBase
         app.UseRouting();
         app.UseEndpoints(e =>
         {
-            e.MapKoanMcpEndpoints();
             e.MapControllers();
         });
     }

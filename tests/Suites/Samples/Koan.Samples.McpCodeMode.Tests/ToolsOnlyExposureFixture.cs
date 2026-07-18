@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
 using Koan.Mcp.Options;
 using Microsoft.AspNetCore.Builder;
@@ -23,7 +22,6 @@ public class ToolsOnlyExposureFixture : TestHostFixtureBase
     {
         services.AddKoan().AsProxiedApi();
         services.AddKoanWeb();
-        services.AddKoanMcp();
 
         var stdioService = services.FirstOrDefault(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(Koan.Mcp.Hosting.StdioTransport));
         if (stdioService != null)
@@ -48,7 +46,6 @@ public class ToolsOnlyExposureFixture : TestHostFixtureBase
         app.UseRouting();
         app.UseEndpoints(e =>
         {
-            e.MapKoanMcpEndpoints();
             e.MapControllers();
         });
     }

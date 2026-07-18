@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core;
 using Koan.Mcp;
-using Koan.Mcp.Extensions;
 using Koan.Mcp.Hosting;
 using Koan.Mcp.Options;
 using Koan.Web.Controllers;
@@ -31,7 +30,6 @@ public class FieldExclusionFixture : TestHostFixtureBase
     protected override void ConfigureTestServices(IServiceCollection services)
     {
         services.AddKoan().AsProxiedApi();
-        services.AddKoanMcp();
         services.AddKoanWeb();
 
         // Drop the StdioTransport hosted service: it reads from stdin, which is dead in the test host,
@@ -57,7 +55,6 @@ public class FieldExclusionFixture : TestHostFixtureBase
         app.UseRouting();
         app.UseEndpoints(endpoints =>
         {
-            endpoints.MapKoanMcpEndpoints();
             endpoints.MapControllers();
         });
     }
