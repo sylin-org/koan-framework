@@ -39,8 +39,9 @@ root stamping pass, or package checklist. A typical file is:
 - patch is the matching Git height and is never typed by hand;
 - `pathFilters` defines the package-affecting history. Most leaf packages own their directory;
   bundles additionally include the paths that define their composition;
-- `versionHeightOffset` establishes a baseline. `-1` makes a newly introduced ownership commit
-  `.0`. Some migrated, already-existing packages deliberately use `0` so the first dedicated
+- `versionHeightOffset` establishes a baseline. `-1` makes a version-resetting ownership commit
+  `.0`. A new child `version.json` that repeats the exact version already inherited from an ancestor does not reset
+  NBGV height; preview it before accepting the package identity. Some migrated, already-existing packages deliberately use `0` so the first dedicated
   ownership commit cannot collide with an already published `.0`; preserve those baselines.
 
 The workflow passes `PublicRelease=true`, so the event's `VersionCommit` produces stable identities.
@@ -90,14 +91,19 @@ the owning package even after a path disappears from current MSBuild evaluation.
 
 ### Add a package
 
-Create its project-local `version.json`, README, metadata, and ProjectReferences, then run:
+Create its project-local `version.json`, README, metadata, and ProjectReferences. The declared major/minor is change
+intent: choose the new package's actual compatibility tier, not an inherited repository default. Then preview the
+public identity and inspect the package surface:
 
 ```powershell
+dotnet nbgv get-version -p src/Koan.New.Package --public-release=true
 dotnet run --project tools/Koan.Packaging -- inventory
 ```
 
 Inventory fails when a packable project lacks a local version owner or two projects claim one package
-ID.
+ID. A surprising inherited patch height is also a stop signal: advance the deliberate compatibility tier so NBGV
+resets naturally. If a migration must retain the inherited major/minor, use a scoped `versionHeightOffset` together
+with `versionHeightOffsetAppliesTo`; never type a patch or add an MSBuild `Version` override.
 
 ## Failure → recovery
 

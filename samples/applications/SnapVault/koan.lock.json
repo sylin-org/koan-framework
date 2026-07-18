@@ -96,7 +96,7 @@
     },
     {
       "id": "Koan.Storage.Abstractions",
-      "version": "0.17"
+      "version": "0.18"
     },
     {
       "id": "Koan.Storage.Connector.Local",

@@ -152,6 +152,9 @@ activation, and agent-readable dependency intent consequently agree.
   graduation.
 - package artifacts: Storage Abstractions, Storage, Media Abstractions, and Media Core pack with owned README and
   canonical icon; nuspec inspection confirms the two contracts packages do not depend on functional assemblies.
+- package identity: the new Storage Abstractions owner deliberately starts at compatibility tier `0.18`; NBGV
+  preview and public pack both produce `0.18.0`. The package-creation guide now requires this preview so a repeated
+  inherited minor cannot silently preserve unrelated repository height.
 - generated truth: 108 packages, 33 repair-required, 50 review-required, 25 structurally ready, and 208 findings.
   All four retained Storage/Media boundaries in this slice have zero structural findings.
 
