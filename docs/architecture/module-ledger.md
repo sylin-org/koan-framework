@@ -106,9 +106,14 @@
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Classification
-- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core
+- Depends on: Koan.Classification.Contracts, Koan.Core, Koan.Data.Abstractions, Koan.Data.Core
 - Depended by: –
-- Documentation: README ❌ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
+
+### Koan.Classification.Contracts
+- Depends on: –
+- Depended by: Koan.Classification
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Communication
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core

@@ -82,7 +82,8 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Canon` | `capability` | `assess` |
 | `Sylin.Koan.Canon.Contracts` | `contracts` | `assess` |
 | `Sylin.Koan.Canon.Web` | `projection` | `assess` |
-| `Sylin.Koan.Classification` | `capability` | `assess` |
+| `Sylin.Koan.Classification` | `capability` | `keep` |
+| `Sylin.Koan.Classification.Contracts` | `contracts` | `keep` (introduced by R11-05 contract isolation) |
 | `Sylin.Koan.Communication` | `capability` | `keep` |
 | `Sylin.Koan.Communication.Connector.RabbitMq` | `provider` | `assess` |
 | `Sylin.Koan.Core` | `foundation` | `keep` |

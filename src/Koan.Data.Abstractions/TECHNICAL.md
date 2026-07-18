@@ -33,6 +33,19 @@ validation:
 - `RepositoryQueryResult<TEntity>` and `CountResult` — values plus execution/estimate facts.
 - `DataCaps` — query, write, isolation, and retention capability tokens.
 - `PatchPayload<TKey>` and `PatchOp` — the provider-neutral patch operation accepted by Data.Core.
+- `IFieldTransform`, `IFieldTransformContributor`, and `IFieldTransformInspector` — neutral contracts for
+  host-compiled round-trip storage transforms and cross-pillar inspection.
+
+## Stored-field transform boundary
+
+- A functional module contributes an `IFieldTransformContributor` through standard DI. Data.Core owns compilation,
+  ordering, per-type memoization, clone-before-write, and reverse-on-read placement.
+- A contributor returns `null` for Entity types it does not affect. Stable contributor ids and order are diagnostic
+  and composition inputs, not application configuration.
+- `IFieldTransformInspector` lets another pillar make a safe structural decision without referencing the functional
+  module. Cache uses it to exclude transformed Entity types; it does not learn Classification internals.
+- These contracts do not authorize adapters to apply, omit, or reorder transforms. Supported application paths enter
+  through Data.Core; direct repository use is outside that facade guarantee.
 
 ## Projection isolation
 

@@ -182,6 +182,15 @@
       "evidence": ["tests/Suites/Tenancy/Koan.Tenancy.Tests", "tests/Suites/Tenancy/Koan.Tenancy.Web.Tests", "tests/Suites/Integration/Identity/Koan.Identity.Tests"]
     },
     {
+      "id": "entity-field-at-rest-classification",
+      "title": "Entity field-at-rest classification",
+      "summary": "Writable classified string Entity properties are authenticated-encrypted through Data-owned transforms; active segmentation scopes key custody automatically, Development is zero-config, and non-Development hosts require an application key provider.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Classification.Contracts", "Sylin.Koan.Classification"],
+      "documentation": ["src/Koan.Classification/README.md", "src/Koan.Classification/TECHNICAL.md", "src/Koan.Classification.Contracts/README.md"],
+      "evidence": ["tests/Suites/Classification/Koan.Classification.Tests", "tests/Suites/Data/Core/Koan.Tests.Data.Core/Specs/Pipeline"]
+    },
+    {
       "id": "authentication-authorization",
       "title": "Authentication, authorization, and client token issuance",
       "summary": "Durable Identity, web sign-in, authenticated identity management, and active-membership tenant scoping compose through referenced modules; the embedded OAuth server issues audience-bound public-client tokens through its verified protocol boundary, while external provider behavior remains connector-specific.",

@@ -194,6 +194,25 @@
       ]
     },
     {
+      "id": "entity-field-at-rest-classification",
+      "title": "Entity field-at-rest classification",
+      "summary": "Writable classified string Entity properties are authenticated-encrypted through Data-owned transforms; active segmentation scopes key custody automatically, Development is zero-config, and non-Development hosts require an application key provider.",
+      "maturity": "verified",
+      "packages": [
+        "Sylin.Koan.Classification",
+        "Sylin.Koan.Classification.Contracts"
+      ],
+      "documentation": [
+        "src/Koan.Classification.Contracts/README.md",
+        "src/Koan.Classification/README.md",
+        "src/Koan.Classification/TECHNICAL.md"
+      ],
+      "evidence": [
+        "tests/Suites/Classification/Koan.Classification.Tests",
+        "tests/Suites/Data/Core/Koan.Tests.Data.Core/Specs/Pipeline"
+      ]
+    },
+    {
       "id": "entity-social-card-projection",
       "title": "Entity social-card projection",
       "summary": "A host-owned Entity declaration projects encoded OpenGraph, Twitter, title, and canonical metadata into SPA navigations without manual middleware or SSR.",
@@ -913,19 +932,37 @@
     {
       "packageId": "Sylin.Koan.Classification",
       "shape": "library",
-      "description": "Data-classification handling for Koan (ARCH-0098): the field-transform contributor (encrypt / tokenize / mask) \u002B the per-tenant crypto seam (IKeyProvider, AES-GCM IFieldCipher, IBlindIndex) behind the [Pii]/[Phi]/[Pci]/[Secret] facts declared in Koan.Data.Abstractions. Registered as a contributor to the Koan.Data.Core storage pipeline (DATA-0105) under Reference = Intent. The data core stays classification-handling-free.",
+      "description": "Local-first AES-GCM field-at-rest protection for writable string Entity properties declared with Koan classification attributes.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.Classification.Contracts",
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
-      "claims": []
+      "readme": "src/Koan.Classification/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Classification/TECHNICAL.md",
+      "claims": [
+        "entity-field-at-rest-classification"
+      ]
+    },
+    {
+      "packageId": "Sylin.Koan.Classification.Contracts",
+      "shape": "library",
+      "description": "Inert key-custody contracts for Koan field-at-rest classification.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [],
+      "readme": "src/Koan.Classification.Contracts/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Classification.Contracts/TECHNICAL.md",
+      "claims": [
+        "entity-field-at-rest-classification"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Communication",

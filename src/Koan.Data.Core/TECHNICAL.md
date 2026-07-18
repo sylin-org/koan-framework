@@ -217,6 +217,17 @@ validation:
 - This contract covers direct edges. Recursive graph planning, depth budgets, cross-key-type edges,
   index verification, and fleet-wide performance certification are not included.
 
+## Stored-field transform compilation
+
+- `StorageFieldTransformPlan` is one host-owned singleton. It snapshots DI contributors in stable order, rejects
+  duplicate ids, and memoizes one immutable plan per Entity type.
+- The write chokepoint shallow-clones the Entity once, then applies applicable transforms in order before repository
+  I/O. Materialization applies transforms in reverse order before any supported Entity result leaves the facade.
+- Data Core knows only the contracts in Data Abstractions. Classification is one consumer; future round-trip concerns
+  must use the same seam rather than add process-static registries or adapter-specific hooks.
+- `IFieldTransformInspector` exposes applicability and contributor ids for cache safety and Data-axis explanation. It
+  does not expose transformed values or module-specific state.
+
 ## Observability and security
 
 - Integrate with platform logging/tracing; propagate operation context

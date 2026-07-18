@@ -2998,6 +2998,155 @@ The resulting developer grammar is smaller and more honest: reference Tenancy an
 Entity isolation; add Tenancy Web only when registry and seat administration is desired. Operators and reviewers can
 trace scope, inbound authorization, and supported mutations through one chokepoint each.
 
+### Classification family discovery
+
+**Task:** Graduate `Sylin.Koan.Classification` around one complete field-at-rest guarantee, rebuilding its contribution,
+key-scope, and failure boundaries while deleting searchable/masking/erasure-shaped surfaces the product does not finish.
+
+**Application intent:** “This Entity property contains sensitive data; protect its stored value without adding crypto
+code to my domain or changing how I save and read the Entity.”
+
+**Public expression:** Reference `Sylin.Koan.Classification` beside a Data provider, keep the existing `AddKoan()`, and
+decorate writable string properties with `[Pii]`, `[Phi]`, `[Pci]`, `[Secret]`, or `[Classified("category")]`:
+
+```csharp
+public sealed class Patient : Entity<Patient>
+{
+    [Pii] public string Email { get; set; } = "";
+}
+```
+
+Development needs no configuration and uses an ephemeral local key provider. Outside Development, the default
+ephemeral provider refuses startup; an application or future provider package must supply the isolated
+`IClassificationKeyProvider` contract before `AddKoan()` completes composition. When Tenancy is active, the same
+compiled segmentation scope automatically partitions active encryption keys; the developer does not implement a
+tenant accessor.
+
+**Guarantee/correction:** Every supported Entity write path persists an AES-256-GCM envelope on a clone while the
+caller's instance remains plaintext; every supported Entity materialization reverses the envelope before returning it;
+classified Entities are excluded from distributed Entity cache; active hard segmentation contributes to key scope.
+Malformed envelopes, tamper, missing keys, unsupported property types, missing tenant scope, and ephemeral keys outside
+Development fail loudly. The guarantee is storage-at-rest protection for writable string properties only. It does not
+promise searchable ciphertext, tokenization, caller-specific masking, log/message/vector redaction, existing-row
+backfill, key destruction/erasure certificates, raw provider bypass coverage, or production key custody.
+
+**Complete intent surface:** The ordinary local path has no action beyond package reference, existing `AddKoan()`, and
+the attribute. A non-Development deployment additionally supplies one `IClassificationKeyProvider` through standard
+.NET DI or a future provider reference. Existing plaintext rows are tolerated on read but remain plaintext until the
+application performs an explicit business migration/rewrite; no hidden scan or backfill occurs.
+
+**Public concepts:** Classification attributes state business facts; `IClassificationKeyProvider` is the one explicit
+production-custody extension seam; `ClassificationDataKey` and `ClassificationKeyUnavailableException` are its minimal
+contract vocabulary; `ClassificationIntegrityException` is the corrective application-visible failure for invalid or
+tampered stored envelopes. AES mechanics, envelope format, segmentation-key encoding, field-transform construction,
+and provider-plan compilation remain internal.
+
+**Docs read:** `docs/engineering/index.md` requires Entity statics, owned package docs, standard options/constants, and
+focused validation; `docs/architecture/principles.md` requires business-to-code intent, host-owned compiled plans,
+semantic honesty, local-first defaults, and isolated cross-module contracts; the root README establishes references +
+`AddKoan()` + Entity decorations as the public grammar; ARCH-0098 preserves the accepted field-transform/clone/read-
+reverse mechanism but also records unfinished searchable, masking, KMS, shred, and leak-guard phases that cannot be
+presented as current product truth; R11 generated truth marks Classification repair-required and unassessed.
+
+**Code read:** `ClassificationModule` currently registers ephemeral crypto then mutates two process-static registries
+from `Start`; `ClassificationFieldTransform` resolves host services per operation and depends on a bespoke tenant
+accessor; `EphemeralKeyProvider` proves AES key rotation but permits restart loss and exposes an incomplete shred verb;
+`StorageFieldTransformRegistry`/`StorageFieldTransformPlan` duplicate contribution ownership outside DI and cache plans
+process-wide; `RepositoryFacade` already provides the correct unavoidable clone/write and reverse/read chokepoints;
+the focused Classification suite proves SQLite at-rest ciphertext, read/write coverage, caller plaintext, and cache
+exclusion but does not prove production refusal, host isolation, automatic Tenancy key scoping, malformed-envelope
+failure, or a package-only consumer.
+
+**Scoped inventory:** AES sizes, envelope magic, and rotation threshold already exist as implementation constants;
+there is no Classification options family and none is needed for the supported promise. Classification attributes and
+property bags already exist in Data Abstractions, but their `Searchable` and masked-read language advertises absent
+behavior. `IFieldTransform`, its contributor seam, and cache-inspection vocabulary are cross-module contracts currently
+owned by functional Data Core. `IKeyProvider` is an intended external/provider seam currently owned by the functional
+Classification assembly. Neither placement satisfies the contract-isolation mandate.
+
+**Reusing:** The existing attributes/category facts, expression-compiled property bag, AES-GCM primitive, envelope
+shape, count-aware ephemeral rotation, RepositoryFacade's exhaustive clone/reverse chokepoint, Core's compiled
+`SegmentationPlan`, standard DI enumerable contributors, Data's host singleton/type memo pattern, cache exclusion,
+module startup reporting, and the focused SQLite raw-at-rest fixture.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| Minimal key-custody contracts | `src/Koan.Classification.Contracts/` | Let applications and future KMS/provider modules implement custody without activating Classification; no inert metadata crutch. |
+| Field-transform contributor/inspection contracts | `src/Koan.Data.Abstractions/Pipeline/` | They are consumed by Classification, Data Core, and Cache and therefore belong in the existing inert Data contract assembly. |
+| Classification transform contributor | `src/Koan.Classification/Pipeline/ClassificationFieldTransformContributor.cs` | Give one DI-owned capability object responsibility for applicability, crypto dependencies, and compiled segmentation scope. |
+| Stable key-scope encoder | `src/Koan.Classification/Infrastructure/ClassificationKeyScope.cs` | Convert Core segmentation bindings to one deterministic opaque provider scope without tenant-specific coupling or delimiter collisions. |
+| Package companions | `src/Koan.Classification*/README.md`, `TECHNICAL.md` | Publish the local path, production responsibility, startup truth, exact guarantee, and explicit exclusions for both runtime and contracts packages. |
+
+**Coalescence:** Closest pattern: Data's host-owned `DataSegmentationPlan` plus DI-owned read contributors. Rebuild the
+field-transform path at the same specificity: inert contracts in Data Abstractions, one host-owned/type-memoized plan
+in Data Core, and one thin Classification contributor. Delete `FieldTransformContributor`,
+`StorageFieldTransformRegistry`, static `ClassifiedFieldRegistry` activation, per-operation `AppHost` service lookup,
+and `IClassificationTenantAccessor`. Do not broaden Core into classification handling; it compiles generic round-trip
+transforms only. Do not put key custody in Data Abstractions; it is classification-specific and deserves one inert
+Classification Contracts package. Remove `Searchable`, masked-read, tokenization, and shred APIs until complete owners
+and evidence exist.
+
+**Ergonomics:** Human and coding-model code remains one business decoration; Tenancy scoping appears automatically
+from the same compiled semantic constitution; local use has no key ceremony; production refusal names the single
+explicit custody responsibility. IntelliSense contains only facts and guarantees that work now. Operators see the
+selected key provider, scope mode, cipher, local/durable posture, and unsupported boundaries. Reviewers inspect one
+host plan, one contributor, one transform, and one unavoidable Data facade rather than process-static registries and
+ambient host lookup.
+
+**Constraints satisfied:** Entity statics remain every data path; no HTTP is introduced; stable storage identifiers
+stay centralized; no tunable options are invented; cross-module contracts are isolated; large data behavior remains
+provider-bounded by the existing facade; package companions and current public truth will be updated; ADR history stays
+unchanged; only Classification/Data seam/Cache-focused evidence runs before R11-07.
+
+**Risks:** This intentionally narrows public attributes and crypto APIs before 1.0. Custom production key-provider
+quality cannot be inferred from interface implementation, so Koan can prove only that the unsafe built-in provider is
+rejected outside Development and report the selected concrete type. Legacy plaintext tolerance is migration-friendly
+but not a backfill guarantee. Moving the generic transform plan from process-static state touches Data Core, Cache, and
+adapter conformance test kits; focused affected suites must prove host isolation and preserve every write/read path.
+
+### Classification family closure
+
+**Disposition:** Pass `Sylin.Koan.Classification` as the functional capability and introduce/pass
+`Sylin.Koan.Classification.Contracts` as its inert production-custody boundary. Both have terminal `keep`
+dispositions. The contract package has no functional dependencies or module activation; a future vault/KMS provider can
+consume it without an `Inert` reference annotation or accidental Classification activation.
+
+**Architecture landed:** Data Abstractions now owns the neutral `IFieldTransform`, contributor, and inspector
+contracts. Data Core compiles contributors once per host in deterministic order, rejects duplicate identities, memoizes
+one immutable plan per Entity type, clones once and writes forward, then materializes in reverse order. Classification
+contributes one DI-owned transform and receives Core's already-compiled `SegmentationPlan`; Cache asks only the neutral
+inspector whether an Entity has transforms. Process-static transform/classification registries, per-operation
+`AppHost.Current` lookup, the Classification-specific tenant accessor, and the unused adapter-surface helper are gone.
+
+**Developer result:** Reference Classification, keep `AddKoan()`, and annotate a writable string property. Development
+gets a complete in-memory key provider with no setup. Referencing Tenancy automatically changes key scope through the
+shared segmentation constitution; no tenant configuration or Classification tenant API exists. Outside Development,
+the ephemeral provider refuses startup and names the one responsibility: register `IClassificationKeyProvider` before
+`AddKoan()`. Unsupported `Searchable`, masking, tokenization, and shred-shaped APIs were removed rather than preserved
+as 1.0 ceremony.
+
+**Safety and inspectability:** AES-256-GCM envelopes fail loudly on malformed reserved prefixes, authentication failure,
+missing keys, invalid key sizes, unsupported classified property types, and missing hard segmentation. Existing
+plaintext remains readable but is not silently backfilled. Classified Entity types are excluded from distributed Entity
+cache. Human startup reporting, resolved composition, and the shared operator/agent facts envelope identify cipher,
+concrete key provider, segmentation ownership, cache posture, and exclusions without exposing scopes or values.
+
+**Focused evidence:** Classification passes 55/55, covering all supported Entity write/read paths against raw SQLite,
+caller plaintext, cache exclusion, strict envelope integrity, key rotation/loss/disposal, production refusal/custom
+provider acceptance, deterministic opaque scopes, automatic Tenancy partitioning, and exact startup facts. The shared
+Data pipeline passes 17/17 including host isolation and forward/reverse composition; Data-axis explanation passes 9/9;
+Cache topology passes 7/7. The Data-axis project still emits the already-recorded stale-reference `MSB9008` owned by
+PMC-032; its focused facts pass. No full release certification ran.
+
+**Artifact and public truth:** Both Release packages build and pack warning-clean with DLL/XML, package-owned README,
+canonical icon, symbols, and build-transitive composition metadata. Their package icons are byte-identical to the
+repository canonical icon and current direct/transitive NuGet audits report no known vulnerable package. Generated
+truth contains 103 packages: 6 repair-required, 21 review-required, and 76 structurally ready across 26 claims. Both
+Classification packages have zero objective quality findings; the public documentation truth gate passes 234 current
+files / 40 navigation targets.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

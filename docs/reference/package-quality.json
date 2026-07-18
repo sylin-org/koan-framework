@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 102,
-    "repairRequired": 7,
+    "packages": 103,
+    "repairRequired": 6,
     "reviewRequired": 21,
-    "structurallyReady": 74,
-    "ownedReadmes": 95,
-    "technicalCompanions": 90,
-    "findings": 79
+    "structurallyReady": 76,
+    "ownedReadmes": 97,
+    "technicalCompanions": 92,
+    "findings": 77
   },
   "findingDefinitions": [
     {
@@ -567,23 +567,37 @@
       "projectPath": "src/Koan.Classification/Koan.Classification.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "repair-required",
-      "description": "Data-classification handling for Koan (ARCH-0098): the field-transform contributor (encrypt / tokenize / mask) \u002B the per-tenant crypto seam (IKeyProvider, AES-GCM IFieldCipher, IBlindIndex) behind the [Pii]/[Phi]/[Pci]/[Secret] facts declared in Koan.Data.Abstractions. Registered as a contributor to the Koan.Data.Core storage pipeline (DATA-0105) under Reference = Intent. The data core stays classification-handling-free.",
+      "status": "structurally-ready",
+      "description": "Local-first AES-GCM field-at-rest protection for writable string Entity properties declared with Koan classification attributes.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.Classification.Contracts",
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Classification/README.md",
+      "technicalDocumentation": "src/Koan.Classification/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Classification.Contracts",
+      "projectPath": "src/Koan.Classification.Contracts/Koan.Classification.Contracts.csproj",
+      "shape": "library",
+      "role": "contracts",
+      "status": "structurally-ready",
+      "description": "Inert key-custody contracts for Koan field-at-rest classification.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [],
+      "readme": "src/Koan.Classification.Contracts/README.md",
+      "technicalDocumentation": "src/Koan.Classification.Contracts/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Communication",
