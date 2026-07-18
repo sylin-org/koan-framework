@@ -115,6 +115,10 @@
       "version": "0.17"
     },
     {
+      "id": "Koan.Web.Auth.Abstractions",
+      "version": "0.1"
+    },
+    {
       "id": "Koan.Web.Auth.Connector.Test",
       "version": "0.17"
     },

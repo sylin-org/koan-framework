@@ -11,9 +11,8 @@ using Xunit;
 namespace Koan.Identity.Tests;
 
 /// <summary>
-/// SEC-0007 P4 — atomic verifiable deprovisioning. Deactivation makes "cannot act" true on the REQUEST PATH (the
-/// SessionGuard rejects the cookie; sessions are revoked now), seat removal seals the tenant via the fail-closed axis
-/// (the middleware stops scoping the person in), and each is recorded by a tamper-evident <see cref="DeprovisioningReceipt"/>.
+/// Identity × Tenancy lifecycle closure. Deactivation rejects Koan cookies, removes tenant seats, and records the
+/// completed writes in an integrity-checked receipt; seat removal closes only the selected tenant scope.
 /// </summary>
 [Collection("identity")]
 public sealed class DeprovisioningSpec : IdentityHostScopedSpec
@@ -32,14 +31,24 @@ public sealed class DeprovisioningSpec : IdentityHostScopedSpec
         await new Identity { Id = "dp-user", DisplayName = "Dp", Status = IdentityStatus.Active }.Save();
         await new Session { IdentityId = "dp-user" }.Save();
         await new Session { IdentityId = "dp-user" }.Save();
+        await new Membership { TenantId = "dp-a", IdentityId = "dp-user" }.Save();
+        await new Membership { TenantId = "dp-b", IdentityId = "dp-user" }.Save();
 
         var receipt = await Service.DeactivateAsync("dp-user");
 
         (await Identity.Get("dp-user"))!.Status.Should().Be(IdentityStatus.Deactivated);
         receipt.Kind.Should().Be(DeprovisioningKind.Deactivation);
         receipt.SessionsRevoked.Should().Be(2);
+        receipt.MembershipsRemoved.Should().Be(2);
         receipt.StatusSet.Should().Be("Deactivated");
-        receipt.Surfaces.Should().Contain(new[] { "data", "storage", "cache", "sessions" });
+        receipt.Surfaces.Should().BeEquivalentTo(new[]
+        {
+            DeprovisioningSurfaces.TenantData,
+            DeprovisioningSurfaces.TenantStorage,
+            DeprovisioningSurfaces.TenantCache,
+            DeprovisioningSurfaces.CookieSessions,
+        });
+        (await Membership.Query(m => m.IdentityId == "dp-user")).Should().BeEmpty();
 
         // The request-path proof: a deactivated person's principal is rejected at the next validation tick.
         (await SessionGuard.ShouldRejectAsync(PrincipalFor("dp-user")))
@@ -53,10 +62,10 @@ public sealed class DeprovisioningSpec : IdentityHostScopedSpec
         var receipt = await Service.DeactivateAsync("dp-verify");
 
         var roundTripped = await DeprovisioningReceipt.Get(receipt.Id);
-        roundTripped!.Verify().Should().BeTrue("a stored receipt recomputes to its content hash");
+        roundTripped!.HasValidHash().Should().BeTrue("a stored receipt recomputes to its content hash");
 
         roundTripped.SessionsRevoked = 99; // tamper without re-hashing
-        roundTripped.Verify().Should().BeFalse("a mutated field no longer matches the content hash");
+        roundTripped.HasValidHash().Should().BeFalse("a mutated field no longer matches the content hash");
     }
 
     [Fact]
@@ -84,7 +93,7 @@ public sealed class DeprovisioningSpec : IdentityHostScopedSpec
 
         receipt.Kind.Should().Be(DeprovisioningKind.SeatRemoval);
         receipt.MembershipsRemoved.Should().Be(1);
-        receipt.Verify().Should().BeTrue();
+        receipt.HasValidHash().Should().BeTrue();
         (await Membership.Query(m => m.IdentityId == "dp-seat" && m.TenantId == "dp-tenant")).Should().BeEmpty();
 
         // The request-path proof: the middleware's membership-authorization now fails, so the tenant can't be scoped in.

@@ -44,16 +44,10 @@ public sealed class ProofMarkRequest
     public string? Comment { get; set; }
 }
 
-/// <summary>Invite a client to one event as a proofer or viewer.</summary>
-public sealed class GalleryInviteRequest
+/// <summary>Grant a known durable person access to one event as a proofer or viewer.</summary>
+public sealed class GalleryGrantRequest
 {
     public string EventId { get; set; } = "";
-    public string Email { get; set; } = "";
+    public string IdentityId { get; set; } = "";
     public string? Role { get; set; }
-}
-
-/// <summary>Accept a gallery invitation by its token.</summary>
-public sealed class GalleryAcceptRequest
-{
-    public string Token { get; set; } = "";
 }

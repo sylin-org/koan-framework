@@ -33,9 +33,9 @@ internal sealed class TenantResolutionMiddleware
         var opts = options.Value;
         var subject = ReadSubject(context.User);
 
-        // Short-circuit: when membership is required, an anonymous request can never be scoped in — skip the carrier
-        // resolution (and its control-plane lookups) entirely, so a forged-carrier spray cannot amplify store reads.
-        if (opts.RequireMembership && string.IsNullOrEmpty(subject))
+        // An anonymous request can never be scoped in. Skip carrier resolution (and its control-plane lookups)
+        // entirely so a forged-carrier spray cannot amplify store reads.
+        if (string.IsNullOrEmpty(subject))
         {
             await _next(context).ConfigureAwait(false);
             return;
@@ -62,13 +62,23 @@ internal sealed class TenantResolutionMiddleware
         }
 
         // One query both authorizes the candidate AND yields the roles to project (no second round-trip).
-        var memberships = string.IsNullOrEmpty(subject)
-            ? (IReadOnlyList<Membership>)Array.Empty<Membership>()
-            : await Membership.Query(m => m.IdentityId == subject && m.TenantId == candidate, context.RequestAborted).ConfigureAwait(false);
+        var memberships = await Membership.Query(
+            m => m.IdentityId == subject && m.TenantId == candidate,
+            context.RequestAborted).ConfigureAwait(false);
 
-        if (opts.RequireMembership && memberships.Count == 0)
+        if (memberships.Count == 0)
         {
             await _next(context).ConfigureAwait(false); // resolved but unauthorized — proceed unscoped (fail closed downstream)
+            return;
+        }
+
+        // Membership alone is insufficient: a suspended/deactivated durable person must not regain tenant access
+        // through an already-issued bearer principal or a stale membership. Resolve status only after membership
+        // matches, preserving the cheap forged/nonmember path while making lifecycle enforcement immediate.
+        var person = await global::Koan.Identity.Identity.Get(subject, context.RequestAborted).ConfigureAwait(false);
+        if (person is not { IsActive: true })
+        {
+            await _next(context).ConfigureAwait(false);
             return;
         }
 

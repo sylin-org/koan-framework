@@ -6,7 +6,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Koan.Identity.Tenancy</AssemblyName>
     <RootNamespace>Koan.Identity.Tenancy</RootNamespace>
-    <Description>SEC-0007 Layer 4 — the Identity × Tenancy bridge (Reference = Intent). Lights up membership-scoped access (the Membership effective-access contributor), the tenant-resolution carriers + AfterAuthentication middleware that scopes the request to a tenant, invite-binds-to-identity, and atomic verifiable deprovisioning. Koan.Identity core never references Koan.Tenancy (graceful degradation, D7); referencing this package composes the two.</Description>
+    <Description>Compose durable Identity with Tenancy: active-membership request scoping, tenant-role projection, effective-access facts, and integrity-checked lifecycle receipts by reference plus AddKoan().</Description>
     <PackageTags>$(CommonPackageTags);identity;tenancy;membership;multi-tenant;tenant-resolution</PackageTags>
   </PropertyGroup>
   <ItemGroup>

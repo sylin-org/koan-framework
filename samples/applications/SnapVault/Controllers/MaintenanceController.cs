@@ -140,18 +140,16 @@ public sealed class MaintenanceController : ControllerBase
             // StudioTenantId, NOT the ambient tenant axis, so they need the resolved studio id — cleared when a
             // studio tenant is resolved (the operator carrier / a test's Tenant.Use); skipped for the tenant-less
             // dev-trust operator. Memberships (the operator's own seat) and the tamper-evident
-            // ClientErasureCertificate (IAmbientExempt audit trail) are deliberately left intact.
+            // ClientAccessClosureReceipt (IAmbientExempt operational trail) rows are deliberately left intact.
             var studioTenantId = Tenant.Current?.Id;
             if (!string.IsNullOrEmpty(studioTenantId))
             {
                 var grants = await GalleryGrant.Query(g => g.StudioTenantId == studioTenantId, ct);
                 foreach (var g in grants) { try { await g.Remove(ct); } catch (Exception ex) { _logger.LogWarning(ex, "Wipe: failed to delete grant {GrantId}", g.Id); } }
-                var galleryInvites = await GalleryInvite.Query(gi => gi.StudioTenantId == studioTenantId, ct);
-                foreach (var gi in galleryInvites) { try { await gi.Remove(ct); } catch (Exception ex) { _logger.LogWarning(ex, "Wipe: failed to delete gallery invite {InviteId}", gi.Id); } }
                 var proofSelections = await ProofSelection.Query(p => p.StudioTenantId == studioTenantId, ct);
                 foreach (var s in proofSelections) { try { await s.Remove(ct); } catch (Exception ex) { _logger.LogWarning(ex, "Wipe: failed to delete selection {SelectionId}", s.Id); } }
-                _logger.LogWarning("Wipe: cleared {Grants} grants, {Invites} gallery invites, {Selections} selections for studio {Studio}",
-                    grants.Count, galleryInvites.Count, proofSelections.Count, studioTenantId);
+                _logger.LogWarning("Wipe: cleared {Grants} grants and {Selections} selections for studio {Studio}",
+                    grants.Count, proofSelections.Count, studioTenantId);
             }
 
             await Progress(100, "Repository wiped successfully");

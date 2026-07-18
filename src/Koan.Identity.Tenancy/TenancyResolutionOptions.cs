@@ -27,13 +27,4 @@ public sealed class TenancyResolutionOptions
     /// <summary>The path prefix the <c>path</c> carrier reads the next segment after as a <c>TenantRecord.Code</c> (e.g. <c>/t/acme/…</c> → <c>acme</c>). Default <c>/t/</c>.</summary>
     public string PathPrefix { get; set; } = "/t/";
 
-    /// <summary>
-    /// Safe-by-default: a resolved candidate is only scoped in when the authenticated subject has a
-    /// <c>Membership</c> in it (so a forged header/path can never scope a non-member into a tenant). This is a single
-    /// GLOBAL switch over <b>all four</b> carriers — setting it <c>false</c> also unguards the forgeable
-    /// header/subdomain/path carriers, so an unauthenticated client asserting a real tenant code IS scoped in
-    /// unauthorized. There is no posture gate on this escape hatch (it is honored identically in Production). Leave it
-    /// on in production; the boot reports a warning when it is off. Default <c>true</c>.
-    /// </summary>
-    public bool RequireMembership { get; set; } = true;
 }

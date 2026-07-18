@@ -9,9 +9,9 @@ using Koan.Tenancy;
 namespace SnapVault.Models;
 
 /// <summary>
-/// The fail-closed source of a guest's scoped access to one shareable SET (an <see cref="Event"/>). Minted when a
-/// guest accepts a <see cref="GalleryInvite"/>; consumed by the guest read path to narrow every PhotoAsset read
-/// to the granted events. The grant itself is the filter.
+/// The fail-closed source of a guest's scoped access to one shareable SET (an <see cref="Event"/>). Minted by an
+/// explicit studio grant; consumed by the guest read path to narrow every PhotoAsset read to the granted events.
+/// The grant itself is the filter.
 /// <para>
 /// [HostScoped] (like <c>Invite</c>/<c>Membership</c>) so it is resolvable from the read-path hook without an ambient
 /// studio tenant; <see cref="StudioTenantId"/> carries the scope explicitly. Revocation is immediate — the hook
@@ -21,6 +21,21 @@ namespace SnapVault.Models;
 [HostScoped]
 public sealed class GalleryGrant : Entity<GalleryGrant>
 {
+    public static class Permission
+    {
+        public const string View = "view";
+        public const string Select = "select";
+        public const string Comment = "comment";
+    }
+
+    public static class Template
+    {
+        public const string Viewer = "viewer";
+        public const string Proofer = "proofer";
+    }
+
+    public const string TenantRole = "guest";
+
     /// <summary>The canonical guest person (Identity id) — never an email string.</summary>
     public string IdentityId { get; set; } = "";
 
@@ -31,7 +46,7 @@ public sealed class GalleryGrant : Entity<GalleryGrant>
     public string StudioTenantId { get; set; } = "";
 
     /// <summary>Guest permissions: "view" (always), optionally "select" / "comment" (the proofing affordances).</summary>
-    public List<string> Permissions { get; set; } = new() { "view" };
+    public List<string> Permissions { get; set; } = new() { Permission.View };
 
     /// <summary>Optional expiry; null = no expiry.</summary>
     public DateTimeOffset? ExpiresAt { get; set; }
@@ -50,7 +65,7 @@ public sealed class GalleryGrant : Entity<GalleryGrant>
            && Permissions.Contains(permission, StringComparer.OrdinalIgnoreCase)
            && (ExpiresAt is null || DateTimeOffset.UtcNow < ExpiresAt);
 
-    /// <summary>Deterministic id — one grant per (guest, event) so a re-accept converges instead of duplicating.
+    /// <summary>Deterministic id — one grant per (guest, event) so command retries converge instead of duplicating.
     /// INVARIANT: <paramref name="eventId"/> MUST be a globally-unique, delimiter-free id (a GUID) — it becomes the
     /// <c>"event:&lt;id&gt;"</c> access-scope token, so a slug/email would break both the (guest,event) uniqueness and
     /// access-scope token contract (U+001F carrier join plus the <c>"event:"</c> prefix; a GUID contains neither).</summary>

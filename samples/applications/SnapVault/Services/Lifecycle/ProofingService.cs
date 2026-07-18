@@ -7,7 +7,7 @@ using SnapVault.Models;
 namespace SnapVault.Services;
 
 /// <summary>
-/// The proofing gallery: an invited guest marks photos (favorite / rating / "I select this" / comment), attributed to
+/// The proofing gallery: a granted guest marks photos (favorite / rating / "I select this" / comment), attributed to
 /// the GUEST via <see cref="ProofSelection"/> — deliberately separate from the studio's own
 /// <c>PhotoAsset.IsFavorite</c>/<c>Rating</c> — and the studio reads the client's selections back. Whether the guest
 /// can see the photo at all is enforced upstream by the access axis; this service only records the marks.

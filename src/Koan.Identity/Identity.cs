@@ -45,6 +45,6 @@ public enum IdentityStatus
     Active = 0,
     /// <summary>Temporarily blocked; recoverable.</summary>
     Suspended = 1,
-    /// <summary>Deactivated; the person can no longer act (atomic deprovisioning target).</summary>
+    /// <summary>Deactivated; Koan cookie sessions reject the person and optional bridges may close other scopes.</summary>
     Deactivated = 2,
 }

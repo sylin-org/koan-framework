@@ -26,7 +26,7 @@ public sealed class GuestScopeService
     {
         var grants = await GalleryGrant.Query(g => g.IdentityId == guestId && g.IsActive, ct);
         return grants
-            .Where(g => g.Allows("view"))
+            .Where(g => g.Allows(GalleryGrant.Permission.View))
             .Select(g => "event:" + g.EventId)
             .Distinct(StringComparer.Ordinal)
             .ToList();
@@ -43,7 +43,7 @@ public sealed class GuestScopeService
     public async Task<GuestAccess?> ResolveGuestAsync(string personId, CancellationToken ct = default)
     {
         var grants = (await GalleryGrant.Query(g => g.IdentityId == personId && g.IsActive, ct))
-            .Where(g => g.Allows("view"))
+            .Where(g => g.Allows(GalleryGrant.Permission.View))
             .ToList();
         if (grants.Count == 0) return null;
 

@@ -38,8 +38,8 @@ public sealed class SessionService
         => RevokeManyAsync(identityId, currentSessionId, ct);
 
     /// <summary>
-    /// Revoke <b>every</b> active session for a person (no exception) — the session leg of atomic deprovisioning
-    /// (SEC-0007 P4). Enforcement is the same request-path <see cref="SessionGuard"/> as everywhere-else, so a
+    /// Revoke <b>every</b> active Koan cookie session for a person (no exception). Enforcement is the same
+    /// request-path <see cref="SessionGuard"/> as everywhere-else, so a
     /// deactivated person's existing cookies stop working at the next validation tick. Returns the count revoked.
     /// </summary>
     public Task<int> RevokeAllAsync(string identityId, CancellationToken ct = default)

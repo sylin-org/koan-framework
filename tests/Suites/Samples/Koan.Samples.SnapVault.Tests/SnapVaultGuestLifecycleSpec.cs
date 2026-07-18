@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
@@ -10,7 +9,6 @@ using Koan.Core.Hosting.App;
 using Koan.Data.Access;
 using Koan.Data.Core;
 using Koan.Identity;
-using Koan.Identity.Tenancy.Invitations;
 using Koan.Jobs;
 using Koan.Media.Web.Routing;
 using Koan.Tenancy;
@@ -29,12 +27,12 @@ namespace Koan.Samples.SnapVault.Tests;
 /// <summary>
 /// SEC-0007 P5 / SEC-0008 — the studio↔client lifecycle flagship. A real <c>AddKoan()</c> boot of the SnapVault sample
 /// (ARCH-0079, in-memory, no Docker) under the FAIL-CLOSED access posture proves the whole arc the framework now
-/// backs: a studio invites a client to ONE event's gallery → the client accepts (verified-email ownership, the
-/// shipped invite-binds-to-identity) → the client sees ONLY that event's photos, cross-event get-by-id is a
+/// backs: a studio grants a known durable client access to ONE event's gallery → the client sees ONLY that event's
+/// photos, cross-event get-by-id is a
 /// fail-closed null (the SEC-0008 data-layer access axis, enforced on a raw <c>Entity.Query()</c>, not a controller
 /// hook) → the client proofs (favorite/rate/select, attributed to the guest, never overwriting the studio's marks) →
-/// the studio reads the selections → "delete this client &amp; prove it" atomically removes access and emits a
-/// verifiable erasure certificate, after which the client's reads fail closed.
+/// the studio reads the selections → closing this client's access removes the grant and seat and emits an
+/// integrity-checked operation record, after which the client's reads fail closed.
 /// </summary>
 [Collection("snapvault")]
 public sealed class SnapVaultGuestLifecycleSpec
@@ -59,10 +57,10 @@ public sealed class SnapVaultGuestLifecycleSpec
         }.Save();
     }
 
-    [Fact(DisplayName = "lifecycle: invite → accept → event-scoped proofing gallery → atomic erasure certificate")]
+    [Fact(DisplayName = "lifecycle: explicit client grant → event-scoped proofing gallery → access-closure receipt")]
     public async Task Full_studio_client_lifecycle()
     {
-        var invites = Svc<GalleryInviteService>();
+        var grants = Svc<GalleryGrantService>();
         var scopes = Svc<GuestScopeService>();
         var proofing = Svc<ProofingService>();
         var deprov = Svc<SnapVaultDeprovisioningService>();
@@ -84,12 +82,11 @@ public sealed class SnapVaultGuestLifecycleSpec
             photoB = new PhotoAsset { EventId = eventB.Id, OriginalFileName = "b.jpg" }; await photoB.Save();
         }
 
-        // 1. Invite the client to eventA; the client accepts (verified-email ownership) → a gallery grant.
-        var ticket = await invites.InviteAsync(studio, eventA.Id, guestEmail, invitedBy: "operator");
-        var accept = await invites.AcceptAsync(ticket.Token, guestId);
-        accept.Outcome.Should().Be(InviteAcceptOutcome.Accepted);
-        accept.Grant.Should().NotBeNull();
-        accept.Grant!.EventId.Should().Be(eventA.Id);
+        // 1. The studio explicitly grants the known durable client access to eventA.
+        var granted = await grants.GrantAsync(studio, eventA.Id, guestId);
+        granted.Outcome.Should().Be(GalleryGrantOutcome.Granted);
+        granted.Grant.Should().NotBeNull();
+        granted.Grant!.EventId.Should().Be(eventA.Id);
         (await GalleryGrant.Get(GalleryGrant.KeyFor(guestId, eventA.Id))).Should().NotBeNull();
 
         // 2. In the studio tenant + their CONSTRAINED subject, the guest sees only eventA's photo; eventB is a 404.
@@ -114,11 +111,11 @@ public sealed class SnapVaultGuestLifecycleSpec
         // 4. The studio reads the client's selections.
         (await proofing.SelectionsForEventAsync(eventA.Id, studio)).Select(s => s.PhotoId).Should().Contain(photoA.Id);
 
-        // 5. "Delete this client & prove it": atomic deprovision + a verifiable, chained certificate.
-        var cert = await deprov.RevokeClientAsync(guestId, studio);
-        cert.Verify().Should().BeTrue();
-        cert.GrantsRemoved.Should().Be(1);
-        cert.SeatReceiptHash.Should().NotBeNullOrEmpty();
+        // 5. Close this client's access and retain an integrity-checked, chained operation record.
+        var receipt = await deprov.CloseAccessAsync(guestId, studio);
+        receipt.HasValidHash().Should().BeTrue();
+        receipt.GrantsRemoved.Should().Be(1);
+        receipt.SeatReceiptHash.Should().NotBeNullOrEmpty();
         (await GalleryGrant.Get(GalleryGrant.KeyFor(guestId, eventA.Id))).Should().BeNull();   // grant gone
         (await Membership.Get(Membership.KeyFor(studio, guestId))).Should().BeNull();           // seat gone
 
@@ -130,43 +127,6 @@ public sealed class SnapVaultGuestLifecycleSpec
             (await PhotoAsset.All()).Should().BeEmpty();
     }
 
-    [Fact(DisplayName = "erasure revokes pending invites: an erased client cannot re-accept a leftover invite")]
-    public async Task Erasure_revokes_pending_invites()
-    {
-        var invites = Svc<GalleryInviteService>();
-        var deprov = Svc<SnapVaultDeprovisioningService>();
-
-        var stamp = Stamp();
-        var studio = "studio-" + stamp;
-        var guestId = "guest-" + stamp;
-        var guestEmail = "client-" + stamp + "@example.com";
-        await SeedGuestAsync(guestId, IdentityEmail.Normalize(guestEmail));
-
-        string eventA, eventB;
-        using (Tenant.Use(studio))
-        {
-            var eA = new Event { Name = "A" }; await eA.Save(); eventA = eA.Id;
-            var eB = new Event { Name = "B" }; await eB.Save(); eventB = eB.Id;
-        }
-
-        // The client accepts an invite to eventA; a SECOND invite (eventB) is issued but left PENDING.
-        (await invites.AcceptAsync((await invites.InviteAsync(studio, eventA, guestEmail)).Token, guestId))
-            .Outcome.Should().Be(InviteAcceptOutcome.Accepted);
-        var pending = await invites.InviteAsync(studio, eventB, guestEmail);
-
-        // "Delete this client" must also revoke the still-pending invite — else it's a re-accept back door.
-        var cert = await deprov.RevokeClientAsync(guestId, studio);
-        cert.InvitesRevoked.Should().Be(1);
-        cert.Surfaces.Should().Contain("invite");
-        cert.Verify().Should().BeTrue();
-
-        // The leftover invite is gone: re-accepting mints NO grant (no access after erasure).
-        var reaccept = await invites.AcceptAsync(pending.Token, guestId);
-        reaccept.Outcome.Should().Be(InviteAcceptOutcome.NotFound);
-        reaccept.Grant.Should().BeNull();
-        (await GalleryGrant.Get(GalleryGrant.KeyFor(guestId, eventB))).Should().BeNull();
-    }
-
     [Fact(DisplayName = "media serving is access-scoped: MediaEntitySource resolves a photo only for a subject that can see it")]
     public async Task Media_serving_inherits_the_access_axis()
     {
@@ -176,7 +136,7 @@ public sealed class SnapVaultGuestLifecycleSpec
         // MediaController allowed), and a subject-less request fails closed. All three assertions short-circuit
         // at the Get gate (null) before any storage read, so they hold even while the blob leg is parked.
         var source = new MediaEntitySource<PhotoAsset>();
-        var invites = Svc<GalleryInviteService>();
+        var grants = Svc<GalleryGrantService>();
         var scopes = Svc<GuestScopeService>();
 
         var stamp = Stamp();
@@ -195,9 +155,8 @@ public sealed class SnapVaultGuestLifecycleSpec
             photoB = new PhotoAsset { EventId = eventB.Id, OriginalFileName = "b.jpg" }; await photoB.Save();
         }
 
-        // The guest is invited to eventA only.
-        (await invites.AcceptAsync((await invites.InviteAsync(studio, eventA.Id, guestEmail)).Token, guestId))
-            .Outcome.Should().Be(InviteAcceptOutcome.Accepted);
+        // The guest is granted eventA only.
+        (await grants.GrantAsync(studio, eventA.Id, guestId)).Outcome.Should().Be(GalleryGrantOutcome.Granted);
         var guestScopes = await scopes.ScopesForAsync(guestId);
 
         using (Tenant.Use(studio))
@@ -218,10 +177,10 @@ public sealed class SnapVaultGuestLifecycleSpec
             (await source.OpenAsync("no-such-photo-" + stamp, CancellationToken.None)).Should().BeNull();
     }
 
-    [Fact(DisplayName = "invite is fail-closed: a leaked link redeemed by the wrong person is refused (EmailNotOwned)")]
-    public async Task Invite_requires_verified_email_ownership()
+    [Fact(DisplayName = "gallery grant is fail-closed: an inactive durable person cannot receive access")]
+    public async Task Grant_requires_an_active_durable_person()
     {
-        var invites = Svc<GalleryInviteService>();
+        var grants = Svc<GalleryGrantService>();
         var stamp = Stamp();
         var studio = "studio-" + stamp;
 
@@ -231,56 +190,50 @@ public sealed class SnapVaultGuestLifecycleSpec
             var ev = new Event { Name = "Gala" }; await ev.Save();
             eventId = ev.Id;
         }
-        var ticket = await invites.InviteAsync(studio, eventId, "invited-" + stamp + "@example.com");
+        var inactive = "inactive-" + stamp;
+        await new PersonIdentity { Id = inactive, Status = IdentityStatus.Deactivated }.Save();
 
-        // A DIFFERENT person (owning a different verified email) tries to redeem the leaked link.
-        var attacker = "attacker-" + stamp;
-        var aNorm = IdentityEmail.Normalize("attacker-" + stamp + "@evil.com");
-        await SeedGuestAsync(attacker, aNorm);
-
-        var accept = await invites.AcceptAsync(ticket.Token, attacker);
-        accept.Outcome.Should().Be(InviteAcceptOutcome.EmailNotOwned);
-        accept.Grant.Should().BeNull();
-        (await GalleryGrant.Get(GalleryGrant.KeyFor(attacker, eventId))).Should().BeNull();
+        var result = await grants.GrantAsync(studio, eventId, inactive);
+        result.Outcome.Should().Be(GalleryGrantOutcome.PersonInactive);
+        result.Grant.Should().BeNull();
+        (await GalleryGrant.Get(GalleryGrant.KeyFor(inactive, eventId))).Should().BeNull();
     }
 
-    [Fact(DisplayName = "guest role: a 'viewer' invite grants view-only; the default 'proofer' grants select + comment (5f)")]
+    [Fact(DisplayName = "guest role: a viewer grant is view-only; the default proofer grant adds select + comment")]
     public async Task Guest_role_maps_to_grant_permissions()
     {
-        var invites = Svc<GalleryInviteService>();
+        var grants = Svc<GalleryGrantService>();
         var stamp = Stamp();
         var studio = "studio-" + stamp;
 
         string eventId;
         using (Tenant.Use(studio)) { var ev = new Event { Name = "Gallery" }; await ev.Save(); eventId = ev.Id; }
 
-        // A "viewer" invite → the grant can view but not select.
+        // A viewer grant can view but not select.
         var viewer = "viewer-" + stamp; var viewerEmail = "viewer-" + stamp + "@example.com";
         await SeedGuestAsync(viewer, IdentityEmail.Normalize(viewerEmail));
-        await invites.AcceptAsync((await invites.InviteAsync(studio, eventId, viewerEmail, role: "viewer")).Token, viewer);
+        await grants.GrantAsync(studio, eventId, viewer, role: "viewer");
         var viewerGrant = await GalleryGrant.Get(GalleryGrant.KeyFor(viewer, eventId));
         viewerGrant!.Allows("view").Should().BeTrue();
         viewerGrant.Allows("select").Should().BeFalse();
 
-        // The default (proofer) invite → the grant can select + comment.
+        // The default proofer grant can select + comment.
         var proofer = "proofer-" + stamp; var prooferEmail = "proofer-" + stamp + "@example.com";
         await SeedGuestAsync(proofer, IdentityEmail.Normalize(prooferEmail));
-        await invites.AcceptAsync((await invites.InviteAsync(studio, eventId, prooferEmail)).Token, proofer);
+        await grants.GrantAsync(studio, eventId, proofer);
         var prooferGrant = await GalleryGrant.Get(GalleryGrant.KeyFor(proofer, eventId));
         prooferGrant!.Allows("select").Should().BeTrue();
         prooferGrant.Allows("comment").Should().BeTrue();
     }
 
-    private GalleryController Gallery(ClaimsPrincipal? user = null)
+    private GalleryController Gallery()
     {
         var http = new DefaultHttpContext();
-        if (user is not null) http.User = user;
-        return new GalleryController(Svc<GalleryInviteService>()) { ControllerContext = new ControllerContext { HttpContext = http } };
+        return new GalleryController(Svc<GalleryGrantService>()) { ControllerContext = new ControllerContext { HttpContext = http } };
     }
-    private static ClaimsPrincipal Person(string sub) => new(new ClaimsIdentity(new[] { new Claim("sub", sub) }, "test"));
 
-    [Fact(DisplayName = "gallery HTTP (5f): studio invites → the signed-in guest accepts → grant; unauthenticated and wrong-person are refused")]
-    public async Task Gallery_http_invite_then_accept()
+    [Fact(DisplayName = "gallery HTTP: an operator grants a known durable person access inside the resolved studio")]
+    public async Task Gallery_http_grants_known_person()
     {
         var stamp = Stamp();
         var studio = "studio-" + stamp;
@@ -291,29 +244,12 @@ public sealed class SnapVaultGuestLifecycleSpec
         string eventId;
         using (Tenant.Use(studio)) { var ev = new Event { Name = "Gallery" }; await ev.Save(); eventId = ev.Id; }
 
-        // Studio issues the invite (tenant = ambient studio).
-        string token;
+        // Studio grants the known person (tenant = ambient studio).
         using (Tenant.Use(studio))
         {
-            var res = await Gallery().Invite(new GalleryInviteRequest { EventId = eventId, Email = guestEmail });
-            var ok = res.Should().BeOfType<OkObjectResult>().Subject.Value!;
-            token = (string)ok.GetType().GetProperty("token")!.GetValue(ok)!;
-            token.Should().NotBeNullOrEmpty();
+            var res = await Gallery().Grant(new GalleryGrantRequest { EventId = eventId, IdentityId = guestId });
+            res.Should().BeOfType<OkObjectResult>();
         }
-
-        // Unauthenticated accept → 401.
-        (await Gallery().Accept(new GalleryAcceptRequest { Token = token }))
-            .Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(401);
-
-        // Wrong person (owns a different verified email) → 403, no grant.
-        var attacker = "attacker-" + stamp;
-        await SeedGuestAsync(attacker, IdentityEmail.Normalize("attacker-" + stamp + "@evil.com"));
-        (await Gallery(Person(attacker)).Accept(new GalleryAcceptRequest { Token = token }))
-            .Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        (await GalleryGrant.Get(GalleryGrant.KeyFor(attacker, eventId))).Should().BeNull();
-
-        // The invited guest accepts → grant minted.
-        (await Gallery(Person(guestId)).Accept(new GalleryAcceptRequest { Token = token })).Should().BeOfType<OkObjectResult>();
         (await GalleryGrant.Get(GalleryGrant.KeyFor(guestId, eventId))).Should().NotBeNull();
     }
 }

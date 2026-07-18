@@ -21,8 +21,8 @@ public sealed class SnapVaultModule : KoanModule
     {
         services.AddKoanOptions<CollectionOptions>("SnapVault:Collections");
 
-        // Studio-to-client lifecycle: invite, grant, proof, and verifiable deprovisioning.
-        services.AddSingleton<GalleryInviteService>();
+        // Studio-to-client lifecycle: explicit grant, proof, and integrity-checked deprovisioning.
+        services.AddSingleton<GalleryGrantService>();
         services.AddSingleton<GuestScopeService>();
         services.AddSingleton<ProofingService>();
         services.AddSingleton<SnapVaultDeprovisioningService>();

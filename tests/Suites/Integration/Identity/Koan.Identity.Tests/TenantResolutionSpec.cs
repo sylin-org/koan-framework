@@ -2,9 +2,11 @@ using System.Security.Claims;
 using AwesomeAssertions;
 using Koan.Data.Core;
 using Koan.Identity.Tenancy;
+using Koan.Identity.Tenancy.Initialization;
 using Koan.Identity.Tenancy.Resolvers;
 using Koan.Tenancy;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -57,9 +59,31 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
     private static void SignedIn(DefaultHttpContext ctx, string subject)
         => ctx.User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, subject) }, "test"));
 
+    [Theory]
+    [InlineData("HeaderName", " ")]
+    [InlineData("PathPrefix", "relative")]
+    public void Invalid_carrier_configuration_fails_standard_options_validation(string key, string value)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{TenancyResolutionOptions.SectionPath}:{key}"] = value,
+            })
+            .Build();
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(configuration);
+        new IdentityTenancyModule().Register(services);
+        using var provider = services.BuildServiceProvider();
+
+        var read = () => provider.GetRequiredService<IOptions<TenancyResolutionOptions>>().Value;
+
+        read.Should().Throw<OptionsValidationException>();
+    }
+
     [Fact]
     public async Task Header_carrier_scopes_a_member_by_routing_code()
     {
+        await new Identity { Id = "carrier-alice" }.Save();
         await new TenantRecord { Id = "tr-acme", Name = "Acme", Code = "acme" }.Save();
         await new Membership { TenantId = "tr-acme", IdentityId = "carrier-alice", Roles = { "koan:member" } }.Save();
 
@@ -75,6 +99,7 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
     [Fact]
     public async Task Path_carrier_scopes_a_member()
     {
+        await new Identity { Id = "carrier-bob" }.Save();
         await new TenantRecord { Id = "tr-globex", Name = "Globex", Code = "globex" }.Save();
         await new Membership { TenantId = "tr-globex", IdentityId = "carrier-bob", Roles = { "koan:member" } }.Save();
 
@@ -90,6 +115,7 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
     [Fact]
     public async Task Claim_carrier_scopes_a_member_by_tenant_id()
     {
+        await new Identity { Id = "carrier-claire" }.Save();
         await new TenantRecord { Id = "tr-initech", Name = "Initech" }.Save();
         await new Membership { TenantId = "tr-initech", IdentityId = "carrier-claire", Roles = { "koan:member" } }.Save();
 
@@ -145,6 +171,7 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
     [Fact]
     public async Task A_members_tenant_roles_are_projected_onto_the_request_principal()
     {
+        await new Identity { Id = "roleproj-user" }.Save();
         await new TenantRecord { Id = "tr-roleproj", Name = "RoleProj", Code = "roleproj" }.Save();
         await new Membership { TenantId = "tr-roleproj", IdentityId = "roleproj-user", Roles = { "koan:manager" } }.Save();
 
@@ -163,6 +190,7 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
     [Fact]
     public async Task A_reserved_host_role_on_a_membership_is_never_projected()
     {
+        await new Identity { Id = "backdoor-user" }.Save();
         await new TenantRecord { Id = "tr-backdoor", Name = "Backdoor", Code = "backdoor" }.Save();
         // A membership that somehow carries the HOST operator role (e.g. a bad seed/import/direct save) alongside a
         // legit tenant role — the projection must strip the host role (ARCH-0104 "no master backdoor").
@@ -213,6 +241,7 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
     [Fact]
     public async Task A_removed_membership_stops_scoping_at_the_very_next_request()
     {
+        await new Identity { Id = "churn-user" }.Save();
         await new TenantRecord { Id = "tr-churn", Name = "Churn", Code = "churn" }.Save();
         var membership = await new Membership { TenantId = "tr-churn", IdentityId = "churn-user", Roles = { "koan:member" } }.Save();
 
@@ -225,5 +254,22 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
         // Request 2 — the SAME carrier no longer scopes, because authorization is re-evaluated on the request path.
         (await RunMiddlewareAsync(ctx => { SignedIn(ctx, "churn-user"); ctx.Request.Headers["X-Koan-Tenant"] = "churn"; }))
             .Should().BeNull("enforcement is on the request path, not a write-only flag");
+    }
+
+    [Fact]
+    public async Task A_deactivated_member_is_never_scoped()
+    {
+        await new Identity { Id = "inactive-user", Status = IdentityStatus.Deactivated }.Save();
+        await new TenantRecord { Id = "tr-inactive", Name = "Inactive", Code = "inactive" }.Save();
+        await new Membership { TenantId = "tr-inactive", IdentityId = "inactive-user", Roles = { "koan:member" } }.Save();
+
+        var scoped = await RunMiddlewareAsync(ctx =>
+        {
+            SignedIn(ctx, "inactive-user");
+            ctx.Request.Headers["X-Koan-Tenant"] = "inactive";
+        });
+
+        scoped.Should().BeNull(
+            "a stale membership or bearer principal cannot restore tenant scope for a deactivated durable person");
     }
 }

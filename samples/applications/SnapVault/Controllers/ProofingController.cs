@@ -46,9 +46,9 @@ public sealed class ProofingController : ControllerBase
 
         // Permission floor: a favorite/rating/select mark needs "select"; a comment needs "comment".
         var wantsMark = request.Favorite is not null || request.Rating is not null || request.Selected is not null;
-        if (wantsMark && !grant.Allows("select"))
+        if (wantsMark && !grant.Allows(GalleryGrant.Permission.Select))
             return StatusCode(StatusCodes.Status403Forbidden, new { error = "This gallery does not allow selecting." });
-        if (request.Comment is not null && !grant.Allows("comment"))
+        if (request.Comment is not null && !grant.Allows(GalleryGrant.Permission.Comment))
             return StatusCode(StatusCodes.Status403Forbidden, new { error = "This gallery does not allow comments." });
 
         var rating = request.Rating is null ? (int?)null : Math.Clamp(request.Rating.Value, 0, 5);   // clamp — never trust the caller

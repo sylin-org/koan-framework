@@ -1,11 +1,9 @@
 /**
- * SnapVault — invited-guest proofing gallery (step 5f).
+ * SnapVault — granted-client proofing gallery.
  *
- * The flow: a guest opens their link (guest.html?token=…) while signed in → the invite is bound to their
- * identity (POST /api/gallery/accept, verified-email ownership enforced server-side) → their event's photos load
- * (access-scoped by the SEC-0008 subject the middleware set from their grant) → they select / rate, each mark
- * recorded via the guest-write floor (POST /api/proofing/{photoId}). The guest can only ever see and mark photos
- * in the event they were invited to — that isolation is the framework's, not this page's.
+ * The flow: a client opens their event link while signed in as the durable identity the studio granted. Their
+ * event's photos load through the access-scoped subject derived from that grant; selection/rating writes pass through
+ * the same guest floor. The query parameter chooses a view, never authority—the stored grant remains the constraint.
  */
 import { API } from './api.js';
 
@@ -14,23 +12,9 @@ const statusEl = document.getElementById('status');
 const galleryEl = document.getElementById('gallery');
 
 async function main() {
-  const token = new URLSearchParams(location.search).get('token');
-  if (!token) {
-    statusEl.textContent = 'This gallery link is missing its invitation token.';
-    return;
-  }
-
-  let eventId;
-  try {
-    const res = await api.post('/api/gallery/accept', { token });
-    eventId = res.eventId;
-  } catch (error) {
-    const message = String(error?.message ?? '');
-    if (message.toLowerCase().includes('sign in')) {
-      statusEl.innerHTML = 'Please sign in to view your gallery, then reload this page.';
-    } else {
-      statusEl.textContent = `This invitation could not be opened (${message}).`;
-    }
+  const eventId = new URLSearchParams(location.search).get('event');
+  if (!eventId) {
+    statusEl.textContent = 'This gallery link is missing its event.';
     return;
   }
 

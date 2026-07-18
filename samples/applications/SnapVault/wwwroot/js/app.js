@@ -539,23 +539,22 @@ class SnapVaultApp {
       });
     });
 
-    // Share affordance — issue a gallery invite for the event and hand back the guest link.
+    // Share affordance — grant a known durable person access and hand back the event link.
     container.querySelectorAll('.share-gallery[data-share-event]').forEach(btn => {
       btn.addEventListener('click', (e) => { e.stopPropagation(); this.shareEventGallery(btn.dataset.shareEvent); });
     });
   }
 
   async shareEventGallery(eventId) {
-    const email = window.prompt("Client's email — they'll sign in with it to open their proofing gallery:");
-    if (!email) return;
+    const identityId = window.prompt("Client identity ID — they must already exist as a durable person:");
+    if (!identityId) return;
     try {
-      const res = await this.api.post('/api/gallery/invite', { eventId, email: email.trim() });
-      const link = `${window.location.origin}${res.acceptUrl}`;
-      this.components.toast?.show('Gallery invite created', { icon: '🔗', duration: 2500 });
-      // Hand the shareable link to the operator to copy.
-      window.prompt('Share this link with your client (they must sign in with the invited email):', link);
+      const res = await this.api.post('/api/gallery/grant', { eventId, identityId: identityId.trim() });
+      const link = `${window.location.origin}/guest.html?event=${encodeURIComponent(res.eventId)}`;
+      this.components.toast?.show('Gallery access granted', { icon: '🔗', duration: 2500 });
+      window.prompt('Share this link with the client (they must sign in as the granted identity):', link);
     } catch (error) {
-      this.components.toast?.show(`Failed to create invite: ${error?.message ?? 'error'}`, { icon: '⚠️', duration: 3500 });
+      this.components.toast?.show(`Failed to grant access: ${error?.message ?? 'error'}`, { icon: '⚠️', duration: 3500 });
     }
   }
 

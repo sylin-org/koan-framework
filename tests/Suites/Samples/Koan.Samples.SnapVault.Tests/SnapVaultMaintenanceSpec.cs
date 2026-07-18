@@ -101,7 +101,6 @@ public sealed class SnapVaultMaintenanceSpec
             await new PhotoProcessingJob { PhotoId = uploaded.Id }.Save();
             // Guest-lifecycle rows for this studio (5e wipe-fold) — HostScoped, keyed by StudioTenantId.
             await new GalleryGrant { Id = GalleryGrant.KeyFor("g-" + Stamp(), ev.Id), IdentityId = "g", EventId = ev.Id, StudioTenantId = studio }.Save();
-            await new GalleryInvite { Id = GalleryInvite.KeyFor("inv-" + Stamp()), InviteId = "inv", EventId = ev.Id, StudioTenantId = studio }.Save();
             await new ProofSelection { Id = ProofSelection.KeyFor("g", uploaded.Id), GuestIdentityId = "g", EventId = ev.Id, PhotoId = uploaded.Id, StudioTenantId = studio }.Save();
 
             var body = new MemoryStream();
@@ -116,7 +115,6 @@ public sealed class SnapVaultMaintenanceSpec
             (await MediaDerivation.All()).Should().BeEmpty();
             // …including the studio's guest-lifecycle rows (5e).
             (await GalleryGrant.Query(g => g.StudioTenantId == studio)).Should().BeEmpty();
-            (await GalleryInvite.Query(gi => gi.StudioTenantId == studio)).Should().BeEmpty();
             (await ProofSelection.Query(p => p.StudioTenantId == studio)).Should().BeEmpty();
 
             // …and the original BLOB is gone too — proves the AfterRemove hook reclaims the blob on Remove (the wipe
