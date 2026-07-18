@@ -1,5 +1,9 @@
 # SnapVault conversion — the break-and-rebuild dogfood plan
 
+> **Historical rollout record, not current product truth.** Use
+> [SnapVault's current application contract](../../samples/applications/SnapVault/README.md) and its executable suite
+> for supported behavior. Invitation acceptance and lifecycle-proof language below preserve design history only.
+>
 > **R07 context amendment (2026-07-15):** This public sample conversion record preserves the original
 > rollout history. Durable tenant carriage now uses Core's `IKoanContextCarrier` and
 > `KoanContextCarrierRegistry`; references below to the Data-owned `AmbientCarrierRegistry` are

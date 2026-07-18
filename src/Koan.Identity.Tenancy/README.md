@@ -81,7 +81,7 @@ after the requested workflow completes and attests only to its own recorded fiel
   OAuth tokens or claim global authorization closure.
 - Public/anonymous tenant routing is not a switch on this security boundary and is not currently provided.
 - Tenant suspension and custom-domain ownership verification are not enforced here.
-- `Invite` is a Tenancy control-plane record, but Koan V1 does not currently provide an invitation-acceptance ceremony.
+- Koan V1 does not currently provide an invitation creation/delivery/acceptance ceremony.
   Applications should not treat a check-then-save flow as a distributed single-use claim.
 
 See [TECHNICAL.md](TECHNICAL.md) and the public [tenancy guide](../../docs/guides/tenancy-howto.md).

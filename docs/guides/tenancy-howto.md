@@ -120,7 +120,7 @@ using (Tenant.None())                       // explicit host scope — touches o
 var who = Tenant.Current?.Id;               // the ambient tenant id, or null when unscoped
 ```
 
-**When to use it.** `Tenant.Use` for admin/support "act-as", background jobs, integration tests, and any code path
+**When to use it.** `Tenant.Use` for trusted host work, background jobs, integration tests, and any code path
 that establishes the tenant from a trusted signal. `Tenant.None` for platform maintenance. In a web request, set the
 scope once per request (§7).
 
@@ -129,8 +129,8 @@ scope once per request (§7).
 ## 4. Posture — dev-open, prod-closed
 
 **Concept.** Strictness is a property of the *environment*, not a code flag. **Open** (Development) lets a developer
-land in a working control plane: a tenant-scoped op with no tenant in scope is *warned* and the auto-seeded **dev
-tenant** stands in. **Closed** (Production / ambiguous) **fails closed**: a tenant-scoped op with no tenant in scope
+start immediately: a tenant-scoped operation with no tenant in scope uses the stable local **dev tenant**. **Closed**
+(Production / ambiguous) **fails closed**: a tenant-scoped op with no tenant in scope
 throws a diagnostic that names the fix, rather than silently writing to a global namespace.
 
 **Recipe.** Do nothing — the posture defaults from `IHostEnvironment` (Development → Open, else → Closed). Override
@@ -138,15 +138,14 @@ only to test the strict path locally:
 
 ```jsonc
 // appsettings.json
-"Koan": { "Data": { "Tenancy": { "Posture": "Closed" } } }   // Open | Closed
+"Koan": { "Tenancy": { "Posture": "Closed" } }   // Open | Closed
 ```
 
 **When to use it.** Leave it on defaults in normal development and production. Set `Closed` in a test to prove
-fail-closed behaviour; the dev-open auto-seed is for local DX only and is never made portable across the async-hop.
+fail-closed behaviour. The local fallback is not carried across an async hop; an explicit tenant is.
 
-> **Production boot pre-flight:** tenancy active in Production with **no registered `ITenantResolver`** refuses to
-> boot (every request would otherwise fail closed at the gate — a fail-fast, not a silent leak). In Development the
-> dev tenant stands in, so a resolver is not required.
+Core Tenancy has no HTTP-resolver prerequisite. A closed production worker can use explicit or captured scope without
+referencing Web. The optional Identity Tenancy bridge owns inbound carrier resolution.
 
 ---
 
@@ -219,7 +218,7 @@ await new Membership
 ```
 
 The defaults are claim `tenant`, header `X-Koan-Tenant`, and path `/t/{tenantCode}`. Subdomain routing is inert until
-`Koan:Data:Tenancy:Resolution:BaseHosts` lists the application's base hosts. Carrier precedence and effective settings
+`Koan:Tenancy:Resolution:BaseHosts` lists the application's base hosts. Carrier precedence and effective settings
 are reported at startup. Every carrier always uses the same active-membership authorization; there is no bypass flag.
 
 **When to use it.** Use Identity Tenancy for normal authenticated multi-tenant Web APIs. Background workers and
@@ -229,7 +228,21 @@ by weakening this security boundary.
 
 ---
 
-## 8. Proving isolation
+## 8. Operating the tenant registry
+
+**Concept.** Reference `Sylin.Koan.Tenancy.Web` when the application should mount a host-authorized operator UI and
+API for the supported control plane. It administers tenant registry rows and deterministic membership seats; it does
+not imply invitation, suspension, erasure, or act-as.
+
+**Recipe.** Add the package and keep the ordinary `AddKoan()` bootstrap. Open `/tenancy`. In Closed posture, grant
+the `koan:tenancy-operator` host role or configure an operator subject under `Koan:Tenancy:Console:Grant`.
+
+**When to use it.** Use the projection for internal tenant/seat administration and review of its mutation audit. Use
+business-named application workflows when membership grants require additional domain checks.
+
+---
+
+## 9. Proving isolation
 
 **Concept.** Isolation is a security boundary, and its failure mode is silent. Koan ships an **executable proof** —
 `DataAxis.AssertNoLeak<T>` (ARCH-0101 §10) — that drives the whole matrix (read · get-by-id IDOR · cross-scope
@@ -252,15 +265,15 @@ change (a new read surface, a new write path) hasn't punched a hole. Blob isolat
 ## Current boundary and deferred work
 
 This guide documents what is **implemented today**: the scoping surface (`Tenant.Use`/`None`/`Current`),
-`[HostScoped]`/`IAmbientExempt`, posture + dev-seed, automatic isolation across data/blobs/cache/jobs, durable
-memberships and roles, and active-member request resolution. Do not assume the following deferred guarantees:
+`[HostScoped]`/`IAmbientExempt`, posture + local Development fallback, automatic isolation across active pillars,
+durable tenant/membership registry rows, active-member request resolution, and the optional registry/membership
+operator projection. Do not assume the following deferred guarantees:
 
-- **Lifecycle verbs** — `Tenant.Provision` / `Relocate` / `Erase` / `Rename`, and the rich current-tenant projection
-  (`{ Id, Codes, Name }`) backed by a tenant registry.
-- **Invitation acceptance** — `Invite` exists as a control-plane record, but V1 has no distributed single-claim
-  acceptance ceremony. Do not hand-roll a check-then-save token flow.
-- **Tenant-status request enforcement and verified custom domains** — membership scoping does not yet interpret a
-  suspended tenant or prove domain ownership.
+- **Tenant lifecycle and data erasure** — registry rename is supported; provisioning sagas, relocation, suspension,
+  product-data deletion, and externally attested erasure are not.
+- **Invitations** — V1 has no invitation record, delivery, or distributed single-claim acceptance ceremony. Do not
+  hand-roll a check-then-save token flow.
+- **Verified custom domains** — configured base hosts enable subdomain parsing; Koan does not prove domain ownership.
 - **Data-classification & residency** — `[Pii]`/`[Phi]` posture, externally attested cryptographic erasure, and region
   pinning are not current tenancy guarantees.
 

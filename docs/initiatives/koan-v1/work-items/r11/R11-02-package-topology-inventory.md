@@ -144,8 +144,8 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Storage.Connector.Local` | `provider` | `keep` |
 | `Sylin.Koan.Storage.Connector.S3` | `provider` | `keep` |
 | `Sylin.Koan.Templates` | `template` | `keep` |
-| `Sylin.Koan.Tenancy` | `capability` | `assess` |
-| `Sylin.Koan.Tenancy.Web` | `projection` | `assess` |
+| `Sylin.Koan.Tenancy` | `capability` | `keep` |
+| `Sylin.Koan.Tenancy.Web` | `projection` | `keep` |
 | `Sylin.Koan.Testing` | `capability` | `assess` |
 | `Sylin.Koan.Testing.Containers` | `capability` | `assess` |
 | `Sylin.Koan.Testing.Hosting` | `capability` | `assess` |

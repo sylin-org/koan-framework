@@ -14,6 +14,12 @@ validation:
 
 # Koan Tenancy — Design (Facet 3 flagship slice)
 
+> **Historical design input only.** This June 2026 plan records the ideas that led to the current isolation kernel; it
+> is not current product truth for control-plane entities, lifecycle, or operator APIs. Use
+> [Tenancy's package contract](../../src/Koan.Tenancy/README.md), the
+> [Tenancy Web contract](../../src/Koan.Tenancy.Web/README.md), and the
+> [current how-to](../guides/tenancy-howto.md) for supported behavior.
+>
 > **Current context ownership (2026-07-15):** The packaging and module-ownership rule below still
 > applies, but the generic logical-flow seam is now `Koan.Core.Context.KoanContext`, not Data's
 > `EntityContext`. Tenancy registers `TenantContextCarrier : IKoanContextCarrier` independently from

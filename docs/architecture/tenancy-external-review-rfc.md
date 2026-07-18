@@ -9,6 +9,10 @@ last_updated: 2026-06-21
 
 # Koan Multi-Tenancy — Request for External Design Review
 
+> **Historical review input only.** This June 2026 RFC intentionally describes a broader proposed surface. Current
+> supported behavior is defined by the [Tenancy package contract](../../src/Koan.Tenancy/README.md), the
+> [Tenancy Web contract](../../src/Koan.Tenancy.Web/README.md), and generated product truth.
+>
 > **You are being asked, as a frontier AI model / external architect, to review a multi-tenancy
 > design for a .NET application framework called Koan.** This document is fully self-contained: it
 > explains what Koan is, the resources the design builds on, and the complete tenancy plan. We want

@@ -4,12 +4,12 @@ domain: tenancy
 title: "Tenancy — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-06-24
+last_updated: 2026-07-18
 framework_version: source-first
 validation:
-  date_last_tested: 2026-06-24
+  date_last_tested: 2026-07-18
   status: verified
-  scope: Koan.Tenancy.Tests (AssertNoTenantLeak + StorageTenantIsolationSpec, real AddKoan + SQLite + Local storage)
+  scope: Koan.Tenancy.Tests 87/87 + Koan.Tenancy.Web.Tests 13/13 + Koan.Identity.Tests 85/85
 ---
 
 # Tenancy — pillar map
@@ -41,7 +41,7 @@ public sealed class Invoice : Entity<Invoice>      // tenant-scoped: reads/write
 [HostScoped]                                        // global / control-plane — the one audited opt-out
 public sealed class FeatureFlag : Entity<FeatureFlag> { public bool Enabled { get; set; } }
 
-using (Tenant.Use("acme"))                          // admin · jobs · tests · support act-as
+using (Tenant.Use("acme"))                          // trusted host work · jobs · tests
 {
     await new Invoice { Amount = 100m }.Save();     // stamped + isolated to "acme"
     var mine = await Invoice.All();                 // sees only "acme" invoices
@@ -56,7 +56,7 @@ using (Tenant.Use("acme"))                          // admin · jobs · tests ·
 | `Tenant.None()` | Enter explicit **host scope** — touches only `[HostScoped]` entities; a tenant-scoped write still fails closed. |
 | `Tenant.Current` | The ambient `TenantContext?` (null when unscoped). Read-only. |
 | `[HostScoped]` | Exempt an entity type from tenancy (global config, system rows). `IAmbientExempt` is the dependency-free equivalent for infra. |
-| `Koan:Data:Tenancy:Posture` | `Open` (dev: warn) / `Closed` (prod: fail-closed). Defaults per environment — set it only to override. |
+| `Koan:Tenancy:Posture` | `Open` (Development local fallback) / `Closed` (fail-closed). Defaults per environment. |
 
 ## The escape hatch
 
@@ -72,6 +72,7 @@ No dedicated tenancy sample yet — the **executable proof** is
 (read · get-by-id IDOR · write-takeover · scoped delete · cache-key) and `StorageTenantIsolationSpec` (blob isolation
 across `StorageEntity`/`MediaEntity`/raw `IStorageService`), both through a real `AddKoan()` boot.
 
-> **Built today:** the scoping surface + automatic data/cache/blob isolation + posture + dev-seed. **Later slices**
-> (designed, not built): tenant lifecycle verbs (`Provision`/`Relocate`/`Erase`), membership/roles, and concrete
-> `ITenantResolver` request strategies (claim/host/header). See the how-to's roadmap.
+> **Built today:** scope + hard segmentation across active pillars, local Development fallback, durable tenant and
+> membership rows, active-Identity request carriers, and the optional registry/membership operator projection.
+> Invitation, tenant lifecycle/data erasure, verified domains, and server-side act-as remain outside the current
+> contract. See the how-to's boundary section.

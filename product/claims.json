@@ -173,6 +173,15 @@
       "evidence": ["tests/Koan.Web.OpenGraph.Tests", "tests/Suites/Samples/Koan.Samples.DevPortal.Tests", "samples/applications/DevPortal"]
     },
     {
+      "id": "tenant-isolation-administration",
+      "title": "Local-first tenant isolation and administration",
+      "summary": "Referencing Tenancy contributes one hard ambient segmentation guarantee across active pillars; the optional Web projection mounts host-authorized tenant-registry, deterministic membership, and administration-audit surfaces without lifecycle-shaped placeholders.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Tenancy", "Sylin.Koan.Tenancy.Web"],
+      "documentation": ["docs/guides/tenancy-howto.md", "docs/reference/cards/tenancy.md", "src/Koan.Tenancy/README.md", "src/Koan.Tenancy.Web/README.md"],
+      "evidence": ["tests/Suites/Tenancy/Koan.Tenancy.Tests", "tests/Suites/Tenancy/Koan.Tenancy.Web.Tests", "tests/Suites/Integration/Identity/Koan.Identity.Tests"]
+    },
+    {
       "id": "authentication-authorization",
       "title": "Authentication, authorization, and client token issuance",
       "summary": "Durable Identity, web sign-in, authenticated identity management, and active-membership tenant scoping compose through referenced modules; the embedded OAuth server issues audience-bound public-client tokens through its verified protocol boundary, while external provider behavior remains connector-specific.",

@@ -9,6 +9,10 @@ last_updated: 2026-06-21
 
 # Koan Multi-Tenancy — External Design Review, Round 2
 
+> **Historical review input only.** This June 2026 RFC pressure-tests a proposed surface broader than Koan V1.
+> Current supported behavior is defined by the [Tenancy package contract](../../src/Koan.Tenancy/README.md), the
+> [Tenancy Web contract](../../src/Koan.Tenancy.Web/README.md), and generated product truth.
+>
 > **This is the second round of review.** Round 1 (the original RFC) drew three independent frontier
 > reviews; their feedback converged sharply and reshaped the design. This document presents **what
 > changed**, asks you to **analyze those changes** (did the reductions lose anything? do the corrections

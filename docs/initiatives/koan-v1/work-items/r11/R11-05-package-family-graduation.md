@@ -2862,6 +2862,142 @@ The result is one readable rule rather than two security postures: a tenant carr
 membership is authority. The bridge and its dogfood application now expose fewer concepts while preserving the useful
 tenant/gallery lifecycle end to end.
 
+### Tenancy core and Web family discovery
+
+**Task:** Graduate `Sylin.Koan.Tenancy` and `Sylin.Koan.Tenancy.Web` around one complete V1 promise, coalescing
+ambient isolation and operator administration while deleting lifecycle-shaped surfaces whose effects stop at the
+control-plane registry.
+
+**Application intent:** Reference Tenancy, keep the existing `AddKoan()` bootstrap, and have ordinary Entities isolate
+by the current tenant across every active pillar; optionally reference Tenancy Web to administer the tenant registry
+and durable membership seats through one inspectable, authorized operator surface.
+
+**Public expression:** Core remains a package reference plus existing `AddKoan()`. An ordinary `Entity<T>` becomes
+tenant-scoped; `[HostScoped]` marks the deliberate global exception; trusted work uses `using (Tenant.Use(id))` or
+`Tenant.None()`. Referencing `Sylin.Koan.Tenancy.Web` additionally mounts `/tenancy` and
+`/api/tenancy/admin`; no application controller registration, middleware, repository, lifecycle job, or activation
+call is required. The Web surface explicitly creates/renames registry tenants and grants/revokes memberships for
+known subject IDs; it does not imply invitation, tenant suspension, product-data erasure, or server-side act-as.
+
+**Guarantee/correction:** Every non-host Entity operation consumes the same hard `tenant` segmentation contribution;
+missing scope in Closed posture fails at the owning pillar, while Development receives the stable local `dev`
+fallback. Adding Tenancy does not require an HTTP resolver in a headless worker: inbound carrier resolution is a
+separate Identity Tenancy responsibility. The operator projection admits only the configured host operator authority,
+rejects reserved host roles in memberships, uses deterministic seat identity for idempotent grants, and records each
+supported mutation. Ambiguous tenant codes fail closed at resolution. Unsupported lifecycle intent has no endpoint or
+type that can be mistaken for a complete guarantee; documentation supplies the corrective boundary.
+
+**Complete intent surface:** Core requires the Tenancy reference, existing `AddKoan()`, a capable isolating Data
+provider for tenant-scoped Entities, and a trusted scope source (`Tenant.Use`, captured Jobs context, or the optional
+Identity Tenancy request bridge). Development needs no configuration. Production remains Closed by default but does
+not assume the host is HTTP. The optional Web projection requires Web, authentication that can issue the host operator
+role or configured operator identity, and a durable Data provider. Exposure host/header and operator grants remain
+typed optional configuration under `Koan:Tenancy:Console`.
+
+**Public concepts:** `Tenant`, `TenantContext`, `[HostScoped]`, `TenancyPosture`, and `TenancyOptions` each express a
+scope or safety decision; `TenantRecord`, `Membership`, `TenancyRoles`, and `TenantAuditEntry` form the minimal durable
+control plane; `TenancyConsoleOptions` separates forgeable exposure from authority. `ITenantResolver` and
+`TenantResolutionRequest` remain public extension vocabulary but move to Identity Tenancy, their actual web-bridge
+owner. `Invite`, `InviteStatus`, `TenantStatus`, `TenantBootstrap`, `TenantBootstrapPolicy`, `TenantOperation`, and the
+current lifecycle service do not survive: today they imply ceremonies or effects the framework does not complete.
+
+**Docs read:** `docs/engineering/index.md` establishes Entity-first access, controller-owned HTTP, standard typed
+options/constants, and owned package companions; `docs/architecture/principles.md` requires business-to-code intent,
+one composition owner, local-first behavior, semantic honesty, and standard .NET reuse; the root `README.md` defines
+references plus `AddKoan()` and Entity semantics as the product grammar; `samples/CATALOG.md` redirects to the current
+sample portfolio rather than stale examples; `docs/reference/cards/tenancy.md` documents the strong isolation kernel
+but still understates the now-built membership/request bridge; `docs/guides/tenancy-howto.md` accurately separates
+current isolation and active-member routing from deferred invitation/status/lifecycle guarantees.
+
+**Code read:** `TenancyModule` composes posture, dev fallback, context carriage, segmentation, preflight, and reporting
+but currently also checks an HTTP resolver and creates unused dev owner/signing state; `Tenant`/`TenancyAmbient`/
+`TenancyRuntime` are the small hot-path scope owner; `TenantRecord`/`Membership` are the minimal durable registry while
+`Invite`, bootstrap, and status types have no complete application terminal; `KoanTenancyWebModule` auto-mounts the
+console but duplicates project ordering and registers jobs/leases for registry-only erase; `TenancyOperatorController`
+and `TenantLifecycleService` expose a broad lifecycle vocabulary including invite, suspend, erase, and act-as whose
+effects do not reach the claimed application guarantees; `TenantResolutionMiddleware` proves carrier interfaces are
+owned by the Identity Tenancy bridge and already fails ambiguous codes closed.
+
+**Reusing:** Core's semantic segmentation contribution, `KoanContext`, context carrier, `TenancyRuntime`, standard
+Options, Entity statics, `[HostScoped]`, deterministic membership keys, module startup/facts reporting, controller
+routing, the Web exposure/authorization split, embedded assets, and focused real-`AddKoan()` Tenancy suites.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| Resolver extension contract | `src/Koan.Identity.Tenancy/Resolution/ITenantResolver.cs` | Put the application extension seam beside the bridge that consumes it; Tenancy core remains transport/Web-neutral. |
+| Resolver input contract | `src/Koan.Identity.Tenancy/Resolution/TenantResolutionRequest.cs` | Keep HTTP adaptation transport-neutral without making core Tenancy own inbound Web policy. |
+| Administration service | `src/Koan.Tenancy.Web/Services/TenantAdministrationService.cs` | Give supported registry and membership mutations one audit-owning chokepoint. |
+| Operator request/projection contracts | `src/Koan.Tenancy.Web/Controllers/TenancyOperatorContracts.cs` | Keep the controller thin and public HTTP vocabulary inspectable without nested type clutter. |
+| Core package companions | `src/Koan.Tenancy/README.md`, `src/Koan.Tenancy/TECHNICAL.md` | State the shortest isolation path, runtime plan, prerequisites, failures, and exact boundaries. |
+| Web package companions | `src/Koan.Tenancy.Web/README.md`, `src/Koan.Tenancy.Web/TECHNICAL.md` | State the reference-mounted operator path, exposure/authority model, supported mutations, and exclusions. |
+
+**Coalescence:** Closest complete pattern: the just-graduated Identity/Identity Web split—headless durable entities and
+policy in core, controller projection in Web, business mutations behind one service. Specificity is pillar-owned for
+ambient isolation, bridge-owned for authenticated inbound resolution, and projection-owned for HTTP/operator policy.
+Disposition: keep/rebuild the isolation kernel; absorb dev fallback directly into runtime posture; move resolver
+contracts to their consuming bridge; rebuild the Web service/controller around registry + membership; delete unused
+dev seed/brand/state, resolver preflight, bootstrap ceremony, invites, unenforced status, jobs-backed registry erase,
+operations feed, fake act-as, and redundant `[After]`. Core is the wrong owner for HTTP resolver availability; Web is
+the wrong owner for product-data erasure; adapters are the wrong owner for tenant meaning.
+
+**Ergonomics:** Human code continues to read exactly as business intent: reference, Entity, `Tenant.Use`, optional
+`[HostScoped]`. IntelliSense loses lifecycle verbs that cannot keep their promise and retains the few concepts that
+matter. A coding model can infer that Web administers registry seats without inventing invite delivery, distributed
+claiming, erasure, or act-as state. Operators see one startup decision for posture and one for console exposure/grant;
+reviewers inspect one segmentation contribution, one authenticated request chokepoint, and one administration service.
+
+**Constraints satisfied:** Entity statics remain every data path; all HTTP remains controller-owned; configuration
+uses typed Options and one `Koan:Tenancy` family path; stable identifiers are centralized; no placeholders or
+compatibility shells remain; hot paths consume cached runtime/composition state; package companions and current public
+truth will be updated; ADRs stay unchanged; only focused Tenancy/Identity bridge evidence runs before R11-07.
+
+**Risks:** This intentionally removes attractive but incomplete pre-1.0 API/UI surface. Direct membership grants name
+a known subject ID without validating an external identity system; the active-Identity guarantee remains specific to
+the Identity Tenancy bridge. Supported administration writes are ordered and audited, not transactional or
+append-only. Tenant-code uniqueness can be enforced by the supported administration path but direct Entity writes
+remain possible; request resolution therefore retains ambiguity-as-denial. Full invitation, tenant-status enforcement,
+data lifecycle/erasure, and true operator act-as need distinct future capability contracts and end-to-end evidence.
+
+### Tenancy core and Web family implementation
+
+Status: `keep with focused proof complete` for `Sylin.Koan.Tenancy` and `Sylin.Koan.Tenancy.Web`.
+
+- Reduced core Tenancy to one headless isolation kernel: ambient scope, resolved posture, context carriage, hard
+  segmentation, and the minimal `TenantRecord`/`Membership`/`TenantAuditEntry` control plane. Open Development now
+  supplies the stable local `dev` scope directly; Closed posture still fails missing tenant context at the consuming
+  pillar. Core no longer requires an HTTP resolver or manufactures unused seed owner, brand, signing-key, bootstrap,
+  status, or invitation state.
+- Moved `ITenantResolver` and `TenantResolutionRequest` to Identity Tenancy, the only functional bridge that consumes
+  them. This keeps core transport-neutral and avoids a contracts project or inert activation mechanism for vocabulary
+  that has one clear owner.
+- Rebuilt Tenancy Web around one `TenantAdministrationService`. The supported surface creates, inspects, and renames
+  registry tenants; deterministically grants/replaces and revokes known-subject memberships; rejects duplicate routing
+  codes and reserved host roles; and audits completed mutations. The controller is a thin HTTP projection, roster
+  reads are complete, and audit reads are explicitly bounded by caller/options policy.
+- Removed registry-only suspend/reactivate/erase, operation-job, invitation, and fake act-as surfaces. The package no
+  longer depends on Jobs or keyed leases, and its embedded UI exposes only the guarantees the service completes.
+  Exposure gates remain separate from host operator authority and both decisions are reported at startup.
+- Consolidated configuration under `Koan:Tenancy`, with bridge resolution at `Koan:Tenancy:Resolution` and console
+  policy at `Koan:Tenancy:Console`. Identity's local-person seed no longer reaches into retired Tenancy configuration.
+- Added package-owned README/TECHNICAL contracts for both survivors and aligned the current guide, reference card,
+  module ledger, surface ledger, topology disposition, and product claim. Invitation, lifecycle/data erasure, verified
+  domains, and server-side act-as remain explicitly outside the current product boundary; PMC-035 retains the future
+  invitation evidence gate.
+- Focused Release evidence is warning-clean: Tenancy passes 87/87, Tenancy Web passes 13/13, and Identity Tenancy's
+  bridge evidence remains green inside Identity's 85/85 suite. PMC-031 is resolved by an isolated Local Storage profile
+  in the intentionally composed Tenancy fixture; PMC-033 still owns framework-wide unused Storage activation.
+- Release packs for both packages contain DLL/XML, package-owned README, canonical icon, symbols, and build-transitive
+  activation metadata; dependency manifests contain only their evaluated functional requirements and current NuGet
+  audit reports no known vulnerable direct or transitive package. Generated truth contains 102 packages: 7
+  repair-required, 21 review-required, and 74 structurally ready across 25 claims. Both Tenancy packages have zero
+  objective package-quality findings, and public documentation passes 230 current files / 40 navigation targets.
+
+The resulting developer grammar is smaller and more honest: reference Tenancy and keep `AddKoan()` for local-first
+Entity isolation; add Tenancy Web only when registry and seat administration is desired. Operators and reviewers can
+trace scope, inbound authorization, and supported mutations through one chokepoint each.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

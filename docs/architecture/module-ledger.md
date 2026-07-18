@@ -388,12 +388,12 @@
 ### Koan.Tenancy
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core
 - Depended by: Koan.Identity.Tenancy, Koan.Tenancy.Web
-- Documentation: README ❌ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Tenancy.Web
-- Depends on: Koan.Jobs, Koan.Tenancy, Koan.Web
+- Depends on: Koan.Tenancy, Koan.Web
 - Depended by: –
-- Documentation: README ❌ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Testing
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Testing.Hosting

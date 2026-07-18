@@ -33,7 +33,7 @@ deactivation must affect the next request, including a request carrying a still-
 
 ## Carrier behavior
 
-`TenancyResolutionOptions` binds from `Koan:Data:Tenancy:Resolution`. Claim and header values may be tenant IDs or an
+`TenancyResolutionOptions` binds from `Koan:Tenancy:Resolution`. Claim and header values may be tenant IDs or an
 exact unique `TenantRecord.Code`; subdomain and path carriers resolve codes. Subdomain extraction accepts exactly one
 label before a configured base host. Empty `BaseHosts` leaves only that carrier inert. Empty names/prefixes and empty
 base-host entries fail startup.

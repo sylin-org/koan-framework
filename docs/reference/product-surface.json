@@ -406,6 +406,27 @@
       ]
     },
     {
+      "id": "tenant-isolation-administration",
+      "title": "Local-first tenant isolation and administration",
+      "summary": "Referencing Tenancy contributes one hard ambient segmentation guarantee across active pillars; the optional Web projection mounts host-authorized tenant-registry, deterministic membership, and administration-audit surfaces without lifecycle-shaped placeholders.",
+      "maturity": "verified",
+      "packages": [
+        "Sylin.Koan.Tenancy",
+        "Sylin.Koan.Tenancy.Web"
+      ],
+      "documentation": [
+        "docs/guides/tenancy-howto.md",
+        "docs/reference/cards/tenancy.md",
+        "src/Koan.Tenancy.Web/README.md",
+        "src/Koan.Tenancy/README.md"
+      ],
+      "evidence": [
+        "tests/Suites/Integration/Identity/Koan.Identity.Tests",
+        "tests/Suites/Tenancy/Koan.Tenancy.Tests",
+        "tests/Suites/Tenancy/Koan.Tenancy.Web.Tests"
+      ]
+    },
+    {
       "id": "testing-local-infrastructure",
       "title": "Testing and local infrastructure",
       "summary": "Koan supplies bounded test hosts and container-backed local infrastructure for focused conformance.",
@@ -1935,7 +1956,7 @@
     {
       "packageId": "Sylin.Koan.Tenancy",
       "shape": "library",
-      "description": "First-class multi-tenancy for Koan: Tenant.Use/.WithTenant/None, [HostScoped], trusted context carriage, and one hard tenant segmentation contribution compiled independently by active framework pillars under Reference = Intent.",
+      "description": "Local-first multi-tenancy for Koan: ambient Tenant.Use/None scope, [HostScoped] exceptions, durable context carriage, and one hard segmentation contribution compiled independently by active framework pillars.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1944,27 +1965,30 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
-      "claims": []
+      "readme": "src/Koan.Tenancy/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Tenancy/TECHNICAL.md",
+      "claims": [
+        "tenant-isolation-administration"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Tenancy.Web",
       "shape": "library",
-      "description": "ARCH-0104 \u2014 the tenancy control-plane operator console (Reference = Intent). Referencing this package auto-mounts the host-face operator API \u002B a bundled UI over the [HostScoped] control-plane entities (TenantRecord/Membership/Invite): fleet roster, tenant drill-in, guarded lifecycle actions (suspend/reactivate, invite/revoke, revoke-seat, control-plane erase), an operations feed, an audit log, and an audited act-as. Gated on the explicit host role koan:tenancy-operator (no master backdoor); dev-open posture makes it just-work in dev, prod fails closed.",
+      "description": "Reference-mounted tenant registry and membership administration for Koan: a bundled operator UI and API with separated exposure/authority controls, idempotent seat grants, and mutation audit.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
-        "Sylin.Koan.Jobs",
         "Sylin.Koan.Tenancy",
         "Sylin.Koan.Web"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
-      "claims": []
+      "readme": "src/Koan.Tenancy.Web/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Tenancy.Web/TECHNICAL.md",
+      "claims": [
+        "tenant-isolation-administration"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Testing",

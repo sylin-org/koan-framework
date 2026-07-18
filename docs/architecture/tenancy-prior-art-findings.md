@@ -1,5 +1,8 @@
 # Tenancy prior-art findings — control planes + config/policy layering
 
+> **Research input, not current product truth.** Proposed invitation, lifecycle, and configuration surfaces below
+> remain prior-art observations only. See the [current Tenancy how-to](../guides/tenancy-howto.md) for supported APIs.
+
 - Date: 2026-06-22
 - Source: prior-art sweep workflow `wf_25fb6f0c-992` (5 clusters · 29 frameworks · real web + `gh` research → synthesis).
 - Purpose: validate / challenge **ARCH-0099 §6** (control plane + the `Koan.Tenancy.Web` portal) and **§7** (the tenant configuration plane) against the field, and pull concrete refinements.
