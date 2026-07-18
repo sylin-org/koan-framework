@@ -1,7 +1,7 @@
 # Sylin.Koan.Storage.Abstractions
 
-Provider-neutral contracts for Koan object storage. This package defines storage services, providers, object metadata,
-optional backend capabilities, and model binding without registering the Storage runtime or selecting a backend.
+Inert provider, service, object, capability, and binding contracts for Koan Storage. Reference this package to build a
+provider or a module that speaks Storage without activating routing, IO, or Entity behavior.
 
 ## Install
 
@@ -9,40 +9,41 @@ optional backend capabilities, and model binding without registering the Storage
 dotnet add package Sylin.Koan.Storage.Abstractions
 ```
 
-Applications normally reference `Sylin.Koan.Storage` and a provider package. Reference Abstractions directly when
-authoring a storage provider or a module that must describe storage behavior without activating it.
+Applications normally install a functional provider package instead; it brings the Storage runtime transitively.
 
 ## Smallest meaningful use
 
-A provider implements the required byte lifecycle and advertises only guarantees it actually supplies:
-
 ```csharp
+using Koan.Core.Capabilities;
 using Koan.Storage.Abstractions;
+using Koan.Storage.Abstractions.Capabilities;
 
 public sealed class ArchiveProvider : IStorageProvider
 {
     public string Name => "archive";
-    public StorageProviderCapabilities Capabilities => new(
-        SupportsSequentialRead: true,
-        SupportsSeek: false,
-        SupportsPresignedRead: false,
-        SupportsServerSideCopy: false);
+    public StorageProviderPlacement Placement => StorageProviderPlacement.Remote;
+
+    public void Describe(ICapabilities caps)
+        => caps.Add(StorageCaps.SequentialRead);
 
     // Implement Write, OpenRead, OpenReadRange, Delete, and Exists.
 }
 ```
 
-Implement `IStatOperations`, `IListOperations`, `IServerSideCopy`, or `IPresignOperations` only when the backend can
-honor that optional operation. `StorageBindingAttribute` carries an Entity model's logical profile/container intent.
+Add `IStatOperations`, `IListOperations`, `IServerSideCopy`, or `IPresignOperations` only when the provider can perform
+that operation, and declare the matching `StorageCaps` token. Storage rejects inconsistent claims during composition.
+Use `[ProviderPriority]` only when this provider should win automatic election over another provider in the same
+placement.
 
 ## Guarantees and boundaries
 
-- Referencing this package alone performs no discovery, dependency injection, routing, IO, or provider election.
-- `IStorageProvider` is the backend SPI; `IStorageService` is the runtime orchestration boundary consumed by modules.
-- `StorageObject` and `ObjectStat` report observed metadata; they do not imply durability, atomicity, consistency,
-  checksum verification, public access, or presign support.
-- Range semantics, listing consistency, server-side copy, and presigned URLs remain explicit provider capabilities.
-- Routing, fallback policy, segmentation, replication, validation, and Entity operations belong to
+- This package contains no `KoanModule`; referencing it alone registers and activates nothing.
+- `StorageProviderPlacement` describes topology, while `StorageCaps` describes backend guarantees. Provider names do
+  not imply either.
+- `IStorageProvider` is the backend SPI. `IStorageService` is the functional runtime boundary consumed by modules.
+- Result objects report observed metadata; they do not imply durability, consistency, atomicity, public access, or
+  distributed transactions.
+- Profile policy, provider election, replication, segmentation, Entity helpers, and startup reporting belong to
   `Sylin.Koan.Storage`.
 
-See [TECHNICAL.md](./TECHNICAL.md) for the complete contract ownership map.
+See [TECHNICAL.md](./TECHNICAL.md) for contract ownership and provider-author rules.

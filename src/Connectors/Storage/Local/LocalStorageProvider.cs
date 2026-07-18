@@ -1,36 +1,65 @@
 using Koan.Storage.Abstractions;
+using Koan.Storage.Abstractions.Capabilities;
 
 namespace Koan.Storage.Connector.Local;
 
+using Koan.Core;
+using Koan.Core.Capabilities;
+using Koan.Storage.Connector.Local.Infrastructure;
 using Microsoft.Extensions.Options;
 using Koan.Storage;
 using System.Security.Cryptography;
 using System.Text;
 
+[ProviderPriority(0)]
 public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IServerSideCopy, IListOperations
 {
-    private readonly IOptionsMonitor<LocalStorageOptions> _options;
+    private readonly string _basePath;
 
-    public LocalStorageProvider(IOptionsMonitor<LocalStorageOptions> options)
+    public LocalStorageProvider(IOptions<LocalStorageOptions> options)
     {
-        _options = options;
+        ArgumentNullException.ThrowIfNull(options);
+        if (string.IsNullOrWhiteSpace(options.Value.BasePath))
+        {
+            throw new InvalidOperationException(
+                "Local storage requires Koan:Storage:Providers:Local:BasePath. Configure a directory path.");
+        }
+
+        _basePath = Path.GetFullPath(options.Value.BasePath);
+        Directory.CreateDirectory(_basePath);
     }
 
-    public string Name => "local";
+    public string Name => LocalStorageConstants.ProviderName;
+    public StorageProviderPlacement Placement => StorageProviderPlacement.Local;
 
-    public StorageProviderCapabilities Capabilities => new(true, true, false, true);
+    public void Describe(ICapabilities caps)
+        => caps.Add(StorageCaps.SequentialRead)
+            .Add(StorageCaps.Seek)
+            .Add(StorageCaps.ServerSideCopy)
+            .Add(StorageCaps.Stat)
+            .Add(StorageCaps.List);
 
     public async Task Write(string container, string key, Stream content, string? contentType, CancellationToken ct = default)
     {
         var path = GetPath(container, key);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var temp = path + ".tmp-" + Guid.CreateVersion7().ToString("N");
-        using (var fs = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
+        try
         {
-            await content.CopyToAsync(fs, ct);
+            await using (var fs = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                await content.CopyToAsync(fs, ct);
+                await fs.FlushAsync(ct);
+            }
+
+            File.Move(temp, path, overwrite: true);
         }
-        if (File.Exists(path)) File.Delete(path);
-        File.Move(temp, path);
+        finally
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); }
+            catch (IOException) { /* Preserve the primary write failure. */ }
+            catch (UnauthorizedAccessException) { /* Preserve the primary write failure. */ }
+        }
     }
 
     public Task<Stream> OpenRead(string container, string key, CancellationToken ct = default)
@@ -98,12 +127,13 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
 
     private string GetPath(string container, string key)
     {
-        var basePath = _options.CurrentValue.BasePath ?? throw new InvalidOperationException("Local storage BasePath not configured.");
         var safeKey = SanitizeKey(key);
-        var path = Path.Combine(basePath, container ?? "", Shard(safeKey), safeKey);
+        var path = Path.Combine(_basePath, container ?? "", Shard(safeKey), safeKey);
         var full = Path.GetFullPath(path);
-        var fullBase = Path.GetFullPath(basePath);
-        if (!full.StartsWith(fullBase, StringComparison.OrdinalIgnoreCase))
+        var relative = Path.GetRelativePath(_basePath, full);
+        if (Path.IsPathRooted(relative)
+            || relative.Equals("..", StringComparison.Ordinal)
+            || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("Path traversal detected.");
         }
@@ -139,8 +169,7 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
 
     public async IAsyncEnumerable<StorageObjectInfo> ListObjects(string container, string? prefix = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        var basePath = _options.CurrentValue.BasePath ?? throw new InvalidOperationException("Local storage BasePath not configured.");
-        var containerPath = Path.Combine(basePath, container ?? "");
+        var containerPath = GetContainerPath(container);
 
         if (!Directory.Exists(containerPath))
             yield break;
@@ -183,6 +212,20 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
                 await Task.Yield();
             }
         }
+    }
+
+    private string GetContainerPath(string? container)
+    {
+        var full = Path.GetFullPath(Path.Combine(_basePath, container ?? ""));
+        var relative = Path.GetRelativePath(_basePath, full);
+        if (Path.IsPathRooted(relative)
+            || relative.Equals("..", StringComparison.Ordinal)
+            || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Path traversal detected.");
+        }
+
+        return full;
     }
 
     private static async Task CopyRange(Stream from, Stream to, long bytesToCopy, CancellationToken ct)

@@ -40,7 +40,7 @@ and generated quality report. It does not run the complete release ratchet.
 |---|---|---|
 | foundation runtime | Core, Data contracts/runtime, JSON, SQLite, Web, Communication | passed |
 | contract isolation | ZenGarden, AI contracts, Vector/Media/Storage abstractions, Orchestration CLI contracts | passed |
-| provider families | Data, Vector, AI, Cache, Storage, Auth, Orchestration providers | pending |
+| provider families | Data, Vector, AI, Cache, Storage, Auth, Orchestration providers | Storage passed; remaining pending |
 | semantic capabilities | Jobs, MCP, AI, Cache, Tenancy, Identity, Canon, Media, Classification, Security | pending |
 | projections and tools | Web add-ons, testing, analyzers, generators, CLI and operator surfaces | pending |
 
@@ -160,6 +160,105 @@ activation, and agent-readable dependency intent consequently agree.
 
 The contract-isolation family passes. Provider prose and the stale Local connector suite remain explicit work in the
 next family; no full release certification ran here.
+
+### Storage provider-family discovery
+
+**Task:** graduate the Local and S3 provider packages by rebuilding Storage provider description, election, routing,
+proof, and prose around one compiled pillar plan.
+
+**Application intent:** “Store this Entity-backed object locally or in S3; when I reference both providers, compose
+the declared Storage mode without vendor-specific application code.”
+
+**Public expression:** reference `Sylin.Koan.Storage.Connector.Local` or
+`Sylin.Koan.Storage.Connector.S3`, call the application's existing `AddKoan()`, declare a
+`StorageEntity<TEntity>` (optionally with `[StorageBinding]`), and configure the profile/container plus the selected
+provider's physical connection settings. No Storage-specific registration call is part of the supported path.
+
+**Guarantee/correction:** an exact provider pin wins; otherwise Storage deterministically elects the highest-priority
+provider for the profile's Local/Remote placement and compiles each profile once. A sole profile is the implicit
+default; several profiles require `DefaultProfile` or an explicit operation/binding profile. Unknown pins, ambiguous
+defaults, absent providers, invalid containers, and explicitly requested replication without both placements fail
+with a corrective error instead of weakening intent. Capability claims and optional provider interfaces must agree.
+
+**Complete intent surface:** package reference, `AddKoan()`, Entity/binding code, logical profile/container, and
+backend connection settings are the complete surface. Provider authors additionally declare stable `Name`,
+`StorageProviderPlacement`, unified `StorageCaps`, and optional `[ProviderPriority]`; they implement no election,
+routing, reporting, or manual-registration machinery.
+
+**Public concepts:** `StorageCaps` expresses backend guarantees through the framework-wide capability vocabulary;
+`StorageProviderPlacement` supplies the Local/Remote fact required by automatic topology; existing
+`ProviderPriorityAttribute` expresses deterministic fallback rank. `StorageFallbackMode`, `ValidateOnStart`, the
+boolean `StorageProviderCapabilities` bag, and manual Storage/provider DI extensions do not represent necessary
+application decisions and will not survive.
+
+**Docs read:** `architecture/principles.md` requires business-first APIs, one composition kernel, and compiled hot
+paths; ARCH-0084 explicitly assigns Storage to unified capability tokens; ARCH-0115 assigns generic election mechanics
+to Core and routing meaning to Storage; the Storage package pages establish profile, segmentation, transfer, and
+provider boundaries; STOR-0005 preserves Local filesystem safety requirements; the quality report identifies Local's
+weak package expression and S3's missing owned docs.
+
+**Code read:** `StorageService` currently mixes object operations with profile validation, name-heuristic placement,
+selection, replication construction, and reload-shaped options access; `StorageModule` owns the supported activation
+path; Local and S3 providers own physical IO but duplicate registration/configuration helpers; the stale Local suite
+tests former shapes rather than current auto-detection; `ProviderCatalog<T>` and Cache/Data selectors are the closest
+shared pattern for normalized identity, priority, stable ties, and selection receipts.
+
+**Reusing:** Core `ProviderCatalog<TProvider>`, `ProviderMetadata`, `ProviderSelectionReceipt`, unified
+`CapabilitySet`/`IDescribesCapabilities`, standard .NET Options/DI, Storage's existing `IStorageService` segmentation
+decorator, and provider optional-operation interfaces already exist.
+
+**Creating new:** `StorageCaps` and `StorageProviderPlacement` live in `Koan.Storage.Abstractions` because provider
+authors and the runtime share them; `StorageProviderCatalog`, `StorageRoutingPlan`, and their immutable route records
+live under `Koan.Storage/Routing` because Storage owns placement and profile policy; `StorageCompositionFacts` lives
+under `Koan.Storage/Composition` so startup/facts project the compiled authority; S3 receives package-owned README and
+TECHNICAL documents. No application-facing registration type is added.
+
+**Coalescence:** closest patterns are Core `ProviderCatalog<T>`, Data's host catalog, and Cache's placement resolver.
+Disposition: keep the Core catalog mechanics; rebuild Storage selection around them; absorb validation, defaulting,
+placement election, replication composition, and receipts into one immutable Storage routing plan; keep
+`StorageService` as a thin operation executor; delete the provider-name heuristic, boolean capability record,
+per-operation routing negotiation, duplicate manual DI extensions, duplicate S3 options configurator, and stale test
+model. Core is too wide for Storage modes; an adapter is too narrow to select peers or defaults.
+
+**Ergonomics:** application code gains no new branch and loses unsupported setup paths. IntelliSense gives provider
+authors one capability catalog and one placement fact. Humans and coding models see the same reference → profile →
+meaningful Entity operation story; startup, facts, errors, and tests read from the same compiled routes.
+
+**Constraints satisfied:** no HTTP surface; no data scan; constants/options remain at their current owners; runtime
+routing compiles once; provider IO stays adapter-local; package docs and generated reference truth update in the same
+slice; only focused Storage tests/builds/packs run before R11-07.
+
+**Risks:** S3's ZenGarden discovery is lazy, so capability support must describe the adapter mechanism while health
+and first-use errors describe endpoint readiness; replication owns background resources and therefore the compiled
+plan must dispose composites with the host; changing profile options after host composition is intentionally not a
+supported hidden reload path.
+
+### Storage provider-family evidence
+
+- Storage now has one immutable routing authority. Core's generic `ProviderCatalog<T>` owns normalized identity,
+  priority, and stable ties; `StorageProviderCatalog` owns placement/capability qualification; `StorageRoutingPlan`
+  owns profile validation, defaulting, exact pins, election receipts, and replicated composition. `StorageService`
+  is consequently a thin IO/transfer executor and performs no runtime provider negotiation.
+- Local and S3 declare only stable identity, placement, unified capability tokens, priority, and physical IO.
+  Replicated routes preserve automatic versus required intent, explicit replication fails rather than degrades, and
+  partially compiled composites are disposed if a later startup correction rejects the plan.
+- Deleted concepts have no replacement ceremony: the provider-name heuristic, boolean capability bag,
+  `StorageFallbackMode`, `ValidateOnStart`, manual Storage/provider registration extensions, duplicate S3 options
+  configurator, per-operation route compilation, and the obsolete 335-line Local test model are gone.
+- Focused behavior passes: Storage Core 20/20; Local filesystem 24/24 including container/key traversal rejection;
+  Tenancy Storage isolation 12/12; Media Web startup 4/4; Backup Storage acceptance 5/5; and the real `AddKoan()`
+  Storage bootstrap/facts contract 1/1. SnapVault, the current Local/Media dogfood application, builds warning-free.
+- Storage, Local, and S3 Release builds complete with zero warnings/errors. The integration bootstrap retains a known
+  stale test-project reference warning for the already retired `Koan.Core.Adapters`; its executable Storage contract
+  passes and this slice does not conceal or broaden that unrelated fixture debt.
+- Local `0.17.2` and S3 `0.17.3` evidence packages contain package-owned README, canonical icon, symbols, and the
+  expected functional/contract dependencies. Generated truth contains 108 packages: 32 repair-required,
+  49 review-required, 27 structurally ready. Both Storage connectors now have zero objective quality findings.
+- S3 has warning-clean source and artifact proof plus existing application dogfood, but no hermetic MinIO/S3 engine
+  conformance suite in this slice. Its package page therefore states buffering, endpoint readiness, and backend
+  semantics conservatively; this evidence graduates package expression, not every compatible S3 implementation.
+
+The Storage provider subfamily passes. The complete release ratchet remains reserved for R11-07.
 
 ## Acceptance
 

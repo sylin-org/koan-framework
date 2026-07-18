@@ -1,4 +1,7 @@
 using Koan.Storage.Abstractions;
+using Koan.Storage.Abstractions.Capabilities;
+using Koan.Core;
+using Koan.Core.Capabilities;
 using Koan.Core.Logging;
 using Koan.ZenGarden;
 using Microsoft.Extensions.Logging;
@@ -22,16 +25,18 @@ namespace Koan.Storage.Connector.S3;
 /// at first use via the connected Moss's S3 port catalog (ZenGarden.Client.BoundEndpoint).
 /// Storage is a first-class garden concept — not an offering.
 /// </summary>
+[ProviderPriority(0)]
 public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServerSideCopy, IListOperations, IPresignOperations, IDisposable
 {
-    private readonly IOptionsMonitor<S3StorageOptions> _options;
+    private readonly IOptions<S3StorageOptions> _options;
     private readonly ILogger<S3StorageProvider>? _logger;
     private readonly IZenGardenClient? _zenGardenClient;
     private readonly HttpClient _presignHttpClient;
+    private readonly object _clientGate = new();
     private IMinioClient? _client;
 
     public S3StorageProvider(
-        IOptionsMonitor<S3StorageOptions> options,
+        IOptions<S3StorageOptions> options,
         ILogger<S3StorageProvider>? logger = null,
         IZenGardenClient? zenGardenClient = null)
     {
@@ -39,17 +44,19 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         _logger = logger;
         _zenGardenClient = zenGardenClient;
         _presignHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-        _options.OnChange(_ => RebuildClient());
     }
 
     public string Name => Infrastructure.S3StorageConstants.ProviderName;
+    public StorageProviderPlacement Placement => StorageProviderPlacement.Remote;
 
-    public StorageProviderCapabilities Capabilities => new(
-        SupportsSequentialRead: true,
-        SupportsSeek: true,
-        SupportsPresignedRead: HasMossEndpoint(),
-        SupportsServerSideCopy: true
-    );
+    public void Describe(ICapabilities caps)
+        => caps.Add(StorageCaps.SequentialRead)
+            .Add(StorageCaps.Seek)
+            .Add(StorageCaps.PresignedRead)
+            .Add(StorageCaps.PresignedWrite)
+            .Add(StorageCaps.ServerSideCopy)
+            .Add(StorageCaps.Stat)
+            .Add(StorageCaps.List);
 
     public async Task Write(string container, string key, Stream content, string? contentType, CancellationToken ct = default)
     {
@@ -150,7 +157,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
             var stat = await Head(container, key, ct);
             return stat is not null;
         }
-        catch
+        catch (Minio.Exceptions.BucketNotFoundException)
         {
             return false;
         }
@@ -225,22 +232,23 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
 
     private IMinioClient GetClient()
     {
-        if (_client is not null) return _client;
-
-        // Try explicit config first
-        RebuildClient();
-        if (_client is not null) return _client;
-
-        // Lazy resolution via ZenGarden: use BoundEndpoint + S3 port catalog
-        if (TryResolveViaZenGarden())
+        lock (_clientGate)
         {
-            RebuildClient();
             if (_client is not null) return _client;
-        }
 
-        throw new InvalidOperationException(
-            "S3 endpoint not resolved. Ensure Zen Garden is connected and a storage replica set is available, " +
-            "or set Koan:Storage:Providers:S3:Endpoint explicitly.");
+            BuildClient();
+            if (_client is not null) return _client;
+
+            if (TryResolveViaZenGarden())
+            {
+                BuildClient();
+                if (_client is not null) return _client;
+            }
+
+            throw new InvalidOperationException(
+                "S3 endpoint not resolved. Ensure Zen Garden is connected and a storage replica set is available, " +
+                "or set Koan:Storage:Providers:S3:Endpoint explicitly.");
+        }
     }
 
     /// <summary>
@@ -260,7 +268,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
 
         try
         {
-            var replicaSet = _options.CurrentValue.ReplicaSet ?? "storage";
+            var replicaSet = _options.Value.ReplicaSet ?? "storage";
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
             var path = $"/api/v1/garden/storage/{Uri.EscapeDataString(replicaSet)}";
 
@@ -302,9 +310,9 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         if (!response.IsSuccessStatusCode) return null;
 
         var json = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
-        return root.TryGetProperty("data", out var data) ? data : root;
+        return (root.TryGetProperty("data", out var data) ? data : root).Clone();
     }
 
     private bool TryExtractS3(JsonElement data, string stoneEndpoint)
@@ -319,7 +327,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         if (string.IsNullOrWhiteSpace(s3Endpoint))
             return false;
 
-        var opts = _options.CurrentValue;
+        var opts = _options.Value;
         opts.Endpoint = s3Endpoint;
         opts.MossEndpoint = stoneEndpoint;
         if (!string.IsNullOrWhiteSpace(accessKey)) opts.AccessKey = accessKey;
@@ -350,9 +358,9 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         return firstEndpoint;
     }
 
-    private void RebuildClient()
+    private void BuildClient()
     {
-        var opts = _options.CurrentValue;
+        var opts = _options.Value;
         if (string.IsNullOrWhiteSpace(opts.Endpoint)) return;
 
         var handler = new S3DiagnosticHandler(_logger);
@@ -378,7 +386,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
 
     private string ResolveBucket(string container)
     {
-        var prefix = _options.CurrentValue.BucketPrefix;
+        var prefix = _options.Value.BucketPrefix;
 
         // Lazy resolve: if configurator ran before AppHost.Identity was populated,
         // BucketPrefix may be the default. Re-check at request time.
@@ -388,7 +396,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
             if (!string.IsNullOrWhiteSpace(appCode) && appCode != "koan-app")
             {
                 prefix = appCode;
-                _options.CurrentValue.BucketPrefix = prefix;
+                _options.Value.BucketPrefix = prefix;
             }
         }
 
@@ -415,7 +423,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         string container, string key, string method, TimeSpan expiry,
         string? contentType, CancellationToken ct)
     {
-        var mossEndpoint = _options.CurrentValue.MossEndpoint;
+        var mossEndpoint = _options.Value.MossEndpoint;
         if (string.IsNullOrWhiteSpace(mossEndpoint))
         {
             throw new NotSupportedException(
@@ -463,22 +471,6 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
             ("bucket", bucket),
             ("key", key));
         return new Uri(presignedUrl);
-    }
-
-    private bool HasMossEndpoint()
-    {
-        return !string.IsNullOrWhiteSpace(_options.CurrentValue.MossEndpoint);
-    }
-
-    /// <summary>
-    /// Swaps the internal MinIO client to point at a new endpoint.
-    /// Called by <c>GardenAwareEndpointManager</c> on endpoint change.
-    /// </summary>
-    internal void SwapClient(IMinioClient newClient)
-    {
-        var old = _client;
-        _client = newClient;
-        (old as IDisposable)?.Dispose();
     }
 
     public void Dispose()

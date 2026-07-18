@@ -38,10 +38,13 @@ public sealed class MediaStartupContractSpec(MediaWebHostFixture fixture)
     public async Task Invalid_recipe_registry_fails_host_startup()
     {
         var current = AppHost.Current;
+        var storageRoot = Path.Combine(Path.GetTempPath(), "koan-media-invalid-startup", Guid.NewGuid().ToString("n"));
         try
         {
             var start = () => KoanIntegrationHost.Configure()
                 .WithSetting("Koan:Environment", "Test")
+                .WithSetting("Koan:Storage:Profiles:test:Container", "media")
+                .WithSetting("Koan:Storage:Providers:Local:BasePath", storageRoot)
                 .WithSetting("Koan:Media:Recipes:invalid-startup:Steps:0:Op", "not-a-media-operation")
                 .ConfigureServices(services =>
                 {
@@ -56,6 +59,8 @@ public sealed class MediaStartupContractSpec(MediaWebHostFixture fixture)
         finally
         {
             AppHost.Current = current;
+            try { if (Directory.Exists(storageRoot)) Directory.Delete(storageRoot, recursive: true); }
+            catch { /* best-effort temp cleanup */ }
         }
     }
 }

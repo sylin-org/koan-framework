@@ -3,7 +3,9 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using Koan.Core.Capabilities;
 using Koan.Storage.Abstractions;
+using Koan.Storage.Abstractions.Capabilities;
 using Koan.Storage.Replication;
 using Xunit;
 
@@ -72,9 +74,12 @@ public sealed class ReplicatedStorageProviderFailurePathSpec
         public FakeProvider(string name) => Name = name;
 
         public string Name { get; }
+        public StorageProviderPlacement Placement => Name == "cache"
+            ? StorageProviderPlacement.Local
+            : StorageProviderPlacement.Remote;
 
-        public StorageProviderCapabilities Capabilities { get; } =
-            new(SupportsSequentialRead: true, SupportsSeek: true, SupportsPresignedRead: false, SupportsServerSideCopy: false);
+        public void Describe(ICapabilities caps)
+            => caps.Add(StorageCaps.SequentialRead).Add(StorageCaps.Seek);
 
         public Func<Exception>? ExistsThrow { get; set; }
         public bool ExistsResult { get; set; }

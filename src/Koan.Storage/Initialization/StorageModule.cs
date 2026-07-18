@@ -7,9 +7,12 @@ using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Storage;
 using Koan.Storage.Abstractions;
+using Koan.Storage.Composition;
 using Koan.Storage.Infrastructure;
 using Koan.Storage.Identity;
 using Koan.Storage.Options;
+using Koan.Storage.Routing;
+using Koan.Core.Composition;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Provenance;
 using StorageItems = Koan.Storage.Infrastructure.StorageProvenanceItems;
@@ -33,6 +36,8 @@ public sealed class StorageModule : KoanModule
                 .GetServices<Koan.Core.Semantics.Segmentation.ISegmentationRealization>()
                 .OfType<StorageIdentityPlan>()
                 .Single());
+            services.AddSingleton<StorageProviderCatalog>();
+            services.AddSingleton<StorageRoutingPlan>();
             // Expose Storage's physical-identity chokepoint around the concrete provider. With no active
             // segmentation dimensions the decorator is a byte-identical pass-through.
             services.AddSingleton<StorageService>();
@@ -40,6 +45,14 @@ public sealed class StorageModule : KoanModule
                 sp.GetRequiredService<StorageService>(),
                 sp.GetRequiredService<StorageIdentityPlan>()));
         }
+    }
+
+    public override Task Start(IServiceProvider services, CancellationToken ct)
+    {
+        // Resolve eagerly when Koan owns the standard pipeline. A deliberately supplied
+        // IStorageService remains authoritative and does not need provider/profile machinery.
+        _ = services.GetService<StorageRoutingPlan>();
+        return Task.CompletedTask;
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
@@ -73,29 +86,9 @@ public sealed class StorageModule : KoanModule
             sourceKey: defaultProfile.ResolvedKey,
             usedDefault: defaultProfile.UsedDefault);
 
-        var fallback = Core.Configuration.ReadWithSource(
-            cfg,
-            $"{StorageConstants.Constants.Configuration.Section}:{StorageConstants.Constants.Configuration.Keys.FallbackMode}",
-            StorageFallbackMode.SingleProfileOnly);
-
-        module.AddSetting(
-            StorageItems.FallbackMode,
-            ProvenanceModes.FromConfigurationValue(fallback),
-            fallback.Value,
-            sourceKey: fallback.ResolvedKey,
-            usedDefault: fallback.UsedDefault);
-
-        var validate = Core.Configuration.ReadWithSource(
-            cfg,
-            $"{StorageConstants.Constants.Configuration.Section}:{StorageConstants.Constants.Configuration.Keys.ValidateOnStart}",
-            true);
-
-        module.AddSetting(
-            StorageItems.ValidateOnStart,
-            ProvenanceModes.FromConfigurationValue(validate),
-            validate.Value,
-            sourceKey: validate.ResolvedKey,
-            usedDefault: validate.UsedDefault);
     }
+
+    public override void ReportComposition(KoanCompositionBuilder composition, IServiceProvider services)
+        => StorageCompositionFacts.Project(composition, services, Id);
 }
 

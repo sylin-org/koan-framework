@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: R11-05 foundation and contract-isolation families passed; provider families next
+  scope: R11-05 foundation, contract-isolation, and Storage provider families passed; remaining providers next
 ---
 
 # Koan V1 reorganization current handoff
@@ -125,11 +125,13 @@ Replace this file at every handoff. It is a restart point, not a diary.
   owners; ZenGarden was renamed to an inert Contracts boundary; AI and Vector contracts shed functional leakage;
   Storage gained one necessary inert Abstractions package; and functional `MediaEntity<TEntity>` moved to Media Core
   under the application namespace `Koan.Media`.
-- Current generated truth contains 108 packages: 33 repair-required, 50 review-required, 25 structurally ready, and
-  208 findings. Focused Storage/Media behavior passes 3/3 + 562/562 + 4/4 + 12/12 isolation; the four affected package
-  artifacts contain owned README/icon assets and honest functional/contract dependency graphs.
-- The Local Storage connector's legacy test project compiles against obsolete option/profile/capability shapes. It
-  remains an explicit provider-family repair and is not represented as graduated; the shipping provider builds clean.
+- The Storage provider subfamily now passes. One compiled plan owns profile validation, exact pins, placement
+  election, replication, capability truth, and receipts; adapters own physical IO and `StorageService` executes the
+  chosen route. Unsupported registration/fallback/capability shapes and the obsolete Local suite are deleted.
+- Current generated truth contains 108 packages: 32 repair-required, 49 review-required, 27 structurally ready.
+  Storage Core 20/20, Local 24/24, Tenancy isolation 12/12, Media Web 4/4, Backup acceptance 5/5, and real bootstrap
+  1/1 pass. Local and S3 packages contain owned README/icon assets and have zero structural findings. S3 engine
+  conformance remains an honestly stated evidence gap rather than an inferred compatibility claim.
 - No package, tag, GitHub Release, branch, or remote configuration was published or mutated. Initial coherent
   public observation and a later real public-to-candidate upgrade/rollback remain separate gates.
 
@@ -152,9 +154,9 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with provider families. Start each provider
-pillar with focused topology/coalescence discovery, repair the Local Storage conformance project as part of its real
-provider review, then graduate package prose and artifacts only after the boundary and guarantees are executable.
+Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the next provider pillar. Start with focused
+topology/coalescence discovery, choose the smallest family whose boundary can become executable in one slice, and
+graduate package prose and artifacts only after its responsibility chokepoints and guarantees are proved.
 
 Keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared. Do not mutate remote settings, push,
 tag, release, or publish until package polish is accepted and separate remote-operation authorization is renewed.

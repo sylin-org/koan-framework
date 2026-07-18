@@ -2,25 +2,28 @@
 
 ## Boundary
 
-This assembly is inert. It contains no `KoanModule`, service registration, provider selection, configuration binding,
-ambient host access, or backend client. Its only project dependency is `Sylin.Koan.Data.Abstractions`, required by
-`IStorageObject : IEntity<string>`.
+This assembly is inert: no module, registration, configuration binding, provider selection, host state, or backend
+client. Its Data Abstractions dependency exists only for `IStorageObject : IEntity<string>`.
 
 ## Contract groups
 
-- `IStorageProvider` owns the required provider byte lifecycle: write, read, ranged read, delete, and existence.
-- `IStorageService` is the provider-neutral orchestration seam exposed by the active Storage runtime.
-- `IStatOperations`, `IListOperations`, `IServerSideCopy`, and `IPresignOperations` are optional provider facets.
-- `StorageProviderCapabilities` is the compact capability declaration used during provider inspection.
+- `IStorageProvider` defines the mandatory byte lifecycle and requires a stable name, topology placement, and unified
+  capability declaration.
+- `StorageCaps` is the one declaration vocabulary used by routing, optional-operation guards, facts, and tests.
+- `IStatOperations`, `IListOperations`, `IServerSideCopy`, and `IPresignOperations` are optional execution facets.
+- `IStorageService` is the provider-neutral chokepoint implemented by the active Storage runtime.
 - `StorageObject`, `IStorageObject`, `ObjectStat`, and `StorageObjectInfo` are cross-module result shapes.
-- `StorageBindingAttribute` is application intent for logical profile/container placement; the runtime interprets it.
+- `[StorageBinding]` carries an Entity model's logical profile/container intent; contracts do not interpret it.
 
-## Ownership rules
+## Provider conformance
 
-Provider packages may implement these contracts but do not place backend clients or options here. The Storage runtime
-owns routing, identity/segmentation, replication, validation, transfer fallback, metadata enrichment, Entity helpers,
-and startup reporting. Callers must not infer optional operations from provider names; they use the advertised
-capabilities/interfaces and accept `NotSupportedException` when a requested guarantee is unavailable.
+A provider's optional interface and matching capability token are an inseparable claim. At host composition Storage
+rejects a token without its operation interface and an interface without its token. Capabilities describe what the
+adapter can faithfully implement; endpoint readiness and credentials remain configuration/health concerns.
 
-No type in this package activates Storage. That property is the reason this package exists as a separate reference
-intent.
+`StorageProviderPlacement.Local` participates as a cache/local tier; `Remote` participates as a durable/network tier.
+`Composite` is reserved for an already-composed mechanism. Higher `[ProviderPriority]` wins automatic election within
+one placement, with stable provider identity breaking ties. Exact application pins bypass automatic rank.
+
+Provider packages own protocol clients, options, health, and physical IO. The Storage runtime owns profile semantics,
+selection, replication composition, logical/physical identity, transfers, and evidence projection.

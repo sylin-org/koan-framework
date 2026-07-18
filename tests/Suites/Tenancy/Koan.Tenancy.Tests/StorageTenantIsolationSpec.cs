@@ -4,9 +4,11 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using Koan.Core.Capabilities;
 using Koan.Media;
 using Koan.Core.Semantics.Segmentation;
 using Koan.Storage.Abstractions;
+using Koan.Storage.Abstractions.Capabilities;
 using Koan.Storage.Extensions;
 using Koan.Storage;
 using Koan.Storage.Keys;
@@ -49,7 +51,12 @@ public sealed class StorageTenantIsolationSpec
     private sealed class CapturingPresignProvider : IStorageProvider, IPresignOperations
     {
         public string Name => "capturing-presign";
-        public StorageProviderCapabilities Capabilities => new(true, true, true, false);
+        public StorageProviderPlacement Placement => StorageProviderPlacement.Remote;
+        public void Describe(ICapabilities caps)
+            => caps.Add(StorageCaps.SequentialRead)
+                .Add(StorageCaps.Seek)
+                .Add(StorageCaps.PresignedRead)
+                .Add(StorageCaps.PresignedWrite);
         public List<string> ReadKeys { get; } = [];
         public List<string> WriteKeys { get; } = [];
 

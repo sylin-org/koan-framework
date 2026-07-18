@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
+using Koan.Core.Capabilities;
 using Koan.Storage.Abstractions;
+using Koan.Storage.Abstractions.Capabilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -60,13 +62,18 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         _syncTask = Task.Run(() => BackgroundSyncLoop(_cts.Token));
     }
 
-    public string Name => $"replicated:{_cache.Name}+{_durable.Name}";
+    public string Name => $"replicated:{_cache.Name}:{_durable.Name}";
+    public StorageProviderPlacement Placement => StorageProviderPlacement.Composite;
 
-    public StorageProviderCapabilities Capabilities => new(
-        SupportsSequentialRead: true,
-        SupportsSeek: _cache.Capabilities.SupportsSeek,
-        SupportsPresignedRead: false,
-        SupportsServerSideCopy: false);
+    public void Describe(ICapabilities caps)
+    {
+        caps.Add(StorageCaps.SequentialRead)
+            .Add(StorageCaps.Stat)
+            .Add(StorageCaps.List);
+
+        if (StorageCaps.Describe(_cache, _cache.Name).Has(StorageCaps.Seek))
+            caps.Add(StorageCaps.Seek);
+    }
 
     // ── Write flow ────────────────────────────────────────────────
 

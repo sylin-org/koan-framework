@@ -24,8 +24,7 @@ public sealed class LocalStorageModule : KoanModule
     {
         module.Describe(Version);
         var basePath = Core.Configuration.Read(cfg, $"{LocalStorageConstants.Configuration.Section}:{LocalStorageConstants.Configuration.Keys.BasePath}", "") ?? "";
-        module.AddSetting("BasePath", string.IsNullOrWhiteSpace(basePath) ? "(not set)" : basePath);
-        module.AddSetting("Capabilities", "seek=true, range=true, presign=false, copy=true");
+        module.AddSetting(LocalStorageConstants.Configuration.Keys.BasePath, string.IsNullOrWhiteSpace(basePath) ? "(not set)" : basePath);
     }
 }
 

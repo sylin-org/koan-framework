@@ -1677,7 +1677,7 @@
     {
       "packageId": "Sylin.Koan.Storage.Connector.Local",
       "shape": "library",
-      "description": "Local file-system storage provider for Koan.",
+      "description": "Safe local-filesystem provider for Koan Storage with seek, range, stat, listing, and same-provider copy.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1693,7 +1693,7 @@
     {
       "packageId": "Sylin.Koan.Storage.Connector.S3",
       "shape": "library",
-      "description": "S3-compatible storage provider for Koan. Connects to Zen Garden storage via Moss S3 gateway or any S3-compatible endpoint.",
+      "description": "S3-compatible Remote provider for Koan Storage with explicit or optional Zen Garden endpoint discovery.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1702,9 +1702,9 @@
         "Sylin.Koan.Storage.Abstractions",
         "Sylin.Koan.ZenGarden.Contracts"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "readme": "src/Connectors/Storage/S3/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Connectors/Storage/S3/TECHNICAL.md",
       "claims": []
     },
     {

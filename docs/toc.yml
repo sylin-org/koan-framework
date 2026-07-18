@@ -18,6 +18,8 @@
       href: guides/data/entity-access-and-streaming.md
     - name: Cache Entity state
       href: reference/data/cache.md
+    - name: Store Entity-backed files
+      href: reference/storage/index.md
     - name: Run durable jobs
       href: reference/cards/jobs.md
     - name: Use Entity Events and Transport

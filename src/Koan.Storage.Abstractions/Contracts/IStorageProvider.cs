@@ -1,9 +1,11 @@
+using Koan.Core.Capabilities;
+
 namespace Koan.Storage.Abstractions;
 
-public interface IStorageProvider
+public interface IStorageProvider : IDescribesCapabilities
 {
     string Name { get; }
-    StorageProviderCapabilities Capabilities { get; }
+    StorageProviderPlacement Placement { get; }
 
     Task Write(string container, string key, Stream content, string? contentType, CancellationToken ct = default);
     Task<Stream> OpenRead(string container, string key, CancellationToken ct = default);

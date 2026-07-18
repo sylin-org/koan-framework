@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>S3-compatible storage provider for Koan. Connects to Zen Garden storage via Moss S3 gateway or any S3-compatible endpoint.</Description>
+    <Description>S3-compatible Remote provider for Koan Storage with explicit or optional Zen Garden endpoint discovery.</Description>
     <PackageTags>$(CommonPackageTags);storage;s3;minio;zen-garden</PackageTags>
   </PropertyGroup>
   <ItemGroup>

@@ -1,7 +1,9 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Koan.Storage.Connector.Local;
 
 public sealed class LocalStorageOptions
 {
-    public required string BasePath { get; init; }
+    [Required]
+    public string BasePath { get; set; } = "";
 }
-

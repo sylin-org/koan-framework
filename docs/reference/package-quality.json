@@ -3,12 +3,12 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 108,
-    "repairRequired": 33,
-    "reviewRequired": 50,
-    "structurallyReady": 25,
-    "ownedReadmes": 75,
-    "technicalCompanions": 65,
-    "findings": 208
+    "repairRequired": 32,
+    "reviewRequired": 49,
+    "structurallyReady": 27,
+    "ownedReadmes": 76,
+    "technicalCompanions": 66,
+    "findings": 201
   },
   "findingDefinitions": [
     {
@@ -1893,8 +1893,8 @@
       "projectPath": "src/Connectors/Storage/Local/Koan.Storage.Connector.Local.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
-      "description": "Local file-system storage provider for Koan.",
+      "status": "structurally-ready",
+      "description": "Safe local-filesystem provider for Koan Storage with seek, range, stat, listing, and same-provider copy.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1905,21 +1905,15 @@
       "readme": "src/Connectors/Storage/Local/README.md",
       "technicalDocumentation": "src/Connectors/Storage/Local/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "metadata.description.terse"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Storage.Connector.S3",
       "projectPath": "src/Connectors/Storage/S3/Koan.Storage.Connector.S3.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "repair-required",
-      "description": "S3-compatible storage provider for Koan. Connects to Zen Garden storage via Moss S3 gateway or any S3-compatible endpoint.",
+      "status": "structurally-ready",
+      "description": "S3-compatible Remote provider for Koan Storage with explicit or optional Zen Garden endpoint discovery.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1928,13 +1922,10 @@
         "Sylin.Koan.Storage.Abstractions",
         "Sylin.Koan.ZenGarden.Contracts"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Connectors/Storage/S3/README.md",
+      "technicalDocumentation": "src/Connectors/Storage/S3/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Templates",

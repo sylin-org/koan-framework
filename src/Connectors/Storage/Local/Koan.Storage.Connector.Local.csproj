@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Local file-system storage provider for Koan.</Description>
+    <Description>Safe local-filesystem provider for Koan Storage with seek, range, stat, listing, and same-provider copy.</Description>
     <PackageTags>$(CommonPackageTags);storage;local;filesystem</PackageTags>
   </PropertyGroup>
   <ItemGroup>

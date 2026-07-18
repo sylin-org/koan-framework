@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core;
+using Koan.Core.Diagnostics;
 using Koan.Storage.Abstractions;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,11 +46,21 @@ public sealed class StoragePillarBootstrapSpec : IDisposable
         await using var host = await KoanIntegrationHost.Configure()
             .WithSetting("Koan:Storage:DefaultProfile", "local")
             .WithSetting("Koan:Storage:Profiles:local:Provider", "local")
-            .WithSetting("Koan:Storage:Profiles:local:Container", _tempRoot)
+            .WithSetting("Koan:Storage:Profiles:local:Container", "files")
+            .WithSetting("Koan:Storage:Providers:Local:BasePath", _tempRoot)
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 
         var storage = host.Services.GetRequiredService<IStorageService>();
         storage.Should().NotBeNull();
+
+        var facts = host.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts;
+        facts.Should().ContainSingle(fact =>
+            fact.Code == "koan.storage.profile.selected"
+            && fact.Subject == "storage:profile:local"
+            && fact.Summary.Contains("local", StringComparison.OrdinalIgnoreCase));
+        facts.Should().ContainSingle(fact =>
+            fact.Code == "koan.storage.default.resolved"
+            && fact.Subject == "storage:default-profile");
     }
 }
