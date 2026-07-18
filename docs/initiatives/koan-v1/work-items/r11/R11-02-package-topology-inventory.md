@@ -162,9 +162,9 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Web.Auth.Services` | `projection` | `assess` |
 | `Sylin.Koan.Web.Backup` | `projection` | `assess` |
 | `Sylin.Koan.Web.Extensions` | `capability` | `keep` |
-| `Sylin.Koan.Web.OpenApi` | `projection` | `assess` |
+| `Sylin.Koan.Web.OpenApi` | `projection` | `keep` |
 | `Sylin.Koan.Web.OpenGraph` | `projection` | `assess` |
-| `Sylin.Koan.Web.Sse` | `projection` | `assess` |
+| `Sylin.Koan.Web.Sse` | `projection` | `keep` |
 | `Sylin.Koan.ZenGarden` | `capability` | `assess` |
 | `Sylin.Koan.ZenGarden.Contracts` | `contracts` | `keep` |
 
@@ -229,7 +229,7 @@ terminal package decisions; the listed boundary repairs happen before graduation
 | `Sylin.Koan.Data.Connector.Cockroach` | `keep` | CockroachDB provider with independent identity/discovery/health and an explicit primary-key stable-order delta over shared Npgsql mechanics. It no longer references PostgreSQL. |
 | `Sylin.Koan.Data.Connector.SqlServer` | `keep` | SQL Server provider with distinct driver, JSON-computed projection, paging, and DDL mechanics; its repository does not yet justify forced convergence with SQLite or Npgsql. |
 | `Sylin.Koan.Web` | `keep` | Controller-first ASP.NET Core projection, health, and well-known inspectability. It is the direct owner of `EntityController<T>`. |
-| `Sylin.Koan.Web.Extensions` | `keep` | Optional moderation, audit, soft-delete, capability authorization, and richer REST projection. This is a deliberate add-on rather than mandatory web weight; its current README claims configuration keys and activation behavior that must be verified or corrected. |
+| `Sylin.Koan.Web.Extensions` | `keep` | Optional terse REST exposure plus moderation, audit, soft-delete, and capability policy. Generic controller composition is host-owned; explicit controllers win; the package page states the real activation, persistence, and authorization boundaries. |
 | `Sylin.Koan.Communication` | `keep` | Entity-first local Events and Transport semantic ring. Its in-process default is meaningful without a network adapter and network providers remain separately elected. |
 | `Sylin.Koan.Templates` | `keep` | `dotnet new` acquisition surface. It is content-only and independently valuable even though the documented source-first path does not require it. Give the isolated pack project the same canonical package assets explicitly. |
 
@@ -247,8 +247,8 @@ The foundation-family review is complete: all seven active survivors have packag
 honest limitations, clean focused builds, and proportionate behavior proof. JSON persistence now fails on corrupt state
 instead of silently treating it as empty. This closes the first review-order group without claiming release maturity.
 
-`Web.Extensions` remains a provisional survivor only in the quality sense: its distinct optional intent is earned,
-but its prose and executable surface require a focused truth audit before R11 can graduate it.
+The focused Web projection pass removes Web Extensions' provisional quality status: its distinct optional intent,
+host-owned composition, public contract, and focused evidence now agree.
 
 ## AI semantic-input and projection dispositions
 
@@ -295,6 +295,17 @@ their exit gate is destination behavior, destination tests, consumer re-pointing
 All three boundaries have independent reference value and pass focused source behavior plus exact artifact evidence.
 Merging either leaf into Core would make the shortest agent path carry unrelated human UI or privileged operational
 dependencies; splitting Code Mode is not justified without measured demand, security, and artifact evidence.
+
+## Web projection family dispositions
+
+| Package | Disposition | Distinct reference intent and boundary |
+|---|---|---|
+| `Sylin.Koan.Web.Extensions` | `keep` | Optional Entity HTTP realizations: `[RestEntity]`, moderation, audit, soft delete, and named capability policy. Per-host generic controller composition prevents process leakage without burdening base Web. |
+| `Sylin.Koan.Web.OpenApi` | `keep` | Optional wire-faithful OpenAPI 3.1 document plus development-default interactive UI. One option/startup owner controls document, routes, UI, and authentication posture. |
+| `Sylin.Koan.Web.Sse` | `keep` | Optional controller/framework SSE projection. One `Sse.Stream(...)`/`SseResult` model provides typed, text, and explicit-envelope streaming without claiming replay, heartbeat, or delivery. |
+
+Each reference adds a distinct application-facing projection and all three pass focused behavior, consumer, exact
+artifact, documentation, and current vulnerability evidence. Base `Sylin.Koan.Web` remains unchanged.
 
 ## Acceptance
 

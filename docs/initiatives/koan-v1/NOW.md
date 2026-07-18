@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-18
   status: in-progress
-  scope: R11-05 through MCP family graduation
+  scope: R11-05 through Web projection family graduation
 ---
 
 # Koan V1 reorganization current handoff
@@ -188,8 +188,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
   explicitly enabled governed Operations. `McpModule` is the only activation/endpoint owner; unsupported manual
   registration/mapping APIs are gone. Focused suites pass 75/75, 16/16, 5/5, and Code Mode 27/27; exact packages and
   current vulnerability results are clean.
-- Current generated truth contains 108 packages: 19 repair-required, 32 review-required, 57 structurally ready across
-  22 claims. Public truth passes across 216 current files and 40 navigation targets.
+- The Web projection family now passes as three earned boundaries. Extensions owns per-host optional Entity HTTP
+  realizations; OpenAPI owns one document/UI policy and fail-closed non-Development UI; SSE owns one stream/result
+  model used by controllers and framework transports. Focused owner/consumer evidence and exact artifacts are clean.
+- Current generated truth contains 108 packages: 17 repair-required, 31 review-required, 60 structurally ready across
+  23 claims. Public truth passes across 221 current files and 40 navigation targets.
   Redis Cache 6/6 and Redis Data 12/12 pass; seven affected packages and their dependency boundaries were inspected,
   and the three new packages have no known vulnerable direct or transitive packages. Earlier Storage evidence remains
   green. Seven relational packages also inspect cleanly, with clear current vulnerability checks for the two new
@@ -217,10 +220,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the Web projection family: Web Extensions,
-OpenAPI, and SSE. Start from the application intent and dependency graph, decide which optional references earn their
-weight, centralize any repeated controller/endpoint/reporting mechanics, and keep base `EntityController<T>` behavior
-unchanged. Keep the cross-repository AI handoff packages untouched and do not run release certification.
+Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the remaining Web edge projections:
+`Media.Web`, `Web.OpenGraph`, and `Web.Backup`. Assess each from its separate application intent before assuming a
+family or merge, centralize only genuinely identical projection/endpoint/reporting mechanics, and keep base Web plus
+domain runtime ownership unchanged. Keep cross-repository AI handoff packages untouched and do not run release
+certification.
 
 Keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared. Do not mutate remote settings, push,
 tag, release, or publish until package polish is accepted and separate remote-operation authorization is renewed.

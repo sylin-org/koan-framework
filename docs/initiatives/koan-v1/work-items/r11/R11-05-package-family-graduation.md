@@ -1905,6 +1905,35 @@ SSE cut is intentional and requires all in-repository AI, MCP, and sample consum
 tests pass 111/111, 10/10, and 5/5; the first parallel baseline attempt only collided on shared MSBuild outputs, so all
 subsequent build/test proof remains sequential.
 
+### Web projection family evidence
+
+- Web Extensions generic controller declarations now live in one registry per `IServiceCollection`; module,
+  registration extensions, MVC feature provider, and route convention share that host-owned instance. Duplicate same-
+  route declarations are idempotent and conflicting routes fail with an explicit-controller correction. The full
+  focused suite passes 113/113, including host-isolation and conflict evidence.
+- OpenAPI has one public option family, module, startup filter, configuration section, document route, UI route, and
+  report. Legacy Swagger registration, pipeline, option, namespace, configuration, and provenance paths are deleted.
+  Real-host evidence passes 12/12, covering Development default, explicit disablement, non-Development absence,
+  authentication fail-closed, deliberate open override, document dominance, custom route alignment, application
+  identity, and Newtonsoft wire fidelity.
+- SSE now exposes one `Sse.Stream(...)` expression and one `SseResult` implementing both MVC and infrastructure result
+  contracts. Duplicated helpers and unused enablement/heartbeat claims are deleted. SSE passes 5/5; AI Web passes 1/1;
+  MCP conformance passes 75/75; SnapVault upload progress passes 3/3 after a forced restore corrected stale evaluated
+  test state. AI Web, MCP, and SnapVault build warning-clean.
+- All three packages own exact README/TECHNICAL contracts, have zero generated quality findings, and are terminal
+  `keep` boundaries. Current public guidance contains no old Swagger or split SSE path; historical ADR/assessment
+  records remain dated evidence rather than curriculum.
+- Exact HEAD `a32d23a28` packages contain DLL/XML, package-owned README, canonical icon, and build-transitive metadata.
+  Extensions depends on Core, Data abstractions/runtime, and Web; OpenAPI depends on Core/Web plus Microsoft OpenAPI and
+  Swagger UI; SSE depends on Core/Web plus Newtonsoft. Current direct/transitive NuGet audits report no known
+  vulnerabilities for all three.
+- Generated truth contains 108 packages: 17 repair-required, 31 review-required, and 60 structurally ready across 23
+  claims. Public documentation truth passes across 221 current files and 40 navigation targets. No feed, release
+  candidate, tag, remote mutation, or full release certification run was created.
+
+The Web projection family passes this R11-05 slice. It preserves three independently meaningful references while
+reducing process-global state, startup owners, public activation concepts, result vocabularies, and false settings.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;
