@@ -462,22 +462,6 @@
       "claims": []
     },
     {
-      "packageId": "Sylin.Koan.AI.Compute",
-      "shape": "library",
-      "description": "Hardware-agnostic compute fabric for Koan AI: discover GPUs, route workloads, delegate to network compute.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.AI.Contracts.Shared",
-        "Sylin.Koan.Core"
-      ],
-      "readme": "src/Koan.AI.Compute/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": null,
-      "claims": []
-    },
-    {
       "packageId": "Sylin.Koan.AI.Connector.HuggingFace",
       "shape": "library",
       "description": "HuggingFace Hub connector for Koan AI: search, metadata, and download via adapter capabilities.",

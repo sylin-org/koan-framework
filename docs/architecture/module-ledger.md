@@ -10,11 +10,6 @@
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ❌
 
-### Koan.AI.Compute
-- Depends on: Koan.AI.Contracts.Shared, Koan.Core
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ❌
-
 ### Koan.AI.Connector.HuggingFace
 - Depends on: Koan.AI.Contracts, Koan.AI.Contracts.Shared, Koan.AI.Models, Koan.Core
 - Depended by: –
@@ -42,7 +37,7 @@
 
 ### Koan.AI.Contracts.Shared
 - Depends on: –
-- Depended by: Koan.AI.Agents, Koan.AI.Compute, Koan.AI.Connector.HuggingFace, Koan.AI.Eval, Koan.AI.Models, Koan.AI.Orchestration
+- Depended by: Koan.AI.Agents, Koan.AI.Connector.HuggingFace, Koan.AI.Eval, Koan.AI.Models, Koan.AI.Orchestration
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.AI.Eval
@@ -127,7 +122,7 @@
 
 ### Koan.Core
 - Depends on: –
-- Depended by: Koan.AI, Koan.AI.Agents, Koan.AI.Compute, Koan.AI.Connector.HuggingFace, Koan.AI.Connector.LMStudio, Koan.AI.Connector.Ollama, Koan.AI.Connector.Onnx, Koan.AI.Eval, Koan.AI.Models, Koan.AI.Orchestration, Koan.AI.Prompt, Koan.AI.Review, Koan.Cache, Koan.Cache.Adapter.Sqlite, Koan.Canon, Koan.Canon.Contracts, Koan.Canon.Web, Koan.Classification, Koan.Communication, Koan.Communication.Connector.RabbitMq, Koan.Data.Abstractions, Koan.Data.Access, Koan.Data.AI, Koan.Data.Backup, Koan.Data.Connector.Cockroach, Koan.Data.Connector.Couchbase, Koan.Data.Connector.ElasticSearch, Koan.Data.Connector.InMemory, Koan.Data.Connector.Json, Koan.Data.Connector.Mongo, Koan.Data.Connector.OpenSearch, Koan.Data.Connector.Postgres, Koan.Data.Connector.Redis, Koan.Data.Core, Koan.Data.SearchEngine, Koan.Data.SoftDelete, Koan.Data.Vector.Connector.InMemory, Koan.Data.Vector.Connector.Milvus, Koan.Data.Vector.Connector.Qdrant, Koan.Data.Vector.Connector.SqliteVec, Koan.Data.Vector.Connector.Weaviate, Koan.Identity, Koan.Jobs, Koan.Mcp, Koan.Media.Abstractions, Koan.Observability, Koan.Orchestration.Aspire, Koan.Orchestration.Connector.Docker, Koan.Orchestration.Connector.Podman, Koan.Orchestration.Renderers.Connector.Compose, Koan.Security.Trust, Koan.Storage, Koan.Tenancy, Koan.Testing, Koan.Testing.Containers, Koan.Web, Koan.Web.Auth, Koan.Web.Auth.Connector.Discord, Koan.Web.Auth.Connector.Google, Koan.Web.Auth.Connector.Microsoft, Koan.Web.Auth.Connector.Oidc, Koan.Web.Auth.Connector.Test, Koan.Web.Auth.Roles, Koan.Web.Auth.Server, Koan.Web.Auth.Services, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.OpenApi, Koan.Web.OpenGraph, Koan.Web.Sse, Koan.ZenGarden
+- Depended by: Koan.AI, Koan.AI.Agents, Koan.AI.Connector.HuggingFace, Koan.AI.Connector.LMStudio, Koan.AI.Connector.Ollama, Koan.AI.Connector.Onnx, Koan.AI.Eval, Koan.AI.Models, Koan.AI.Orchestration, Koan.AI.Prompt, Koan.AI.Review, Koan.Cache, Koan.Cache.Adapter.Sqlite, Koan.Canon, Koan.Canon.Contracts, Koan.Canon.Web, Koan.Classification, Koan.Communication, Koan.Communication.Connector.RabbitMq, Koan.Data.Abstractions, Koan.Data.Access, Koan.Data.AI, Koan.Data.Backup, Koan.Data.Connector.Cockroach, Koan.Data.Connector.Couchbase, Koan.Data.Connector.ElasticSearch, Koan.Data.Connector.InMemory, Koan.Data.Connector.Json, Koan.Data.Connector.Mongo, Koan.Data.Connector.OpenSearch, Koan.Data.Connector.Postgres, Koan.Data.Connector.Redis, Koan.Data.Core, Koan.Data.SearchEngine, Koan.Data.SoftDelete, Koan.Data.Vector.Connector.InMemory, Koan.Data.Vector.Connector.Milvus, Koan.Data.Vector.Connector.Qdrant, Koan.Data.Vector.Connector.SqliteVec, Koan.Data.Vector.Connector.Weaviate, Koan.Identity, Koan.Jobs, Koan.Mcp, Koan.Media.Abstractions, Koan.Observability, Koan.Orchestration.Aspire, Koan.Orchestration.Connector.Docker, Koan.Orchestration.Connector.Podman, Koan.Orchestration.Renderers.Connector.Compose, Koan.Security.Trust, Koan.Storage, Koan.Tenancy, Koan.Testing, Koan.Testing.Containers, Koan.Web, Koan.Web.Auth, Koan.Web.Auth.Connector.Discord, Koan.Web.Auth.Connector.Google, Koan.Web.Auth.Connector.Microsoft, Koan.Web.Auth.Connector.Oidc, Koan.Web.Auth.Connector.Test, Koan.Web.Auth.Roles, Koan.Web.Auth.Server, Koan.Web.Auth.Services, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.OpenApi, Koan.Web.OpenGraph, Koan.Web.Sse, Koan.ZenGarden
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Core.Registry.Generators

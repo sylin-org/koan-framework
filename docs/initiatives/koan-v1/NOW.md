@@ -178,8 +178,11 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - The providerless AI Training facade and the reverse Zen Garden AI connector are retired. Shared lifecycle contracts
   remain inert; no compatibility package or production-registry mutation was restored. AI Models and both dependent
   test hosts build warning-clean, and the corrected EndToEnd adapter-resolution cell passes 7/7.
-- Current generated truth contains 109 packages: 21 repair-required, 34 review-required, 54 structurally ready across
-  22 claims. Public truth passes across 213 current files and 40 navigation targets.
+- The misleading local-only AI Compute facade is also retired after read-only committed Zen Garden inspection confirmed
+  the real hardware/resource owner. Its sole test consumer is gone; the surviving EndToEnd host builds warning-clean,
+  while dependency-free compute exchange contracts remain and pass 9/9.
+- Current generated truth contains 108 packages: 21 repair-required, 33 review-required, 54 structurally ready across
+  22 claims. Public truth passes across 212 current files and 40 navigation targets.
   Redis Cache 6/6 and Redis Data 12/12 pass; seven affected packages and their dependency boundaries were inspected,
   and the three new packages have no known vulnerable direct or transitive packages. Earlier Storage evidence remains
   green. Seven relational packages also inspect cleanly, with clear current vulnerability checks for the two new
@@ -208,10 +211,10 @@ Replace this file at every handoff. It is a restart point, not a diary.
 ## Next safe action
 
 Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the surviving AI vertical as an explicit
-disposition slice: reconcile Agents, Orchestration, Eval, Review, Compute, Models, and Hugging Face with the accepted
-Agyo/Zen Garden ownership plan. Prefer removal or a narrow inert boundary over polishing transitional facades into
-permanent Koan products. Keep sibling repositories read-only, start with focused topology/coalescence discovery, and
-do not run release certification.
+disposition slice: reconcile Agents, Orchestration, Eval, Review, Models, and Hugging Face with the accepted Agyo/Zen
+Garden ownership plan. The safe local cuts are complete; do not delete real capability until its destination is green,
+and do not polish transitional facades into permanent Koan products. Keep sibling repositories read-only and do not
+run release certification.
 
 Keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared. Do not mutate remote settings, push,
 tag, release, or publish until package polish is accepted and separate remote-operation authorization is renewed.

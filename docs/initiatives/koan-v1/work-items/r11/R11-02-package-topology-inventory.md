@@ -46,7 +46,7 @@ generated package-quality and product-surface references.
 
 R11-01 opened with 109 packages: 37 required an objective repair, 72 required review, and none was inferred
 graduated. Subsequent family work retired unearned identities and introduced only independently useful contract or
-shared-mechanism boundaries. The current evaluated graph again contains 109 packages: 21 repair-required, 34
+shared-mechanism boundaries. The current evaluated graph contains 108 packages: 21 repair-required, 33
 review-required, and 54 structurally ready across 22 claims. The active matrix contains only present package projects;
 implemented retirements remain in the disposition tables as release-lineage decisions.
 
@@ -62,7 +62,6 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan` | `entry` | `keep` |
 | `Sylin.Koan.AI` | `capability` | `assess` |
 | `Sylin.Koan.AI.Agents` | `capability` | `assess` |
-| `Sylin.Koan.AI.Compute` | `capability` | `assess` |
 | `Sylin.Koan.AI.Connector.HuggingFace` | `provider` | `assess` |
 | `Sylin.Koan.AI.Connector.LMStudio` | `provider` | `assess` |
 | `Sylin.Koan.AI.Connector.Ollama` | `provider` | `assess` |
@@ -259,6 +258,7 @@ but its prose and executable surface require a focused truth audit before R11 ca
 | `Sylin.Koan.AI.Web` | `keep` | Provider-neutral HTTP projection over the compiled AI runtime. Its module owns controller discovery and startup tooling; it owns no provider election, health duplication, authorization, quotas, retry, or application registration ceremony. |
 | `Sylin.Koan.AI.Training` | `retire` (implemented) | The facade had no runtime provider or behavior consumer and advertised placeholder/empty behavior as a package capability. Training workflow ownership belongs outside Koan; inert lifecycle exchange vocabulary remains in AI Contracts Shared. |
 | `Sylin.Koan.AI.Connector.ZenGarden` | `retire` (implemented) | The untested connector was already outside the solution and reversed orchestration ownership back into Koan. Zen Garden owns its model/resource orchestration boundary; Koan retains only independently consumed inert integration contracts. |
+| `Sylin.Koan.AI.Compute` | `retire` (implemented) | The package advertised fleet discovery and placement but only guessed one local resource, hard-coded network/model absence, and returned an unsatisfied fallback as the selected target. Committed Zen Garden resource/hardware domains own this concern; inert exchange vocabulary remains in AI Contracts Shared. |
 
 The two survivors pass focused source behavior and inspected artifact evidence. The two retirements are proven by
 their absence from the evaluated package graph, solution, and surviving project references. Remaining AI vertical and

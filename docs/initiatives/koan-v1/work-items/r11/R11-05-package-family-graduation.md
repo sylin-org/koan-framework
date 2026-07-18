@@ -1626,6 +1626,69 @@ no compatibility method was restored to make an obsolete test compile.
 The two accepted retirements pass this R11-05 slice. The remaining AI vertical still requires explicit terminal
 topology and cross-repository ownership decisions before any package prose is polished.
 
+## AI compute-topology discovery
+
+**Task:** determine whether the accepted cut-in-favor-of-Zen-Garden decision for `Sylin.Koan.AI.Compute` can be
+implemented independently without moving or losing a real Koan application capability.
+
+**Application intent:** applications that need hardware inventory or workload placement should use the product that
+owns garden resources. Koan should not offer a package called a compute fabric when it only probes the local machine
+and cannot satisfy network, model, or non-local placement requirements.
+
+**Docs read:** ARCH-0089 assigns Compute to a cut in favor of Zen Garden and requires committed resource coverage to
+be confirmed before deletion. Koan's package law requires executable guarantees rather than aspirational names. The
+current README advertises fleet discovery and workload routing beyond the implementation.
+
+**Code read:** Compute has no application, sample, production-module, or package consumer. Its only consumer is a
+six-cell EndToEnd test file. `Fleet()` always contains one local resource; network readiness is hard-coded false;
+required-model readiness is hard-coded false; capability checks assume only inference; and `Resolve()` returns the
+local resource as `Target` even when it explicitly does not satisfy the requirement. Local probing shells out and
+swallows all failures, so it cannot support the advertised guarantee or operator truth.
+
+**Sibling evidence:** read-only inspection of Zen Garden's committed `HEAD` confirms hardware inventory, two-tier
+capabilities, GPU/VRAM facts, garden inspection, resource collection, load, election, and AI-orchestrator resource
+domains. The sibling worktree is dirty and remains untouched; only committed paths and symbols were inspected.
+
+**Constants/options/DTO inventory:** `Accelerator`, `ComputeLocation`, and `ComputeRequirement` remain in dependency-free
+AI Contracts Shared and have their own contract tests. They are cross-repository exchange vocabulary, not evidence
+that Koan must own a compute runtime. Compute-specific resource, resolution, service, status, and readiness types have
+no external source consumer and leave with the false package.
+
+**Closest pattern:** the just-completed Training retirement removes a package whose name exceeds its mechanics while
+retaining independently useful inert lifecycle contracts. This cut likewise removes the functional promise without
+inventing a forwarding shim or making Koan depend upward on Zen Garden.
+
+**Coalescence and placement:** Zen Garden is the one resource/hardware owner. Koan AI consumes provider capabilities
+for inference but owns no garden-wide compute plane. There is no replacement Koan service, adapter, HTTP client, or
+static facade in this slice.
+
+**Ergonomics:** developers and agents lose a misleading install choice and an API that reports fallback as placement.
+Operators are no longer shown a locally guessed singleton as a fleet. Applications needing this concern choose the
+explicit Zen Garden boundary; applications using Koan AI inference change nothing.
+
+**Constraints satisfied:** standard package removal expresses the decision; shared contracts stay inert; no sibling
+mutation, compatibility package, new identifier, ADR edit, release artifact, or broad certification run.
+
+**Risks:** this is intentionally package- and source-breaking. Current cross-links, solution membership, the one test
+file, generated inventories, and topology ledgers must all leave together. The surviving AI vertical is not implied
+safe to remove: Eval/Review/Agents/Orchestration contain real capability awaiting Agyo migration, while Models and
+Hugging Face await the larger Zen Garden port.
+
+### AI compute-topology evidence
+
+- `Sylin.Koan.AI.Compute` and its sole Compute-specific test consumer are absent from source ownership, the solution,
+  surviving references, and regenerated package/product inventories. No forwarding service or compatibility facade
+  replaces it.
+- The surviving AI EndToEnd host builds warning-clean with the false capability removed. AI Contracts Shared passes
+  9/9, proving dependency-free accelerator/location/requirement exchange vocabulary remains available without a Koan
+  compute runtime.
+- Generated truth contains 108 packages: 21 repair-required, 33 review-required, and 54 structurally ready across 22
+  claims. Public documentation truth passes across 212 current files and 40 navigation targets. No sibling worktree,
+  release artifact, package feed, or remote state was mutated, and no full certification run occurred.
+
+The accepted Compute cut passes this R11-05 slice. The safe local retirements are complete; the remaining vertical
+must wait for evidenced Agyo/Zen Garden destination work rather than being deleted or polished prematurely.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;
