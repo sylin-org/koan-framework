@@ -31,6 +31,10 @@
       "version": "0.17"
     },
     {
+      "id": "Koan.Data.Relational.Abstractions",
+      "version": "0.18"
+    },
+    {
       "id": "Koan.Security.Trust",
       "version": "0.17"
     },
@@ -47,11 +51,11 @@
       "version": "0.17"
     },
     {
-      "id": "Koan.Web.Auth.Connector.Test",
-      "version": "0.17"
+      "id": "Koan.Web.Auth.Abstractions",
+      "version": "0.1"
     },
     {
-      "id": "Koan.Web.Auth.Services",
+      "id": "Koan.Web.Auth.Connector.Test",
       "version": "0.17"
     },
     {
@@ -78,15 +82,7 @@
     },
     {
       "kind": "project",
-      "id": "Koan.Web.Auth"
-    },
-    {
-      "kind": "project",
       "id": "Koan.Web.Auth.Connector.Test"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Web.Auth.Services"
     },
     {
       "kind": "project",

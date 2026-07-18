@@ -19,10 +19,6 @@
       "version": "0.17"
     },
     {
-      "id": "Koan.AI.Prompt",
-      "version": "0.17"
-    },
-    {
       "id": "Koan.Cache.Abstractions",
       "version": "0.18"
     },
@@ -51,6 +47,10 @@
       "version": "0.17"
     },
     {
+      "id": "Koan.Data.Relational.Abstractions",
+      "version": "0.18"
+    },
+    {
       "id": "Koan.Data.Vector",
       "version": "0.18"
     },
@@ -63,15 +63,7 @@
       "version": "0.17"
     },
     {
-      "id": "Koan.Media.Abstractions",
-      "version": "0.18"
-    },
-    {
       "id": "Koan.Security.Trust",
-      "version": "0.17"
-    },
-    {
-      "id": "Koan.Storage",
       "version": "0.17"
     },
     {
@@ -87,11 +79,11 @@
       "version": "0.17"
     },
     {
-      "id": "Koan.Web.Auth.Connector.Test",
-      "version": "0.17"
+      "id": "Koan.Web.Auth.Abstractions",
+      "version": "0.1"
     },
     {
-      "id": "Koan.Web.Auth.Services",
+      "id": "Koan.Web.Auth.Connector.Test",
       "version": "0.17"
     },
     {
@@ -130,15 +122,7 @@
     },
     {
       "kind": "project",
-      "id": "Koan.Web.Auth"
-    },
-    {
-      "kind": "project",
       "id": "Koan.Web.Auth.Connector.Test"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Web.Auth.Services"
     },
     {
       "kind": "project",

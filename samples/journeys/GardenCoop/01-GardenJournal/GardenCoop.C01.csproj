@@ -14,8 +14,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\Connectors\Web\Auth\Test\Koan.Web.Auth.Connector.Test.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Web.Admin\Koan.Web.Admin.csproj" />
-    <ProjectReference Include="..\..\..\..\src\Koan.Web.Auth.Services\Koan.Web.Auth.Services.csproj" />
-    <ProjectReference Include="..\..\..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Web.OpenApi\Koan.Web.OpenApi.csproj" />
     <ProjectReference Include="..\..\..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />

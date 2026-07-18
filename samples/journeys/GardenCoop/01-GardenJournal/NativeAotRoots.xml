@@ -5,5 +5,4 @@
     <type fullname="GardenCoop.Automation.GardenAutomation" preserve="all" />
   </assembly>
   <assembly fullname="Koan.Web.Admin" preserve="all" />
-  <assembly fullname="Koan.Web.Auth.Services" preserve="all" />
 </linker>
