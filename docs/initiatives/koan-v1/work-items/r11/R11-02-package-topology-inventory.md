@@ -98,11 +98,11 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Data.Backup` | `capability` | `assess` |
 | `Sylin.Koan.Data.Connector.Cockroach` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Couchbase` | `provider` | `keep` |
-| `Sylin.Koan.Data.Connector.ElasticSearch` | `provider` | `assess` |
+| `Sylin.Koan.Data.Connector.ElasticSearch` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.InMemory` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Json` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Mongo` | `provider` | `keep` |
-| `Sylin.Koan.Data.Connector.OpenSearch` | `provider` | `assess` |
+| `Sylin.Koan.Data.Connector.OpenSearch` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Postgres` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Redis` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Sqlite` | `provider` | `keep` |
@@ -112,7 +112,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Data.Relational.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Data.Relational.Dapper` | `capability` | `retire` |
 | `Sylin.Koan.Data.Relational.Npgsql` | `capability` | `keep` |
-| `Sylin.Koan.Data.SearchEngine` | `capability` | `assess` |
+| `Sylin.Koan.Data.SearchEngine` | `capability` | `keep` |
 | `Sylin.Koan.Data.SoftDelete` | `capability` | `assess` |
 | `Sylin.Koan.Data.Vector` | `capability` | `keep` |
 | `Sylin.Koan.Data.Vector.Abstractions` | `contracts` | `keep` |
@@ -227,6 +227,9 @@ terminal package decisions; the listed boundary repairs happen before graduation
 | `Sylin.Koan.Data.Relational` | `keep` | One functional owner for relational schema governance, common translation, comparable scalar encoding, and AOT-clean ADO helpers. It receives the selected route's resolved table and immutable policy rather than re-electing or reading global provider state. |
 | `Sylin.Koan.Data.Relational.Npgsql` | `split` (implemented) | Module-free PostgreSQL-wire repository mechanics shared by PostgreSQL and CockroachDB. Concrete connectors retain identity, discovery, options, health, and reporting; neither activates the other. |
 | `Sylin.Koan.Data.Relational.Dapper` | `retire` (implemented) | Its only type had no source, test, or sample consumer and duplicated an ADO helper surface without owning provider semantics. The project and package identity are removed. |
+| `Sylin.Koan.Data.SearchEngine` | `keep` | Module-free Lucene-family vector mechanics shared transitively by Elasticsearch and OpenSearch. It centralizes exact configuration, discovery, authenticated HTTP, participation health, startup reporting, selected-provider naming, REST operations, and filter translation without becoming a third application provider. |
+| `Sylin.Koan.Data.Connector.ElasticSearch` | `keep` | One reference elects Elasticsearch's independent service identity, discovery/orchestration vocabulary, and native `dense_vector`/top-level `knn` dialect over the shared SearchEngine mechanics. |
+| `Sylin.Koan.Data.Connector.OpenSearch` | `keep` | One reference elects OpenSearch's independent service identity, discovery/orchestration vocabulary, and native `knn_vector`/`query.knn` dialect over the shared SearchEngine mechanics. |
 | `Sylin.Koan.Data.Connector.Json` | `keep` | Bounded, file-backed local provider that gives the foundation bundle an immediate meaningful result. Its package page must state its concurrency and deployment limits plainly. |
 | `Sylin.Koan.Data.Connector.Sqlite` | `keep` | Durable embedded relational provider selected by one reference, with a materially different guarantee from JSON. |
 | `Sylin.Koan.Data.Connector.Postgres` | `keep` | PostgreSQL provider with independent discovery, source routing, health, orchestration contribution, and provider identity over shared Npgsql mechanics. |

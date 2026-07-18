@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: R11-05 through document Data provider-family graduation and caller-owned pagination; search providers next
+  scope: R11-05 through search-engine vector provider-family graduation and caller-owned pagination
 ---
 
 # Koan V1 reorganization current handoff
@@ -147,11 +147,16 @@ Replace this file at every handoff. It is a restart point, not a diary.
   immutable route monitor, and participate in readiness only when selected. Mongo passes 68/68; Couchbase passes three
   connection-free participation cells and one real-container CRUD cell. Couchbase first use remains observably slow
   (about 64 seconds in the focused cell), and its full suite is intentionally not claimed as certified here.
+- The search-engine vector provider family now passes. One transitive SearchEngine owner centralizes configuration,
+  discovery, authenticated HTTP, participation health, startup reporting, selected-provider naming, and common REST
+  mechanics; Elasticsearch and OpenSearch retain their independent provider identities and native kNN dialects.
+  Each real-container matrix passes 29 with 4 honest capability skips; each AODB path passes 4/4, including exact
+  Endpoint binding and connection-free unused health. The unrelated stale test-project reference is PMC-032.
 - Data pagination is now caller-owned end to end. `All()` means the complete visible set; adapters have no row-page
   default and append paging only for explicit shaping. SQLite, PostgreSQL/shared Npgsql, and SQL Server regressions each
   prove 75 unpaged rows versus an explicitly requested page of 7.
-- Current generated truth contains 111 packages: 26 repair-required, 45 review-required, 40 structurally ready across
-  17 claims.
+- Current generated truth contains 111 packages: 26 repair-required, 42 review-required, 43 structurally ready across
+  18 claims.
   Redis Cache 6/6 and Redis Data 12/12 pass; seven affected packages and their dependency boundaries were inspected,
   and the three new packages have no known vulnerable direct or transitive packages. Earlier Storage evidence remains
   green. Seven relational packages also inspect cleanly, with clear current vulnerability checks for the two new
@@ -179,8 +184,8 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the next terminally unassessed provider
-pillar. Start with focused topology/coalescence discovery, choose the smallest family whose boundary can become
+Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the next terminally unassessed semantic or
+projection/tool family. Start with focused topology/coalescence discovery, choose the smallest family whose boundary can become
 executable in one slice, and graduate package prose and artifacts only after its responsibility chokepoints and
 guarantees are proved.
 

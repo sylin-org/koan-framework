@@ -14,8 +14,8 @@ test project. Each adapter implements **one** interface
 |---|---|---|
 | `InMemory` | 24 pass / 1 skip | Reference adapter; matrix self-validation |
 | `Weaviate` | 25/25 | Full coverage, including hybrid search + cursor continuation |
-| `ElasticSearch` | 15 pass / 10 skip | Real adapter gaps surfaced — see Capabilities |
-| `OpenSearch` | 0/25 (all skip) | Adapter emits ES-style KNN that OS rejects (documented divergence) |
+| `ElasticSearch` | 29 pass / 4 skip | Native Elasticsearch dialect; embedding reads and hybrid search are not supported |
+| `OpenSearch` | 29 pass / 4 skip | Native OpenSearch dialect; embedding reads and hybrid search are not supported |
 | `Milvus` | 0/25 on this box | Container OOMs at ~2GB; wire-up validated; CI hosts should pass |
 | `PGVector` | Not yet wired | Connector itself doesn't currently compile on this branch |
 
@@ -59,7 +59,7 @@ The `<Name>TestFactory.cs` is the only meaningful surface area. It declares:
 | `SupportsDynamicCollections` | Adapter can create collections on demand | `true` |
 | `SupportsScoreNormalization` | Search returns normalised similarity scores | `false` |
 
-## Spec inventory (~25 per adapter)
+## Spec inventory (~29 capability specs plus provider boot/conformance specs)
 
 ### `VectorAdapterSurfaceSpecsBase` — CRUD + search (14)
 - Upsert: single, overwrite-existing, bulk, bulk-empty
@@ -108,7 +108,7 @@ Before this kit, vector adapter coverage was uneven:
 - ElasticSearch and OpenSearch each had a single `Save_with_vector_and_search_similar` spec
 - Milvus had **zero** tests
 
-The matrix replaces those one-off shapes with a uniform 24-spec contract per
+The matrix replaces those one-off shapes with a uniform capability contract per
 adapter. Cell-level test counts are now meaningful (a Milvus regression shows
 up in the same place a Weaviate regression would), and adapter divergences are
 surfaced as `Supports*=false` flags with green-skipped specs rather than

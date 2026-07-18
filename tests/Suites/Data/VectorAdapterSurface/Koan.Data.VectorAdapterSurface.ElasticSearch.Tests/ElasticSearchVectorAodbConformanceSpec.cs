@@ -61,23 +61,19 @@ public sealed class ElasticSearchVectorAodbConformanceSpec : VectorAodbConforman
 
         var host = await KoanIntegrationHost.Configure()
             .WithSettings(settings)
-            .ConfigureServices(s =>
-            {
-                s.AddKoan();
-                s.PostConfigure<ElasticSearchOptions>(o =>
-                {
-                    o.ConnectionString = endpoint;
-                    o.Endpoint = endpoint;
-                    o.Dimension = 8;
-                    o.RefreshMode = "true";
-                });
-            })
+            .ConfigureServices(s => s.AddKoan())
             .StartAsync()
             .ConfigureAwait(false);
 
         // Defense-in-depth: confirm the adapter resolved to THIS Testcontainers Elasticsearch, not a stray local one.
         host.Services.GetRequiredService<IOptions<ElasticSearchOptions>>().Value.Endpoint
             .Should().Be(endpoint, "the adapter must target THIS Testcontainers Elasticsearch, not a stray local one");
+        var health = host.Services.GetServices<IHealthContributor>()
+            .Single(contributor => contributor.Name == "data:elasticsearch");
+        health.IsCritical.Should().BeFalse("an available but unused Vector provider is not a runtime dependency");
+        (await health.Check()).State.Should().Be(
+            Koan.Core.Observability.Health.HealthState.Unknown,
+            "unused provider health must remain connection-free");
         return (host, null);
     }
 

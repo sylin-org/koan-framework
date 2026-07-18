@@ -4,11 +4,11 @@
   "summary": {
     "packages": 111,
     "repairRequired": 26,
-    "reviewRequired": 45,
-    "structurallyReady": 40,
+    "reviewRequired": 42,
+    "structurallyReady": 43,
     "ownedReadmes": 85,
     "technicalCompanions": 75,
-    "findings": 178
+    "findings": 173
   },
   "findingDefinitions": [
     {
@@ -874,24 +874,19 @@
       "projectPath": "src/Connectors/Data/ElasticSearch/Koan.Data.Connector.ElasticSearch.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Elasticsearch vector adapter for Koan: index provisioning, kNN search, metadata filtering and health checks via the Elasticsearch REST API.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.SearchEngine",
-        "Sylin.Koan.Data.Vector.Abstractions"
+        "Sylin.Koan.Data.SearchEngine"
       ],
       "readme": "src/Connectors/Data/ElasticSearch/README.md",
       "technicalDocumentation": "src/Connectors/Data/ElasticSearch/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.InMemory",
@@ -959,24 +954,19 @@
       "projectPath": "src/Connectors/Data/OpenSearch/Koan.Data.Connector.OpenSearch.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "OpenSearch vector adapter for Koan: index provisioning, kNN search, metadata filtering and health checks via the OpenSearch REST API.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.SearchEngine",
-        "Sylin.Koan.Data.Vector.Abstractions"
+        "Sylin.Koan.Data.SearchEngine"
       ],
       "readme": "src/Connectors/Data/OpenSearch/README.md",
       "technicalDocumentation": "src/Connectors/Data/OpenSearch/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Postgres",
@@ -1007,7 +997,7 @@
       "shape": "library",
       "role": "provider",
       "status": "structurally-ready",
-      "description": "Redis-backed key/value repository adapter for Koan: simple CRUD, paging guardrails, and options binding.",
+      "description": "Redis-backed key/value Entity persistence for Koan with explicit caller paging, source routing, shared connection pooling, and participation-aware health.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1147,7 +1137,7 @@
       "projectPath": "src/Koan.Data.SearchEngine/Koan.Data.SearchEngine.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Shared core for Koan search-engine vector connectors (Elasticsearch / OpenSearch, both built on Apache Lucene): the shared SearchEngineVectorRepository behind a 3-member ISearchEngineDialect seam, plus the single source of truth for translating the unified Filter AST into the search-engine query DSL.",
       "targetFrameworks": [
         "net10.0"
@@ -1155,17 +1145,14 @@
       "dependencies": [
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
         "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": "src/Koan.Data.SearchEngine/README.md",
       "technicalDocumentation": "src/Koan.Data.SearchEngine/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.SoftDelete",

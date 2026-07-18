@@ -1,49 +1,73 @@
 ---
 uid: reference.modules.Koan.data.connector.elasticsearch
 title: Koan.Data.Connector.ElasticSearch - Technical Reference
-description: Elasticsearch vector adapter for Koan — index provisioning, kNN search, and metadata filtering.
+description: Elasticsearch vector provider for Koan with native kNN, shared search-engine mechanics, and selection-aware readiness.
 packages: [Sylin.Koan.Data.Connector.ElasticSearch]
 source: src/Connectors/Data/ElasticSearch/
 ---
 
-## Summary
-- Adapter integrating Elasticsearch with the `Koan.Data.Vector` facade.
-- Index provisioning, dense vector mappings, kNN queries, and metadata-filter translation.
-- Health contributor and orchestration-aware option binding.
+## Role
 
-## Capabilities
-- `VectorEnsureCreated`: creates `dense_vector` index mappings.
-- Upsert/UpsertMany: bulk-friendly ingestion via `_bulk`.
-- Delete/DeleteMany: immediate deletion with refresh control.
-- Search: kNN query with a pushed-down metadata filter, optional timeout.
-- Instructions: `data.ensureCreated`, `data.clear`.
-- Health: `_cluster/health`.
+This package makes the `elasticsearch` vector provider available by reference. Its thin provider assembly owns the
+Elasticsearch identity, aliases, orchestration metadata, discovery vocabulary, and native `dense_vector`/top-level
+`knn` dialect. `Sylin.Koan.Data.SearchEngine` owns the common repository, configuration, health, naming, and REST
+mechanics shared with OpenSearch.
 
-## Metadata filtering
+No Elasticsearch-specific service registration is required in application code.
 
-The `Filter` → Elasticsearch query-DSL translation lives in `SearchEngineFilterTranslator`
-(`Koan.Data.SearchEngine`), shared with OpenSearch — both engines speak the same Apache Lucene query
-DSL. The adapter exposes that one `VectorFilterCapabilities` constant and pushes the filter **into the
-kNN query** (`knn.filter`), not as a sibling query, so the filter actually narrows the neighbour set.
+## Election and lifecycle
 
-- **Supported operators:** `Eq`, `Ne`, `Gt`, `Gte`, `Lt`, `Lte`, `In`, `Nin`, `StartsWith`,
-  `EndsWith`, `Contains`, `Has`, `HasAny`, `HasAll`, `HasNone`, `Exists`.
-- **Field targeting:** caller metadata is nested under the configured metadata field. String
-  exact-match (`term`/`terms`) and wildcard target the dynamic `.keyword` sub-field; numeric range and
-  `exists` target the bare field.
-- **Null-inclusive negation:** `Ne`/`Nin`/`HasNone` use Lucene's null-inclusive `bool/must_not`, so
-  rows missing the key are included — matching the convergence oracle.
-- **Fail-loud:** an operator outside the declared set throws rather than degrading to match-all.
+`ElasticSearchVectorAdapterFactory` is a provider candidate with priority 20 and alias `elastic`. An exact
+`[VectorAdapter("elasticsearch")]` request or `Koan:Data:VectorDefaults:DefaultProvider` pin wins over automatic
+selection and fails if unavailable; Koan does not substitute a different provider.
 
-## Configuration Keys
-- `Koan:Data:ElasticSearch:Endpoint`
-- `Koan:Data:ElasticSearch:IndexPrefix`
-- `Koan:Data:ElasticSearch:IndexName`
-- `Koan:Data:ElasticSearch:Dimension`
-- `Koan:Data:ElasticSearch:ApiKey` / `Username` / `Password`
-- `Koan:Data:ElasticSearch:Similarity`
-- `Koan:Data:ElasticSearch:Refresh`
+Reference makes the connector available but not critical. Before a runtime Entity/source selects it, health is
+`Unknown`, non-critical, and connection-free. Selection records provider/source participation; subsequent health
+checks probe `/_cluster/health` with the same endpoint and authentication used by repository operations.
+
+## Configuration precedence
+
+Endpoint resolution uses the first exact value:
+
+1. `ConnectionStrings:ElasticSearch`
+2. `Koan:Data:ElasticSearch:ConnectionString`
+3. `Koan:Data:ElasticSearch:Endpoint`
+4. autonomous discovery and then `http://localhost:9200`
+
+There is no generic Data connection-string alias. Other keys under `Koan:Data:ElasticSearch` are `IndexPrefix`,
+`IndexName`, `VectorField`, `MetadataField`, `IdField`, `SimilarityMetric`, `RefreshMode`, `TimeoutSeconds`,
+`Dimension`, `ApiKey`, `Username`, `Password`, `DisableIndexAutoCreate`, and `DisableAutoDetection`.
+
+Startup facts show the effective de-identified endpoint and common vector/index choices. Credentials are never
+projected.
+
+## Repository behavior
+
+The shared repository provides automatic index ensure, upsert/bulk upsert, delete/bulk delete, clear, count, scroll
+export, statistics, and kNN search. The Elasticsearch dialect emits a `dense_vector` mapping and Elasticsearch 8.x
+top-level `knn` request. The caller's `topK` is passed through; the adapter does not invent or reduce it.
+
+The unified `Filter` AST is translated once in `Sylin.Koan.Data.SearchEngine` and placed in `knn.filter`. Supported
+operators are `Eq`, `Ne`, `Gt`, `Gte`, `Lt`, `Lte`, `In`, `Nin`, `StartsWith`, `EndsWith`, `Contains`, `Has`,
+`HasAny`, `HasAll`, `HasNone`, and `Exists`. Unsupported operators fail before a misleading match-all result.
+
+## Naming and isolation
+
+The factory passes the provider selected by Vector into Koan's central naming chokepoint; the repository does not
+re-elect naming during an operation. Generated index names include active source, partition, container, and tenant
+contributors. All sources use the one configured cluster endpoint.
+
+`IndexName` is an explicit physical-name pin. Koan honors it and reports when it defeats active isolation. Per-source
+cluster endpoints, embedding retrieval, hybrid text/vector search, and snapshot-consistent scroll guarantees are not
+part of this provider contract.
+
+## Validation surface
+
+The provider-owned matrix exercises boot/configuration, pre-use readiness, index ensure, CRUD/bulk behavior, search,
+filtering, partition isolation, export, clear, and semantic shapes against Elasticsearch 8.13.4. Capability-gated
+tests record embedding retrieval and hybrid search as unsupported.
 
 ## References
-- `~/decisions/DATA-0097-vector-pathway-parity.md` — vector pathway + filter model
-- `~/decisions/AI-0036-embedding-vector-seam.md` — §10.4 the ES/OS shared base
+
+- Shared implementation: `~/reference/modules/Koan/data/searchengine`
+- DATA-0097 Vector Pathway Parity: `~/decisions/DATA-0097-vector-pathway-parity.md`

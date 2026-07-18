@@ -1,13 +1,21 @@
+using System.ComponentModel.DataAnnotations;
+using Koan.Core.Adapters;
+using Koan.Data.Adapters.Configuration;
+
 namespace Koan.Data.SearchEngine;
 
 /// <summary>
-/// Shared base for the Elasticsearch and OpenSearch vector option classes (DATA-0103). Carries every
-/// field the shared <see cref="SearchEngineVectorRepository{TEntity,TKey}"/> reads. Concrete classes add
-/// only the per-package binding members (<c>ConnectionString</c>, <c>Readiness</c>) and the
-/// <c>IAdapterOptions</c> implementation.
+/// Shared base for the Elasticsearch and OpenSearch vector option classes (DATA-0103). It owns the
+/// complete option contract used by the shared connector mechanics and repository; concrete provider
+/// option classes exist only to preserve independent package binding and public configuration types.
 /// </summary>
-public abstract class SearchEngineVectorOptions : ISearchEngineVectorOptions
+public abstract class SearchEngineVectorOptions : ISearchEngineVectorOptions, IAdapterOptions
 {
+    [Required]
+    public string ConnectionString { get; set; } = "auto";
+
+    public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();
+
     public string Endpoint { get; set; } = "http://localhost:9200";
     public string? IndexPrefix { get; set; } = "koan";
     public string? IndexName { get; set; } = null;

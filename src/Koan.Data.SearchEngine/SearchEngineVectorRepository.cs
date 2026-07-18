@@ -6,13 +6,13 @@ using System.Linq;
 using System.Net.Http;
 using System.Globalization;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Abstractions.Naming;
 using Koan.Core.Capabilities;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
@@ -42,6 +42,8 @@ public sealed class SearchEngineVectorRepository<TEntity, TKey> :
     private readonly ISearchEngineDialect _dialect;
     private readonly ActivitySource _activity;
     private readonly IServiceProvider _services;
+    private readonly INamingProvider _naming;
+    private readonly string _source;
     private readonly ILogger? _logger;
     // Keyed by IndexName — one repo instance serves multiple partitions/storage names, so a
     // single bool would short-circuit EnsureIndex after the first partition is created and
@@ -56,7 +58,9 @@ public sealed class SearchEngineVectorRepository<TEntity, TKey> :
         ISearchEngineDialect dialect,
         ActivitySource activity,
         ILogger? logger,
-        IServiceProvider services)
+        IServiceProvider services,
+        INamingProvider naming,
+        string source)
     {
         _http = http;
         _options = options;
@@ -64,7 +68,9 @@ public sealed class SearchEngineVectorRepository<TEntity, TKey> :
         _activity = activity;
         _logger = logger;
         _services = services;
-        ConfigureHttpClient();
+        _naming = naming;
+        _source = source;
+        SearchEngineHttp.Configure(_http, _options, _dialect.EngineLabel);
     }
 
     public void Describe(ICapabilities caps) => caps
@@ -580,7 +586,7 @@ public sealed class SearchEngineVectorRepository<TEntity, TKey> :
                 return _options.IndexName!;
             }
 
-            var baseName = VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services);
+            var baseName = VectorAdapterNaming.GetOrCompute<TEntity>(_services, _naming, _source);
             baseName = baseName.Replace('#', '-').Replace('.', '-').ToLowerInvariant();
             if (!string.IsNullOrEmpty(_options.IndexPrefix))
             {
@@ -588,34 +594,6 @@ public sealed class SearchEngineVectorRepository<TEntity, TKey> :
             }
 
             return baseName;
-        }
-    }
-
-    private void ConfigureHttpClient()
-    {
-        if (string.IsNullOrWhiteSpace(_options.Endpoint))
-        {
-            throw new InvalidOperationException($"{_dialect.EngineLabel} endpoint must be configured.");
-        }
-
-        _http.BaseAddress = new Uri(_options.Endpoint);
-        if (_http.Timeout == default)
-        {
-            _http.Timeout = TimeSpan.FromSeconds(Math.Max(1, _options.DefaultTimeoutSeconds));
-        }
-
-        // ApiKey is the Elasticsearch 'ApiKey' Authorization scheme. OpenSearch does not natively use it
-        // (it relies on Basic / the security plugin), but the branch is kept identical across both
-        // engines because it is harmless when ApiKey is unset (the default) and divergence here would
-        // re-introduce the very drift DATA-0103 collapses. Configure Username/Password for OpenSearch.
-        if (!string.IsNullOrEmpty(_options.ApiKey))
-        {
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("ApiKey", _options.ApiKey);
-        }
-        else if (!string.IsNullOrEmpty(_options.Username))
-        {
-            var token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password ?? ""}"));
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", token);
         }
     }
 

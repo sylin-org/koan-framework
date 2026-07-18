@@ -952,6 +952,124 @@ The pagination invariant and document Data provider family pass this R11-05 slic
 certification run, package feed, or remote state was created; the complete release ratchet remains the single R11-07
 boundary.
 
+### Search-engine vector provider-family discovery
+
+**Task:** graduate the Elasticsearch/OpenSearch vector family by making their already-shared Lucene runtime the one
+family owner for configuration, discovery, factory construction, health, naming, and boot projection, leaving each
+connector with only its native dialect and service identity.
+
+**Application intent:** “Reference Elasticsearch or OpenSearch, keep `AddKoan()`, and use the ordinary Entity vector
+ring. Koan provisions the Entity index, stores embeddings and metadata, pushes supported filters into kNN search, and
+reports the selected backend only when that Entity actually uses it.”
+
+**Public expression:** reference `Sylin.Koan.Data.Connector.ElasticSearch` or
+`Sylin.Koan.Data.Connector.OpenSearch`; retain the existing Entity/AI/vector semantics. Configure an exact
+`ConnectionStrings:<Provider>` or `Koan:Data:<Provider>:Endpoint` only when placement is explicit. Use
+`[VectorAdapter]` or `Koan:Data:VectorDefaults:DefaultProvider` only when multiple vector providers make the intended
+backend ambiguous. No repository, health registration, discovery adapter, or search-engine helper belongs in
+application code.
+
+**Guarantee/correction:** Vector owns provider election and records provider/source participation. A referenced but
+unused search connector is available, non-critical, and connection-free. Once selected, its exact endpoint/index
+route becomes critical and failures name the provider/source; Koan does not substitute another vector backend.
+Supported metadata filters are pushed into the native kNN request; unsupported filters fail loudly. A source is
+physically isolated by index naming on the configured cluster; per-source cluster endpoints remain unsupported and
+must not be implied. Explicit `IndexName` continues to warn when it defeats active partition/source naming.
+
+**Complete intent surface:** provider reference, `AddKoan()`, Entity vector/AI use, optional exact provider selection,
+endpoint and credentials, index prefix or deliberate index pin, fields, similarity, dimension, refresh mode, timeout,
+and index auto-create. Top-K is the requested nearest-neighbour candidate bound, not row pagination. Generic
+`Koan:Data:ConnectionString`, duplicate casing aliases, inert `BaseUrl`, provider-specific health classes, and direct
+use of `SearchEngineFilterTranslator` are not application decisions.
+
+**Public concepts:** the Entity vector ring expresses business intent; Vector provider/source expresses placement;
+the two provider packages express native availability; the transitive `Sylin.Koan.Data.SearchEngine` package is a
+module-free shared implementation substrate analogous to relational mechanics, not a capability an application must
+reference directly. `ISearchEngineDialect`, shared options/configuration, REST repository, and filter translator are
+module-author/runtime mechanics and will be hidden from ordinary IntelliSense where compatibility permits.
+
+**Docs read:** the provider READMEs show a useful vector result but lack limitations; both TECHNICAL companions repeat
+the same runtime/configuration account. The SearchEngine README uses the wrong package title, teaches applications to
+call the translator directly despite saying the package is not application-facing, and incorrectly says repositories
+remain separate even though `SearchEngineVectorRepository` already owns both. The old VectorAdapterSurface README's
+0/25 OpenSearch note is historical drift contradicted by current native-dialect tests.
+
+**Code read:** `SearchEngineVectorRepository` already centralizes REST/auth/bulk/index/scroll/filter behavior behind
+the correct three-member dialect seam. In contrast, the two connectors duplicate their options configurators,
+150-line boot reports, discovery normalization and health probes almost line-for-line. Their health contributors are
+always critical by reference, bypassing the existing Vector participation base used by Qdrant/Milvus/Weaviate.
+`Endpoint` and `BaseUrl` are read but discarded by both configurators when `ConnectionString` remains `auto`, so the
+documented endpoint key can be silently ignored. The generic `Koan:Data:ConnectionString` alias lets one provider read
+another concern's placement. Both factories repeat construction/naming and the repository calls
+`VectorAdapterNaming.GetOrCompute`, which can reselect a provider after `VectorService` already selected the factory.
+
+**Reusing:** `VectorService`, `VectorProviderCatalog`, `IVectorAdapterParticipation`,
+`VectorAdapterHealthContributorBase`, `StorageNameGenerator`, the existing shared repository/filter translator/dialect
+seam, provider-owned `KoanService` metadata, standard .NET configuration/options/HTTP factory, Core safe logging and
+redaction, and the two live vector conformance projects.
+
+**Creating new:** one module-free search-engine connector descriptor plus one shared connector-mechanics owner in
+`Koan.Data.SearchEngine`. It compiles the common exact configuration, autonomous discovery, selected-factory repository
+construction, participation-aware authenticated health probe, and boot projection. These are one coherent family
+responsibility currently copied twice; provider assemblies retain thin annotated factories/modules and native
+dialects. `VectorAdapterNaming` receives one selected-provider overload so search operations consume the already-made
+decision instead of negotiating again.
+
+**Coalescence:** keep three packages because they have three real responsibilities: one transitive family mechanism
+and two independently referenceable native providers. Delete the six duplicated configurator/discovery/health classes,
+collapse the two large reports and factories onto the shared owner, and keep only dialect mapping/service metadata in
+the leaves. Do not merge Elasticsearch and OpenSearch dialects: their kNN query and index mapping shapes differ
+materially. Do not move Lucene REST mechanics into general Vector Core: other vector stores do not share them.
+
+**Ergonomics:** application C# does not grow. Humans and models retain “reference provider, AddKoan, use Entity
+semantics”; exact endpoint configuration finally behaves as documented. IntelliSense stops suggesting a translator
+package as an application capability. Operators see one effective redacted endpoint and only active providers affect
+readiness. Module authors add a future Lucene-family provider by supplying service identity plus the narrow dialect,
+not by copying configuration/discovery/health/reporting machinery.
+
+**Constraints satisfied:** no application abstraction, registration call, endpoint, or decoration is added; selected
+provider/source and isolation stay Vector-owned; provider identities and exact sections remain stable; removed generic
+aliases are intentionally breaking under the greenfield mandate; ADRs remain untouched; focused shared/unit/provider,
+package, docs, and vulnerability proof only before R11-07.
+
+**Risks:** secured automatic discovery still cannot prove credentials before options are compiled and must be stated;
+Elasticsearch API-key auth is native while OpenSearch normally uses Basic/security-plugin auth; explicit per-source
+clusters are unsupported; live suites depend on Docker and large JVM containers; the shared mechanism package remains
+publicly installable because NuGet dependencies require it, so its package page must clearly say “transitive/module
+authors,” not invent a direct application result.
+
+### Search-engine vector provider-family evidence
+
+- `Koan.Data.SearchEngine` is now the one family owner for exact configuration, autonomous discovery, authenticated
+  HTTP setup, participation-aware health, startup projection, selected-provider naming, repository construction,
+  common REST operations, and filter translation. Elasticsearch and OpenSearch retain thin provider modules,
+  discovery identities, orchestration declarations, and their three-member native dialects. The change removes
+  duplicated configurators, health contributors, large startup reports, and factory construction rather than adding
+  another application concept.
+- Exact `Koan:Data:<Provider>:Endpoint` configuration is exercised without test-only post-configuration and now reaches
+  the repository. The unsafe generic Data connection-string alias and inert `BaseUrl` branches are gone. A real host
+  observes an unused provider as non-critical, connection-free `Unknown`; provider/source participation is the only
+  transition into readiness dependency.
+- Vector-only composition no longer forces construction of a record-Data default plan when no record provider exists.
+  The Data Core participation suite passes 4/4, including that regression. Naming now consumes the factory already
+  selected by `VectorService`; it does not re-enter provider election on the operation path.
+- Both provider-owned AODB conformance paths pass 4/4 after the health/configuration changes. The complete focused
+  matrix passes 29 with 4 capability-gated skips for Elasticsearch 8.13.4 and 29 with 4 skips for OpenSearch 2.13.0.
+  The skips state the same honest boundary for both: embedding retrieval and hybrid search are unsupported. The old
+  public OpenSearch 0/25 note is retired. Both test projects still emit `MSB9008` for a retired test-only project
+  reference; the repository-wide cleanup is preserved as PMC-032 rather than mixed into provider production work.
+- All three packages build and pack in Release. Their nupkgs contain the library/XML, build-transitive composition
+  metadata, package-owned README, and byte-identical canonical icon; current NuGet audit reports no known vulnerable
+  direct or transitive packages. Package quality reports all three structurally ready with no objective findings.
+- The public claim remains `demonstrated`, not `verified`: native container matrices prove the current vector floor,
+  while secured automatic discovery, per-source cluster endpoints, embedding retrieval, hybrid search, and a full
+  release certification remain explicitly outside this slice. Generated truth now contains 111 packages: 26 repair,
+  42 review, and 43 structurally ready across 18 claims. Strict documentation generation and the public truth gate
+  pass across 204 current files and 38 navigation targets.
+
+The search-engine vector provider family passes this R11-05 slice. No release candidate, full certification run,
+package feed, or remote state was created; the complete release ratchet remains the single R11-07 boundary.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

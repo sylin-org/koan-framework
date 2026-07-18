@@ -4,8 +4,8 @@ namespace Koan.Data.SearchEngine;
 /// The option surface the shared <see cref="SearchEngineVectorRepository{TEntity,TKey}"/> reads. Both
 /// the Elasticsearch and OpenSearch concrete option classes expose these (via the
 /// <see cref="SearchEngineVectorOptions"/> base) so the repository is agnostic to which backend it
-/// drives. Per-package binding concerns (<c>ConnectionString</c>, <c>Readiness</c>) stay on the
-/// concrete classes — they are not read by the repository.
+/// drives. Connection selection and readiness are handled by the shared connector mechanics before
+/// the repository is created.
 /// </summary>
 public interface ISearchEngineVectorOptions
 {

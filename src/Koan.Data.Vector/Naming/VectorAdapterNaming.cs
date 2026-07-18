@@ -41,6 +41,27 @@ public static class VectorAdapterNaming
             () => factory.GetNamingCapability(sp));
     }
 
+    /// <summary>
+    /// Resolves a vector name through the provider already selected by <c>VectorService</c>. Adapter operation paths
+    /// use this overload so naming cannot trigger a second provider-election decision.
+    /// </summary>
+    public static string GetOrCompute<TEntity>(IServiceProvider services, INamingProvider provider, string? source)
+        where TEntity : class
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(provider);
+        var routedSource = string.IsNullOrWhiteSpace(source) ||
+                           string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : source;
+        return StorageNameGenerator.Resolve(
+            provider.Provider,
+            typeof(TEntity),
+            Koan.Data.Core.EntityContext.Current?.Partition,
+            routedSource,
+            () => provider.GetNamingCapability(services));
+    }
+
     // ARCH-0103 §6 follow-on — the CollectionName/IndexName pin footgun. An adapter option that pins a STATIC
     // collection/index name (Qdrant/Milvus CollectionName, ES/OpenSearch IndexName) is used verbatim, bypassing the
     // name-fold above — so the THREE isolation discriminators that fold IS the name are all DEFEATED for that entity (every
