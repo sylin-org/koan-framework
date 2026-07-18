@@ -3,12 +3,12 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 105,
-    "repairRequired": 15,
+    "repairRequired": 13,
     "reviewRequired": 21,
-    "structurallyReady": 69,
-    "ownedReadmes": 90,
-    "technicalCompanions": 85,
-    "findings": 95
+    "structurallyReady": 71,
+    "ownedReadmes": 92,
+    "technicalCompanions": 87,
+    "findings": 91
   },
   "findingDefinitions": [
     {
@@ -1240,7 +1240,7 @@
       "projectPath": "src/Koan.Identity/Koan.Identity.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "repair-required",
+      "status": "structurally-ready",
       "description": "SEC-0007 \u2014 the durable person (Identity) and the sign-in \u2192 identity reconciliation seam. Implements Koan.Web.Auth\u0027s IUserStore / IExternalIdentityStore with Entity\u003C\u003E-backed durable stores, upserts an Identity from claims on every sign-in, and gives Membership.IdentityId a real backing entity. Reference = Intent.",
       "targetFrameworks": [
         "net10.0"
@@ -1251,13 +1251,10 @@
         "Sylin.Koan.Web",
         "Sylin.Koan.Web.Auth.Abstractions"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Identity/README.md",
+      "technicalDocumentation": "src/Koan.Identity/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Identity.Credentials",
@@ -1350,8 +1347,8 @@
       "projectPath": "src/Koan.Identity.Web/Koan.Identity.Web.csproj",
       "shape": "library",
       "role": "projection",
-      "status": "repair-required",
-      "description": "SEC-0007 \u2014 the Reference = Intent dual consoles over Koan.Identity: the operator admin API and the end-user self-service API, generated over the identity entities. Referencing this package auto-mounts both surfaces.",
+      "status": "structurally-ready",
+      "description": "Reference-activated authenticated HTTP management for Koan.Identity: subject-scoped self-service, role-gated operator lifecycle and access APIs, and dual-control impersonation.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1359,13 +1356,10 @@
         "Sylin.Koan.Identity",
         "Sylin.Koan.Web"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Identity.Web/README.md",
+      "technicalDocumentation": "src/Koan.Identity.Web/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Jobs",

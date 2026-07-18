@@ -2494,6 +2494,140 @@ The result preserves the application expression—package reference plus the exi
 activation/routing moving parts to one conventional MVC chokepoint and making the supported security boundary
 explicit to developers, agents, and operators.
 
+### Durable Identity core and Web discovery
+
+**Task:** Graduate `Sylin.Koan.Identity` and `Sylin.Koan.Identity.Web` around the behavior they actually enforce,
+removing public placeholder capabilities before writing their package contracts.
+
+**Application intent:** “When a user signs in, keep one durable person, enforce their lifecycle and sessions, and let
+the user or an operator inspect and manage the result.” Adding the Web leaf should expose those proven operations
+without application endpoint wiring.
+
+**Public expression:** Reference `Sylin.Koan.Identity` beside the application's Web Auth provider and keep the existing
+`AddKoan()` bootstrap. A selected Data provider persists the Entity-backed identity plane. Optional
+`Koan:Identity:{Posture,SeedDevUsers,DevUser,HashChainAudit}` values change explicit posture, local seeding, and audit
+tamper evidence. Reference `Sylin.Koan.Identity.Web` to add authenticated `/api/identity/me` self-service and the
+`koan:identity-operator`-gated `/api/identity/admin` surface. No registration, repository, middleware, or endpoint-map
+call is part of the application expression.
+
+**Guarantee/correction:** A successful Web Auth sign-in reconciles `(provider, subject)` to one durable person without
+email auto-merge, records a durable cookie session, stamps global roles, and rejects later cookie validation when the
+session is revoked or the person is inactive. Development defaults Open and may seed local people; every other
+environment defaults Closed, and forcing Open outside Development refuses startup. Invalid enum configuration is a
+standard .NET binding failure. Identity Web scopes self-service to the authenticated subject and keeps destructive
+operator and impersonation operations role-gated and actor-attributed. A durable Data provider is required for durable
+behavior; absence/failure is not disguised as an Identity-local store.
+
+**Complete intent surface:** Core requires only package reference, the ordinary `AddKoan()`, an active Data provider,
+and Web Auth when automatic sign-in reconciliation is desired. Web requires its package reference, an authenticated
+principal for self-service, and a standard role claim `koan:identity-operator` for operator APIs. Configuration is
+optional unless deployment posture differs from the environment-derived default. Client token issuance is a separate
+intent expressed by `Sylin.Koan.Web.Auth.Server`.
+
+**Public concepts:** `Identity`, `IdentityEmail`, and `ExternalIdentityLink` express person and explicit factor linkage;
+`Session` expresses enforced cookie-session revocation; `IdentityRole` expresses standard global role binding;
+`AuditEvent`/`AuditChain` express best-effort mutation evidence and optional tamper detection; effective-access and
+impersonation types express proved access explanation and dual-control acting-as. `IdentityOptions` contains only
+deployment decisions. `ApiToken`, `ApiTokenService`, and `Group` do not survive: the former has no authentication
+consumer and duplicates the OAuth Server's token concern, while the latter contributes nothing to access despite
+claiming bulk-role semantics. `Identity.Epoch` also does not survive because no verifier consumes it.
+
+**Docs read:** `docs/engineering/index.md` requires Entity-first data, controller-only HTTP, typed options/constants,
+and package companions; `docs/architecture/principles.md` requires one business expression, reference intent, standard
+.NET reuse, semantic honesty, and one current path; `SEC-0007` supplies the accepted durable-person and layering
+decisions but remains dated ADR evidence; `authentication-setup.md` establishes the current Web Auth expression and
+separates sign-in from token issuance; Canon's README/TECHNICAL provide the closest current package-companion pattern.
+
+**Code read:** `SecIdentityModule` owns options, discovered reconciliation/access gates, management services, audit
+hooks, dev seeding, and startup reporting; `IdentityReconciler` and `IdentityAuthFlowHandler` own explicit account
+linking, sign-in reconciliation, session creation/validation, and role stamping; `SessionService`,
+`IdentityLifecycleService`, `AccessExplainer`, and `ImpersonationService` are the effective day-two chokepoints;
+Identity Web's four controllers are conventional attribute-routed projections; the 114-spec real-host family suite
+proves core, Web, tenancy, passwords, and MFA together. Source/consumer searches show no enforcement reader of
+`Identity.Epoch`, `ApiToken.SecretHash`, or `Group.MemberIdentityIds`: the Tenancy bridge only incremented the dormant
+epoch, while token and group behavior ended at their CRUD-oriented services/tests.
+
+**Reusing:** Entity statics and relationships; the inert Web Auth lifecycle contracts; standard `ClaimTypes.Role` and
+ASP.NET controller/authorization primitives; `IdentityPosture`, typed options binding, module lifecycle/reporting;
+existing reconciliation, session guard, role/access, audit, and impersonation implementations; OAuth Server for real
+client-token issuance; the focused 114-spec suite and generated package/product compilers.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| Package quick contract | `src/Koan.Identity/README.md` | State the smallest activation, meaningful result, configuration, and honest boundaries. |
+| Package technical contract | `src/Koan.Identity/TECHNICAL.md` | State ownership, lifecycle, persistence, failure, access, audit, and unsupported scenarios. |
+| Web package quick contract | `src/Koan.Identity.Web/README.md` | State route groups, role/subject gates, and reference-only activation. |
+| Web package technical contract | `src/Koan.Identity.Web/TECHNICAL.md` | Inventory controller ownership, projections, security, and non-UI boundary. |
+| Focused honesty specs | existing Identity spec files | Prove typed posture and complete core-dependent deletion without inventing another test mechanism. |
+
+**Coalescence:** Closest posture pattern is typed `TenancyOptions.Posture`; rebuild Identity's string parser as the
+same standard nullable enum. Closest token owner is the now-verified OAuth Server; delete Identity's unusable personal
+token record/endpoints instead of building a competing issuer/verifier. Delete Group until a real group-to-access
+contributor and management use case exists. Keep one headless Identity domain owner and one thin Web projection;
+`Koan.Web` remains an explicit dependency because the current `IAuthorize`/`AgentGrant` floor lives there. Extracting a
+framework-neutral authorization package would affect several pillars and belongs to a separately assessed logical
+block, not a hidden side effect of package documentation.
+
+**Ergonomics:** A human or model reads “reference Identity; sign in; a durable person and enforceable session exist.”
+Entity types remain directly discoverable through IntelliSense, standard role claims remain the authorization
+vocabulary, and the Web leaf adds routes rather than setup verbs. Operators see effective posture and inspect actual
+entities/APIs. Removing inert tokens, groups, and epoch eliminates three branches that looked security-bearing but
+created no guarantee.
+
+**Constraints satisfied:** Entity statics remain the data path; all HTTP stays in attribute-routed controllers; stable
+role/claim identifiers remain centralized; posture becomes a typed option; no large unbounded path is added (existing
+operator search is separately bounded for this slice); package companions are added; ADRs remain unchanged; no broad
+release certification is planned.
+
+**Risks:** Public types are intentionally removed in a greenfield pre-1.0 release. Current Identity deletion also
+under-counts global roles and impersonation grants; the repair must make its report cover every core-owned dependent
+while retaining audit evidence. The family integration project combines six packages, so final counts will fall when
+placeholder-only facts are removed; evidence must state the new count rather than preserve a vanity number.
+
+### Durable Identity core and Web implementation
+
+Status: `keep with focused proof complete` for `Sylin.Koan.Identity` and `Sylin.Koan.Identity.Web`; optional Identity
+leaves remain separately assessed work.
+
+- Removed the public `ApiToken` Entity, `ApiTokenService`, self-service token routes, and their CRUD-only tests. No
+  verifier, authentication handler, or request path accepted those secrets; real client-token issuance remains the
+  separately referenced, verified OAuth Server instead of a second security-looking record store.
+- Removed the public `Group` Entity and read-only operator route. Member IDs had no effective-access contributor or
+  bulk-role behavior. A future group capability must prove assignment, nesting semantics, authorization effects, and
+  management before re-entering the product.
+- Removed `Identity.Epoch` and the Tenancy bridge's write-only increment. No bearer verifier read it, so deactivation
+  continues to state the exact live guarantee: inactive status plus durable cookie-session revocation. Already-issued
+  bearer tokens remain valid until their issuer's normal expiry/revocation rule.
+- Replaced Identity's custom string posture parser with nullable `IdentityPosture`, matching standard .NET options and
+  the existing Tenancy posture shape. Invalid configuration now refuses host startup with the Identity configuration
+  path; forced Open outside Development retains the explicit fail-closed guard.
+- Corrected lifecycle deletion to remove every core-owned dependent: emails, sessions, external links, global roles,
+  and impersonation grants where the person is actor or target. Audit evidence is deliberately retained and reported
+  boundaries state that optional modules own their own deprovisioning.
+- Renamed the impersonation request action to stop hiding `ControllerBase.Request`; Identity, Identity.Web, and the
+  affected Identity.Tenancy bridge now each build with zero warnings. All HTTP remains controller-owned.
+- Moved the global operator role from a Web-only constants type to core `IdentityRoles` and hardened the
+  Identity-Tenancy role-projection chokepoint to strip both tenancy-fleet and identity-plane operator roles. A tenant
+  membership can no longer unlock the global Identity operator API; ordinary tenant roles continue to project.
+- Added owned README/TECHNICAL contracts for core and Web. They teach reference + existing `AddKoan()`, Data/Web Auth
+  prerequisites, typed posture, enforced sessions/roles/access/impersonation, route authority, startup reporting, and
+  explicit non-support for personal tokens, group access, bearer revocation, bundled UI, and transactional cross-module
+  deletion. Current surface truth now calls the Web leaf management APIs rather than generated consoles.
+- The focused family suite passes 111/111 after removing three placeholder-only facts and adding invalid-posture plus
+  complete-dependent-deletion proof. Core, Web, and the affected Tenancy bridge build with zero warnings/errors.
+- Canonical truth remains 105 packages and 24 product claims. Core and Web move from repair-required to structurally
+  ready, yielding 13 repair-required, 21 review-required, and 71 structurally ready packages. The verified
+  authentication/authorization claim now explicitly includes Identity.Web and the 111-spec family evidence.
+- Both packed artifacts contain DLL/XML, owned README, mascot icon, build-transitive props, and their expected direct
+  dependencies. Identity depends on Core, Data.Core, Web.Auth.Abstractions, and the current Web authorization floor;
+  Identity.Web depends only on Identity and Web plus `Microsoft.AspNetCore.App`.
+
+This cut makes the developer promise smaller and stronger: sign-in becomes a durable person with enforceable cookie
+sessions and standard roles; the optional Web reference exposes management APIs. Security-shaped concepts that did
+not participate in security are gone rather than documented as future magic.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

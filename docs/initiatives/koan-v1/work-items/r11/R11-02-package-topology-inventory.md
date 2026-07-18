@@ -114,12 +114,12 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Data.Vector.Connector.Qdrant` | `provider` | `keep` |
 | `Sylin.Koan.Data.Vector.Connector.SqliteVec` | `provider` | `keep` |
 | `Sylin.Koan.Data.Vector.Connector.Weaviate` | `provider` | `keep` |
-| `Sylin.Koan.Identity` | `capability` | `assess` |
+| `Sylin.Koan.Identity` | `capability` | `keep` |
 | `Sylin.Koan.Identity.Credentials` | `capability` | `assess` |
 | `Sylin.Koan.Identity.Mfa` | `capability` | `assess` |
 | `Sylin.Koan.Identity.Passwords` | `capability` | `assess` |
 | `Sylin.Koan.Identity.Tenancy` | `capability` | `assess` |
-| `Sylin.Koan.Identity.Web` | `projection` | `assess` |
+| `Sylin.Koan.Identity.Web` | `projection` | `keep` |
 | `Sylin.Koan.Jobs` | `capability` | `assess` |
 | `Sylin.Koan.Mcp` | `capability` | `keep` |
 | `Sylin.Koan.Mcp.Explorer` | `capability` | `keep` |

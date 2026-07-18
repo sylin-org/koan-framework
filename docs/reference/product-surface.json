@@ -44,10 +44,11 @@
     {
       "id": "authentication-authorization",
       "title": "Authentication, authorization, and client token issuance",
-      "summary": "Identity and web sign-in compose through referenced modules; the embedded OAuth server issues audience-bound public-client tokens through its verified protocol boundary, while external provider behavior remains connector-specific.",
+      "summary": "Durable Identity, web sign-in, and authenticated identity-management APIs compose through referenced modules; the embedded OAuth server issues audience-bound public-client tokens through its verified protocol boundary, while external provider behavior remains connector-specific.",
       "maturity": "verified",
       "packages": [
         "Sylin.Koan.Identity",
+        "Sylin.Koan.Identity.Web",
         "Sylin.Koan.Web.Auth",
         "Sylin.Koan.Web.Auth.Server"
       ],
@@ -59,8 +60,10 @@
       "evidence": [
         "docs/initiatives/koan-v1/R02-EVIDENCE.md",
         "src/Koan.Identity",
+        "src/Koan.Identity.Web",
         "src/Koan.Web.Auth",
-        "tests/Suites/Auth/Koan.Web.Auth.Server.IntegrationTests"
+        "tests/Suites/Auth/Koan.Web.Auth.Server.IntegrationTests",
+        "tests/Suites/Integration/Identity/Koan.Identity.Tests"
       ]
     },
     {
@@ -1486,9 +1489,9 @@
         "Sylin.Koan.Web",
         "Sylin.Koan.Web.Auth.Abstractions"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Identity/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Identity/TECHNICAL.md",
       "claims": [
         "authentication-authorization"
       ]
@@ -1558,7 +1561,7 @@
     {
       "packageId": "Sylin.Koan.Identity.Web",
       "shape": "library",
-      "description": "SEC-0007 \u2014 the Reference = Intent dual consoles over Koan.Identity: the operator admin API and the end-user self-service API, generated over the identity entities. Referencing this package auto-mounts both surfaces.",
+      "description": "Reference-activated authenticated HTTP management for Koan.Identity: subject-scoped self-service, role-gated operator lifecycle and access APIs, and dual-control impersonation.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1566,10 +1569,12 @@
         "Sylin.Koan.Identity",
         "Sylin.Koan.Web"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
-      "claims": []
+      "readme": "src/Koan.Identity.Web/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Identity.Web/TECHNICAL.md",
+      "claims": [
+        "authentication-authorization"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Jobs",

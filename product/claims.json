@@ -175,11 +175,11 @@
     {
       "id": "authentication-authorization",
       "title": "Authentication, authorization, and client token issuance",
-      "summary": "Identity and web sign-in compose through referenced modules; the embedded OAuth server issues audience-bound public-client tokens through its verified protocol boundary, while external provider behavior remains connector-specific.",
+      "summary": "Durable Identity, web sign-in, and authenticated identity-management APIs compose through referenced modules; the embedded OAuth server issues audience-bound public-client tokens through its verified protocol boundary, while external provider behavior remains connector-specific.",
       "maturity": "verified",
-      "packages": ["Sylin.Koan.Identity", "Sylin.Koan.Web.Auth", "Sylin.Koan.Web.Auth.Server"],
+      "packages": ["Sylin.Koan.Identity", "Sylin.Koan.Identity.Web", "Sylin.Koan.Web.Auth", "Sylin.Koan.Web.Auth.Server"],
       "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md", "docs/guides/authentication-setup.md", "docs/guides/oauth-server-howto.md"],
-      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Identity", "src/Koan.Web.Auth", "tests/Suites/Auth/Koan.Web.Auth.Server.IntegrationTests"]
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Identity", "src/Koan.Identity.Web", "src/Koan.Web.Auth", "tests/Suites/Auth/Koan.Web.Auth.Server.IntegrationTests", "tests/Suites/Integration/Identity/Koan.Identity.Tests"]
     },
     {
       "id": "testing-local-infrastructure",
