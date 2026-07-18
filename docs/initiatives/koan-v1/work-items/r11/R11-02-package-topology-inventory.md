@@ -126,7 +126,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Mcp.Operations` | `capability` | `keep` |
 | `Sylin.Koan.Media.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Media.Core` | `capability` | `keep` |
-| `Sylin.Koan.Media.Web` | `projection` | `assess` |
+| `Sylin.Koan.Media.Web` | `projection` | `keep` |
 | `Sylin.Koan.Observability` | `capability` | `assess` |
 | `Sylin.Koan.Orchestration.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Orchestration.Aspire.Abstractions` | `contracts` | `keep` |
@@ -160,10 +160,10 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Web.Auth.Roles` | `projection` | `assess` |
 | `Sylin.Koan.Web.Auth.Server` | `projection` | `assess` |
 | `Sylin.Koan.Web.Auth.Services` | `projection` | `assess` |
-| `Sylin.Koan.Web.Backup` | `projection` | `assess` |
+| `Sylin.Koan.Web.Backup` | `projection` | `retire` (implemented) |
 | `Sylin.Koan.Web.Extensions` | `capability` | `keep` |
 | `Sylin.Koan.Web.OpenApi` | `projection` | `keep` |
-| `Sylin.Koan.Web.OpenGraph` | `projection` | `assess` |
+| `Sylin.Koan.Web.OpenGraph` | `projection` | `keep` |
 | `Sylin.Koan.Web.Sse` | `projection` | `keep` |
 | `Sylin.Koan.ZenGarden` | `capability` | `assess` |
 | `Sylin.Koan.ZenGarden.Contracts` | `contracts` | `keep` |
@@ -306,6 +306,18 @@ dependencies; splitting Code Mode is not justified without measured demand, secu
 
 Each reference adds a distinct application-facing projection and all three pass focused behavior, consumer, exact
 artifact, documentation, and current vulnerability evidence. Base `Sylin.Koan.Web` remains unchanged.
+
+## Web edge projection dispositions
+
+| Package | Disposition | Distinct reference intent and boundary |
+|---|---|---|
+| `Sylin.Koan.Media.Web` | `keep` | Optional Entity-backed original/recipe HTTP serving. Exactly one concrete `MediaEntity<T>` is selected automatically; an explicit source is required only for a real zero/multiple/custom-source decision, and Entity access/tenant axes remain the serving gate. |
+| `Sylin.Koan.Web.OpenGraph` | `keep` | Optional Entity-to-social-card HTML projection. `SocialCards.For<T>` composes a host-owned registry and lifecycle plan while the package contributes its middleware automatically; it owns no SPA fallback or media runtime. |
+| `Sylin.Koan.Web.Backup` | `retire` (implemented) | The projection had no supported consumer or controller suite and exposed unauthenticated destructive routes, permissive CORS, process-local tracking, non-cancelling cancellation, detached work, in-memory archives, placeholder results, fake enhancement helpers, and a private Swagger stack. `Koan.Data.Backup` remains; any future HTTP control plane must be rebuilt around explicit authorization, durable Jobs, resource bounds, and tested recovery guarantees. |
+
+Media Web and OpenGraph retain distinct reference value and focused owner/consumer evidence. Web Backup's removal
+reduces the active package graph without deleting the independent backup/restore domain capability or manufacturing
+a compatibility package.
 
 ## Acceptance
 
