@@ -3,12 +3,12 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 102,
-    "repairRequired": 10,
+    "repairRequired": 9,
     "reviewRequired": 21,
-    "structurallyReady": 71,
-    "ownedReadmes": 92,
-    "technicalCompanions": 87,
-    "findings": 85
+    "structurallyReady": 72,
+    "ownedReadmes": 93,
+    "technicalCompanions": 88,
+    "findings": 83
   },
   "findingDefinitions": [
     {
@@ -1261,8 +1261,8 @@
       "projectPath": "src/Koan.Identity.Tenancy/Koan.Identity.Tenancy.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "repair-required",
-      "description": "SEC-0007 Layer 4 \u2014 the Identity \u00D7 Tenancy bridge (Reference = Intent). Lights up membership-scoped access (the Membership effective-access contributor), the tenant-resolution carriers \u002B AfterAuthentication middleware that scopes the request to a tenant, invite-binds-to-identity, and atomic verifiable deprovisioning. Koan.Identity core never references Koan.Tenancy (graceful degradation, D7); referencing this package composes the two.",
+      "status": "structurally-ready",
+      "description": "Compose durable Identity with Tenancy: active-membership request scoping, tenant-role projection, effective-access facts, and integrity-checked lifecycle receipts by reference plus AddKoan().",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1271,13 +1271,10 @@
         "Sylin.Koan.Tenancy",
         "Sylin.Koan.Web"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Identity.Tenancy/README.md",
+      "technicalDocumentation": "src/Koan.Identity.Tenancy/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Identity.Web",

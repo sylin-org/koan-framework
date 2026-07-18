@@ -118,7 +118,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Identity.Credentials` | `capability` | `retire` (implemented) |
 | `Sylin.Koan.Identity.Mfa` | `capability` | `retire` (implemented) |
 | `Sylin.Koan.Identity.Passwords` | `capability` | `retire` (implemented) |
-| `Sylin.Koan.Identity.Tenancy` | `capability` | `assess` |
+| `Sylin.Koan.Identity.Tenancy` | `capability` | `keep (implemented)` |
 | `Sylin.Koan.Identity.Web` | `projection` | `keep` |
 | `Sylin.Koan.Jobs` | `capability` | `assess` |
 | `Sylin.Koan.Mcp` | `capability` | `keep` |

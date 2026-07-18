@@ -1,5 +1,11 @@
 # SnapVault — Product Spec & Greenfield Harvest Map
 
+> **Historical build plan, not current product truth.** It preserves the June 2026 greenfield decisions and completed
+> work narrative. The supported application now uses an explicit operator-to-known-person gallery grant; the former
+> token invitation/acceptance and “atomic/signed erasure proof” claims were removed during the V1 Identity × Tenancy
+> honesty pass. Read [`samples/applications/SnapVault/README.md`](../../samples/applications/SnapVault/README.md), its
+> current controllers/services, and the executable SnapVault suite for the supported surface.
+
 - Status: **Draft for review** (2026-06-26)
 - Scope: `samples/applications/SnapVault`. This is the **spec-first** artifact for the greenfield backend rebuild: it says *what SnapVault is meant to offer*, realigns the surface around "fewer, more meaningful parts," and is the **harvest map** for porting the genuine domain out of the legacy backend.
 - Companions: [snapvault-ui-api-contract.md](./snapvault-ui-api-contract.md) (the functional acceptance gate — what the SPA calls) · [snapvault-koan-modernization.md](./snapvault-koan-modernization.md) (the original in-place ADR, **superseded** by this greenfield approach; its strip/build/keep table is folded in below).

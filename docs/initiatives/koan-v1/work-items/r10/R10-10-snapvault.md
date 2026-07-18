@@ -4,10 +4,10 @@ domain: framework
 title: "R10-10 - Graduate SnapVault as the local-first studio proof"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-18
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-17
+  date_last_tested: 2026-07-18
   status: passed
   scope: local-first composition, participation-owned vector readiness, studio-to-client proof, public sample truth
 ---
@@ -23,7 +23,7 @@ validation:
 ## Meaningful outcome
 
 A developer runs SnapVault from a fresh checkout without Docker, uploads one photo, sees Koan durably file and
-serve it inside the local studio, and can share that event with one invited client whose access is structurally
+serve it inside the local studio, and can grant that event to one known durable client whose access is structurally
 limited to that gallery. External AI, vector, MongoDB, and object-storage providers remain composable enhancements;
 their absence never makes the core application pretend to be broken, and using one makes its health responsibility
 and correction visible.
@@ -71,9 +71,10 @@ original blob, extracts safe metadata, creates or reuses the UTC-day event, pers
 media recipes, and reports progress from the Jobs ledger. AI failure is non-fatal and explicit: the stored photo
 remains usable with a failed/unavailable analysis state and can be retried after an eligible provider appears.
 
-An invited client receives an identity-bound grant to one event. Raw Entity reads, media reads, and proofing writes
-all fail closed outside that event; deprovisioning revokes grants and pending invitations and emits the existing
-verifiable certificate.
+An operator grants a known active durable person access to one event. Raw Entity reads, media reads, and proofing
+writes all fail closed outside that event; access closure removes the grant and membership and emits an
+integrity-checked operation record. Token invitation acceptance is deliberately absent until Koan can prove a
+distributed single-claim ceremony.
 
 Referenced-but-unused external providers are available composition, not readiness dependencies. Once a vector
 provider is actually selected by a vector operation, it becomes critical and its probe/correction is reported. An
@@ -99,7 +100,7 @@ registration is added to the common path.
 - `PhotoAsset` is the stored original and the Entity-centered media/analysis surface.
 - `Event` is the studio album and auto-organization boundary.
 - `PhotoProcessingJob` makes ingest durable and carries ambient studio context.
-- `GalleryInvite` / `GalleryGrant` express the client-sharing business decision rather than a second tenant axis.
+- `GalleryGrant` expresses the client-sharing business decision rather than a second tenant axis.
 - `ProofSelection` keeps client choices attributed to the guest instead of mutating studio ratings.
 - AI analysis and semantic search are optional enrichments; they do not redefine whether a photo vault works.
 
@@ -211,8 +212,9 @@ one visible runtime decision; it does not change the application grammar.
    connectors only as explicit optional composition and delete any unproved launcher/deployment path.
 3. Add one cumulative default-host proof: initial readiness/facts, real JPEG upload through HTTP and durable Jobs,
    stored/served photo, event creation, optional AI degradation, and clean shutdown.
-4. Close the studio-to-client arc at the smallest reliable surface: invite, identity-bound accept, event-scoped
-   gallery/proofing, cross-event denial, and deprovision certificate. Reuse existing proof rather than duplicate it.
+4. Close the studio-to-client arc at the smallest reliable surface: explicit known-person grant, event-scoped
+   gallery/proofing, cross-event denial, and an integrity-checked access-closure record. Reuse existing proof rather
+   than duplicate it.
 5. Rewrite current sample code comments and README as greenfield intent; centralize live constants; remove unearned
    interfaces/ceremony and stale deployment artifacts only where focused compile/proof confirms deletion.
 6. Run the focused Vector owner tests, SnapVault 33-test suite plus the new cumulative cell, strict sample build,

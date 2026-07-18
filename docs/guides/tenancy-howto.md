@@ -4,12 +4,12 @@ domain: tenancy
 title: "Multi-Tenancy How-To"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-06-24
-framework_version: v0.17.0
+last_updated: 2026-07-18
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-06-24
+  date_last_tested: 2026-07-18
   status: verified
-  scope: Koan.Tenancy.Tests — AssertNoTenantLeakSpec + StorageTenantIsolationSpec (real AddKoan, SQLite + Local storage)
+  scope: Koan.Tenancy.Tests + Koan.Identity.Tests 85/85 + SnapVault 33/33
 related_guides:
   - jobs-howto.md
   - framework-utilities.md
@@ -192,35 +192,40 @@ using (Tenant.Use("acme"))
 
 ---
 
-## 7. Wiring a tenant per web request
+## 7. Resolving an authenticated web request
 
-**Concept.** The framework resolves the ambient tenant from a **trusted signal** per request. Concrete resolver
-strategies (verified claim, host/domain, authorized header) are a **later slice** — today you establish the scope
-yourself with middleware, using the `Tenant.Use` primitive. This is the app's responsibility because "what is the
-trusted tenant signal" is an app/security decision.
+**Concept.** Reference `Sylin.Koan.Identity.Tenancy` when a signed-in person should select a tenant through durable
+membership. The bridge reads claim, header, subdomain, and path carriers after authentication, but treats each value
+only as a candidate. It establishes `Tenant.Current` only when the durable `Identity` is active and a current
+`Membership` authorizes that exact tenant. The same row supplies tenant roles; forged, anonymous, inactive, or removed
+subjects remain unscoped.
 
-**Recipe.** Add small middleware early in the pipeline that opens a `Tenant.Use(...)` scope around the request and
-disposes it after. Resolve the id from whatever your app trusts (a verified claim in real systems; a header for a
-demo). Leave global config entities `[HostScoped]` so startup seeding (which has no tenant) still works.
+**Recipe.** Add the bridge package and keep the ordinary `AddKoan()` bootstrap. Create memberships as business data;
+do not add application middleware or re-read raw carrier values inside domain code.
 
 **Sample.**
 
-```csharp
-// Program.cs — after auth, before routing. A demo header resolver; production uses a verified claim/host.
-app.Use(async (ctx, next) =>
-{
-    var tenant = ctx.User.FindFirst("tenant")?.Value
-                 ?? ctx.Request.Headers["X-Tenant-Id"].FirstOrDefault();
-    if (string.IsNullOrWhiteSpace(tenant)) { await next(); return; }  // unscoped → posture decides (dev-seed / fail-closed)
-    using (Tenant.Use(tenant))
-        await next();
-});
+```powershell
+dotnet add package Sylin.Koan.Identity.Tenancy
 ```
 
-**When to use it.** Every multi-tenant web app. Two cautions when retrofitting tenancy onto an existing app: (1)
-mark genuinely-global entities `[HostScoped]` (otherwise startup seeders fail closed under Closed posture); (2)
-background workers and startup tasks have **no request** — they must establish their own `Tenant.Use(...)` (e.g.
-iterate tenants) or operate on `[HostScoped]`/`IAmbientExempt` data.
+```csharp
+await new Membership
+{
+    TenantId = tenant.Id,
+    IdentityId = person.Id,
+    Roles = { "billing:review" }
+}.Save();
+```
+
+The defaults are claim `tenant`, header `X-Koan-Tenant`, and path `/t/{tenantCode}`. Subdomain routing is inert until
+`Koan:Data:Tenancy:Resolution:BaseHosts` lists the application's base hosts. Carrier precedence and effective settings
+are reported at startup. Every carrier always uses the same active-membership authorization; there is no bypass flag.
+
+**When to use it.** Use Identity Tenancy for normal authenticated multi-tenant Web APIs. Background workers and
+startup tasks have no request and must rely on Koan's captured job context, establish an explicit trusted
+`Tenant.Use(...)`, or operate on `[HostScoped]`/`IAmbientExempt` data. Public/anonymous tenant routing is not provided
+by weakening this security boundary.
 
 ---
 
@@ -244,19 +249,20 @@ change (a new read surface, a new write path) hasn't punched a hole. Blob isolat
 
 ---
 
-## Roadmap — designed, not yet built
+## Current boundary and deferred work
 
 This guide documents what is **implemented today**: the scoping surface (`Tenant.Use`/`None`/`Current`),
-`[HostScoped]`/`IAmbientExempt`, posture + dev-seed, and automatic isolation across data, blobs, cache, and the
-job async-hop. The following are **designed** (ARCH-0095 / ARCH-0099 / the tenancy design canon) but **not yet
-shipped** — do not assume them in code:
+`[HostScoped]`/`IAmbientExempt`, posture + dev-seed, automatic isolation across data/blobs/cache/jobs, durable
+memberships and roles, and active-member request resolution. Do not assume the following deferred guarantees:
 
 - **Lifecycle verbs** — `Tenant.Provision` / `Relocate` / `Erase` / `Rename`, and the rich current-tenant projection
   (`{ Id, Codes, Name }`) backed by a tenant registry.
-- **Membership & roles** — per-tenant membership, roles-on-membership, the gate-above-roles model.
-- **Concrete `ITenantResolver` strategies** — claim / host / authorized-header request resolution (today the seam
-  is a marker the production boot pre-flight checks; you wire the scope yourself, §7).
-- **Data-classification & residency** — `[Pii]`/`[Phi]` posture, cryptographic erasure certificate, region pinning.
+- **Invitation acceptance** — `Invite` exists as a control-plane record, but V1 has no distributed single-claim
+  acceptance ceremony. Do not hand-roll a check-then-save token flow.
+- **Tenant-status request enforcement and verified custom domains** — membership scoping does not yet interpret a
+  suspended tenant or prove domain ownership.
+- **Data-classification & residency** — `[Pii]`/`[Phi]` posture, externally attested cryptographic erasure, and region
+  pinning are not current tenancy guarantees.
 
 ---
 

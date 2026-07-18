@@ -1,7 +1,7 @@
 # SnapVault — a local photo studio that grows with you
 
 SnapVault accepts a photo, durably organizes it into a daily event, serves the original and gallery recipes,
-and can share that event with one invited client without exposing the rest of the studio.
+and can grant one known durable client access to that event without exposing the rest of the studio.
 
 ## Run it
 

@@ -2732,6 +2732,136 @@ This is architecture coalescence rather than feature denial. Authentication cere
 retains only guarantees it currently completes. Developers and agents no longer encounter three polished-looking
 packages whose missing work begins exactly where security becomes application-critical.
 
+### Identity × Tenancy bridge discovery
+
+**Task:** Graduate `Sylin.Koan.Identity.Tenancy` as the one application bridge between a durable person and Koan's
+tenant control plane, removing any security-shaped workflow whose guarantee ends before the application result.
+
+**Application intent:** Reference the bridge and keep the existing `AddKoan()` bootstrap so an authenticated tenant
+member can select a tenant by claim, header, subdomain, or path; receive only that membership's tenant roles; and lose
+that scope on the next request when the person or seat is deprovisioned.
+
+**Public expression:** Reference `Sylin.Koan.Identity.Tenancy` beside Identity, Tenancy, Web Auth, and a durable Data
+provider. The reference contributes request resolution and effective-access facts automatically. Optional standard
+configuration changes carrier names/hosts/prefixes. There is no application middleware registration, endpoint map,
+repository, contributor registration, or authorization-bypass switch.
+
+**Guarantee/correction:** A client-supplied tenant candidate becomes ambient only when the authenticated subject has a
+current durable membership and an active durable Identity. The membership query both authorizes and supplies projected
+tenant roles; reserved host roles never project. Missing, forged, inactive, or removed subjects proceed unscoped so
+tenant-managed data fails closed without disclosing tenant existence. Full deactivation closes durable cookie sessions
+and tenant scope; already-issued bearer tokens remain governed by their issuer outside tenant scope. Deprovisioning is
+a fail-closed multi-write workflow with an integrity-checked operation receipt, not a database transaction, append-only
+ledger, external-state proof, or global bearer revocation mechanism.
+
+**Complete intent surface:** Carrier configuration is optional: claim `tenant`, header `X-Koan-Tenant`, and path
+`/t/{code}` work by default; subdomain resolution becomes live only when `BaseHosts` is configured. Every carrier is
+membership-authorized. Public/anonymous tenant routing is not a weakened mode of this capability and must return later
+as a separately named business capability if a real use case and isolation contract justify it.
+
+**Public concepts:** `Membership` remains the tenant seat and tenant-role source; `ITenantResolver` remains the carrier
+extension seam; `TenantResolutionMiddleware` remains the single inbound authorization/scoping chokepoint;
+`MembershipAccessContributor` composes the same roles into Identity's effective-access explanation;
+`DeprovisioningService` and `DeprovisioningReceipt` remain the explicit lifecycle operation and integrity-checked
+record. `InviteAcceptanceService` does not survive this slice: the current check-then-write flow cannot enforce one
+accepting identity per invite under multi-node contention, and deterministic membership IDs only prevent duplicate
+seats for the same person.
+
+**Docs read:** `docs/engineering/index.md` requires Entity-first data, controller-only HTTP, typed options/constants,
+and owned package companions; `docs/architecture/principles.md` requires reference intent, standard .NET reuse,
+semantic honesty, and one business expression; Identity's current README establishes durable-person/session boundaries;
+the Tenancy and Identity ADRs remain historical evidence and will not be edited.
+
+**Code read:** `IdentityTenancyModule` owns carrier/contributor/service composition and startup reporting;
+`TenantResolutionMiddleware` owns carrier order, membership authorization, role projection, and ambient scope;
+the four resolvers own only signal extraction and code-to-id resolution; `MembershipAccessContributor` plugs into
+Identity's already-discovered contributor registry; `InviteAcceptanceService` checks durable verified email then
+performs non-atomic invite/membership writes; `DeprovisioningService` performs lifecycle writes and hashes a receipt;
+the focused Identity suite covers carriers, forged/nonmember behavior, role projection, invitation happy paths, and
+deprovisioning but does not prove cross-node invite claiming or bearer-path deactivation.
+
+**Scoped inventory:** Stable carrier defaults and the configuration path already exist in
+`TenancyResolutionOptions`; receipt surface strings are currently repeated magic values and need one internal owner.
+The package has one options type and no competing options or validator. Its only public result DTO is
+`InviteAcceptResult`, which leaves with the incomplete invitation workflow; no replacement request/response DTO is
+needed because the retained capability is automatic request composition plus Entity-backed receipts.
+
+**Reusing:** Standard DataAnnotations/`OptionsBuilder.Validate` for startup validation; the registry's
+`[KoanDiscoverable]` interface discovery for effective-access contributors; standard ASP.NET claims/middleware;
+Entity statics and deterministic membership identity; Identity status/session services; Tenancy's ambient scope and
+resolver contract; module provenance and focused real-host Identity evidence.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| Receipt surface constants | `src/Koan.Identity.Tenancy/Deprovisioning/DeprovisioningSurfaces.cs` | Give stable receipt vocabulary one owner and make its tenant/cookie scope explicit. |
+| Package quick contract | `src/Koan.Identity.Tenancy/README.md` | Teach the reference-only path, carrier defaults, meaningful result, and honest boundaries. |
+| Package technical contract | `src/Koan.Identity.Tenancy/TECHNICAL.md` | State request ordering, status/membership enforcement, lifecycle failure semantics, and unsupported scenarios. |
+| Deferred invitation contract | `docs/initiatives/koan-v1/POST-CYCLE-TODO.md` | Preserve the correct claim-state/concurrency evidence gate without shipping a misleading security workflow. |
+
+**Coalescence:** Remove `[After]`; project dependencies already express assembly availability and the involved
+registrations are order-independent. Remove the bridge's explicit `IEffectiveAccessContributor` registration because
+Identity's one registry already discovers it. Remove `RequireMembership`; it creates a second unsafe authorization
+mode inside the same request chokepoint. Keep carrier resolution in this bridge for now: the functional intent is not
+generic host parsing but durable Identity membership authorization. Do not add a keyed local lease or bespoke CAS
+fallback for invitations; a future invitation ceremony needs one explicit claim-state owner and provider-independent
+failure/recovery semantics.
+
+**Ergonomics:** The developer expression remains package reference plus existing `AddKoan()`. Humans and models can
+read one invariant—“a tenant carrier scopes only an active member”—without learning activation ordering or a dangerous
+escape switch. Operators see effective carrier settings and whether subdomain routing is live. Reviewers can inspect
+one middleware for inbound isolation, one contributor for access explanation, and one lifecycle service for closure.
+
+**Constraints satisfied:** Entity statics remain the data path; no HTTP controller is invented; stable receipt values
+gain one constant owner; options use standard .NET validation; package companions are added; current docs and generated
+truth will be aligned; ADRs remain unchanged; only the focused Identity family suite runs before R11-07.
+
+**Risks:** Removing invitation acceptance leaves the existing Tenancy `Invite` record without a supported acceptance
+ceremony; current docs must say so plainly until the future state machine exists. Identity status adds one durable read
+after a matching membership is found; it is intentionally not memoized because deactivation must affect the next
+request. Deprovisioning remains multi-write and may partially complete before a later provider failure; status is set
+first so full deactivation fails closed, and no receipt is emitted unless the requested workflow completes.
+
+### Identity × Tenancy bridge implementation
+
+Status: `keep with focused proof complete` for `Sylin.Koan.Identity.Tenancy`.
+
+- Removed module `[After]` ordering and the duplicate effective-access registration. Project dependencies express
+  availability, Identity's discovered contributor registry owns contributor composition, and the bridge retains only
+  its thin registrations.
+- Removed `RequireMembership`. Claim, header, subdomain, and path inputs now share one invariant: only an authenticated,
+  active durable person with a current membership can establish the tenant axis. Carrier names/hosts/prefixes use
+  standard startup validation; subdomain routing remains visibly inert until `BaseHosts` is configured.
+- Centralized inbound lifecycle enforcement in `TenantResolutionMiddleware`. The existing membership query authorizes
+  and yields roles; an Identity read then rejects missing, suspended, or deactivated people, including stale bearer
+  principals. Reserved host roles remain stripped at the same projection chokepoint.
+- Made full deactivation close every tenant seat as well as Koan cookie sessions. Stable receipt surface names now say
+  `tenant-data`, `tenant-storage`, `tenant-cache`, and `cookie-sessions`; `HasValidHash()` states the exact verification
+  operation. Public comments and docs no longer call the ordered multi-write workflow atomic, append-only, signed, or
+  external proof.
+- Retired `InviteAcceptanceService` and its nine happy-path/mechanics facts. A deterministic seat ID did not prevent one
+  invite granting two different identities under distributed contention. PMC-035 preserves the correct claim-state,
+  token, recovery, assurance, and controller evidence gate.
+- Dogfeeding forced the same honesty into SnapVault. Its gallery flow now uses one operator-owned
+  `GalleryGrantService`: grant a known active durable person access to an event, then let stored membership plus
+  `GalleryGrant` constrain tenant entry and photo reads. The token/accept controller, duplicated `GalleryInvite` row,
+  pending-invite cleanup, and misleading erasure-proof language are gone. The SPA now shares an event link only after
+  the explicit grant. This keeps the business story while removing a sample-only security ceremony.
+- Added owned package README/TECHNICAL contracts covering the shortest reference path, carrier order, runtime
+  chokepoint, startup inspectability, lifecycle failure semantics, and unsupported scenarios. The package description
+  now names only supported results.
+- Canonical truth remains 102 packages and 24 claims. Identity Tenancy moves from repair-required/unassessed to
+  structurally ready and joins the verified authentication/authorization claim, yielding 9 repair-required,
+  21 review-required, and 72 structurally ready packages.
+- The rebuilt focused Identity suite passes 85/85; the rebuilt SnapVault application and test project are warning-free,
+  and all 33 SnapVault dogfood facts pass. A focused restore refreshed the executable dependency graph after Identity's
+  earlier contracts split; no sample/test-only framework reference was retained.
+
+The result is one readable rule rather than two security postures: a tenant carrier is only a candidate; active durable
+membership is authority. The bridge and its dogfood application now expose fewer concepts while preserving the useful
+tenant/gallery lifecycle end to end.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

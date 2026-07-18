@@ -278,12 +278,12 @@
 ### Koan.Identity.Tenancy
 - Depends on: Koan.Identity, Koan.Tenancy, Koan.Web
 - Depended by: –
-- Documentation: README ❌ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Identity.Web
 - Depends on: Koan.Identity, Koan.Web
 - Depended by: –
-- Documentation: README ❌ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Jobs
 - Depends on: Koan.Communication, Koan.Core, Koan.Data.Abstractions, Koan.Data.Core

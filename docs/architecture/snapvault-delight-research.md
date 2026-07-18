@@ -1,5 +1,10 @@
 # SnapVault — Delight Research & Direction
 
+> **Historical product research, not current framework capability truth.** The invite and signed/atomic-erasure ideas
+> below remain valuable discovery inputs, but Koan V1 does not currently provide a distributed single-use invitation
+> ceremony or external erasure attestation. SnapVault's supported dogfood path grants a known durable person access
+> explicitly and records integrity-checked lifecycle operations. See its package-adjacent README and current tests.
+
 - Status: **Accepted direction (2026-06-27)**
 - Purpose: the user-pain / delight evidence base for the SnapVault greenfield build, mapped to Koan's structural moats, plus the decided product direction. Companion to [snapvault-product-spec.md](./snapvault-product-spec.md) (§9 records the build-shape consequences) and [snapvault-ui-api-contract.md](./snapvault-ui-api-contract.md).
 - Source: web-research fan-out (4 facets — studio/client-gallery DAM, self-hosted, AI search + auto-culling, multi-tenant/privacy — each evidence-backed, 2023–2026 sources) + synthesis against Koan moats. The "delight == moat" gate (lead with the named differentiator competitors structurally can't copy) is canon for this product arc.
