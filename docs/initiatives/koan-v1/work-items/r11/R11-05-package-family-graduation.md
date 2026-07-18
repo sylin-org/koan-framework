@@ -2049,6 +2049,39 @@ hosts. Removing Web Backup changes package count and release lineage; the R11 ma
 retirement decision. Baseline evidence is Media Web 4/4 and OpenGraph 39/39; both current builds expose a stale removed
 Core.Adapters reference from evaluated restore state, and Web Backup has build-only evidence with no controller suite.
 
+### Web edge projection evidence
+
+- Media Web now discovers concrete `MediaEntity<T>` candidates once from the compiled application closure. Exactly one
+  candidate becomes the default `IMediaSource`; an explicit source always dominates, while zero or several candidates
+  produce one corrective selection error. The source itself uses the first-class Entity and Media semantics rather
+  than reaching through the Data facade. Media Web passes 7/7 and SnapVault's unchanged golden path passes 1/1 with
+  no application source-registration ceremony.
+- OpenGraph now stores declarations in the exact composing host. `SocialCards.For<T>` uses the composition scope,
+  Entity lifecycle plans capture that host's registration directly, and rendering consumes the same host-owned
+  registry. The process-static dictionary, `Reset()` test crutch, assembly-wide test serialization, and public manual
+  middleware call are gone. OpenGraph passes 39/39, including independent same-route declarations in two service
+  collections; DevPortal's unchanged golden path passes 1/1.
+- Web Backup is retired in full. It had no supported application consumer or controller suite and could not honestly
+  guarantee authorization, durable execution, cancellation, bounded resources, or recovery. `Koan.Data.Backup`
+  remains an independent domain capability and passes 7/7 after its aggregate-discovery proof was aligned with the
+  current provider catalog. Any future HTTP control plane must be rebuilt around explicit authorization, durable
+  Jobs, resource bounds, and tested recovery—not revived from this projection.
+- Media Web and OpenGraph now own exact README/TECHNICAL contracts. Current public guidance teaches reference plus
+  `AddKoan()` and one media Entity, or one `SocialCards.For<T>` declaration; it names the meaningful ambiguity and
+  security/operational boundaries without exposing framework wiring. Both generated package-quality records have
+  zero findings and are structurally ready.
+- Exact HEAD `6d9b0f8fa` packages contain DLL/XML, package-owned README, canonical icon, and build-transitive metadata.
+  Media Web's dependency closure is Data Core, Media Abstractions/Core, Storage Abstractions/runtime, and Web;
+  OpenGraph's is Cache Abstractions, Core, Data Core, and Web. Current direct/transitive NuGet audits report no known
+  vulnerabilities for either package.
+- Generated truth contains 107 packages: 16 repair-required, 29 review-required, and 62 structurally ready across 24
+  claims. Public documentation truth passes across 222 current files and 40 navigation targets. No feed, release
+  candidate, tag, remote mutation, or full release-certification run was created.
+
+The Web edge projection slice passes. Media Web and OpenGraph remain separate, meaningful references with automatic
+composition and host-owned decisions; Web Backup no longer turns an unsupported route collection into a product
+promise.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

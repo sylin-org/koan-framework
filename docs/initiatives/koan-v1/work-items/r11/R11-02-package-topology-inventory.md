@@ -46,8 +46,8 @@ generated package-quality and product-surface references.
 
 R11-01 opened with 109 packages: 37 required an objective repair, 72 required review, and none was inferred
 graduated. Subsequent family work retired unearned identities and introduced only independently useful contract or
-shared-mechanism boundaries. The current evaluated graph contains 108 packages: 21 repair-required, 33
-review-required, and 54 structurally ready across 22 claims. The active matrix contains only present package projects;
+shared-mechanism boundaries. The current evaluated graph contains 107 packages: 16 repair-required, 29
+review-required, and 62 structurally ready across 24 claims. The active matrix contains only present package projects;
 implemented retirements remain in the disposition tables as release-lineage decisions.
 
 ## Exact active matrix
@@ -141,8 +141,8 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Security.Trust` | `capability` | `assess` |
 | `Sylin.Koan.Storage` | `capability` | `keep` |
 | `Sylin.Koan.Storage.Abstractions` | `contracts` | `keep` |
-| `Sylin.Koan.Storage.Connector.Local` | `provider` | `assess` |
-| `Sylin.Koan.Storage.Connector.S3` | `provider` | `assess` |
+| `Sylin.Koan.Storage.Connector.Local` | `provider` | `keep` |
+| `Sylin.Koan.Storage.Connector.S3` | `provider` | `keep` |
 | `Sylin.Koan.Templates` | `template` | `keep` |
 | `Sylin.Koan.Tenancy` | `capability` | `assess` |
 | `Sylin.Koan.Tenancy.Web` | `projection` | `assess` |
