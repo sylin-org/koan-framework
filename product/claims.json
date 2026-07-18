@@ -155,6 +155,15 @@
       "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Mcp", "tests/Suites/Mcp/Koan.Mcp.Conformance.Tests", "tests/Suites/Mcp/Koan.Mcp.Explorer.IntegrationTests", "tests/Suites/Mcp/Koan.Mcp.Operations.IntegrationTests"]
     },
     {
+      "id": "web-projection-addons",
+      "title": "Optional Entity HTTP, OpenAPI, and SSE projections",
+      "summary": "Referenced Web add-ons compose through AddKoan(): richer Entity controllers remain host-owned, OpenAPI resolves one document/UI policy, and one SSE result model serves controllers and framework transports.",
+      "maturity": "verified",
+      "packages": ["Sylin.Koan.Web.Extensions", "Sylin.Koan.Web.OpenApi", "Sylin.Koan.Web.Sse"],
+      "documentation": ["docs/reference/web/index.md", "src/Koan.Web.Extensions/README.md", "src/Koan.Web.OpenApi/README.md", "src/Koan.Web.Sse/README.md"],
+      "evidence": ["tests/Suites/Web/Koan.Web.Extensions.Tests", "tests/Suites/Web/Koan.Web.OpenApi.Tests", "tests/Koan.Web.Sse.Tests", "tests/Suites/Mcp/Koan.Mcp.Conformance.Tests"]
+    },
+    {
       "id": "authentication-authorization",
       "title": "Authentication and authorization",
       "summary": "Identity and web authorization compose through referenced modules while external providers require separate proof.",

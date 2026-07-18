@@ -488,12 +488,12 @@
 ### Koan.Web.Extensions
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Web
 - Depended by: Koan.Canon.Web, Koan.Web.Auth.Roles
-- Documentation: README ✅ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.OpenApi
 - Depends on: Koan.Core, Koan.Web
 - Depended by: –
-- Documentation: README ❌ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.OpenGraph
 - Depends on: Koan.Cache.Abstractions, Koan.Core, Koan.Data.Core, Koan.Web
@@ -503,7 +503,7 @@
 ### Koan.Web.Sse
 - Depends on: Koan.Core, Koan.Web
 - Depended by: Koan.AI.Web, Koan.Mcp
-- Documentation: README ❌ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.ZenGarden
 - Depends on: Koan.AI.Contracts, Koan.Core, Koan.ZenGarden.Contracts

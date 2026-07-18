@@ -405,6 +405,29 @@
         "docs/initiatives/koan-v1/R02-EVIDENCE.md",
         "tests/Suites/Web"
       ]
+    },
+    {
+      "id": "web-projection-addons",
+      "title": "Optional Entity HTTP, OpenAPI, and SSE projections",
+      "summary": "Referenced Web add-ons compose through AddKoan(): richer Entity controllers remain host-owned, OpenAPI resolves one document/UI policy, and one SSE result model serves controllers and framework transports.",
+      "maturity": "verified",
+      "packages": [
+        "Sylin.Koan.Web.Extensions",
+        "Sylin.Koan.Web.OpenApi",
+        "Sylin.Koan.Web.Sse"
+      ],
+      "documentation": [
+        "docs/reference/web/index.md",
+        "src/Koan.Web.Extensions/README.md",
+        "src/Koan.Web.OpenApi/README.md",
+        "src/Koan.Web.Sse/README.md"
+      ],
+      "evidence": [
+        "tests/Koan.Web.Sse.Tests",
+        "tests/Suites/Mcp/Koan.Mcp.Conformance.Tests",
+        "tests/Suites/Web/Koan.Web.Extensions.Tests",
+        "tests/Suites/Web/Koan.Web.OpenApi.Tests"
+      ]
     }
   ],
   "packages": [
@@ -2212,7 +2235,7 @@
     {
       "packageId": "Sylin.Koan.Web.Extensions",
       "shape": "library",
-      "description": "Web capability extensions (moderation, soft-delete, audit) for Koan applications.",
+      "description": "Entity-first REST exposure plus optional moderation, audit, soft-delete, and capability-policy controllers for Koan web applications.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -2224,13 +2247,15 @@
       ],
       "readme": "src/Koan.Web.Extensions/README.md",
       "ownsReadme": true,
-      "technicalDocumentation": null,
-      "claims": []
+      "technicalDocumentation": "src/Koan.Web.Extensions/TECHNICAL.md",
+      "claims": [
+        "web-projection-addons"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Web.OpenApi",
       "shape": "library",
-      "description": "First-class OpenAPI 3.1 registration for Koan web applications using Microsoft.AspNetCore.OpenApi.",
+      "description": "OpenAPI 3.1 document and governed interactive UI projection for Koan web applications.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -2238,10 +2263,12 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Web"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
-      "claims": []
+      "readme": "src/Koan.Web.OpenApi/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Web.OpenApi/TECHNICAL.md",
+      "claims": [
+        "web-projection-addons"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Web.OpenGraph",
@@ -2264,7 +2291,7 @@
     {
       "packageId": "Sylin.Koan.Web.Sse",
       "shape": "library",
-      "description": "Server-Sent Events helpers for Koan web applications.",
+      "description": "Controller-first Server-Sent Events projection with one typed result model for Koan web applications and framework transports.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -2272,10 +2299,12 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Web"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
-      "claims": []
+      "readme": "src/Koan.Web.Sse/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Web.Sse/TECHNICAL.md",
+      "claims": [
+        "web-projection-addons"
+      ]
     },
     {
       "packageId": "Sylin.Koan.ZenGarden",

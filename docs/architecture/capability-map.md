@@ -126,9 +126,10 @@ capability-qualified. Koan rejects an unsupported guarantee before pretending to
 
 ## Web and agent projections
 
-`EntityController<T>` is the shortest HTTP projection. `Sylin.Koan.Web.OpenApi` adds OpenAPI behavior;
-`Web.Extensions` adds optional moderation, audit, soft-delete, and capability authorization rather than
-burdening every web application.
+`EntityController<T>` is the shortest HTTP projection. `Sylin.Koan.Web.OpenApi` adds a wire-faithful OpenAPI document
+and development-default UI; `Sylin.Koan.Web.Extensions` adds terse `[RestEntity]` exposure plus optional moderation,
+audit, soft-delete, and capability policy. `Sylin.Koan.Web.Sse` projects controller-owned async streams through one
+`Sse.Stream(...)` result model. None burden the base Web reference.
 
 `Sylin.Koan.Mcp` projects Entity operations and the same redacted runtime facts to coding agents.
 Operator HTTP facts and MCP facts consume one canonical envelope; neither should infer success from

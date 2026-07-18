@@ -86,7 +86,8 @@ Samples should showcase the canonical Koan experience:
 
 - Startup code should rely on `builder.Services.AddKoan()` and avoid manual `AddControllers()`, `AddSwaggerGen()`, or ad-hoc routing when the referenced Koan modules already encapsulate that behaviour. Fluent toggles (for example, `.WithRateLimit()`) remain available for opt-in behaviours.
 - Customisation (e.g., bespoke authorization policies) belongs in targeted extension points rather than re-adding MVC or Swagger from scratch.
-- Compose additional services via Koan-provided helpers (`AddKoanSwagger`, `AddKoanObservability`) only when the auto-registrar cannot infer the intent.
+- Let package references plus `AddKoan()` compose inferable capability behavior. Use an explicit helper only when it
+  expresses an application decision the module cannot derive, such as named authorization policy mappings.
 
 ---
 

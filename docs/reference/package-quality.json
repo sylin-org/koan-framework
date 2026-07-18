@@ -3,12 +3,12 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 108,
-    "repairRequired": 19,
-    "reviewRequired": 32,
-    "structurallyReady": 57,
-    "ownedReadmes": 89,
-    "technicalCompanions": 82,
-    "findings": 134
+    "repairRequired": 17,
+    "reviewRequired": 31,
+    "structurallyReady": 60,
+    "ownedReadmes": 91,
+    "technicalCompanions": 85,
+    "findings": 125
   },
   "findingDefinitions": [
     {
@@ -2245,8 +2245,8 @@
       "projectPath": "src/Koan.Web.Extensions/Koan.Web.Extensions.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
-      "description": "Web capability extensions (moderation, soft-delete, audit) for Koan applications.",
+      "status": "structurally-ready",
+      "description": "Entity-first REST exposure plus optional moderation, audit, soft-delete, and capability-policy controllers for Koan web applications.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -2257,22 +2257,17 @@
         "Sylin.Koan.Web"
       ],
       "readme": "src/Koan.Web.Extensions/README.md",
-      "technicalDocumentation": null,
+      "technicalDocumentation": "src/Koan.Web.Extensions/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.package-title.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Web.OpenApi",
       "projectPath": "src/Koan.Web.OpenApi/Koan.Web.OpenApi.csproj",
       "shape": "library",
       "role": "projection",
-      "status": "repair-required",
-      "description": "First-class OpenAPI 3.1 registration for Koan web applications using Microsoft.AspNetCore.OpenApi.",
+      "status": "structurally-ready",
+      "description": "OpenAPI 3.1 document and governed interactive UI projection for Koan web applications.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -2280,13 +2275,10 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Web"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Web.OpenApi/README.md",
+      "technicalDocumentation": "src/Koan.Web.OpenApi/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Web.OpenGraph",
@@ -2317,8 +2309,8 @@
       "projectPath": "src/Koan.Web.Sse/Koan.Web.Sse.csproj",
       "shape": "library",
       "role": "projection",
-      "status": "repair-required",
-      "description": "Server-Sent Events helpers for Koan web applications.",
+      "status": "structurally-ready",
+      "description": "Controller-first Server-Sent Events projection with one typed result model for Koan web applications and framework transports.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -2326,14 +2318,10 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Web"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Web.Sse/README.md",
+      "technicalDocumentation": "src/Koan.Web.Sse/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing",
-        "metadata.description.terse"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.ZenGarden",

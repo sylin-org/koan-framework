@@ -1801,6 +1801,110 @@ new install decision and is not justified without a measured size/security/use-c
 The MCP family passes this R11-05 slice. Core, Explorer, and Operations are terminal `keep` boundaries with less public
 ceremony and more truthful activation/inspection.
 
+### Web projection family discovery
+
+**Task:** Graduate `Sylin.Koan.Web.Extensions`, `Sylin.Koan.Web.OpenApi`, and `Sylin.Koan.Web.Sse` by rebuilding the
+host-composition, OpenAPI, and stream-result chokepoints before publishing their package contracts.
+
+**Application intent:** “Expose richer Entity HTTP behavior, describe the resulting API, and stream live results by
+adding only the package reference and the smallest business-facing declaration.”
+
+**Public expression:** Each reference composes through the application's existing `AddKoan()` call. Web Extensions
+keeps `[RestEntity] public sealed class Todo : Entity<Todo>;` as the terse REST projection and the existing
+`EntityAuditController<T>`, `EntityModerationController<T>`, and `EntitySoftDeleteController<T>` realizations for
+explicit richer surfaces. OpenAPI requires no application code: the reference publishes the OpenAPI document and, in
+Development, its UI. SSE becomes one expression from a controller action: `return Sse.Stream(events);`, whether the
+stream contains typed values, text, or explicit `SseEnvelope` values.
+
+**Guarantee/correction:** Generic controller registrations are owned by one service collection/host and cannot leak
+into another host; an explicit `EntityController<T>` still wins over `[RestEntity]`. OpenAPI has one option model, one
+startup owner, one document route, and one UI policy; its document remains faithful to the Newtonsoft REST wire. The
+UI defaults on only in Development and, when explicitly enabled elsewhere, fails closed for an unauthenticated request
+unless the application deliberately disables that requirement. SSE writes one normalized wire contract through both
+MVC and framework transport contexts, flushes each frame, and follows request cancellation; it does not claim replay,
+delivery, buffering immunity, or heartbeat behavior it does not implement. Invalid or unsupported configuration is
+reported with the effective posture rather than silently selecting a legacy path.
+
+**Complete intent surface:** Beyond the package reference and existing `AddKoan()`, Web Extensions requires only the
+exposure attribute or explicit capability-controller declaration the business surface needs. OpenAPI requires no code;
+configuration is an optional deliberate override. SSE requires only returning `Sse.Stream(...)` from a controller.
+Authentication/authorization remains an application guarantee and is required when an OpenAPI UI is deliberately
+published outside Development.
+
+**Public concepts:** `[RestEntity]` means terse full-CRUD exposure; explicit capability controller bases mean audit,
+moderation, or soft-delete HTTP intent; `KoanOpenApiOptions` carries the real document/UI choices; `Sse` is the single
+stream factory; `SseResult` bridges ASP.NET MVC and framework transport execution without two helper vocabularies;
+`SseEnvelope` carries explicit event/id/retry fields. Each concept maps to a distinct application or wire decision.
+
+**Docs read:**
+
+- `docs/architecture/principles.md` makes business-to-code mapping, reference-as-availability, host-owned composition,
+  semantic honesty, startup explanation, and standard .NET reuse binding constraints.
+- `docs/reference/web/http-api.md` establishes controller-first Entity HTTP behavior and the existing paging,
+  transformer, and error contract that this slice must not disturb.
+- `docs/decisions/WEB-0035-entitycontroller-transformers.md` establishes that OpenAPI must describe actual negotiated
+  REST media types without duplicating controller behavior.
+- `docs/engineering/index.md` requires controller routes, typed options/constants, per-package README/TECHNICAL pages,
+  and focused validation.
+- `src/Koan.Web.Extensions/README.md` is relevant but materially inaccurate: it names nonexistent configuration and
+  public types and does not state installation or honest boundaries.
+
+**Code read:**
+
+- `WebExtensionsModule`, `RestEntityRegistration`, and `GenericControllers` discover/materialize terse and explicit
+  generic controllers, but store registrations in a process-static dictionary rather than host-owned composition.
+- `EntityAuditController`, `EntityModerationController`, and `EntitySoftDeleteController` are real optional capability
+  projections; their existing controller actions and Entity/data semantics remain the package's earned reference value.
+- `OpenApiModule`, `KoanOpenApiStartupFilter`, `SwaggerBootstrap`, and `KoanSwaggerStartupFilter` currently divide one
+  product decision across two option sections, two startup filters, duplicate mapping paths, and legacy public wiring.
+- `KoanOpenApiOptions` is the natural single public owner, but currently omits UI route/security decisions while the
+  legacy `KoanWebSwaggerOptions` carries them separately.
+- `SseResults` and `SseActionResult` duplicate projection, headers, normalization, writing, and flushing; only their
+  ASP.NET result interface differs. Current AI/SnapVault consumers use MVC while MCP uses the infrastructure result.
+
+**Reusing:** `KoanModule`, `AddKoanOptions<T>`, ASP.NET MVC `IActionResult`, ASP.NET `IResult`, OpenAPI document and
+operation transformers, `SseEnvelope`, `SseFormatter`, request cancellation, and the existing explicit-controller
+precedence rule already exist. Existing constants/options are retained only for settings that actually affect runtime.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| Host-owned generic controller registry | `src/Koan.Web.Extensions/GenericControllers/GenericControllerRegistry.cs` | One composition instance shared by the module, feature provider, convention, and service-collection extensions; no process-static host leakage. |
+| Unified OpenAPI document/UI runtime | `src/Koan.Web.OpenApi/Hosting/KoanOpenApiStartupFilter.cs` and `Options/KoanOpenApiOptions.cs` | The OpenAPI pillar owns its document, UI, security posture, mapping, and reporting in one standard ASP.NET startup path. |
+| `Sse` factory | `src/Koan.Web.Sse/Sse.cs` | One discoverable application expression maps typed, text, and envelope streams to the wire. |
+| `SseResult` | `src/Koan.Web.Sse/SseResult.cs` | One execution engine implements both required ASP.NET result contracts and centralizes response semantics. |
+| Host-isolation/OpenAPI-policy/SSE-unification specs | Existing focused Web test projects | Pin the corrected guarantees without creating another test topology. |
+
+**Coalescence:** The closest patterns are `GenericControllers`, the two OpenAPI startup filters, and the two SSE result
+helpers. Specificity is the Web capability/package family: Core is too wide, individual controllers/transports are too
+narrow, and application code must not own framework assembly mechanics. Rebuild the generic registry around one
+host-owned instance; absorb all Swagger behavior into `OpenApiModule` and its one option/filter; rebuild SSE around one
+factory/result pair. Delete the static registration dictionary, legacy `AddKoanSwagger`/`UseKoanSwagger`, the second
+Swagger option/config/provenance family and startup filter, manual `AddKoanSse`, duplicated `SseResults`/
+`SseActionResult`, and unused SSE enablement/heartbeat claims.
+
+**Ergonomics:** Humans and coding models see one intent per reference: decorate/realize a richer Entity surface, inspect
+OpenAPI, or `Sse.Stream(...)`. IntelliSense begins at a business noun rather than hosting extensions. Optional policy
+appears only when it changes exposure/security. Operators see document route, UI route, enablement, and authentication
+posture at boot; no setting is reported unless runtime honors it.
+
+**Constraints satisfied:**
+
+- Entity-first behavior and the base `EntityController<T>` contract remain unchanged.
+- Application HTTP remains controller-first; OpenAPI/MCP transport mapping is framework infrastructure, not public
+  application endpoint guidance.
+- Stable configuration keys live in project constants and tunables in typed options.
+- No placeholder or compatibility surface survives the greenfield cut.
+- Large Entity reads are not introduced; existing capability-controller paging remains explicit.
+- Package README/TECHNICAL pages, current reference truth, and the R11 matrix will be updated after focused proof.
+
+**Risks:** OpenAPI UI authentication must remain middleware-order-safe across Koan auth combinations; focused real-host
+tests must prove Development default, explicit disable, non-Development fail-closed, and explicit opt-out. The public
+SSE cut is intentional and requires all in-repository AI, MCP, and sample consumers to move atomically. Baseline focused
+tests pass 111/111, 10/10, and 5/5; the first parallel baseline attempt only collided on shared MSBuild outputs, so all
+subsequent build/test proof remains sequential.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

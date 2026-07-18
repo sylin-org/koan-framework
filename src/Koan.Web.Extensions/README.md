@@ -1,44 +1,56 @@
-﻿# Koan.Web.Extensions
+# Sylin.Koan.Web.Extensions
 
-## Contract
+Add terse Entity REST exposure or explicit moderation, audit, and soft-delete HTTP capabilities without writing
+framework hosting code.
 
-- **Purpose**: Deliver optional HTTP capabilities for Koan Web applications (moderation, audit, soft delete, capability controllers).
-- **Primary inputs**: Entity models exposed through Koan controllers, capability descriptors, and policy configuration.
-- **Outputs**: Extension controllers, authorization policies, moderation workflows, and capability metadata for clients.
-- **Failure modes**: Missing capability registrations, conflicts with custom routing, or policies referencing undefined roles.
-- **Success criteria**: Extensions register only when needed, controllers expose consistent routes, and policy enforcement remains predictable.
+## Install
 
-## Quick start
+```powershell
+dotnet add package Sylin.Koan.Web.Extensions
+```
+
+The package composes through the application's existing `AddKoan()` call. Do not add an Extensions-specific service
+registration.
+
+## Smallest meaningful result
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
+
+var app = builder.Build();
+await app.RunAsync();
+
+[RestEntity]
+public sealed class Todo : Entity<Todo>;
 ```
 
-- Reference the package; `WebExtensionsModule` hooks the capability controllers into Koan Web without manual endpoint wiring.
-- Use capability attributes to expose moderation and audit features in generated clients.
+`Todo` now has full Entity CRUD at `/api/todo`. Supply `[RestEntity("api/todos")]` when the route is a business
+decision. A concrete `EntityController<Todo>` takes precedence automatically when the API needs custom behavior.
 
-## Configuration
+Use an explicit capability controller when the business surface needs more than CRUD:
 
-- `Koan:Web:Extensions:EnableModeration` – toggles moderation controllers.
-- `Koan:Web:Extensions:AuditLogRetention` – controls audit retention windows.
-- `Koan:Web:Extensions:PolicyMappings` – map capabilities to authorization policies.
+```csharp
+[Route("api/todos")]
+public sealed class TodoModerationController : EntityModerationController<Todo>;
+```
 
-## Edge cases
+Equivalent bases exist for audit and soft delete. The declaration is the opt-in; the package does not expose those
+surfaces for every Entity merely because it is referenced.
 
-- Multi-tenant moderation: ensure capability routes include tenant identifiers to prevent cross-tenant actions.
-- Soft delete conflicts: coordinate with domain logic to avoid double-deleting resources.
-- Authorization policies: missing roles cause 403 responses; confirm policies exist when enabling capabilities.
-- Client regeneration: when enabling new capabilities, regenerate API clients to pick up metadata.
+## Guarantees and boundaries
 
-## Related packages
+- Generic controller declarations belong to one application host and cannot leak into another host in the process.
+- One generic capability projection has one route. Conflicting registrations fail with a correction; use an explicit
+  controller when multiple route projections are genuinely required.
+- `[RestEntity]` declares exposure only. Entity `[Access(...)]`, `EntityAccess<T>`, authentication, and configured
+  capability policies remain the authorization authority shared by REST and MCP.
+- Audit, moderation, and soft delete are partition-backed Entity workflows. They do not promise cross-partition
+  transactions, immutable compliance logging, legal retention, or a universal workflow engine.
+- List operations are explicitly paged. This package does not turn an adapter's unsupported query or streaming
+  capability into a supported one.
 
-- `Koan.Web` – base web framework hosting these extensions.
-- `Koan.Canon.Web` – can consume capability metadata for orchestration.
-- `Koan.Data.Core` – used for moderation/audit persistence.
+Use `AddKoanAuthorization(...)` only when the application needs named ASP.NET policies or capability-policy mappings.
+The ordinary `[RestEntity]` path requires no additional registration.
 
-## Reference
-
-- `ModerationController` – handles moderation workflows.
-- `CapabilityController` – surfaces capability metadata.
-- `WebExtensionsOptions` – options class for enabling features.
+See [TECHNICAL.md](TECHNICAL.md) for activation, routing, authorization, and persistence ownership.

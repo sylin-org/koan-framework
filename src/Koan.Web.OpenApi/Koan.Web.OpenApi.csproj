@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Description>First-class OpenAPI 3.1 registration for Koan web applications using Microsoft.AspNetCore.OpenApi.</Description>
+    <Description>OpenAPI 3.1 document and governed interactive UI projection for Koan web applications.</Description>
     <PackageTags>$(CommonPackageTags);openapi;json-schema;documentation</PackageTags>
   </PropertyGroup>
   <ItemGroup>

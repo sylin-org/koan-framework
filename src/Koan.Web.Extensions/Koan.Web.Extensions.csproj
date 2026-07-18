@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Web capability extensions (moderation, soft-delete, audit) for Koan applications.</Description>
+    <Description>Entity-first REST exposure plus optional moderation, audit, soft-delete, and capability-policy controllers for Koan web applications.</Description>
     <PackageTags>$(CommonPackageTags);web;aspnetcore;controllers;capabilities;moderation;soft-delete;audit</PackageTags>
   </PropertyGroup>
   <ItemGroup>

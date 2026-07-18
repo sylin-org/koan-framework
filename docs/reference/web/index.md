@@ -51,6 +51,21 @@ code still owns its model, route, authorization declarations, and any business-s
 Koan.Web maps controllers by default through its startup filter (`AutoMapControllers = true`); an
 application only owns explicit pipeline mapping when it disables that default.
 
+## Optional projection references
+
+- `Sylin.Koan.Web.Extensions` adds `[RestEntity]` terse CRUD exposure and explicit audit, moderation, and soft-delete
+  controller realizations. It keeps generic controller declarations host-owned; package presence does not expose the
+  richer capability controllers automatically.
+- `Sylin.Koan.Web.OpenApi` publishes `/openapi/v1.json` from the existing `AddKoan()` composition. Its interactive UI
+  defaults to `/swagger` in Development only and fails closed for unauthenticated callers when explicitly enabled in
+  another environment.
+- `Sylin.Koan.Web.Sse` lets a controller return `Sse.Stream(asyncValues)`. One `SseResult` handles typed JSON, raw text,
+  and explicit envelopes for both MVC and framework transports; replay and heartbeat are not implied.
+
+See the package-owned contracts for [Web Extensions](../../../src/Koan.Web.Extensions/README.md),
+[OpenAPI](../../../src/Koan.Web.OpenApi/README.md), and [SSE](../../../src/Koan.Web.Sse/README.md). No package-specific
+`Add` or `Use` ceremony belongs in the common path.
+
 ## EntityController behavior
 
 `EntityController<TEntity, TKey>` provides collection, query, get-new, get-by-id, single/bulk upsert,

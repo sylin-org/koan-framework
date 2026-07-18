@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Server-Sent Events helpers for Koan web applications.</Description>
+    <Description>Controller-first Server-Sent Events projection with one typed result model for Koan web applications and framework transports.</Description>
     <PackageTags>$(CommonPackageTags);sse;streaming;realtime</PackageTags>
   </PropertyGroup>
   <ItemGroup>
