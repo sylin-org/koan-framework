@@ -47,9 +47,8 @@ public sealed class AuthSwapFixture : IAsyncLifetime
                 // offline-only, mirrors the bootstrap specs
                 ["ConnectionStrings:Redis"] = "localhost:0",
                 // Deliberately NO TestProvider:Enabled opt-in — this fixture runs in plain Development, exactly like
-                // the real deployment that filed the regression. The Test simulator endpoints must AUTO-MAP in
-                // Development (advertise ⇒ map, shared IsActive predicate); if they don't, every round-trip below
-                // 404s. This is the Bug-1 regression guard against advertise/map gating drift.
+                // the real deployment that filed the regression. Automatic definitions and attribute-routed
+                // endpoints share IsActive; if they drift, every round-trip below 404s.
             }))
             .ConfigureWebHostDefaults(web =>
             {

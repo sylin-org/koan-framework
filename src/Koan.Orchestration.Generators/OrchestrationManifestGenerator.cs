@@ -76,29 +76,15 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
         try
         {
             var candidates = new List<ServiceCandidate>();
-            var authProviders = new List<AuthProviderCandidate>();
             var manifestTypesById = new Dictionary<string, int>();
-            // Collect assembly-level attributes for auth provider descriptors once per compilation
+            // Collect assembly-level service manifests once per compilation.
             try
             {
                 var asm = context.Compilation.Assembly;
                 foreach (var a in asm.GetAttributes())
                 {
                     var full = a.AttributeClass?.ToDisplayString();
-                    if (full == "Koan.Web.Auth.Attributes.AuthProviderDescriptorAttribute")
-                    {
-                        string id = a.ConstructorArguments.Length > 0 ? a.ConstructorArguments[0].Value?.ToString() ?? "" : "";
-                        string name = a.ConstructorArguments.Length > 1 ? a.ConstructorArguments[1].Value?.ToString() ?? "" : "";
-                        string protocol = a.ConstructorArguments.Length > 2 ? a.ConstructorArguments[2].Value?.ToString() ?? "" : "";
-                        string? icon = null;
-                        foreach (var na in a.NamedArguments)
-                        {
-                            if (na.Key == "Icon") icon = na.Value.Value?.ToString();
-                        }
-                        if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(name))
-                            authProviders.Add(new AuthProviderCandidate(id, name, protocol, icon));
-                    }
-                    else if (full == OrchestrationServiceManifestAttr)
+                    if (full == OrchestrationServiceManifestAttr)
                     {
                         // Capture declared service type per service id from assembly-level manifest
                         string id = a.ConstructorArguments.Length > 0 ? a.ConstructorArguments[0].Value?.ToString() ?? "" : "";
@@ -505,10 +491,10 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                 }
             }
 
-            // Generate a manifest if we have any useful data: services, app metadata, or auth providers
-            if (candidates.Count == 0 && authProviders.Count == 0 && app is null) return;
+            // Generate a manifest if we have service or application metadata.
+            if (candidates.Count == 0 && app is null) return;
 
-            var json = BuildJson(candidates, app, authProviders);
+            var json = BuildJson(candidates, app);
             var src = "namespace Koan.Orchestration { public static class __KoanOrchestrationManifest { public const string Json = \"" + Escape(json) + "\"; } }";
             context.AddSource("__KoanOrchestrationManifest.g.cs", SourceText.From(src, Encoding.UTF8));
         }
@@ -518,7 +504,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
         }
     }
 
-    private static string BuildJson(List<ServiceCandidate> items, AppCandidate? app, List<AuthProviderCandidate> providers)
+    private static string BuildJson(List<ServiceCandidate> items, AppCandidate? app)
     {
         var sb = new StringBuilder();
         sb.Append('{');
@@ -535,23 +521,6 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             if (sb.Length > before && sb[sb.Length - 1] == ',') sb.Length -= 1; // trim trailing comma
             sb.Append("},");
         }
-        if (providers is { Count: > 0 })
-        {
-            sb.Append("\"authProviders\": [");
-            for (int i = 0; i < providers.Count; i++)
-            {
-                var p = providers[i];
-                if (i > 0) sb.Append(',');
-                sb.Append('{')
-                    .Append(Prop("id", p.Id)).Append(',')
-                    .Append(Prop("name", p.Name)).Append(',')
-                    .Append(Prop("protocol", p.Protocol));
-                if (!string.IsNullOrEmpty(p.Icon)) sb.Append(',').Append(Prop("icon", p.Icon!));
-                sb.Append('}');
-            }
-            sb.Append("],");
-        }
-
         sb.Append("\"services\": [");
         for (int i = 0; i < items.Count; i++)
         {
@@ -672,16 +641,6 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             var val = kv.Substring(idx + 1);
             target[key] = val;
         }
-    }
-
-    private sealed class AuthProviderCandidate
-    {
-        public string Id { get; }
-        public string Name { get; }
-        public string Protocol { get; }
-        public string? Icon { get; }
-        public AuthProviderCandidate(string id, string name, string protocol, string? icon)
-        { Id = id; Name = name; Protocol = protocol; Icon = icon; }
     }
 
     private sealed class ServiceCandidate

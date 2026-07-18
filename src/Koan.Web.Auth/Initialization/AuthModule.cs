@@ -1,287 +1,60 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
+using Koan.Core;
+using Koan.Core.Composition;
+using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Ordering;
+using Koan.Web.Auth.Composition;
+using Koan.Web.Auth.Extensions;
+using Koan.Web.Auth.Hosting;
+using Koan.Web.Auth.Infrastructure;
+using Koan.Web.Auth.Pillars;
+using Koan.Web.Auth.Providers;
+using Koan.Web.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Koan.Core;
-using Koan.Core.Ordering;
-using Koan.Web.Auth.Extensions;
-using Koan.Web.Auth.Infrastructure;
-using Koan.Web.Extensions;
-using Koan.Web.Auth.Pillars;
-using Koan.Core.Hosting.Bootstrap;
-using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
-using BootSettingSource = Koan.Core.Hosting.Bootstrap.BootSettingSource;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.Web.Auth.Initialization;
 
-// CORE-0091: Koan.Web.Auth's pipeline contributions (Cookie / OAuth auth
-// scheme registration, MeController et al.) depend on Koan.Web having
-// already wired UseRouting + the controller dispatcher. Declaring the
-// ordering explicitly so the bootstrap doesn't depend on
-// ConcurrentDictionary enumeration luck.
 [After(typeof(Koan.Web.Initialization.WebModule))]
 public sealed class AuthModule : KoanModule
 {
     public override void Register(IServiceCollection services)
     {
         SecurityPillarManifest.EnsureRegistered();
-        // Ensure auth services are registered once
         services.AddKoanWebAuth();
-        // WEB-0071: a self-hosted OIDC provider (relative authority) resolves its absolute discovery URL from the
-        // live request at challenge time — RequestHostOidcConfigurationManager needs IHttpContextAccessor.
         services.AddHttpContextAccessor();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.KoanWebAuthStartupFilter>());
-        // SEC-0001 §4 / WEB-0069: the zero-config dev identity injects at the AfterAuthentication stage via the
-        // supported pipeline-contributor seam on KoanWebStartupFilter — not via startup-filter ordering (dead).
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Web.Hosting.IKoanWebPipelineContributor, Hosting.DevIdentityContributor>());
-
-        // Ensure MVC discovers controllers from this assembly
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Web.Hosting.IKoanWebPipelineContributor, DevIdentityContributor>());
         services.AddKoanControllersFrom<Controllers.DiscoveryController>();
+    }
+
+    public override Task Start(IServiceProvider services, CancellationToken ct)
+    {
+        var plan = services.GetRequiredService<AuthProviderPlan>();
+        AuthSchemeSeeder.Seed(services);
+
+        var logger = services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Web.Auth");
+        logger?.LogInformation(
+            "Koan Web Auth provider plan compiled: available={Available} eligible={Eligible} default={Default} reason={Reason}",
+            plan.Providers.Count,
+            plan.Providers.Count(static provider => provider.Eligible),
+            plan.Default?.Id ?? "none",
+            plan.Default?.Reason ?? "no-eligible-provider");
+
+        return Task.CompletedTask;
     }
 
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
-        cfg ??= new ConfigurationBuilder().Build();
-
-        // Best-effort discovery summary without binding or DI: list provider display names and protocol
-        // Strategy: if configured providers exist, list those; otherwise fall back to well-known defaults.
-        var section = cfg.GetSection(Options.AuthOptions.SectionPath);
-        var providers = section.GetSection("Providers");
-
-        var configured = LoadConfiguredProviders(providers);
-        var defaults = DiscoverContributorProviders(cfg, env);
-        var effective = ComposeEffectiveProviders(configured, defaults);
-
-        var detected = effective.Select(pair => FormatProvider(pair.Key, pair.Value)).ToList();
-
-        var providerSectionKey = $"{Options.AuthOptions.SectionPath}:{nameof(Options.AuthOptions.Providers)}";
-        var providerSource = configured.Count > 0
-            ? Koan.Core.Hosting.Bootstrap.BootSettingSource.AppSettings
-            : defaults.Count > 0
-                ? Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto
-                : Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto;
-
-        var providerMode = ProvenanceModes.FromBootSource(providerSource, configured.Count == 0);
-        var providerSourceKey = configured.Count > 0 ? providerSectionKey : null;
-        var providerUsedDefault = configured.Count == 0;
-
-        module.AddSetting(
-            WebAuthProvenanceItems.ProviderRegistryCount,
-            providerMode,
-            effective.Count,
-            sourceKey: providerSourceKey,
-            usedDefault: providerUsedDefault);
-
-        module.AddSetting(
-            WebAuthProvenanceItems.ProviderRegistryDetails,
-            providerMode,
-            detected.Count == 0 ? "(none)" : string.Join(", ", detected),
-            sourceKey: providerSourceKey,
-            usedDefault: providerUsedDefault);
-
-        // Production gating for dynamic providers (adapter/contributor defaults without explicit config)
-        var allowDynamicOption = Koan.Core.Configuration.ReadWithSource(
-            cfg,
-            Infrastructure.AuthConstants.Configuration.AllowDynamicProvidersInProduction,
-            false);
-        var allowMagicOption = Koan.Core.Configuration.ReadWithSource(
-            cfg,
-            Koan.Core.Infrastructure.Constants.Configuration.Koan.AllowMagicInProduction,
-            false);
-
-        var allowDynamic = allowDynamicOption.Value
-                           || Koan.Core.KoanEnv.AllowMagicInProduction
-                           || allowMagicOption.Value;
-
-        var dynamicMode = !allowDynamicOption.UsedDefault
-            ? ProvenanceModes.FromConfigurationValue(allowDynamicOption)
-            : !allowMagicOption.UsedDefault
-                ? ProvenanceModes.FromConfigurationValue(allowMagicOption)
-                : Koan.Core.KoanEnv.AllowMagicInProduction
-                    ? ProvenanceModes.FromBootSource(BootSettingSource.Environment)
-                    : ProvenancePublicationMode.Auto;
-        var dynamicSourceKey = !allowDynamicOption.UsedDefault
-            ? allowDynamicOption.ResolvedKey
-            : !allowMagicOption.UsedDefault
-                ? allowMagicOption.ResolvedKey
-                : Koan.Core.Infrastructure.Constants.Configuration.Koan.AllowMagicInProduction;
-        var dynamicUsedDefault = allowDynamicOption.UsedDefault && allowMagicOption.UsedDefault && !Koan.Core.KoanEnv.AllowMagicInProduction;
-        var dynamicValue = Koan.Core.KoanEnv.IsProduction && !allowDynamic
-            ? "disabled (set Koan:Web:Auth:AllowDynamicProvidersInProduction=true or Koan:AllowMagicInProduction=true)"
-            : "enabled";
-
-        module.AddSetting(
-            WebAuthProvenanceItems.DynamicProvidersInProduction,
-            dynamicMode,
-            dynamicValue,
-            sourceKey: dynamicSourceKey,
-            usedDefault: dynamicUsedDefault);
-
         module.AddTool(
             "Auth Provider Discovery",
-            Infrastructure.AuthConstants.Routes.Discovery,
-            "Lists configured authentication providers",
+            AuthConstants.Routes.Discovery,
+            "Lists eligible authentication providers",
             capability: "auth.discovery");
     }
 
-    private static Dictionary<string, Options.ProviderOptions> LoadConfiguredProviders(IConfigurationSection providers)
-    {
-        var result = new Dictionary<string, Options.ProviderOptions>(StringComparer.OrdinalIgnoreCase);
-        if (providers is null || !providers.Exists()) return result;
-
-        foreach (var child in providers.GetChildren())
-        {
-            var options = new Options.ProviderOptions();
-            child.Bind(options);
-            result[child.Key] = options;
-        }
-
-        return result;
-    }
-
-    private static Dictionary<string, Options.ProviderOptions> DiscoverContributorProviders(IConfiguration cfg, IHostEnvironment env)
-    {
-        var result = new Dictionary<string, Options.ProviderOptions>(StringComparer.OrdinalIgnoreCase);
-        var contract = typeof(Providers.IAuthProviderContributor);
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-
-        foreach (var assembly in assemblies)
-        {
-            foreach (var type in SafeGetTypes(assembly))
-            {
-                if (!contract.IsAssignableFrom(type) || type.IsInterface || type.IsAbstract) continue;
-                var contributor = CreateContributor(type, cfg, env);
-                if (contributor is null) continue;
-
-                try
-                {
-                    var defaults = contributor.GetDefaults();
-                    if (defaults is null) continue;
-                    foreach (var kv in defaults)
-                    {
-                        result[kv.Key] = kv.Value;
-                    }
-                }
-                catch
-                {
-                    // ignore contributor failures during boot reporting
-                }
-            }
-        }
-
-        return result;
-    }
-
-    private static Providers.IAuthProviderContributor? CreateContributor(Type type, IConfiguration cfg, IHostEnvironment env)
-    {
-        try
-        {
-            var ctor = type.GetConstructor(Type.EmptyTypes);
-            if (ctor is not null)
-            {
-                return (Providers.IAuthProviderContributor?)Activator.CreateInstance(type);
-            }
-
-            ctor = type.GetConstructor(new[] { typeof(IConfiguration), typeof(IHostEnvironment) });
-            if (ctor is not null)
-            {
-                return (Providers.IAuthProviderContributor?)ctor.Invoke(new object?[] { cfg, env });
-            }
-
-            ctor = type.GetConstructor(new[] { typeof(IConfiguration) });
-            if (ctor is not null)
-            {
-                return (Providers.IAuthProviderContributor?)ctor.Invoke(new object?[] { cfg });
-            }
-
-            ctor = type.GetConstructor(new[] { typeof(IHostEnvironment) });
-            if (ctor is not null)
-            {
-                return (Providers.IAuthProviderContributor?)ctor.Invoke(new object?[] { env });
-            }
-        }
-        catch
-        {
-            // ignore creation failure
-        }
-
-        return null;
-    }
-
-    private static IEnumerable<Type> SafeGetTypes(Assembly assembly)
-    {
-        try
-        {
-            return assembly.GetTypes();
-        }
-        catch (ReflectionTypeLoadException ex)
-        {
-            return ex.Types.Where(t => t is not null).Select(t => t!);
-        }
-        catch
-        {
-            return [];
-        }
-    }
-
-    private static Dictionary<string, Options.ProviderOptions> ComposeEffectiveProviders(
-        IDictionary<string, Options.ProviderOptions> configured,
-        IDictionary<string, Options.ProviderOptions> defaults)
-    {
-        var result = new Dictionary<string, Options.ProviderOptions>(defaults, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var pair in configured)
-        {
-            if (result.TryGetValue(pair.Key, out var existing))
-            {
-                result[pair.Key] = MergeProviders(existing, pair.Value);
-            }
-            else
-            {
-                result[pair.Key] = pair.Value;
-            }
-        }
-
-        return result;
-    }
-
-    private static Options.ProviderOptions MergeProviders(Options.ProviderOptions baseline, Options.ProviderOptions overlay)
-        => Options.ProviderOptions.Merge(baseline, overlay);
-
-    private static string FormatProvider(string id, Options.ProviderOptions options)
-    {
-        var name = string.IsNullOrWhiteSpace(options.DisplayName) ? Titleize(id) : options.DisplayName!;
-        var protocol = PrettyProtocol(options.Type);
-        return options.Enabled ? $"{name} ({protocol})" : $"{name} ({protocol}, disabled)";
-    }
-
-    private static string PrettyProtocol(string? type)
-        => string.IsNullOrWhiteSpace(type) ? "OIDC"
-           : type!.ToLowerInvariant() switch
-           {
-               "oidc" => "OIDC",
-               "oauth2" => "OAuth",
-               "oauth" => "OAuth",
-               "saml" => "SAML",
-               "ldap" => "LDAP",
-               _ => type
-           };
-
-    private static string Titleize(string id)
-    {
-        if (string.IsNullOrWhiteSpace(id)) return id;
-        var parts = id.Replace('-', ' ').Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        for (var i = 0; i < parts.Length; i++)
-        {
-            var p = parts[i];
-            parts[i] = char.ToUpperInvariant(p[0]) + (p.Length > 1 ? p.Substring(1) : "");
-        }
-        return string.Join(' ', parts);
-    }
+    public override void ReportComposition(KoanCompositionBuilder composition, IServiceProvider services)
+        => AuthCompositionFacts.Project(composition, services, Id);
 }
-

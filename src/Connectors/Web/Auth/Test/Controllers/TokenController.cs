@@ -13,11 +13,11 @@ public sealed class TokenController(IOptionsSnapshot<TestProviderOptions> opts, 
 {
     public sealed record TokenRequest(string grant_type, string? code, string? redirect_uri, string client_id, string? client_secret, string? code_verifier, string? scope);
 
-    [HttpPost]
+    [HttpPost(Constants.Routes.Token)]
     public IActionResult Token([FromForm] TokenRequest req)
     {
         var o = opts.Value;
-        if (!(env.IsDevelopment() || o.Enabled)) return NotFound();
+        if (!o.IsActive(env)) return NotFound();
 
         // Handle client credentials flow
         if (string.Equals(req.grant_type, "client_credentials", StringComparison.OrdinalIgnoreCase))
@@ -49,8 +49,7 @@ public sealed class TokenController(IOptionsSnapshot<TestProviderOptions> opts, 
         if (isOpenId)
         {
             // OIDC: also mint a signed id_token (iss derived from the request so it matches the discovery issuer).
-            var routeBase = string.IsNullOrWhiteSpace(o.RouteBase) ? "/.testoauth" : o.RouteBase.TrimEnd('/');
-            var issuer = $"{Request.Scheme}://{Request.Host}{routeBase}";
+            var issuer = $"{Request.Scheme}://{Request.Host}{Constants.Routes.Base}";
             var idToken = jwt.CreateIdToken(profile, issuer, req.client_id, nonce, TimeSpan.FromHours(1));
             return Ok(new { access_token = token, token_type = "Bearer", expires_in = 3600, id_token = idToken });
         }

@@ -12,11 +12,11 @@ namespace Koan.Web.Auth.Connector.Test.Controllers;
 
 public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> opts, DevTokenStore store, IHostEnvironment env, ILogger<AuthorizeController> logger) : ControllerBase
 {
-  [HttpGet]
+  [HttpGet(Constants.Routes.Authorize)]
     public IActionResult Authorize([FromQuery] string response_type, [FromQuery] string client_id, [FromQuery] string redirect_uri, [FromQuery] string? scope, [FromQuery] string? state, [FromQuery] string? code_challenge, [FromQuery] string? code_challenge_method, [FromQuery] string? prompt, [FromQuery] string? nonce)
     {
         var o = opts.Value;
-        if (!(env.IsDevelopment() || o.Enabled)) return NotFound();
+        if (!o.IsActive(env)) return NotFound();
         if (string.IsNullOrWhiteSpace(response_type) || !string.Equals(response_type, "code", StringComparison.OrdinalIgnoreCase)) return BadRequest("response_type must be 'code'");
         if (string.IsNullOrWhiteSpace(client_id) || string.IsNullOrWhiteSpace(redirect_uri)) return BadRequest("client_id and redirect_uri are required");
         if (!string.Equals(client_id, o.ClientId, StringComparison.Ordinal)) return Unauthorized();
@@ -32,7 +32,7 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
   if (forceLogin || !Request.Cookies.TryGetValue(Constants.CookieUser, out var userCookie) || string.IsNullOrWhiteSpace(userCookie))
         {
       // Serve a dedicated static HTML to keep SoC clean
-            var url = o.RouteBase.TrimEnd('/') + "/login.html";
+            const string url = Constants.Routes.Login;
             var queryParams = new Dictionary<string, string?>();
             queryParams["client_id"] = client_id;
             queryParams["redirect_uri"] = redirect_uri;

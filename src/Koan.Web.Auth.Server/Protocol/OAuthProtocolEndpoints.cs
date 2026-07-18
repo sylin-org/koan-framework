@@ -499,8 +499,18 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
     private static async Task WriteConsentContext(HttpContext ctx, string clientId, string scope, string resource, string? userCode)
     {
         var client = await OAuthClient.Get(clientId, ctx.RequestAborted);
-        var registry = ctx.RequestServices.GetService<IProviderRegistry>();
-        var providers = registry?.GetDescriptors().Where(d => d.Enabled).ToArray() ?? Array.Empty<ProviderDescriptor>();
+        var catalog = ctx.RequestServices.GetService<IAuthProviderCatalog>();
+        var providers = catalog?.Providers
+            .Where(static provider => provider.Eligible)
+            .Select(static provider => new
+            {
+                id = provider.Id,
+                name = provider.DisplayName,
+                protocol = provider.Protocol,
+                icon = provider.Icon,
+                challengeUrl = provider.ChallengePath
+            })
+            .ToArray() ?? [];
         var scopes = scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(s => new { id = s, description = s }).ToArray();
 

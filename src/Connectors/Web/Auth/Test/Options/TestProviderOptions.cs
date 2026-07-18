@@ -8,10 +8,8 @@ public sealed class TestProviderOptions
     // Opt-in flag for non-Development. In Development the provider is active by default (see IsActive); set this
     // true to expose the OAuth/OIDC simulator endpoints outside Development.
     public bool Enabled { get; init; } = false;
-    public string RouteBase { get; init; } = "/.testoauth";
     public string ClientId { get; init; } = "test-client";
     public string ClientSecret { get; init; } = "test-secret";
-    public bool ExposeInDiscoveryOutsideDevelopment { get; init; } = false;
     public string[] AllowedRedirectUris { get; init; } = [];
 
     // Caps and DX knobs
@@ -38,13 +36,10 @@ public sealed class TestProviderOptions
     public string[] AllowedScopes { get; set; } = [];
 
     /// <summary>
-    /// The single source of truth for whether the Test provider is active: advertised AND its endpoints mapped.
-    /// Active in Development by default (the zero-config dev login — SEC-0003 §2.2); opt-in elsewhere via
-    /// <see cref="Enabled"/> / <see cref="ExposeInDiscoveryOutsideDevelopment"/> (fail-closed outside Development —
-    /// SEC-0001). Both the discovery contributor and the endpoint-mapping startup filter MUST use this, so the two
-    /// halves cannot drift into advertising buttons whose endpoints aren't mapped.
+    /// The single source of truth for whether the local provider is available for automatic election. Its stable
+    /// attribute-routed endpoints remain fail-closed outside Development unless explicitly enabled.
     /// </summary>
     public bool IsActive(IHostEnvironment? env)
-        => Enabled || (env?.IsDevelopment() ?? false) || ExposeInDiscoveryOutsideDevelopment;
+        => Enabled || (env?.IsDevelopment() ?? false);
 }
 

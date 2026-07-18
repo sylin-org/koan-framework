@@ -12,9 +12,12 @@
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
-    <!-- SEC-0007 D6: compose, don't duplicate. Koan.Identity references Koan.Web.Auth one-way to supply the
-         IUserStore / IExternalIdentityStore the auth pillar defines. Web.Auth never references back up. -->
-    <ProjectReference Include="..\Koan.Web.Auth\Koan.Web.Auth.csproj" />
+    <!-- Identity's current access explainer/JIT grant surface composes with the authorization floor owned by Web.
+         This direct edge was previously hidden transitively behind functional Web Auth. -->
+    <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
+    <!-- SEC-0007 D6: durable Identity consumes only inert auth vocabulary. When functional Web Auth is also
+         referenced, its discovered lifecycle pipeline composes with Identity without activating Web Auth here. -->
+    <ProjectReference Include="..\Koan.Web.Auth.Abstractions\Koan.Web.Auth.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">

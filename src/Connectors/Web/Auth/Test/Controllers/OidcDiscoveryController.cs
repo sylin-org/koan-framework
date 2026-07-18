@@ -14,10 +14,10 @@ namespace Koan.Web.Auth.Connector.Test.Controllers;
 /// </summary>
 public sealed class OidcDiscoveryController(IOptionsSnapshot<TestProviderOptions> opts, JwtTokenService jwt, IHostEnvironment env) : ControllerBase
 {
-    [HttpGet]
+    [HttpGet(Constants.Routes.Discovery)]
     public IActionResult Discovery()
     {
-        if (!(env.IsDevelopment() || opts.Value.Enabled)) return NotFound();
+        if (!opts.Value.IsActive(env)) return NotFound();
         var baseUrl = BaseUrl(opts.Value);
         return Ok(new
         {
@@ -36,10 +36,10 @@ public sealed class OidcDiscoveryController(IOptionsSnapshot<TestProviderOptions
         });
     }
 
-    [HttpGet]
+    [HttpGet(Constants.Routes.Jwks)]
     public IActionResult Jwks()
     {
-        if (!(env.IsDevelopment() || opts.Value.Enabled)) return NotFound();
+        if (!opts.Value.IsActive(env)) return NotFound();
         var jwk = jwt.GetPublicJwk();
         // Project to explicit lower-case JWK members (Newtonsoft would otherwise PascalCase the JsonWebKey).
         return Ok(new { keys = new[] { new { kty = jwk.Kty, use = jwk.Use, alg = jwk.Alg, kid = jwk.Kid, crv = jwk.Crv, x = jwk.X, y = jwk.Y } } });
@@ -47,7 +47,6 @@ public sealed class OidcDiscoveryController(IOptionsSnapshot<TestProviderOptions
 
     private string BaseUrl(TestProviderOptions o)
     {
-        var prefix = string.IsNullOrWhiteSpace(o.RouteBase) ? "/.testoauth" : o.RouteBase.TrimEnd('/');
-        return $"{Request.Scheme}://{Request.Host}{prefix}";
+        return $"{Request.Scheme}://{Request.Host}{Constants.Routes.Base}";
     }
 }

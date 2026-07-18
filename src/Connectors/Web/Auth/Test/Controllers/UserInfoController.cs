@@ -1,16 +1,18 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Koan.Web.Auth.Connector.Test.Infrastructure;
+using Koan.Web.Auth.Connector.Test.Options;
 
 namespace Koan.Web.Auth.Connector.Test.Controllers;
 
-public sealed class UserInfoController(DevTokenStore store, IHostEnvironment env, ILogger<UserInfoController> logger) : ControllerBase
+public sealed class UserInfoController(DevTokenStore store, IHostEnvironment env, IOptionsSnapshot<TestProviderOptions> opts, ILogger<UserInfoController> logger) : ControllerBase
 {
-    [HttpGet]
+    [HttpGet(Constants.Routes.UserInfo)]
     public IActionResult UserInfo()
     {
-        if (!env.IsDevelopment()) return NotFound(); // extra guard
+        if (!opts.Value.IsActive(env)) return NotFound();
         var auth = Request.Headers.Authorization.ToString();
         if (string.IsNullOrWhiteSpace(auth) || !auth.StartsWith("Bearer ", StringComparison.Ordinal)) return Unauthorized();
         var token = auth.Substring("Bearer ".Length).Trim();

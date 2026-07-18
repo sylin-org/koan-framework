@@ -10,7 +10,7 @@ internal static class TestProviderProvenanceItems
 
     private static readonly IReadOnlyCollection<string> StartupConsumers = new[]
     {
-        "Koan.Web.Auth.Connector.Test.Hosting.KoanTestProviderStartupFilter"
+        "Koan.Web.Auth.Connector.Test.Initialization.TestAuthModule"
     };
 
     private static readonly IReadOnlyCollection<string> TokenConsumers = new[]
@@ -26,7 +26,7 @@ internal static class TestProviderProvenanceItems
     internal static readonly ProvenanceItem Enabled = new(
         TestProviderOptions.SectionPath + ":" + nameof(TestProviderOptions.Enabled),
         "Test Provider Enabled",
-        "Activator toggle for the test OAuth provider; auto-enabled in Development.",
+        "Availability toggle for the local OAuth2/OIDC simulator; automatic in Development.",
         DefaultValue: BoolString(Defaults.Enabled),
         DefaultConsumers: StartupConsumers);
 

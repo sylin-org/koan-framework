@@ -5,8 +5,9 @@ namespace Koan.Web.Auth.Flow;
 
 /// <summary>
 /// Runs <see cref="IKoanAuthFlowHandler"/>s for each lifecycle event in
-/// <see cref="IKoanAuthFlowHandler.Priority"/> order, sequentially. Soft-fails per-handler on
-/// exception (logs and continues); propagates <see cref="OperationCanceledException"/>.
+/// <see cref="IKoanAuthFlowHandler.Priority"/> order, sequentially. Security-bearing flows fail closed:
+/// bootstrap, sign-in, challenge, and access-denied failures propagate; validation rejects the principal.
+/// Sign-out alone remains best-effort because local session removal must not depend on remote cleanup.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -54,16 +55,7 @@ public sealed class AuthFlowDispatcher
     public async Task DispatchBootstrap(AuthBootstrapContext ctx, CancellationToken ct)
     {
         foreach (var h in _handlers)
-        {
-            try { await h.OnBootstrap(ctx, ct); }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "Koan.Web.Auth.Flow: bootstrap handler {Handler} failed; continuing pipeline",
-                    h.GetType().FullName);
-            }
-        }
+            await h.OnBootstrap(ctx, ct);
     }
 
     public async Task DispatchValidatePrincipal(AuthValidatePrincipalContext ctx, CancellationToken ct)
@@ -74,9 +66,11 @@ public sealed class AuthFlowDispatcher
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex,
-                    "Koan.Web.Auth.Flow: validate-principal handler {Handler} failed; continuing pipeline",
+                ctx.Inner.RejectPrincipal();
+                _logger.LogError(ex,
+                    "Koan.Web.Auth.Flow: validate-principal handler {Handler} failed; principal rejected",
                     h.GetType().FullName);
+                return;
             }
         }
     }
@@ -86,14 +80,7 @@ public sealed class AuthFlowDispatcher
         foreach (var h in _handlers)
         {
             if (ctx.RejectReason is not null) break;
-            try { await h.OnSignIn(ctx, ct); }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "Koan.Web.Auth.Flow: sign-in handler {Handler} failed for user {UserId}; continuing pipeline",
-                    h.GetType().FullName, ctx.UserId);
-            }
+            await h.OnSignIn(ctx, ct);
         }
     }
 
@@ -115,30 +102,12 @@ public sealed class AuthFlowDispatcher
     public async Task DispatchChallenge(AuthChallengeContext ctx, CancellationToken ct)
     {
         foreach (var h in _handlers)
-        {
-            try { await h.OnChallenge(ctx, ct); }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "Koan.Web.Auth.Flow: challenge handler {Handler} failed; continuing pipeline",
-                    h.GetType().FullName);
-            }
-        }
+            await h.OnChallenge(ctx, ct);
     }
 
     public async Task DispatchAccessDenied(AuthAccessDeniedContext ctx, CancellationToken ct)
     {
         foreach (var h in _handlers)
-        {
-            try { await h.OnAccessDenied(ctx, ct); }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "Koan.Web.Auth.Flow: access-denied handler {Handler} failed; continuing pipeline",
-                    h.GetType().FullName);
-            }
-        }
+            await h.OnAccessDenied(ctx, ct);
     }
 }

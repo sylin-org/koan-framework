@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Koan.Core.Diagnostics;
 using Koan.Web.Auth.Domain;
 using Xunit;
 
@@ -59,15 +60,38 @@ public sealed class AuthEngineSwapSpec : IClassFixture<AuthSwapFixture>
     }
 
     [Fact]
-    public async Task Development_maps_test_endpoints_without_opt_in()
+    public async Task Development_exposes_stable_test_endpoints_without_opt_in()
     {
-        // Bug-1 regression: the contributor advertises test/test-oidc in Development, so their endpoints MUST be
-        // mapped there too — without any TestProvider:Enabled opt-in (the fixture sets none). If advertisement and
-        // mapping drift again, the discovery document 404s and OIDC discovery (and the round-trips above) break.
+        // The Test connector's automatic definitions and attribute-routed protocol surface share IsActive. No
+        // startup filter, conventional mapper, or TestProvider:Enabled opt-in is required in Development.
         using var client = _fx.NewClient();
         var resp = await client.GetAsync("/.testoauth/.well-known/openid-configuration");
         resp.StatusCode.Should().Be(HttpStatusCode.OK,
-            "the Test simulator endpoints must auto-map in Development (advertise ⇒ map) with no opt-in");
+            "the Test simulator's stable routes must be available with its automatic Development definitions");
+    }
+
+    [Fact]
+    public async Task Provider_discovery_and_runtime_facts_project_the_same_compiled_plan()
+    {
+        using var client = _fx.NewClient();
+        var response = await client.GetAsync("/.well-known/auth/providers");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var providers = document.RootElement.EnumerateArray().ToArray();
+
+        providers.Select(provider => provider.GetProperty("id").GetString())
+            .Should().BeEquivalentTo("test", "test-oidc");
+        providers.Should().OnlyContain(provider =>
+            provider.GetProperty("challengeUrl").GetString()
+            == $"/auth/{provider.GetProperty("id").GetString()}/challenge");
+
+        var facts = _fx.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts;
+        facts.Should().Contain(fact =>
+            fact.Code == "koan.auth.provider.eligible" && fact.Subject == "auth:provider:test");
+        facts.Should().Contain(fact =>
+            fact.Code == "koan.auth.provider.eligible" && fact.Subject == "auth:provider:test-oidc");
+        facts.Should().Contain(fact =>
+            fact.Code == "koan.auth.provider.selected" && fact.Subject == "auth:provider:default");
     }
 
     [Fact]

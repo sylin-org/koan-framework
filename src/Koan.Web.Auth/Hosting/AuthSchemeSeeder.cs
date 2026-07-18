@@ -23,9 +23,8 @@ namespace Koan.Web.Auth.Hosting;
 /// WEB-0071 — registers a maintained ASP.NET <see cref="OAuthHandler{TOptions}"/> /
 /// <see cref="OpenIdConnectHandler"/> scheme per effective provider at startup (post-build, full DI),
 /// so id_token validation, nonce, PKCE, state, and correlation are owned by the framework rather than
-/// hand-rolled. The provider set is composed at runtime (config + <see cref="IAuthProviderContributor"/>
-/// defaults + ownerless config ids), which is why this runs centrally and reads
-/// <see cref="IProviderRegistry.EffectiveProviders"/> once — see WEB-0071 for the architecture decision.
+/// hand-rolled. The provider set is compiled once by <see cref="AuthProviderPlan"/> from connector definitions and
+/// configuration; this seeder realizes only that plan's eligible routes.
 /// </summary>
 /// <remarks>
 /// CRITICAL: <see cref="IOptionsMonitorCache{TOptions}.TryAdd"/> caches the instance verbatim and bypasses
@@ -39,10 +38,10 @@ internal static class AuthSchemeSeeder
 {
     private const string ExtraClaimPermission = "Koan.permission";
 
-    /// <summary>Seed schemes from the effective provider set. <paramref name="sp"/> MUST be a scope (the registry is scoped).</summary>
+    /// <summary>Seed schemes from the host-owned provider plan.</summary>
     public static void Seed(IServiceProvider sp)
     {
-        var registry = sp.GetRequiredService<IProviderRegistry>();
+        var plan = sp.GetRequiredService<AuthProviderPlan>();
         var schemes = sp.GetRequiredService<IAuthenticationSchemeProvider>();
         var dp = sp.GetRequiredService<IDataProtectionProvider>();
         var oauthCache = sp.GetRequiredService<IOptionsMonitorCache<OAuthOptions>>();
@@ -52,41 +51,30 @@ internal static class AuthSchemeSeeder
         var oauthPost = new OAuthPostConfigureOptions<OAuthOptions, OAuthHandler<OAuthOptions>>(dp);
         var oidcPost = new OpenIdConnectPostConfigureOptions(dp);
 
-        foreach (var (id, cfg) in registry.EffectiveProviders)
+        foreach (var route in plan.Routes.Where(static route => route.Info.Eligible))
         {
-            if (!cfg.Enabled) continue;
-            var type = (cfg.Type ?? AuthConstants.Protocols.Oidc).ToLowerInvariant();
+            var id = route.Info.Id;
+            var cfg = route.Options;
+            var type = (cfg.Type ?? AuthProviderProtocols.Oidc).ToLowerInvariant();
             // Idempotent: another seeding pass (or a statically-registered scheme) already owns this id.
             if (schemes.GetSchemeAsync(id).GetAwaiter().GetResult() is not null) continue;
 
-            try
+            if (type == AuthProviderProtocols.OAuth2)
             {
-                if (type == AuthConstants.Protocols.OAuth2)
-                {
-                    var opts = BuildOAuthOptions(id, cfg);
-                    oauthPost.PostConfigure(id, opts);   // MUST precede TryAdd (see remarks)
-                    oauthCache.TryAdd(id, opts);
-                    schemes.AddScheme(new AuthenticationScheme(id, cfg.DisplayName ?? id, typeof(OAuthHandler<OAuthOptions>)));
-                }
-                else if (type == AuthConstants.Protocols.Oidc)
-                {
-                    var opts = BuildOidcOptions(id, cfg, sp);
-                    oidcPost.PostConfigure(id, opts);    // MUST precede TryAdd (see remarks)
-                    oidcCache.TryAdd(id, opts);
-                    schemes.AddScheme(new AuthenticationScheme(id, cfg.DisplayName ?? id, typeof(OpenIdConnectHandler)));
-                }
-                else
-                {
-                    log?.LogDebug("Koan.Web.Auth: provider {Provider} has unsupported type '{Type}'; no scheme seeded", id, type);
-                    continue;
-                }
-                log?.LogDebug("Koan.Web.Auth: seeded {Type} scheme for provider {Provider}", type, id);
+                var opts = BuildOAuthOptions(id, cfg);
+                oauthPost.PostConfigure(id, opts);   // MUST precede TryAdd (see remarks)
+                oauthCache.TryAdd(id, opts);
+                schemes.AddScheme(new AuthenticationScheme(id, cfg.DisplayName ?? id, typeof(OAuthHandler<OAuthOptions>)));
             }
-            catch (Exception ex)
+            else if (type == AuthProviderProtocols.Oidc)
             {
-                // One misconfigured provider must not bring down auth for the others.
-                log?.LogWarning(ex, "Koan.Web.Auth: failed to seed scheme for provider {Provider} ({Type})", id, type);
+                var opts = BuildOidcOptions(id, cfg, sp);
+                oidcPost.PostConfigure(id, opts);    // MUST precede TryAdd (see remarks)
+                oidcCache.TryAdd(id, opts);
+                schemes.AddScheme(new AuthenticationScheme(id, cfg.DisplayName ?? id, typeof(OpenIdConnectHandler)));
             }
+
+            log?.LogDebug("Koan.Web.Auth: seeded {Type} scheme for provider {Provider}", type, id);
         }
     }
 
@@ -239,7 +227,13 @@ internal static class AuthSchemeSeeder
         var name = (string?)user["name"] ?? (string?)user["username"];
         var avatar = (string?)user["avatar"] ?? (string?)user["picture"];
 
-        if (!string.IsNullOrWhiteSpace(sub) && !identity.HasClaim(c => c.Type == ClaimTypes.NameIdentifier))
+        if (string.IsNullOrWhiteSpace(sub))
+        {
+            throw new InvalidOperationException(
+                "Koan Web Auth rejected the external identity because userinfo contained neither 'sub' nor 'id'.");
+        }
+
+        if (!identity.HasClaim(c => c.Type == ClaimTypes.NameIdentifier))
             identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, sub));
         if (!string.IsNullOrWhiteSpace(name) && !identity.HasClaim(c => c.Type == ClaimTypes.Name))
             identity.AddClaim(new Claim(ClaimTypes.Name, name));
@@ -255,31 +249,26 @@ internal static class AuthSchemeSeeder
             if (!identity.HasClaim(kv.Key, kv.Value)) identity.AddClaim(new Claim(kv.Key, kv.Value));
     }
 
-    /// <summary>Best-effort external-identity link (SEC-0001). Fail-closed on a missing sub; logged, never swallowed blind.</summary>
+    /// <summary>Persist the external-identity link before sign-in completes; any failure rejects the authentication flow.</summary>
     private static async Task LinkExternalIdentityAsync(HttpContext http, string provider, JObject user, string claimsJson)
     {
         var sub = (string?)user["sub"] ?? (string?)user["id"];
-        if (string.IsNullOrWhiteSpace(sub)) return; // no identifier → no link (was a SHA256("") collision)
+        if (string.IsNullOrWhiteSpace(sub))
+        {
+            throw new InvalidOperationException(
+                $"Koan Web Auth rejected provider '{provider}' because userinfo contained neither 'sub' nor 'id'.");
+        }
 
-        try
+        var store = http.RequestServices.GetService<IExternalIdentityStore>();
+        if (store is null) return;
+        var keyHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sub)));
+        await store.Link(new ExternalIdentity
         {
-            var store = http.RequestServices.GetService<IExternalIdentityStore>();
-            if (store is null) return;
-            var keyHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sub)));
-            await store.Link(new ExternalIdentity
-            {
-                UserId = sub,
-                Provider = provider,
-                ProviderKeyHash = keyHash,
-                ClaimsJson = claimsJson
-            }, http.RequestAborted);
-        }
-        catch (Exception ex)
-        {
-            http.RequestServices.GetService<ILoggerFactory>()?
-                .CreateLogger("Koan.Web.Auth.AuthSchemeSeeder")
-                .LogWarning(ex, "Koan.Web.Auth: external-identity link failed for provider {Provider}; continuing", provider);
-        }
+            UserId = sub,
+            Provider = provider,
+            ProviderKeyHash = keyHash,
+            ClaimsJson = claimsJson
+        }, http.RequestAborted);
     }
 
     /// <summary>

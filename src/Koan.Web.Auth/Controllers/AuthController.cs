@@ -19,13 +19,13 @@ namespace Koan.Web.Auth.Controllers;
 /// action here) — and (b) signs the user out.
 /// </summary>
 [ApiController]
-public sealed class AuthController(IProviderRegistry registry, IOptionsSnapshot<AuthOptions> authOptions, ILogger<AuthController> logger) : ControllerBase
+public sealed class AuthController(IAuthProviderCatalog providers, IOptions<AuthOptions> authOptions, ILogger<AuthController> logger) : ControllerBase
 {
     [HttpGet(AuthConstants.Routes.Challenge)]
     public IActionResult Challenge([FromRoute] string provider, [FromQuery(Name = "return")] string? returnUrl)
     {
         if (string.IsNullOrWhiteSpace(provider)) return NotFound();
-        if (!registry.EffectiveProviders.TryGetValue(provider, out var cfg) || !cfg.Enabled) return NotFound();
+        if (providers.Find(provider) is not { Eligible: true }) return NotFound();
 
         // SEC-0001 §10: the allow-list is the security boundary. Resolve the return URL HERE, before handing
         // it to the handler — the handler redirects to AuthenticationProperties.RedirectUri WITHOUT

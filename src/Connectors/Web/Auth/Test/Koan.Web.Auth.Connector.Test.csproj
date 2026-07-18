@@ -19,6 +19,7 @@
     <EmbeddedResource Include="wwwroot\testprovider-login.html" />
   </ItemGroup>
   <ItemGroup>
+  <ProjectReference Include="..\..\..\..\Koan.Web.Auth.Abstractions\Koan.Web.Auth.Abstractions.csproj" />
   <ProjectReference Include="..\..\..\..\Koan.Web.Auth\Koan.Web.Auth.csproj" />
   <ProjectReference Include="..\..\..\..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>

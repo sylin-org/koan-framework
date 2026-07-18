@@ -8,7 +8,6 @@ using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Registry;
 using Koan.Core.Modules;
-using Koan.Core.Ordering;
 using Koan.Core.Provenance;
 using Koan.Identity.Infrastructure;
 using Koan.Identity.Reconciliation;
@@ -21,10 +20,9 @@ namespace Koan.Identity.Initialization;
 /// registers the reconciler, replaces Koan.Web.Auth's vestigial in-memory <see cref="IUserStore"/> /
 /// <see cref="IExternalIdentityStore"/> with <c>Entity&lt;&gt;</c>-backed durable stores, and seeds offline dev
 /// users under a dev-open / prod-closed posture. The reconciliation <i>trigger</i> is the discovered
-/// <see cref="IdentityAuthFlowHandler"/> (cookie sign-in) — no manual wiring. Ordered <c>[After]</c> the auth
-/// registrar so the store replacement wins.
+/// <see cref="IdentityAuthFlowHandler"/> (cookie sign-in) when functional Web Auth is also referenced—no manual
+/// wiring. Web Auth's defaults use standard <c>TryAdd</c> semantics, so durable store replacement is order-independent.
 /// </summary>
-[After(typeof(Koan.Web.Auth.Initialization.AuthModule))]
 public sealed class SecIdentityModule : KoanModule
 {
     public override void Register(IServiceCollection services)

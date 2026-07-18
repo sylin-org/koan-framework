@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Auth.Abstractions\Koan.Web.Auth.Abstractions.csproj" />
     <!-- SEC-0001 §11: exercises the dev TestProvider's asymmetric JWT signing (JwtTokenService). -->
     <ProjectReference Include="..\..\src\Connectors\Web\Auth\Test\Koan.Web.Auth.Connector.Test.csproj" />
   </ItemGroup>

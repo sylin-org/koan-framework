@@ -46,7 +46,7 @@ public sealed class TrustModule : KoanModule
         // 2e — the ambient Identity.Current reads HttpContext.User through this accessor (idempotent).
         services.AddHttpContextAccessor();
         // Rung 0 — zero-config dev identity options. The middleware is inserted by the auth pipeline in
-        // Development only (KoanWebAuthStartupFilter), so it is structurally absent in production.
+        // Development only (the Web Auth pipeline contributor), so it is structurally absent in production.
         services.AddKoanOptions<DevIdentityOptions>(DevIdentityOptions.SectionPath);
         // The inbound bearer scheme is attached by Koan.Web.Auth.AddKoanWebAuth() via AddKoanBearer (2d);
         // the resource-side IAuthorize seam lives in Koan.Web.Extensions (2f).

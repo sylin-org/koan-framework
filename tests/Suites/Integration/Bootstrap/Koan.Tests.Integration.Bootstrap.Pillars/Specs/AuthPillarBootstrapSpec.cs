@@ -9,16 +9,12 @@ using Xunit;
 namespace Koan.Tests.Integration.Bootstrap.Pillars.Specs;
 
 /// <summary>
-/// Boot-smoke for the Auth pillar (per ARCH-0079). Proves <c>IProviderRegistry</c> resolves
+/// Boot-smoke for the Auth pillar (per ARCH-0079). Proves the immutable provider catalog resolves
 /// through real <c>AddKoan()</c> reflective discovery.
 /// </summary>
 /// <remarks>
-/// <c>IProviderRegistry</c> is <b>scoped</b> (not singleton), so the resolution goes through
-/// <c>IServiceScopeFactory.CreateScope()</c> rather than the root container. The auth
-/// auto-registrar wires in-memory <c>IUserStore</c> / <c>IExternalIdentityStore</c> defaults
-/// and an <c>IStartupFilter</c> — safe offline. Auto-discovery of
-/// <c>IKoanAuthEventContributor</c> and <c>IAuthProviderContributor</c> finds nothing in this
-/// test, so the registry constructs with an empty provider set.
+/// The auth module wires in-memory store defaults and compiles a host-owned, credential-free projection. With no
+/// provider connector in this host, the catalog is valid and empty.
 /// </remarks>
 public sealed class AuthPillarBootstrapSpec
 {
@@ -30,15 +26,14 @@ public sealed class AuthPillarBootstrapSpec
     }
 
     [Fact]
-    public async Task AddKoan_resolves_IProviderRegistry_through_real_bootstrap()
+    public async Task AddKoan_registers_the_host_owned_provider_catalog()
     {
-        await using var host = await KoanIntegrationHost.Configure()
+        await using var host = KoanIntegrationHost.Configure()
             .ConfigureServices(services => services.AddKoan())
-            .StartAsync();
+            .Build();
 
-        // Scoped service — must resolve through a scope, not the root container.
-        using var scope = host.Services.CreateScope();
-        var registry = scope.ServiceProvider.GetRequiredService<IProviderRegistry>();
-        registry.Should().NotBeNull();
+        var catalog = host.Services.GetRequiredService<IAuthProviderCatalog>();
+        catalog.Providers.Should().BeEmpty();
+        catalog.Default.Should().BeNull();
     }
 }

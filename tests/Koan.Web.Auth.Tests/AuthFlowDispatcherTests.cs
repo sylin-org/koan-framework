@@ -12,7 +12,7 @@ namespace Koan.Web.Auth.Tests;
 
 /// <summary>
 /// Behavior tests for the WEB-0066 flow handler pipeline. The dispatcher's job is to fan
-/// every event out to every handler in Priority order, soft-fail on per-handler exceptions, and
+/// every event out to every handler in Priority order, fail closed on security-bearing exceptions, and
 /// honor ResponseHandled / Reject short-circuit signals.
 /// </summary>
 public sealed class AuthFlowDispatcherTests
@@ -69,7 +69,7 @@ public sealed class AuthFlowDispatcherTests
     }
 
     [Fact]
-    public async Task DispatchChallenge_handler_exception_is_swallowed_and_pipeline_continues()
+    public async Task DispatchChallenge_handler_exception_propagates_and_stops_pipeline()
     {
         var trace = new List<string>();
         var dispatcher = NewDispatcher(
@@ -77,9 +77,32 @@ public sealed class AuthFlowDispatcherTests
             new RecordingHandler("after", priority: 0, trace));
 
         var ctx = NewChallengeCtx();
-        await dispatcher.DispatchChallenge(ctx, CancellationToken.None);
+        var act = () => dispatcher.DispatchChallenge(ctx, CancellationToken.None);
 
-        trace.Should().Equal("after");
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        trace.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DispatchSignIn_handler_exception_propagates_and_stops_pipeline()
+    {
+        var trace = new List<string>();
+        var dispatcher = NewDispatcher(
+            new ThrowingHandler("thrower", priority: -1000),
+            new RecordingHandler("after", priority: 0, trace));
+        var http = NewHttpContext();
+        var ctx = new AuthSignInContext
+        {
+            Provider = "test",
+            Identity = new System.Security.Claims.ClaimsIdentity("test"),
+            Services = http.RequestServices,
+            HttpContext = http,
+        };
+
+        var act = () => dispatcher.DispatchSignIn(ctx, CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        trace.Should().BeEmpty();
     }
 
     [Fact]
@@ -242,6 +265,8 @@ public sealed class AuthFlowDispatcherTests
         public ThrowingHandler(string name, int priority) { _name = name; Priority = priority; }
         public int Priority { get; }
         public Task OnChallenge(AuthChallengeContext ctx, CancellationToken ct)
+            => throw new InvalidOperationException($"{_name} blew up");
+        public Task OnSignIn(AuthSignInContext ctx, CancellationToken ct)
             => throw new InvalidOperationException($"{_name} blew up");
     }
 

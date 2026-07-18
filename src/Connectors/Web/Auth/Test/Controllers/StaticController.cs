@@ -3,17 +3,18 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Web.Auth.Connector.Test.Options;
+using Koan.Web.Auth.Connector.Test.Infrastructure;
 using System.Reflection;
 
 namespace Koan.Web.Auth.Connector.Test.Controllers;
 
 public sealed class StaticController(IHostEnvironment env, IOptionsSnapshot<TestProviderOptions> opts) : ControllerBase
 {
-    [HttpGet]
+    [HttpGet(Constants.Routes.Login)]
     public async Task<IActionResult> LoginPage()
     {
         var o = opts.Value;
-        if (!(env.IsDevelopment() || o.Enabled)) return NotFound();
+        if (!o.IsActive(env)) return NotFound();
         var path = Path.Combine(AppContext.BaseDirectory, "wwwroot", "testprovider-login.html");
         if (System.IO.File.Exists(path))
         {

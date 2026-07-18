@@ -22,9 +22,9 @@ using Koan.Security.Trust.Inbound;
 
 namespace Koan.Web.Auth.Extensions;
 
-public static class ServiceCollectionExtensions
+internal static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddKoanWebAuth(this IServiceCollection services)
+    internal static IServiceCollection AddKoanWebAuth(this IServiceCollection services)
     {
         // Bind from configuration by section path at runtime (no IConfiguration required here)
         services.AddKoanOptions<AuthOptions>(AuthOptions.SectionPath);
@@ -33,13 +33,12 @@ public static class ServiceCollectionExtensions
 
         services.AddHttpClient();
 
-        services.AddScoped<IProviderRegistry, ProviderRegistry>();
-        services.AddScoped<IAuthProviderElection, AuthProviderElection>();
-        // Note: external packages may register IAuthProviderContributor instances to augment defaults.
+        services.AddSingleton<AuthProviderPlan>();
+        services.AddSingleton<IAuthProviderCatalog>(sp => sp.GetRequiredService<AuthProviderPlan>());
 
         // Default in-memory stores; apps can replace these via DI with Entity<>-backed implementations.
-        services.AddSingleton<IUserStore, InMemoryUserStore>();
-        services.AddSingleton<IExternalIdentityStore, InMemoryExternalIdentityStore>();
+        services.TryAddSingleton<IUserStore, InMemoryUserStore>();
+        services.TryAddSingleton<IExternalIdentityStore, InMemoryExternalIdentityStore>();
 
         // /me projector. Default surfaces the rich shape (email, roles, claims) so SPAs can render
         // role-gated UI on first paint without a probe round-trip. Use TryAdd so a host can swap
@@ -93,11 +92,11 @@ public static class ServiceCollectionExtensions
                         // /sign-in when a single provider is configured). Handlers see this as the
                         // initial RedirectUri and can rewrite it freely.
                         var defaultRedirect = ctx.RedirectUri;
-                        var selection = services.GetService<IAuthProviderElection>()?.Current;
-                        if (selection is not null && selection.HasProvider && selection.SupportsInteractiveChallenge)
+                        var selection = services.GetService<AuthProviderPlan>()?.Default;
+                        if (selection is not null && selection.Eligible && !string.IsNullOrWhiteSpace(selection.ChallengePath))
                         {
                             var returnUrl = ResolveReturnUrl(ctx);
-                            defaultRedirect = BuildChallengeUrl(selection.ChallengePath ?? "", returnUrl);
+                            defaultRedirect = BuildChallengeUrl(selection.ChallengePath, returnUrl);
                         }
 
                         var flowCtx = new AuthChallengeContext
@@ -166,7 +165,8 @@ public static class ServiceCollectionExtensions
                         if (signInCtx.RejectReason is not null)
                         {
                             ctx.HttpContext.Items[AuthLifecycleMarkers.SignInRejected] = signInCtx.RejectReason;
-                            ctx.Principal = new ClaimsPrincipal(new ClaimsIdentity());
+                            throw new InvalidOperationException(
+                                $"Koan Web Auth sign-in was rejected: {signInCtx.RejectReason}");
                         }
                     },
                     OnSigningOut = async ctx =>
