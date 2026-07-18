@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>

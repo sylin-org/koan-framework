@@ -17,9 +17,9 @@ namespace Koan.Data.VectorAdapterSurface.SqliteVec.Tests;
 /// neighbouring tenant's vector. InMemoryVector takes the opposite (isolates) branch because it filters — together the
 /// two cells co-define <c>RowScoped</c> from both sides.
 /// <para>
-/// The Container and Database modes are realized by mechanism, not name-fold: Container = a distinct <c>vec0</c> virtual
-/// table per ambient partition inside one SQLite database; Database = a distinct SQLite database per routed source,
-/// resolved at the factory through the shared <c>AdapterConnectionResolver.ResolveRoutedConnection</c>. The two
+/// The Container and Database modes use the shared Vector name fold: Container = a distinct <c>vec0</c> virtual
+/// table per ambient partition; Database = a routed SQLite connection plus a source-folded table name, resolved through
+/// the provider's single route decision. The two
 /// conformance sources therefore need a real per-source connection string (unlike the name-folding InMemory cell, where
 /// they are inert). Each uses a private in-memory database (<c>Data Source=:memory:</c> is unshared per connection, and
 /// sqlite-vec holds one connection per repository for its lifetime), so the isolation is genuine — no files, no cleanup,
@@ -44,9 +44,8 @@ public sealed class SqliteVecVectorAodbConformanceSpec : VectorAodbConformanceSp
             ["Koan:Data:Tenancy:Posture"] = "Closed",
             // The Default source (Shared + Container cells) — keep it off-disk too.
             ["Koan:Data:SqliteVec:ConnectionString"] = Memory,
-            // Database cell: sqlite-vec does NOT name-fold the routed source; it routes each source to a distinct
-            // physical SQLite database via the shared AdapterConnectionResolver. So each conformance source needs a real
-            // per-source connection string — a private :memory: database per source is isolated (unshared per connection).
+            // Database cell: each source exercises both the shared source name-fold and a separately routed connection.
+            // A private :memory: database per source is isolated and keeps the proof file-free.
             [$"Koan:Data:Sources:{SourceA}:Adapter"] = "inmemory",
             [$"Koan:Data:Sources:{SourceA}:SqliteVec:ConnectionString"] = Memory,
             [$"Koan:Data:Sources:{SourceB}:Adapter"] = "inmemory",

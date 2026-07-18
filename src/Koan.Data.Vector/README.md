@@ -7,13 +7,13 @@ providers actually became runtime dependencies.
 ## Install
 
 ```powershell
-dotnet add package Sylin.Koan.Data.Vector
 dotnet add package Sylin.Koan.Data.Vector.Connector.InMemory
 ```
 
-The in-memory provider is the zero-infrastructure development floor. Replace or complement it with a durable provider
-package for deployed workloads. `AddKoan()` discovers the runtime and referenced providers; no vector-specific startup
-code is required.
+Provider packages bring this runtime. The in-memory provider is the zero-infrastructure development floor; replace or
+complement it with a durable provider package when guarantees grow. `AddKoan()` discovers the runtime and referenced
+providers; no vector-specific startup code is required. Reference this runtime directly only when authoring a provider
+or intentionally composing Vector without a provider.
 
 ## Smallest meaningful use
 

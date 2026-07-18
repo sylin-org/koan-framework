@@ -4,10 +4,10 @@ domain: framework
 title: "Koan V1 Reorganization Progress"
 audience: [architects, maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-17
+last_updated: 2026-07-18
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-17
+  date_last_tested: 2026-07-18
   status: in-progress
   scope: R11-05 dependency-ordered package-family graduation
 ---
@@ -25,7 +25,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Active child: [R11-05 — Graduate package families](work-items/r11/R11-05-package-family-graduation.md)
 - Most recently passed child: [R11-04 — Prove the golden package journey](work-items/r11/R11-04-golden-package-journey.md)
 - Pending release item: [R08-05 — Initial coherent public observation](work-items/r08/R08-05-initial-public-observation.md);
-  its local contract is prepared, but R10 graduation and separate remote authorization come first
+  its local contract is prepared, but R11 graduation and separate remote authorization come first
 - V1 readiness: `not ready`; public observation, later upgrade/rollback proof,
   and an explicit release decision remain
 
@@ -44,7 +44,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R08 | [Make Koan V1 responsibly releasable](work-items/R08-v1-release-readiness.md) | T7B | pending | R09; R10 and R11 guard R08-05 | Codex · 2026-07-17 | R08-01 through R08-04 passed locally and R08-05 is prepared but unauthorized. R10 graduated the maintained sample portfolio; R11 now graduates the package product surface before public observation. |
 | R09 | [Compile the Semantic Composition Kernel](work-items/R09-semantic-composition-kernel.md) | T7A | passed | R07; protects R08-01 | Codex · 2026-07-17 | R09-01 through R09-09 passed. One retained module lifecycle, compiled semantic constitution, typed contribution/election mechanics, hard capability overlays, canonical evidence, contract isolation, and legacy-kernel deletion are proved. ARCH-0115 and ARCH-0116 record the result. |
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
-| R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | in-progress | R09; R10; guards R08-05 | Architect + Codex · 2026-07-17 | R11-01 through R11-04 pass. R11-05 foundation, contract-isolation, Storage, Cache, Redis/shared-backend, relational, local Data, document Data, and search-engine vector provider families pass after responsibility coalescence and focused proof. Pagination is caller-owned. Current truth: 111 packages, 43 structurally ready across 18 claims. |
+| R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | in-progress | R09; R10; guards R08-05 | Architect + Codex · 2026-07-18 | R11-01 through R11-04 pass. R11-05 foundation, contract-isolation, Storage, Cache, Redis/shared-backend, relational, local Data, document Data, search-engine vector, and local vector provider families pass after responsibility coalescence and focused proof. Pagination is caller-owned. Current truth: 111 packages, 45 structurally ready across 19 claims. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -64,12 +64,13 @@ item should normally be `in-progress`.
 | R08 | pending | R08-01 through R08-04 passed locally. R08-05's preparation checklist is complete; R10 sample graduation, remote trust setup/public observation, and later real upgrade/rollback remain separate gates. Publication remains unauthorized. |
 | R09 | passed | All nine children pass. Functional assemblies use one module lifecycle, contracts are isolated without activation metadata, the duplicate bootstrap kernel is deleted, and focused source/package journeys remain meaningful. |
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
-| R11 | in-progress | R11-01 through R11-04 pass. R11-05 foundation, contract-isolation, Storage, Cache, Redis/shared-backend, relational, local Data, document Data, and search-engine vector provider families pass; remaining semantic-capability and projection/tool families still require terminal topology, prose, and focused evidence before R11-07. |
+| R11 | in-progress | R11-01 through R11-04 pass. R11-05 foundation, contract-isolation, Storage, Cache, Redis/shared-backend, relational, local Data, document Data, search-engine vector, and local vector provider families pass; remaining semantic-capability and projection/tool families still require terminal topology, prose, and focused evidence before R11-07. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-18 | R11-05 local vector provider closure | InMemory was described but not declared as the automatic floor; both local providers required a separate functional Vector reference and bypassed its selected-provider naming seam. sqlite-vec repeated/underreported placement, had no participation health, trusted same-length native cache files, and made GardenCoop repeat SQLite placement. | Pass the InMemory/sqlite-vec family as one meaningful progression. Provider references bring Vector; InMemory declares the priority -100 floor; one sqlite-vec route decision owns factory, health, and boot placement; selected naming is uniform; native extraction is hash-validated; package boundaries are explicit. Focused suites pass 34/34 and 5/5; both packages build/pack/audit cleanly and are structurally ready. Generated truth is 111 packages, 45 structurally ready across 19 claims; public docs pass 208/38. GardenCoop's independent eager Storage activation is PMC-033. No full release certification ran. |
 | 2026-07-17 | R11-05 search-engine vector provider closure | Elasticsearch and OpenSearch already shared one repository but duplicated configuration, discovery, health, factories, and startup reporting. Exact Endpoint configuration could be discarded, health was critical by reference, repository naming re-entered election, vector-only hosts incorrectly required a record-Data provider, and public docs still called OpenSearch 0/25. | Pass the search-engine vector family. Centralize common mechanics in the transitive SearchEngine owner while retaining native provider dialects and identities. Exact endpoint and unused-health AODB paths pass 4/4 each; full provider matrices pass 29 with 4 honest skips each; Vector participation passes 4/4. All three packages are structurally ready, pack with canonical contents, and have no known vulnerable packages. Generated truth is 111 packages, 43 structurally ready across 18 claims; public docs pass 204/38. PMC-032 retains the unrelated stale test-project reference warning. No full release certification ran. |
 | 2026-07-17 | R11-05 document Data and pagination closure | Adapter page-size options were dead on ordinary queries but SQLite, SQL Server, and Npgsql raw-predicate paths silently applied them; document stores also re-entered provider election for naming, Couchbase connected eagerly and always reported critical, and both document packages understated or overstated current behavior. | Pass caller-owned pagination and the Mongo/Couchbase family. Delete every adapter row-page default and prove unpaged 75-row raw queries plus explicit pages on three SQL dialects; keep Web policy explicit. Retain selected naming in the document base, share one fixed route monitor, make Couchbase lazy/selection-aware, and publish exact package boundaries. Mongo passes 68/68; Couchbase passes 3 participation cells plus 1 real CRUD cell, with its observed 64-second first-use cost and incomplete full-suite certification stated honestly. Generated truth is 111 packages, 40 structurally ready across 17 claims; public docs pass 204/38. |
 | 2026-07-17 | R11-05 local Data provider closure | InMemory was incorrectly presented as a fallback even though only JSON declares automatic-floor eligibility. JSON also exposed an unused per-Entity registration bypass and page-size option, and re-entered provider election from every physical-name resolution; InMemory exposed its host store/reset controls publicly. | Pass the local Data family. Preserve JSON automatic-floor and direct InMemory intent; keep JSON naming inside the selected factory; delete bypass/dead configuration surfaces; internalize host store state. JSON passes 21/21 and InMemory 56/56; both build/pack cleanly; both packages are structurally ready; generated truth is 111 packages, 39 structurally ready across 16 claims. No full release certification ran. |

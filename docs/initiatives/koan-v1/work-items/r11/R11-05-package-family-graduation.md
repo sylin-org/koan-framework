@@ -1070,6 +1070,134 @@ authors,” not invent a direct application result.
 The search-engine vector provider family passes this R11-05 slice. No release candidate, full certification run,
 package feed, or remote state was created; the complete release ratchet remains the single R11-07 boundary.
 
+### Local vector provider-family discovery
+
+**Task:** graduate the in-memory/sqlite-vec vector family as one meaningful progression: a zero-infrastructure
+semantic floor that works from a reference, followed by an embedded durable provider that preserves the same Entity
+intent while changing only placement and guarantees.
+
+**Application intent:** “Reference the in-memory vector package and use the ordinary Entity vector/AI ring with no
+server or configuration. When durability matters, reference sqlite-vec (and SQLite for record storage when wanted),
+keep the same application code, and let Koan place vectors in-process in the local SQLite store.”
+
+**Public expression:** retain `AddKoan()` and the existing Entity vector/AI methods. A direct reference to either local
+provider must bring the Vector runtime it implements. In-memory is the lowest-priority automatic floor. sqlite-vec
+automatically pairs with SQLite provider identity and may be placed explicitly with the standard
+`ConnectionStrings:SqliteVec` or `Koan:Data:SqliteVec:ConnectionString` keys. Multiple vector providers still require
+the existing `[VectorAdapter]` or Vector default-provider decision; no new registration call or application service is
+introduced.
+
+**Guarantee/correction:** the provider chosen by `VectorService` owns the operation; local repositories consume that
+selected factory and the centrally folded source/partition name without re-election or private naming rules. An
+available but unused sqlite-vec package is connection-free and non-critical; once selected, its exact routed database
+is a readiness dependency and failures identify the source. In-memory is ephemeral and process-local. sqlite-vec is
+durable on the three embedded native RIDs only, supports pure kNN but not metadata-filtered scoped reads, and therefore
+continues to fail closed for tenant/Shared search rather than implying isolation it cannot execute.
+
+**Complete intent surface:** provider reference; `AddKoan()`; Entity vector/AI calls; optional provider pin; optional
+exact sqlite-vec connection; distance metric; ambient partition and Database source routing; startup projection;
+selection-aware readiness; native RID support; persistence and filter limitations. Vector Top-K remains the caller's
+nearest-neighbour bound, not adapter pagination. Test reset controls and native extraction mechanics are not
+application concepts.
+
+**Public concepts:** the Entity ring expresses business intent; Vector owns election, source participation, naming,
+isolation decoration, and repository lifetime; in-memory expresses the ephemeral managed guarantee; sqlite-vec
+expresses embedded durability. SQLite row storage and sqlite-vec vector storage are independent providers that can
+share a file, not one merged data abstraction.
+
+**Docs read:** the root README and architecture principles establish reference-as-intent, meaningful small steps,
+local-first defaults, inspectability, and provider negotiation. The Vector README/TECHNICAL and vector reference card
+name in-memory as the zero-infrastructure floor and GardenCoop C2 as the local ONNX/sqlite-vec step. Neither local
+provider owns a README or TECHNICAL companion today. sqlite-vec package prose overstates automatic row/vector
+co-location and NativeAOT support relative to current proof; the in-memory floor claim is not represented by
+`IsAutomaticFloor` in code.
+
+**Code read:** `VectorProviderCatalog` selects direct references first and otherwise only candidates declaring
+`IsAutomaticFloor`; JSON is the existing honest floor pattern. `VectorService` memoizes provider/source selection and
+participation. `VectorAdapterNaming` is the shared selected-factory name fold. Both local repositories currently bypass
+it: in-memory prefixes source manually and sqlite-vec omits source from table naming while routing database files
+separately. `AdapterConnectionResolver` is the shared source-ownership-aware placement mechanism. sqlite-vec currently
+resolves placement only in its factory, reports a different raw default at boot, and has no participation health;
+`VectorAdapterHealthContributorBase` is the established selection-aware readiness pattern. Both provider projects
+reference Vector abstractions but not the functional Vector runtime, unlike the network and search-engine providers.
+`InMemoryVectorAdapterFactory.ClearAll` is public solely for test reset. `Vec0Native` embeds v0.1.9 for win-x64,
+linux-x64, and linux-arm64 and fails explicitly elsewhere; extraction currently trusts any same-length cached file.
+
+**Constants/options/DTO inventory:** in-memory has no options, DTOs, or stable constants. sqlite-vec has one public
+`SqliteVecOptions`, one public section constant, and one private native version constant; it has no request/response
+DTOs. Stable provider aliases, section/connection keys, native version/RIDs, and store defaults need one internal
+project vocabulary owner. The typed options remain the complete application configuration surface; no new public DTO
+or module contract is justified.
+
+**Reusing:** `VectorProviderCatalog`, `VectorService`, `IVectorAdapterParticipation`,
+`VectorAdapterHealthContributorBase`, selected-provider `VectorAdapterNaming`, `AdapterConnectionResolver`,
+`DataSourceRegistry`, standard .NET options/configuration/DI, Core redaction and startup provenance, the shared vector
+AODB ledger, explicit native bootstrap, and GardenCoop C2 golden proof.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| sqlite-vec route decision | `src/Connectors/Data/Vector/SqliteVec/SqliteVecRoute.cs` | Factory, health, and startup projection require one side-effect-free, source-aware placement owner; three independent reads would recreate distributed policy. |
+| sqlite-vec health contributor | `src/Connectors/Data/Vector/SqliteVec/SqliteVecHealthContributor.cs` | Embedded storage is still an operational dependency after selection; the existing Vector participation base supplies the correct availability-to-readiness transition. |
+| package companions | each provider's `README.md` and `TECHNICAL.md` | Both public packages currently fail the objective quality contract and lack exact result, placement, limitations, and operator behavior. |
+
+**Coalescence:** make Vector's selected-provider naming the sole local collection identity owner; delete in-memory's
+manual source prefix and sqlite-vec's direct naming call. Make one sqlite-vec route decision feed repository creation,
+health, and boot projection. Remove the public test reset seam and isolate tests by service-provider/factory lifetime.
+Keep two providers and two repositories because ephemeral concurrent managed search and durable serialized native SQL
+have different guarantees and mechanics. Do not move SQLite-specific routing/native loading into general Vector Core.
+
+**Ergonomics:** application C# does not grow. One provider package reference becomes complete; the in-memory reference
+really is the automatic semantic floor, and swapping to sqlite-vec preserves the Entity code. IntelliSense loses a
+test-only reset method. Operators see the same effective de-identified route in boot facts and readiness, and an unused
+embedded provider does not create a file or fail the app. Module authors reuse existing Vector election,
+participation, naming, and health seams rather than inventing local counterparts.
+
+**Constraints satisfied:** Entity remains the business surface; no HTTP/controller or application abstraction is
+added; provider/source/isolation decisions remain in their existing DDD owners; stable local vocabulary is centralized;
+route resolution is side-effect free and native/database I/O remains repository/health-owned; README/TECHNICAL,
+current public guidance, focused conformance, package evidence, and generated truth move together; ADRs remain dated
+and untouched; no release certification suite runs before R11-07.
+
+**Risks:** adding the functional Vector dependency intentionally changes package composition; sqlite-vec native loading
+must remain lazy until selection; sharing the SQLite default must not steal a source explicitly owned by another data
+provider; source and partition isolation must remain behaviorally identical; native extraction hardening must be
+bounded and cross-process safe; unsupported RIDs and metadata filters must be stated rather than hidden. Maturity will
+not be promoted beyond focused evidence observed in this slice.
+
+### Local vector provider-family evidence
+
+- Both provider packages now bring the functional Vector runtime they implement. Their inspected nupkgs declare the
+  `Sylin.Koan.Data.Vector` dependency and contain the provider DLL/XML, build-transitive composition metadata,
+  package-owned README, and canonical icon. Current NuGet audit reports no known vulnerable direct or transitive
+  packages for either provider.
+- In-memory declares `IsAutomaticFloor = true` at priority -100, consumes the provider already selected by Vector for
+  naming, and no longer publishes a process-wide test-reset method. A fresh service-provider lifetime is the reset
+  boundary. Its complete provider matrix passes 34/34, including the explicit automatic-floor contract.
+- sqlite-vec has one side-effect-free route owner for repository creation, readiness, and boot projection. Exact
+  sqlite-vec placement wins; otherwise it pairs with SQLite placement and finally the shared local
+  `.koan/data/Koan.sqlite` fallback. Repository and health own directory/database/native effects. The new participation
+  cell proves no file and non-critical `Unknown` before use, then paired persistence, critical healthy readiness,
+  embedded vec0 loading, and embedding retrieval after selection. Its full focused AODB/participation project passes
+  5/5.
+- Both local repositories use Vector's selected-provider partition/source name fold rather than maintaining adapter
+  naming rules or re-entering provider election. sqlite-vec keeps its honest no-filter boundary, so tenant/Shared reads
+  still fail closed; the existing AODB isolation ledger remains green.
+- GardenCoop C2 no longer repeats SQLite placement under a second sqlite-vec key. Its wider golden test currently stops
+  before the vector story because transitive Storage activation eagerly requires an unused profile; that independent
+  layered-activation defect is preserved as PMC-033 rather than hidden with sample-only configuration. The sqlite-vec
+  pairing/first-use behavior itself is proved in the provider-owned host.
+- Native extraction now validates the embedded payload hash and repairs through a unique temporary file before atomic
+  placement. Public/package prose limits support to the actually embedded win-x64, linux-x64, and linux-arm64 assets and
+  removes the unproved NativeAOT claim.
+- Both packages are structurally ready with no objective quality findings. Generated truth contains 111 packages: 24
+  repair-required, 42 review-required, and 45 structurally ready across 19 claims. Public documentation truth passes
+  across 208 current files and 38 navigation targets.
+
+The local vector provider family passes this R11-05 slice. No release candidate, full certification run, package feed,
+or remote state was created; the complete release ratchet remains the single R11-07 boundary.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

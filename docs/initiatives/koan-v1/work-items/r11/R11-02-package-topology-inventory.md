@@ -116,10 +116,10 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Data.SoftDelete` | `capability` | `assess` |
 | `Sylin.Koan.Data.Vector` | `capability` | `keep` |
 | `Sylin.Koan.Data.Vector.Abstractions` | `contracts` | `keep` |
-| `Sylin.Koan.Data.Vector.Connector.InMemory` | `provider` | `assess` |
+| `Sylin.Koan.Data.Vector.Connector.InMemory` | `provider` | `keep` |
 | `Sylin.Koan.Data.Vector.Connector.Milvus` | `provider` | `assess` |
 | `Sylin.Koan.Data.Vector.Connector.Qdrant` | `provider` | `assess` |
-| `Sylin.Koan.Data.Vector.Connector.SqliteVec` | `provider` | `assess` |
+| `Sylin.Koan.Data.Vector.Connector.SqliteVec` | `provider` | `keep` |
 | `Sylin.Koan.Data.Vector.Connector.Weaviate` | `provider` | `assess` |
 | `Sylin.Koan.Identity` | `capability` | `assess` |
 | `Sylin.Koan.Identity.Credentials` | `capability` | `assess` |

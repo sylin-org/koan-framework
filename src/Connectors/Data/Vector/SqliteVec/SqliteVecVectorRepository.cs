@@ -1,9 +1,9 @@
 using Newtonsoft.Json;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
-using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
+using Koan.Data.Vector.Naming;
 using Microsoft.Data.Sqlite;
 
 namespace Koan.Data.Vector.Connector.SqliteVec;
@@ -22,15 +22,21 @@ internal sealed class SqliteVecVectorRepository<TEntity, TKey>
     private readonly SqliteVecAdapterFactory _factory;
     private readonly IServiceProvider _sp;
     private readonly SqliteVecOptions _options;
+    private readonly string _source;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private readonly HashSet<string> _ensured = new(StringComparer.Ordinal);
     private SqliteConnection? _conn;
 
-    public SqliteVecVectorRepository(SqliteVecAdapterFactory factory, IServiceProvider sp, SqliteVecOptions options)
+    public SqliteVecVectorRepository(
+        SqliteVecAdapterFactory factory,
+        IServiceProvider sp,
+        SqliteVecOptions options,
+        string source)
     {
         _factory = factory;
         _sp = sp;
         _options = options;
+        _source = source;
     }
 
     public void Describe(ICapabilities caps) => caps
@@ -43,6 +49,7 @@ internal sealed class SqliteVecVectorRepository<TEntity, TKey>
     private SqliteConnection Connection()
     {
         if (_conn is not null) return _conn;
+        SqliteVecRoute.PrepareFileSystem(_options.ConnectionString);
         var conn = new SqliteConnection(_options.ConnectionString);
         conn.Open();
         Vec0Native.Load(conn);
@@ -52,8 +59,7 @@ internal sealed class SqliteVecVectorRepository<TEntity, TKey>
 
     private string Table()
     {
-        var partition = Koan.Data.Core.EntityContext.Current?.Partition;
-        var name = ((INamingProvider)_factory).ResolveStorage(typeof(TEntity), partition, _sp);
+        var name = VectorAdapterNaming.GetOrCompute<TEntity>(_sp, _factory, _source);
         return "vec_" + Sanitize(name);
     }
 
@@ -68,11 +74,13 @@ internal sealed class SqliteVecVectorRepository<TEntity, TKey>
         _ensured.Add(table);
     }
 
-    private string Metric() => _options.DistanceMetric.ToLowerInvariant() switch
+    private string Metric() => _options.DistanceMetric.Trim().ToLowerInvariant() switch
     {
         "l2" => "L2",
         "l1" => "L1",
-        _ => "cosine",
+        "cosine" => "cosine",
+        _ => throw new InvalidOperationException(
+            $"Unsupported sqlite-vec distance metric '{_options.DistanceMetric}'. Use cosine, l2, or l1."),
     };
 
     public async Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)

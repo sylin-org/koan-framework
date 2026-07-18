@@ -6,9 +6,9 @@ using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
-using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
+using Koan.Data.Vector.Naming;
 
 namespace Koan.Data.Vector.Connector.InMemory;
 
@@ -56,11 +56,7 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey>
 
     private ConcurrentDictionary<string, (float[] Embedding, object? Metadata)> Bucket()
     {
-        var partition = Koan.Data.Core.EntityContext.Current?.Partition;
-        var storage = ((INamingProvider)_factory).ResolveStorage(typeof(TEntity), partition, _sp);
-        // ARCH-0103 P1 (Moniker): the routed source prefixes the store key — Database-mode isolation by source,
-        // orthogonal to partition (Container) and the metadata read-filter (Shared). Off-axis source is "Default".
-        var bucketKey = _source + "::" + storage;
+        var bucketKey = VectorAdapterNaming.GetOrCompute<TEntity>(_sp, _factory, _source);
         return _stores.GetOrAdd(bucketKey, _ => new ConcurrentDictionary<string, (float[], object?)>(StringComparer.Ordinal));
     }
 

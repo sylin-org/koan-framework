@@ -44,7 +44,6 @@ public sealed class GardenCoopC02Fixture : IAsyncLifetime
                     ["Koan:Environment"] = "Development",
                     ["Koan:BackgroundServices:Enabled"] = "false",
                     ["Koan:Data:Sqlite:ConnectionString"] = $"Data Source={database}",
-                    ["Koan:Data:SqliteVec:ConnectionString"] = $"Data Source={database}",
                     ["Koan:Ai:Onnx:ModelPath"] = "models/model_quantized.onnx",
                     ["Koan:Ai:Onnx:ModelName"] = "all-MiniLM-L6-v2",
                     ["Logging:LogLevel:Default"] = "Warning"

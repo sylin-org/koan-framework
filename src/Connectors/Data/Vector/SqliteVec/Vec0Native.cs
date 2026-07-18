@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
 
 namespace Koan.Data.Vector.Connector.SqliteVec;
@@ -6,12 +7,11 @@ namespace Koan.Data.Vector.Connector.SqliteVec;
 /// <summary>
 /// Resolves and loads the embedded sqlite-vec <c>vec0</c> native extension. The binary for the current
 /// floor RID is carried as an assembly resource and self-extracted to a per-version temp dir on first use,
-/// so it travels inside a single-file / NativeAOT publish and needs no NuGet RID-asset plumbing (the exact
-/// fragility the survey flagged). Floor RIDs only: win-x64, linux-x64, linux-arm64 — anything else fails loud.
+/// so it travels as an assembly resource and needs no NuGet RID-asset plumbing. Floor RIDs only:
+/// win-x64, linux-x64, linux-arm64 — anything else fails loud.
 /// </summary>
 internal static class Vec0Native
 {
-    private const string Version = "0.1.9";
     private static readonly object Gate = new();
     private static string? _extracted;
 
@@ -36,25 +36,59 @@ internal static class Vec0Native
             using var stream = asm.GetManifestResourceStream($"vec0.{rid}")
                 ?? throw new PlatformNotSupportedException(
                     $"sqlite-vec native binary is not bundled for RID '{rid}'. Floor RIDs: win-x64, linux-x64, linux-arm64.");
-            var dir = Path.Combine(Path.GetTempPath(), $"koan-sqlite-vec-{Version}", rid);
+            using var payload = new MemoryStream();
+            stream.CopyTo(payload);
+            var bytes = payload.ToArray();
+            var expectedHash = SHA256.HashData(bytes);
+
+            var dir = Path.Combine(
+                Path.GetTempPath(),
+                $"koan-sqlite-vec-{Infrastructure.Constants.Native.Version}",
+                rid);
             Directory.CreateDirectory(dir);
             var path = Path.Combine(dir, file);
-            if (!File.Exists(path) || new FileInfo(path).Length != stream.Length)
+            if (!HasHash(path, expectedHash))
             {
-                using var fs = File.Create(path);
-                stream.CopyTo(fs);
+                var temporary = Path.Combine(dir, $".{file}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp");
+                try
+                {
+                    File.WriteAllBytes(temporary, bytes);
+                    File.Move(temporary, path, overwrite: true);
+                }
+                catch (IOException) when (HasHash(path, expectedHash))
+                {
+                    // Another process completed the same versioned extraction first.
+                }
+                finally
+                {
+                    if (File.Exists(temporary)) File.Delete(temporary);
+                }
             }
             _extracted = path;
             return path;
         }
     }
 
+    private static bool HasHash(string path, byte[] expected)
+    {
+        if (!File.Exists(path)) return false;
+        try
+        {
+            using var file = File.OpenRead(path);
+            return CryptographicOperations.FixedTimeEquals(SHA256.HashData(file), expected);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
     private static (string Rid, string File) Resolve()
     {
         var arm = RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
-        if (OperatingSystem.IsWindows()) return (arm ? "win-arm64" : "win-x64", "vec0.dll");
+        if (OperatingSystem.IsWindows() && !arm) return ("win-x64", "vec0.dll");
         if (OperatingSystem.IsLinux()) return (arm ? "linux-arm64" : "linux-x64", "vec0.so");
-        if (OperatingSystem.IsMacOS()) return (arm ? "osx-arm64" : "osx-x64", "vec0.dylib");
-        throw new PlatformNotSupportedException("Unsupported OS for sqlite-vec.");
+        throw new PlatformNotSupportedException(
+            $"sqlite-vec native binary is not bundled for this platform. Supported RIDs: {string.Join(", ", Infrastructure.Constants.Native.SupportedRids)}.");
     }
 }

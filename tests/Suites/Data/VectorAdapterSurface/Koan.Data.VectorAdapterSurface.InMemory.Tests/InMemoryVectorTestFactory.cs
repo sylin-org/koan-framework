@@ -16,7 +16,7 @@ namespace Koan.Data.VectorAdapterSurface.InMemory.Tests;
 /// </summary>
 public sealed class InMemoryVectorTestFactory : IVectorAdapterTestFactory
 {
-    private readonly InMemoryVectorAdapterFactory _adapter = new();
+    private InMemoryVectorAdapterFactory _adapter = new();
     private ServiceProvider? _sp;
 
     public bool IsAvailable => true;
@@ -66,11 +66,10 @@ public sealed class InMemoryVectorTestFactory : IVectorAdapterTestFactory
 
     public Task ResetAsync(CancellationToken ct = default)
     {
-        // InMemory only needs to clear data — the adapter has no schema/index cache to invalidate.
-        // The data matrix InMemoryAdapterFactory pattern of setting AppHost.Current = Services
-        // gives a global fallback for AsyncLocal-flow gaps; we do the same.
+        _sp?.Dispose();
+        _sp = null;
+        _adapter = new InMemoryVectorAdapterFactory();
         Koan.Core.Hosting.App.AppHost.Current = Services;
-        _adapter.ClearAll();
         return Task.CompletedTask;
     }
 }

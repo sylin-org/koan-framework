@@ -3,12 +3,12 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 111,
-    "repairRequired": 26,
+    "repairRequired": 24,
     "reviewRequired": 42,
-    "structurallyReady": 43,
-    "ownedReadmes": 85,
-    "technicalCompanions": 75,
-    "findings": 173
+    "structurallyReady": 45,
+    "ownedReadmes": 87,
+    "technicalCompanions": 77,
+    "findings": 169
   },
   "findingDefinitions": [
     {
@@ -1219,7 +1219,7 @@
       "projectPath": "src/Connectors/Data/Vector/InMemory/Koan.Data.Vector.Connector.InMemory.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "repair-required",
+      "status": "structurally-ready",
       "description": "In-process, in-memory vector adapter for Koan: brute-force cosine k-NN over System.Numerics.Tensors (SIMD). The zero-infrastructure vector floor for single-binary deployments and the cross-adapter convergence oracle. Pure managed, no native dependencies, NativeAOT-friendly.",
       "targetFrameworks": [
         "net10.0"
@@ -1228,15 +1228,13 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Vector",
         "Sylin.Koan.Data.Vector.Abstractions"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Connectors/Data/Vector/InMemory/README.md",
+      "technicalDocumentation": "src/Connectors/Data/Vector/InMemory/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Milvus",
@@ -1292,8 +1290,8 @@
       "projectPath": "src/Connectors/Data/Vector/SqliteVec/Koan.Data.Vector.Connector.SqliteVec.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "repair-required",
-      "description": "Durable in-process vector adapter for Koan over sqlite-vec (asg017 vec0 v0.1.9) as a loadable SQLite extension. One .db file holds rows and vectors; k-NN runs in-process with no server. The native vec0 for win-x64/linux-x64/linux-arm64 ships embedded in the assembly and self-extracts at load \u2014 single-file / NativeAOT friendly.",
+      "status": "structurally-ready",
+      "description": "Durable in-process vector adapter for Koan over sqlite-vec (asg017 vec0 v0.1.9) as a loadable SQLite extension. It can share SQLite\u0027s local database while k-NN runs in-process with no server. Native vec0 binaries for win-x64/linux-x64/linux-arm64 ship embedded and extract on first use.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1301,15 +1299,13 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Vector",
         "Sylin.Koan.Data.Vector.Abstractions"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Connectors/Data/Vector/SqliteVec/README.md",
+      "technicalDocumentation": "src/Connectors/Data/Vector/SqliteVec/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Weaviate",

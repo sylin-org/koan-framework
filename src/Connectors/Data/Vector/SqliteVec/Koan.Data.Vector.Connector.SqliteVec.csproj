@@ -5,12 +5,13 @@
     <Nullable>enable</Nullable>
     <AssemblyName>Koan.Data.Vector.Connector.SqliteVec</AssemblyName>
     <RootNamespace>Koan.Data.Vector.Connector.SqliteVec</RootNamespace>
-    <Description>Durable in-process vector adapter for Koan over sqlite-vec (asg017 vec0 v0.1.9) as a loadable SQLite extension. One .db file holds rows and vectors; k-NN runs in-process with no server. The native vec0 for win-x64/linux-x64/linux-arm64 ships embedded in the assembly and self-extracts at load — single-file / NativeAOT friendly.</Description>
+    <Description>Durable in-process vector adapter for Koan over sqlite-vec (asg017 vec0 v0.1.9) as a loadable SQLite extension. It can share SQLite's local database while k-NN runs in-process with no server. Native vec0 binaries for win-x64/linux-x64/linux-arm64 ship embedded and extract on first use.</Description>
     <PackageTags>$(CommonPackageTags);data;vector;sqlite;sqlite-vec;knn;embedded;inproc;durable</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>

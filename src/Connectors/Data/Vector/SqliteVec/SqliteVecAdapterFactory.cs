@@ -18,8 +18,8 @@ namespace Koan.Data.Vector.Connector.SqliteVec;
 [ProviderPriority(40)]
 public sealed class SqliteVecAdapterFactory : IVectorAdapterFactory
 {
-    public string Provider => "sqlitevec";
-    public IReadOnlyCollection<string> Aliases => ["sqlite", "sqlite-vec"];
+    public string Provider => Infrastructure.Constants.Provider.Name;
+    public IReadOnlyCollection<string> Aliases => Infrastructure.Constants.Provider.Aliases;
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)
         => new()
@@ -36,16 +36,15 @@ public sealed class SqliteVecAdapterFactory : IVectorAdapterFactory
     {
         var baseOpts = sp.GetService<IOptions<SqliteVecOptions>>()?.Value ?? new SqliteVecOptions();
 
-        // ARCH-0103 P1 (Moniker): a distinct .db file per routed source, via the SHARED AdapterConnectionResolver the
-        // record plane uses (reuse, not a bespoke per-source rule — [[no-stopgaps]]). The Default keeps the configured
-        // ConnectionString (byte-identical to the pre-P1 single-file path); a non-Default source whose connection relies
-        // on discovery and resolves to "auto" collapses onto it rather than keying a .db file on the sentinel (P5 hoist).
         var config = sp.GetRequiredService<IConfiguration>();
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
-        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "SqliteVec", source, baseOpts.ConnectionString, this);
+        var route = SqliteVecRoute.Resolve(config, sourceRegistry, baseOpts, this, source);
 
-        var sourceOpts = new SqliteVecOptions { ConnectionString = connectionString, DistanceMetric = baseOpts.DistanceMetric };
-        return new SqliteVecVectorRepository<TEntity, TKey>(this, sp, sourceOpts);
+        var sourceOpts = new SqliteVecOptions
+        {
+            ConnectionString = route.ConnectionString,
+            DistanceMetric = baseOpts.DistanceMetric
+        };
+        return new SqliteVecVectorRepository<TEntity, TKey>(this, sp, sourceOpts, source);
     }
 }

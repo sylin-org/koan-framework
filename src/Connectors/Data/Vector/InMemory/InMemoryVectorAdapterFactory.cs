@@ -8,8 +8,8 @@ namespace Koan.Data.Vector.Connector.InMemory;
 
 /// <summary>
 /// In-process, in-memory <see cref="IVectorAdapterFactory"/> — the zero-infrastructure vector floor.
-/// Issues per-(entity, partition) <see cref="InMemoryVectorRepository{TEntity, TKey}"/> stores keyed by
-/// the adapter's own <see cref="INamingProvider.ResolveStorage"/> output, so partition isolation works
+/// Issues per-(entity, partition, source) <see cref="InMemoryVectorRepository{TEntity, TKey}"/> stores keyed by
+/// Vector's selected-provider naming output, so physical isolation works
 /// with no external infrastructure. Reference = Intent: referencing this package makes a single managed
 /// binary capable of semantic search (k-NN over <see cref="System.Numerics.Tensors.TensorPrimitives"/>).
 /// </summary>
@@ -27,6 +27,7 @@ public sealed class InMemoryVectorAdapterFactory : IVectorAdapterFactory
 
     public string Provider => "inmemory";
     public IReadOnlyCollection<string> Aliases => ["memory", "inproc"];
+    public bool IsAutomaticFloor => true;
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)
         => new()
@@ -44,6 +45,4 @@ public sealed class InMemoryVectorAdapterFactory : IVectorAdapterFactory
         // embeddings in a distinct in-memory store (native-or-emulated: the emulation is a source-keyed dictionary).
         => new InMemoryVectorRepository<TEntity, TKey>(this, sp, _stores, source);
 
-    /// <summary>Clears every per-(entity, partition) store this factory has issued (in-memory reset).</summary>
-    public void ClearAll() => _stores.Clear();
 }

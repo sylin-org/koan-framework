@@ -110,6 +110,15 @@
       "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.ElasticSearch.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.OpenSearch.Tests", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
     },
     {
+      "id": "local-vector-providers",
+      "title": "Local in-memory and sqlite-vec vector providers",
+      "summary": "In-memory supplies Koan's automatic ephemeral semantic floor while sqlite-vec preserves the same Entity intent with embedded durability, SQLite placement pairing, selected-provider naming, and participation-owned readiness within stated limits.",
+      "maturity": "demonstrated",
+      "packages": ["Sylin.Koan.Data.Vector.Connector.InMemory", "Sylin.Koan.Data.Vector.Connector.SqliteVec"],
+      "documentation": ["src/Connectors/Data/Vector/InMemory/README.md", "src/Connectors/Data/Vector/SqliteVec/README.md", "docs/reference/cards/vector.md"],
+      "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.InMemory.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.SqliteVec.Tests", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
+    },
+    {
       "id": "mcp-agent-surface",
       "title": "MCP and agent-facing surfaces",
       "summary": "Koan exposes application tools and self-description to coding and runtime agents through MCP.",

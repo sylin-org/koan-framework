@@ -4,12 +4,12 @@ domain: framework
 title: "Koan V1 Reorganization Current Handoff"
 audience: [maintainers, ai-agents]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-18
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-17
+  date_last_tested: 2026-07-18
   status: in-progress
-  scope: R11-05 through search-engine vector provider-family graduation and caller-owned pagination
+  scope: R11-05 through local vector provider-family graduation and caller-owned pagination
 ---
 
 # Koan V1 reorganization current handoff
@@ -152,11 +152,15 @@ Replace this file at every handoff. It is a restart point, not a diary.
   mechanics; Elasticsearch and OpenSearch retain their independent provider identities and native kNN dialects.
   Each real-container matrix passes 29 with 4 honest capability skips; each AODB path passes 4/4, including exact
   Endpoint binding and connection-free unused health. The unrelated stale test-project reference is PMC-032.
+- The local vector provider family now passes. InMemory is a real priority -100 automatic floor and sqlite-vec is the
+  embedded durable step up; both provider references bring Vector, both consume selected-provider naming, and
+  sqlite-vec owns one route decision across construction, health, and boot reporting. InMemory passes 34/34 and
+  sqlite-vec 5/5. GardenCoop's unrelated eager Storage activation is retained as PMC-033.
 - Data pagination is now caller-owned end to end. `All()` means the complete visible set; adapters have no row-page
   default and append paging only for explicit shaping. SQLite, PostgreSQL/shared Npgsql, and SQL Server regressions each
   prove 75 unpaged rows versus an explicitly requested page of 7.
-- Current generated truth contains 111 packages: 26 repair-required, 42 review-required, 43 structurally ready across
-  18 claims.
+- Current generated truth contains 111 packages: 24 repair-required, 42 review-required, 45 structurally ready across
+  19 claims.
   Redis Cache 6/6 and Redis Data 12/12 pass; seven affected packages and their dependency boundaries were inspected,
   and the three new packages have no known vulnerable direct or transitive packages. Earlier Storage evidence remains
   green. Seven relational packages also inspect cleanly, with clear current vulnerability checks for the two new
