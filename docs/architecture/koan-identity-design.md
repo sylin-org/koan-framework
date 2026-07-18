@@ -1,6 +1,10 @@
 # Koan.Identity — design & capability plan
 
-> **Graduated to [SEC-0007](../decisions/SEC-0007-koan-identity-module.md) (Accepted — planned, 2026-06-27).** That ADR is the authoritative, operational, composition-ordered build spec. This document remains the longer-form capability/data-model/pain→delight reference the ADR points back to.
+> **Historical design input only.** This draft and its accepted [SEC-0007](../decisions/SEC-0007-koan-identity-module.md)
+> ADR preserve the decisions considered in June 2026; neither is current product truth. The supported surface is
+> described by [Identity's package contract](../../src/Koan.Identity/README.md), the
+> [generated product surface](../reference/product-surface.md), and [PMC-034](../initiatives/koan-v1/POST-CYCLE-TODO.md)
+> records why the partial local-password/MFA implementation was retired before V1.
 
 - Status: **Superseded by SEC-0007** (Draft 2026-06-26; graduated 2026-06-27)
 - Scope: a new framework module `Koan.Identity` (+ `Koan.Identity.Web`) that owns the **person** (the durable identity), its **management/self-service surfaces**, and the **day-2 access primitives** — composing with the existing auth, authz, trust, and tenancy pillars rather than duplicating them.

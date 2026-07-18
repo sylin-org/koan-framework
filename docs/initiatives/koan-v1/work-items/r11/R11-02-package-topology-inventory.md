@@ -115,9 +115,9 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Data.Vector.Connector.SqliteVec` | `provider` | `keep` |
 | `Sylin.Koan.Data.Vector.Connector.Weaviate` | `provider` | `keep` |
 | `Sylin.Koan.Identity` | `capability` | `keep` |
-| `Sylin.Koan.Identity.Credentials` | `capability` | `assess` |
-| `Sylin.Koan.Identity.Mfa` | `capability` | `assess` |
-| `Sylin.Koan.Identity.Passwords` | `capability` | `assess` |
+| `Sylin.Koan.Identity.Credentials` | `capability` | `retire` (implemented) |
+| `Sylin.Koan.Identity.Mfa` | `capability` | `retire` (implemented) |
+| `Sylin.Koan.Identity.Passwords` | `capability` | `retire` (implemented) |
 | `Sylin.Koan.Identity.Tenancy` | `capability` | `assess` |
 | `Sylin.Koan.Identity.Web` | `projection` | `keep` |
 | `Sylin.Koan.Jobs` | `capability` | `assess` |

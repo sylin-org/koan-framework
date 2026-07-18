@@ -342,19 +342,19 @@ not itself promote a product claim: compatibility boundaries remain pre-V1 work.
 
 ### Authentication and authorization
 
-- **Outcome and shortest path:** reference the relevant identity/auth module and express access through
-  policies, roles, credentials, or identity extensions rather than application-owned protocol glue.
+- **Outcome and shortest path:** reference Web Auth plus a provider and optionally durable Identity; express access
+  through standard policies and roles rather than application-owned protocol glue.
 - **Entry point and owner:** [`Koan.Identity`](../../../src/Koan.Identity/Koan.Identity.csproj),
   [`Koan.Identity.Web`](../../../src/Koan.Identity.Web/Koan.Identity.Web.csproj), and web auth packages.
 - **Executable evidence:** [identity integration](../../../tests/Suites/Integration/Identity/Koan.Identity.Tests/Koan.Identity.Tests.csproj)
-  passes 113/113. Current OIDC integration tests exercise the maintained ASP.NET handler path rather
+  passes 91/91. Current OIDC integration tests exercise the maintained ASP.NET handler path rather
   than the obsolete placeholder callback.
-- **Inspection and failure:** audit, effective-access explanation, sessions, impersonation, tenancy,
-  MFA, and credential primitives exist. Security posture depends on which optional modules and host
-  policies are selected.
-- **Unsupported / compatibility:** no claim is made for every external provider, production key
-  management, federation topology, regulatory posture, or secure deployment without operator-owned
-  configuration.
+- **Inspection and failure:** audit, effective-access explanation, enforceable cookie sessions, impersonation, and
+  optional tenancy integration exist. Security posture depends on the selected provider and host policies.
+- **Unsupported / compatibility:** local passwords, MFA, recovery, and step-up are not V1 capabilities; their partial
+  packages were retired pending one complete Web Auth-owned ceremony (PMC-034). No claim is made for every external
+  provider, production key management, federation topology, regulatory posture, or secure deployment without
+  operator-owned configuration.
 - **Open risks:** document secure responsibility boundaries and create external-provider smoke lanes
   before `supported-extension` language.
 

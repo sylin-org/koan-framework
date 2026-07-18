@@ -272,23 +272,8 @@
 
 ### Koan.Identity
 - Depends on: Koan.Core, Koan.Data.Core, Koan.Web, Koan.Web.Auth.Abstractions
-- Depended by: Koan.Identity.Credentials, Koan.Identity.Tenancy, Koan.Identity.Web
-- Documentation: README ❌ · TECHNICAL ❌
-
-### Koan.Identity.Credentials
-- Depends on: Koan.Identity
-- Depended by: Koan.Identity.Mfa, Koan.Identity.Passwords
-- Documentation: README ❌ · TECHNICAL ❌
-
-### Koan.Identity.Mfa
-- Depends on: Koan.Identity.Credentials
-- Depended by: –
-- Documentation: README ❌ · TECHNICAL ❌
-
-### Koan.Identity.Passwords
-- Depends on: Koan.Identity.Credentials
-- Depended by: –
-- Documentation: README ❌ · TECHNICAL ❌
+- Depended by: Koan.Identity.Tenancy, Koan.Identity.Web
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Identity.Tenancy
 - Depends on: Koan.Identity, Koan.Tenancy, Koan.Web

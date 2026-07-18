@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 105,
-    "repairRequired": 13,
+    "packages": 102,
+    "repairRequired": 10,
     "reviewRequired": 21,
     "structurallyReady": 71,
     "ownedReadmes": 92,
     "technicalCompanions": 87,
-    "findings": 91
+    "findings": 85
   },
   "findingDefinitions": [
     {
@@ -1255,69 +1255,6 @@
       "technicalDocumentation": "src/Koan.Identity/TECHNICAL.md",
       "packageIcon": "icon.png",
       "findings": []
-    },
-    {
-      "packageId": "Sylin.Koan.Identity.Credentials",
-      "projectPath": "src/Koan.Identity.Credentials/Koan.Identity.Credentials.csproj",
-      "shape": "library",
-      "role": "capability",
-      "status": "repair-required",
-      "description": "SEC-0007 P3 group 4 \u2014 the shared base for the opt-in account-security factor family. Owns the framework-native 2-phase (interrupted \u2192 resume) step-up sign-in seam \u002B amr/acr claims, the IPasswordHasher abstraction, and the Security Checkup contributor-pipeline read-model. Off by default (Reference = Intent); the factor packages (Koan.Identity.Passwords / .Mfa / .Passkeys) build on it.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Identity"
-      ],
-      "readme": null,
-      "technicalDocumentation": null,
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
-    },
-    {
-      "packageId": "Sylin.Koan.Identity.Mfa",
-      "projectPath": "src/Koan.Identity.Mfa/Koan.Identity.Mfa.csproj",
-      "shape": "library",
-      "role": "capability",
-      "status": "repair-required",
-      "description": "SEC-0007 P3 group 4 \u2014 the optional MFA factor (off by default, D4): TOTP authenticator enrollment (Otp.NET) with the shared secret encrypted at rest (IDataProtector), pre-provisioned hashed single-use recovery codes, the step-up requirement that makes the 2-phase sign-in interrupt, and the MFA/recovery Security Checkup nudges. Reference = Intent.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Identity.Credentials"
-      ],
-      "readme": null,
-      "technicalDocumentation": null,
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
-    },
-    {
-      "packageId": "Sylin.Koan.Identity.Passwords",
-      "projectPath": "src/Koan.Identity.Passwords/Koan.Identity.Passwords.csproj",
-      "shape": "library",
-      "role": "capability",
-      "status": "repair-required",
-      "description": "SEC-0007 P3 group 4 \u2014 the optional local-password factor (off by default, D4). A LocalCredential Entity\u003CT\u003E stores a PORTABLE BCrypt PHC/MCF hash (D2 \u2014 no bespoke auth-storage adapter), verify with upgrade-on-verify rehash, and a Security Checkup contributor. Reference = Intent.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Identity.Credentials"
-      ],
-      "readme": null,
-      "technicalDocumentation": null,
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
     },
     {
       "packageId": "Sylin.Koan.Identity.Tenancy",

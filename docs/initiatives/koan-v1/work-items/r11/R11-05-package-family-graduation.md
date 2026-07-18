@@ -2628,6 +2628,110 @@ This cut makes the developer promise smaller and stronger: sign-in becomes a dur
 sessions and standard roles; the optional Web reference exposes management APIs. Security-shaped concepts that did
 not participate in security are gone rather than documented as future magic.
 
+### Account-security factor family discovery
+
+**Task:** Decide whether Credentials, Passwords, and MFA are complete, distinct V1 package capabilities, then either
+graduate their supported path or remove the incomplete product surface.
+
+**Application intent:** Reference a local-password and/or MFA capability, keep `AddKoan()` as the only bootstrap, and
+receive a complete sign-in ceremony: primary proof, an honest step-up continuation when required, factor verification,
+and a normal enforceable Koan session.
+
+**Public expression:** No honest complete expression exists today. `Sylin.Koan.Identity.Passwords` exposes
+`PasswordCredentialService.SetPasswordAsync/VerifyAsync`; `Sylin.Koan.Identity.Mfa` exposes TOTP and recovery-code
+services; `Sylin.Koan.Identity.Credentials` can reject cookie sign-in and mint a `StepUpTicket`. An application must
+still invent the local-login controller, challenge response, ticket transport, TOTP/recovery controller, resumed
+`SignInAsync`, rate limiting, return handling, and browser security policy. Tests bypass that missing journey by
+manually stamping `amr` claims and redispatching the sign-in lifecycle.
+
+**Guarantee/correction:** V1 must not claim local authentication, two-phase sign-in, or MFA enforcement unless one
+supported application path proves the complete ceremony. The safe correction is to retire the three current packages
+and remove their gate from Identity rather than leave a confirmed enrollment able to abort a real provider callback
+with an exception no production surface translates. Reintroduction requires one Web Auth-owned ceremony engine with
+factor contributors and end-to-end browser/API evidence.
+
+**Complete intent surface:** The desired future common path is references plus existing `AddKoan()`; enrollment and
+policy choices remain explicit business actions. Today the hidden application responsibilities listed above are
+mandatory, so the current surface fails the completeness test.
+
+**Public concepts:** Password hashes, TOTP enrollments, recovery codes, `amr`/`acr`, step-up requirements, and security
+checkup signals each represent legitimate security concepts. They do not survive as V1 public types because their
+composition does not produce a supported authentication result. A future build should expose factor contracts from an
+isolated contracts assembly, keep factor storage/mechanics in opt-in leaves, and let Web Auth alone own the ceremony,
+continuation, cookie issuance, corrective failures, and HTTP security posture.
+
+**Docs read:** `docs/engineering/index.md` requires controller-owned HTTP, Entity-first data, typed options/constants,
+and package companions; `docs/architecture/principles.md` requires one business expression, semantic honesty, standard
+.NET reuse, compile-once composition, and one current path; `SEC-0007` records the dated factor design and remains as
+ADR history; `src/Koan.Identity/README.md` defines the current durable-person/authentication boundary; R11-02 requires
+every package to have distinct reference intent and a meaningful result.
+
+**Code read:** `CredentialsModule`, `StepUpService`, and `StepUpSignInGate` own the split requirement/ticket machinery;
+`PasswordsModule`/`PasswordCredentialService` own portable BCrypt storage and verification but no authentication
+terminal; `MfaModule`, `TotpService`, and `RecoveryCodeService` own real factor mechanics but no challenge terminal;
+`IdentityAuthFlowHandler` invokes gates inside cookie `OnSigningIn`; Web Auth's cookie event converts any rejection to
+an `InvalidOperationException`; the factor specs simulate completion by manufacturing proof claims rather than driving
+a public controller or provider.
+
+**Reusing:** The future rebuild should retain the existing Web Auth dispatcher/cookie owner, standard ASP.NET Core
+`SignInAsync`, controller routing, rate limiting and antiforgery/same-origin posture; Entity-backed factor persistence;
+typed options; provider-independent `amr`/`acr`; and conditional-write capabilities where the selected Data provider
+can make single-use guarantees. No implementation is retained in V1 merely because these individual pieces work.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| Deferred rebuild contract | `docs/initiatives/koan-v1/POST-CYCLE-TODO.md` | Preserve the full ceremony requirement, correct owner, and evidence gate without shipping partial security behavior. |
+
+**Coalescence:** The closest complete pattern is Web Auth's provider challenge/callback/cookie pipeline, not the current
+Identity-side gate. Ceremony state, continuation, corrective response, and session issuance have identical lifecycle
+for external and Koan-managed primary factors, so Web Auth is the one future pillar owner. Factor packages should be
+thin contributors plus storage mechanics; cross-module factor vocabulary must live in an inert contracts package.
+Disposition: delete the present Credentials/Passwords/MFA packages and the now-unused Identity gate. Do not create a
+fourth controller package or preserve `StepUpTicket` as a compatibility shell.
+
+**Ergonomics:** Retirement is less delightful than a complete factor journey, but substantially more responsible than
+making a developer or coding agent discover hidden authentication plumbing after a package reference. It restores one
+honest current sentence: Koan Identity persists and governs a person after authentication; Web Auth and its verified
+connectors establish sign-in. The future factor surface earns re-entry only when references + `AddKoan()` produce the
+whole ceremony and startup/facts explain the selected factors and guarantees.
+
+**Constraints satisfied:** No new HTTP is introduced; existing false/incomplete security paths are removed rather than
+scaffolded; Entity-first behavior remains for supported Identity records; stable identifiers disappear with their
+unsupported owner; ADR history is retained; current docs and generated truth will be updated; only the focused Identity
+family suite will run before the R11-07 release boundary.
+
+**Risks:** This intentionally removes substantial tested mechanics and three package identities before 1.0. Rebuilding
+too soon inside R11 would instead create a security-critical auth product without enough end-to-end, rate-limit,
+CSRF/origin, replay, key-persistence, provider-callback, and restart evidence. The deferred card must make those gates
+explicit so retirement cannot be mistaken for rejecting the capability itself.
+
+### Account-security factor family implementation
+
+Status: `retire implemented` for `Sylin.Koan.Identity.Credentials`, `Sylin.Koan.Identity.Passwords`, and
+`Sylin.Koan.Identity.Mfa`.
+
+- Removed all three package projects and solution/test graph entries. No compatibility shell or forwarding package
+  remains in the greenfield V1 graph.
+- Removed `ISignInGate` and the gate loop from durable Identity. A referenced provider can no longer reach an
+  Identity-owned sign-in rejection that no production challenge/continuation surface translates.
+- Removed the four factor-only spec classes. They proved useful BCrypt/TOTP/recovery mechanics, but their successful
+  continuation manufactured `amr` claims and called the dispatcher directly; they were not executable evidence of a
+  supported application ceremony.
+- Removed stale current claims from Identity package docs, capability truth, module inventory, and `SURFACES.md`.
+  Historical ADRs remain unchanged; the older architecture draft now labels itself historical rather than current
+  product truth.
+- Added PMC-034 with the future owner and full evidence gate: one Web Auth ceremony, inert cross-module contracts,
+  opt-in factor mechanics, real controller/provider round trips, continuation/replay/concurrency, key persistence,
+  lockout/rate limiting, browser security, and matching runtime explanation.
+- The remaining Identity integration family passes 91/91. Generated truth contains 102 packages: 10 repair-required,
+  21 review-required, and 71 structurally ready; all 24 product claims still resolve.
+
+This is architecture coalescence rather than feature denial. Authentication ceremony has one future owner; Identity
+retains only guarantees it currently completes. Developers and agents no longer encounter three polished-looking
+packages whose missing work begins exactly where security becomes application-critical.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

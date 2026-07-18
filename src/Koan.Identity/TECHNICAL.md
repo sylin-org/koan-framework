@@ -6,7 +6,7 @@ Identity owns the durable person, explicit provider links, cookie-session twin, 
 contribution/explanation, identity-domain audit, lifecycle operations, and impersonation primitives. It does not own
 external authentication protocols, OAuth client-token issuance, tenant membership, or HTTP projection.
 
-`SecIdentityModule` registers typed options and host-owned services, discovers access contributors and sign-in gates,
+`SecIdentityModule` registers typed options and host-owned services, discovers access contributors,
 installs lifecycle audit hooks, replaces inert auth-store defaults with Entity-backed implementations, and applies the
 startup posture. Package reference is activation intent; application code retains the ordinary `AddKoan()`.
 
@@ -17,12 +17,11 @@ When functional Web Auth is present, the discovered `IdentityAuthFlowHandler` ru
 1. resolve an explicit `(provider, subject)` link or keep the incoming subject as the canonical person ID;
 2. create the person or backfill only empty display fields;
 3. attach/upgrade email factors without email-based account merging;
-4. run discovered `ISignInGate` implementations before session creation;
-5. project global `IdentityRole` rows as standard role claims;
-6. persist a `Session` and stamp its ID on the cookie principal.
+4. project global `IdentityRole` rows as standard role claims;
+5. persist a `Session` and stamp its ID on the cookie principal.
 
-A gate exception rejects sign-in. Cookie validation rejects a missing/revoked stamped session, an inactive person, or
-an expired/revoked impersonation grant. External identity persistence failures propagate through the Web Auth seam.
+Cookie validation rejects a missing/revoked stamped session, an inactive person, or an expired/revoked impersonation
+grant. External identity persistence failures propagate through the Web Auth seam.
 
 `IUserStore` and `IExternalIdentityStore` contracts live in inert `Sylin.Koan.Web.Auth.Abstractions`; Identity supplies
 their durable implementations without activating functional Web Auth.

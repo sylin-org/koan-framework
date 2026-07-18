@@ -58,8 +58,8 @@ startup. Invalid enum values fail standard .NET options binding.
 ## Add management HTTP APIs
 
 Reference `Sylin.Koan.Identity.Web` to add subject-scoped self-service and role-gated operator APIs. No controller or
-route registration is required. Add `Sylin.Koan.Identity.Tenancy`, Passwords, or MFA only when those separate business
-capabilities are intended.
+route registration is required. Add `Sylin.Koan.Identity.Tenancy` only when tenant membership and request resolution
+are intended.
 
 ## Boundaries
 
