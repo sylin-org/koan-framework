@@ -3,11 +3,9 @@ using System.Security.Claims;
 using Koan.Data.Core;
 using Koan.Security.Trust.Issuer;
 using Koan.Web.Auth.Providers;
+using Koan.Web.Auth.Server.Infrastructure;
 using Koan.Web.Auth.Server.Options;
-using Koan.Web.Hosting;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -21,22 +19,13 @@ namespace Koan.Web.Auth.Server.Protocol;
 /// token). The app owns only page rendering. D4 (bound, single-use, PKCE-mandatory codes), D6 (down-scope; roles
 /// from the session, never the request), D7 (consent hardening: browser-bound rid, anti-forgery, clickjacking).
 /// </summary>
-internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
+internal static class OAuthProtocolEndpoints
 {
     private const string BindingCookiePrefix = "koan.oauth.";
 
-    public void Map(IEndpointRouteBuilder endpoints)
-    {
-        endpoints.MapGet("/oauth/authorize", Authorize).ExcludeFromDescription();
-        endpoints.MapGet("/oauth/request/{rid}", GetRequest).ExcludeFromDescription();
-        endpoints.MapPost("/oauth/request/{rid}/approve", Approve).ExcludeFromDescription();
-        endpoints.MapPost("/oauth/request/{rid}/deny", Deny).ExcludeFromDescription();
-        endpoints.MapPost("/oauth/token", Token).ExcludeFromDescription();
-    }
-
     // ---- GET /oauth/authorize ---------------------------------------------------------------------------
 
-    private static async Task Authorize(HttpContext ctx)
+    internal static async Task Authorize(HttpContext ctx)
     {
         var q = ctx.Request.Query;
         var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
@@ -130,7 +119,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
             HttpOnly = true,
             SameSite = SameSiteMode.Lax,
             Secure = ctx.Request.IsHttps,
-            Path = "/oauth",
+            Path = AuthServerRoutes.OAuthBase,
             MaxAge = options.ConsentRequestLifetime,
         });
 
@@ -139,7 +128,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
 
     // ---- GET /oauth/request/{rid|user_code} (the consent seam — auth-code OR device, unified) ------------
 
-    private static async Task GetRequest(HttpContext ctx, string rid)
+    internal static async Task GetRequest(HttpContext ctx, string rid)
     {
         ApplyAntiFraming(ctx);
         if (await RejectOversizedId(ctx, rid)) return;
@@ -167,7 +156,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
 
     // ---- POST /oauth/request/{rid|user_code}/approve --------------------------------------------------
 
-    private static async Task Approve(HttpContext ctx, string rid)
+    internal static async Task Approve(HttpContext ctx, string rid)
     {
         ApplyAntiFraming(ctx);
         if (await RejectOversizedId(ctx, rid)) return;
@@ -229,7 +218,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
 
     // ---- POST /oauth/request/{rid|user_code}/deny -----------------------------------------------------
 
-    private static async Task Deny(HttpContext ctx, string rid)
+    internal static async Task Deny(HttpContext ctx, string rid)
     {
         ApplyAntiFraming(ctx);
         if (await RejectOversizedId(ctx, rid)) return;
@@ -258,7 +247,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
 
     // ---- POST /oauth/token (authorization_code | device_code grants) ----------------------------------
 
-    private static async Task Token(HttpContext ctx)
+    internal static async Task Token(HttpContext ctx)
     {
         var form = await ctx.Request.ReadFormAsync(ctx.RequestAborted);
         var grant = form["grant_type"].ToString();
@@ -595,7 +584,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
     }
 
     private static void ClearBinding(HttpContext ctx, string rid)
-        => ctx.Response.Cookies.Delete(BindingCookiePrefix + rid, new CookieOptions { Path = "/oauth" });
+        => ctx.Response.Cookies.Delete(BindingCookiePrefix + rid, new CookieOptions { Path = AuthServerRoutes.OAuthBase });
 
     private static void ApplyAntiFraming(HttpContext ctx)
     {

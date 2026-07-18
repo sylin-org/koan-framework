@@ -11,10 +11,12 @@ using Koan.Core.Provenance;
 using Koan.Data.Core;
 using Koan.Security.Trust.Issuer;
 using Koan.Web.Auth.Server.Hosting;
+using Koan.Web.Auth.Server.Controllers;
+using Koan.Web.Auth.Server.Infrastructure;
 using Koan.Web.Auth.Server.Keys;
 using Koan.Web.Auth.Server.Options;
 using Koan.Web.Auth.Server.Protocol;
-using Koan.Web.Hosting;
+using Koan.Web.Extensions;
 
 namespace Koan.Web.Auth.Server;
 
@@ -23,11 +25,6 @@ namespace Koan.Web.Auth.Server;
 /// leaf (Reference = Intent): referencing this package activates the AS. It references <c>Koan.Web.Auth</c>
 /// (cookie session + the chained bearer scheme) and transitively <c>Koan.Security.Trust</c> (the ES256
 /// asymmetric issuer it mints with). A clean downward edge — Trust never references back up.
-/// <para>
-/// Phase 1 maps the dev-token convenience endpoint and installs the production key lifecycle (persisted,
-/// encrypted-at-rest, auto-rotating ES256 keys outside Development; ephemeral in Development). The
-/// authorize/token/device/DCR surface and the consent seam land in later phases.
-/// </para>
 /// </summary>
 public sealed class AuthServerModule : KoanModule
 {
@@ -40,12 +37,8 @@ public sealed class AuthServerModule : KoanModule
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<AuthServerOptions>(AuthServerOptions.SectionPath);
-        // Map /oauth/* inside Koan's single UseEndpoints block (WEB-0069 seam) — no app ceremony.
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanEndpointContributor, DevTokenEndpoint>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanEndpointContributor, Protocol.OAuthProtocolEndpoints>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanEndpointContributor, Protocol.WellKnownEndpoints>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanEndpointContributor, Protocol.DcrEndpoint>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanEndpointContributor, Protocol.DeviceEndpoint>());
+        // One controller owns the complete OAuth HTTP surface; protocol handlers remain transport-thin.
+        services.AddKoanControllersFrom<OAuthServerController>();
         services.TryAddSingleton<Protocol.FixedWindowRateLimiter>();
         services.AddHostedService<Protocol.OAuthArtifactCleanupService>();
 
@@ -115,7 +108,6 @@ public sealed class AuthServerModule : KoanModule
         {
             Id = DevExplorerClientId,
             ClientName = "Koan Dev Explorer",
-            IsPublic = true,    // public client — no secret; PKCE + device consent are the protection
             IsDynamic = false,  // not loopback-constrained, not swept by the dynamic-client GC
             ExpiresUtc = null,  // no expiry (it is re-seeded idempotently on every dev boot)
             CreatedUtc = now,
@@ -126,7 +118,7 @@ public sealed class AuthServerModule : KoanModule
     {
         module.Describe(Version);
         module.AddNote(env.IsDevelopment()
-            ? "Embedded OAuth 2.1 AS — ephemeral ES256 key; dev-token endpoint (GET /oauth/dev-token) ENABLED."
+            ? $"Embedded OAuth 2.1 AS — ephemeral ES256 key; dev-token endpoint (GET {AuthServerRoutes.DevToken}) ENABLED."
             : "Embedded OAuth 2.1 AS — persisted + rotating ES256 key (encrypted-at-rest); dev-token endpoint is dev-only (404 here).");
     }
 }

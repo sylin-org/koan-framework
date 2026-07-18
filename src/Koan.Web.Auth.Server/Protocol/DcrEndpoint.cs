@@ -1,10 +1,7 @@
 using System.Text.Json;
 using Koan.Data.Core;
 using Koan.Web.Auth.Server.Options;
-using Koan.Web.Hosting;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -14,14 +11,11 @@ namespace Koan.Web.Auth.Server.Protocol;
 /// SEC-0006 D5 — Dynamic Client Registration (RFC 7591). Open by default (Claude Desktop has no pre-shared
 /// client_id) but zero-trust: every registered client is forced <b>public</b> (no secret, PKCE-required),
 /// constrained to <b>loopback</b> redirect URIs, rate-limited per source + globally, and TTL-expired. The
-/// <c>client_name</c>/<c>logo_uri</c> are stored untrusted (displayed escaped + "unverified" on consent).
+/// <c>client_name</c> is stored untrusted (displayed escaped + "unverified" on consent).
 /// </summary>
-internal sealed class DcrEndpoint : IKoanEndpointContributor
+internal static class DcrEndpoint
 {
-    public void Map(IEndpointRouteBuilder endpoints)
-        => endpoints.MapPost("/oauth/register", Register).ExcludeFromDescription();
-
-    private static async Task Register(HttpContext ctx)
+    internal static async Task Register(HttpContext ctx)
     {
         var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
         var now = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
@@ -80,7 +74,6 @@ internal sealed class DcrEndpoint : IKoanEndpointContributor
             Id = "dcr_" + OpaqueToken.New(16),
             ClientName = clientName, // untrusted display-only
             RedirectUris = redirectUris,
-            IsPublic = true,
             IsDynamic = true,
             CreatedUtc = now,
             ExpiresUtc = now + options.DynamicClientLifetime,

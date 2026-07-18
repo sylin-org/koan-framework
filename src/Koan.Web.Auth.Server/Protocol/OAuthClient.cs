@@ -4,8 +4,9 @@ namespace Koan.Web.Auth.Server.Protocol;
 
 /// <summary>
 /// SEC-0006 D5 — a registered OAuth client. The row id is the <c>client_id</c>. Dynamic-registration clients
-/// (RFC 7591) are <b>public</b> (no secret, PKCE-required) with loopback-only redirect URIs and a TTL; clients
-/// pre-registered by config can relax those. <c>redirect_uri</c> is matched <b>exact-string</b> (D4).
+/// (RFC 7591) are <b>public</b> (no secret, PKCE-required) with loopback-only redirect URIs and a TTL; Entity-first
+/// pre-registration can supply deliberate non-loopback redirects. <c>redirect_uri</c> is matched
+/// <b>exact-string</b> (D4). Confidential clients/client secrets are not supported.
 /// </summary>
 public sealed class OAuthClient : Entity<OAuthClient>
 {
@@ -14,9 +15,6 @@ public sealed class OAuthClient : Entity<OAuthClient>
 
     /// <summary>The exact redirect URIs this client may use. Exact-string match, no normalization.</summary>
     public List<string> RedirectUris { get; set; } = new();
-
-    /// <summary>Public client (no secret; PKCE-required). Dynamic-registration clients are always public.</summary>
-    public bool IsPublic { get; set; } = true;
 
     /// <summary>True when this client was created via open dynamic registration (constrains it to loopback redirects).</summary>
     public bool IsDynamic { get; set; }

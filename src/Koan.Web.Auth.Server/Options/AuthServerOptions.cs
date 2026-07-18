@@ -2,8 +2,7 @@ namespace Koan.Web.Auth.Server.Options;
 
 /// <summary>
 /// SEC-0006 — configuration for the embedded OAuth 2.1 Authorization Server. Bound from
-/// <c>Koan:Web:Auth:Server</c>. Phase 1 carries only the dev-token convenience knobs; the authorize/token/DCR
-/// surface lands in later phases.
+/// <c>Koan:Web:Auth:Server</c>.
 /// </summary>
 public sealed class AuthServerOptions
 {

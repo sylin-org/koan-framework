@@ -1,9 +1,6 @@
 using Koan.Web.Auth.Server.Options;
-using Koan.Web.Hosting;
 using Koan.Security.Trust.Issuer;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -11,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace Koan.Web.Auth.Server.Hosting;
 
 /// <summary>
-/// SEC-0006 Phase 1 — the <c>GET /oauth/dev-token</c> convenience endpoint. Mints a real ES256 access token
+/// SEC-0006 — the <c>GET /oauth/dev-token</c> convenience endpoint. Mints a real ES256 access token
 /// for the <b>currently signed-in cookie user</b>, bound (RFC 8707) to the requested resource (default: this
 /// host's MCP edge). It exists to validate the whole token → bearer → SEC-0004/0005 chain end-to-end without
 /// standing up a full OAuth client.
@@ -21,14 +18,9 @@ namespace Koan.Web.Auth.Server.Hosting;
 /// authorization-code flow). This deliberately rejects the dev Test provider's "Enabled ships it everywhere" footgun.
 /// </para>
 /// </summary>
-internal sealed class DevTokenEndpoint : IKoanEndpointContributor
+internal static class DevTokenEndpoint
 {
-    public void Map(IEndpointRouteBuilder endpoints)
-    {
-        endpoints.MapGet("/oauth/dev-token", HandleAsync).ExcludeFromDescription();
-    }
-
-    private static async Task HandleAsync(HttpContext ctx)
+    internal static async Task HandleAsync(HttpContext ctx)
     {
         var env = ctx.RequestServices.GetRequiredService<IHostEnvironment>();
         var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;

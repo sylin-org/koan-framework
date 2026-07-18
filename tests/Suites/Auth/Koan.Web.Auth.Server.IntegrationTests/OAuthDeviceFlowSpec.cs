@@ -32,7 +32,7 @@ public sealed class OAuthDeviceFlowSpec : IClassFixture<OAuthFlowFixture>
 
     private static async Task RegisterClientAsync(string clientId)
     {
-        var client = new OAuthClient { Id = clientId, ClientName = "Headless CLI", IsPublic = true, CreatedUtc = DateTimeOffset.UtcNow };
+        var client = new OAuthClient { Id = clientId, ClientName = "Headless CLI", CreatedUtc = DateTimeOffset.UtcNow };
         await client.Save(Ct);
     }
 

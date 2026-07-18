@@ -44,7 +44,7 @@ public sealed class OAuthHardeningSpec : IClassFixture<OAuthFlowFixture>
     }
 
     private static async Task RegisterAsync(string clientId)
-        => await new OAuthClient { Id = clientId, ClientName = "C", RedirectUris = new() { Redirect }, IsPublic = true, CreatedUtc = DateTimeOffset.UtcNow }.Save(Ct);
+        => await new OAuthClient { Id = clientId, ClientName = "C", RedirectUris = new() { Redirect }, CreatedUtc = DateTimeOffset.UtcNow }.Save(Ct);
 
     private async Task<string> RunToCodeAsync(HttpClient client, string clientId, string challenge, string resource)
     {

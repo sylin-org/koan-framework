@@ -36,7 +36,7 @@ public sealed class DevExplorerClientSeedSpec : IClassFixture<OAuthFlowFixture>
         var client = await OAuthClient.Get(AuthServerModule.DevExplorerClientId, Ct);
 
         client.Should().NotBeNull("the AS seeds it on a Development boot");
-        client!.IsPublic.Should().BeTrue("a public client — no secret; PKCE + device consent are the protection");
+        client!.IsDynamic.Should().BeFalse("the well-known client is pre-registered rather than open-DCR state");
         client.IsDynamic.Should().BeFalse("not a DCR client — not loopback-constrained, not GC-swept");
         client.ExpiresUtc.Should().BeNull("no expiry — it is re-seeded idempotently each dev boot");
         client.IsActive(DateTimeOffset.UtcNow).Should().BeTrue();

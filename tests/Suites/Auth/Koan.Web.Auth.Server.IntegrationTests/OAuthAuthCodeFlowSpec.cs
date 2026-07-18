@@ -47,7 +47,6 @@ public sealed class OAuthAuthCodeFlowSpec : IClassFixture<OAuthFlowFixture>
             Id = clientId,
             ClientName = "Test MCP Client",
             RedirectUris = new() { redirectUri },
-            IsPublic = true,
             CreatedUtc = DateTimeOffset.UtcNow,
         };
         await client.Save(Ct);

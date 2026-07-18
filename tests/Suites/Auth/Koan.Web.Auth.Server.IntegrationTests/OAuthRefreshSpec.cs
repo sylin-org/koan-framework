@@ -48,7 +48,7 @@ public sealed class OAuthRefreshSpec : IClassFixture<OAuthFlowFixture>
 
     private static async Task RegisterClientAsync(string clientId)
     {
-        await new OAuthClient { Id = clientId, ClientName = "Refresh Client", RedirectUris = new() { Redirect }, IsPublic = true, CreatedUtc = DateTimeOffset.UtcNow }.Save(Ct);
+        await new OAuthClient { Id = clientId, ClientName = "Refresh Client", RedirectUris = new() { Redirect }, CreatedUtc = DateTimeOffset.UtcNow }.Save(Ct);
     }
 
     /// <summary>signin → authorize → approve → token; returns the parsed token response.</summary>

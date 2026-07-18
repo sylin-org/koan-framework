@@ -1,9 +1,7 @@
 using Koan.Security.Trust.Issuer;
+using Koan.Web.Auth.Server.Infrastructure;
 using Koan.Web.Auth.Server.Options;
-using Koan.Web.Hosting;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -14,16 +12,9 @@ namespace Koan.Web.Auth.Server.Protocol;
 /// only probe <c>/.well-known/openid-configuration</c>) and the public ES256 JWKS. All derived from the live
 /// request host so the advertised endpoints match where the client actually reached the AS.
 /// </summary>
-internal sealed class WellKnownEndpoints : IKoanEndpointContributor
+internal static class WellKnownEndpoints
 {
-    public void Map(IEndpointRouteBuilder endpoints)
-    {
-        endpoints.MapGet("/.well-known/oauth-authorization-server", Metadata).ExcludeFromDescription();
-        endpoints.MapGet("/.well-known/openid-configuration", Metadata).ExcludeFromDescription();
-        endpoints.MapGet("/.well-known/jwks.json", Jwks).ExcludeFromDescription();
-    }
-
-    private static Task Metadata(HttpContext ctx)
+    internal static Task Metadata(HttpContext ctx)
     {
         var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
         var root = RequestHost.Root(ctx);
@@ -34,22 +25,22 @@ internal sealed class WellKnownEndpoints : IKoanEndpointContributor
         var doc = new Dictionary<string, object?>
         {
             ["issuer"] = root,
-            ["authorization_endpoint"] = root + "/oauth/authorize",
-            ["token_endpoint"] = root + "/oauth/token",
-            ["device_authorization_endpoint"] = root + "/oauth/device",
-            ["jwks_uri"] = root + "/.well-known/jwks.json",
+            ["authorization_endpoint"] = root + AuthServerRoutes.Authorize,
+            ["token_endpoint"] = root + AuthServerRoutes.Token,
+            ["device_authorization_endpoint"] = root + AuthServerRoutes.Device,
+            ["jwks_uri"] = root + AuthServerRoutes.Jwks,
             ["response_types_supported"] = new[] { "code" },
             ["grant_types_supported"] = grantTypes.ToArray(),
             ["code_challenge_methods_supported"] = new[] { Pkce.MethodS256 },
             ["token_endpoint_auth_methods_supported"] = new[] { "none" },
         };
         if (options.AllowDynamicRegistration)
-            doc["registration_endpoint"] = root + "/oauth/register";
+            doc["registration_endpoint"] = root + AuthServerRoutes.Register;
 
         return ctx.Response.WriteAsJsonAsync(doc, cancellationToken: ctx.RequestAborted);
     }
 
-    private static Task Jwks(HttpContext ctx)
+    internal static Task Jwks(HttpContext ctx)
     {
         var issuer = ctx.RequestServices.GetRequiredService<IAsymmetricIssuer>();
         ctx.Response.Headers.CacheControl = "public, max-age=3600"; // cacheable; rotation keeps the retiring key published

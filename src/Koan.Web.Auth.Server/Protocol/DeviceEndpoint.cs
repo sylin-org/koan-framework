@@ -1,9 +1,6 @@
 using Koan.Data.Core;
 using Koan.Web.Auth.Server.Options;
-using Koan.Web.Hosting;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -14,12 +11,9 @@ namespace Koan.Web.Auth.Server.Protocol;
 /// (+ scope + resource) and receives a <c>device_code</c> (it polls <c>/oauth/token</c> with) and a short
 /// <c>user_code</c> the user enters on a second device at <c>verification_uri</c> (the app's consent page).
 /// </summary>
-internal sealed class DeviceEndpoint : IKoanEndpointContributor
+internal static class DeviceEndpoint
 {
-    public void Map(IEndpointRouteBuilder endpoints)
-        => endpoints.MapPost("/oauth/device", Device).ExcludeFromDescription();
-
-    private static async Task Device(HttpContext ctx)
+    internal static async Task Device(HttpContext ctx)
     {
         var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
         var now = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
