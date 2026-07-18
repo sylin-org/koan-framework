@@ -311,7 +311,7 @@ With `RequireAuthentication: true`, `/mcp` is an OAuth 2.1 **resource server**. 
 
 ## Rung 10 — Operational toolsets (ops verbs)
 
-Sometimes the agent's job is to *operate* the system, not just its data — trigger a background job, flush a cache. Reference **`Koan.Mcp.Operations`** (Reference = Intent) and the framework ships those verbs as governed tools, on the *same* grant/audit rails as everything above (rung 8):
+Sometimes the agent's job is to *operate* the system, not just its data — trigger a background job, flush a cache. Reference **`Koan.Mcp.Operations`** to make those toolsets available, then explicitly enable the ones the host intends to expose. They use the *same* grant/audit rails as everything above (rung 8):
 
 - `koan.jobs.{trigger,cancel,status}` · `koan.cache.{flush,flushAll}`
 
@@ -330,7 +330,7 @@ agent → koan.jobs.trigger { "workType": "ImportJob", "action": "import" }     
 
 **Destructive** verbs (`cancel`, `flushAll`) require `"confirm": true`; called without it they return a **dry-run** describing what *would* happen (the safe default). Every mutating call writes an `AgentAction` audit row (rung 8). An anonymous/STDIO caller has no subject and so cannot hold an ops grant — ops are for governed *remote* agents.
 
-The boot report names what's live: `mcp.ops: jobs,cache · grants required · audited`. Exercised end-to-end (real host, real ledger, real grant + audit) in [`tests/Suites/Mcp/Koan.Mcp.Operations.IntegrationTests`](../../tests/Suites/Mcp/Koan.Mcp.Operations.IntegrationTests). *(A Data toolset — re-embed / transfer — is deliberately absent until demand exists.)*
+The boot report names availability and effective activation: `mcp.ops: available jobs,cache · enabled jobs,cache · grants required · destructive confirm`. Exercised end-to-end (real host, real ledger, real grant + audit) in [`tests/Suites/Mcp/Koan.Mcp.Operations.IntegrationTests`](../../tests/Suites/Mcp/Koan.Mcp.Operations.IntegrationTests). *(A Data toolset — re-embed / transfer — is deliberately absent until demand exists.)*
 
 ## Recap — the ladder
 

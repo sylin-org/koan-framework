@@ -313,12 +313,12 @@
 ### Koan.Mcp.Explorer
 - Depends on: Koan.Mcp
 - Depended by: –
-- Documentation: README ❌ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Mcp.Operations
 - Depends on: Koan.Cache, Koan.Jobs, Koan.Mcp
 - Depended by: –
-- Documentation: README ❌ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Media.Abstractions
 - Depends on: Koan.Data.Abstractions, Koan.Storage.Abstractions

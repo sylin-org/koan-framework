@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-18
   status: in-progress
-  scope: R11-05 through terminal AI topology and handoff gates
+  scope: R11-05 through MCP family graduation
 ---
 
 # Koan V1 reorganization current handoff
@@ -184,8 +184,12 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - The surviving AI topology is terminal without a premature cut: Koan keeps semantic inference, Entity-first Data.AI,
   Prompt/Web, and Ollama/LM Studio/ONNX. Agents/Orchestration/Eval/Review remain only until Agyo destinations are green;
   Models/Hugging Face remain only until the Zen Garden port is green. They receive no Koan V1 polish or support claim.
-- Current generated truth contains 108 packages: 21 repair-required, 33 review-required, 54 structurally ready across
-  22 claims. Public truth passes across 212 current files and 40 navigation targets.
+- The MCP family now passes as three earned boundaries: Core agent projection/runtime, optional human Explorer, and
+  explicitly enabled governed Operations. `McpModule` is the only activation/endpoint owner; unsupported manual
+  registration/mapping APIs are gone. Focused suites pass 75/75, 16/16, 5/5, and Code Mode 27/27; exact packages and
+  current vulnerability results are clean.
+- Current generated truth contains 108 packages: 19 repair-required, 32 review-required, 57 structurally ready across
+  22 claims. Public truth passes across 216 current files and 40 navigation targets.
   Redis Cache 6/6 and Redis Data 12/12 pass; seven affected packages and their dependency boundaries were inspected,
   and the three new packages have no known vulnerable direct or transitive packages. Earlier Storage evidence remains
   green. Seven relational packages also inspect cleanly, with clear current vulnerability checks for the two new
@@ -213,10 +217,10 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Next safe action
 
-Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the MCP family. Assess Core, Explorer, and
-Operations as one agent-facing product progression before package prose: determine whether the two add-ons earn
-separate reference intent, coalesce duplicated tooling/inspection mechanics, and preserve the zero-configuration
-Entity/MCP path. Keep the cross-repository AI handoff packages untouched and do not run release certification.
+Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the Web projection family: Web Extensions,
+OpenAPI, and SSE. Start from the application intent and dependency graph, decide which optional references earn their
+weight, centralize any repeated controller/endpoint/reporting mechanics, and keep base `EntityController<T>` behavior
+unchanged. Keep the cross-repository AI handoff packages untouched and do not run release certification.
 
 Keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared. Do not mutate remote settings, push,
 tag, release, or publish until package polish is accepted and separate remote-operation authorization is renewed.

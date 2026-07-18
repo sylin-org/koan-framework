@@ -1779,6 +1779,28 @@ Operations prose must distinguish package availability, configuration enablement
 than collapsing them into “reference equals execution.” Code Mode remains in Core for this slice; a split would add a
 new install decision and is not justified without a measured size/security/use-case comparison.
 
+### MCP family evidence
+
+- `McpModule` is now the only public activation owner. The manual `AddKoanMcp()` and `MapKoanMcpEndpoints()` surfaces
+  are internal mechanics; every affected fixture uses canonical `AddKoan()` and the endpoint-contributor path.
+- Core conformance passes 75/75, Explorer 16/16, Operations 5/5, and Code Mode 27/27. These cover caller projection,
+  direct-invocation enforcement, resources/self-description, browser negotiation, access-map gating, real Jobs ledger,
+  exact grants, dry-run, audit, and supported composition.
+- Core reports effective MCP configuration without the permanent false “diagnostics unavailable” note. Explorer
+  reports inactive versus route/access-map posture. Operations reports available and enabled toolsets plus exact
+  grant/destructive-confirm requirements.
+- Package-owned Core, Explorer, and Operations pages state install, smallest result, layered activation, production
+  security, and unsupported guarantees. All three are structurally ready with zero objective findings.
+- Exact-HEAD packages contain DLL/XML, package-owned README, canonical icon, and build-transitive composition metadata.
+  The inspected graph keeps Explorer dependent only on MCP while Operations explicitly adds Cache, Jobs, and MCP.
+  Current NuGet audit reports no known vulnerable direct or transitive packages for all three.
+- Generated truth contains 108 packages: 19 repair-required, 32 review-required, and 57 structurally ready across 22
+  claims. Public documentation truth passes across 216 current files and 40 navigation targets. No release candidate,
+  feed, remote state, or full certification run was created.
+
+The MCP family passes this R11-05 slice. Core, Explorer, and Operations are terminal `keep` boundaries with less public
+ceremony and more truthful activation/inspection.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

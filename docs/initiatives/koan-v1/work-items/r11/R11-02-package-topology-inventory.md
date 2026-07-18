@@ -121,9 +121,9 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Identity.Tenancy` | `capability` | `assess` |
 | `Sylin.Koan.Identity.Web` | `projection` | `assess` |
 | `Sylin.Koan.Jobs` | `capability` | `assess` |
-| `Sylin.Koan.Mcp` | `capability` | `assess` |
-| `Sylin.Koan.Mcp.Explorer` | `capability` | `assess` |
-| `Sylin.Koan.Mcp.Operations` | `capability` | `assess` |
+| `Sylin.Koan.Mcp` | `capability` | `keep` |
+| `Sylin.Koan.Mcp.Explorer` | `capability` | `keep` |
+| `Sylin.Koan.Mcp.Operations` | `capability` | `keep` |
 | `Sylin.Koan.Media.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Media.Core` | `capability` | `keep` |
 | `Sylin.Koan.Media.Web` | `projection` | `assess` |
@@ -283,6 +283,18 @@ AI vertical and external provider packages receive separate terminal handoff dis
 These are terminal architecture dispositions, not permission to delete unported capability. The five handoff groups
 remain visible but receive no R11 package polish or support promotion. R08-05 cannot publish them as Koan V1 products;
 their exit gate is destination behavior, destination tests, consumer re-pointing, then ordinary package retirement.
+
+## MCP family dispositions
+
+| Package | Disposition | Distinct reference intent and boundary |
+|---|---|---|
+| `Sylin.Koan.Mcp` | `keep` | Agent-facing Entity/custom-tool projection, resources, governed execution, Code Mode, STDIO, Streamable HTTP, and session/resource security. `McpModule` is the sole activation and endpoint-mapping owner. |
+| `Sylin.Koan.Mcp.Explorer` | `keep` | Optional embedded human console, caller map, governed try-it, and fail-closed privileged access map over Core's existing projection. It adds UI but no second registry, authority, executor, or transport. |
+| `Sylin.Koan.Mcp.Operations` | `keep` | Optional Jobs/Cache control-plane vocabulary. Its heavy dependencies and explicit enable/grant/confirm/audit posture must not burden ordinary MCP applications. |
+
+All three boundaries have independent reference value and pass focused source behavior plus exact artifact evidence.
+Merging either leaf into Core would make the shortest agent path carry unrelated human UI or privileged operational
+dependencies; splitting Code Mode is not justified without measured demand, security, and artifact evidence.
 
 ## Acceptance
 

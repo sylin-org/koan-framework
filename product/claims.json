@@ -150,9 +150,9 @@
       "title": "MCP and agent-facing surfaces",
       "summary": "Koan exposes application tools and self-description to coding and runtime agents through MCP.",
       "maturity": "verified",
-      "packages": ["Sylin.Koan.Mcp"],
+      "packages": ["Sylin.Koan.Mcp", "Sylin.Koan.Mcp.Explorer", "Sylin.Koan.Mcp.Operations"],
       "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
-      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Mcp"]
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Mcp", "tests/Suites/Mcp/Koan.Mcp.Conformance.Tests", "tests/Suites/Mcp/Koan.Mcp.Explorer.IntegrationTests", "tests/Suites/Mcp/Koan.Mcp.Operations.IntegrationTests"]
     },
     {
       "id": "authentication-authorization",
