@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-18
   status: in-progress
-  scope: R11-05 through local vector provider-family graduation and caller-owned pagination
+  scope: R11-05 through external vector provider-family graduation and caller-owned pagination
 ---
 
 # Koan V1 reorganization current handoff
@@ -156,11 +156,16 @@ Replace this file at every handoff. It is a restart point, not a diary.
   embedded durable step up; both provider references bring Vector, both consume selected-provider naming, and
   sqlite-vec owns one route decision across construction, health, and boot reporting. InMemory passes 34/34 and
   sqlite-vec 5/5. GardenCoop's unrelated eager Storage activation is retained as PMC-033.
+- The external vector provider family now passes. One `VectorQueryOptions` contract owns Top-K default/validation and
+  adapters preserve explicit intent; Qdrant, Milvus, and Weaviate consume selected-provider naming and exact endpoint
+  placement. First writes derive dimension instead of guessing a model, Weaviate's inert knob is gone, and Milvus
+  discovery speaks the same REST contract as its repository. Real matrices pass 39/41, 25/33, and 34/34 respectively,
+  with every skip matching an explicitly unclaimed capability.
 - Data pagination is now caller-owned end to end. `All()` means the complete visible set; adapters have no row-page
   default and append paging only for explicit shaping. SQLite, PostgreSQL/shared Npgsql, and SQL Server regressions each
   prove 75 unpaged rows versus an explicitly requested page of 7.
-- Current generated truth contains 111 packages: 24 repair-required, 42 review-required, 45 structurally ready across
-  19 claims.
+- Current generated truth contains 111 packages: 23 repair-required, 40 review-required, 48 structurally ready across
+  20 claims.
   Redis Cache 6/6 and Redis Data 12/12 pass; seven affected packages and their dependency boundaries were inspected,
   and the three new packages have no known vulnerable direct or transitive packages. Earlier Storage evidence remains
   green. Seven relational packages also inspect cleanly, with clear current vulnerability checks for the two new

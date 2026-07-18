@@ -1,39 +1,36 @@
 # Sylin.Koan.Data.Vector.Connector.Milvus
 
-Milvus adapter for Koan vector data.
+Use Milvus behind Koan's entity-first vector API. Referencing this package activates the adapter; `AddKoan()` handles
+registration, provider election, naming, health participation, and startup reporting.
 
-- Target framework: net10.0
-- License: Apache-2.0
-
-## Capabilities
-- Creates collections with a dense vector schema and JSON metadata fields
-- Bulk upsert and delete via the Milvus REST API
-- Hybrid similarity search with operator-aware metadata filters pushed into the query
-
-## Install
+## Install and use
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Vector.Connector.Milvus
 ```
 
-## Example
-
 ```csharp
-using Koan.Data.Abstractions.Filtering;
+public sealed class Article : Entity<Article> { }
 
-await Vector<MyDoc>.Save("doc-1", embedding, metadata: new { category = "support" });
-
-// Metadata filter pushed into the search (the unified Filter AST).
-var results = await Vector<MyDoc>.Search(
-    embedding,
-    topK: 10,
-    filter: Filter.Eq("category", "support"));
+await Vector<Article>.Save(article.Id, embedding, new { category = "support" });
+var matches = await Vector<Article>.Search(embedding, topK: 12);
 ```
 
-The `filter` argument also accepts the JSON metadata-filter DSL or a dictionary; all three are parsed
-by the one schemaless reader. An operator the adapter cannot push down is a hard error, never a silent
-match-all.
+No Milvus-specific registration is required. The zero-configuration endpoint is `http://localhost:19530`. Configure
+another deployment with `Koan:Data:Milvus:Endpoint`; use `Token` or `Username`/`Password` when authentication is
+enabled.
 
-## Links
-- Vector pathway + filter model: `~/decisions/DATA-0097-vector-pathway-parity.md`
-- Milvus REST API reference: https://milvus.io/docs
+The first write establishes vector dimension. Set `Koan:Data:Milvus:Dimension` only when an empty collection must be
+created before the first write. Koan defaults `topK` to 10; an explicit positive value is sent unchanged.
+
+## Honest capability boundary
+
+Milvus supports KNN search, native metadata-filter pushdown, bulk writes/deletes, collection clear, dynamic collection
+naming, and normalized cosine scores. The current adapter does not provide embedding reads, export, hybrid text
+search, search continuation tokens, or index statistics. Delete visibility follows the configured Milvus consistency
+posture and is not claimed as immediately observable.
+
+Avoid pinning `CollectionName` in partitioned or tenant-isolated applications unless one shared collection is truly
+intended. A fixed name bypasses Koan's physical-name folds, and the runtime reports that correction.
+
+See [TECHNICAL.md](./TECHNICAL.md) for configuration, deployment shape, health, and failure behavior.

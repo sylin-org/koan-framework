@@ -33,6 +33,9 @@ await Vector<Article>.SaveWithVector(article, embedding);
 var nearest = await Vector<Article>.Search(embedding, topK: 5);
 ```
 
+Omitting `topK` requests 10 matches. Any explicit positive value is preserved through the runtime; adapters do not
+cap or replace it. Non-positive values fail at `VectorQueryOptions` construction, before provider I/O.
+
 `SaveWithVector` persists the entity through the active data provider and its vector through the elected vector
 provider. Use `Vector<Article>.Save(...)` when only the vector representation should change.
 

@@ -41,6 +41,8 @@ warning per entity type when that pin defeats active isolation.
   its coordinator; otherwise the operations are sequential and a partial success becomes `VectorCoordinationException`.
 - `Search` normalizes external filter input into the shared Filter AST and `VectorFilterCoordinator` gates provider
   pushdown before the repository executes.
+- `VectorQueryOptions` is the single TopK policy owner: default 10, positive-only validation, and exact pass-through to
+  providers. Connector options do not carry competing defaults or caps.
 - destructive/optional operations (`Flush`, `Clear`, `Rebuild`, `Stats`, export, embedding retrieval) preserve provider
   capability failures rather than returning fabricated success.
 

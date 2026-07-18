@@ -1198,6 +1198,121 @@ not be promoted beyond focused evidence observed in this slice.
 The local vector provider family passes this R11-05 slice. No release candidate, full certification run, package feed,
 or remote state was created; the complete release ratchet remains the single R11-07 boundary.
 
+### External vector provider-family discovery
+
+**Task:** graduate Qdrant, Milvus, and Weaviate after making Vector query intent and selected-provider naming
+framework-owned, then leave each connector with native placement, schema, filter, consistency, and wire mechanics.
+
+**Application intent:** “Reference one external vector provider, keep `AddKoan()` and the ordinary Entity vector/AI
+ring, optionally configure its endpoint and native guarantees, and receive exactly the nearest-neighbour count I asked
+for without adapter rewriting.”
+
+**Public expression:** reference `Sylin.Koan.Data.Vector.Connector.Qdrant`, `.Milvus`, or `.Weaviate`; use the existing
+`Vector<TEntity>` / Entity AI semantics. Configure one standard `ConnectionStrings:<Provider>` or exact
+`Koan:Data:<Provider>:Endpoint` only when placement is explicit. Use `[VectorAdapter]` only when multiple candidates
+make automatic selection ambiguous. Provider-specific fields, metric, consistency, quantization, credentials, and
+static collection pins remain deliberate native options where they change real guarantees.
+
+**Guarantee/correction:** `VectorQueryOptions` owns one positive default Top-K of 10. An explicit positive count reaches
+the backend unchanged; zero/negative intent rejects at the query contract and no adapter silently clamps it. The
+factory already selected by `VectorService` owns naming for the operation, including partition/source folds. Explicit
+connection or endpoint placement wins discovery and boot reporting; generic Data connection strings and casing aliases
+cannot accidentally place a different concern. Unsupported filters/features fail through declared capabilities; an
+explicit provider or placement never falls back silently.
+
+**Complete intent surface:** connector reference, `AddKoan()`, Entity vector/AI calls, optional exact provider pin,
+endpoint/credentials, collection/schema field overrides, similarity metric, dimension only where pre-creating a native
+collection requires it, consistency/write-visibility/quantization, ambient partition/source context, readiness, and
+startup facts. Per-source endpoints remain unsupported; routed sources isolate by collection/class naming on the one
+configured backend. Adapter-owned default/max Top-K, generic `Koan:Data:ConnectionString`, duplicate lowercase
+connection keys, Weaviate `BaseUrl`/`Key`, and its inert dimension setting are not application decisions.
+
+**Public concepts:** Entity/Vector expresses semantic intent; `VectorQueryOptions.TopK` expresses requested result
+cardinality; Vector owns election, validation, naming, isolation, participation, and lifetime; the connector reference
+expresses backend availability; provider options expose only native placement/guarantee choices. Discovery and Zen
+Garden remain layered capability contributors, not alternate application APIs.
+
+**Docs read:** engineering guardrails require Entity-first surfaces, stable constants, and package companions;
+architecture principles require reference-as-availability, pillar-owned meaning, thin adapters, immutable decisions,
+and semantic honesty. Vector README/TECHNICAL establish one provider election/naming/health chokepoint. The vector card
+teaches the correct provider-neutral application expression but still presents raw repositories too prominently.
+Milvus/Weaviate companions lack full placement/readiness/limits; Qdrant owns none.
+
+**Code read:** `VectorQueryOptions` currently makes Top-K nullable, so every repository invents 10; Qdrant/Milvus expose
+unused `MaxTopK`, while Weaviate silently caps explicit values at 200. `ScopedVectorRepository` is already the one query
+chokepoint and can enforce positive intent. All three factories receive the selected source but discard it; their
+repositories call the generic `VectorAdapterNaming` overload and re-enter election. Qdrant/Milvus configurators read
+`Endpoint` but ignore it during automatic resolution, accept a generic Data connection string and duplicate casing
+aliases, while boot reporting can claim that endpoint as effective. Weaviate correctly preserves layered Zen Garden
+intent but retains the same generic/casing aliases plus legacy `BaseUrl`, `Key`, and `Weaviate:Endpoint`. Its Dimension
+option is absent from schema creation and first-vector discovery overrides it, making the public knob inert; dimension
+changes currently log and continue toward a backend failure rather than reject correctively.
+
+**Constants/options/DTO inventory:** each connector already owns an Infrastructure constants vocabulary and typed
+options. Stable provider/HTTP/health/config identifiers exist but Qdrant/Milvus still duplicate literals in discovery
+and modules, and Weaviate constants are unnecessarily public. Repositories use internal dictionaries/JSON objects
+rather than public request/response DTOs. No new DTO, registration abstraction, or shared provider package is needed.
+
+**Reusing:** `VectorQueryOptions`, `ScopedVectorRepository`, selected-provider `VectorAdapterNaming`,
+`VectorAdapterHealthContributorBase`, participation, Core discovery coordinator/reporting, provider constants/options,
+native filter translators/repositories, three provider AODB/matrix suites, package compiler, and public truth gate.
+
+**Creating new:** none. The correct owners and types already exist; the slice changes their contracts and deletes
+adapter-local policy rather than adding another mechanism.
+
+**Coalescence:** closest patterns are the selected naming/participation corrections already proven in local and
+search-engine providers. Rebuild `VectorQueryOptions` as the single result-cardinality and validation owner so raw and
+decorated paths share one contract; delete five provider default/max knobs, the dead Data Core duplicate, and
+Weaviate's inert dimension branch. Pass the selected
+factory/source into each native repository and delete generic naming calls. Correct each provider's existing
+configuration owner rather than inventing an “HTTP vector provider” package: discovery orchestration is framework-wide
+but native authentication, connection normalization, schema, and failure shapes differ, so a three-provider shared
+runtime would be a name-based abstraction at the wrong specificity. Retain native repositories/translators; remove
+false aliases, ignored settings, and misleading prose.
+
+**Ergonomics:** application code does not grow. Humans/models get one stable rule—Top-K is the count requested, 10 only
+when omitted—and endpoint configuration behaves as reported. IntelliSense loses dead caps/dimension and compatibility
+aliases. Operators see exact redacted placement and participation-owned readiness. Adapter authors accept a compiled
+query/naming decision and implement only native mechanics.
+
+**Constraints satisfied:** no HTTP surface; Entity/Vector remains the application path; no new magic identifiers or
+public abstraction; large row-data rules are untouched; exact provider limitations remain fail-loud; package
+README/TECHNICAL, current Vector guidance, focused behavior, artifacts, audit, and generated truth move together; ADRs
+remain dated and untouched; no release certification before R11-07.
+
+**Risks:** changing nullable Top-K and removing options is intentionally breaking under the greenfield mandate;
+provider suites require Docker images and may expose backend-version drift; static collection pins still defeat source
+folds and must retain warnings; per-source endpoints remain explicitly unsupported; Weaviate's layered Zen Garden path
+must stay inert unless the engine is active. Maturity cannot exceed focused evidence actually observed.
+
+### External vector provider-family evidence
+
+- `VectorQueryOptions` is now the sole result-cardinality contract: omitted Top-K is 10, non-positive values reject at
+  construction (including `with` expressions), and 250 reaches the selected repository unchanged. The obsolete Data
+  Core `VectorDefaultsOptions` duplicate and every connector default/cap are gone. Focused Core proof passes 10/10.
+- Qdrant, Milvus, and Weaviate repositories receive the factory/source already selected by Vector and use the shared
+  naming fold without re-entering election. Exact `Koan:Data:<Provider>:Endpoint` settings now configure real
+  `AddKoan()` hosts without `PostConfigure` pins; generic Data fallbacks and casing/legacy aliases are removed.
+- Qdrant and Milvus no longer guess a 1536-dimensional model. First write supplies collection dimension; explicit
+  pre-creation requires an explicit dimension. Weaviate's inert dimension knob is deleted and a changed embedding
+  dimension now fails before backend I/O. Milvus discovery now preserves/probes its actual REST endpoint rather than
+  translating it into a nonfunctional gRPC-shaped URI.
+- Real provider matrices pass: Qdrant 39 with 2 honest capability skips; Milvus 25 with 8 honest skips; Weaviate 34/34.
+  The Weaviate isolation fixture also shed duplicate manual provider composition and now proves reference-driven module
+  activation directly. Qdrant/Milvus do not claim hybrid search; Milvus additionally states its absent embedding read,
+  export, continuation, stats, and immediate-delete guarantees.
+- All three packages build and pack warning-free with their own README/TECHNICAL contract, canonical icon, provider
+  DLL/XML, functional `Sylin.Koan.Data.Vector` dependency, and exact package metadata. Weaviate's optional layered
+  integration depends only on `Sylin.Koan.ZenGarden.Contracts`. Current NuGet audit reports no known vulnerable direct
+  or transitive packages.
+- All three packages are structurally ready with zero objective findings. Generated truth contains 111 packages: 23
+  repair-required, 40 review-required, and 48 structurally ready across 20 claims. Strict docs generation has no
+  errors (the existing repository-wide front-matter warnings remain non-gating), and public documentation truth passes
+  across 210 current files and 38 navigation targets.
+
+The external vector provider family passes this R11-05 slice. No release candidate, full certification run, package
+feed, or remote state was created; the complete release ratchet remains the single R11-07 boundary.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

@@ -3,12 +3,12 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 111,
-    "repairRequired": 24,
-    "reviewRequired": 42,
-    "structurallyReady": 45,
-    "ownedReadmes": 87,
-    "technicalCompanions": 77,
-    "findings": 169
+    "repairRequired": 23,
+    "reviewRequired": 40,
+    "structurallyReady": 48,
+    "ownedReadmes": 88,
+    "technicalCompanions": 78,
+    "findings": 165
   },
   "findingDefinitions": [
     {
@@ -1241,8 +1241,8 @@
       "projectPath": "src/Connectors/Data/Vector/Milvus/Koan.Data.Vector.Connector.Milvus.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
-      "description": "Milvus vector adapter for Koan: collection management, hybrid metadata filtering, and REST-based vector search.",
+      "status": "structurally-ready",
+      "description": "Milvus vector provider for Koan: entity-first KNN search, metadata-filter pushdown, bulk operations, and collection management over REST.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1256,17 +1256,15 @@
       "readme": "src/Connectors/Data/Vector/Milvus/README.md",
       "technicalDocumentation": "src/Connectors/Data/Vector/Milvus/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Qdrant",
       "projectPath": "src/Connectors/Data/Vector/Qdrant/Koan.Data.Vector.Connector.Qdrant.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "repair-required",
-      "description": "Qdrant vector adapter for Koan \u2014 the lean cell: scalar quantization \u002B on-disk originals tuned for resource-constrained deployments. Payload-based metadata filtering, REST-based KNN search, synchronous write semantics (wait=true). For full-featured / high-fidelity vector workloads prefer Koan.Data.Vector.Connector.Weaviate.",
+      "status": "structurally-ready",
+      "description": "Qdrant vector provider for Koan: entity-first KNN search, payload filtering, bulk operations, export, and visibility-aware writes over REST.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1277,13 +1275,10 @@
         "Sylin.Koan.Data.Vector",
         "Sylin.Koan.Data.Vector.Abstractions"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Connectors/Data/Vector/Qdrant/README.md",
+      "technicalDocumentation": "src/Connectors/Data/Vector/Qdrant/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.SqliteVec",
@@ -1312,8 +1307,8 @@
       "projectPath": "src/Connectors/Data/Vector/Weaviate/Koan.Data.Vector.Connector.Weaviate.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
-      "description": "Weaviate vector adapter for Koan: schema ensure, KNN search, filter pushdown via AST\u2192GraphQL translator, and health checks.",
+      "status": "structurally-ready",
+      "description": "Weaviate vector provider for Koan: entity-first KNN and hybrid search, GraphQL filter pushdown, continuation, export, and schema management.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1328,9 +1323,7 @@
       "readme": "src/Connectors/Data/Vector/Weaviate/README.md",
       "technicalDocumentation": "src/Connectors/Data/Vector/Weaviate/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Identity",

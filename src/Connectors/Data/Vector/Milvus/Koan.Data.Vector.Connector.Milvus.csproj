@@ -6,7 +6,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Koan.Data.Vector.Connector.Milvus</AssemblyName>
     <RootNamespace>Koan.Data.Vector.Connector.Milvus</RootNamespace>
-    <Description>Milvus vector adapter for Koan: collection management, hybrid metadata filtering, and REST-based vector search.</Description>
+    <Description>Milvus vector provider for Koan: entity-first KNN search, metadata-filter pushdown, bulk operations, and collection management over REST.</Description>
     <PackageTags>$(CommonPackageTags);data;vector;milvus;knn</PackageTags>
   </PropertyGroup>
   <ItemGroup>

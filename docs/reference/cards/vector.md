@@ -4,7 +4,7 @@ domain: data
 title: "Vector — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-18
 framework_version: v0.19.0
 validation:
   date_last_tested: 2026-07-16
@@ -35,7 +35,7 @@ await media.Save();                                  // entity + embedding lifec
 var hits = await Vector<Media>.Search(
     vector: queryVector,                             // float[] — the query embedding
     text: "cozy sci-fi",                             // optional → hybrid BM25 + vector
-    topK: 20,                                        // how many matches
+    topK: 20,                                        // exact positive request; omitted defaults to 10
     filter: vectorFilter);                           // optional metadata filter (pushed down)
 
 foreach (var m in hits.Matches) { /* m.Id, m.Score */ }
@@ -67,6 +67,10 @@ await foreach (var batch in repo.ExportAll()) { /* provider migration */ }
 The repository exposes `Upsert` / `Delete` / `Search` / `Flush` / `ExportAll` and the `TKey`-generic key the facade hides. The connector is present only when you reference that adapter (Reference = Intent). The shared Lucene-DSL translator behind the ElasticSearch / OpenSearch connectors is documented in [DATA-0103](../../decisions/DATA-0103-search-engine-shared-core.md).
 
 Referencing a connector makes it available for election; it does not by itself make the external service a readiness dependency. Once repository resolution selects a provider for an entity/source route, that connector becomes critical and `/health/ready` probes it. Startup and health facts therefore distinguish optional capability presence from an active application dependency.
+
+`VectorQueryOptions` owns the one `TopK` policy: omitted means 10 and non-positive values fail immediately. Adapters
+receive an explicit positive value unchanged; they never substitute a preferred page size or silently cap application
+intent. A provider may still reject a value outside its native deployment limits.
 
 ## The sample that shows it
 

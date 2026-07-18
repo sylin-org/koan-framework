@@ -6,7 +6,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Koan.Data.Vector.Connector.Qdrant</AssemblyName>
     <RootNamespace>Koan.Data.Vector.Connector.Qdrant</RootNamespace>
-    <Description>Qdrant vector adapter for Koan — the lean cell: scalar quantization + on-disk originals tuned for resource-constrained deployments. Payload-based metadata filtering, REST-based KNN search, synchronous write semantics (wait=true). For full-featured / high-fidelity vector workloads prefer Koan.Data.Vector.Connector.Weaviate.</Description>
+    <Description>Qdrant vector provider for Koan: entity-first KNN search, payload filtering, bulk operations, export, and visibility-aware writes over REST.</Description>
     <PackageTags>$(CommonPackageTags);data;vector;qdrant;knn</PackageTags>
   </PropertyGroup>
   <ItemGroup>

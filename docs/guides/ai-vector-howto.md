@@ -4,7 +4,7 @@ domain: ai
 title: "AI & Vector Search How-To"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-15
+last_updated: 2026-07-18
 framework_version: source-first
 validation:
   status: not-yet-tested
@@ -33,52 +33,38 @@ hybrid and personalization recipes are compositional patterns, not a certified p
 
 ## 0. Prerequisites
 
-1. Add the Koan AI and Vector packages:
-   ```xml
-   <PackageReference Include="Koan.AI" Version="0.6.3" />
-   <PackageReference Include="Koan.AI.Contracts" Version="0.6.3" />
-   <PackageReference Include="Koan.Data.Vector" Version="0.6.3" />
-   <PackageReference Include="Koan.Data.Vector.Abstractions" Version="0.6.3" />
-   ```
+Reference one embedding provider and one vector provider. Provider packages bring their functional runtimes; do not
+manually assemble the abstraction packages.
 
-2. Reference at least one AI connector (Ollama example):
-   ```xml
-   <PackageReference Include="Koan.AI.Connector.Ollama" Version="0.6.3" />
-   ```
+```powershell
+dotnet add package Sylin.Koan.AI.Connector.Ollama
+dotnet add package Sylin.Koan.Data.Vector.Connector.Weaviate
+```
 
-3. Reference a vector database adapter (Weaviate example):
-   ```xml
-   <PackageReference Include="Koan.Data.Vector.Connector.Weaviate" Version="0.6.3" />
-   ```
+Then boot Koan once:
 
-4. Configure AI and vector services:
-   ```json
-   {
-     "Koan": {
-       "AI": {
-         "Providers": {
-           "Ollama": {
-             "Endpoint": "http://localhost:11434",
-             "DefaultModel": "llama3.2:latest",
-             "DefaultEmbeddingModel": "all-minilm:latest"
-           }
-         }
-       },
-       "Vector": {
-         "Providers": {
-           "Weaviate": {
-             "Endpoint": "http://localhost:8080",
-             "Dimension": 384
-           }
-         }
-       }
-     }
-   }
-   ```
+```csharp
+builder.Services.AddKoan();
+```
 
-5. Boot the runtime with `builder.Services.AddKoan();` in your `Program.cs`.
+Reference is intent. With Ollama and Weaviate on their local default endpoints, no vector-specific startup code is
+needed. Configure a non-default Weaviate deployment through the provider-owned section:
 
-With that in place, you can leverage AI embeddings and vector search as described below.
+```json
+{
+  "Koan": {
+    "Data": {
+      "Weaviate": {
+        "Endpoint": "https://weaviate.example.net",
+        "ApiKey": "use-a-secret-provider"
+      }
+    }
+  }
+}
+```
+
+The adapter derives vector dimension from the first write. Configure the chosen embedding provider according to its
+package README, and use the same model for indexing and queries.
 
 ---
 
@@ -141,7 +127,7 @@ var embedding = await Koan.AI.Client.Embed(
 
 **Recipe**
 
-- Vector provider configured in `Koan:Vector:Providers`
+- A vector provider package referenced; configure only when its local/discovered default is not the intended route
 - Entity must have string-based ID (GUID v7 recommended)
 - Optional metadata dictionary for hybrid search
 
@@ -201,10 +187,10 @@ Console.WriteLine($"Indexed {count} items");
 
 **Concepts**
 
-- `Vector<T>.Search()` finds semantically similar items using cosine similarity
+- `Vector<T>.Search()` finds semantically similar items using the selected provider's configured metric
 - Pure vector search excels at conceptual queries ("cute but powerful characters")
 - Query embedding compared against all stored embeddings
-- Results ranked by similarity score (1.0 = identical, 0.0 = orthogonal)
+- Results are ranked by score; interpretation and normalization are provider/metric capabilities
 
 **Recipe**
 
@@ -262,12 +248,12 @@ if (capabilities.Has(VectorCaps.Knn))
 - Combines vector similarity (semantic) with BM25 keyword matching (lexical)
 - Solves exact title matching for non-English content
 - `alpha` parameter controls semantic vs keyword balance (0.0=keyword, 1.0=semantic)
-- Provider-native fusion (Weaviate, ElasticSearch) for optimal performance
+- Provider-native fusion (currently Weaviate and ElasticSearch) for optimal performance
 - Requires `VectorCaps.Hybrid` support
 
 **Recipe**
 
-- Vector provider supporting hybrid search (Weaviate, ElasticSearch, Qdrant)
+- Vector provider supporting hybrid search (currently Weaviate or ElasticSearch)
 - Metadata with `searchText` field indexed during save
 - Same embedding as pure vector search
 

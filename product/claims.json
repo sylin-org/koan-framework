@@ -94,7 +94,7 @@
     {
       "id": "ai-vector-semantics",
       "title": "AI, vector, and semantic capabilities",
-      "summary": "AI and vector modules add semantic model capabilities while external provider lifecycles remain experimental.",
+      "summary": "AI and vector modules add provider-neutral semantic model capabilities; individual provider guarantees are stated separately.",
       "maturity": "experimental",
       "packages": ["Sylin.Koan.AI", "Sylin.Koan.Data.Vector"],
       "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
@@ -117,6 +117,15 @@
       "packages": ["Sylin.Koan.Data.Vector.Connector.InMemory", "Sylin.Koan.Data.Vector.Connector.SqliteVec"],
       "documentation": ["src/Connectors/Data/Vector/InMemory/README.md", "src/Connectors/Data/Vector/SqliteVec/README.md", "docs/reference/cards/vector.md"],
       "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.InMemory.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.SqliteVec.Tests", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
+    },
+    {
+      "id": "external-vector-providers",
+      "title": "Qdrant, Milvus, and Weaviate vector providers",
+      "summary": "Qdrant, Milvus, and Weaviate preserve Koan's Entity vector intent while owning their native schema, filter, consistency, discovery, and wire guarantees; query cardinality, selected-provider naming, and participation readiness remain framework-owned.",
+      "maturity": "demonstrated",
+      "packages": ["Sylin.Koan.Data.Vector.Connector.Qdrant", "Sylin.Koan.Data.Vector.Connector.Milvus", "Sylin.Koan.Data.Vector.Connector.Weaviate"],
+      "documentation": ["src/Connectors/Data/Vector/Qdrant/README.md", "src/Connectors/Data/Vector/Milvus/README.md", "src/Connectors/Data/Vector/Weaviate/README.md", "docs/reference/cards/vector.md"],
+      "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Qdrant.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Milvus.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Weaviate.Tests", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
     },
     {
       "id": "mcp-agent-surface",
