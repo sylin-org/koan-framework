@@ -1,6 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using Koan.Cache.Adapter.Redis.Tests.Support;
+using Koan.Data.Abstractions;
+using StackExchange.Redis;
 
 namespace Koan.Cache.Adapter.Redis.Tests.Specs;
 
@@ -12,6 +14,26 @@ namespace Koan.Cache.Adapter.Redis.Tests.Specs;
 public sealed class RedisCacheAdapterSpec(RedisFixture fixture, ITestOutputHelper output)
 {
     private readonly ITestOutputHelper _output = output;
+
+    [Fact]
+    public async Task Cache_reference_activates_the_shared_backend_without_a_Redis_Data_provider()
+    {
+        Assert.SkipWhen(!fixture.IsAvailable, fixture.Reason ?? "Redis unavailable");
+        var ct = TestContext.Current.CancellationToken;
+        var token = Guid.CreateVersion7().ToString("N");
+
+        await using var node = await RedisCacheNode.Start(
+            fixture.ConnectionString!,
+            $"cache:{token}:",
+            $"cache:tag:{token}:",
+            $"koan-cache-{token}-boundary",
+            ct);
+
+        node.Provider.GetRequiredService<IConnectionMultiplexer>().Should().NotBeNull();
+        node.Provider.GetServices<IDataAdapterFactory>()
+            .Should().NotContain(static factory =>
+                string.Equals(factory.Provider, "redis", StringComparison.OrdinalIgnoreCase));
+    }
 
     [Fact]
     public async Task Set_and_fetch_roundtrip_across_clients()

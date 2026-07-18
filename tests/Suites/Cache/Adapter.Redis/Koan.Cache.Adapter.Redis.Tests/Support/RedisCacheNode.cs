@@ -43,10 +43,8 @@ internal sealed class RedisCacheNode : IAsyncDisposable
         CancellationToken ct)
     {
         var host = await KoanIntegrationHost.Configure()
-            // Per ARCH-0080: IConnectionMultiplexer is owned by Koan.Data.Connector.Redis;
-            // configure its canonical key. The cache adapter consumes the multiplexer via DI.
-            .WithSetting("Koan:Data:Redis:ConnectionString", connectionString)
-            .WithSetting("Koan:Data:Redis:DisableAutoDetection", "true")
+            .WithSetting("ConnectionStrings:Redis", connectionString)
+            .WithSetting("Koan:Redis:DisableAutoDetection", "true")
             // Cache-specific knobs the cache adapter still owns.
             .WithSetting(CacheConstants.Configuration.Redis.KeyPrefix, keyPrefix)
             .WithSetting(CacheConstants.Configuration.Redis.TagPrefix, tagPrefix)

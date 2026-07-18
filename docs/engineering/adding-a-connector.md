@@ -5,7 +5,7 @@ Wire a new external system (database, vector store, message broker, AI provider,
 > Companion ADRs:
 > - [ARCH-0049 — `[KoanService]` orchestration metadata](../decisions/) (referenced by the orchestration generator)
 > - [ARCH-0079 — Integration tests as canon](../decisions/) (every connector ships at least one integration spec)
-> - [ARCH-0080 — Shared transport ownership](../decisions/ARCH-0080-shared-transport-ownership.md) (if your connector needs Redis, Postgres, etc., consume — don't re-register)
+> - [ARCH-0080 — Shared transport ownership](../decisions/ARCH-0080-shared-transport-ownership.md) (historical context; shared backends now have their own functional owner)
 > - [ARCH-0081 — Typed registration helpers](../decisions/ARCH-0081-typed-registration-helpers-and-analyzer.md) (use the helpers, not raw `TryAddEnumerable`)
 > - [ARCH-0085 — Versioning](../decisions/ARCH-0085-versioning-compatibility-and-automation.md) (each package owns version intent)
 >
@@ -306,7 +306,7 @@ major/minor change is an explicit `version.json` edit. See [versioning.md](versi
 | Add a new AI provider | Pillar = `AI`, model after `Koan.AI.Connector.Ollama`. |
 | Add a new communication transport | Pillar = `Communication`, model after `Koan.Communication.Connector.RabbitMq`. |
 | Add a new storage backend | Pillar = `Storage`, model after `Koan.Storage.Connector.Local` or `Koan.Storage.Connector.S3`. |
-| Add a connector that shares transport with another | Don't re-register the shared transport (e.g. `IConnectionMultiplexer`). See [ARCH-0080](../decisions/ARCH-0080-shared-transport-ownership.md) for the consume-don't-register pattern. |
+| Add a connector that shares a physical backend with another | Reference the backend owner and consume its inert contract or ecosystem-standard client. Redis adapters reference `Koan.Redis`; they do not activate Data to borrow a connection. |
 
 ---
 
@@ -401,9 +401,9 @@ Re-run the release compiler inventory, then package verification for the affecte
 ## Anti-patterns
 
 - **Don't require applications to call `services.AddYourConnector()`** — the package's `KoanModule` should call its concern-owned registration internally. Reference = Intent means adding the package is sufficient.
-- **Don't skip the discovery adapter** — without it, every consumer must set `Endpoint` explicitly. The whole "drop in a connector and it just works in compose/Aspire" experience depends on autonomous discovery.
-- **Don't use raw `TryAddEnumerable(ServiceDescriptor.Singleton<I>(factory))`** — that's the indistinguishable-descriptor footgun KOAN0001 catches. Use the typed helpers (`AddCacheStore<T>`, etc.) where they exist for the pillar; for pillars without helpers yet, use the two-generic form: `Singleton<TService, TImpl>(...)`. See [ARCH-0081](../decisions/ARCH-0081-typed-registration-helpers-and-analyzer.md).
-- **Don't re-register shared transports** — if your connector talks to Redis, you reference `Koan.Data.Connector.Redis` and consume its `IConnectionMultiplexer`. You do not register your own. See [ARCH-0080](../decisions/ARCH-0080-shared-transport-ownership.md).
+- **Don't leave discovery ownerless** — a standalone connector owns its discovery; a shared physical backend owns it once for every consuming pillar. Without one owner, every application must configure an endpoint explicitly.
+- **Don't use factory-form `TryAddEnumerable(ServiceDescriptor.Singleton<I>(factory))` for repeated services** — standard DI cannot distinguish identical descriptors reliably. Use the two-generic `ServiceDescriptor.Singleton<TService,TImplementation>()` form.
+- **Don't re-register shared backends** — if your connector talks to Redis, reference `Koan.Redis`. Consume `IConnectionMultiplexer` for the default endpoint or `IRedisConnectionProvider` for source-aware routing; do not create a second owner.
 - **Don't ship without an integration test** — ARCH-0079 makes integration tests canonical. A unit test against a mock is not a substitute. Even a single round-trip spec against a real container is enough to start.
 - **Don't put your connector under `samples/` or `tests/`** — those folders are `IsPackable=false` by inheritance. Your connector lives under `src/Connectors/<Pillar>/<Name>/`.
 
@@ -413,7 +413,7 @@ Re-run the release compiler inventory, then package verification for the affecte
 
 - [Weaviate connector](../../src/Connectors/Data/Vector/Weaviate/) — canonical example for the full pattern
 - [Mongo connector](../../src/Connectors/Data/Mongo/) — example for data store pillar
-- [Redis connector](../../src/Connectors/Data/Redis/) — example with shared-transport ownership
+- [Redis backend](../../src/Koan.Redis/) and [Data Redis connector](../../src/Connectors/Data/Redis/) — example of backend-owned lifecycle with a thin pillar adapter
 - [tests/Suites/Data/Connector.Weaviate/](../../tests/Suites/Data/Connector.Weaviate/) — test layout template
 - [Koan.Packaging](../../tools/Koan.Packaging/README.md) — evaluated inventory and release proof
 - [versioning.md](versioning.md) — when your connector bumps

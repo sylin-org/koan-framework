@@ -24,10 +24,11 @@ source: src/Koan.Data.Connector.Redis/
 
 ## Configuration
 
-- Endpoints, SSL, timeouts, naming and TTL policies.
-- A named source may select its own endpoint and logical database. Koan shares one connection multiplexer per
-  distinct endpoint for the host lifetime; the default DI multiplexer remains the shared transport for cache and
-  coherence modules.
+- The transitive `Sylin.Koan.Redis` backend owns endpoints, SSL, timeouts, discovery, orchestration, and host-lifetime
+  connection pooling. `ConnectionStrings:Redis` configures the common endpoint.
+- A named Data source may select its own endpoint and logical database. The shared backend reuses one connection
+  multiplexer per distinct endpoint; the default DI multiplexer is also consumed by Cache Redis when present.
+- Referencing this Data adapter activates the Redis backend. Referencing Cache Redis alone does not activate Data.
 
 ## Key conventions
 

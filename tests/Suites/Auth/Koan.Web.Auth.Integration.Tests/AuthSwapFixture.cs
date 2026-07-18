@@ -45,7 +45,7 @@ public sealed class AuthSwapFixture : IAsyncLifetime
             .ConfigureAppConfiguration(b => b.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 // offline-only, mirrors the bootstrap specs
-                ["Koan:Data:Redis:ConnectionString"] = "localhost:0",
+                ["ConnectionStrings:Redis"] = "localhost:0",
                 // Deliberately NO TestProvider:Enabled opt-in — this fixture runs in plain Development, exactly like
                 // the real deployment that filed the regression. The Test simulator endpoints must AUTO-MAP in
                 // Development (advertise ⇒ map, shared IsActive predicate); if they don't, every round-trip below

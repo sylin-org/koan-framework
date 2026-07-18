@@ -11,11 +11,11 @@
     <ProjectReference Include="..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\..\..\Koan.Orchestration.Aspire\Koan.Orchestration.Aspire.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Redis.Abstractions\Koan.Redis.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Redis\Koan.Redis.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="StackExchange.Redis" Version="2.9.32" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="Aspire.Hosting.Redis" Version="13.0.0" />
   </ItemGroup>
 </Project>

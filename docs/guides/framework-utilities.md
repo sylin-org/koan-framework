@@ -400,7 +400,7 @@ public static IServiceCollection ConfigureKoanOptions<TOptions>(
 public void Register(IServiceCollection services, IConfiguration configuration)
 {
     // Basic registration
-    services.AddKoanOptions<RedisOptions>(configuration, "Koan:Data:Redis");
+    services.AddKoanOptions<RedisOptions>("Koan:Redis");
 
     // With validation
     services.AddKoanOptionsWithValidation<PostgresOptions>(configuration, "Koan:Data:Postgres")

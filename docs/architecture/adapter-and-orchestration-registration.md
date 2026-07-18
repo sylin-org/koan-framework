@@ -68,7 +68,8 @@ Abstractions package so referencing vocabulary never activates the functional im
 - Cache adapters append `ICacheStore` with standard two-generic `TryAddEnumerable`; no Cache-specific registration helper or analyzer exists.
 - Providers declare stable identity, Local/Remote placement, truthful `CacheCaps`, and optional `[ProviderPriority]`.
 - One host-level `CacheTopology` compiles candidates, capabilities, pins, election receipts, and stable ties once.
-- Redis currently shares a connection owner with the functional Data Redis connector. That cross-functional activation is documented as an ungraduated boundary pending a backend-neutral contract; new adapters must not copy it.
+- Redis adapters reference `Sylin.Koan.Redis`: one backend-owned endpoint/discovery/pool lifecycle. Cache and Data keep
+  only their pillar semantics, and AppHost contributors reference the inert Aspire contract rather than its runtime.
 
 ## Orchestration Module Pattern
 
@@ -96,11 +97,12 @@ Samples should showcase the canonical Koan experience:
 | Scope                               | Evidence                                                                                                                                                                                                          |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Koan.Cache**                      | `CacheModule` owns the runtime; standard-DI candidates compile into one immutable Local/Remote topology with capability and receipt facts.                                                                         |
-| **Cache adapters – Memory, SQLite & Redis** | Adapter modules append providers with standard DI and truthful capabilities. SQLite is graduated; Redis's borrowed functional Data activation remains explicitly under assessment.                     |
+| **Cache adapters – Memory, SQLite & Redis** | Adapter modules append providers with standard DI and truthful capabilities. Redis consumes the shared backend without activating Data; SQLite and Redis have focused engine evidence.             |
 | **Data connectors**                 | Every shipping data adapter exposes one module whose `Register`/`Report` methods bind options, register discovery and health contributors, and avoid temporary service providers.                                |
 | **Orchestration host providers**    | Docker, Podman, and Compose expose domain-named modules that register providers, capture engine diagnostics, and participate in boot telemetry; modules with Aspire behavior implement `IKoanAspireResources`.     |
 | **Service Inbox Redis module**      | `Koan.Service.Inbox.Connector.Redis` ships as a reusable module with options binding, hosted announcement service, and controller registration surfaced through its module.                                      |
-| **Redis cache boundary**            | Cache Redis consumes the Data Redis connection owner and documents that transitive functional activation honestly; a backend-neutral contract remains future work.                                                |
+| **Redis backend boundary**          | `Koan.Redis` owns endpoint/discovery/orchestration/pooling; Cache and Data consume it independently and share the default multiplexer when composed.                                                                  |
+| **Aspire contributor boundary**     | `IKoanAspireResources` lives in inert `Koan.Orchestration.Aspire.Abstractions`; Redis/Postgres no longer activate the functional Aspire runtime for vocabulary.                                                       |
 | **Sample conformance**              | `KoanAspireIntegration`, `S8.Location.Api`, and `S15.RedisInbox` sample all rely on `.AddKoan()` fluents with Koan-provided helpers for Swagger, authorization, and static file handling.  |
 | **Authorization helper**            | `Koan.Web.Extensions.Authorization.AddKoanAuthorization` centralises policy registration and capability mapping, letting samples declare role policies without re-wiring MVC or capability infrastructure.        |
 
@@ -111,7 +113,7 @@ Samples should showcase the canonical Koan experience:
 | **Orchestration host providers** (`Connectors/Orchestration/Docker`, `Podman`, `Renderers/Compose`) | ✅ Resolved | Auto-registrars register the providers, publish engine diagnostics, and surface Aspire resources for zero-touch orchestration selection.                | Continue monitoring for new orchestration connectors to keep parity. |
 | **~~Connector – Web GraphQL~~** (`Koan.Web.Connector.GraphQl`)                                          | 🗄️ Attic'd 2026-06 | ~~Auto-registration now invokes `AddKoanGraphQl()`, binds options, and emits boot notes for schema endpoints.~~ Connector cut from `dev` (recoverable at git tag `attic/koan-web-graphql`).                                             | n/a — sole consumer was archived sample S4.                          |
 | **Connector – Service Inbox Redis** (`Koan.Service.Inbox.Connector.Redis`)                          | ✅ Resolved | Module exposes options, hosted announcement service, and controller registration via auto-registrar; executable host moved to `samples/S15.RedisInbox`. | Validate future inbox connectors follow the same pattern.            |
-| **Cache Redis backend boundary**                                                                     | 🟡 Open | Cache Redis currently obtains `IConnectionMultiplexer` from the functional Data Redis connector, so one Cache reference activates a second pillar.       | Design one backend-neutral Redis contract before package graduation. |
+| **Cache Redis backend boundary**                                                                     | ✅ Resolved | Cache Redis references the shared Redis backend; Cache-only composition proves no Redis Data provider is activated.                                  | Keep future Redis consumers on the same backend owner. |
 | **Samples – `KoanAspireIntegration`, `S8.Location.Api`**                                            | ✅ Resolved | Samples depend on `.AddKoan()` fluents, Koan-provided Swagger/authorization helpers, and no longer re-wire MVC manually.                                | Periodically audit additional samples to prevent regressions.        |
 
 ### Recommended fixes

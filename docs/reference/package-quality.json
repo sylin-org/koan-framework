@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 107,
+    "packages": 110,
     "repairRequired": 28,
     "reviewRequired": 48,
-    "structurallyReady": 31,
-    "ownedReadmes": 79,
-    "technicalCompanions": 69,
+    "structurallyReady": 34,
+    "ownedReadmes": 82,
+    "technicalCompanions": 72,
     "findings": 191
   },
   "findingDefinitions": [
@@ -546,7 +546,7 @@
       "shape": "library",
       "role": "provider",
       "status": "structurally-ready",
-      "description": "Redis-backed L2 cache store and layered every-node Communication provider for Koan.Cache, sharing Koan.Data.Connector.Redis\u0027s IConnectionMultiplexer.",
+      "description": "Redis-backed Remote Cache and layered every-node invalidation, using Koan\u0027s shared Redis backend without activating Data.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -554,7 +554,8 @@
         "Sylin.Koan.Cache",
         "Sylin.Koan.Cache.Abstractions",
         "Sylin.Koan.Communication",
-        "Sylin.Koan.Data.Connector.Redis"
+        "Sylin.Koan.Redis",
+        "Sylin.Koan.Redis.Abstractions"
       ],
       "readme": "src/Koan.Cache.Adapter.Redis/README.md",
       "technicalDocumentation": "src/Koan.Cache.Adapter.Redis/TECHNICAL.md",
@@ -1002,7 +1003,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Relational",
-        "Sylin.Koan.Orchestration.Aspire"
+        "Sylin.Koan.Orchestration.Aspire.Abstractions"
       ],
       "readme": "src/Connectors/Data/Postgres/README.md",
       "technicalDocumentation": "src/Connectors/Data/Postgres/TECHNICAL.md",
@@ -1023,7 +1024,8 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Orchestration.Aspire"
+        "Sylin.Koan.Redis",
+        "Sylin.Koan.Redis.Abstractions"
       ],
       "readme": "src/Connectors/Data/Redis/README.md",
       "technicalDocumentation": "src/Connectors/Data/Redis/TECHNICAL.md",
@@ -1683,7 +1685,8 @@
         "net10.0"
       ],
       "dependencies": [
-        "Sylin.Koan.Core"
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Orchestration.Aspire.Abstractions"
       ],
       "readme": "src/Koan.Orchestration.Aspire/README.md",
       "technicalDocumentation": "src/Koan.Orchestration.Aspire/TECHNICAL.md",
@@ -1693,6 +1696,22 @@
         "docs.readme.meaningful-use.missing",
         "docs.readme.package-title.missing"
       ]
+    },
+    {
+      "packageId": "Sylin.Koan.Orchestration.Aspire.Abstractions",
+      "projectPath": "src/Koan.Orchestration.Aspire.Abstractions/Koan.Orchestration.Aspire.Abstractions.csproj",
+      "shape": "library",
+      "role": "contracts",
+      "status": "structurally-ready",
+      "description": "Inert Aspire resource-contribution contract for Koan modules and backend adapters.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [],
+      "readme": "src/Koan.Orchestration.Aspire.Abstractions/README.md",
+      "technicalDocumentation": "src/Koan.Orchestration.Aspire.Abstractions/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Orchestration.Cli",
@@ -1798,6 +1817,42 @@
         "docs.readme.install.missing",
         "docs.readme.package-title.missing"
       ]
+    },
+    {
+      "packageId": "Sylin.Koan.Redis",
+      "projectPath": "src/Koan.Redis/Koan.Redis.csproj",
+      "shape": "library",
+      "role": "capability",
+      "status": "structurally-ready",
+      "description": "Shared Redis backend lifecycle, discovery, orchestration, and connection pooling for Koan adapters.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Orchestration.Aspire.Abstractions",
+        "Sylin.Koan.Redis.Abstractions"
+      ],
+      "readme": "src/Koan.Redis/README.md",
+      "technicalDocumentation": "src/Koan.Redis/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Redis.Abstractions",
+      "projectPath": "src/Koan.Redis.Abstractions/Koan.Redis.Abstractions.csproj",
+      "shape": "library",
+      "role": "contracts",
+      "status": "structurally-ready",
+      "description": "Inert connection-lifecycle contracts for Koan modules that share a Redis backend.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [],
+      "readme": "src/Koan.Redis.Abstractions/README.md",
+      "technicalDocumentation": "src/Koan.Redis.Abstractions/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Security.Trust",

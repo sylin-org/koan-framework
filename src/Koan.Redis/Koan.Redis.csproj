@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Shared Redis backend lifecycle, discovery, orchestration, and connection pooling for Koan adapters.</Description>
+    <PackageTags>$(CommonPackageTags);redis;backend;discovery;orchestration;pooling</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Orchestration.Aspire.Abstractions\Koan.Orchestration.Aspire.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Redis.Abstractions\Koan.Redis.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="StackExchange.Redis" Version="2.9.32" />
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.0.0" />
+  </ItemGroup>
+</Project>

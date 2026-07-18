@@ -46,7 +46,7 @@ public sealed class AuthE2EFixture : IAsyncLifetime
             // Offline-only, mirrors the bootstrap specs.
             .ConfigureAppConfiguration(cfg => cfg.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Koan:Data:Redis:ConnectionString"] = "localhost:0",
+                ["ConnectionStrings:Redis"] = "localhost:0",
             }))
             .ConfigureWebHost(web =>
             {

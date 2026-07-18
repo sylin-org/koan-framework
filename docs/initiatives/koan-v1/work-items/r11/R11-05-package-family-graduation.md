@@ -375,6 +375,129 @@ The Cache core/contracts and SQLite provider subfamily pass. Redis behavior and 
 package boundary remains open for a joint backend/Data decision. The complete release ratchet remains reserved for
 R11-07.
 
+### Redis shared-backend discovery
+
+**Task:** remove Cache Redis's transitive activation of the functional Data Redis connector and give Redis
+connection, discovery, orchestration, and host-lifetime pooling one backend-owned chokepoint.
+
+**Application intent:** reference Redis-backed Data, Redis-backed Cache, or both; configure one Redis endpoint once;
+retain `AddKoan()` as the only bootstrap expression. A Cache-only application must not acquire a Data provider merely
+because both capabilities use the same physical technology. When both adapters are referenced, they must reuse one
+default connection and one backend lifecycle.
+
+**Public expression:** applications reference `Sylin.Koan.Data.Connector.Redis` and/or
+`Sylin.Koan.Cache.Adapter.Redis`, keep `builder.Services.AddKoan()`, and use the standard
+`ConnectionStrings:Redis` key for the common endpoint. Data-only database/page settings remain Data-owned; Cache
+key/tag/database/channel settings remain Cache-owned. The shared-backend mechanism adds no application terminal,
+attribute, module ID, or manual registration.
+
+**Guarantee/correction:** a Cache-only reference activates Cache plus the Redis backend, never the Redis Data
+provider. A Data-only reference activates Data plus the same backend. Referencing both produces one host-owned default
+`IConnectionMultiplexer`; named Data sources reuse the same pool when endpoints coincide and receive one connection
+per distinct endpoint otherwise. Malformed/unreachable endpoints retain corrective Redis errors. Connection,
+discovery, orchestration, adapter participation, and health facts remain attributable to their actual owners.
+
+**Complete intent surface:**
+
+- Cache Redis alone: Redis is eligible as Remote Cache and for layered invalidation, with no Data adapter activation.
+- Data Redis alone: Redis is eligible as a Data provider and preserves source/database routing.
+- Both adapters: one backend module, default connection, discovery decision, and orchestration contribution are shared.
+- Multiple Data sources: explicit endpoints are pooled per host and per distinct connection; logical databases remain
+  Data routing, not backend identity.
+- Explicit endpoint: `ConnectionStrings:Redis` wins; `Koan:Redis` owns backend-specific discovery controls.
+- Automatic endpoint: the backend owns local/container/Aspire discovery and explains the result once.
+- Failure: invalid configuration fails with a Redis-specific correction; an unelected Data provider remains
+  non-critical through Data's existing participation-aware health policy.
+- Removal: removing the last Redis adapter reference removes the backend transitively and leaves no Redis module.
+
+**Public concepts:** no new application concept. Module authors that need source-aware Redis reuse gain one narrow inert
+contract, `IRedisConnectionProvider`; ordinary consumers continue to inject StackExchange.Redis's standard
+`IConnectionMultiplexer`. `Koan.Redis` is a functional backend package and `Koan.Redis.Abstractions` contains only the
+cross-module contract, satisfying the isolated-contract mandate without `Inert` metadata.
+
+**Docs read:** engineering front door; product constitution; architecture principles; adapter/orchestration
+registration standard; current Data Redis and Cache Redis README/TECHNICAL companions; documentation TOC; historical
+ARCH-0080 only as prior decision context (it remains unchanged).
+
+**Code read:** Data Redis project/module/options/configurator, connection factory and source pool, adapter factory,
+health contributor, discovery adapter, orchestration evaluator, constants and provenance; Cache Redis project/module,
+options, store, layered Communication adapter and constants; Cache Redis and bootstrap fixtures; Core Data source and
+routed-connection resolution; ZenGarden contract isolation as the closest package-boundary precedent; repository
+package/version/solution conventions; all current `IConnectionMultiplexer`, Redis configuration, and Redis package
+consumers outside generated output.
+
+**Reusing:** standard `IConnectionMultiplexer`; standard .NET DI/options/configuration/lifetime disposal; Koan's
+`KoanModule`, service discovery, orchestration, Aspire-resource, provenance, and health contribution seams; Data's
+`AdapterConnectionResolver`, `DataSourceRegistry`, provider-aware health, and source/database routing; Cache's compiled
+topology and existing Redis store/Communication contracts.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| `IRedisConnectionProvider` | `src/Koan.Redis.Abstractions` | One inert cross-module seam is required to share the default connection and source-aware pool without exposing a functional adapter as vocabulary. |
+| Redis backend module/options/provider/discovery/orchestration | `src/Koan.Redis` | Redis lifecycle and endpoint resolution currently sit incorrectly inside Data; two independent consumers prove a backend owner exists. |
+| `IKoanAspireResources` isolation | `src/Koan.Orchestration.Aspire.Abstractions` | Redis exposed that the Aspire contribution contract still lived in a functional module; isolate it once so Redis/Postgres contributors do not activate the Aspire runtime merely to describe resources. |
+| focused backend-boundary evidence | Redis/Cache/Data focused suites | Proves Cache-only activation, shared default identity, source pooling, and retained adapter behavior without a release certification run. |
+
+**Coalescence:** move connection construction, default/source pooling, endpoint configuration, discovery,
+`KoanService` metadata, orchestration, Aspire resource declaration, and their provenance from Data Redis into one Redis
+backend. Data Redis becomes a thin Data adapter: repository mechanics, database/source routing, Data capabilities, and
+provider-aware health. Cache Redis remains a thin Cache/Communication adapter. Delete Data's private duplicate
+connection owner and Cache's borrowed-owner prose. A Core abstraction is rejected because Core must not depend on
+StackExchange.Redis; duplicate `TryAddSingleton` registrations are rejected because registration order would become
+a second ownership policy; a public helper in either functional adapter is rejected by the isolated-contract mandate.
+The same mandate moves `IKoanAspireResources` out of the functional Aspire runtime; Redis and Postgres then reference
+inert Aspire vocabulary while only an AppHost that intentionally references the runtime activates it.
+
+**Ergonomics:** the human and model sentence becomes “reference Redis Cache/Data, configure Redis once, use the normal
+Entity/Cache surface.” IntelliSense gains no new application ceremony. Module developers use one purposeful provider
+contract only when they need multiple Redis sources; simple consumers use the ecosystem-standard multiplexer. Operators
+and agents see Redis endpoint/lifecycle once, then Data and Cache participation separately, so physical infrastructure
+and semantic capability are no longer conflated.
+
+**Constraints satisfied:** standard .NET carries connection identity; contracts are isolated and inert; functional
+activation remains reference-driven; no legacy alias is taught in current docs; no `Inert` project metadata or custom
+module identity is introduced; stable constants and typed options own configuration; no Entity/HTTP surface changes;
+ADRs remain historical; only focused builds/tests/packages run until R11-07.
+
+**Risks:** moving the canonical key from `Koan:Data:Redis:ConnectionString` to `ConnectionStrings:Redis` requires a
+current-doc/test sweep; source pooling must not eagerly connect the default endpoint when only an explicit named source
+is used; Aspire/discovery must not be registered twice; Cache topology currently constructs eligible stores during
+composition, so a referenced Redis Remote candidate can still resolve its connection at startup; generated package
+truth grows by three packages and must classify them honestly rather than declaring graduation from structure alone.
+
+### Redis shared-backend evidence
+
+- `Sylin.Koan.Redis` is now the only functional owner of Redis endpoint configuration, autonomous discovery,
+  orchestration/Aspire contribution, connection creation, pooling, and host-lifetime disposal. It publishes the
+  standard `IConnectionMultiplexer` for ordinary consumers and the narrow `IRedisConnectionProvider` only for
+  source-aware modules.
+- Data Redis is thin: it owns repository mechanics, logical database/source routing, Data capabilities, and
+  provider-aware health. Its private connection factory, source pool, discovery adapter, orchestration evaluator,
+  backend configuration, and `KoanService` ownership are deleted.
+- Cache Redis is thin: it owns Remote Cache storage and layered invalidation semantics, references the shared backend,
+  and no longer references or activates the functional Data Redis package. A focused boundary spec proves a
+  Cache-only host resolves Redis while exposing no Redis `IDataAdapterFactory`.
+- `IKoanAspireResources` now lives in the inert `Sylin.Koan.Orchestration.Aspire.Abstractions` package. Redis and
+  Postgres can describe resources without activating the functional Aspire runtime; the runtime alone discovers and
+  executes contributors. No `Inert` metadata or custom module identity was introduced.
+- The supported application expression is one adapter reference, the existing `AddKoan()`, and optionally
+  `ConnectionStrings:Redis`. Current tests and public docs no longer teach the Data-owned connection key. Data and
+  Cache options remain under their own concern-specific sections.
+- Focused behavior passes: Cache Redis 6/6, including Cache-only activation; Data Redis 12/12, including source and
+  shared-default routing. The new and affected Redis/Aspire/Postgres projects build warning-clean.
+- Seven focused packages contain their DLL/XML, package-owned README, canonical `icon.png`, symbols, and
+  build-transitive composition metadata. Their nuspec dependency graph carries the shared backend/contracts without
+  pulling Data into Cache or functional Aspire into resource contributors. The three new packages have no vulnerable
+  direct or transitive dependencies in the current NuGet audit.
+- Generated truth now contains 110 packages: 28 repair-required, 48 review-required, and 34 structurally ready. The
+  new Redis backend, Redis contracts, and Aspire contracts have zero objective package-quality findings; product
+  surface truth describes all three without promoting an unevidenced public claim.
+
+The Redis backend, Data provider, Cache provider, and Aspire contribution-contract boundaries pass this family
+slice. The complete release ratchet remains reserved for R11-07.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

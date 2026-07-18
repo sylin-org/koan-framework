@@ -20,7 +20,7 @@ public sealed class RedisAdapterFactory : AdapterTestFactoryBase
         ["Koan:Environment"] = "Test",
         ["Koan:Data:Sources:Default:Adapter"] = "redis",
         ["Koan:Data:Sources:Default:ConnectionString"] = _redis.ConnectionString,
-        ["Koan:Data:Redis:ConnectionString"] = _redis.ConnectionString,
+        ["ConnectionStrings:Redis"] = _redis.ConnectionString,
         ["Koan:BackgroundServices:Enabled"] = "false",
         ["Logging:LogLevel:Default"] = "Warning",
     };

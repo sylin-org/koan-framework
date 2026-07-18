@@ -11,14 +11,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting" Version="13.0.0" />
-    <!-- Transitive-vulnerability override: Aspire.Hosting 13.0.0 pulls MessagePack 2.5.192, affected by
-         CVE-2026-48109 (GHSA-hv8m-jj95-wg3x, high/8.2 — LZ4 out-of-bounds-read DoS). Pin the patched 2.5.x release;
-         staying on the 2.5.x line keeps it API-compatible with what Aspire.Hosting expects. This is the single
-         chokepoint: every other framework project that references an Aspire.Hosting.* package (the Postgres / PGVector
-         / Redis connectors) also ProjectReferences THIS project, so the 2.5.301 floor propagates to all of them and
-         their consumers (verified clean per the `dotnet list package` vulnerability scan on each). Remove once Aspire.Hosting's
-         own transitive MessagePack floor is >= 2.5.301. -->
-    <PackageReference Include="MessagePack" Version="2.5.301" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
@@ -26,5 +18,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Orchestration.Aspire.Abstractions\Koan.Orchestration.Aspire.Abstractions.csproj" />
   </ItemGroup>
 </Project>

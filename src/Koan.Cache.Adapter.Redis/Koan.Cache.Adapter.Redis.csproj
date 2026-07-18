@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Koan.Cache.Adapter.Redis</AssemblyName>
     <RootNamespace>Koan.Cache.Adapter.Redis</RootNamespace>
-    <Description>Redis-backed L2 cache store and layered every-node Communication provider for Koan.Cache, sharing Koan.Data.Connector.Redis's IConnectionMultiplexer.</Description>
+    <Description>Redis-backed Remote Cache and layered every-node invalidation, using Koan's shared Redis backend without activating Data.</Description>
     <PackageTags>$(CommonPackageTags);cache;adapter;redis;l2;coherence</PackageTags>
   </PropertyGroup>
   <ItemGroup>
@@ -14,10 +14,11 @@
     <ProjectReference Include="..\Koan.Cache.Abstractions\Koan.Cache.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Communication\Koan.Communication.csproj"
                       />
-    <ProjectReference Include="..\Connectors\Data\Redis\Koan.Data.Connector.Redis.csproj"
-                      />
+    <ProjectReference Include="..\Koan.Redis.Abstractions\Koan.Redis.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Redis\Koan.Redis.csproj" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
+    <PackageReference Include="StackExchange.Redis" Version="2.9.32" />
   </ItemGroup>
 </Project>

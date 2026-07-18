@@ -22,7 +22,7 @@ validation:
 | Area                             | Types                                                                                                                            | Notes                                                                                                                                                                               |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Discovery & wiring               | `KoanAspireExtensions`, `KoanAssemblyDiscovery`, `KoanDiscoveryResult`                                                           | Scans loaded assemblies, queues registrars by priority, handles logging, and returns resource names.                                                                                |
-| Aspire resource contract         | `IKoanAspireResources`                                                                                                           | Optional capability on the assembly's single `KoanModule`, with `RegisterAspireResources`, `Priority`, and `ShouldRegister`.                                                        |
+| Aspire resource contract         | `IKoanAspireResources` from `Sylin.Koan.Orchestration.Aspire.Abstractions`                                                       | Inert optional capability on the assembly's single `KoanModule`, with `RegisterAspireResources`, `Priority`, and `ShouldRegister`.                                                 |
 | Orchestration module             | `Initialization.AspireModule`                                                                                                    | Detects `KoanEnv.OrchestrationMode`, injects matching config providers, registers self-orchestration hosted service in `SelfOrchestrating` mode, and contributes boot report notes. |
 | Self orchestration               | `DockerContainerManager`, `KoanDependencyOrchestrator`, `KoanSelfOrchestrationService`, `SelfOrchestrationConfigurationProvider` | Spins up dependencies via Docker, waits for health, cleans orphaned containers, and synthesizes connection strings for local usage.                                                 |
 | Configuration adapters           | `SelfOrchestrationConfigurationProvider`, `DockerComposeConfigurationProvider`, `KubernetesConfigurationProvider`                | Inject connection strings + orchestration metadata per detected mode without forcing app code changes.                                                                              |
@@ -43,6 +43,8 @@ validation:
 
 ## Aspire resource contract (`IKoanAspireResources`)
 
+- The contract lives in the isolated `Sylin.Koan.Orchestration.Aspire.Abstractions` package. Referencing its
+  vocabulary does not activate this functional Aspire runtime.
 - Implemented by the functional assembly's single `KoanModule`, keeping DI and AppHost resource ownership on one semantic owner.
 - Members:
   - `RegisterAspireResources(builder, configuration, environment)` – create Aspire resources (databases, caches, external services) from configuration.
@@ -84,7 +86,7 @@ validation:
 
 ## Validation notes
 
-- Focused code reviewed: `Extensions/KoanAspireExtensions.cs`, `Discovery/KoanAssemblyDiscovery.cs`, `IKoanAspireResources.cs`, `Initialization/AspireModule.cs`, and `SelfOrchestration/*` on 2026-07-17.
+- Focused code reviewed: `Extensions/KoanAspireExtensions.cs`, `Discovery/KoanAssemblyDiscovery.cs`, the isolated Aspire contract, `Initialization/AspireModule.cs`, and `SelfOrchestration/*` on 2026-07-17.
 - Confirmed that self-orchestration only activates in `KoanEnv.OrchestrationMode == SelfOrchestrating` and that configuration providers are mode-specific.
 - Verified container cleanup paths tag with `koan.session`, `koan.app-instance`, and auto-cleanup labels.
 - Doc build (`docs:build`) executed post-update; build passes with existing backlog warnings (unrelated XML comments in data-backup projects).

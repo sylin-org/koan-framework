@@ -1,14 +1,13 @@
-using Microsoft.Extensions.Logging;
 using Koan.Core;
 using Koan.Core.Logging;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
-namespace Koan.Data.Connector.Redis;
+namespace Koan.Redis.Connections;
 
-/// <summary>Owns the one connection-construction policy shared by default and named Redis sources.</summary>
 internal static class RedisConnectionFactory
 {
-    public static IConnectionMultiplexer Connect(string connectionString, ILogger? logger = null)
+    internal static IConnectionMultiplexer Connect(string connectionString, ILogger? logger = null)
     {
         var abortConnectImplicitlyDefaulted =
             !connectionString.Contains("abortConnect", StringComparison.OrdinalIgnoreCase);
@@ -17,9 +16,7 @@ internal static class RedisConnectionFactory
         {
             var options = ConfigurationOptions.Parse(connectionString);
             if (abortConnectImplicitlyDefaulted)
-            {
                 options.AbortOnConnectFail = false;
-            }
 
             var multiplexer = ConnectionMultiplexer.Connect(options);
             if (abortConnectImplicitlyDefaulted &&
@@ -30,20 +27,16 @@ internal static class RedisConnectionFactory
                     logger,
                     Infrastructure.Constants.Logging.Connection,
                     "disconnected",
-                    ("connection", connectionString),
+                    ("connection", Redaction.DeIdentify(connectionString)),
                     ("abortOnConnectFail", false),
-                    ("guidance", "The host remains available, but Redis operations will fail until this source is reachable. Pin abortConnect=true to fail fast."));
+                    ("guidance", "The host remains available, but Redis operations will fail until this endpoint is reachable. Pin abortConnect=true to fail fast."));
             }
 
             return multiplexer;
         }
         catch (RedisConnectionException ex)
         {
-            KoanLog.BootError(
-                logger,
-                Infrastructure.Constants.Logging.Connection,
-                "failed",
-                ("error", ex));
+            KoanLog.BootError(logger, Infrastructure.Constants.Logging.Connection, "failed", ("error", ex));
             throw new InvalidOperationException(
                 $"Redis is not available. Connection string: {Redaction.DeIdentify(connectionString)}. " +
                 "Ensure Redis is running or use the Aspire AppHost for managed Redis.",
@@ -51,15 +44,10 @@ internal static class RedisConnectionFactory
         }
         catch (Exception ex) when (ex is ArgumentException or FormatException)
         {
-            KoanLog.BootError(
-                logger,
-                Infrastructure.Constants.Logging.Connection,
-                "malformed",
-                ("error", ex));
+            KoanLog.BootError(logger, Infrastructure.Constants.Logging.Connection, "malformed", ("error", ex));
             throw new InvalidOperationException(
                 $"Redis connection string is malformed and could not be parsed: {Redaction.DeIdentify(connectionString)}. " +
-                "Expected StackExchange.Redis configuration syntax (e.g., 'localhost:6379' or " +
-                "'host1:6379,host2:6379,abortConnect=false'). See https://stackexchange.github.io/StackExchange.Redis/Configuration.",
+                "Expected StackExchange.Redis configuration syntax (for example, 'localhost:6379').",
                 ex);
         }
     }

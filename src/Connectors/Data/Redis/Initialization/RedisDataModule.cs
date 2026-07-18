@@ -1,31 +1,20 @@
-using System;
+using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Modules;
+using Koan.Core.Provenance;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Koan.Core;
-using Koan.Core.Hosting.Bootstrap;
-using Koan.Core.Logging;
-using Koan.Core.Modules;
-using Koan.Core.Orchestration;
-using Koan.Core.Orchestration.Abstractions;
-using Koan.Data.Abstractions;
-using Koan.Data.Abstractions.Naming;
-using Koan.Data.Connector.Redis.Orchestration;
-using StackExchange.Redis;
-using Koan.Orchestration.Aspire;
-using Aspire.Hosting;
-using Microsoft.Extensions.Logging.Abstractions;
-using Koan.Data.Connector.Redis.Discovery;
-using Koan.Core.Provenance;
 using RedisItems = Koan.Data.Connector.Redis.Infrastructure.RedisProvenanceItems;
-using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Connector.Redis.Initialization;
 
-public sealed class RedisDataModule : KoanModule, IKoanAspireResources
+/// <summary>Contributes Redis repository mechanics; <c>Koan.Redis</c> owns the shared backend lifecycle.</summary>
+public sealed class RedisDataModule : KoanModule
 {
     public override void Register(IServiceCollection services)
     {
@@ -33,171 +22,37 @@ public sealed class RedisDataModule : KoanModule, IKoanAspireResources
         services.AddSingleton<IConfigureOptions<RedisOptions>, RedisOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, RedisHealthContributor>());
-
-        // Register orchestration evaluator for dependency management
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, RedisOrchestrationEvaluator>());
-
-        // Register Redis discovery adapter (maintains "Reference = Intent")
-        // Adding Koan.Data.Connector.Redis automatically enables Redis discovery capabilities
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, Discovery.RedisDiscoveryAdapter>());
-
         services.AddSingleton<IDataAdapterFactory, RedisAdapterFactory>();
-        services.AddSingleton<RedisSourceConnectionPool>();
-
-        // Only register connection multiplexer if Redis is available or in Aspire context
-        RegisterConnectionMultiplexer(services);
     }
 
-    private void RegisterConnectionMultiplexer(IServiceCollection services)
-    {
-        services.AddSingleton<IConnectionMultiplexer>(sp =>
-        {
-            var cfg = sp.GetRequiredService<IOptions<RedisOptions>>().Value;
-            var cs = cfg.ConnectionString;
-            if (string.IsNullOrWhiteSpace(cs))
-            {
-                cs = KoanEnv.InContainer ? Infrastructure.Constants.Discovery.DefaultCompose : Infrastructure.Constants.Discovery.DefaultLocal;
-            }
-
-            var logger = sp.GetService<ILogger<RedisDataModule>>();
-            KoanLog.BootDebug(logger, Infrastructure.Constants.Logging.Connection, "attempt",
-                ("connection", cs));
-
-            return RedisConnectionFactory.Connect(cs, logger);
-        });
-    }
-
-    public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
+    public override void Report(
+        Koan.Core.Provenance.ProvenanceModuleWriter module,
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         module.Describe(Version);
-        // Autonomous discovery adapter handles all connection string resolution
-        // Boot report shows discovery results from RedisDiscoveryAdapter
-        module.AddNote("Redis discovery handled by autonomous RedisDiscoveryAdapter");
+        module.AddNote("Redis endpoint discovery and connection lifetime are owned by Sylin.Koan.Redis.");
         module.AddNote("AODB isolation: RowScoped + ContainerScoped + DatabaseScoped (conformance: AodbConformanceSpecsBase)");
 
-        // Configure default options for reporting (with provenance)
-        var defaultOptions = new RedisOptions();
-
-        var connection = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.ConnectionString,
-            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.ConnectionString}",
-            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.ConnectionString}",
-            "ConnectionStrings:Redis",
-            "ConnectionStrings:Default");
-
+        var defaults = new RedisOptions();
         var database = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.Database,
-            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.Database}",
-            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.Database}");
-
+            configuration,
+            defaults.Database,
+            Infrastructure.Constants.Configuration.Keys.Database,
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:Database");
         var defaultPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.DefaultPageSize,
-            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.DefaultPageSize}",
-            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.DefaultPageSize}");
-
+            configuration,
+            defaults.DefaultPageSize,
+            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:DefaultPageSize");
         var ensureCreated = Configuration.ReadFirstWithSource(
-            cfg,
+            configuration,
             true,
             $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported}",
             $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported}");
-
-        var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
-        var connectionSourceKey = connection.ResolvedKey ??
-            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.ConnectionString}";
-
-        var effectiveConnectionString = connection.Value ?? defaultOptions.ConnectionString;
-        if (connectionIsAuto)
-        {
-            var adapter = new RedisDiscoveryAdapter(cfg, NullLogger<RedisDiscoveryAdapter>.Instance);
-            effectiveConnectionString = ServiceDiscoveryReporting.ResolveConnectionString(
-                cfg,
-                adapter,
-                null,
-                () => BuildRedisFallback(defaultOptions));
-        }
-
-        var connectionMode = connectionIsAuto
-            ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
-            : ProvenanceModes.FromConfigurationValue(connection);
-
-        module.PublishConfigValue(
-            RedisItems.ConnectionString,
-            connection,
-            displayOverride: effectiveConnectionString,
-            modeOverride: connectionMode,
-            usedDefaultOverride: connectionIsAuto ? true : connection.UsedDefault,
-            sourceKeyOverride: connectionSourceKey);
 
         module.PublishConfigValue(RedisItems.Database, database);
         module.PublishConfigValue(RedisItems.EnsureCreatedSupported, ensureCreated);
         module.PublishConfigValue(RedisItems.DefaultPageSize, defaultPageSize);
     }
-
-    private static string BuildRedisFallback(RedisOptions defaults)
-    {
-        if (!string.IsNullOrWhiteSpace(defaults.ConnectionString) &&
-            !string.Equals(defaults.ConnectionString, "auto", StringComparison.OrdinalIgnoreCase))
-        {
-            return defaults.ConnectionString;
-        }
-
-        return KoanEnv.InContainer
-            ? Infrastructure.Constants.Discovery.DefaultCompose
-            : Infrastructure.Constants.Discovery.DefaultLocal;
-    }
-
-    // IKoanAspireResources implementation
-    public void RegisterAspireResources(IDistributedApplicationBuilder builder, IConfiguration configuration, IHostEnvironment environment)
-    {
-        var options = new RedisOptions();
-        new RedisOptionsConfigurator(configuration).Configure(options);
-
-        // ARCH-0068: Use static ConnectionStringParser for unified parsing
-        var components = Koan.Core.Orchestration.ConnectionStringParser.Parse(
-            options.ConnectionString ?? "localhost:6379",
-            "redis");
-
-        var redis = builder.AddRedis("redis", port: components.Port)
-            .WithDataVolume();
-
-        // Set password if one is provided and not empty
-        if (!string.IsNullOrEmpty(components.Password))
-        {
-            redis.WithEnvironment("REDIS_PASSWORD", components.Password);
-        }
-
-        // Set default database if not 0
-        if (options.Database != 0)
-        {
-            redis.WithEnvironment("REDIS_DEFAULT_DB", options.Database.ToString());
-        }
-
-        // TODO: Configure proper health check for Redis
-        // redis.WithHealthCheck("/health");
-    }
-
-    public int Priority => 200; // Cache infrastructure registers after databases but before apps
-
-    public bool ShouldRegister(IConfiguration configuration, IHostEnvironment environment)
-    {
-        // Register in development environments or when explicitly configured
-        return environment.IsDevelopment() || HasExplicitConfiguration(configuration);
-    }
-
-    private bool HasExplicitConfiguration(IConfiguration configuration)
-    {
-        // Check if there's explicit Redis configuration
-        var options = new RedisOptions();
-        new RedisOptionsConfigurator(configuration).Configure(options);
-
-        return !string.IsNullOrEmpty(options.ConnectionString) ||
-               !string.IsNullOrEmpty(configuration["Redis:ConnectionString"]) ||
-               !string.IsNullOrEmpty(configuration["ConnectionStrings:Redis"]);
-    }
-
 }
-
-

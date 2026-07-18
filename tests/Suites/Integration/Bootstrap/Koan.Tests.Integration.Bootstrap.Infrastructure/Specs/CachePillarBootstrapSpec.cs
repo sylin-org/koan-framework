@@ -105,17 +105,15 @@ public sealed class CachePillarBootstrapSpec(RedisFixture redis, ITestOutputHelp
     /// bootstrap smoke. Tests call <c>.StartAsync(ct)</c> on the returned builder to get a started host.
     /// </summary>
     /// <remarks>
-    /// Per ARCH-0080, <c>IConnectionMultiplexer</c> is owned by <c>Koan.Data.Connector.Redis</c> and
-    /// reads from the canonical <c>Koan:Data:Redis:ConnectionString</c> key. The cache adapter consumes
-    /// the multiplexer via DI and only owns cache-specific options (key/tag prefixes, channel name).
+    /// <c>Koan.Redis</c> owns the shared <c>IConnectionMultiplexer</c>; the Cache adapter owns only
+    /// cache-specific options (key/tag prefixes, channel name).
     /// </remarks>
     private static KoanIntegrationHost.Builder BuildBootstrapHost(string redisConnectionString, string sqliteDbPath, Guid executionId)
     {
         var token = executionId.ToString("N");
         return KoanIntegrationHost.Configure()
-            // ARCH-0080: data connector owns IConnectionMultiplexer; this is the canonical key.
-            .WithSetting("Koan:Data:Redis:ConnectionString", redisConnectionString)
-            .WithSetting("Koan:Data:Redis:DisableAutoDetection", "true")
+            .WithSetting("ConnectionStrings:Redis", redisConnectionString)
+            .WithSetting("Koan:Redis:DisableAutoDetection", "true")
             // Cache-adapter-owned options (prefixes + channel name).
             .WithSetting(CacheConstants.Configuration.Redis.KeyPrefix, $"boot:{token}:")
             .WithSetting(CacheConstants.Configuration.Redis.TagPrefix, $"boot:tag:{token}:")

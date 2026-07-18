@@ -83,7 +83,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.App` | `entry` | `keep` |
 | `Sylin.Koan.Cache` | `capability` | `keep` |
 | `Sylin.Koan.Cache.Abstractions` | `contracts` | `keep` |
-| `Sylin.Koan.Cache.Adapter.Redis` | `provider` | `assess` |
+| `Sylin.Koan.Cache.Adapter.Redis` | `provider` | `keep` |
 | `Sylin.Koan.Cache.Adapter.Sqlite` | `provider` | `keep` |
 | `Sylin.Koan.Canon` | `capability` | `assess` |
 | `Sylin.Koan.Canon.Contracts` | `contracts` | `assess` |
@@ -104,7 +104,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Data.Connector.Mongo` | `provider` | `assess` |
 | `Sylin.Koan.Data.Connector.OpenSearch` | `provider` | `assess` |
 | `Sylin.Koan.Data.Connector.Postgres` | `provider` | `assess` |
-| `Sylin.Koan.Data.Connector.Redis` | `provider` | `assess` |
+| `Sylin.Koan.Data.Connector.Redis` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Sqlite` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.SqlServer` | `provider` | `assess` |
 | `Sylin.Koan.Data.Core` | `capability` | `keep` |
@@ -134,12 +134,15 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Media.Web` | `projection` | `assess` |
 | `Sylin.Koan.Observability` | `capability` | `assess` |
 | `Sylin.Koan.Orchestration.Abstractions` | `contracts` | `keep` |
+| `Sylin.Koan.Orchestration.Aspire.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Orchestration.Aspire` | `projection` | `assess` |
 | `Sylin.Koan.Orchestration.Cli` | `tool` | `assess` |
 | `Sylin.Koan.Orchestration.Connector.Docker` | `provider` | `assess` |
 | `Sylin.Koan.Orchestration.Connector.Podman` | `provider` | `assess` |
 | `Sylin.Koan.Orchestration.Generators` | `analyzer` | `assess` |
 | `Sylin.Koan.Orchestration.Renderers.Connector.Compose` | `provider` | `assess` |
+| `Sylin.Koan.Redis` | `provider` | `keep` |
+| `Sylin.Koan.Redis.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Security.Trust` | `capability` | `assess` |
 | `Sylin.Koan.Storage` | `capability` | `keep` |
 | `Sylin.Koan.Storage.Abstractions` | `contracts` | `keep` |
@@ -209,7 +212,11 @@ terminal package decisions; the listed boundary repairs happen before graduation
 | `Sylin.Koan.Cache` | `keep` | Entity-first Cache runtime and the single owner of policy materialization, physical identity, compiled Local/Remote election, tier execution, serialization, coherence meaning, health, and facts. |
 | `Sylin.Koan.Cache.Adapter.Sqlite` | `keep` | Persistent Local provider selected by one reference. It proves exact tags, schema migration, sliding expiration, and restart persistence without adding application registration. |
 | `Sylin.Koan.Cache.Analyzers` | `retire` (implemented) | It enforced a Cache-specific DI helper that duplicated standard two-generic `TryAddEnumerable`. The helper, analyzer, test package, and package identity were removed; modules now use ordinary .NET DI. |
-| `Sylin.Koan.Cache.Adapter.Redis` | `assess` | Its Cache and layered Communication behavior is real, but it currently borrows `IConnectionMultiplexer` from the functional Data Redis connector, so referencing Cache Redis also activates Data Redis. A joint backend-contract decision is required before terminal graduation. |
+| `Sylin.Koan.Cache.Adapter.Redis` | `keep` | Redis Remote Cache and layered invalidation are distinct, evidenced mechanics. The adapter references the shared Redis backend, activates no Data provider, and adds no Cache-specific bootstrap code. |
+| `Sylin.Koan.Data.Connector.Redis` | `keep` | Redis-backed Entity persistence remains a distinct Data provider. It now owns only repository behavior, logical database/source routing, Data capabilities, and participation-aware health while the shared Redis backend owns physical connectivity. |
+| `Sylin.Koan.Redis.Abstractions` | `keep` | Inert source-aware connection-pool vocabulary shared by Redis-backed modules; simple consumers continue to use StackExchange.Redis's standard `IConnectionMultiplexer`. |
+| `Sylin.Koan.Redis` | `keep` | One functional owner for Redis endpoint configuration, discovery, orchestration, connection pooling, and host-lifetime disposal. It contains no Data, Cache, or Communication semantics and normally arrives transitively. |
+| `Sylin.Koan.Orchestration.Aspire.Abstractions` | `keep` | Inert `IKoanAspireResources` vocabulary independently consumed by resource contributors. Its extraction prevents Redis/Postgres modules from activating the functional Aspire runtime merely to describe AppHost resources. |
 | `Sylin.Koan.Media.Abstractions` | `keep` | Inert recipe, pipeline, registry, output, and media-object vocabulary. Functional `MediaEntity<TEntity>` moved out; the package now depends only on Data and Storage contract assemblies. |
 | `Sylin.Koan.Media.Core` | `keep` | Functional owner of Entity-backed originals, content-addressed storage semantics, recipe discovery/validation, image planning/execution, and Media runtime facts. The application type now lives in the honest `Koan.Media` namespace. |
 | `Sylin.Koan.Data.Abstractions` | `keep` | Entity and repository vocabulary independently consumed by providers, projections, and modules without selecting a data runtime or backend. Its legacy ASP.NET JSON Patch dependency and duplicate object-shaped patch path were removed; the boundary now exposes one provider-neutral `PatchPayload`. |

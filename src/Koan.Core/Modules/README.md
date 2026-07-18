@@ -29,10 +29,7 @@ using Koan.Core.Modules;
 public override void Register(IServiceCollection services)
 {
     // Basic registration
-    services.AddKoanOptions<RedisOptions>(
-        configuration,
-        "Koan:Data:Redis"
-    );
+    services.AddKoanOptions<RedisOptions>("Koan:Redis");
 
     // With validation
     services.AddKoanOptionsWithValidation<PostgresOptions>(

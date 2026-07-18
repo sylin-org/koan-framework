@@ -6,21 +6,12 @@ using Koan.Data.Abstractions;
 using Koan.Core;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
-using Koan.Core.Services;
+using Koan.Redis;
 using StackExchange.Redis;
 
 namespace Koan.Data.Connector.Redis;
 
 [ProviderPriority(5)]
-[KoanService(ServiceKind.Cache, shortCode: "redis", name: "Redis",
-    ContainerImage = "redis",
-    DefaultTag = "7",
-    DefaultPorts = new[] { 6379 },
-    Capabilities = new[] { "protocol=redis" },
-    Volumes = new[] { "./Data/redis:/data" },
-    AppEnv = new[] { "Koan__Data__Redis__Endpoint={scheme}://{host}:{port}" },
-    Scheme = "redis", Host = "redis", EndpointPort = 6379, UriPattern = "redis://{host}:{port}",
-    LocalScheme = "redis", LocalHost = "localhost", LocalPort = 6379, LocalPattern = "redis://{host}:{port}")]
 public sealed class RedisAdapterFactory : IDataAdapterFactory
 {
     public string Provider => "redis";
@@ -43,20 +34,19 @@ public sealed class RedisAdapterFactory : IDataAdapterFactory
         var baseOpts = sp.GetRequiredService<IOptions<RedisOptions>>().Value;
         var config = sp.GetRequiredService<IConfiguration>();
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
+        var connections = sp.GetRequiredService<IRedisConnectionProvider>();
 
         var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
             config,
             sourceRegistry,
             Provider,
             source,
-            baseOpts.ConnectionString,
+            connections.DefaultConnectionString,
             this);
         var database = AdapterConnectionResolver.GetSourceSetting(
             config, sourceRegistry, Provider, source, "Database", baseOpts.Database, this);
 
-        var connection = string.Equals(connectionString, baseOpts.ConnectionString, StringComparison.Ordinal)
-            ? sp.GetRequiredService<IConnectionMultiplexer>()
-            : sp.GetRequiredService<RedisSourceConnectionPool>().Get(connectionString);
+        var connection = connections.GetConnection(connectionString);
 
         return new RedisSourceRoute(connection, database, source);
     }

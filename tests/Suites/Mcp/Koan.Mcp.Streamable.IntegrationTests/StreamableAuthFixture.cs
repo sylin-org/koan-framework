@@ -38,7 +38,7 @@ public sealed class StreamableAuthFixture : IAsyncLifetime
         _host = Host.CreateDefaultBuilder()
             .ConfigureAppConfiguration(b => b.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Koan:Data:Redis:ConnectionString"] = "localhost:0",
+                ["ConnectionStrings:Redis"] = "localhost:0",
             }))
             .ConfigureWebHostDefaults(web =>
             {

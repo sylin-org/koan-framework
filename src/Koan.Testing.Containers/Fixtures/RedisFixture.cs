@@ -33,6 +33,6 @@ public sealed class RedisFixture : KoanContainerFixture
 
     protected override IEnumerable<KeyValuePair<string, string?>> ExtraSettings(string connectionString) => new[]
     {
-        new KeyValuePair<string, string?>("Koan:Data:Redis:ConnectionString", connectionString),
+        new KeyValuePair<string, string?>("ConnectionStrings:Redis", connectionString),
     };
 }

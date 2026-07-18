@@ -7,7 +7,7 @@ Redis provider for Koan data - key-value storage with options binding, health ch
 
 ## Capabilities
 
-- Connection multiplexer management via options
+- Shared backend connection pooling without activating unrelated pillars
 - Basic scan/query over keys for simple filters
 - Health checks and minimal metrics hooks
 - Explicitly does not advertise `DataCaps.Query.ProviderBoundedPaging`
@@ -20,8 +20,12 @@ dotnet add package Sylin.Koan.Data.Connector.Redis
 
 ## Minimal setup
 
-- Configure `ConnectionStrings:Redis` or `Koan:Data:Redis:ConnectionString`.
+- Configure `ConnectionStrings:Redis` when automatic discovery is not appropriate.
 - Avoid embedding credentials; use environment or secret stores.
+
+`Sylin.Koan.Redis` arrives transitively and owns endpoint discovery, orchestration, connection pooling, and disposal.
+Data Redis owns only repository behavior, source/database routing, Data capabilities, and provider-aware health.
+Referencing this adapter together with Cache Redis reuses one default connection.
 
 ## Usage - safe snippets
 

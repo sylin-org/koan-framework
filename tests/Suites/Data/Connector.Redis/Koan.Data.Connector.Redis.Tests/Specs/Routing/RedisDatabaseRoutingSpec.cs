@@ -11,8 +11,10 @@ using Koan.Core.Hosting.App;
 using Koan.Data.Core;
 using Koan.Data.Core.Axes;
 using Koan.Data.Core.Model;
+using Koan.Redis;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
 using Testcontainers.Redis;
 using Xunit;
 
@@ -59,7 +61,7 @@ public sealed class RedisDatabaseRoutingSpec : IAsyncLifetime
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
-            ["Koan:Data:Redis:ConnectionString"] = conn,   // the shared connection (default logical db 0)
+            ["ConnectionStrings:Redis"] = conn,   // the shared backend connection (default logical db 0)
 
             // Three sources on the SAME Redis server, isolated by logical database index.
             ["Koan:Data:Sources:Default:Adapter"] = "redis",
@@ -110,6 +112,16 @@ public sealed class RedisDatabaseRoutingSpec : IAsyncLifetime
             (await Doc.All()).Select(d => d.Title).Should().Equal("from-b");
             (await Doc.Get(a.Id)).Should().BeNull();   // and vice-versa
         }
+    }
+
+    [Fact(DisplayName = "Data Redis and the standard DI multiplexer use the shared backend connection")]
+    public void Default_route_uses_the_shared_backend_connection()
+    {
+        Assert.SkipWhen(_host is null, _skip ?? "Redis unavailable");
+
+        var provider = _host.Services.GetRequiredService<IRedisConnectionProvider>();
+        var standard = _host.Services.GetRequiredService<IConnectionMultiplexer>();
+        provider.GetDefault().Should().BeSameAs(standard);
     }
 
     [Fact(DisplayName = "Database-mode route to an unconfigured Redis source fails closed (external-only, self-explaining)")]

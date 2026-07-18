@@ -25,6 +25,8 @@ provider intent.
 ## Responsibility boundary
 
 - Application and module projects declare orchestration metadata.
+- Resource-contributing modules implement the inert contract from
+  `Sylin.Koan.Orchestration.Aspire.Abstractions`; that reference does not activate this runtime.
 - Koan's manifest generator compiles that metadata.
 - This package translates the manifest into Aspire resource registrations.
 - Aspire owns execution and orchestration behavior.
