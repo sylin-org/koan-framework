@@ -16,11 +16,16 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
 
     private readonly IOptionsMonitor<OpenGraphOptions> _options;
     private readonly ShellCache _shellCache;
+    private readonly SocialCardRegistry _cards;
 
-    public OpenGraphCardRenderer(IOptionsMonitor<OpenGraphOptions> options, ShellCache shellCache)
+    public OpenGraphCardRenderer(
+        IOptionsMonitor<OpenGraphOptions> options,
+        ShellCache shellCache,
+        SocialCardRegistry cards)
     {
         _options = options;
         _shellCache = shellCache;
+        _cards = cards;
     }
 
     public async Task<string?> RenderShellAsync(HttpRequest request, CancellationToken ct = default)
@@ -46,7 +51,7 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
 
     private async Task<SocialCardSnapshot?> ResolveSnapshotAsync(string path, CancellationToken ct)
     {
-        foreach (var registration in SocialCardRegistry.Registrations)
+        foreach (var registration in _cards.Registrations)
         {
             if (!registration.Matcher.TryExtractToken(path, out var token))
             {

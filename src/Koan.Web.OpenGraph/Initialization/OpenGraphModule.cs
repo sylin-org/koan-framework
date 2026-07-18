@@ -31,11 +31,14 @@ namespace Koan.Web.OpenGraph.Initialization;
 [After(typeof(Koan.Web.Initialization.WebModule))]
 public sealed class OpenGraphModule : KoanModule
 {
+    private SocialCardRegistry? _cards;
+
     public override void Register(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddKoanOptions<OpenGraphOptions>(Constants.Configuration.Section);
+        _cards = SocialCardRegistry.GetOrCreate(services);
         services.TryAddSingleton<ShellCache>();
         services.TryAddSingleton<IOpenGraphCardRenderer, OpenGraphCardRenderer>();
         services.TryAddEnumerable(
@@ -65,6 +68,8 @@ public sealed class OpenGraphModule : KoanModule
             source: BootSettingSource.AppSettings,
             sourceKey: $"{Constants.Configuration.Section}:{Constants.Configuration.Keys.ShellPath}",
             state: string.IsNullOrWhiteSpace(options.ShellPath) ? ProvenanceSettingState.Default : ProvenanceSettingState.Configured);
+
+        module.AddNote($"{_cards?.Registrations.Count ?? 0} host-owned social-card declaration(s).");
     }
 
 }

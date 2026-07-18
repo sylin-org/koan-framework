@@ -6,16 +6,14 @@ using Microsoft.Extensions.Logging;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
-using Koan.Media.Web.Routing;
 using Koan.Web.Hosting;
 using SnapVault.Configuration;
-using SnapVault.Models;
 using SnapVault.Services;
 
 namespace SnapVault.Initialization;
 
 /// <summary>
-/// Owns SnapVault's configuration, domain services, media source, access posture, seed data, and boot report.
+/// Owns SnapVault's configuration, domain services, access posture, seed data, and boot report.
 /// </summary>
 public sealed class SnapVaultModule : KoanModule
 {
@@ -28,9 +26,6 @@ public sealed class SnapVaultModule : KoanModule
         services.AddSingleton<GuestScopeService>();
         services.AddSingleton<ProofingService>();
         services.AddSingleton<SnapVaultDeprovisioningService>();
-
-        // MediaEntitySource resolves through PhotoAsset, so tenant and guest scopes protect rendered bytes too.
-        services.AddMediaSource<PhotoAsset>();
 
         // Durable ingest and optional enrichment.
         services.AddSingleton<Services.AI.AnalysisPromptFactory>();

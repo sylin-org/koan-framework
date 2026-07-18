@@ -11,8 +11,6 @@ namespace Koan.Web.OpenGraph.Tests;
 /// </summary>
 public sealed class ProjectionAndPassthroughTests
 {
-    public ProjectionAndPassthroughTests() => SocialCards.Reset();
-
     [Fact]
     public void CardImage_recipe_composes_a_media_path()
     {
@@ -47,7 +45,8 @@ public sealed class ProjectionAndPassthroughTests
     public async Task Disabled_options_pass_through_as_null()
     {
         var options = new OpenGraphOptions { Enabled = false, ShellPath = "anything" };
-        var renderer = new OpenGraphCardRenderer(new TestOptionsMonitor<OpenGraphOptions>(options), new ShellCache());
+        var renderer = new OpenGraphCardRenderer(
+            new TestOptionsMonitor<OpenGraphOptions>(options), new ShellCache(), new SocialCardRegistry());
 
         var result = await renderer.RenderShellAsync(NavRequest("/work/abc"));
 
@@ -58,7 +57,8 @@ public sealed class ProjectionAndPassthroughTests
     public async Task Missing_shell_passes_through_as_null()
     {
         var options = new OpenGraphOptions { Enabled = true, ShellPath = Path.Combine(Path.GetTempPath(), "does-not-exist-" + System.Guid.NewGuid().ToString("N") + ".html") };
-        var renderer = new OpenGraphCardRenderer(new TestOptionsMonitor<OpenGraphOptions>(options), new ShellCache());
+        var renderer = new OpenGraphCardRenderer(
+            new TestOptionsMonitor<OpenGraphOptions>(options), new ShellCache(), new SocialCardRegistry());
 
         var result = await renderer.RenderShellAsync(NavRequest("/work/abc"));
 

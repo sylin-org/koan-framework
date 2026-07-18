@@ -1,10 +1,6 @@
 using Koan.Data.Core.Model;
 using Microsoft.Extensions.Options;
 
-// The whole assembly shares process-global static state (SocialCardRegistry + AppHost.Current),
-// so test classes must not run in parallel with each other.
-[assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
-
 namespace Koan.Web.OpenGraph.Tests;
 
 /// <summary>A domain-agnostic entity used as a card source in tests.</summary>

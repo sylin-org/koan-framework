@@ -1,4 +1,5 @@
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Web.Controllers;
 using Koan.Media.Web.Options;
@@ -37,6 +38,8 @@ namespace Koan.Media.Web.Initialization;
 /// </summary>
 public sealed class MediaWebModule : KoanModule
 {
+    private MediaSourceDiscovery.Selection? _sourceSelection;
+
     public override void Register(IServiceCollection services)
     {
         services.AddOptions<MediaWebOptions>()
@@ -53,11 +56,22 @@ public sealed class MediaWebModule : KoanModule
         // (e.g. an in-process logo store for brand assets that aren't
         // regular MediaEntity rows).
         services.TryAddSingleton<IOverlayResolver, DefaultOverlayResolver>();
+        _sourceSelection = MediaSourceDiscovery.RegisterDefault(services);
+    }
 
+    public override Task Start(IServiceProvider services, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        _ = services.GetRequiredService<IMediaSource>();
+        return Task.CompletedTask;
     }
 
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
+        if (_sourceSelection is not null)
+        {
+            module.AddNote(_sourceSelection.Summary);
+        }
     }
 }

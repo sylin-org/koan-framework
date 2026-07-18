@@ -1,56 +1,63 @@
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Web.OpenGraph;
 
 /// <summary>
-/// Static, type-keyed card registry. Application declarations are written during
-/// boot, read at request time, with a <c>Reset()</c> for test isolation. Registration is boot-time and
-/// consumption is request-time, so there is no deferred-attach problem to solve.
+/// Host-owned, type-keyed card registry. Application declarations are written during composition and
+/// the same host reads the immutable registration order at request time.
 /// </summary>
-internal static class SocialCardRegistry
+internal sealed class SocialCardRegistry
 {
-    private static readonly object Gate = new();
-    private static readonly Dictionary<Type, CardRegistration> ByType = new();
-    private static List<CardRegistration> Ordered = new();
+    private readonly object _gate = new();
+    private readonly Dictionary<Type, CardRegistration> _byType = new();
+    private List<CardRegistration> _ordered = new();
+
+    public static SocialCardRegistry GetOrCreate(IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        var existing = services
+            .Where(static descriptor => descriptor.ServiceType == typeof(SocialCardRegistry))
+            .Select(static descriptor => descriptor.ImplementationInstance)
+            .OfType<SocialCardRegistry>()
+            .LastOrDefault();
+        if (existing is not null) return existing;
+
+        var registry = new SocialCardRegistry();
+        services.AddSingleton(registry);
+        return registry;
+    }
 
     /// <summary>Registrations in registration order; first match wins at request time.</summary>
-    public static IReadOnlyList<CardRegistration> Registrations
+    public IReadOnlyList<CardRegistration> Registrations
     {
-        get { lock (Gate) { return Ordered; } }
+        get { lock (_gate) { return _ordered; } }
     }
 
-    public static bool Has(Type type)
+    public bool Has(Type type)
     {
-        lock (Gate) { return ByType.ContainsKey(type); }
+        lock (_gate) { return _byType.ContainsKey(type); }
     }
 
-    public static bool TryGet(Type type, out CardRegistration registration)
+    public bool TryGet(Type type, out CardRegistration registration)
     {
-        lock (Gate) { return ByType.TryGetValue(type, out registration!); }
+        lock (_gate) { return _byType.TryGetValue(type, out registration!); }
     }
 
-    public static void Register(Type type, CardRegistration registration)
+    public void Register(Type type, CardRegistration registration)
     {
-        lock (Gate)
+        lock (_gate)
         {
-            if (ByType.ContainsKey(type))
+            if (_byType.ContainsKey(type))
             {
                 throw new InvalidOperationException(
-                    $"A social card is already registered for '{type.Name}'. Register one card per type; call SocialCards.Reset() first in tests.");
+                    $"A social card is already registered for '{type.Name}' in this application. Register one card per type.");
             }
 
-            ByType[type] = registration;
+            _byType[type] = registration;
             // Copy-on-write so a concurrent reader iterating Registrations is never disturbed.
-            Ordered = new List<CardRegistration>(Ordered) { registration };
-        }
-    }
-
-    public static void Reset()
-    {
-        lock (Gate)
-        {
-            ByType.Clear();
-            Ordered = new List<CardRegistration>();
+            _ordered = new List<CardRegistration>(_ordered) { registration };
         }
     }
 }

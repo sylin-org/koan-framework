@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Koan.Core.Composition;
 using Koan.Core.Logging;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
@@ -26,6 +27,9 @@ public static class SocialCards
         ArgumentException.ThrowIfNullOrWhiteSpace(routeTemplate);
         ArgumentNullException.ThrowIfNull(resolve);
 
+        var services = KoanCompositionScope.RequireServices($"SocialCards.For<{typeof(T).Name}>");
+        var registry = SocialCardRegistry.GetOrCreate(services);
+
         var builder = new SocialCardBuilder<T>();
         var registration = new CardRegistration
         {
@@ -39,38 +43,21 @@ public static class SocialCards
             ProjectFromEntity = entity => builder.Project((T)entity),
         };
 
-        SocialCardRegistry.Register(typeof(T), registration);
-        WireLifecycle<T>();
+        registry.Register(typeof(T), registration);
+        WireLifecycle<T>(registration);
         return builder;
     }
 
-    /// <summary>Clears card declarations. Host-owned lifecycle plans need no process reset.</summary>
-    public static void Reset() => SocialCardRegistry.Reset();
-
-    private static void WireLifecycle<T>() where T : Entity<T>
+    private static void WireLifecycle<T>(CardRegistration registration) where T : Entity<T>
     {
-        // Warm on upsert: the entity is already in hand, so this costs one write and no read. The
-        // handler looks up the current registration at fire time so it survives Reset + re-register.
+        // The lifecycle plan and registration belong to the same composing host. The entity is already in hand,
+        // so warming costs one write and no read.
         Entity<T, string>.Lifecycle.AfterUpsert(ctx =>
-        {
-            if (!SocialCardRegistry.TryGet(typeof(T), out var registration))
-            {
-                return ValueTask.CompletedTask;
-            }
-
-            return WarmAsync(registration, ctx.Current, ctx.Current.Id);
-        });
+            WarmAsync(registration, ctx.Current, ctx.Current.Id));
 
         // Evict on remove.
         Entity<T, string>.Lifecycle.AfterRemove(ctx =>
-        {
-            if (!SocialCardRegistry.TryGet(typeof(T), out var registration))
-            {
-                return ValueTask.CompletedTask;
-            }
-
-            return EvictAsync(registration, ctx.Current.Id);
-        });
+            EvictAsync(registration, ctx.Current.Id));
     }
 
     private static async ValueTask WarmAsync(CardRegistration registration, object entity, string id)

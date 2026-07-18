@@ -26,8 +26,6 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        SocialCards.Reset();
-
         _shellPath = Path.Combine(Path.GetTempPath(), $"koan-og-shell-{Guid.NewGuid():N}.html");
         await File.WriteAllTextAsync(_shellPath, "<html><head><!--KOAN_OPENGRAPH--></head><body>app</body></html>");
 
@@ -47,7 +45,6 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         AppHost.Current = _previousAppHost!;
-        SocialCards.Reset();
         await _host.DisposeAsync();
         try { File.Delete(_shellPath); } catch { /* best-effort */ }
     }
@@ -183,7 +180,6 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
     public async Task Toggles_off_suppress_their_tags()
     {
         // A fresh host with the head toggles disabled; operate entirely against its own store.
-        SocialCards.Reset();
         await using var host = await KoanIntegrationHost.Configure()
             .WithSetting("Koan:Environment", "Test")
             .WithSetting("Koan:Data:Sources:Default:Adapter", "inmemory")

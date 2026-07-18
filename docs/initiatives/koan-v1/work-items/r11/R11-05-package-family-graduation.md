@@ -1934,6 +1934,121 @@ subsequent build/test proof remains sequential.
 The Web projection family passes this R11-05 slice. It preserves three independently meaningful references while
 reducing process-global state, startup owners, public activation concepts, result vocabularies, and false settings.
 
+### Web edge projection discovery
+
+**Task:** Graduate `Sylin.Koan.Media.Web` and `Sylin.Koan.Web.OpenGraph` around their smallest application intent,
+and retire `Sylin.Koan.Web.Backup` unless its HTTP surface can earn a responsible independent product promise.
+
+**Application intent:** “Define one media Entity and reference Media Web to serve its originals and recipes without a
+registration incantation. Declare an Entity's social-card projection while Koan composes the application and let the
+referenced OpenGraph package enrich matching HTML navigations. Keep backup/restore as a domain capability until an
+HTTP control plane can make honest durability, cancellation, authorization, and resource guarantees.”
+
+**Public expression:** The ordinary media path is `public sealed class Photo : MediaEntity<Photo>;` plus the package
+reference and the application's existing `AddKoan()`; `AddMediaSource<Photo>()` remains only the meaningful override
+when several media Entity types or a custom source make selection ambiguous. OpenGraph remains the business-readable
+`SocialCards.For<Article>("/articles/{id}", Article.Get).Title(x => x.Title)` declaration inside `AddKoan(() => ...)`
+or an application `KoanModule`; the package reference contributes the middleware automatically. No Web Backup
+expression is promoted: its reference currently publishes unauthenticated destructive endpoints, permissive CORS,
+placeholder results, process-local tracking, and tracking-only cancellation.
+
+**Guarantee/correction:** Exactly one discovered `MediaEntity<T>` becomes the default access/tenant-scoped source; an
+explicit `IMediaSource` or `AddMediaSource<T>()` always wins. Zero or several candidates produce a corrective source
+selection error rather than a generic DI failure. Social-card declarations and their lifecycle plans belong to the
+exact composing host, so one host cannot retain another host's resolvers/selectors and tests need no global reset.
+OpenGraph remains inert without a configured shell or matching declaration. Web Backup is removed rather than
+claiming operational guarantees its code and tests do not provide; `Koan.Data.Backup` remains independently intact.
+
+**Complete intent surface:** Media requires only one concrete media Entity for the default path; multiple types or a
+non-Entity source require one explicit source choice. OpenGraph requires the route, resolver, and only the metadata
+selectors the application actually owns; shell/site defaults remain typed configuration. There is no manual
+middleware call. Backup/restore runtime policy remains outside this projection slice and no replacement endpoint is
+invented.
+
+**Public concepts:** `MediaEntity<T>` is the stored media business object; `IMediaSource` is the necessary custom
+source seam; `AddMediaSource<T>()` expresses ambiguity resolution, not framework activation. `SocialCards.For<T>`
+expresses route-to-Entity projection and its fluent selectors express actual metadata decisions. No backup-specific
+web DTO, tracker, notifier, Swagger filter, CORS helper, or fake persistence helper survives without an earned
+guarantee.
+
+**Docs read:**
+
+- `docs/architecture/principles.md` requires reference-as-availability, host-owned composition, business-to-code
+  mapping, startup explanation, and semantic honesty; it is binding for both retained projections.
+- `docs/engineering/index.md` requires controller-owned routes, typed options/constants, focused tests, and owned
+  package companions; it is binding for implementation and graduation.
+- `docs/reference/media/index.md` establishes one source, Entity-layer access/tenant gating, recipe negotiation, and
+  durable derivations; it currently overstates the need for manual registration in the one-Entity case.
+- `docs/decisions/WEB-0070-opengraph-social-cards.md` preserves the accepted social-card semantics and historical
+  middleware decision; current automatic pipeline contribution supersedes only its manual-use curriculum.
+- The three package READMEs/technical pages reveal accurate Media constraints, OpenGraph's missing package-owned
+  product contract, and Web Backup's unusually honest unsupported posture; the latter is evidence for retirement,
+  not a documentation-only repair.
+
+**Code read:**
+
+- `MediaWebModule`, `MediaEntitySource<T>`, `MediaController`, and the Media Web tests show a sound Entity-gated
+  serving pipeline whose only common-path ceremony is selecting a source manually.
+- `AssemblyCache` plus Web Extensions' `RestEntityRegistration` provide the existing boot-time, safe assembly-closure
+  discovery pattern needed to find concrete media Entity types; no new discovery subsystem is warranted.
+- `SocialCards`, `SocialCardRegistry`, `OpenGraphCardRenderer`, and the OpenGraph tests show that terse declarations
+  currently write application closures into one process-static registry and rely on `Reset()` plus assembly-wide
+  test serialization.
+- `KoanCompositionScope` and `EntityLifecycleBuilder` are the closest canonical pattern: static semantic facets locate
+  the current `IServiceCollection`, create one host-owned plan, and execute through host-owned lifecycle services.
+- Web Backup's module, controllers, tracker, middleware, Swagger extension, and README expose unauthenticated global
+  backup/restore, detached `Task.Run`, non-cancelling cancellation, in-memory ZIPs and operation state, permissive
+  CORS, placeholder histories/counts/status, fake enhancement helpers, and no dedicated test or sample consumer.
+
+**Reusing:** `KoanCompositionScope`, standard `IServiceCollection` singleton/replace semantics, `AssemblyCache`,
+`MediaEntity<T>`, `Entity<T>.Lifecycle`, MVC controllers, typed Media/OpenGraph options, the Koan Web pipeline
+contributor, runtime provenance, and existing focused Media/OpenGraph suites already exist. Media/OpenGraph constants,
+options, source handles, recipes, social-card value objects, request projection, and snapshot Entity already exist.
+No Backup HTTP contract is reused because no supported consumer or guarantee justifies one.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| Media source discovery/selection | `src/Koan.Media.Web/Routing/MediaSourceDiscovery.cs` | Reuse the compiled assembly closure once at composition, automatically select the only concrete media Entity, and centralize corrective zero/multiple-candidate behavior. |
+| Media automatic/override specs | `tests/Suites/Media/Koan.Media.Web.Tests/MediaSourceSelectionSpec.cs` | Prove the zero-ceremony default, explicit dominance, and corrective ambiguity without widening the test topology. |
+| Host-isolated social-card specs | `tests/Koan.Web.OpenGraph.Tests/SocialCardRegistryTests.cs` | Prove two service collections may independently declare the same Entity without leakage or reset. |
+| Package-owned OpenGraph docs | `src/Koan.Web.OpenGraph/README.md` and `TECHNICAL.md` | Give the retained package an exact install/result/boundary and runtime-owner contract. |
+
+**Coalescence:** The closest patterns are Web Extensions' assembly-closure scan and Data Core's composition-owned
+Entity lifecycle plan. Specificity remains at each projection pillar: Core is too wide, while controllers and samples
+are too narrow. Rebuild Media's source choice around one boot-time selector and absorb the one-Entity default into the
+package module. Rebuild OpenGraph's registry as a host-owned instance obtained through `KoanCompositionScope`; capture
+each host registration directly in its host-owned lifecycle plan. Delete `SocialCards.Reset()`, the static registry,
+manual media ceremony in the golden consumer, and stale manual OpenGraph middleware curriculum. Retire Web Backup in
+full; rebuilding it responsibly belongs with a future Jobs-backed, authorized backup control-plane design, not a
+cosmetic package pass.
+
+**Ergonomics:** Human and model readers see one business noun produce one serving surface, and one social-card
+declaration produce one navigation projection. IntelliSense keeps the explicit media-source override available only
+for a real ambiguity. The same expressions remain legible in an application module or `AddKoan(() => ...)`.
+Operators see the selected media source/candidate posture and social-card declaration count at startup. Removing Web
+Backup prevents agents and operators from mistaking a broad route list for a production recovery guarantee.
+
+**Constraints satisfied:**
+
+- Entity-first access remains the source gate; internal `Data<T>` calls in Media source resolution will move to the
+  equivalent first-class Entity static where the generic constraint permits it.
+- All application HTTP remains controller-owned; no inline endpoint is added.
+- Existing stable routes and headers remain centralized; tunables remain in typed options.
+- No placeholder, compatibility, fake persistence, or inert enhancement surface survives.
+- No large unbounded data path is introduced; media bytes continue to use streams and the existing explicit render
+  buffer limitation remains documented.
+- Both retained reusable packages receive exact README/TECHNICAL contracts; current docs and generated topology are
+  regenerated after the package cut.
+
+**Risks:** Media discovery must use the already compiled assembly closure and remain reflection-load tolerant. An
+explicit source must dominate regardless of module registration order. OpenGraph lifecycle execution still relies on
+Koan's ambient host for Entity operations, but application closures and registration state will no longer leak across
+hosts. Removing Web Backup changes package count and release lineage; the R11 matrix must preserve the implemented
+retirement decision. Baseline evidence is Media Web 4/4 and OpenGraph 39/39; both current builds expose a stale removed
+Core.Adapters reference from evaluated restore state, and Web Backup has build-only evidence with no controller suite.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

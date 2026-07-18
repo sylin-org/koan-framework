@@ -158,8 +158,8 @@ public sealed class MediaWebHostFixture : IAsyncLifetime
 
         Host = await KoanIntegrationHost.Configure()
             .WithSettings(settings)
-            // Register ScopedMedia's source exactly as a real app does. The specs also `new` one for direct calls.
-            .ConfigureServices(s => { s.AddKoan(); s.AddMediaSource<ScopedMedia>(); })
+            // One concrete MediaEntity is the complete common path; Media Web selects it automatically.
+            .ConfigureServices(s => s.AddKoan())
             .StartAsync();
 
         _prevAppHost = AppHost.Current;

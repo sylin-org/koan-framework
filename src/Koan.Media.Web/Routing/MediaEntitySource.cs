@@ -1,9 +1,11 @@
 using System.Security.Cryptography;
 using Koan.Data.Core;
+using Koan.Data.Core.Model;
 using Koan.Media;
 using Koan.Media.Abstractions.Model;
 using Koan.Media.Abstractions.Recipes;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Koan.Media.Web.Routing;
 
@@ -41,7 +43,7 @@ public class MediaEntitySource<TEntity> : IMediaSource
 
         // Entity-layer resolve. RepositoryFacade folds in every active read axis (tenant +
         // SEC-0008 access): a gated-out or subject-less request yields null here → 404 upstream.
-        var entity = await Data<TEntity, string>.Get(id, ct).ConfigureAwait(false);
+        var entity = await Entity<TEntity, string>.Get(id, ct).ConfigureAwait(false);
         if (entity is null) return null;
 
         // Instance OpenRead is tenant-scoped (STOR-0011 StorageScope) and streams the stored
@@ -72,7 +74,7 @@ public class MediaEntitySource<TEntity> : IMediaSource
     public async Task<MediaDerivationHandle?> OpenDerivationAsync(
         string sourceId, string recipeFingerprint, CancellationToken ct = default)
     {
-        var row = await Data<MediaDerivation, string>
+        var row = await MediaDerivation
             .Get(MediaDerivation.KeyFor(sourceId, recipeFingerprint), ct).ConfigureAwait(false);
         if (row is null) return null;
         var bytes = await row.OpenRead(ct).ConfigureAwait(false);
@@ -87,7 +89,7 @@ public class MediaEntitySource<TEntity> : IMediaSource
     {
         var rowId = MediaDerivation.KeyFor(sourceId, recipeFingerprint);
         // Idempotent: the fingerprint pins an immutable render, so a present row is already correct.
-        if (await Data<MediaDerivation, string>.Get(rowId, ct).ConfigureAwait(false) is not null) return;
+        if (await MediaDerivation.Get(rowId, ct).ConfigureAwait(false) is not null) return;
 
         // Materialize the render bytes via the streaming terminal (not the obsolete MediaOutput.Bytes).
         using var buffer = new MemoryStream();
@@ -119,5 +121,9 @@ public static class MediaSourceServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddMediaSource<TEntity>(this IServiceCollection services)
         where TEntity : MediaEntity<TEntity>
-        => services.AddSingleton<IMediaSource, MediaEntitySource<TEntity>>();
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.Replace(ServiceDescriptor.Singleton<IMediaSource, MediaEntitySource<TEntity>>());
+        return services;
+    }
 }
