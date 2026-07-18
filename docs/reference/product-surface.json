@@ -2226,22 +2226,6 @@
       "claims": []
     },
     {
-      "packageId": "Sylin.Koan.Web.Auth.Services",
-      "shape": "library",
-      "description": "Authentication service helpers for Koan Web: token exchange clients, caching bridges, and backend-to-backend auth flows.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Web.Auth"
-      ],
-      "readme": "src/Koan.Web.Auth.Services/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": "src/Koan.Web.Auth.Services/TECHNICAL.md",
-      "claims": []
-    },
-    {
       "packageId": "Sylin.Koan.Web.Extensions",
       "shape": "library",
       "description": "Entity-first REST exposure plus optional moderation, audit, soft-delete, and capability-policy controllers for Koan web applications.",

@@ -159,7 +159,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Web.Auth.Connector.Test` | `provider` | `assess` |
 | `Sylin.Koan.Web.Auth.Roles` | `projection` | `assess` |
 | `Sylin.Koan.Web.Auth.Server` | `projection` | `assess` |
-| `Sylin.Koan.Web.Auth.Services` | `projection` | `assess` |
+| `Sylin.Koan.Web.Auth.Services` | `projection` | `retire (implemented)` |
 | `Sylin.Koan.Web.Backup` | `projection` | `retire` (implemented) |
 | `Sylin.Koan.Web.Extensions` | `capability` | `keep` |
 | `Sylin.Koan.Web.OpenApi` | `projection` | `keep` |

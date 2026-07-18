@@ -122,7 +122,7 @@
 
 ### Koan.Core
 - Depends on: –
-- Depended by: Koan.AI, Koan.AI.Agents, Koan.AI.Connector.HuggingFace, Koan.AI.Connector.LMStudio, Koan.AI.Connector.Ollama, Koan.AI.Connector.Onnx, Koan.AI.Eval, Koan.AI.Models, Koan.AI.Orchestration, Koan.AI.Prompt, Koan.AI.Review, Koan.Cache, Koan.Cache.Adapter.Sqlite, Koan.Canon, Koan.Canon.Contracts, Koan.Canon.Web, Koan.Classification, Koan.Communication, Koan.Communication.Connector.RabbitMq, Koan.Data.Abstractions, Koan.Data.Access, Koan.Data.AI, Koan.Data.Backup, Koan.Data.Connector.Cockroach, Koan.Data.Connector.Couchbase, Koan.Data.Connector.ElasticSearch, Koan.Data.Connector.InMemory, Koan.Data.Connector.Json, Koan.Data.Connector.Mongo, Koan.Data.Connector.OpenSearch, Koan.Data.Connector.Postgres, Koan.Data.Connector.Redis, Koan.Data.Core, Koan.Data.SearchEngine, Koan.Data.SoftDelete, Koan.Data.Vector.Connector.InMemory, Koan.Data.Vector.Connector.Milvus, Koan.Data.Vector.Connector.Qdrant, Koan.Data.Vector.Connector.SqliteVec, Koan.Data.Vector.Connector.Weaviate, Koan.Identity, Koan.Jobs, Koan.Mcp, Koan.Media.Abstractions, Koan.Observability, Koan.Orchestration.Aspire, Koan.Orchestration.Connector.Docker, Koan.Orchestration.Connector.Podman, Koan.Orchestration.Renderers.Connector.Compose, Koan.Security.Trust, Koan.Storage, Koan.Tenancy, Koan.Testing, Koan.Testing.Containers, Koan.Web, Koan.Web.Auth, Koan.Web.Auth.Connector.Discord, Koan.Web.Auth.Connector.Google, Koan.Web.Auth.Connector.Microsoft, Koan.Web.Auth.Connector.Oidc, Koan.Web.Auth.Connector.Test, Koan.Web.Auth.Roles, Koan.Web.Auth.Server, Koan.Web.Auth.Services, Koan.Web.Extensions, Koan.Web.OpenApi, Koan.Web.OpenGraph, Koan.Web.Sse, Koan.ZenGarden
+- Depended by: Koan.AI, Koan.AI.Agents, Koan.AI.Connector.HuggingFace, Koan.AI.Connector.LMStudio, Koan.AI.Connector.Ollama, Koan.AI.Connector.Onnx, Koan.AI.Eval, Koan.AI.Models, Koan.AI.Orchestration, Koan.AI.Prompt, Koan.AI.Review, Koan.Cache, Koan.Cache.Adapter.Sqlite, Koan.Canon, Koan.Canon.Contracts, Koan.Canon.Web, Koan.Classification, Koan.Communication, Koan.Communication.Connector.RabbitMq, Koan.Data.Abstractions, Koan.Data.Access, Koan.Data.AI, Koan.Data.Backup, Koan.Data.Connector.Cockroach, Koan.Data.Connector.Couchbase, Koan.Data.Connector.ElasticSearch, Koan.Data.Connector.InMemory, Koan.Data.Connector.Json, Koan.Data.Connector.Mongo, Koan.Data.Connector.OpenSearch, Koan.Data.Connector.Postgres, Koan.Data.Connector.Redis, Koan.Data.Core, Koan.Data.SearchEngine, Koan.Data.SoftDelete, Koan.Data.Vector.Connector.InMemory, Koan.Data.Vector.Connector.Milvus, Koan.Data.Vector.Connector.Qdrant, Koan.Data.Vector.Connector.SqliteVec, Koan.Data.Vector.Connector.Weaviate, Koan.Identity, Koan.Jobs, Koan.Mcp, Koan.Media.Abstractions, Koan.Observability, Koan.Orchestration.Aspire, Koan.Orchestration.Connector.Docker, Koan.Orchestration.Connector.Podman, Koan.Orchestration.Renderers.Connector.Compose, Koan.Security.Trust, Koan.Storage, Koan.Tenancy, Koan.Testing, Koan.Testing.Containers, Koan.Web, Koan.Web.Auth, Koan.Web.Auth.Abstractions, Koan.Web.Auth.Connector.Discord, Koan.Web.Auth.Connector.Google, Koan.Web.Auth.Connector.Microsoft, Koan.Web.Auth.Connector.Test, Koan.Web.Auth.Roles, Koan.Web.Auth.Server, Koan.Web.Extensions, Koan.Web.OpenApi, Koan.Web.OpenGraph, Koan.Web.Sse, Koan.ZenGarden
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Core.Registry.Generators
@@ -271,7 +271,7 @@
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Identity
-- Depends on: Koan.Core, Koan.Data.Core, Koan.Web.Auth
+- Depends on: Koan.Core, Koan.Data.Core, Koan.Web, Koan.Web.Auth.Abstractions
 - Depended by: Koan.Identity.Credentials, Koan.Identity.Tenancy, Koan.Identity.Web
 - Documentation: README ❌ · TECHNICAL ❌
 
@@ -436,49 +436,44 @@
 - Documentation: README ❌ · TECHNICAL ❌
 
 ### Koan.Web.Auth
-- Depends on: Koan.Core, Koan.Security.Trust, Koan.Web
-- Depended by: Koan.Identity, Koan.Web.Auth.Connector.Discord, Koan.Web.Auth.Connector.Google, Koan.Web.Auth.Connector.Microsoft, Koan.Web.Auth.Connector.Oidc, Koan.Web.Auth.Connector.Test, Koan.Web.Auth.Roles, Koan.Web.Auth.Server, Koan.Web.Auth.Services
+- Depends on: Koan.Core, Koan.Security.Trust, Koan.Web, Koan.Web.Auth.Abstractions
+- Depended by: Koan.Web.Auth.Connector.Discord, Koan.Web.Auth.Connector.Google, Koan.Web.Auth.Connector.Microsoft, Koan.Web.Auth.Connector.Test, Koan.Web.Auth.Roles, Koan.Web.Auth.Server
+- Documentation: README ✅ · TECHNICAL ✅
+
+### Koan.Web.Auth.Abstractions
+- Depends on: Koan.Core
+- Depended by: Koan.Identity, Koan.Web.Auth, Koan.Web.Auth.Connector.Discord, Koan.Web.Auth.Connector.Google, Koan.Web.Auth.Connector.Microsoft, Koan.Web.Auth.Connector.Test, Koan.Web.Auth.Roles, Koan.Web.Auth.Server
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Auth.Connector.Discord
-- Depends on: Koan.Core, Koan.Web.Auth
+- Depends on: Koan.Core, Koan.Web.Auth, Koan.Web.Auth.Abstractions
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Auth.Connector.Google
-- Depends on: Koan.Core, Koan.Web.Auth
+- Depends on: Koan.Core, Koan.Web.Auth, Koan.Web.Auth.Abstractions
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Auth.Connector.Microsoft
-- Depends on: Koan.Core, Koan.Web.Auth
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
-
-### Koan.Web.Auth.Connector.Oidc
-- Depends on: Koan.Core, Koan.Web.Auth
+- Depends on: Koan.Core, Koan.Web.Auth, Koan.Web.Auth.Abstractions
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Auth.Connector.Test
-- Depends on: Koan.Core, Koan.Web.Auth
+- Depends on: Koan.Core, Koan.Web.Auth, Koan.Web.Auth.Abstractions
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Auth.Roles
-- Depends on: Koan.Core, Koan.Data.Core, Koan.Web.Auth, Koan.Web.Extensions
+- Depends on: Koan.Core, Koan.Data.Core, Koan.Web.Auth, Koan.Web.Auth.Abstractions, Koan.Web.Extensions
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Auth.Server
-- Depends on: Koan.Core, Koan.Data.Core, Koan.Security.Trust, Koan.Web, Koan.Web.Auth
+- Depends on: Koan.Core, Koan.Data.Core, Koan.Security.Trust, Koan.Web, Koan.Web.Auth, Koan.Web.Auth.Abstractions
 - Depended by: –
 - Documentation: README ❌ · TECHNICAL ❌
-
-### Koan.Web.Auth.Services
-- Depends on: Koan.Core, Koan.Web.Auth
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Extensions
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Web

@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 107,
+    "packages": 106,
     "repairRequired": 16,
-    "reviewRequired": 23,
+    "reviewRequired": 22,
     "structurallyReady": 68,
-    "ownedReadmes": 91,
-    "technicalCompanions": 86,
-    "findings": 105
+    "ownedReadmes": 90,
+    "technicalCompanions": 85,
+    "findings": 101
   },
   "findingDefinitions": [
     {
@@ -2173,30 +2173,6 @@
       "findings": [
         "docs.readme.owned.missing",
         "docs.technical.missing"
-      ]
-    },
-    {
-      "packageId": "Sylin.Koan.Web.Auth.Services",
-      "projectPath": "src/Koan.Web.Auth.Services/Koan.Web.Auth.Services.csproj",
-      "shape": "library",
-      "role": "projection",
-      "status": "review-required",
-      "description": "Authentication service helpers for Koan Web: token exchange clients, caching bridges, and backend-to-backend auth flows.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Web.Auth"
-      ],
-      "readme": "src/Koan.Web.Auth.Services/README.md",
-      "technicalDocumentation": "src/Koan.Web.Auth.Services/TECHNICAL.md",
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
       ]
     },
     {

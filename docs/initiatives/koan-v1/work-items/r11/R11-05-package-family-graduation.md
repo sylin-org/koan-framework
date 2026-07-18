@@ -2269,6 +2269,77 @@ member-hiding warning, and its package's pre-existing missing NuGet README warni
 bounded Identity package-graduation slice rather than being hidden or superficially papered over here. The inspected
 Identity nuspec now depends on `Core`, `Data.Core`, `Web`, and inert `Web.Auth.Abstractions`—not functional Web Auth.
 
+### Service authentication leaf discovery
+
+**Task:** Decide whether `Sylin.Koan.Web.Auth.Services` owns an independently meaningful V1 capability after the
+Trust/authentication foundation rebuild, or whether keeping it would preserve a second, incomplete service-identity
+model.
+
+**Application intent:** “Call another Koan workload with the current security context or a workload credential, bound
+to the destination and enforced on receipt.” The application should use ordinary `HttpClient` for HTTP; Koan should
+own only the security-context carrier and trust guarantees that are reusable across HTTP, MCP, Messaging, and Jobs.
+
+**Public expression:** There is no supported expression to preserve in this slice. No current application source uses
+`IKoanServiceClient`, `IServiceAuthenticator`, `IServiceDiscovery`, `[KoanService]`, or `[CallsService]`. GardenCoop
+chapters 1 and 2 reference the package but never consume it. A future expression must be proved by a real distributed
+golden scenario before Koan introduces a transport-specific convenience API.
+
+**Guarantee/correction:** The current package cannot honestly guarantee its README claims. Its registration method and
+default `HttpClient` configuration are no-ops; registry discovery/register operations return empty/do nothing;
+`EnableAutoDiscovery`, token cache duration, invalidation, token endpoint, client secret, certificate validation, and
+retry settings do not control the advertised behavior; guessed ports use process-randomized `string.GetHashCode()`;
+and token acquisition failure is swallowed so a request can leave without authentication. This is fail-open security,
+not progressive disclosure.
+
+**Docs and code read:** The package README, TECHNICAL, 900-line SAMPLES document, complete source, project graph,
+GardenCoop references/lockfiles, `SEC-0001`, superseded `DEC-0053`, and current `Koan.Security.Trust` issuer/inbound
+contracts were inspected. The package builds without warnings but owns no tests, product claim, current code consumer,
+or demonstrated application result. `SEC-0001` makes one verifiable security-context envelope across four channels the
+current architectural owner; `IIssuer.Issue(..., audience)` already owns audience-bound credential issuance. ADRs
+remain dated records and are not rewritten.
+
+**Closest pattern and coalescence:** Standard `IHttpClientFactory`/typed `HttpClient` is the HTTP substrate;
+`Koan.Security.Trust` is the concern chokepoint for workload identity, audience binding, verification, delegation, and
+future cross-channel carriers. Retaining a Web.Auth leaf with its own service attribute, discovery system, token
+cache, client abstraction, and options would distribute one security concern across two authorities. No replacement
+abstraction is created now: a future Trust-owned outbound carrier must emerge from an executable multi-workload use
+case and share the same envelope semantics with Communication, MCP, and Jobs.
+
+**Disposition:** Retire `Sylin.Koan.Web.Auth.Services` in V1. Remove it from the active solution and package graph;
+remove its unused GardenCoop references and AOT root; let the supported build target regenerate both sample
+composition lockfiles; regenerate package-quality/product-surface truth. Historical ADRs, archived proposals,
+assessment evidence, and attic content remain historical. Roles is explicitly separate: it owns real Entity/admin/
+bootstrap behavior and requires its own Identity-overlap assessment rather than inheriting this result.
+
+**Ergonomics:** Developers and agents no longer discover an attractive API whose advertised behavior is mostly inert.
+GardenCoop returns to Reference = Intent: the Test connector expresses local authentication without redundant direct
+Web Auth or unused service-auth references. Operators are no longer shown configuration knobs and discovery facts that
+do not control runtime guarantees.
+
+### Service authentication leaf implementation
+
+Status: `retired with focused proof complete`.
+
+- Removed `Sylin.Koan.Web.Auth.Services` from the solution and active package graph. Its empty registrar, speculative
+  endpoint guessing, duplicate client/token layers, false options, fail-open handler, and unproved attribute model no
+  longer constitute a V1 package promise.
+- Removed the unused package reference from GardenCoop chapters 1 and 2 and the chapter-1 AOT root. Also removed each
+  chapter's redundant direct Web Auth reference: the Test connector is the developer's authentication intent and
+  brings the runtime dependency transitively.
+- Both GardenCoop projects build with zero warnings/errors. Their composition lockfiles were regenerated by the
+  supported build target and now record the actual Auth Abstractions/Test-connector closure without Services, the
+  redundant direct Web Auth intent, or previously stale transitive modules.
+- After clean restore of the changed graph, the owned GardenCoop chapter-1 and chapter-2 golden-path suites each pass
+  1/1. The public documentation truth gate passes across 220 current files and 40 navigation targets.
+- Canonical generated truth now contains 106 packages: 16 repair-required, 22 review-required, and 68 structurally
+  ready; product surface remains 24 claims across 106 packages. Auth Services had no claim to migrate.
+- No Trust-owned outbound convenience was invented. The future acceptance bar is a real multi-workload scenario that
+  proves destination audience, inbound enforcement, delegation/actor preservation, failure posture, and one envelope
+  across more than HTTP. Standard typed `HttpClient` plus the current Trust issuer remain the honest building blocks.
+
+Historical ADRs, archived proposals, assessment evidence, and attic content remain intact as dated evidence; current
+solution, samples, package inventories, and architecture inventory no longer present the retired package as active.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;
