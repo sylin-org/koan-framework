@@ -4,11 +4,11 @@ using Xunit;
 
 namespace Koan.Web.OpenApi.Tests;
 
-public sealed class ApplicationIdentityDocumentSpec : IClassFixture<SwaggerWebApplicationFactory>
+public sealed class ApplicationIdentityDocumentSpec : IClassFixture<OpenApiWebApplicationFactory>
 {
-    private readonly SwaggerWebApplicationFactory _factory;
+    private readonly OpenApiWebApplicationFactory _factory;
 
-    public ApplicationIdentityDocumentSpec(SwaggerWebApplicationFactory factory)
+    public ApplicationIdentityDocumentSpec(OpenApiWebApplicationFactory factory)
     {
         _factory = factory;
     }

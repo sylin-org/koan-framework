@@ -43,5 +43,5 @@ internal static class WebProvenanceItems
         "Application Base URL",
         "Explicit override for application base URL. When set, takes precedence over ASPNETCORE_URLS detection. Used for generating absolute URLs in container environments.",
         DefaultValue: "(detected from ASPNETCORE_URLS)",
-        DefaultConsumers: new[] { "Koan.Web.Urls", "Koan.Web.Admin", "Koan.Web.Connector.Swagger" });
+        DefaultConsumers: new[] { "Koan.Web.Urls", "Koan.Web.Admin", "Koan.Web.OpenApi" });
 }

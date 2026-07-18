@@ -29,11 +29,11 @@ namespace Koan.Web.OpenApi.Tests;
 /// doc reflects the real wire names and string enums BY CONSTRUCTION. These specs now pin both the honest invariant
 /// (keep [McpIgnore]) and the restored fidelity (Newtonsoft wire name + string enums).
 /// </summary>
-public sealed class SchemaProjectionConformanceSpec : IClassFixture<SwaggerWebApplicationFactory>
+public sealed class SchemaProjectionConformanceSpec : IClassFixture<OpenApiWebApplicationFactory>
 {
-    private readonly SwaggerWebApplicationFactory _factory;
+    private readonly OpenApiWebApplicationFactory _factory;
 
-    public SchemaProjectionConformanceSpec(SwaggerWebApplicationFactory factory) => _factory = factory;
+    public SchemaProjectionConformanceSpec(OpenApiWebApplicationFactory factory) => _factory = factory;
 
     private async Task<JObject> ProbeSchema()
     {

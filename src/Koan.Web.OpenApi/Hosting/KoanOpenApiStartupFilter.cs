@@ -1,114 +1,182 @@
-﻿using System;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Koan.Core;
-using Koan.Core.Extensions;
 using Koan.Web.OpenApi.Infrastructure;
 using Koan.Web.OpenApi.Options;
 
 namespace Koan.Web.OpenApi.Hosting;
 
 /// <summary>
-/// Ensures Koan's OpenAPI endpoint is automatically mapped once the application starts.
+/// Publishes Koan's OpenAPI document and optional interactive UI from one resolved option model.
 /// </summary>
-internal sealed class KoanOpenApiStartupFilter(IOptions<KoanOpenApiOptions> options) : IStartupFilter
+internal sealed class KoanOpenApiStartupFilter(
+    IOptions<KoanOpenApiOptions> options,
+    ILogger<KoanOpenApiStartupFilter> logger) : IStartupFilter
 {
-    private readonly IOptions<KoanOpenApiOptions> _options = options;
-
     public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
     {
         return app =>
         {
-            next(app);
-
-            const string appliedKey = "Koan.Web.OpenApi.Applied";
-            if (app.Properties.ContainsKey(appliedKey))
+            if (app.Properties.ContainsKey(Constants.Runtime.AppliedKey))
             {
+                next(app);
                 return;
             }
 
-            app.Properties[appliedKey] = true;
+            app.Properties[Constants.Runtime.AppliedKey] = true;
 
-            var cfg = app.ApplicationServices.GetService<IConfiguration>();
-            var env = app.ApplicationServices.GetService<IHostEnvironment>();
-            var logger = app.ApplicationServices.GetService<ILogger<KoanOpenApiStartupFilter>>();
-            var resolved = ResolveOptions(cfg);
+            var environment = app.ApplicationServices.GetRequiredService<IHostEnvironment>();
+            var resolved = Resolve(options.Value, environment);
 
-            var enabled = ResolveEnabled(resolved, cfg, env);
-            if (!enabled)
+            if (resolved.UiEnabled)
             {
-                logger?.LogInformation("Koan.Web.OpenApi disabled for environment {EnvironmentName}", env?.EnvironmentName);
+                if (resolved.RequiresAuthentication)
+                {
+                    RequireAuthenticatedUi(app, resolved.UiPath);
+                }
+
+                app.UseSwaggerUI(ui =>
+                {
+                    ui.RoutePrefix = resolved.UiRoutePrefix;
+                    ui.SwaggerEndpoint(resolved.DocumentPath, "Koan API v1");
+                });
+
+                logger.LogInformation(
+                    "Koan OpenAPI UI mapped {UiPath} (authentication={Authentication})",
+                    resolved.UiPath,
+                    resolved.RequiresAuthentication ? "required" : "not-required");
+            }
+            else
+            {
+                logger.LogInformation("Koan OpenAPI UI disabled for environment {EnvironmentName}", environment.EnvironmentName);
+            }
+
+            next(app);
+
+            if (!resolved.DocumentEnabled)
+            {
+                logger.LogInformation("Koan OpenAPI document disabled");
                 return;
             }
 
             if (TryGetEndpointRouteBuilder(app, out var endpoints))
             {
                 endpoints.MapOpenApi(resolved.RoutePattern);
-                logger?.LogInformation("Koan.Web.OpenApi mapped {Pattern} (document={Document})", resolved.RoutePattern, KoanOpenApiOptions.DefaultDocumentName);
+                logger.LogInformation(
+                    "Koan OpenAPI 3.1 document mapped {DocumentPath} (document={DocumentName})",
+                    resolved.DocumentPath,
+                    KoanOpenApiOptions.DefaultDocumentName);
             }
             else
             {
-                logger?.LogWarning("Koan.Web.OpenApi could not locate an endpoint route builder; ensure you host with WebApplication");
+                logger.LogWarning(
+                    "Koan OpenAPI could not locate an endpoint route builder; host with WebApplication or ASP.NET endpoint routing");
             }
         };
     }
 
-    private KoanOpenApiOptions ResolveOptions(IConfiguration? configuration)
+    private void RequireAuthenticatedUi(IApplicationBuilder app, string uiPath)
     {
-        var baseOptions = _options.Value ?? new KoanOpenApiOptions();
-        var options = new KoanOpenApiOptions
-        {
-            Enabled = baseOptions.Enabled,
-            RoutePattern = baseOptions.RoutePattern
-        };
-        if (configuration is null)
-        {
-            return options;
-        }
+        app.UseWhen(
+            context => context.Request.Path.StartsWithSegments(uiPath),
+            branch => branch.Use(async (context, next) =>
+            {
+                if (context.User.Identity?.IsAuthenticated == true)
+                {
+                    await next(context).ConfigureAwait(false);
+                    return;
+                }
 
-        // ADR-0040: use explicit reads rather than binding.
-        options.Enabled = configuration.Read<bool?>(Constants.Configuration.Enabled, options.Enabled);
-        options.RoutePattern = configuration.Read(
-            $"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RoutePattern}",
-            options.RoutePattern)!;
-        return options;
+                try
+                {
+                    var result = await context.AuthenticateAsync().ConfigureAwait(false);
+                    if (result.Succeeded && result.Principal is not null)
+                    {
+                        context.User = result.Principal;
+                        await next(context).ConfigureAwait(false);
+                        return;
+                    }
+                }
+                catch (InvalidOperationException exception)
+                {
+                    logger.LogDebug(exception, "OpenAPI UI authentication has no usable default scheme");
+                }
+
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "text/plain; charset=utf-8";
+                await context.Response.WriteAsync(
+                    "OpenAPI UI requires authentication outside Development. Configure a default authentication scheme " +
+                    $"or deliberately set {KoanOpenApiOptions.SectionPath}:RequireAuthenticationOutsideDevelopment=false.",
+                    context.RequestAborted).ConfigureAwait(false);
+            }));
     }
 
-    private static bool ResolveEnabled(KoanOpenApiOptions options, IConfiguration? configuration, IHostEnvironment? env)
+    private static ResolvedOpenApiOptions Resolve(KoanOpenApiOptions options, IHostEnvironment environment)
     {
-        if (options.Enabled.HasValue)
+        var documentEnabled = options.Enabled ?? true;
+        var uiEnabled = documentEnabled && (options.EnableUi ?? environment.IsDevelopment());
+
+        if (documentEnabled && string.IsNullOrWhiteSpace(options.RoutePattern))
         {
-            return options.Enabled.Value;
+            throw new InvalidOperationException(
+                $"{KoanOpenApiOptions.SectionPath}:RoutePattern cannot be empty while the OpenAPI document is enabled.");
         }
 
-        // Referencing Koan.Web.OpenApi indicates intent; keep the document on unless explicitly disabled.
-        // Allow the global magic flag to opt-in when configuration bindings run before options.
-        var magic = configuration?.Read<bool?>(Koan.Core.Infrastructure.Constants.Configuration.Koan.AllowMagicInProduction);
-        if (magic.HasValue)
+        if (uiEnabled && string.IsNullOrWhiteSpace(options.UiRoute))
         {
-            return magic.Value;
+            throw new InvalidOperationException(
+                $"{KoanOpenApiOptions.SectionPath}:UiRoute cannot be empty while the OpenAPI UI is enabled.");
         }
 
-        return true;
+        var routePattern = EnsureLeadingSlash(options.RoutePattern);
+        var documentPath = routePattern.Replace(
+            "{documentName}",
+            KoanOpenApiOptions.DefaultDocumentName,
+            StringComparison.OrdinalIgnoreCase);
+        var uiRoutePrefix = options.UiRoute.Trim('/');
+
+        return new ResolvedOpenApiOptions(
+            documentEnabled,
+            uiEnabled,
+            uiEnabled && !environment.IsDevelopment() && options.RequireAuthenticationOutsideDevelopment,
+            routePattern,
+            documentPath,
+            uiRoutePrefix,
+            "/" + uiRoutePrefix);
     }
 
-    private static bool TryGetEndpointRouteBuilder(IApplicationBuilder app, [NotNullWhen(true)] out IEndpointRouteBuilder? endpoints)
+    private static string EnsureLeadingSlash(string path)
+        => path.StartsWith('/') ? path : "/" + path;
+
+    private static bool TryGetEndpointRouteBuilder(
+        IApplicationBuilder app,
+        [NotNullWhen(true)] out IEndpointRouteBuilder? endpoints)
     {
-        if (app.Properties.TryGetValue("__EndpointRouteBuilder", out var routeBuilder) && routeBuilder is IEndpointRouteBuilder builder)
+        if (app.Properties.TryGetValue("__EndpointRouteBuilder", out var routeBuilder)
+            && routeBuilder is IEndpointRouteBuilder builder)
         {
             endpoints = builder;
             return true;
         }
 
-        endpoints = app as IEndpointRouteBuilder ?? app.Properties.Values.OfType<IEndpointRouteBuilder>().FirstOrDefault();
+        endpoints = app as IEndpointRouteBuilder
+            ?? app.Properties.Values.OfType<IEndpointRouteBuilder>().FirstOrDefault();
         return endpoints is not null;
     }
+
+    private sealed record ResolvedOpenApiOptions(
+        bool DocumentEnabled,
+        bool UiEnabled,
+        bool RequiresAuthentication,
+        string RoutePattern,
+        string DocumentPath,
+        string UiRoutePrefix,
+        string UiPath);
 }

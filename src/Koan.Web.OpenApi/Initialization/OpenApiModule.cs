@@ -48,13 +48,12 @@ public sealed class OpenApiModule : KoanModule
         services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o => Schema.NewtonsoftSchemaMirror.Apply(o.SerializerOptions));
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IStartupFilter, KoanOpenApiStartupFilter>());
-        global::Koan.Web.Connector.Swagger.Initialization.SwaggerBootstrap.Register(services);
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
-        var settings = ResolveOptions(cfg);
+        var settings = ResolveOptions(cfg, env);
 
         module.AddSetting(
             Constants.Provenance.SpecVersion,
@@ -63,37 +62,81 @@ public sealed class OpenApiModule : KoanModule
             usedDefault: true);
 
         module.AddSetting(
+            Constants.Provenance.Enabled,
+            ProvenancePublicationMode.Auto,
+            settings.DocumentEnabled.ToString(),
+            sourceKey: Constants.Configuration.Enabled,
+            usedDefault: settings.Enabled is null);
+
+        module.AddSetting(
             Constants.Provenance.Route,
             ProvenancePublicationMode.Auto,
-            settings.CurrentRoute,
-            sourceKey: settings.SourceRoutePatternKey,
+            settings.DocumentRoute,
+            sourceKey: Constants.Configuration.RoutePattern,
             usedDefault: settings.RoutePattern == KoanOpenApiOptions.DefaultRoutePattern);
 
-        module.AddTool(
-            "OpenAPI Document",
-            settings.CurrentRoute,
-            "HTTP OpenAPI document exposed by Koan.Web.OpenApi",
-            capability: "observability.openapi");
+        var uiPosture = settings.UiEnabled
+            ? $"{settings.UiRoute} ({(settings.RequiresAuthentication ? "authentication required" : "open")})"
+            : "disabled";
 
-        global::Koan.Web.Connector.Swagger.Initialization.SwaggerBootstrap.Report(module, cfg, env);
+        module.AddSetting(
+            Constants.Provenance.Ui,
+            ProvenancePublicationMode.Auto,
+            uiPosture,
+            sourceKey: Constants.Configuration.EnableUi,
+            usedDefault: settings.EnableUi is null);
+
+        if (settings.DocumentEnabled)
+        {
+            module.AddTool(
+                "OpenAPI Document",
+                settings.DocumentRoute,
+                "HTTP OpenAPI 3.1 document",
+                capability: "observability.openapi");
+        }
+
+        if (settings.UiEnabled)
+        {
+            module.AddTool(
+                "OpenAPI UI",
+                settings.UiRoute,
+                settings.RequiresAuthentication ? "Interactive OpenAPI UI; authentication required" : "Interactive OpenAPI UI",
+                capability: "observability.openapi.ui");
+        }
     }
 
-    private static OpenApiOptionSnapshot ResolveOptions(IConfiguration cfg)
+    private static OpenApiOptionSnapshot ResolveOptions(IConfiguration cfg, IHostEnvironment env)
     {
-        var options = new KoanOpenApiOptions();
-        var routePatternKey = $"{Infrastructure.Constants.Configuration.Section}:{Infrastructure.Constants.Configuration.Keys.RoutePattern}";
-
-        options.RoutePattern = cfg.Read(routePatternKey, options.RoutePattern)!;
+        var defaults = new KoanOpenApiOptions();
+        var enabled = cfg.Read<bool?>(Constants.Configuration.Enabled);
+        var enableUi = cfg.Read<bool?>(Constants.Configuration.EnableUi);
+        var routePattern = cfg.Read(Constants.Configuration.RoutePattern, defaults.RoutePattern)!;
+        var uiRoute = cfg.Read(Constants.Configuration.UiRoute, defaults.UiRoute)!;
+        var requireAuthentication = cfg.Read(
+            Constants.Configuration.RequireAuthenticationOutsideDevelopment,
+            defaults.RequireAuthenticationOutsideDevelopment);
 
         return new OpenApiOptionSnapshot(
-            options.RoutePattern,
-            routePatternKey);
+            enabled,
+            enableUi,
+            routePattern,
+            uiRoute,
+            requireAuthentication,
+            env.IsDevelopment());
     }
 
     private sealed record OpenApiOptionSnapshot(
+        bool? Enabled,
+        bool? EnableUi,
         string RoutePattern,
-        string SourceRoutePatternKey)
+        string UiRoutePrefix,
+        bool RequireAuthenticationOutsideDevelopment,
+        bool IsDevelopment)
     {
-        public string CurrentRoute => RoutePattern.Replace("{documentName}", KoanOpenApiOptions.DefaultDocumentName, StringComparison.OrdinalIgnoreCase);
+        public bool DocumentEnabled => Enabled ?? true;
+        public bool UiEnabled => DocumentEnabled && (EnableUi ?? IsDevelopment);
+        public bool RequiresAuthentication => UiEnabled && !IsDevelopment && RequireAuthenticationOutsideDevelopment;
+        public string DocumentRoute => RoutePattern.Replace("{documentName}", KoanOpenApiOptions.DefaultDocumentName, StringComparison.OrdinalIgnoreCase);
+        public string UiRoute => "/" + UiRoutePrefix.Trim('/');
     }
 }

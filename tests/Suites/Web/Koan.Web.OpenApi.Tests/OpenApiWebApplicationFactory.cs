@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -11,32 +10,32 @@ using Xunit;
 namespace Koan.Web.OpenApi.Tests;
 
 /// <summary>
-/// ARCH-0091: xUnit v3 runs out-of-process and must own the assembly entry point, so this can't be a
-/// <c>WebApplicationFactory&lt;Program&gt;</c>. The Swagger gate is config-sensitive (each spec wants a
-/// different <c>Koan:OpenApi:EnableUi</c> / legacy toggle), so instead of WAF's
-/// <c>WithWebHostBuilder</c>, <see cref="CreateClient"/> boots a fresh in-memory TestServer host per call
-/// with the requested overrides layered over the base config. Hosts are torn down on dispose.
+/// Boots an isolated TestServer host for each OpenAPI posture under test.
 /// </summary>
-public sealed class SwaggerWebApplicationFactory : IAsyncLifetime
+public sealed class OpenApiWebApplicationFactory : IAsyncLifetime
 {
     private readonly List<IHost> _hosts = new();
 
     public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
-    /// <summary>Boot a fresh TestServer host (base config + per-test overrides) and return its client.</summary>
     public HttpClient CreateClient(params (string Key, string Value)[] extraSettings)
+        => CreateClientForEnvironment("Test", extraSettings);
+
+    public HttpClient CreateClientForEnvironment(
+        string environmentName,
+        params (string Key, string Value)[] extraSettings)
     {
         var host = Host.CreateDefaultBuilder()
             .ConfigureWebHost(web =>
             {
                 web.UseTestServer();
                 web.UseContentRoot(AppContext.BaseDirectory);
-                web.UseEnvironment("Test");
+                web.UseEnvironment(environmentName);
                 web.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
-                        ["Koan:Environment"] = "Test",
+                        ["Koan:Environment"] = environmentName,
                         ["Koan:Data:Sources:Default:Adapter"] = "inmemory",
                         ["Koan:Data:Sources:Default:ConnectionString"] = "memory://openapi-tests",
                         ["Koan:BackgroundServices:Enabled"] = "false",
@@ -45,7 +44,7 @@ public sealed class SwaggerWebApplicationFactory : IAsyncLifetime
                     if (extraSettings.Length > 0)
                     {
                         cfg.AddInMemoryCollection(extraSettings.Select(
-                            s => new KeyValuePair<string, string?>(s.Key, s.Value)));
+                            setting => new KeyValuePair<string, string?>(setting.Key, setting.Value)));
                     }
                 });
                 web.ConfigureServices(services =>
@@ -68,9 +67,18 @@ public sealed class SwaggerWebApplicationFactory : IAsyncLifetime
     {
         foreach (var host in _hosts)
         {
-            try { await host.StopAsync(); } catch { /* best effort */ }
+            try
+            {
+                await host.StopAsync();
+            }
+            catch
+            {
+                // Best-effort fixture cleanup.
+            }
+
             host.Dispose();
         }
+
         _hosts.Clear();
     }
 }
