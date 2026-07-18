@@ -44,11 +44,6 @@ public sealed class SecIdentityModule : KoanModule
         foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(Access.IEffectiveAccessContributor)))
             services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(Access.IEffectiveAccessContributor), type));
 
-        // P3-grp4 — pre-session gates (the 2-phase step-up enforcement). Discovered so the Credentials base's
-        // step-up gate lights up when referenced; with no gates registered, sign-in is unchanged (graceful degradation).
-        foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(ISignInGate)))
-            services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(ISignInGate), type));
-
         // Layer 3 — day-2 power: safe impersonation, JIT/time-boxed grants, tamper-evident audit.
         services.TryAddSingleton<Impersonation.ImpersonationService>();
         services.TryAddSingleton<Management.JitGrantService>();

@@ -20,7 +20,7 @@ namespace Koan.Identity.Tests;
 /// <summary>
 /// SEC-0007 P3-core / Layer-3 acceptance (ARCH-0079 — real <c>AddKoan()</c>, offline): safe impersonation
 /// (dual-control, time-boxed, actor-claim not a sub-swap, dangerous verbs 403, banner), JIT time-boxed grants,
-/// and tamper-evident audit. (Local-credential/passkey/MFA/recovery — group 4 — is scoped separately.)
+/// and tamper-evident audit. Local credentials and application-managed factors are outside the supported V1 surface.
 /// </summary>
 [Collection("identity")]
 public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
