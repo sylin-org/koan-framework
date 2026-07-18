@@ -22,7 +22,7 @@ This report separates objective package repairs from human review. `structurally
 
 | Packages | Repair required | Review required | Structurally ready | Owned READMEs | Technical companions | Findings |
 |---:|---:|---:|---:|---:|---:|---:|
-| 102 | 6 | 18 | 78 | 96 | 91 | 71 |
+| 102 | 6 | 17 | 79 | 96 | 91 | 69 |
 
 ## Packages
 
@@ -53,7 +53,7 @@ This report separates objective package repairs from human review. `structurally
 | `Sylin.Koan.Classification`<br>[`src/Koan.Classification/Koan.Classification.csproj`](../../src/Koan.Classification/Koan.Classification.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Classification/README.md)<br>[TECHNICAL](../../src/Koan.Classification/TECHNICAL.md) | none |
 | `Sylin.Koan.Classification.Contracts`<br>[`src/Koan.Classification.Contracts/Koan.Classification.Contracts.csproj`](../../src/Koan.Classification.Contracts/Koan.Classification.Contracts.csproj) | contracts / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Classification.Contracts/README.md)<br>[TECHNICAL](../../src/Koan.Classification.Contracts/TECHNICAL.md) | none |
 | `Sylin.Koan.Communication`<br>[`src/Koan.Communication/Koan.Communication.csproj`](../../src/Koan.Communication/Koan.Communication.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Communication/README.md)<br>[TECHNICAL](../../src/Koan.Communication/TECHNICAL.md) | none |
-| `Sylin.Koan.Communication.Connector.RabbitMq`<br>[`src/Connectors/Communication/RabbitMq/Koan.Communication.Connector.RabbitMq.csproj`](../../src/Connectors/Communication/RabbitMq/Koan.Communication.Connector.RabbitMq.csproj) | provider / library<br>net10.0 | `review-required` | [README](../../src/Connectors/Communication/RabbitMq/README.md)<br>[TECHNICAL](../../src/Connectors/Communication/RabbitMq/TECHNICAL.md) | `docs.readme.meaningful-use.missing` (warning): The README has no recognizable meaningful-use or behavior section.<br>`docs.readme.package-title.missing` (warning): The README does not use the exact package ID as its primary title. |
+| `Sylin.Koan.Communication.Connector.RabbitMq`<br>[`src/Connectors/Communication/RabbitMq/Koan.Communication.Connector.RabbitMq.csproj`](../../src/Connectors/Communication/RabbitMq/Koan.Communication.Connector.RabbitMq.csproj) | provider / library<br>net10.0 | `structurally-ready` | [README](../../src/Connectors/Communication/RabbitMq/README.md)<br>[TECHNICAL](../../src/Connectors/Communication/RabbitMq/TECHNICAL.md) | none |
 | `Sylin.Koan.Core`<br>[`src/Koan.Core/Koan.Core.csproj`](../../src/Koan.Core/Koan.Core.csproj) | foundation / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Core/README.md)<br>[TECHNICAL](../../src/Koan.Core/TECHNICAL.md) | none |
 | `Sylin.Koan.Data.Abstractions`<br>[`src/Koan.Data.Abstractions/Koan.Data.Abstractions.csproj`](../../src/Koan.Data.Abstractions/Koan.Data.Abstractions.csproj) | contracts / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Data.Abstractions/README.md)<br>[TECHNICAL](../../src/Koan.Data.Abstractions/TECHNICAL.md) | none |
 | `Sylin.Koan.Data.Access`<br>[`src/Koan.Data.Access/Koan.Data.Access.csproj`](../../src/Koan.Data.Access/Koan.Data.Access.csproj) | capability / library<br>net10.0 | `repair-required` | root README fallback | `docs.readme.owned.missing` (error): The package falls back to the framework root README.<br>`docs.technical.missing` (warning): No package-owned technical companion describes runtime or build ownership. |

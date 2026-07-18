@@ -168,11 +168,14 @@
         "Sylin.Koan.Communication.Connector.RabbitMq"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md"
+        "docs/reference/communication/index.md",
+        "src/Connectors/Communication/RabbitMq/README.md",
+        "src/Koan.Communication/README.md"
       ],
       "evidence": [
-        "docs/initiatives/koan-v1/R02-EVIDENCE.md",
-        "tests/Suites/Communication"
+        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "tests/Suites/Communication/Koan.Communication.Connector.RabbitMq.Tests",
+        "tests/Suites/Communication/Koan.Communication.Tests"
       ]
     },
     {

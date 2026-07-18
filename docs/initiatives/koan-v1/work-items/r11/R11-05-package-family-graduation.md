@@ -3373,6 +3373,221 @@ discovered, functional/Web ownership remains split, and failed/parked pipeline o
 R11-02 now records `keep` Canon, implemented `merge` Contracts, and `keep` Canon Web. Full solution/release
 certification, publication, tagging, and remote mutation remain intentionally deferred to R11-07.
 
+## RabbitMQ Communication provider discovery and disposition proposal (architecture checkpoint)
+
+**Task:** Graduate `Sylin.Koan.Communication.Connector.RabbitMq` from temporary `assess` without reopening the passed
+R07-10 provider-election/transport rebuild; retain its earned external-reach intent, remove only current unearned
+branches/surfaces, and align package/product truth with focused real-provider evidence.
+
+**Application intent:** An application adds one RabbitMQ connector reference and keeps its Entity Transport code;
+Koan moves that snapshot onto the application mesh with broker-confirmed acceptance, authenticated context carriage,
+typed receiver-group fan-out, and no silent reduction back to process-local reach.
+
+**Public expression:**
+
+```powershell
+dotnet add package Sylin.Koan.Communication.Connector.RabbitMq
+```
+
+```csharp
+var builder = Host.CreateApplicationBuilder(args);
+builder.Services.AddKoan();
+
+public sealed class ImportOrder : IReceiveEntity<Order>
+{
+    public Task Receive(Order order, CancellationToken ct) => Task.CompletedTask;
+}
+
+await order.Transport.Send(ct);
+```
+
+The direct reference is provider intent. With Koan orchestration, no Rabbit-specific registration or endpoint setting
+is required. An existing broker uses standard .NET configuration:
+
+```json
+{
+  "ConnectionStrings": {
+    "RabbitMq": "amqp://app:secret@rabbitmq:5672"
+  }
+}
+```
+
+Publisher and receiver participants must share the application mesh identity, compatible CLR contract identities,
+declared business channel, and trust material. RabbitMQ must be reachable, or Koan orchestration must be allowed to
+provision it. No provider pin is part of the common direct-reference path.
+
+**Guarantee/correction:** Awaiting `Transport.Send` means RabbitMQ confirmed a mandatory persistent publication to
+Koan's durable mesh exchange and did not report a missing receiver-group route. Each stable receiver group owns a
+durable competing queue; distinct groups fan out independent host-deserialized Entity copies. The receipt reports
+`rabbitmq`, `durably-acknowledged`, and `SettlementObservable=false`; it does not imply handler completion. An elected
+connector that cannot start, authenticate, route, or confirm fails with a typed/corrective provider boundary and never
+falls back locally. Invalid or failed inbound envelopes are rejected without requeue because retry/dead-letter policy
+is explicitly absent.
+
+**Complete intent surface:** The complete normal action is the direct package reference, ordinary `AddKoan()`, existing
+business receiver, and existing `Entity.Transport.Send`. A standard connection string is needed only for an existing
+broker when discovery/orchestration cannot supply it. A named Communication channel/provider pin remains a deliberate
+Core Communication policy override, not Rabbit-specific setup. `MeshTrustKey`, provisioning credentials, prefetch,
+and publication timeout are optional operator decisions under `Koan:Communication:RabbitMq`; there is no queue,
+exchange, routing-key, handler-registration, or arbitrary-message API.
+
+**Public concepts:**
+
+- `Sylin.Koan.Communication.Connector.RabbitMq` — the one application-visible decision to extend Transport and
+  framework-owned routes beyond the process.
+- `RabbitMqCommunicationOptions` — earned operator controls for mesh trust, provisioned/discovered endpoint
+  credentials, consumer prefetch, and confirmed-publication timeout. Its duplicate `ConnectionString` property is not
+  earned once standard `ConnectionStrings:RabbitMq` is the canonical explicit endpoint.
+- `RabbitMqModule` — the generated functional activation owner required by the package reference.
+- `RabbitMqDiscoveryAdapter` and `RabbitMqOrchestrationEvaluator` — package mechanics, not application contracts;
+  current repository consumers do not instantiate them outside the connector's friend test assembly.
+- Entity Transport, receivers, acceptance/settlement, business channels, adapter contracts, host wire, and provider
+  election remain owned by `Sylin.Koan.Communication`; RabbitMQ adds no second grammar.
+
+**Docs read:**
+
+- `CLAUDE.md` — requires reference-as-intent, Entity Communication vocabulary, one host composition, adapter-owned
+  mechanics, and focused evidence; directly governing.
+- `docs/engineering/index.md` — requires typed options, centralized constants, package companions, and focused package
+  validation; directly governing.
+- `docs/architecture/principles.md` — places semantic route/election policy in Communication and backend realization
+  in the adapter; directly governing.
+- `docs/toc.yml` — already links the current Communication reference; no new navigation branch is needed.
+- root `README.md` — teaches unchanged `Entity.Events`/`Entity.Transport` grammar and connector-transparent reach.
+- `samples/CATALOG.md` — retires the historical sample catalog; no stale catalog entry is an authority for this slice.
+- `R07-10-communication-provider-election.md` — proves the provider boundary, real RabbitMQ topology, authenticated
+  carriage, fail-closed reach, and explicit non-claims already passed; it must not be rebuilt.
+- `src/Koan.Communication/{README,TECHNICAL}.md` and `docs/reference/communication/index.md` — state the current pillar
+  contract, named channels, internal routes, settlement distinction, and Rabbit limits; relevant current truth.
+- `src/Connectors/Communication/RabbitMq/{README,TECHNICAL}.md` — accurately describes most mechanics and limits but
+  lacks the exact NuGet title/recognized meaningful-use heading and still teaches a Koan-specific endpoint branch.
+- generated package/product references — classify RabbitMQ correctly as a provider under the verified Communication
+  claim; only two README findings remain, while claim evidence still points to older broad initiative pages.
+
+**Code read:**
+
+- `RabbitMqModule.cs` — one module registers options, discovery, orchestration, adapter, and health; correct owner,
+  though its fixed `default` claim text understates named-channel candidacy.
+- `RabbitMqCommunicationAdapter.cs` — one host-lifetime connection plus publisher/consumer channels implements
+  confirmed mandatory publication, topology, HMAC verification, manual settlement, and clean shutdown; directly
+  relevant and retained.
+- `RabbitMqCommunicationOptions.cs` and `Infrastructure/Constants.cs` — typed tunables and most identifiers already
+  exist; one duplicate endpoint property, legacy keys, a legacy Koan environment alias, and scattered stable
+  image/port/topology values remain.
+- `RabbitMqDiscoveryAdapter.cs` — startup-only standard discovery with real AMQP health and credential normalization;
+  keep the mechanism, internalize the type, and read one standard connection string plus `RABBITMQ_URL`/Aspire.
+- `RabbitMqOrchestrationEvaluator.cs` and `RabbitMqServiceDescriptor.cs` — direct-reference provisioning and service
+  metadata share one physical lifecycle; keep in this package and centralize their broker constants.
+- `RabbitMqHealthContributor.cs` — elected-only criticality projects the adapter's actual state; retain unchanged.
+- `CommunicationAdapterContracts.cs` and `CommunicationRouter.cs` — Communication already owns the immutable adapter
+  declaration, per-route election, host wire/bindings, context trust gate, and no-fallback policy; RabbitMQ must not
+  duplicate them.
+- `RabbitMqTransportSpec.cs`, `RabbitMqTopologySpec.cs`, and `ProviderElectionSpec.cs` — nine Rabbit-specific cells plus
+  provider-neutral election cells prove direct intent, named channels, group/node fan-out, authenticated Tenancy
+  context, no-route correction, orchestration, health posture, and topology identity.
+- Mongo's graduated discovery/package pattern — closest sibling: discovery mechanics are internal, standard connection
+  strings are the first explicit endpoint, package docs state one meaningful result and operational limits.
+
+**Reusing:** `Entity.Transport.Send`, `IReceiveEntity<T>`, Communication's immutable provider catalog/router, host-owned
+wire codec and ingress, context trust plan, `ServiceDiscoveryAdapterBase`, `BaseOrchestrationEvaluator`,
+`RabbitMqCommunicationOptions`, existing project constants, RabbitMQ Client 7, health/facts projections, the nine
+RabbitMQ cells, the provider-neutral election suite, and the generated quality/product compilers.
+
+**Creating new:** No new file, service, abstraction, option family, endpoint, or application concept is proposed.
+
+| New code | Location | Justification |
+|---|---|---|
+| broker image/tag, AMQP/management ports, orchestration health command/timeouts, and topology/wire generation constants | existing `src/Connectors/Communication/RabbitMq/Infrastructure/Constants.cs` | Remove stable broker/protocol literals from module, service descriptor, orchestration, and adapter code without adding a new owner. |
+
+Existing code changes are deliberately narrow: remove `RabbitMqCommunicationOptions.ConnectionString`; remove
+`Koan:Messaging:*`, `Koan:Communication:RabbitMq:ConnectionString`, and `Koan_RABBITMQ_URL` endpoint branches; use
+`ConnectionStrings:RabbitMq` as the one explicit endpoint plus standard `RABBITMQ_URL`, Aspire, or orchestration;
+internalize discovery/orchestration mechanics; make module reporting lane-accurate; update existing tests to the
+standard endpoint; and graduate current package/product prose and evidence.
+
+**Coalescence:** Closest pattern: the graduated Mongo provider combines a pillar-owned provider contract with one
+mechanical connector package, internal discovery, standard connection strings, selection-aware health, and exact
+package docs. RabbitMQ's current decision owner is `CommunicationRouter`; its consumers are Entity Transport plus
+Jobs competing signals and Cache node broadcasts; adapter state is one host-lifetime connection/channel set; discovery
+cost is startup-only, while publication uses one bounded serialized confirm gate. No sibling repeats RabbitMQ
+topology/HMAC mechanics. Specificity is therefore adapter. Disposition: `keep` the package; absorb nothing into Core or
+Communication; rebuild no R07 mechanism; delete only obsolete configuration/public branches. The one target owner is
+the RabbitMQ connector because discovery, orchestration, health, options, topology, and AMQP lifetime are one physical
+backend decision. Communication is too wide—it must preserve a dependency-light local floor and provider-neutral
+semantics. A narrower package is wrong because none of these mechanics has independent reference intent or version
+value.
+
+**Ergonomics:** Human and coding-model code remains one package reference plus `Transport.Send`; explicit endpoints
+become the standard .NET connection-string concept instead of a parallel Koan property and three legacy aliases.
+IntelliSense retains only options that change trust or flow-control guarantees. Discovery/evaluator implementation
+types disappear from application completion lists. Reviewers retain one 398-line adapter chokepoint with one constants
+owner and nine direct behavior cells; no new cognitive branch is introduced.
+
+**Constraints satisfied:**
+
+- Entity-first: the application grammar remains `Entity.Transport.Send`; no repository/data surface is involved.
+- Controllers-only HTTP: this provider exposes no HTTP route or inline endpoint.
+- Constants/options: stable broker/protocol values move to the existing constants owner; tunables remain typed options.
+- Shared contracts: provider-neutral adapter/wire/election types remain in Communication; RabbitMQ mechanics remain in
+  the connector.
+- Structural composition: reference intent and route election still compile once per host; hot publication does not
+  rediscover or renegotiate.
+- Data/streaming guardrails are not applicable; Communication preserves lazy source enumeration and bounded
+  acceptance at its existing pillar boundary.
+- Docs: package companions, current Communication reference, product claim/evidence, R11-02, generated truth, and
+  progress/handoff will be aligned; dated ADR/R07 evidence remains historical.
+- Focused proof only: RabbitMQ connector/election/build/pack/audit/docs evidence; no full R11-07 ratchet.
+
+**Risks:** Removing the public options endpoint and legacy environment/configuration aliases is intentionally breaking
+before 1.0. Repository search finds no current source/sample consumer; the real connector tests are the only direct
+project consumer and will move to `ConnectionStrings:RabbitMq`. External users of the deprecated Messaging keys must
+adopt the documented standard connection string. RabbitMQ container evidence depends on an available Docker-compatible
+runtime; if unavailable, the result must be reported as an environmental block rather than replaced by mocks. The
+HMAC protects integrity/provenance, not confidentiality; broker TLS/network/vhost controls remain operator-owned.
+
+**Architecture checkpoint:** No RabbitMQ production edit follows this record until the maintainer accepts or adjusts
+the `keep` disposition and the narrow promise reduction: one standard explicit endpoint; removal of the public
+`ConnectionString` option and legacy aliases; internal discovery/orchestration mechanics; no change to R07 transport,
+topology, acceptance, context, health, internal-route, or failure semantics.
+
+## RabbitMQ Communication provider implementation closure
+
+The maintainer accepted the checkpoint. R11-05 implements the terminal `keep` disposition without reopening R07-10
+or changing Communication's application grammar:
+
+- `ConnectionStrings:RabbitMq` is the single explicit endpoint. Standard `RABBITMQ_URL`, Aspire discovery, and Koan
+  orchestration remain. The duplicate options endpoint, `Koan:Communication:RabbitMq:ConnectionString`, both
+  `Koan:Messaging:*` legacy keys, and `Koan_RABBITMQ_URL` were removed.
+- `RabbitMqCommunicationOptions` now exposes only earned operator decisions: discovered/provisioned credentials,
+  explicit mesh trust, bounded prefetch, and confirmed-publication timeout.
+- Discovery and orchestration evaluators are internal connector mechanics. Broker image/tag, ports, recovery and
+  health timing, health command, environment identifiers, and wire/topology generations have one existing constants
+  owner. Module reporting names candidate lanes rather than falsely fixing them to `default`.
+- The passed direct-reference election, named channels, confirmed mandatory persistent publication, durable group
+  queues, ephemeral node queues, manual acknowledgement, authenticated context ingress, selection-aware health,
+  internal framework routes, no remote settlement, and fail-closed reach remain unchanged.
+- Package and current Communication docs teach one package reference, unchanged `Entity.Transport.Send`, the standard
+  .NET connection string only when an existing broker requires it, the exact acceptance boundary, and deliberate
+  non-claims. Historical ADR/R07 pages remain historical evidence rather than current configuration authority.
+
+**Focused evidence:**
+
+- Release connector build: zero warnings and zero errors.
+- Real RabbitMQ connector suite: 9/9, including direct and named-channel election, group/node fan-out, authenticated
+  Tenancy context, no-route correction, orchestration, participation health, and topology identity.
+- Provider-neutral `ProviderElectionSpec`: 8/8. Both test projects retain the already recorded PMC-032 stale
+  `Koan.Core.Adapters` project-reference warning; test discovery and execution are green.
+- Release pack contains the package-owned README, canonical icon, one net10.0 DLL/XML pair, build-transitive props,
+  and symbol package. Its exact dependencies are Communication, Core, Microsoft Extensions configuration/DI/logging/
+  options, and RabbitMQ Client; no new contract or functional dependency was introduced.
+- The current direct/transitive vulnerability audit reports no known vulnerable package.
+- Generated truth is 102 evaluated packages: 6 repair-required, 17 review-required, 79 structurally ready, and 26
+  claims. RabbitMQ is structurally ready with no findings, and the verified Communication claim points to current
+  Communication/RabbitMQ docs plus the focused owner/provider suites.
+
+R11-02 now records the implemented `keep` disposition. No full solution/release ratchet, publication, remote mutation,
+or unrelated family suite ran; those boundaries remain R11-07 work.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

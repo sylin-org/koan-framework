@@ -191,7 +191,7 @@ That direct reference elects RabbitMQ for `Transport/default` and both internal 
 Events remain process-local. A
 transitive connector remains inert. Koan orchestration can provision the broker automatically, or an
 existing endpoint can be supplied with
-`Koan:Communication:RabbitMq:ConnectionString=amqp://user:password@host:5672`.
+`ConnectionStrings:RabbitMq=amqp://user:password@host:5672`.
 
 The Entity and receiver code does not change. RabbitMQ creates a durable queue per stable receiver
 group, confirms mandatory persistent publications, restores authenticated context at ingress, and

@@ -61,8 +61,8 @@
       "summary": "Entities and entity sequences express local-first events and transport intent with pluggable routing.",
       "maturity": "verified",
       "packages": ["Sylin.Koan.Communication", "Sylin.Koan.Communication.Connector.RabbitMq"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
-      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "tests/Suites/Communication"]
+      "documentation": ["docs/reference/communication/index.md", "src/Koan.Communication/README.md", "src/Connectors/Communication/RabbitMq/README.md"],
+      "evidence": ["tests/Suites/Communication/Koan.Communication.Tests", "tests/Suites/Communication/Koan.Communication.Connector.RabbitMq.Tests", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
     },
     {
       "id": "jobs-scheduling",

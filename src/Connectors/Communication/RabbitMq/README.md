@@ -1,4 +1,4 @@
-# Koan Communication RabbitMQ
+# Sylin.Koan.Communication.Connector.RabbitMq
 
 `Sylin.Koan.Communication.Connector.RabbitMq` carries Entity Transport and framework-owned internal
 signals across a RabbitMQ mesh while leaving the application language unchanged:
@@ -6,6 +6,8 @@ signals across a RabbitMQ mesh while leaving the application language unchanged:
 ```powershell
 dotnet add package Sylin.Koan.Communication.Connector.RabbitMq
 ```
+
+## Meaningful result
 
 ```csharp
 using Koan.Communication;
@@ -61,19 +63,14 @@ configuration. To use an existing broker, set one endpoint:
 
 ```json
 {
-  "Koan": {
-    "Communication": {
-      "RabbitMq": {
-        "ConnectionString": "amqp://app:secret@rabbitmq:5672"
-      }
-    }
+  "ConnectionStrings": {
+    "RabbitMq": "amqp://app:secret@rabbitmq:5672"
   }
 }
 ```
 
-`RABBITMQ_URL`, `Koan_RABBITMQ_URL`, Aspire service discovery, and
-`ConnectionStrings:rabbitmq` are also recognized. When a discovered URL has no credentials,
-`Username` and `Password` default to `koan` for the Koan-provisioned container.
+`RABBITMQ_URL` and Aspire service discovery are also recognized. When a discovered URL has no
+credentials, `Username` and `Password` default to `koan` for the Koan-provisioned container.
 
 ## What acceptance means
 
@@ -98,7 +95,6 @@ application reach.
 
 All options live under `Koan:Communication:RabbitMq`:
 
-- `ConnectionString` — AMQP URI or `auto` (default).
 - `Username` / `Password` — credentials added to discovered endpoints without user information.
 - `MeshTrustKey` — optional explicit HMAC material; otherwise the authenticated broker credential is
   used. Applications on the same mesh must use the same material.

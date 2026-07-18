@@ -4,11 +4,11 @@
   "summary": {
     "packages": 102,
     "repairRequired": 6,
-    "reviewRequired": 18,
-    "structurallyReady": 78,
+    "reviewRequired": 17,
+    "structurallyReady": 79,
     "ownedReadmes": 96,
     "technicalCompanions": 91,
-    "findings": 71
+    "findings": 69
   },
   "findingDefinitions": [
     {
@@ -594,7 +594,7 @@
       "projectPath": "src/Connectors/Communication/RabbitMq/Koan.Communication.Connector.RabbitMq.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "RabbitMQ Transport provider for Koan Communication with typed receiver groups and confirmed publication.",
       "targetFrameworks": [
         "net10.0"
@@ -606,10 +606,7 @@
       "readme": "src/Connectors/Communication/RabbitMq/README.md",
       "technicalDocumentation": "src/Connectors/Communication/RabbitMq/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Core",

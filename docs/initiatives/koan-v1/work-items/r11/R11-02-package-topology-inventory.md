@@ -46,8 +46,8 @@ generated package-quality and product-surface references.
 
 R11-01 opened with 109 packages: 37 required an objective repair, 72 required review, and none was inferred
 graduated. Subsequent family work retired unearned identities and introduced only independently useful contract or
-shared-mechanism boundaries. The current evaluated graph contains 102 packages: 6 repair-required, 18
-review-required, and 78 structurally ready across 26 claims. The active matrix contains only present package projects;
+shared-mechanism boundaries. The current evaluated graph contains 102 packages: 6 repair-required, 17
+review-required, and 79 structurally ready across 26 claims. The active matrix contains only present package projects;
 implemented retirements remain in the disposition tables as release-lineage decisions.
 
 ## Exact active matrix
@@ -84,7 +84,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Classification` | `capability` | `keep` |
 | `Sylin.Koan.Classification.Contracts` | `contracts` | `keep` (introduced by R11-05 contract isolation) |
 | `Sylin.Koan.Communication` | `capability` | `keep` |
-| `Sylin.Koan.Communication.Connector.RabbitMq` | `provider` | `assess` |
+| `Sylin.Koan.Communication.Connector.RabbitMq` | `provider` | `keep` (implemented) |
 | `Sylin.Koan.Core` | `foundation` | `keep` |
 | `Sylin.Koan.Data.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Data.Access` | `capability` | `assess` |
@@ -243,6 +243,15 @@ instead of silently treating it as empty. This closes the first review-order gro
 
 The focused Web projection pass removes Web Extensions' provisional quality status: its distinct optional intent,
 host-owned composition, public contract, and focused evidence now agree.
+
+## Communication provider dispositions
+
+Communication retains a dependency-light process-local semantic floor. External broker mechanics remain separately
+elected so adding network reach is an explicit application reference rather than a hidden transitive side effect.
+
+| Package | Disposition | Distinct reference intent and implemented boundary work |
+|---|---|---|
+| `Sylin.Koan.Communication.Connector.RabbitMq` | `keep` (implemented) | One direct reference elects RabbitMQ carriage for Entity Transport and the supported framework-owned routes while Events remain local. The connector retains broker-confirmed mandatory publication, typed group/node topology, authenticated context, selection-aware health, and fail-closed reach. Its explicit endpoint is now the standard `ConnectionStrings:RabbitMq`; duplicate/legacy Koan endpoint branches were removed, discovery/orchestration mechanics were internalized, and stable broker/protocol identifiers were consolidated without changing the passed R07 transport contract. |
 
 ## AI semantic-input and projection dispositions
 

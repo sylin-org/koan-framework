@@ -9,7 +9,7 @@ framework_version: source-first
 validation:
   date_last_tested: 2026-07-18
   status: tested
-  scope: R11-05 Canon package-family graduation implemented and focused-proof green
+  scope: R11-05 RabbitMQ Communication provider graduation implemented and focused-proof green
 ---
 
 # Koan V1 reorganization current handoff
@@ -22,81 +22,76 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - R11-01 through R11-04 pass. R11-05 is active and graduates package families in dependency order before the single
   R11-07 release-certification boundary.
 - Foundation, package identity, templates, Storage, Cache, Redis, relational/Data providers, Vector, AI, MCP, Web,
-  Media, OpenGraph, Identity, Tenancy, Classification, and now Canon have completed their current R11 family slices.
+  Media, OpenGraph, Identity, Tenancy, Classification, Canon, and now the RabbitMQ Communication provider have
+  completed their current R11 family slices.
 - The current evaluated product graph contains 102 packages and 26 claims. Generated package quality reports 6
-  repair-required, 18 review-required, and 78 structurally ready packages.
+  repair-required, 17 review-required, and 79 structurally ready packages.
 
 The accepted architecture remains business intent first: Entity-first application language, references express
 capability intent, `AddKoan()` compiles one host-owned semantic constitution, pillars own meaning and runtime
 chokepoints, adapters own mechanics, and applications own business rules. Cross-module contract packages survive only
 when they are genuinely inert and independently consumed.
 
-## Most recent completed slice: Canon
+## Most recent completed slice: RabbitMQ Communication provider
 
-R10-11 was not restarted. Its four-line CustomerCanon host, automatic contributor discovery, functional/Web split,
-same-id convergence, and failed/parked non-persistence remain the application contract.
+R07-10 was not rebuilt. Its direct-reference provider election, named-channel topology, broker-confirmed acceptance,
+authenticated context, typed group/node fan-out, selection-aware health, internal framework routes, no remote
+settlement, and fail-closed external reach remain the product contract.
 
-R11-05 implemented the accepted topology:
+R11-05 records and implements `keep` for `Sylin.Koan.Communication.Connector.RabbitMq`:
 
-- `Sylin.Koan.Canon` — `keep`;
-- `Sylin.Koan.Canon.Contracts` — `merge` into Canon, implemented without a compatibility package;
-- `Sylin.Koan.Canon.Web` — `keep`.
+- standard `ConnectionStrings:RabbitMq` is the single explicit endpoint;
+- `RABBITMQ_URL`, Aspire discovery, and Koan orchestration remain;
+- the duplicate public endpoint option and legacy Koan endpoint aliases are gone;
+- discovery/orchestration evaluators are internal mechanics;
+- stable broker/protocol values have one existing constants owner;
+- module reporting names candidate lanes rather than fixed default routes; and
+- package/current reference/product claim evidence states the exact meaningful result and limits.
 
-One immutable `CanonCompositionPlan` now owns every discovered `CanonEntity<T>`, including contributor-free models.
-Runtime, startup/facts, pipeline inspection, and Web project that same decision. Built-in aggregation/policy always
-participates; the first failed or parked contributor is terminal; duplicate HTTP slugs reject composition.
+The application path remains one package reference, ordinary `AddKoan()`, the existing receiver, and
+`Entity.Transport.Send`. No new registration surface, package, abstraction, or broker grammar was added.
 
-The default commit is explicit and tested: canonical Entity → aggregation indexes → audit. It is fail-loud and not
-atomic across all Data providers. A failed checkpoint may leave earlier checkpoints durable; Canon does not claim
-rollback, blind-retry safety, durable replay, distributed locking/delivery, or automatic recovery.
+## Focused RabbitMQ proof
 
-The public manual builder/configuration, observer/replay records, record capacity, disconnected optimization subsystem,
-`CanonValueObject<T>` auto-CRUD, generated admin/rebuild routes, and `FlowPillarManifest` were retired. Headless
-`ICanonRuntime.RebuildViews<T>`, standard-DI `ICanonPersistence`/`ICanonAuditSink` replacement, contributors, options,
-results, and read-only pipeline metadata remain.
-
-## Focused Canon proof
-
-- Canon unit: 35/35.
-- Canon integration: 7/7.
-- CustomerCanon real-host golden path: 1/1.
-- Both surviving packages built and packed in Release with one DLL/XML pair, build-transitive props, package-owned
-  README, canonical icon, symbol package, exact dependencies, and no Contracts dependency.
-- Current direct/transitive vulnerability audit: no known vulnerable packages for either survivor.
-- Generated package-quality and product-surface truth regenerated; both Canon packages are structurally ready with no
-  findings, and the verified claim names exactly Canon and Canon Web.
+- Release connector build: zero warnings and zero errors.
+- Real RabbitMQ connector suite: 9/9.
+- Provider-neutral provider-election facts: 8/8.
+- The known PMC-032 stale `Koan.Core.Adapters` test-project reference warning remains; execution is green.
+- The Release nupkg contains the package README, icon, DLL/XML pair, build-transitive props, exact dependencies, and a
+  symbol package; current direct/transitive vulnerability audit reports no known vulnerable package.
+- Generated quality/product truth is 102 packages — 6 repair, 17 review, 79 structurally ready — and 26 claims.
+  RabbitMQ is structurally ready with no findings and current claim links.
 - No full solution/release ratchet ran; that remains R11-07 work.
 
 ## Current repository state
 
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
-- Branch: `dev` at `1e91e2c10`; local is 140 commits ahead of `origin/dev` and 0 behind.
-- The Canon implementation, R11 discovery/closure, topology, package truth, and docs are intentionally uncommitted.
+- Branch: `dev`; verify the exact HEAD and ahead/behind count before the next action.
+- Canon is already committed locally in `64bf83d69` and `ef037a479`; RabbitMQ implementation/docs are the current
+  uncommitted slice until intentionally committed.
 - `tmp/` remains untracked scratch/evaluator material and must never be staged.
-- The CustomerCanon lockfile was refreshed by the focused real-host build and no longer contains Canon Contracts.
 - No push, publication, tag, release, deployment, remote mutation, private downstream inspection, or full release
   certification occurred.
 
 ## Resume here
 
-1. Verify `git status`, `HEAD`, and this Canon evidence before committing or starting another family.
-2. Review the complete Canon discovery, accepted checkpoint, implementation closure, and exact focused evidence in
+1. Verify `git status`, `HEAD`, and the focused RabbitMQ evidence in
    [R11-05](work-items/r11/R11-05-package-family-graduation.md).
-3. Review Canon's implemented dispositions and the 102-row active matrix in
+2. Review the implemented RabbitMQ disposition and exact 102-row matrix in
    [R11-02](work-items/r11/R11-02-package-topology-inventory.md).
-4. If the Canon slice is accepted for commit, keep architecture and public/package truth logically reviewable and do
-   not stage `tmp/`.
-5. Continue R11-05 with the next dependency-ordered `assess` family. The first unresolved active row is
-   `Sylin.Koan.Communication.Connector.RabbitMq`; begin with fresh exploration rather than presuming its disposition.
+3. If the slice is not yet committed, commit code/tests separately from docs/generated truth and never stage `tmp/`.
+4. Continue R11-05 with the next dependency-ordered `assess` family. The first unresolved active row is
+   `Sylin.Koan.Data.Access`; begin with fresh exploration rather than presuming its disposition.
 
 ## Remaining temporary dispositions
 
-Communication RabbitMQ; Data Access, Backup, and SoftDelete; Jobs; Observability; the remaining Orchestration CLI,
-Aspire, generator, container-provider, and Compose renderer family; Security Trust; Testing, Containers, and Hosting;
-Web Admin; and ZenGarden still require terminal R11-02 decisions.
+Data Access, Backup, and SoftDelete; Jobs; Observability; the remaining Orchestration CLI, Aspire, generator,
+container-provider, and Compose renderer family; Security Trust; Testing, Containers, and Hosting; Web Admin; and
+ZenGarden still require terminal R11-02 decisions.
 
 ## Do not redo
 
+- Do not reopen R07-10's RabbitMQ transport/provider architecture or rerun its historical assessment.
 - Do not reopen R10-11's historical Canon assessment or rebuild CustomerCanon.
 - Do not rerun Classification, Tenancy, or earlier family suites without an affected dependency.
 - Do not run the full release ratchet before R11-07.
