@@ -1479,7 +1479,8 @@
       "dependencies": [
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Web.Auth"
+        "Sylin.Koan.Web",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": null,
       "ownsReadme": false,
@@ -2092,7 +2093,8 @@
       "dependencies": [
         "Sylin.Koan.Core",
         "Sylin.Koan.Security.Trust",
-        "Sylin.Koan.Web"
+        "Sylin.Koan.Web",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": "src/Koan.Web.Auth/README.md",
       "ownsReadme": true,
@@ -2100,6 +2102,21 @@
       "claims": [
         "authentication-authorization"
       ]
+    },
+    {
+      "packageId": "Sylin.Koan.Web.Auth.Abstractions",
+      "shape": "library",
+      "description": "Inert Koan Web authentication contracts for provider composition, cookie lifecycle extensions, identity stores, and current-user projection.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core"
+      ],
+      "readme": "src/Koan.Web.Auth.Abstractions/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Web.Auth.Abstractions/TECHNICAL.md",
+      "claims": []
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Discord",
@@ -2110,7 +2127,8 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Web.Auth"
+        "Sylin.Koan.Web.Auth",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": "src/Connectors/Web/Auth/Discord/README.md",
       "ownsReadme": true,
@@ -2126,7 +2144,8 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Web.Auth"
+        "Sylin.Koan.Web.Auth",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": "src/Connectors/Web/Auth/Google/README.md",
       "ownsReadme": true,
@@ -2142,27 +2161,12 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Web.Auth"
+        "Sylin.Koan.Web.Auth",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": "src/Connectors/Web/Auth/Microsoft/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Web/Auth/Microsoft/TECHNICAL.md",
-      "claims": []
-    },
-    {
-      "packageId": "Sylin.Koan.Web.Auth.Connector.Oidc",
-      "shape": "library",
-      "description": "Generic OIDC adapter for Koan.Web.Auth (handler wiring; no defaults).",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Web.Auth"
-      ],
-      "readme": "src/Connectors/Web/Auth/Oidc/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": "src/Connectors/Web/Auth/Oidc/TECHNICAL.md",
       "claims": []
     },
     {
@@ -2174,7 +2178,8 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Web.Auth"
+        "Sylin.Koan.Web.Auth",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": "src/Connectors/Web/Auth/Test/README.md",
       "ownsReadme": true,
@@ -2192,6 +2197,7 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Web.Auth",
+        "Sylin.Koan.Web.Auth.Abstractions",
         "Sylin.Koan.Web.Extensions"
       ],
       "readme": "src/Koan.Web.Auth.Roles/README.md",
@@ -2211,7 +2217,8 @@
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Security.Trust",
         "Sylin.Koan.Web",
-        "Sylin.Koan.Web.Auth"
+        "Sylin.Koan.Web.Auth",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": null,
       "ownsReadme": false,

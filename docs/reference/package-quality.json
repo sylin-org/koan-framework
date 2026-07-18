@@ -4,11 +4,11 @@
   "summary": {
     "packages": 107,
     "repairRequired": 16,
-    "reviewRequired": 29,
-    "structurallyReady": 62,
+    "reviewRequired": 23,
+    "structurallyReady": 68,
     "ownedReadmes": 91,
     "technicalCompanions": 86,
-    "findings": 116
+    "findings": 105
   },
   "findingDefinitions": [
     {
@@ -1248,7 +1248,8 @@
       "dependencies": [
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Web.Auth"
+        "Sylin.Koan.Web",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": null,
       "technicalDocumentation": null,
@@ -2007,7 +2008,7 @@
       "projectPath": "src/Koan.Web.Auth/Koan.Web.Auth.csproj",
       "shape": "library",
       "role": "projection",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Authentication core for Koan Web: IDP configuration, controller wiring, and claims transformation pipelines.",
       "targetFrameworks": [
         "net10.0"
@@ -2015,124 +2016,111 @@
       "dependencies": [
         "Sylin.Koan.Core",
         "Sylin.Koan.Security.Trust",
-        "Sylin.Koan.Web"
+        "Sylin.Koan.Web",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": "src/Koan.Web.Auth/README.md",
       "technicalDocumentation": "src/Koan.Web.Auth/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing"
-      ]
+      "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Web.Auth.Abstractions",
+      "projectPath": "src/Koan.Web.Auth.Abstractions/Koan.Web.Auth.Abstractions.csproj",
+      "shape": "library",
+      "role": "contracts",
+      "status": "structurally-ready",
+      "description": "Inert Koan Web authentication contracts for provider composition, cookie lifecycle extensions, identity stores, and current-user projection.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core"
+      ],
+      "readme": "src/Koan.Web.Auth.Abstractions/README.md",
+      "technicalDocumentation": "src/Koan.Web.Auth.Abstractions/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Discord",
       "projectPath": "src/Connectors/Web/Auth/Discord/Koan.Web.Auth.Connector.Discord.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Discord OAuth2 auth provider adapter for Koan.Web.Auth (self-registering defaults).",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Web.Auth"
+        "Sylin.Koan.Web.Auth",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": "src/Connectors/Web/Auth/Discord/README.md",
       "technicalDocumentation": "src/Connectors/Web/Auth/Discord/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Google",
       "projectPath": "src/Connectors/Web/Auth/Google/Koan.Web.Auth.Connector.Google.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Google auth provider adapter for Koan.Web.Auth (self-registering defaults).",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Web.Auth"
+        "Sylin.Koan.Web.Auth",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": "src/Connectors/Web/Auth/Google/README.md",
       "technicalDocumentation": "src/Connectors/Web/Auth/Google/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Microsoft",
       "projectPath": "src/Connectors/Web/Auth/Microsoft/Koan.Web.Auth.Connector.Microsoft.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Microsoft (Entra ID) auth provider adapter for Koan.Web.Auth (self-registering defaults).",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Web.Auth"
+        "Sylin.Koan.Web.Auth",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": "src/Connectors/Web/Auth/Microsoft/README.md",
       "technicalDocumentation": "src/Connectors/Web/Auth/Microsoft/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
-    },
-    {
-      "packageId": "Sylin.Koan.Web.Auth.Connector.Oidc",
-      "projectPath": "src/Connectors/Web/Auth/Oidc/Koan.Web.Auth.Connector.Oidc.csproj",
-      "shape": "library",
-      "role": "provider",
-      "status": "review-required",
-      "description": "Generic OIDC adapter for Koan.Web.Auth (handler wiring; no defaults).",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Web.Auth"
-      ],
-      "readme": "src/Connectors/Web/Auth/Oidc/README.md",
-      "technicalDocumentation": "src/Connectors/Web/Auth/Oidc/TECHNICAL.md",
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Test",
       "projectPath": "src/Connectors/Web/Auth/Test/Koan.Web.Auth.Connector.Test.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Test identity provider for Koan Web Auth: local login UI, token issuance for demos, and development-only wiring.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Web.Auth"
+        "Sylin.Koan.Web.Auth",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": "src/Connectors/Web/Auth/Test/README.md",
       "technicalDocumentation": "src/Connectors/Web/Auth/Test/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Roles",
@@ -2148,6 +2136,7 @@
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Web.Auth",
+        "Sylin.Koan.Web.Auth.Abstractions",
         "Sylin.Koan.Web.Extensions"
       ],
       "readme": "src/Koan.Web.Auth.Roles/README.md",
@@ -2175,7 +2164,8 @@
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Security.Trust",
         "Sylin.Koan.Web",
-        "Sylin.Koan.Web.Auth"
+        "Sylin.Koan.Web.Auth",
+        "Sylin.Koan.Web.Auth.Abstractions"
       ],
       "readme": null,
       "technicalDocumentation": null,
