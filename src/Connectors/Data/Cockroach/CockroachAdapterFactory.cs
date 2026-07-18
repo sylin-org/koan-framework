@@ -7,6 +7,7 @@ using Koan.Core;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Core.Services;
+using Koan.Data.Relational.Npgsql;
 
 namespace Koan.Data.Connector.Cockroach;
 
@@ -60,7 +61,19 @@ public sealed class CockroachAdapterFactory : IDataAdapterFactory
             Readiness = baseOpts.Readiness
         };
 
-        return new CockroachRepository<TEntity, TKey>(sp, sourceOpts, resolver);
+        return new NpgsqlRepository<TEntity, TKey>(sp, new NpgsqlRepositoryOptions
+        {
+            ProviderName = Provider,
+            ConnectionString = sourceOpts.ConnectionString,
+            DefaultPageSize = sourceOpts.DefaultPageSize,
+            DdlPolicy = sourceOpts.DdlPolicy,
+            SchemaMatching = sourceOpts.SchemaMatching,
+            AllowProductionDdl = sourceOpts.AllowProductionDdl,
+            SearchPath = sourceOpts.SearchPath,
+            NamingStyle = sourceOpts.NamingStyle,
+            Separator = sourceOpts.Separator,
+            StableOrderClause = "ORDER BY \"Id\""
+        }, resolver);
     }
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)

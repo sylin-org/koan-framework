@@ -13,7 +13,7 @@ namespace Koan.Data.Relational.Ado;
 /// </summary>
 /// <remarks>
 /// Names are stored without the <c>@</c> sigil and bound as <c>@name</c> (which Microsoft.Data.Sqlite and the
-/// other ADO providers match against the SQL token). The Dapper-backed twin in <c>Koan.Data.Relational.Dapper</c>
+/// other ADO providers match against the SQL token). Provider mechanisms may translate this model to their native command API.
 /// reuses this same model so a non-AOT adapter can swap executors without changing call sites.
 /// </remarks>
 public sealed class SqlParameters

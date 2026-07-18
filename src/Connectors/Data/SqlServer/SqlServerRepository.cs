@@ -107,6 +107,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private readonly int _defaultPageSize;
     private readonly ILogger _logger;
     private readonly JsonSerializerSettings _json;
+    private readonly RelationalSchemaPolicy _schemaPolicy;
     private static readonly CamelCaseNamingStrategy CamelCase = new();
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
 
@@ -126,6 +127,14 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                       : NullLogger.Instance);
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
         _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
+        _schemaPolicy = new RelationalSchemaPolicy
+        {
+            Projections = RelationalProjectionMode.ComputedProjections,
+            Ddl = options.DdlPolicy,
+            Matching = options.SchemaMatching,
+            AllowProductionDdl = options.AllowProductionDdl,
+            DefaultSchema = "dbo"
+        };
         _json = new JsonSerializerSettings
         {
             ContractResolver = new Newtonsoft.Json.Serialization.DefaultContractResolver
@@ -230,12 +239,12 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                 var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                 var ddl = new MsSqlDdlExecutor(conn);
                 var feats = new MsSqlStoreFeatures();
-                var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, runCt);
+                var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, runCt);
                 var ddlAllowed = report.TryGetValue("DdlAllowed", out var da) && da is bool allowed && allowed;
                 var tableExists = report.TryGetValue("TableExists", out var te) && te is bool exists && exists;
                 if (ddlAllowed)
                 {
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, runCt);
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, runCt);
                     _healthyCache[cacheKey] = true;
                     return;
                 }
@@ -773,7 +782,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new MsSqlDdlExecutor(conn);
                     var feats = new MsSqlStoreFeatures();
-                    var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
+                    var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, ct);
                     return (TResult)report;
                 }
             case DataInstructions.EnsureCreated:
@@ -786,7 +795,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                     var key = $"{conn.DataSource}/{conn.Database}::{TableName}";
                     await Singleflight.Run(key, async kct =>
                     {
-                        await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, kct);
+                        await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, kct);
                         _healthyCache[key] = true;
                     }, ct);
                     object ok = true; return (TResult)ok;

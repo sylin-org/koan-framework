@@ -3,7 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Infrastructure;
 using Koan.Core.Logging;
@@ -67,7 +66,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private readonly ILinqSqlDialect _dialect = new SqliteDialect();
     private readonly int _defaultPageSize;
     private readonly ILogger _logger;
-    private readonly RelationalMaterializationOptions _relOptions;
+    private readonly RelationalSchemaPolicy _schemaPolicy;
     private readonly StorageOptimizationInfo _optimizationInfo;
     private readonly SqliteConnectionLifecycle _connections;
     private readonly string _source;
@@ -127,9 +126,16 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                       : NullLogger.Instance);
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
         _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
-        // Orchestration options (global, provider-agnostic)
-        _relOptions = (sp.GetService(typeof(IOptions<RelationalMaterializationOptions>)) as IOptions<RelationalMaterializationOptions>)?.Value
-                      ?? new RelationalMaterializationOptions();
+        _schemaPolicy = new RelationalSchemaPolicy
+        {
+            Projections = RelationalProjectionMode.PhysicalColumns,
+            Ddl = typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), false).Any()
+                ? RelationalDdlPolicy.NoDdl
+                : options.DdlPolicy,
+            Matching = options.SchemaMatching,
+            AllowProductionDdl = options.AllowProductionDdl,
+            DefaultSchema = "main"
+        };
 
         // Get storage optimization info from AggregateBag
         _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
@@ -235,96 +241,24 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
         var ddl = new SqliteDdlExecutor(conn, table);
         var feats = new SqliteStoreFeatures();
-        // Always validate first to discover DDL allowance and current state
-        var vReport = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
-        var vState = (vReport["State"] as string) ?? "Unknown";
-        var vDdlAllowed = vReport.TryGetValue("DdlAllowed", out var vDa) && vDa is bool vb && vb;
-        var vTableExists = vReport.TryGetValue("TableExists", out var vTe) && vTe is bool vtb && vtb;
+        var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, table, _schemaPolicy, ct);
+        var ddlAllowed = report.TryGetValue("DdlAllowed", out var da) && da is true;
+        if (ddlAllowed)
+        {
+            KoanLog.DataDebug(_logger, LogActions.Ensure, "create", ("table", table));
+            await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, table, _schemaPolicy, ct);
+            report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, table, _schemaPolicy, ct);
+        }
 
-        // If table is missing but this adapter is configured for AutoCreate, attempt a local create
-        // This covers test fixtures where orchestrator denies DDL but tests expect local auto-create.
-        if (!vTableExists && _options.DdlPolicy == SchemaDdlPolicy.AutoCreate)
+        var state = report.TryGetValue("State", out var value) ? value as string : null;
+        if (_schemaPolicy.Matching == RelationalSchemaMatchingMode.Strict && state != "Healthy")
         {
-            try
-            {
-                KoanLog.DataDebug(_logger, LogActions.Ensure, "fallback-create",
-                    ("table", table));
-                var projections = ProjectionResolver.Get(typeof(TEntity));
-                var allColumns = new List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)>();
-                allColumns.Add(("Id", typeof(string), false, false, null, false));
-                allColumns.Add(("Json", typeof(string), false, false, null, false));
-                foreach (var p in projections) allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
-                ddl.CreateTableWithColumns("", table, allColumns);
-                // update the table exists flag after creating
-                vTableExists = ddl.TableExists("", table);
-            }
-            catch (Exception ex)
-            {
-                // DDL fallback failed. Don't throw here: the FailOnMismatch gate below (or the query-path
-                // no-such-table retry) is the authoritative decision. But surface the cause — a silently
-                // failed CREATE TABLE was previously invisible.
-                KoanLog.DataWarning(_logger, LogActions.Ensure, "fallback-create-failed", ("table", table), ("error", ex.Message));
-            }
+            var missing = report.TryGetValue("MissingColumns", out var columns) && columns is string[] names ? names : [];
+            throw new SchemaMismatchException(typeof(TEntity).FullName!, table, _schemaPolicy.Projections.ToString(), missing, [], ddlAllowed);
         }
-        // If FailOnMismatch, escalate when unhealthy/degraded
-        if (_relOptions.FailOnMismatch)
-        {
-            if (!string.Equals(vState, "Healthy", StringComparison.OrdinalIgnoreCase))
-            {
-                var missing = vReport.TryGetValue("MissingColumns", out var mc) && mc is string[] ms ? ms : [];
-                string[] extra = [];
-                var policy = _relOptions.Materialization.ToString();
-                throw new SchemaMismatchException(typeof(TEntity).FullName!, table, policy, missing, extra, vDdlAllowed);
-            }
-            _healthyCache[cacheKey] = true; return;
-        }
-        // Non-fail path: only ensure when DDL is allowed; otherwise just mark healthy if table exists
-        if (vDdlAllowed)
-        {
-            KoanLog.DataDebug(_logger, LogActions.Ensure, "create",
-                ("table", table));
-            try
-            {
-                await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
-            }
-            catch (InvalidOperationException ex) when (ex.Message?.Contains("DDL is disabled", StringComparison.OrdinalIgnoreCase) == true)
-            {
-                // Orchestrator refused to perform DDL; fall back to best-effort local creation for tests
-                var projections = ProjectionResolver.Get(typeof(TEntity));
-                var allColumns = new List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)>();
-                allColumns.Add(("Id", typeof(string), false, false, null, false));
-                allColumns.Add(("Json", typeof(string), false, false, null, false));
-                foreach (var p in projections)
-                {
-                    allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
-                }
-                ddl.CreateTableWithColumns("", table, allColumns);
-            }
-            // Wait for expected projected columns to appear (poll with small backoff)
-            try
-            {
-                var projections = ProjectionResolver.Get(typeof(TEntity));
-                var required = projections.Select(p => p.ColumnName).ToArray();
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                var maxMs = 1000; // total wait time
-                while (sw.ElapsedMilliseconds < maxMs)
-                {
-                    var missing = required.Where(c => !ddl.ColumnExists("", table, c)).ToArray();
-                    if (missing.Length == 0) break;
-                    Thread.Sleep(20);
-                }
-            }
-            catch (Exception ex)
-            {
-                // Degradable: this only waits for just-created columns to become visible. The query path
-                // re-ensures on a no-such-table error, so an early exit here is recoverable. Broad by design —
-                // a mid-poll connection-state fault (disposed/invalid-op) is equally recoverable here.
-                KoanLog.DataDebug(_logger, LogActions.Ensure, "column-wait-failed", ("table", table), ("error", ex.Message));
-            }
-            _healthyCache[cacheKey] = true; return;
-        }
-        if (vTableExists && string.Equals(vState, "Healthy", StringComparison.OrdinalIgnoreCase))
-        { _healthyCache[cacheKey] = true; }
+
+        if (report.TryGetValue("TableExists", out var exists) && exists is true)
+            _healthyCache[cacheKey] = true;
     }
 
     // Comparable-encoding contract (DATA-0100): the canonical converters make DateTimeOffset (UTC-ISO
@@ -918,87 +852,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new SqliteDdlExecutor(conn, TableName);
                     var feats = new SqliteStoreFeatures();
-                    var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
-                    // Normalize to provider options for tests: override MatchingMode/DdlAllowed and compute missing projected columns
-                    var projections = ProjectionResolver.Get(typeof(TEntity));
-                    var required = projections.Select(p => p.ColumnName).ToArray();
-                    var tableExists = ddl.TableExists("", TableName);
-                    // Debug aid (suppressed in Release): PRAGMA table_info snapshot during validate
-#if DEBUG
-                    try
-                    {
-                        using var dbg = conn.CreateCommand();
-                        dbg.CommandText = $"PRAGMA table_info('{TableName}')";
-                        using var rdr = dbg.ExecuteReader();
-                        System.Diagnostics.Debug.WriteLine($"[VALIDATE] PRAGMA table_info for {TableName} (begin):");
-                        while (rdr.Read())
-                        {
-                            var nm = rdr.IsDBNull(1) ? "(null)" : rdr.GetString(1);
-                            var tp = rdr.IsDBNull(2) ? "(null)" : rdr.GetString(2);
-                            System.Diagnostics.Debug.WriteLine($"[VALIDATE]   name={nm}, type={tp}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[VALIDATE] PRAGMA table_info failed for {TableName}: {ex.Message}");
-                    }
-#endif
-                    var missing = required.Where(c => !ddl.ColumnExists("", TableName, c)).ToArray();
-                    // Quick retry to avoid races where another operation creates columns concurrently
-                    if (missing.Length > 0)
-                    {
-                        try
-                        {
-                            Thread.Sleep(30);
-                            missing = required.Where(c => !ddl.ColumnExists("", TableName, c)).ToArray();
-                        }
-                        catch (Exception ex)
-                        {
-                            // Degradable: the re-probe is only a race-mitigation; on failure keep the first
-                            // 'missing' snapshot and let the validation report reflect it. Broad by design — a
-                            // mid-poll connection-state fault is equally tolerable on this race-mitigation path.
-                            KoanLog.DataDebug(_logger, "validate", "recheck-failed", ("table", TableName), ("error", ex.Message));
-                        }
-                    }
-                    // Debug: print ColumnExists outcome per required column (debug only)
-#if DEBUG
-                    try
-                    {
-                        foreach (var c in required)
-                        {
-                            try
-                            {
-                                var exists = ddl.ColumnExists("", TableName, c);
-                                System.Diagnostics.Debug.WriteLine($"[VALIDATE] ColumnExists check: table={TableName}, column={c}, exists={exists}");
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"[VALIDATE] ColumnExists check error for {c}: {ex.Message}");
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        // Diagnostics-only (DEBUG): never let the debug print loop disturb validation.
-                        System.Diagnostics.Debug.WriteLine($"[VALIDATE] ColumnExists diagnostic loop error: {ex.Message}");
-                    }
-#endif
-                    report["TableExists"] = tableExists;
-                    report["MissingColumns"] = missing;
-                    // Matching mode: prefer explicit config (including env override)
-                    var modeStr = Configuration.ReadFirst(
-                        _sp.GetRequiredService<IConfiguration>(),
-                        defaultValue: _options.SchemaMatching.ToString(),
-                        Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
-                        Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
-                    if (string.IsNullOrWhiteSpace(modeStr)) modeStr = _options.SchemaMatching.ToString();
-                    report["MatchingMode"] = modeStr;
-                    var ddlAllowed = _options.DdlPolicy == SchemaDdlPolicy.AutoCreate && (!KoanEnv.IsProduction || _options.AllowProductionDdl);
-                    if (typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: false).Any()) ddlAllowed = false;
-                    report["DdlAllowed"] = ddlAllowed;
-                    var strict = string.Equals(modeStr, "Strict", StringComparison.OrdinalIgnoreCase);
-                    var state = !tableExists ? (strict ? "Unhealthy" : "Degraded") : (missing.Length > 0 ? (strict ? "Unhealthy" : "Degraded") : "Healthy");
-                    report["State"] = state;
+                    var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, ct);
                     return (TResult)report;
                 }
             case DataInstructions.EnsureCreated:
@@ -1010,23 +864,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new SqliteDdlExecutor(conn, TableName);
                     var feats = new SqliteStoreFeatures();
-                    try
-                    {
-                        await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
-                    }
-                    catch (InvalidOperationException ex) when (ex.Message?.Contains("DDL is disabled", StringComparison.OrdinalIgnoreCase) == true)
-                    {
-                        // Orchestrator refused to perform DDL. Fall back to a best-effort local creation so tests that expect AutoCreate succeed.
-                        var projections = ProjectionResolver.Get(typeof(TEntity));
-                        var allColumns = new List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)>();
-                        allColumns.Add(("Id", typeof(string), false, false, null, false));
-                        allColumns.Add(("Json", typeof(string), false, false, null, false));
-                        foreach (var p in projections)
-                        {
-                            allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
-                        }
-                        ddl.CreateTableWithColumns("", TableName, allColumns);
-                    }
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, ct);
                     object d_ok = true; return (TResult)d_ok;
                 }
             case RelationalInstructions.SchemaClear:
@@ -1058,7 +896,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new SqliteDdlExecutor(conn, TableName);
                     var feats = new SqliteStoreFeatures();
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, ct);
                     object ok = true; return (TResult)ok;
                 }
             case RelationalInstructions.SqlScalar:
@@ -1197,7 +1035,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             this.tableName = tableName;
         }
         // New: Create table with all columns in one statement
-        public void CreateTableWithColumns(string schema, string table, List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
+        public void CreateTableWithColumns(string schema, string table, IReadOnlyList<RelationalColumnDefinition> columns)
         {
             var tname = string.IsNullOrWhiteSpace(table) ? tableName : table;
             var colDefs = new List<string>();

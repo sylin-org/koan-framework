@@ -166,9 +166,9 @@
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Data.Connector.Cockroach
-- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Connector.Postgres, Koan.Data.Core, Koan.Data.Relational
+- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Data.Relational, Koan.Data.Relational.Npgsql
 - Depended by: –
-- Documentation: README ❌ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Data.Connector.Couchbase
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core
@@ -201,8 +201,8 @@
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Data.Connector.Postgres
-- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Data.Relational, Koan.Orchestration.Aspire
-- Depended by: Koan.Data.Connector.Cockroach
+- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Data.Relational, Koan.Data.Relational.Npgsql, Koan.Orchestration.Aspire.Abstractions
+- Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Data.Connector.Redis
@@ -226,14 +226,19 @@
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Data.Relational
-- Depends on: Koan.Data.Abstractions, Koan.Data.Core
-- Depended by: Koan.Data.Connector.Cockroach, Koan.Data.Connector.Postgres, Koan.Data.Connector.Sqlite, Koan.Data.Connector.SqlServer, Koan.Data.Relational.Dapper
+- Depends on: Koan.Data.Abstractions, Koan.Data.Core, Koan.Data.Relational.Abstractions
+- Depended by: Koan.Data.Connector.Cockroach, Koan.Data.Connector.Postgres, Koan.Data.Connector.Sqlite, Koan.Data.Connector.SqlServer, Koan.Data.Relational.Npgsql
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Data.Relational.Dapper
-- Depends on: Koan.Data.Relational
-- Depended by: –
-- Documentation: README ❌ · TECHNICAL ❌
+### Koan.Data.Relational.Abstractions
+- Depends on: Koan.Data.Abstractions
+- Depended by: Koan.Data.Relational
+- Documentation: README ✅ · TECHNICAL ✅
+
+### Koan.Data.Relational.Npgsql
+- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Data.Relational
+- Depended by: Koan.Data.Connector.Cockroach, Koan.Data.Connector.Postgres
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Data.SearchEngine
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Vector, Koan.Data.Vector.Abstractions

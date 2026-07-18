@@ -32,7 +32,6 @@ public sealed class PostgresDataModule : KoanModule, IKoanAspireResources
             configuratorLifetime: ServiceLifetime.Singleton);
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, PostgresHealthContributor>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<RelationalMaterializationOptions>, PostgresRelationalMaterializationOptionsConfigurator>());
 
         // Register orchestration evaluator for dependency management
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, PostgresOrchestrationEvaluator>());
@@ -47,10 +46,6 @@ public sealed class PostgresDataModule : KoanModule, IKoanAspireResources
         // Carried from the former manual PostgresRegistration so the auto path is complete.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Data.Core.Configuration.IDataProviderConnectionFactory, PostgresConnectionFactory>());
 
-        // Register the relational schema orchestrator (required by PostgresRepository.EnsureOrchestrated).
-        // The auto-discovery path needs it, or schema bootstrap fails with "No service for type
-        // IRelationalSchemaOrchestrator has been registered." Mirrors what Sqlite and SqlServer do.
-        services.AddRelationalOrchestration();
     }
 
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

@@ -49,7 +49,7 @@ END";
     }
 
     // Create table with provided columns (Id, Json already included in columns list expected by orchestrator)
-    public void CreateTableWithColumns(string schema, string table, List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
+    public void CreateTableWithColumns(string schema, string table, IReadOnlyList<RelationalColumnDefinition> columns)
     {
         using var cmd = _conn.CreateCommand();
         // Build column definitions. Expect Id and Json to be present as first two columns.

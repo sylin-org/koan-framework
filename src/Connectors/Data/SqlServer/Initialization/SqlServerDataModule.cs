@@ -29,9 +29,6 @@ public sealed class SqlServerDataModule : KoanModule
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqlServerHealthContributor>());
 
-        // Bridge SQL Server provider options into the relational materialization pipeline.
-        // Carried from the former manual SqlServerRegistration so the auto path is complete.
-        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RelationalMaterializationOptions>, SqlServerToRelationalBridgeConfigurator>());
 
         // Register SQL Server discovery adapter (maintains "Reference = Intent")
         // Adding Koan.Data.Connector.SqlServer automatically enables SQL Server discovery capabilities
@@ -43,9 +40,6 @@ public sealed class SqlServerDataModule : KoanModule
         // Carried from the former manual SqlServerRegistration so the auto path is complete.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Data.Core.Configuration.IDataProviderConnectionFactory, SqlServerConnectionFactory>());
 
-        // Register the relational schema orchestrator (required by SqlServerRepository).
-        // The auto-discovery path needs it, or schema bootstrap fails. Mirrors Sqlite/Postgres.
-        services.AddRelationalOrchestration();
     }
 
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

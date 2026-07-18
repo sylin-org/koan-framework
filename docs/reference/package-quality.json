@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 110,
-    "repairRequired": 28,
-    "reviewRequired": 48,
-    "structurallyReady": 34,
-    "ownedReadmes": 82,
-    "technicalCompanions": 72,
-    "findings": 191
+    "packages": 111,
+    "repairRequired": 26,
+    "reviewRequired": 47,
+    "structurallyReady": 38,
+    "ownedReadmes": 85,
+    "technicalCompanions": 75,
+    "findings": 183
   },
   "findingDefinitions": [
     {
@@ -832,7 +832,7 @@
       "projectPath": "src/Connectors/Data/Cockroach/Koan.Data.Connector.Cockroach.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "repair-required",
+      "status": "structurally-ready",
       "description": "CockroachDB provider for Koan relational data: a thin pg-wire delta over the Postgres connector (Npgsql \u002B Dapper) with guardrails and governance.",
       "targetFrameworks": [
         "net10.0"
@@ -840,17 +840,14 @@
       "dependencies": [
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Connector.Postgres",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.Relational"
+        "Sylin.Koan.Data.Relational",
+        "Sylin.Koan.Data.Relational.Npgsql"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Connectors/Data/Cockroach/README.md",
+      "technicalDocumentation": "src/Connectors/Data/Cockroach/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Couchbase",
@@ -1003,6 +1000,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Relational",
+        "Sylin.Koan.Data.Relational.Npgsql",
         "Sylin.Koan.Orchestration.Aspire.Abstractions"
       ],
       "readme": "src/Connectors/Data/Postgres/README.md",
@@ -1097,45 +1095,59 @@
       "projectPath": "src/Koan.Data.Relational/Koan.Data.Relational.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
-      "description": "Relational data support for Koan: EF Core integration and common helpers for SQL databases.",
+      "status": "structurally-ready",
+      "description": "Shared schema governance, SQL translation, and command mechanics for Koan relational Data providers.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core"
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Relational.Abstractions"
       ],
       "readme": "src/Koan.Data.Relational/README.md",
       "technicalDocumentation": "src/Koan.Data.Relational/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
-      "packageId": "Sylin.Koan.Data.Relational.Dapper",
-      "projectPath": "src/Koan.Data.Relational.Dapper/Koan.Data.Relational.Dapper.csproj",
+      "packageId": "Sylin.Koan.Data.Relational.Abstractions",
+      "projectPath": "src/Koan.Data.Relational.Abstractions/Koan.Data.Relational.Abstractions.csproj",
       "shape": "library",
-      "role": "capability",
-      "status": "repair-required",
-      "description": "Dapper-backed implementation of the Koan relational command helpers (SqlParameters/AdoCommands surface) for non-AOT relational adapters. AOT-targeted adapters use the hand-rolled Koan.Data.Relational.Ado helpers instead, since Dapper emits IL at runtime.",
+      "role": "contracts",
+      "status": "structurally-ready",
+      "description": "Inert relational schema, dialect, and DDL contracts for Koan Data providers.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.Data.Abstractions"
+      ],
+      "readme": "src/Koan.Data.Relational.Abstractions/README.md",
+      "technicalDocumentation": "src/Koan.Data.Relational.Abstractions/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Relational.Npgsql",
+      "projectPath": "src/Koan.Data.Relational.Npgsql/Koan.Data.Relational.Npgsql.csproj",
+      "shape": "library",
+      "role": "capability",
+      "status": "structurally-ready",
+      "description": "Shared Npgsql repository mechanics for PostgreSQL-wire Koan Data providers.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Relational"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Data.Relational.Npgsql/README.md",
+      "technicalDocumentation": "src/Koan.Data.Relational.Npgsql/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.SearchEngine",

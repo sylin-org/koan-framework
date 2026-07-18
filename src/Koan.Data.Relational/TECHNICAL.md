@@ -1,50 +1,32 @@
----
-uid: reference.modules.Koan.data.relational
-title: Koan.Data.Relational - Technical Reference
-description: Shared relational helpers and conventions for relational adapters.
-since: 0.2.x
-packages: [Sylin.Koan.Data.Relational]
-source: src/Koan.Data.Relational/
----
+# Sylin.Koan.Data.Relational technical notes
 
-## Contract
+## Ownership
 
-- Inputs/Outputs: schema helpers, parameter conventions, paging integration.
-- Error modes: provider exceptions; consistent mapping.
+`RelationalModule` is the one functional owner of schema orchestration. Concrete providers reference this package and
+receive that service through normal Koan composition; they do not register bridges or mutate shared relational options.
 
-## Usage guidance
+Every repository passes the already-resolved table plus an immutable `RelationalSchemaPolicy` to the orchestrator.
+That policy carries projection mode, DDL policy, matching strictness, production guard, and provider schema. This makes
+schema decisions local to the selected provider/source route and prevents one connector from changing another.
 
-- Used by Sqlite/SqlServer/Postgres adapters; do not use directly in apps unless needed.
+Provider implementations supply `IRelationalDdlExecutor`, `IRelationalStoreFeatures`, and `ILinqSqlDialect` from the
+module-free Abstractions package. Application code should not consume these contracts.
 
-## Supported LINQ subset
+## Schema behavior
 
-- Equality/inequality: `==`, `!=`
-- Comparisons on scalars: `<`, `<=`, `>`, `>=` (numeric, DateTime, string per collation)
-- Logical composition: `&&`, `||`, with parentheses respected
-- Null checks: `x == null`, `x != null`
-- String functions: `StartsWith`, `EndsWith`, `Contains` → translated to `LIKE` with dialect-proper escaping; case sensitivity is dialect/collation specific
-- Boolean members: `x.IsActive` and `!x.IsActive`
-- Enum equality (stored as int or string per mapping)
+- `NoDdl`: inspect only; missing schema is reported and creation is rejected.
+- `Validate`: inspect only; callers can use the report as a readiness or corrective signal.
+- `AutoCreate`: create a missing table and add missing projected columns when the environment guard allows it.
+- `Relaxed`: a mismatch reports `Degraded`.
+- `Strict`: a mismatch reports `Unhealthy`; repositories surface their corrective schema error.
 
-Not supported (throw NotSupportedException):
+Creation is additive. Koan does not rename/drop columns, infer destructive migrations, or promise full migration
+management. Production DDL remains denied unless the selected provider explicitly allows it.
 
-- Arbitrary method calls, client-eval delegates, custom functions
-- Subqueries/joins/navigation properties
-- Complex collection operators (`Any/All` on in-memory lists), except where provider adds explicit support
+## Query translation
 
-Fallbacks:
+The common translator supports scalar equality/comparison, logical composition, null checks, Boolean members, and the
+basic string operations providers can represent safely. Provider dialects own quoting, parameters, LIKE escaping, and
+JSON-array operations. Unsupported expressions fail closed; Koan does not silently scan an unbounded source.
 
-- Callers should change an unsupported predicate or explicitly materialize a known-small page before
-  applying client-side logic. Provider-bounded Entity streams may apply supported pointwise residuals,
-  but they reject unsupported ordering and never hide a complete-source fallback (see DATA-0107).
-
-## Pushdown coverage
-
-- Translator produces a WHERE clause and parameters; exact SQL (quoting, LIKE escaping, parameter names) is provided by `ILinqSqlDialect`.
-- JSON columns: complex CLR types may be stored as JSON (TEXT); predicate pushdown against JSON fields is provider-specific (see provider TECHNICAL docs).
-- Projection: select lists are cached per (entity, dialect) via `RelationalCommandCache`.
-
-## References
-
-- DATA-0046 SQLite DDL policy: `/docs/decisions/DATA-0046-sqlite-schema-governance-ddl-policy.md`
-- DATA-0044 Paging guardrails: `/docs/decisions/DATA-0044-paging-guardrails-and-tracing-must.md`
+Provider-specific SQL, connection lifecycle, discovery, health, and startup reporting remain in each concrete connector.

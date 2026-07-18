@@ -96,20 +96,22 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Data.Access` | `capability` | `assess` |
 | `Sylin.Koan.Data.AI` | `capability` | `assess` |
 | `Sylin.Koan.Data.Backup` | `capability` | `assess` |
-| `Sylin.Koan.Data.Connector.Cockroach` | `provider` | `assess` |
+| `Sylin.Koan.Data.Connector.Cockroach` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Couchbase` | `provider` | `assess` |
 | `Sylin.Koan.Data.Connector.ElasticSearch` | `provider` | `assess` |
 | `Sylin.Koan.Data.Connector.InMemory` | `provider` | `assess` |
 | `Sylin.Koan.Data.Connector.Json` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Mongo` | `provider` | `assess` |
 | `Sylin.Koan.Data.Connector.OpenSearch` | `provider` | `assess` |
-| `Sylin.Koan.Data.Connector.Postgres` | `provider` | `assess` |
+| `Sylin.Koan.Data.Connector.Postgres` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Redis` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Sqlite` | `provider` | `keep` |
-| `Sylin.Koan.Data.Connector.SqlServer` | `provider` | `assess` |
+| `Sylin.Koan.Data.Connector.SqlServer` | `provider` | `keep` |
 | `Sylin.Koan.Data.Core` | `capability` | `keep` |
-| `Sylin.Koan.Data.Relational` | `capability` | `assess` |
-| `Sylin.Koan.Data.Relational.Dapper` | `capability` | `assess` |
+| `Sylin.Koan.Data.Relational` | `capability` | `keep` |
+| `Sylin.Koan.Data.Relational.Abstractions` | `contracts` | `keep` |
+| `Sylin.Koan.Data.Relational.Dapper` | `capability` | `retire` |
+| `Sylin.Koan.Data.Relational.Npgsql` | `capability` | `keep` |
 | `Sylin.Koan.Data.SearchEngine` | `capability` | `assess` |
 | `Sylin.Koan.Data.SoftDelete` | `capability` | `assess` |
 | `Sylin.Koan.Data.Vector` | `capability` | `keep` |
@@ -181,7 +183,7 @@ in the family disposition tables, not as phantom active-package rows.
 2. **Contract-isolation anomalies:** review the former `ZenGarden.Core` contract boundary, the two AI contract
    packages, Vector and Media abstractions, and the former `Orchestration.Cli.Core` implementation split. Ambiguous
    derivation is evidence, not an instruction to add role metadata.
-3. **Mechanism candidates:** review `Data.Relational.Dapper`, Identity's fine-grained packages,
+3. **Mechanism candidates:** the unused `Data.Relational.Dapper` shim is retired; review Identity's fine-grained packages,
    MCP Explorer/Operations, and build/runtime splits for merge or clearer independent intent before documentation.
 4. **Provider families:** retain separate packages only where each reference elects distinct mechanics or guarantees;
    then apply one provider documentation/evidence contract across Data, Vector, AI, Cache, Storage, Auth, and Orchestration.
@@ -221,8 +223,15 @@ terminal package decisions; the listed boundary repairs happen before graduation
 | `Sylin.Koan.Media.Core` | `keep` | Functional owner of Entity-backed originals, content-addressed storage semantics, recipe discovery/validation, image planning/execution, and Media runtime facts. The application type now lives in the honest `Koan.Media` namespace. |
 | `Sylin.Koan.Data.Abstractions` | `keep` | Entity and repository vocabulary independently consumed by providers, projections, and modules without selecting a data runtime or backend. Its legacy ASP.NET JSON Patch dependency and duplicate object-shaped patch path were removed; the boundary now exposes one provider-neutral `PatchPayload`. |
 | `Sylin.Koan.Data.Core` | `keep` | Entity data runtime and provider election. It owns data-specific adapter policy after the `Core.Adapters` redistribution. |
+| `Sylin.Koan.Data.Relational.Abstractions` | `split` (implemented) | Inert DDL, dialect, feature, column, and immutable schema-policy vocabulary independently consumed by the functional owner and providers. It activates no module or backend. |
+| `Sylin.Koan.Data.Relational` | `keep` | One functional owner for relational schema governance, common translation, comparable scalar encoding, and AOT-clean ADO helpers. It receives the selected route's resolved table and immutable policy rather than re-electing or reading global provider state. |
+| `Sylin.Koan.Data.Relational.Npgsql` | `split` (implemented) | Module-free PostgreSQL-wire repository mechanics shared by PostgreSQL and CockroachDB. Concrete connectors retain identity, discovery, options, health, and reporting; neither activates the other. |
+| `Sylin.Koan.Data.Relational.Dapper` | `retire` (implemented) | Its only type had no source, test, or sample consumer and duplicated an ADO helper surface without owning provider semantics. The project and package identity are removed. |
 | `Sylin.Koan.Data.Connector.Json` | `keep` | Bounded, file-backed local provider that gives the foundation bundle an immediate meaningful result. Its package page must state its concurrency and deployment limits plainly. |
 | `Sylin.Koan.Data.Connector.Sqlite` | `keep` | Durable embedded relational provider selected by one reference, with a materially different guarantee from JSON. |
+| `Sylin.Koan.Data.Connector.Postgres` | `keep` | PostgreSQL provider with independent discovery, source routing, health, orchestration contribution, and provider identity over shared Npgsql mechanics. |
+| `Sylin.Koan.Data.Connector.Cockroach` | `keep` | CockroachDB provider with independent identity/discovery/health and an explicit primary-key stable-order delta over shared Npgsql mechanics. It no longer references PostgreSQL. |
+| `Sylin.Koan.Data.Connector.SqlServer` | `keep` | SQL Server provider with distinct driver, JSON-computed projection, paging, and DDL mechanics; its repository does not yet justify forced convergence with SQLite or Npgsql. |
 | `Sylin.Koan.Web` | `keep` | Controller-first ASP.NET Core projection, health, and well-known inspectability. It is the direct owner of `EntityController<T>`. |
 | `Sylin.Koan.Web.Extensions` | `keep` | Optional moderation, audit, soft-delete, capability authorization, and richer REST projection. This is a deliberate add-on rather than mandatory web weight; its current README claims configuration keys and activation behavior that must be verified or corrected. |
 | `Sylin.Koan.Communication` | `keep` | Entity-first local Events and Transport semantic ring. Its in-process default is meaningful without a network adapter and network providers remain separately elected. |

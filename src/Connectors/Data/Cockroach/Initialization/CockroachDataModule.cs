@@ -34,7 +34,6 @@ public sealed class CockroachDataModule : KoanModule
             configuratorLifetime: ServiceLifetime.Singleton);
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, CockroachHealthContributor>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<RelationalMaterializationOptions>, CockroachRelationalMaterializationOptionsConfigurator>());
 
         // Register orchestration evaluator for dependency management
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, CockroachOrchestrationEvaluator>());
@@ -49,10 +48,6 @@ public sealed class CockroachDataModule : KoanModule
         // Carried from the former manual CockroachRegistration so the auto path is complete.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Data.Core.Configuration.IDataProviderConnectionFactory, CockroachConnectionFactory>());
 
-        // Register the relational schema orchestrator (required by CockroachRepository.EnsureOrchestrated).
-        // The auto-discovery path needs it, or schema bootstrap fails with "No service for type
-        // IRelationalSchemaOrchestrator has been registered." Mirrors what Sqlite and SqlServer do.
-        services.AddRelationalOrchestration();
     }
 
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

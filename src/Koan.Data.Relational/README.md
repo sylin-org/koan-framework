@@ -1,32 +1,51 @@
-# Koan.Data.Relational
+# Sylin.Koan.Data.Relational
 
-Adapter-agnostic relational schema + LINQ translator used by providers like `Koan.Data.Connector.Sqlite` and `Koan.Data.Connector.SqlServer`.
+Shared relational execution for Koan Data providers: schema governance, SQL translation, comparable scalar encoding,
+and AOT-clean ADO helpers.
 
-- Contracts: `IRelationalDialect`, `IRelationalSchemaModel`, `IRelationalSchemaSynchronizer`
-- LINQ translator hooks: `ILinqSqlDialect`, `LinqWhereTranslator<TEntity>`, `RelationalCommandCache`
+## Application use
 
-## Capabilities
-- Build table/index models from entity annotations
-- Add-only schema synchronization (create table/index)
-- Minimal LINQ-to-SQL pushdown for simple predicates and projections
+Applications normally reference a concrete connector, not this package directly:
 
-## LINQ (minimal translator)
+```powershell
+dotnet add package Sylin.Koan.Data.Connector.Sqlite
+```
 
-An intentionally small LINQ-to-SQL helper lives in `Linq/`:
+Provider authors who need the functional relational owner can reference it explicitly:
 
-- `ILinqSqlDialect`: tiny hooks the translator needs (identifier quoting, LIKE escaping, parameter naming).
-- `LinqWhereTranslator<TEntity>`: translates a restricted subset of predicate expressions to a WHERE clause and parameters.
-- `RelationalCommandCache`: caches select lists per (entity, dialect) to avoid repeated string building.
+```powershell
+dotnet add package Sylin.Koan.Data.Relational
+```
 
-Providers can implement `ILinqSqlDialect` (in addition to schema `IRelationalDialect`) to enable pushdown. Unsupported expressions should throw NotSupportedException; callers should fallback to in-memory filtering.
-- Builder: `RelationalModelBuilder.FromEntity(typeof(TEntity))` builds a table model from annotations
-- Synchronizer: `EnsureCreated(dialect, model, connection)` emits CREATE TABLE + INDEX statements (add-only)
+The application remains Entity-first:
 
-Notes:
-- Provider-specific SQL grammar belongs in the provider (e.g., `SqliteDialect` in `Koan.Data.Connector.Sqlite`).
-- Complex CLR types map to JSON-encoded TEXT columns; simple types map to native types.
+```csharp
+builder.Services.AddKoan();
 
-## References
-- Data access reference: `~/reference/data-access.md`
-- Decision DATA-0061: `~/decisions/DATA-0061-data-access-pagination-and-streaming.md`
+public sealed class Todo : Entity<Todo>;
+```
 
+The selected connector supplies its endpoint, schema, and provider-specific SQL. Koan applies the connector's
+route-local DDL and matching policy automatically on first meaningful use.
+
+## What this package owns
+
+- the single functional registration for `IRelationalSchemaOrchestrator`;
+- provider-neutral schema validation and add-only creation mechanics;
+- restricted LINQ-to-SQL translation shared by relational connectors;
+- comparable scalar JSON encoding and AOT-clean ADO command helpers.
+
+It does not elect a Data provider, open a connection, activate PostgreSQL/SQL Server/SQLite/CockroachDB, or expose an
+application-facing relational registration call. Cross-module contracts live in
+`Sylin.Koan.Data.Relational.Abstractions`; PostgreSQL-wire repository mechanics live in the module-free
+`Sylin.Koan.Data.Relational.Npgsql` package.
+
+## Guarantees and limits
+
+- Schema policy and resolved storage identity are supplied per selected provider/source route; connectors do not share
+  a mutable global schema decision.
+- Schema creation is additive. This package is not a destructive migration engine.
+- Unsupported query expressions reject rather than silently scanning an unbounded source.
+- A concrete connector and reachable database are required for persistence; this package alone provides no backend.
+
+See [TECHNICAL.md](TECHNICAL.md) for provider-author contracts and supported translation boundaries.

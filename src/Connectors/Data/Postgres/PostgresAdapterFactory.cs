@@ -7,6 +7,7 @@ using Koan.Core;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Core.Services;
+using Koan.Data.Relational.Npgsql;
 
 namespace Koan.Data.Connector.Postgres;
 
@@ -33,7 +34,20 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory
         where TKey : notnull
     {
         var resolver = sp.GetRequiredService<IStorageNameResolver>();
-        return new PostgresRepository<TEntity, TKey>(sp, ResolveOptions(sp, source), resolver);
+        var options = ResolveOptions(sp, source);
+        return new NpgsqlRepository<TEntity, TKey>(sp, new NpgsqlRepositoryOptions
+        {
+            ProviderName = Provider,
+            ConnectionString = options.ConnectionString,
+            DefaultPageSize = options.DefaultPageSize,
+            DdlPolicy = options.DdlPolicy,
+            SchemaMatching = options.SchemaMatching,
+            AllowProductionDdl = options.AllowProductionDdl,
+            SearchPath = options.SearchPath,
+            NamingStyle = options.NamingStyle,
+            Separator = options.Separator,
+            StableOrderClause = "ORDER BY ctid"
+        }, resolver);
     }
 
     internal PostgresOptions ResolveOptions(IServiceProvider sp, string source)

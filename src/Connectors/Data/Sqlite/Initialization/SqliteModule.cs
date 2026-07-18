@@ -36,11 +36,6 @@ public sealed class SqliteModule : KoanModule
         // Adding Koan.Data.Connector.Sqlite automatically enables SQLite discovery capabilities
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, Discovery.SqliteDiscoveryAdapter>());
 
-        // Ensure relational orchestration services are available (schema validation/creation)
-        services.AddRelationalOrchestration();
-        // Bridge SQLite governance options into relational orchestrator options
-        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RelationalMaterializationOptions>, SqliteToRelationalBridgeConfigurator>());
-
         services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
 
         // Connection factory for Koan.Data.Direct relational sessions (DATA-0053).

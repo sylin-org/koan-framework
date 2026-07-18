@@ -498,6 +498,133 @@ truth grows by three packages and must classify them honestly rather than declar
 The Redis backend, Data provider, Cache provider, and Aspire contribution-contract boundaries pass this family
 slice. The complete release ratchet remains reserved for R11-07.
 
+### Relational provider-family discovery
+
+**Task:** graduate the relational Data family by isolating cross-module contracts, making schema governance
+provider/source-specific, removing provider-to-provider activation, and retaining only shared mechanics that have
+identical meaning and lifecycle.
+
+**Application intent:** “Reference PostgreSQL, SQL Server, SQLite, or CockroachDB; define an Entity; use normal Entity
+verbs. If I configure schema governance, it applies only to the selected provider/source, and adding another connector
+does not activate a sibling provider or change an existing database's DDL decisions.”
+
+**Public expression:** reference one relational connector, retain the application's single `AddKoan()`, and define the
+Entity. With one eligible provider no relational registration or repository appears in application code. Pin
+`[DataAdapter("postgres")]` or `Koan:Data:Sources:Default:Adapter` only when durability must remain stable as references
+grow; configure `ConnectionStrings:<Provider>` when discovery is not appropriate and the provider's existing
+`DdlPolicy` / `SchemaMatchingMode` only when overriding safe defaults.
+
+**Guarantee/correction:** each selected provider/source carries its own endpoint, schema, DDL policy, matching mode,
+projection mechanics, and production guard. A Cockroach reference must not activate PostgreSQL. Multiple referenced
+relational providers must not mutate one global schema-options object. Missing providers, invalid sources, strict
+schema mismatches, or forbidden production DDL reject with the existing corrective Data/relational failure rather
+than silently selecting, provisioning, or weakening another route.
+
+**Complete intent surface:** package reference, `AddKoan()`, Entity definition, and runtime backend are sufficient.
+Provider/source pinning, connection configuration, and DDL/matching overrides are optional business/operations
+decisions. There is no application-facing `AddRelationalOrchestration`, global relational materialization section,
+repository, Npgsql helper, module identity, or provider bridge. The unevidenced `RelationalStorageShape` decoration is
+not part of the supported expression.
+
+**Public concepts:** Entity verbs express persistence intent; Data provider/source selection expresses physical
+placement; provider-local `DdlPolicy` expresses whether Koan may validate/create schema; provider-local
+`SchemaMatchingMode` expresses whether a mismatch is corrective. Relational projection mode, DDL executors,
+store features, and Npgsql repository options are module-author mechanics, not application decisions. The unused
+Dapper helper package and the unproved Entity storage-shape decoration do not earn separate concepts.
+
+**Docs read:** `docs/engineering/index.md` requires Entity-first access, project-scoped constants/options, package
+companions, and focused validation; `docs/architecture/principles.md` requires contracts to be inert, pillars to own
+meaning, adapters to stay thin, and composition to compile once; `docs/engineering/adding-a-connector.md` establishes
+reference-driven modules, real integration evidence, and shared-backend ownership but still contains one stale
+typed-helper citation to correct; `docs/reference/data/index.md` limits provider parity claims and defines exact
+selection/correction order; `docs/reference/data/adapter-diagnostics.md` describes the intended shared diagnostics
+posture but is stale about mutable augmenters and must not be treated as current runtime truth. Historical DATA-0052
+and DATA-0053 preserve the still-valid separation of adapter SQL mechanics from provider-neutral Direct access.
+
+**Code read:** `RelationalModule` is a functional module that currently registers nothing while every adapter calls a
+public registration helper; `RelationalSchemaOrchestrator` owns useful schema mechanics but reads one global
+`IOptionsMonitor<RelationalMaterializationOptions>`, contains unused cache/debug state, and accepts no provider/source
+policy; PostgreSQL, SQL Server, SQLite, and Cockroach modules duplicate bridge registration into that global object;
+PostgreSQL and SQL Server repositories are large dialect-specific implementations, while Cockroach is a genuinely
+thin PostgreSQL-wire delta implemented through a functional Postgres reference plus `InternalsVisibleTo`; the
+`Koan.Data.Relational.Dapper` package has no consumer anywhere in source, tests, or samples.
+
+**Reusing:** ordinary package/project references and semantic module activation; Data's compiled provider catalog,
+source routing, naming, health participation, Entity grammar, and corrective errors; the existing relational schema
+orchestrator, filter translator, comparable encoding, provider options, discovery/orchestration adapters, real
+connector suites, and PostgreSQL-wire repository behavior; standard .NET DI/options only at their actual owner.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| relational contracts and immutable schema policy | `src/Koan.Data.Relational.Abstractions` | Cross-module DDL/dialect/orchestrator vocabulary must be inert and cannot remain in a functional module. |
+| shared PostgreSQL-wire repository mechanics | `src/Koan.Data.Relational.Npgsql` | PostgreSQL and Cockroach use identical Npgsql/Dapper repository mechanics but must not activate each other's provider module. |
+| provider-isolation/schema-policy specs | `tests/Suites/Data/Relational/Koan.Data.Relational.Tests` | A fast owner suite must prove one orchestrator can execute different provider policies without global mutation or provider activation. |
+| package companions and version intent | both new project roots | Every independently shipped mechanism/contract package needs an exact module-author reference intent and honest limits. |
+
+**Coalescence:** closest successful pattern is the Redis backend split: shared vocabulary is inert, one functional
+owner registers shared lifecycle, and thin consumers contribute concern-specific mechanics. Rebuild Relational the
+same way at pillar specificity. `Koan.Data.Relational` becomes the single functional owner of schema orchestration and
+translator mechanics; its Abstractions package owns only contracts/policy. Delete global
+`RelationalMaterializationOptions`, its configurator, adapter bridge configurators, repeated
+`AddRelationalOrchestration` calls, provider-local duplicate DDL/matching enums, unused cache/debug output, the unused
+Dapper package, and the unproved public storage-shape concept. Extract the byte-identical PostgreSQL/Cockroach
+repository into a no-module Npgsql mechanism package and delete the friend-assembly relationship. Do not force SQL
+Server/SQLite into the same repository base yet: their connection, JSON, paging, and DDL mechanics differ materially;
+the per-route policy/contract base is the stable prerequisite for any later repository-engine convergence.
+
+**Ergonomics:** application C# does not grow. Humans and models still read “reference provider, AddKoan, Entity,”
+with optional provider-local governance where the guarantee requires it. IntelliSense loses three duplicate policy
+enums and an unsupported storage-shape branch. Module authors receive one relational contract vocabulary and no
+registration helper; Cockroach becomes an honest thin provider instead of secretly carrying PostgreSQL. Operators
+and agents can attribute schema decisions to the actual provider/source instead of a process-global mutable option.
+
+**Constraints satisfied:**
+
+- no HTTP route or controller change;
+- Entity statics remain the application data path;
+- no large-source scan or streaming claim changes;
+- stable provider/config identifiers remain in provider `Infrastructure.Constants` and tunables remain typed options;
+- both reusable packages receive README/TECHNICAL/version companions;
+- current docs and generated package truth update; ADRs remain unchanged historical records;
+- only relational owner/provider/tests/packages run before the R11-07 certification boundary.
+
+**Risks:** four connector suites and Jobs/Web consumers rely on relational schema behavior; Cockroach needs a real
+container to prove the extracted pg-wire delta; production-DDL guards must remain fail-closed; removing the unused
+storage-shape API is intentionally breaking and requires a current-doc sweep; generated truth will add two packages
+and retire one. Full PostgreSQL/SQL Server repository convergence remains a future internal opportunity, not a claim
+of this bounded stable-base slice.
+
+### Relational provider-family evidence
+
+- `Sylin.Koan.Data.Relational` is now the single functional schema-orchestration owner. The public registration helper,
+  global materialization options/configurator, and four provider bridge configurators are deleted.
+- Cross-module DDL, dialect, feature, column, and immutable policy vocabulary now lives in the module-free
+  `Sylin.Koan.Data.Relational.Abstractions` package. Provider-local duplicate DDL/matching enums are gone.
+- Every repository supplies its already-resolved table plus one immutable provider/source policy. The orchestrator no
+  longer resolves the default Data route a second time, so named sources and coexisting providers retain their own
+  schema, projection, production guard, and matching decision.
+- PostgreSQL and CockroachDB share `Sylin.Koan.Data.Relational.Npgsql`, a module-free repository mechanism. Cockroach
+  no longer references the PostgreSQL connector or uses `InternalsVisibleTo`; its primary-key ordering difference is an
+  explicit option. SQL Server and SQLite remain separate because their mechanics do not yet justify a common engine.
+- The unused Dapper command shim and unevidenced `RelationalStorage` Entity decoration are retired rather than taught.
+  SQLite's test-only schema fallback and debug output are removed; the shared owner is authoritative.
+- The focused relational owner suite passes 4/4, proving route-local policy/table identity, one registration owner,
+  DDL guard integrity, and Cockroach assembly independence. Isolated real-path checks pass for SQLite lifecycle, PostgreSQL idempotent schema
+  creation, Cockroach shared isolation, and SQL Server CRUD/paging. The full SQLite process still exposes a separate
+  parallel host-bootstrap/Pillar-catalog contamination (34 fail during boot, 1 pass); an isolated affected cell passes.
+- All four connectors and both new mechanism/contract projects build warning-clean. Seven Release packages contain
+  their DLL/XML, package-owned README, canonical icon, symbols, and build-transitive composition props. Nuspecs carry
+  the intended graph; Cockroach has no PostgreSQL connector dependency. The two new packages and Cockroach have no
+  known vulnerable direct or transitive packages under the current NuGet audit.
+- Generated truth now contains 111 packages: 26 repair-required, 47 review-required, and 38 structurally ready. The
+  relational owner, contracts, Npgsql mechanism, PostgreSQL, SQL Server, SQLite, and Cockroach package pages describe
+  their current boundaries without promoting support maturity.
+
+The relational provider family passes this R11-05 slice. The complete release ratchet remains reserved for R11-07;
+the shared parallel-host bootstrap defect remains separately visible and is not misreported as relational evidence.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

@@ -137,10 +137,15 @@ Replace this file at every handoff. It is a restart point, not a diary.
   Cache no longer activates Data, both consumers share the standard default `IConnectionMultiplexer`, and
   `IRedisConnectionProvider` lives in an inert contract package. `IKoanAspireResources` likewise moved to isolated
   Aspire contracts so contributors do not activate the functional runtime.
-- Current generated truth contains 110 packages: 28 repair-required, 48 review-required, 34 structurally ready.
+- The relational provider family now passes. One functional relational owner executes immutable route-local schema
+  policy; contracts and Npgsql mechanics are module-free; Cockroach no longer activates PostgreSQL; dead Dapper and
+  storage-shape surfaces are retired. Focused owner and real SQLite/PostgreSQL/Cockroach/SQL Server paths pass.
+- Current generated truth contains 111 packages: 26 repair-required, 47 review-required, 38 structurally ready.
   Redis Cache 6/6 and Redis Data 12/12 pass; seven affected packages and their dependency boundaries were inspected,
   and the three new packages have no known vulnerable direct or transitive packages. Earlier Storage evidence remains
-  green. S3 engine conformance remains an honestly stated evidence gap rather than an inferred compatibility claim.
+  green. Seven relational packages also inspect cleanly, with clear current vulnerability checks for the two new
+  packages and Cockroach. S3 engine conformance remains an honestly stated evidence gap rather than an inferred
+  compatibility claim.
 - No package, tag, GitHub Release, branch, or remote configuration was published or mutated. Initial coherent
   public observation and a later real public-to-candidate upgrade/rollback remain separate gates.
 

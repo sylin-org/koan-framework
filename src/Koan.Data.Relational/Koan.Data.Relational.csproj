@@ -3,17 +3,22 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Relational data support for Koan: EF Core integration and common helpers for SQL databases.</Description>
-    <PackageTags>$(CommonPackageTags);data;relational;efcore;sql</PackageTags>
+    <Description>Shared schema governance, SQL translation, and command mechanics for Koan relational Data providers.</Description>
+    <PackageTags>$(CommonPackageTags);data;relational;schema;sql</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <!-- Comparable-encoding contract (DATA-0100): the shared JsonConverters that canonicalise
          DateTimeOffset/TimeSpan/DateOnly/TimeOnly on the relational write path. Relational adapters
          persist entities as a JSON document via Newtonsoft. -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Relational.Abstractions\Koan.Data.Relational.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Koan.Data.Relational.Tests" />
   </ItemGroup>
 </Project>

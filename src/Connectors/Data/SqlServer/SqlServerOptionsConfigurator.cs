@@ -10,6 +10,7 @@ using Koan.Data.Adapters.Configuration;
 using Koan.Core.Infrastructure;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Data.Relational.Orchestration;
 
 namespace Koan.Data.Connector.SqlServer;
 
@@ -80,12 +81,12 @@ internal sealed class SqlServerOptionsConfigurator : AdapterOptionsConfigurator<
         var ddlStr = ReadProviderConfiguration(options.DdlPolicy.ToString(),
             Infrastructure.Constants.Configuration.Keys.DdlPolicy,
             Infrastructure.Constants.Configuration.Keys.AltDdlPolicy);
-        if (!string.IsNullOrWhiteSpace(ddlStr) && Enum.TryParse<SchemaDdlPolicy>(ddlStr, true, out var ddl)) options.DdlPolicy = ddl;
+        if (!string.IsNullOrWhiteSpace(ddlStr) && Enum.TryParse<RelationalDdlPolicy>(ddlStr, true, out var ddl)) options.DdlPolicy = ddl;
 
         var smStr = ReadProviderConfiguration(options.SchemaMatching.ToString(),
             Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
             Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
-        if (!string.IsNullOrWhiteSpace(smStr) && Enum.TryParse<SchemaMatchingMode>(smStr, true, out var sm)) options.SchemaMatching = sm;
+        if (!string.IsNullOrWhiteSpace(smStr) && Enum.TryParse<RelationalSchemaMatchingMode>(smStr, true, out var sm)) options.SchemaMatching = sm;
 
         options.AllowProductionDdl = Koan.Core.Configuration.Read(
             Configuration,

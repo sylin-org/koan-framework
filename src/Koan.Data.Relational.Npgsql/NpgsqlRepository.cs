@@ -26,9 +26,9 @@ using System.Linq;
 using System.Linq.Expressions;
 using Newtonsoft.Json;
 
-namespace Koan.Data.Connector.Postgres;
+namespace Koan.Data.Relational.Npgsql;
 
-internal class PostgresRepository<
+public sealed class NpgsqlRepository<
     [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicParameterlessConstructor | DynamicallyAccessedMemberTypes.PublicProperties)] TEntity,
     TKey> :
     IDataRepository<TEntity, TKey>,
@@ -62,16 +62,17 @@ internal class PostgresRepository<
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
     private readonly IServiceProvider _sp;
-    private readonly PostgresOptions _options;
+    private readonly NpgsqlRepositoryOptions _options;
     private readonly IStorageNameResolver _nameResolver;
     private readonly StorageNameResolver.Convention _conv;
-    private readonly ILinqSqlDialect _dialect = new PgDialect();
+    private readonly ILinqSqlDialect _dialect = new NpgsqlDialect();
     private readonly int _defaultPageSize;
     private readonly ILogger _logger;
     private readonly JsonSerializerSettings _json;
+    private readonly RelationalSchemaPolicy _schemaPolicy;
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
 
-    public PostgresRepository(IServiceProvider sp, PostgresOptions options, IStorageNameResolver resolver)
+    public NpgsqlRepository(IServiceProvider sp, NpgsqlRepositoryOptions options, IStorageNameResolver resolver)
     {
         _sp = sp;
         _options = options;
@@ -80,22 +81,21 @@ internal class PostgresRepository<
         // Get storage optimization info from AggregateBag
         _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
 
-        // DEBUG: MediaFormat specific logging
-        if (typeof(TEntity).Name == "MediaFormat")
-        {
-            Console.WriteLine($"[REPOSITORY-DEBUG] PostgresRepository<MediaFormat> - Retrieved optimization info:");
-            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - OptimizationType: {_optimizationInfo.OptimizationType}");
-            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - Reason: {_optimizationInfo.Reason}");
-            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - IdPropertyName: {_optimizationInfo.IdPropertyName}");
-        }
-
         KoanEnv.TryInitialize(sp);
-        _logger = (sp.GetService(typeof(ILogger<PostgresRepository<TEntity, TKey>>)) as ILogger)
+        _logger = (sp.GetService(typeof(ILogger<NpgsqlRepository<TEntity, TKey>>)) as ILogger)
                   ?? (sp.GetService(typeof(ILoggerFactory)) is ILoggerFactory lf
-                      ? lf.CreateLogger($"Koan.Data.Connector.Postgres[{typeof(TEntity).FullName}]")
+                      ? lf.CreateLogger($"Koan.Data.Relational.Npgsql.{options.ProviderName}[{typeof(TEntity).FullName}]")
                       : NullLogger.Instance);
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
         _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
+        _schemaPolicy = new RelationalSchemaPolicy
+        {
+            Projections = RelationalProjectionMode.None,
+            Ddl = options.DdlPolicy,
+            Matching = options.SchemaMatching,
+            AllowProductionDdl = options.AllowProductionDdl,
+            DefaultSchema = options.SearchPath ?? "public"
+        };
         _json = ComparableScalarEncoding.Apply(
             new JsonSerializerSettings(),
             sp.GetRequiredService<DataSegmentationPlan>().For(typeof(TEntity)).Fields);
@@ -195,13 +195,13 @@ internal class PostgresRepository<
             {
                 var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                 var ddl = new PgDdlExecutor(conn, _options.SearchPath);
-                var feats = new PostgresStoreFeatures();
-                var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, runCt);
+                var feats = new NpgsqlStoreFeatures(_options.ProviderName);
+                var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, table, _schemaPolicy, runCt);
                 var ddlAllowed = report.TryGetValue("DdlAllowed", out var da) && da is bool allowed && allowed;
                 var tableExists = report.TryGetValue("TableExists", out var te) && te is bool exists && exists;
                 if (ddlAllowed)
                 {
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, runCt);
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, table, _schemaPolicy, runCt);
                     _healthyCache[cacheKey] = true;
                     return;
                 }
@@ -213,7 +213,7 @@ internal class PostgresRepository<
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "Postgres schema ensure failed for {Table}", table);
+                _logger.LogDebug(ex, "{Provider} schema ensure failed for {Table}", _options.ProviderName, table);
                 _healthyCache.TryRemove(cacheKey, out _);
                 throw;
             }
@@ -233,7 +233,7 @@ internal class PostgresRepository<
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Postgres ensure ready failed for {Table}", table);
+            _logger.LogWarning(ex, "{Provider} ensure ready failed for {Table}", _options.ProviderName, table);
             throw;
         }
     }
@@ -323,7 +323,7 @@ internal class PostgresRepository<
     public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.get");
+        using var act = NpgsqlTelemetry.Activity.StartActivity("npgsql.get");
         act?.SetTag("entity", typeof(TEntity).FullName);
         await using var conn = Open();
 
@@ -354,7 +354,7 @@ internal class PostgresRepository<
     public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.get.many");
+        using var act = NpgsqlTelemetry.Activity.StartActivity("npgsql.get.many");
         act?.SetTag("entity", typeof(TEntity).FullName);
 
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
@@ -408,7 +408,7 @@ internal class PostgresRepository<
     public async Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query");
+        using var act = NpgsqlTelemetry.Activity.StartActivity("npgsql.query");
         act?.SetTag("entity", typeof(TEntity).FullName);
 
         var (whereSql, parameters) = BuildWhere(query.Filter);
@@ -456,7 +456,7 @@ internal class PostgresRepository<
     public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.count");
+        using var act = NpgsqlTelemetry.Activity.StartActivity("npgsql.count");
         act?.SetTag("entity", typeof(TEntity).FullName);
 
         var (whereSql, parameters) = BuildWhere(query.Filter);
@@ -545,7 +545,7 @@ internal class PostgresRepository<
     /// <summary>The stable total-order fallback used when no sort is requested — an overridable seam. Postgres orders by
     /// its physical-row <c>ctid</c> system column (cheap, stable); a pg-wire engine that lacks <c>ctid</c> (e.g.
     /// CockroachDB, error 42703) overrides this to the portable equivalent (<c>ORDER BY "Id"</c>).</summary>
-    protected virtual string StableOrderClause => "ORDER BY ctid";
+    private string StableOrderClause => _options.StableOrderClause;
 
     /// <summary>Builds an ORDER BY clause from the sort specs; falls back to <see cref="StableOrderClause"/>.</summary>
     private (string orderBy, IReadOnlySet<SortSpec> sortHandled) BuildOrderBy(IReadOnlyList<SortSpec> sort)
@@ -610,7 +610,7 @@ internal class PostgresRepository<
     public async Task<RepositoryQueryResult<TEntity>> QueryRaw(string query, object? parameters, QueryDefinition shaping, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:raw");
+        using var act = NpgsqlTelemetry.Activity.StartActivity("npgsql.query:raw");
         act?.SetTag("entity", typeof(TEntity).FullName);
         await using var conn = Open();
         if (IsFullSelect(query))
@@ -747,7 +747,7 @@ internal class PostgresRepository<
                 await conn.ExecuteAsync($"TRUNCATE TABLE {QualifiedTable} RESTART IDENTITY", ct);
                 return -1; // TRUNCATE doesn't report count
             }
-            catch (Npgsql.PostgresException ex) when (ex.SqlState == "0A000") // Feature not supported
+            catch (global::Npgsql.PostgresException ex) when (ex.SqlState == "0A000") // Feature not supported
             {
                 // Foreign key constraint - fall back to DELETE
                 // Silently fall through to safe path
@@ -762,7 +762,7 @@ internal class PostgresRepository<
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new PgBatch(this);
 
-    private sealed class PgBatch(PostgresRepository<TEntity, TKey> repo) : IBatchSet<TEntity, TKey>
+    private sealed class PgBatch(NpgsqlRepository<TEntity, TKey> repo) : IBatchSet<TEntity, TKey>
     {
         private readonly List<TEntity> _adds = new();
         private readonly List<TEntity> _updates = new();
@@ -822,7 +822,7 @@ internal class PostgresRepository<
 
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
     {
-        using var act = PgTelemetry.Activity.StartActivity("pg.instruction");
+        using var act = NpgsqlTelemetry.Activity.StartActivity("npgsql.instruction");
         act?.SetTag("entity", typeof(TEntity).FullName);
         await using var conn = new NpgsqlConnection(_options.ConnectionString);
         await conn.OpenAsync(ct);
@@ -832,8 +832,8 @@ internal class PostgresRepository<
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new PgDdlExecutor(conn, _options.SearchPath);
-                    var feats = new PostgresStoreFeatures();
-                    var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
+                    var feats = new NpgsqlStoreFeatures(_options.ProviderName);
+                    var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, ct);
                     return (TResult)report;
                 }
             case DataInstructions.EnsureCreated:
@@ -841,11 +841,11 @@ internal class PostgresRepository<
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new PgDdlExecutor(conn, _options.SearchPath);
-                    var feats = new PostgresStoreFeatures();
+                    var feats = new NpgsqlStoreFeatures(_options.ProviderName);
                     var key = $"{conn.Host}/{conn.Database}::{TableName}";
                     await Singleflight.Run(key, async kct =>
                     {
-                        await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, kct);
+                        await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, kct);
                         _healthyCache[key] = true;
                     }, ct);
                     object ok = true; return (TResult)ok;
@@ -881,7 +881,7 @@ internal class PostgresRepository<
                     return (TResult)(object)list;
                 }
             default:
-                throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Postgres adapter for {typeof(TEntity).Name}.");
+                throw new NotSupportedException($"Instruction '{instruction.Name}' is not supported by the {_options.ProviderName} adapter for {typeof(TEntity).Name}.");
         }
     }
 
@@ -894,10 +894,10 @@ internal class PostgresRepository<
         var exists = TableExists(conn);
         var projections = ProjectionResolver.Get(typeof(TEntity));
         var projectedColumns = projections.Select(p => p.ColumnName).Distinct(StringComparer.Ordinal).ToArray();
-        var state = exists ? "Healthy" : (_options.SchemaMatching == SchemaMatchingMode.Strict ? "Unhealthy" : "Degraded");
+        var state = exists ? "Healthy" : (_options.SchemaMatching == RelationalSchemaMatchingMode.Strict ? "Unhealthy" : "Degraded");
         return new Dictionary<string, object?>
         {
-            ["Provider"] = "postgres",
+            ["Provider"] = _options.ProviderName,
             ["Schema"] = schema,
             ["Table"] = table,
             ["TableExists"] = exists,
@@ -955,7 +955,7 @@ internal class PostgresRepository<
             cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{Qual(sch)}\".\"{Qual(table)}\" (\"{Qual(idColumn)}\" text PRIMARY KEY, \"{Qual(jsonColumn)}\" jsonb NOT NULL)";
             cmd.ExecuteNonQuery();
         }
-        public void CreateTableWithColumns(string schema, string table, List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
+        public void CreateTableWithColumns(string schema, string table, IReadOnlyList<RelationalColumnDefinition> columns)
         {
             var sch = schema ?? (searchPath ?? "public");
             using var cmd = conn.CreateCommand();
@@ -1033,12 +1033,12 @@ internal class PostgresRepository<
         }
     }
 
-    private sealed class PostgresStoreFeatures : IRelationalStoreFeatures
+    private sealed class NpgsqlStoreFeatures(string providerName) : IRelationalStoreFeatures
     {
         public bool SupportsJsonFunctions => true;
         public bool SupportsPersistedComputedColumns => true; // generated columns are stored
         public bool SupportsIndexesOnComputedColumns => true;
-        public string ProviderName => "postgresql";
+        public string ProviderName => providerName;
     }
 
     private string RewriteEntityToken(string sql)
@@ -1191,7 +1191,7 @@ internal class PostgresRepository<
 
     private bool IsDdlAllowed(bool entityReadOnly)
     {
-        if (_options.DdlPolicy != SchemaDdlPolicy.AutoCreate) return false;
+        if (_options.DdlPolicy != RelationalDdlPolicy.AutoCreate) return false;
         if (entityReadOnly) return false;
         bool prod = KoanEnv.IsProduction;
         bool allowMagic = KoanEnv.AllowMagicInProduction || _options.AllowProductionDdl;

@@ -869,13 +869,13 @@
       "dependencies": [
         "Sylin.Koan.Core",
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Connector.Postgres",
         "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.Relational"
+        "Sylin.Koan.Data.Relational",
+        "Sylin.Koan.Data.Relational.Npgsql"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "readme": "src/Connectors/Data/Cockroach/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Connectors/Data/Cockroach/TECHNICAL.md",
       "claims": []
     },
     {
@@ -997,6 +997,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Relational",
+        "Sylin.Koan.Data.Relational.Npgsql",
         "Sylin.Koan.Orchestration.Aspire.Abstractions"
       ],
       "readme": "src/Connectors/Data/Postgres/README.md",
@@ -1080,13 +1081,14 @@
     {
       "packageId": "Sylin.Koan.Data.Relational",
       "shape": "library",
-      "description": "Relational data support for Koan: EF Core integration and common helpers for SQL databases.",
+      "description": "Shared schema governance, SQL translation, and command mechanics for Koan relational Data providers.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core"
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Relational.Abstractions"
       ],
       "readme": "src/Koan.Data.Relational/README.md",
       "ownsReadme": true,
@@ -1094,18 +1096,36 @@
       "claims": []
     },
     {
-      "packageId": "Sylin.Koan.Data.Relational.Dapper",
+      "packageId": "Sylin.Koan.Data.Relational.Abstractions",
       "shape": "library",
-      "description": "Dapper-backed implementation of the Koan relational command helpers (SqlParameters/AdoCommands surface) for non-AOT relational adapters. AOT-targeted adapters use the hand-rolled Koan.Data.Relational.Ado helpers instead, since Dapper emits IL at runtime.",
+      "description": "Inert relational schema, dialect, and DDL contracts for Koan Data providers.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.Data.Abstractions"
+      ],
+      "readme": "src/Koan.Data.Relational.Abstractions/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Data.Relational.Abstractions/TECHNICAL.md",
+      "claims": []
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Relational.Npgsql",
+      "shape": "library",
+      "description": "Shared Npgsql repository mechanics for PostgreSQL-wire Koan Data providers.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Relational"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Data.Relational.Npgsql/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Data.Relational.Npgsql/TECHNICAL.md",
       "claims": []
     },
     {

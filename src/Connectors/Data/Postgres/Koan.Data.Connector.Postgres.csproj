@@ -9,23 +9,17 @@
     <PackageTags>$(CommonPackageTags);data;postgres;relational;sql;dapper</PackageTags>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Npgsql" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.0.0" />
-  </ItemGroup>
-  <ItemGroup>
-    <!-- The CockroachDB adapter is a thin subclass of PostgresRepository (pg-wire reuse, ARCH-0094 Phase 4): it
-         inherits the repository + PgDialect + DDL wholesale and overrides only StableOrderClause (no `ctid`). -->
-    <InternalsVisibleTo Include="Koan.Data.Connector.Cockroach" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\Koan.Data.Relational\Koan.Data.Relational.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Data.Relational.Npgsql\Koan.Data.Relational.Npgsql.csproj" />
     <ProjectReference Include="..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\Koan.Orchestration.Aspire.Abstractions\Koan.Orchestration.Aspire.Abstractions.csproj" />

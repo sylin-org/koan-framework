@@ -1,8 +1,8 @@
 using Koan.Data.Relational.Linq;
 
-namespace Koan.Data.Connector.Postgres;
+namespace Koan.Data.Relational.Npgsql;
 
-internal sealed class PgDialect : ILinqSqlDialect
+internal sealed class NpgsqlDialect : ILinqSqlDialect
 {
     public string QuoteIdent(string ident) => "\"" + ident.Replace("\"", "\"\"") + "\"";
     public string EscapeLike(string fragment)

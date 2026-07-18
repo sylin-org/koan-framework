@@ -1,120 +1,106 @@
-using Microsoft.Extensions.Options;
 using Koan.Data.Core;
-using System.Collections.Concurrent;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Reflection;
 using Koan.Data.Core.Optimization;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.Relational.Orchestration;
 
 internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrator
 {
-    private readonly IOptionsMonitor<RelationalMaterializationOptions> _optionsMonitor;
     private readonly IServiceProvider _sp;
-    private readonly ConcurrentDictionary<string, (string State, string[] Missing, string[] Extra)> _cache = new(StringComparer.Ordinal);
+    private readonly ILogger<RelationalSchemaOrchestrator>? _logger;
 
-    public RelationalSchemaOrchestrator(IOptionsMonitor<RelationalMaterializationOptions> optionsMonitor, IServiceProvider sp)
-    { _optionsMonitor = optionsMonitor; _sp = sp; }
-
-    public Task<object> ValidateAsync<TEntity, TKey>(IRelationalDdlExecutor ddl, IRelationalStoreFeatures features, CancellationToken ct = default)
-        where TEntity : class, Abstractions.IEntity<TKey>
-        where TKey : notnull
+    public RelationalSchemaOrchestrator(
+        IServiceProvider sp,
+        ILogger<RelationalSchemaOrchestrator>? logger = null)
     {
-        ct.ThrowIfCancellationRequested();
-        var entity = typeof(TEntity);
-        var (schema, table) = ResolveTable(entity);
-        var required = GetRequiredColumns(entity, features);
-        var missing = required.Where(c => !ddl.ColumnExists(schema, table, c)).ToArray();
-        var state = ComputeState(ddl.TableExists(schema, table), missing.Length == 0);
-        _cache[table] = (state, missing, []);
-        var options = _optionsMonitor.CurrentValue;
-        var report = new Dictionary<string, object?>
-        {
-            ["Provider"] = "relational",
-            ["Table"] = table,
-            ["TableExists"] = ddl.TableExists(schema, table),
-            ["ProjectedColumns"] = required,
-            ["MissingColumns"] = missing,
-            ["Policy"] = options.Materialization.ToString(),
-            ["DdlAllowed"] = IsDdlAllowed(options),
-            ["MatchingMode"] = options.SchemaMatching.ToString(),
-            ["State"] = state
-        };
-        return Task.FromResult<object>(report);
+        _sp = sp;
+        _logger = logger;
     }
 
-    public Task EnsureCreatedJsonAsync<TEntity, TKey>(IRelationalDdlExecutor ddl, IRelationalStoreFeatures features, CancellationToken ct = default)
+    public Task<IReadOnlyDictionary<string, object?>> ValidateAsync<TEntity, TKey>(
+        IRelationalDdlExecutor ddl,
+        IRelationalStoreFeatures features,
+        string table,
+        RelationalSchemaPolicy policy,
+        CancellationToken ct = default)
         where TEntity : class, Abstractions.IEntity<TKey>
         where TKey : notnull
     {
         ct.ThrowIfCancellationRequested();
         var entity = typeof(TEntity);
-        var (schema, table) = ResolveTable(entity);
+        var schema = ResolveSchema(policy);
+        var required = GetRequiredColumns(entity, policy);
+        var missing = required.Where(c => !ddl.ColumnExists(schema, table, c)).ToArray();
+        var tableExists = ddl.TableExists(schema, table);
+        var state = ComputeState(tableExists, missing.Length == 0, policy);
+        IReadOnlyDictionary<string, object?> report = new Dictionary<string, object?>
+        {
+            ["Provider"] = features.ProviderName,
+            ["Schema"] = schema,
+            ["Table"] = table,
+            ["TableExists"] = tableExists,
+            ["ProjectedColumns"] = required,
+            ["MissingColumns"] = missing,
+            ["Policy"] = policy.Projections.ToString(),
+            ["DdlAllowed"] = IsDdlAllowed(policy),
+            ["MatchingMode"] = policy.Matching.ToString(),
+            ["State"] = state
+        };
+        return Task.FromResult(report);
+    }
+
+    private Task EnsureCreatedJsonAsync<TEntity, TKey>(
+        IRelationalDdlExecutor ddl,
+        IRelationalStoreFeatures features,
+        string table,
+        RelationalSchemaPolicy policy,
+        CancellationToken ct)
+        where TEntity : class, Abstractions.IEntity<TKey>
+        where TKey : notnull
+    {
+        ct.ThrowIfCancellationRequested();
+        var schema = ResolveSchema(policy);
         if (!ddl.TableExists(schema, table))
         {
-            EnsureDdlAllowed();
+            EnsureDdlAllowed(policy, features, schema, table);
             ddl.CreateTableIdJson(schema, table);
         }
         return Task.CompletedTask;
     }
 
-    public async Task EnsureCreatedAsync<TEntity, TKey>(IRelationalDdlExecutor ddl, IRelationalStoreFeatures features, CancellationToken ct = default)
+    public Task EnsureCreatedAsync<TEntity, TKey>(
+        IRelationalDdlExecutor ddl,
+        IRelationalStoreFeatures features,
+        string table,
+        RelationalSchemaPolicy policy,
+        CancellationToken ct = default)
         where TEntity : class, Abstractions.IEntity<TKey>
         where TKey : notnull
-    {
-        ct.ThrowIfCancellationRequested();
-        // Precedence: [RelationalStorage(Shape=...)] > options.Materialization
-        var entity = typeof(TEntity);
-        var attr = entity.GetCustomAttribute<Abstractions.Annotations.RelationalStorageAttribute>(inherit: false);
-        var options = _optionsMonitor.CurrentValue;
-        System.Diagnostics.Debug.WriteLine($"[ORCH] EnsureCreatedAsync: Entity={entity.Name}, Materialization={options.Materialization}, DdlPolicy={options.DdlPolicy}, AllowProductionDdl={options.AllowProductionDdl}");
-        if (attr is not null)
-        {
-            switch (attr.Shape)
-            {
-                case Abstractions.Annotations.RelationalStorageShape.Json:
-                    System.Diagnostics.Debug.WriteLine($"[ORCH] EnsureCreatedAsync: Shape=Json, calling EnsureCreatedJsonAsync");
-                    await EnsureCreatedJsonAsync<TEntity, TKey>(ddl, features, ct); return;
-                case Abstractions.Annotations.RelationalStorageShape.ComputedProjections:
-                case Abstractions.Annotations.RelationalStorageShape.PhysicalColumns:
-                    System.Diagnostics.Debug.WriteLine($"[ORCH] EnsureCreatedAsync: Shape=Projections/Physical, calling EnsureCreatedMaterializedAsync");
-                    await EnsureCreatedMaterializedAsync<TEntity, TKey>(ddl, features, ct); return;
-            }
-        }
-        // Fallback to options
-        if (options.Materialization == RelationalMaterializationPolicy.None)
-        {
-            System.Diagnostics.Debug.WriteLine($"[ORCH] EnsureCreatedAsync: Fallback to Json");
-            await EnsureCreatedJsonAsync<TEntity, TKey>(ddl, features, ct);
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine($"[ORCH] EnsureCreatedAsync: Fallback to Materialized");
-            await EnsureCreatedMaterializedAsync<TEntity, TKey>(ddl, features, ct);
-        }
-    }
+        => policy.Projections == RelationalProjectionMode.None
+            ? EnsureCreatedJsonAsync<TEntity, TKey>(ddl, features, table, policy, ct)
+            : EnsureCreatedMaterializedAsync<TEntity, TKey>(ddl, features, table, policy, ct);
 
-    public Task EnsureCreatedMaterializedAsync<TEntity, TKey>(IRelationalDdlExecutor ddl, IRelationalStoreFeatures features, CancellationToken ct = default)
+    private Task EnsureCreatedMaterializedAsync<TEntity, TKey>(
+        IRelationalDdlExecutor ddl,
+        IRelationalStoreFeatures features,
+        string table,
+        RelationalSchemaPolicy policy,
+        CancellationToken ct)
         where TEntity : class, Abstractions.IEntity<TKey>
         where TKey : notnull
     {
         ct.ThrowIfCancellationRequested();
         var entity = typeof(TEntity);
-        var (schema, table) = ResolveTable(entity);
-        System.Diagnostics.Debug.WriteLine($"[ORCH] EnsureCreatedMaterializedAsync: Entity={entity.Name}, Schema={schema}, Table={table}");
+        var schema = ResolveSchema(policy);
         var projections = ProjectionResolver.Get(entity);
-        var allColumns = new List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)>();
+        var allColumns = new List<RelationalColumnDefinition>();
 
         // Always add Id and Json columns - use optimized storage type for Id
         var optimizationInfo = _sp.GetStorageOptimization<TEntity, TKey>();
         var idStorageType = GetIdStorageType<TKey>(optimizationInfo, features.ProviderName);
 
-        System.Diagnostics.Debug.WriteLine($"[ORCH] ID Storage Optimization: Entity={entity.Name}, Provider={features.ProviderName}, " +
-            $"OptimizationType={optimizationInfo.OptimizationType}, StorageType={idStorageType.Name}, " +
-            $"IsOptimized={optimizationInfo.IsOptimized}");
-
-        allColumns.Add(("Id", idStorageType, false, false, null, false));
-        allColumns.Add(("Json", typeof(string), false, false, null, false));
+        allColumns.Add(new("Id", idStorageType, false));
+        allColumns.Add(new("Json", typeof(string), false));
         foreach (var p in projections)
         {
             var clr = p.Property.PropertyType;
@@ -123,20 +109,19 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
             if (features.SupportsJsonFunctions)
             {
                 // Computed/generated from JSON; underlying nullability doesn't matter here
-                allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
+                allColumns.Add(new(p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
             }
             else
             {
                 // No JSON computed columns (e.g., SQLite): create physical columns but keep them nullable
                 // so inserts that only write Json don’t violate NOT NULL constraints.
-                allColumns.Add((p.ColumnName, underlying, true, false, null, p.IsIndexed));
+                allColumns.Add(new(p.ColumnName, underlying, true, false, null, p.IsIndexed));
             }
         }
         bool created = false;
         if (!ddl.TableExists(schema, table))
         {
-            System.Diagnostics.Debug.WriteLine($"[ORCH] Table does not exist, calling EnsureDdlAllowed and CreateTableWithColumns");
-            EnsureDdlAllowed();
+            EnsureDdlAllowed(policy, features, schema, table);
             // Use the strongly-typed API on the executor. Executors that don't implement CreateTableWithColumns
             // should implement CreateTableIdJson instead; the interface now includes CreateTableWithColumns so
             // the MsSql executor implements it.
@@ -148,27 +133,19 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
         {
             foreach (var col in allColumns.Skip(2)) // skip Id, Json (already created)
             {
-                System.Diagnostics.Debug.WriteLine($"[ORCH] Checking column: {col.Name}");
                 var exists = ddl.ColumnExists(schema, table, col.Name);
-                System.Diagnostics.Debug.WriteLine($"[ORCH] ColumnExists({col.Name}) returned: {exists}");
                 if (!exists)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[ORCH] Column {col.Name} does not exist, will add");
+                    EnsureDdlAllowed(policy, features, schema, table);
                     if (col.IsComputed && features.SupportsJsonFunctions)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[ORCH] Adding computed column from JSON: {col.Name}, path={col.JsonPath}");
                         // JsonPath is defined when IsComputed=true; assert non-null to satisfy nullable analysis
                         ddl.AddComputedColumnFromJson(schema, table, col.Name, col.JsonPath!, features.SupportsPersistedComputedColumns);
                     }
                     else
                     {
-                        System.Diagnostics.Debug.WriteLine($"[ORCH] Adding physical column: {col.Name}, type={col.ClrType}, nullable={col.Nullable}");
                         ddl.AddPhysicalColumn(schema, table, col.Name, col.ClrType, col.Nullable);
                     }
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine($"[ORCH] Column {col.Name} already exists");
                 }
             }
         }
@@ -179,11 +156,12 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
         // the per-lane claim seek slow on relational (no composite (Lane,Status,VisibleAt,FirstSubmittedAt) index).
         // CREATE INDEX IF NOT EXISTS makes it idempotent; each is best-effort so a non-indexable column degrades to a
         // scan, never a failure.
-        EnsureIndexes(ddl, features, schema, table, entity);
+        if (IsDdlAllowed(policy))
+            EnsureIndexes(ddl, features, schema, table, entity);
         return Task.CompletedTask;
     }
 
-    private static void EnsureIndexes(IRelationalDdlExecutor ddl, IRelationalStoreFeatures features, string schema, string table, Type entity)
+    private void EnsureIndexes(IRelationalDdlExecutor ddl, IRelationalStoreFeatures features, string schema, string table, Type entity)
     {
         if (!features.SupportsIndexesOnComputedColumns) return;
         foreach (var idx in IndexMetadata.GetIndexes(entity))
@@ -194,36 +172,27 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
                 .ToArray();
             var name = !string.IsNullOrWhiteSpace(idx.Name) ? idx.Name! : $"IX_{table}_{string.Join("_", cols)}";
             try { ddl.CreateIndex(schema, table, name, cols, unique: idx.Unique); }
-            catch { /* best-effort: a missing index degrades to a scan, never a failure */ }
+            catch (Exception error)
+            {
+                _logger?.LogWarning(
+                    error,
+                    "Relational index {Index} could not be created for {Provider}/{Schema}/{Table}; queries may scan.",
+                    name,
+                    features.ProviderName,
+                    schema,
+                    table);
+            }
         }
     }
 
-    private (string schema, string table) ResolveTable(Type entity)
+    private static string ResolveSchema(RelationalSchemaPolicy policy)
+        => string.IsNullOrWhiteSpace(policy.DefaultSchema) ? "dbo" : policy.DefaultSchema;
+
+
+    private static string[] GetRequiredColumns(Type entity, RelationalSchemaPolicy policy)
     {
-        // Resolve via StorageNameResolver defaults for relational. Allow provider-specific schema overrides via options.
-        var schema = _optionsMonitor.CurrentValue.DefaultSchema;
-        if (string.IsNullOrWhiteSpace(schema)) schema = "dbo";
-        var method = typeof(Core.Configuration.AdapterNaming).GetMethods()
-            .First(m => m.Name == "GetOrCompute" && m.GetGenericArguments().Length == 2);
-
-        // Extract the actual TKey type from the entity's IEntity<TKey> interface
-        var entityInterface = entity.GetInterfaces()
-            .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(Abstractions.IEntity<>));
-
-        if (entityInterface == null)
-            throw new InvalidOperationException($"Entity type {entity.Name} does not implement IEntity<TKey>");
-
-        var keyType = entityInterface.GetGenericArguments()[0];
-        var table = (string)method.MakeGenericMethod(entity, keyType).Invoke(null, new object?[] { _sp })!;
-        return (schema, table);
-    }
-
-
-    private string[] GetRequiredColumns(Type entity, IRelationalStoreFeatures features)
-    {
-        var options = _optionsMonitor.CurrentValue;
         var cols = new List<string> { "Id", "Json" };
-        if (options.Materialization == RelationalMaterializationPolicy.ComputedProjections || options.Materialization == RelationalMaterializationPolicy.PhysicalColumns)
+        if (policy.Projections is RelationalProjectionMode.ComputedProjections or RelationalProjectionMode.PhysicalColumns)
         {
             var projections = ProjectionResolver.Get(entity);
             cols.AddRange(projections.Select(p => p.ColumnName));
@@ -232,29 +201,32 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
     }
 
 
-    private string ComputeState(bool tableExists, bool matches)
+    private static string ComputeState(bool tableExists, bool matches, RelationalSchemaPolicy policy)
     {
-        var options = _optionsMonitor.CurrentValue;
-        if (!tableExists) return options.SchemaMatching == RelationalSchemaMatchingMode.Strict ? "Unhealthy" : "Degraded";
-        if (!matches) return options.SchemaMatching == RelationalSchemaMatchingMode.Strict ? "Unhealthy" : "Degraded";
+        if (!tableExists) return policy.Matching == RelationalSchemaMatchingMode.Strict ? "Unhealthy" : "Degraded";
+        if (!matches) return policy.Matching == RelationalSchemaMatchingMode.Strict ? "Unhealthy" : "Degraded";
         return "Healthy";
     }
 
-
-    private void EnsureDdlAllowed()
+    private static void EnsureDdlAllowed(
+        RelationalSchemaPolicy policy,
+        IRelationalStoreFeatures features,
+        string schema,
+        string table)
     {
-        var options = _optionsMonitor.CurrentValue;
-        if (!IsDdlAllowed(options))
+        if (!IsDdlAllowed(policy))
         {
-            var reason = options.DdlPolicy != RelationalDdlPolicy.AutoCreate
-                ? "DDL is disabled by policy."
-                : "DDL not allowed in production.";
-            throw new InvalidOperationException(reason);
+            var reason = policy.Ddl != RelationalDdlPolicy.AutoCreate
+                ? $"DDL is disabled by policy '{policy.Ddl}'."
+                : "DDL is not allowed in production.";
+            throw new InvalidOperationException(
+                $"Relational schema creation was rejected for {features.ProviderName}/{schema}/{table}. {reason} " +
+                "Set the selected provider's DdlPolicy to AutoCreate and explicitly allow production DDL only when intended.");
         }
     }
 
-    private static bool IsDdlAllowed(RelationalMaterializationOptions options)
-        => options.DdlPolicy == RelationalDdlPolicy.AutoCreate && (!Koan.Core.KoanEnv.IsProduction || options.AllowProductionDdl);
+    private static bool IsDdlAllowed(RelationalSchemaPolicy policy)
+        => policy.Ddl == RelationalDdlPolicy.AutoCreate && (!Koan.Core.KoanEnv.IsProduction || policy.AllowProductionDdl);
 
     private static Type GetIdStorageType<TKey>(StorageOptimizationInfo optimizationInfo, string providerName)
         where TKey : notnull
