@@ -48,7 +48,9 @@ internal sealed class VectorService(
             var preferred = PreferredRecordProvider<TEntity>();
             if (string.IsNullOrWhiteSpace(preferred))
             {
-                preferred = services.GetService<DataDefaultProviderPlan>()?.ProviderId;
+                var dataProviders = services.GetService<DataProviderCatalog>();
+                if (dataProviders?.Candidates.Count > 0)
+                    preferred = services.GetRequiredService<DataDefaultProviderPlan>().ProviderId;
             }
 
             factory = !string.IsNullOrWhiteSpace(preferred) ? providers.Find(preferred) : null;

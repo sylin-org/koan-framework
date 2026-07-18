@@ -65,6 +65,17 @@ public sealed class VectorAdapterParticipationSpec
         report.Data!["failedSource"].Should().Be("Default");
     }
 
+    [Fact]
+    public async Task Vector_only_application_does_not_require_a_record_data_provider()
+    {
+        await using var services = Build(new TestVectorFactory("test"));
+
+        var repository = services.GetRequiredService<IVectorService>()
+            .TryGetRepository<VectorOnlyEntity, string>();
+
+        repository.Should().NotBeNull();
+    }
+
     private static ServiceProvider Build(IVectorAdapterFactory factory)
     {
         var services = new ServiceCollection();
@@ -135,6 +146,12 @@ public sealed class VectorAdapterParticipationSpec
 
     [VectorAdapter("test")]
     private sealed class ParticipationEntity : Entity<ParticipationEntity, string>
+    {
+        [Identifier]
+        public override string Id { get; set; } = "";
+    }
+
+    private sealed class VectorOnlyEntity : Entity<VectorOnlyEntity, string>
     {
         [Identifier]
         public override string Id { get; set; } = "";
