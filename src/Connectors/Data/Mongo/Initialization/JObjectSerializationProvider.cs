@@ -4,7 +4,7 @@ using System;
 
 namespace Koan.Data.Connector.Mongo.Initialization
 {
-    public class JObjectSerializationProvider : IBsonSerializationProvider
+    internal sealed class JObjectSerializationProvider : IBsonSerializationProvider
     {
         public IBsonSerializer? GetSerializer(Type type)
         {
@@ -23,4 +23,3 @@ namespace Koan.Data.Connector.Mongo.Initialization
         }
     }
 }
-

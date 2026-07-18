@@ -77,14 +77,14 @@ internal sealed class CouchbaseDiscoveryAdapter : ServiceDiscoveryAdapterBase
         // Check Couchbase-specific configuration paths
         return _configuration.GetConnectionString("Couchbase") ??
                _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
-               _configuration[Infrastructure.Constants.Configuration.Keys.AltConnectionString];
+               _configuration[Infrastructure.Constants.Configuration.Keys.DefaultSourceConnectionString];
     }
 
     /// <summary>Couchbase-specific environment variable handling</summary>
     protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
     {
-        var couchbaseUrls = Environment.GetEnvironmentVariable("COUCHBASE_URLS") ??
-                           Environment.GetEnvironmentVariable("CB_URLS");
+        var couchbaseUrls = Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.CouchbaseUrls) ??
+                           Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.CouchbaseAliasUrls);
 
         if (string.IsNullOrWhiteSpace(couchbaseUrls))
             return Enumerable.Empty<DiscoveryCandidate>();

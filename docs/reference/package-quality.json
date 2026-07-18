@@ -4,11 +4,11 @@
   "summary": {
     "packages": 111,
     "repairRequired": 26,
-    "reviewRequired": 46,
-    "structurallyReady": 39,
+    "reviewRequired": 45,
+    "structurallyReady": 40,
     "ownedReadmes": 85,
     "technicalCompanions": 75,
-    "findings": 181
+    "findings": 178
   },
   "findingDefinitions": [
     {
@@ -854,7 +854,7 @@
       "projectPath": "src/Connectors/Data/Couchbase/Koan.Data.Connector.Couchbase.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Couchbase data provider for Koan: options binding and repository integration for document databases.",
       "targetFrameworks": [
         "net10.0"
@@ -867,11 +867,7 @@
       "readme": "src/Connectors/Data/Couchbase/README.md",
       "technicalDocumentation": "src/Connectors/Data/Couchbase/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.ElasticSearch",

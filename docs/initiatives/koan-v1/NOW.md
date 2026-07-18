@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
-  scope: R11-05 through relational and local Data provider-family graduation; remaining document/search providers next
+  scope: R11-05 through document Data provider-family graduation and caller-owned pagination; search providers next
 ---
 
 # Koan V1 reorganization current handoff
@@ -143,8 +143,15 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - The local Data provider family now passes. JSON is truthfully the automatic inspectable floor; InMemory is a direct,
   host-scoped ephemeral provider. Dead manual JSON registration/page-size surfaces and public InMemory store controls
   are gone, while JSON naming stays inside the already-selected provider route. JSON passes 21/21 and InMemory 56/56.
-- Current generated truth contains 111 packages: 26 repair-required, 46 review-required, 39 structurally ready across
-  16 claims.
+- The document Data provider family now passes. Mongo and Couchbase consume selected-factory naming, share one
+  immutable route monitor, and participate in readiness only when selected. Mongo passes 68/68; Couchbase passes three
+  connection-free participation cells and one real-container CRUD cell. Couchbase first use remains observably slow
+  (about 64 seconds in the focused cell), and its full suite is intentionally not claimed as certified here.
+- Data pagination is now caller-owned end to end. `All()` means the complete visible set; adapters have no row-page
+  default and append paging only for explicit shaping. SQLite, PostgreSQL/shared Npgsql, and SQL Server regressions each
+  prove 75 unpaged rows versus an explicitly requested page of 7.
+- Current generated truth contains 111 packages: 26 repair-required, 45 review-required, 40 structurally ready across
+  17 claims.
   Redis Cache 6/6 and Redis Data 12/12 pass; seven affected packages and their dependency boundaries were inspected,
   and the three new packages have no known vulnerable direct or transitive packages. Earlier Storage evidence remains
   green. Seven relational packages also inspect cleanly, with clear current vulnerability checks for the two new

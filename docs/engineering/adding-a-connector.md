@@ -6,7 +6,6 @@ Wire a new external system (database, vector store, message broker, AI provider,
 > - [ARCH-0049 — `[KoanService]` orchestration metadata](../decisions/) (referenced by the orchestration generator)
 > - [ARCH-0079 — Integration tests as canon](../decisions/) (every connector ships at least one integration spec)
 > - [ARCH-0080 — Shared transport ownership](../decisions/ARCH-0080-shared-transport-ownership.md) (historical context; shared backends now have their own functional owner)
-> - [ARCH-0081 — Typed registration helpers](../decisions/ARCH-0081-typed-registration-helpers-and-analyzer.md) (use the helpers, not raw `TryAddEnumerable`)
 > - [ARCH-0085 — Versioning](../decisions/ARCH-0085-versioning-compatibility-and-automation.md) (each package owns version intent)
 >
 > Companion workbooks:
@@ -35,11 +34,13 @@ You want to add a new connector to a pillar that already exists (Data, Data.Vect
 A Koan connector is **just** a few standard pieces:
 
 1. **Adapter factory** — implements the pillar's factory interface, decorated with `[KoanService]` so orchestration knows how to spin up a dependency container locally. Decorated with `[ProviderPriority]` for tie-breaking when multiple adapters can handle the same provider name.
-2. **Repository / client** — does the actual I/O. Owned per request via DI scope.
+2. **Repository / client** — does the actual I/O. Data caches the selected repository per
+   Entity/key/provider/source route; the connector pools expensive native clients at the narrow physical-source owner.
 3. **Options + configurator** — strongly-typed config bound from `Koan:Data:<Provider>:*` (or equivalent).
 4. **One domain-named `KoanModule`** — discovered at build time and activated by `AddKoan()`. Registers everything above.
 5. **Autonomous discovery adapter** — answers "where is the service?" for local/container/Aspire environments. Optional but expected.
-6. **Health contributor** — reports readiness.
+6. **Health contributor** — reports readiness for elected or runtime-participating routes. Package availability alone
+   is non-critical and must not open a connection.
 7. **Orchestration evaluator** — decides whether to inject the dependency into compose/Aspire when the user runs `koan up`.
 8. **Tests** — at minimum, one integration spec hitting a real container via Testcontainers (ARCH-0079).
 
@@ -154,7 +155,14 @@ public sealed class AcmeOptionsConfigurator(IConfiguration cfg) : IConfigureOpti
 
 ### Step 4 — Repository + client + health contributor
 
-Connector-specific. Model after the Weaviate ones for the I/O layer + the `IHealthContributor` implementation.
+Connector-specific. Keep the repository thin around the native dialect and let the adapter factory own route
+construction. Pool expensive clients by physical placement, not by request or Entity. For Data connectors, derive
+health from `DataAdapterHealthContributorBase` so default election and runtime source participation decide criticality;
+probe each participating route through the same factory decision used by repositories.
+
+Do not register an optional connector client as a global eager initializer merely to make health work. A directly
+referenced but unelected connector is available, non-critical, and connection-free. Selected first use may initialize
+the client lazily; health becomes critical once Data records participation.
 
 ### Step 5 — Discovery adapter (optional but expected)
 
@@ -421,6 +429,5 @@ Re-run the release compiler inventory, then package verification for the affecte
 - [ARCH-0049](../decisions/) — `[KoanService]` orchestration metadata
 - [ARCH-0079](../decisions/) — integration tests as canon
 - [ARCH-0080](../decisions/ARCH-0080-shared-transport-ownership.md) — shared transport ownership
-- [ARCH-0081](../decisions/ARCH-0081-typed-registration-helpers-and-analyzer.md) — typed registration helpers
 - [ARCH-0082](../decisions/ARCH-0082-versioning-strategy.md) — versioning
 - [ARCH-0083](../decisions/ARCH-0083-operational-workbooks.md) — workbook standard this follows

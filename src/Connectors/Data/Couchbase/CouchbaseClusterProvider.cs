@@ -42,6 +42,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
     private readonly IOptionsMonitor<CouchbaseOptions> _options;
     private readonly ILogger<CouchbaseClusterProvider>? _logger;
     private readonly SemaphoreSlim _sync = new(1, 1);
+    private readonly object _initializationGate = new();
     private readonly HttpClient _httpClient;
     private ICluster? _cluster;
     private IBucket? _bucket;
@@ -49,6 +50,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
     private readonly ConcurrentDictionary<string, IScope> _scopes = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, ICouchbaseCollection> _collections = new(StringComparer.OrdinalIgnoreCase);
     private readonly ReadinessStateManager _stateManager = new();
+    private Task? _initialization;
 
     public CouchbaseClusterProvider(IOptionsMonitor<CouchbaseOptions> options, ILogger<CouchbaseClusterProvider>? logger = null)
     {
@@ -75,11 +77,16 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
 
     public ReadinessStateManager StateManager => _stateManager;
 
-    public Task<bool> IsReadyAsync(CancellationToken ct = default)
-        => Task.FromResult(_stateManager.IsReady);
+    public async Task<bool> IsReadyAsync(CancellationToken ct = default)
+    {
+        await EnsureInitialized(ct).ConfigureAwait(false);
+        return _stateManager.IsReady;
+    }
 
     public async Task WaitForReadiness(TimeSpan? timeout = null, CancellationToken ct = default)
     {
+        await EnsureInitialized(ct).ConfigureAwait(false);
+
         if (_stateManager.IsReady)
         {
             return;
@@ -379,6 +386,12 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
 
     public async ValueTask<CouchbaseCollectionContext> GetCollectionContext(string collectionName, CancellationToken ct)
     {
+        await EnsureInitialized(ct).ConfigureAwait(false);
+        return await GetCollectionContextCore(collectionName, ct).ConfigureAwait(false);
+    }
+
+    private async ValueTask<CouchbaseCollectionContext> GetCollectionContextCore(string collectionName, CancellationToken ct)
+    {
         var options = _options.CurrentValue;
         var cluster = await EnsureCluster(options, ct);
         var bucket = await EnsureBucket(cluster, options, ct);
@@ -402,10 +415,6 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
             ? (!string.IsNullOrWhiteSpace(options.Collection) ? options.Collection! : "_default")
             : collectionName;
         var collection = await GetCollection(scope, scopeName, finalCollection);
-        if (_stateManager.State == AdapterReadinessState.Initializing)
-        {
-            _stateManager.TransitionTo(AdapterReadinessState.Ready);
-        }
         return new CouchbaseCollectionContext(cluster, bucket, scope, collection, bucket.Name, scopeName, finalCollection);
     }
 
@@ -706,15 +715,40 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         _stateManager.TransitionTo(AdapterReadinessState.Degraded);
     }
 
-    public async Task InitializeAsync(CancellationToken ct = default)
+    public Task InitializeAsync(CancellationToken ct = default) => EnsureInitialized(ct);
+
+    internal async Task Probe(CancellationToken ct)
+    {
+        await EnsureInitialized(ct).ConfigureAwait(false);
+        await _cluster!.PingAsync(new global::Couchbase.Diagnostics.PingOptions().CancellationToken(ct)).ConfigureAwait(false);
+    }
+
+    private Task EnsureInitialized(CancellationToken ct)
+    {
+        if (_stateManager.IsReady)
+        {
+            return Task.CompletedTask;
+        }
+
+        Task initialization;
+        lock (_initializationGate)
+        {
+            _initialization ??= InitializeCoreAsync(CancellationToken.None);
+            initialization = _initialization;
+        }
+
+        return initialization.WaitAsync(ct);
+    }
+
+    private async Task InitializeCoreAsync(CancellationToken ct)
     {
         _stateManager.TransitionTo(AdapterReadinessState.Initializing);
 
         try
         {
             var options = _options.CurrentValue;
-            var collectionName = options.Collection ?? "";
-            await GetCollectionContext(collectionName, ct);
+            var cluster = await EnsureCluster(options, ct).ConfigureAwait(false);
+            _ = await EnsureBucket(cluster, options, ct).ConfigureAwait(false);
 
             if (_stateManager.State == AdapterReadinessState.Degraded)
             {
@@ -746,6 +780,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
 
         _httpClient?.Dispose();
         _sync?.Dispose();
+        _initialization = null;
     }
 }
 

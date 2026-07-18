@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -28,8 +27,6 @@ public sealed class CouchbaseDataModule : KoanModule
         services.AddKoanOptions<CouchbaseOptions>();
         services.AddSingleton<IConfigureOptions<CouchbaseOptions>, CouchbaseOptionsConfigurator>();
         services.AddSingleton<CouchbaseClusterProvider>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAsyncAdapterInitializer, CouchbaseClusterProvider>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAdapterReadiness, CouchbaseClusterProvider>());
         services.AddSingleton<IDataAdapterFactory, CouchbaseAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, CouchbaseHealthContributor>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, CouchbaseOrchestrationEvaluator>());

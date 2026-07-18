@@ -4,13 +4,14 @@ using Koan.Core.Observability.Health;
 using Koan.Data.Core;
 using Koan.Data.Core.Diagnostics;
 using Koan.Data.Core.Routing;
+using Koan.Data.Connector.Mongo.Infrastructure;
 
 namespace Koan.Data.Connector.Mongo;
 
 /// <summary>Reports readiness for the Mongo sources that actually participate in this application.</summary>
 internal sealed class MongoHealthContributor : DataAdapterHealthContributorBase
 {
-    private const string ProviderName = "mongo";
+    private const string ProviderName = Constants.Provider.Name;
     private readonly IServiceProvider _services;
     private readonly MongoAdapterFactory _factory;
 

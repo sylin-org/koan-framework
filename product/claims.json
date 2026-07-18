@@ -29,6 +29,15 @@
       "evidence": ["tests/Suites/Data/Connector.Json", "tests/Suites/Data/Connector.InMemory"]
     },
     {
+      "id": "document-data-providers",
+      "title": "MongoDB and Couchbase Entity persistence",
+      "summary": "MongoDB and Couchbase preserve Koan Entity semantics through selected-provider naming, source-aware client pooling, explicit pagination, and participation-owned readiness within each backend's stated limits.",
+      "maturity": "demonstrated",
+      "packages": ["Sylin.Koan.Data.Connector.Mongo", "Sylin.Koan.Data.Connector.Couchbase"],
+      "documentation": ["src/Connectors/Data/Mongo/README.md", "src/Connectors/Data/Couchbase/README.md", "docs/reference/data/index.md"],
+      "evidence": ["tests/Suites/Data/Connector.Mongo", "tests/Suites/Data/Connector.Couchbase", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
+    },
+    {
       "id": "backend-negotiation",
       "title": "Backend discovery and negotiation",
       "summary": "Referenced adapters participate in capability-aware selection with inspectable decisions and corrective rejection.",

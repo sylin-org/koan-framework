@@ -62,17 +62,6 @@ public sealed class CouchbaseOptions : IAdapterOptions
     public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.FullNamespace;
 
     /// <summary>
-    /// Separator used when composing namespace + entity for default naming.
-    /// </summary>
-    public string Separator { get; set; } = ".";
-
-    /// <summary>
-    /// Default server-side page size used when DataQueryOptions don't specify one. NOT a cap —
-    /// callers may request larger sizes and the connector honours them.
-    /// </summary>
-    public int DefaultPageSize { get; set; } = 50;
-
-    /// <summary>
     /// Optional timeout for N1QL queries.
     /// </summary>
     public TimeSpan QueryTimeout { get; set; } = TimeSpan.FromSeconds(75);

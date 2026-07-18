@@ -107,6 +107,26 @@
       ]
     },
     {
+      "id": "document-data-providers",
+      "title": "MongoDB and Couchbase Entity persistence",
+      "summary": "MongoDB and Couchbase preserve Koan Entity semantics through selected-provider naming, source-aware client pooling, explicit pagination, and participation-owned readiness within each backend\u0027s stated limits.",
+      "maturity": "demonstrated",
+      "packages": [
+        "Sylin.Koan.Data.Connector.Couchbase",
+        "Sylin.Koan.Data.Connector.Mongo"
+      ],
+      "documentation": [
+        "docs/reference/data/index.md",
+        "src/Connectors/Data/Couchbase/README.md",
+        "src/Connectors/Data/Mongo/README.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "tests/Suites/Data/Connector.Couchbase",
+        "tests/Suites/Data/Connector.Mongo"
+      ]
+    },
+    {
       "id": "entity-communication",
       "title": "Entity Events and Transport",
       "summary": "Entities and entity sequences express local-first events and transport intent with pluggable routing.",
@@ -911,7 +931,9 @@
       "readme": "src/Connectors/Data/Couchbase/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Data/Couchbase/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "document-data-providers"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.ElasticSearch",
@@ -986,7 +1008,9 @@
       "readme": "src/Connectors/Data/Mongo/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Data/Mongo/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "document-data-providers"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.OpenSearch",

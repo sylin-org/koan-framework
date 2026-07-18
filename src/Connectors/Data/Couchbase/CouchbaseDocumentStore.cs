@@ -81,7 +81,13 @@ internal sealed class CouchbaseDocumentStore<TEntity, TKey> :
     private readonly StorageOptimizationInfo _optimizationInfo;
     private readonly KvDurabilityLevel? _kvDurability;
 
-    public CouchbaseDocumentStore(CouchbaseClusterProvider provider, IOptionsMonitor<CouchbaseOptions> options, IServiceProvider sp, string source)
+    internal CouchbaseDocumentStore(
+        CouchbaseClusterProvider provider,
+        IOptionsMonitor<CouchbaseOptions> options,
+        INamingProvider naming,
+        IServiceProvider sp,
+        string source)
+        : base(naming, sp)
     {
         _provider = provider;
         _options = options;
@@ -125,7 +131,7 @@ internal sealed class CouchbaseDocumentStore<TEntity, TKey> :
 
     // Sanitize the framework-resolved name to Couchbase's collection charset (the resolver leaves a nested-type '+'
     // intact, which the collection manager rejects). Applied at the single resolution point so create + query agree.
-    private string CollectionName() => CouchbaseAdapterFactory.FormatCollectionName(AdapterNaming.GetOrCompute<TEntity, TKey>(_sp));
+    private string CollectionName() => CouchbaseAdapterFactory.FormatCollectionName(ResolveStorageName());
 
     // The schema-ready gate keys on the full physical container — source (bucket placement) · bucket · scope (ambient
     // partition) · collection — so each partition's scope and each routed source's bucket get their primary index

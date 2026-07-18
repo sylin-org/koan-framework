@@ -5,6 +5,7 @@ using MongoDB.Driver;
 using Koan.Core;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using MongoConstants = Koan.Data.Connector.Mongo.Infrastructure.Constants;
 
 namespace Koan.Data.Connector.Mongo.Discovery;
 
@@ -15,8 +16,8 @@ namespace Koan.Data.Connector.Mongo.Discovery;
 /// </summary>
 internal sealed class MongoDiscoveryAdapter : ServiceDiscoveryAdapterBase
 {
-    public override string ServiceName => "mongo";
-    public override string[] Aliases => new[] { "mongodb" };
+    public override string ServiceName => MongoConstants.Discovery.ServiceName;
+    public override string[] Aliases => [MongoConstants.Provider.Alias];
 
     public MongoDiscoveryAdapter(IConfiguration configuration, ILogger<MongoDiscoveryAdapter> logger)
         : base(configuration, logger) { }
@@ -41,16 +42,16 @@ internal sealed class MongoDiscoveryAdapter : ServiceDiscoveryAdapterBase
     protected override string? ReadExplicitConfiguration()
     {
         // Check MongoDB-specific configuration paths
-        return _configuration.GetConnectionString("MongoDB") ??
-               _configuration[Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.ConnectionString)] ??
-               _configuration[Infrastructure.ConfigurationConstants.DataFallback.ConnectionString];
+        return _configuration.GetConnectionString(MongoConstants.Provider.ConfigurationName) ??
+               _configuration[MongoConstants.Configuration.ConnectionString] ??
+               _configuration[MongoConstants.Configuration.DefaultSourceConnectionString];
     }
 
     /// <summary>MongoDB-specific environment variable handling</summary>
     protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
     {
-        var mongoUrls = Environment.GetEnvironmentVariable("MONGO_URLS") ??
-                       Environment.GetEnvironmentVariable("MONGODB_URLS");
+        var mongoUrls = Environment.GetEnvironmentVariable(MongoConstants.Discovery.MongoUrls) ??
+                       Environment.GetEnvironmentVariable(MongoConstants.Discovery.MongoDbUrls);
 
         if (string.IsNullOrWhiteSpace(mongoUrls))
             return Enumerable.Empty<DiscoveryCandidate>();

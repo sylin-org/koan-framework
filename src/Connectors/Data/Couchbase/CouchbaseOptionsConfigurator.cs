@@ -52,9 +52,8 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
         // Couchbase-specific configuration
         var explicitConnectionString = ReadProviderConfiguration("",
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
             Infrastructure.Constants.Configuration.Keys.ConnectionStringsCouchbase,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+            Infrastructure.Constants.Configuration.Keys.DefaultSourceConnectionString);
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
@@ -75,8 +74,7 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
 
         options.Bucket = ReadProviderConfiguration(options.Bucket,
             Infrastructure.Constants.Configuration.Keys.Bucket,
-            Infrastructure.Constants.Configuration.Keys.AltBucket,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDatabase);
+            Infrastructure.Constants.Configuration.Keys.DefaultSourceBucket);
 
         options.Scope = ReadProviderConfiguration(options.Scope ?? "",
             Infrastructure.Constants.Configuration.Keys.Scope) ?? options.Scope;
@@ -86,11 +84,11 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
 
         options.Username = ReadProviderConfiguration(options.Username ?? "",
             Infrastructure.Constants.Configuration.Keys.Username,
-            Infrastructure.Constants.Configuration.Keys.AltUsername) ?? options.Username;
+            Infrastructure.Constants.Configuration.Keys.DefaultSourceUsername) ?? options.Username;
 
         options.Password = ReadProviderConfiguration(options.Password ?? "",
             Infrastructure.Constants.Configuration.Keys.Password,
-            Infrastructure.Constants.Configuration.Keys.AltPassword) ?? options.Password;
+            Infrastructure.Constants.Configuration.Keys.DefaultSourcePassword) ?? options.Password;
 
         var queryTimeoutSeconds = ReadProviderConfiguration(0,
             Infrastructure.Constants.Configuration.Keys.QueryTimeout);

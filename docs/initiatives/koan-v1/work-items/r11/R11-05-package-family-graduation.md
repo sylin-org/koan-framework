@@ -729,6 +729,229 @@ must be regenerated rather than hand-edited. No cross-provider selection behavio
 The local Data provider family passes this R11-05 slice. No release candidate, full certification run, package feed,
 or remote state was created; the complete release ratchet remains the single R11-07 boundary.
 
+### Data pagination-ownership discovery
+
+**Task:** make pagination ownership semantically honest across Data: caller-facing capabilities may choose and bound a
+default page, while Data adapters only execute an explicit `QueryDefinition` page and never invent a row limit.
+
+**Application intent:** `await Product.All()` means the complete visible set; `await Product.Page(2, 100)` means exactly
+the requested page. A Web or MCP surface may deliberately apply its own documented page policy before calling Data.
+
+**Public expression:** `Product.All(ct)` is unpaged and `Product.Page(page, size, ct)` is explicitly paged. HTTP uses
+`[Pagination(...)]` or its Web-owned default policy. No adapter reference, adapter option, provider configuration, or
+backend-specific decoration is part of pagination intent.
+
+**Guarantee/correction:** an unpaged Data query reaches every adapter without an implicit `LIMIT`, `Take`, or provider
+default. Explicit pages preserve their requested size. A consumer boundary may refuse an unsafe unpaged response or
+apply a declared page policy, but it must encode that decision into `QueryDefinition`; an adapter cannot silently
+truncate it.
+
+**Complete intent surface:** choose `All`, `Page`, `FirstPage`, an explicitly paged `QueryDefinition`, a provider-bounded
+Entity stream, or a consumer policy such as Web pagination. There is no Data-adapter pagination configuration. Large
+unbounded materialization remains an explicit caller decision; Web's absolute response safety limit remains a
+consumer-owned corrective refusal.
+
+**Public concepts:** `QueryDefinition` carries explicit pagination; Entity statics express application intent;
+`PaginationAttribute`/Web endpoint options express HTTP policy; vector `DefaultTopK`/`MaxTopK` remain vector-search
+candidate semantics and are not row pagination. `IAdapterOptions` carries readiness only.
+
+**Docs read:** `docs/engineering/index.md` requires Entity-first access and explicit paging/qualified streams for large
+sets; `docs/architecture/principles.md` assigns application intent to the application and backend mechanics to adapters;
+`docs/reference/data/index.md` names `All`, `Page`, and streams as distinct cost choices;
+`docs/guides/data/entity-access-and-streaming.md` explicitly defines `Product.All()` as the full set;
+`DATA-0107` requires explicit provider-bounded candidate pages for streams; `docs/reference/web/http-api.md` assigns
+pagination defaults and bounds to Web.
+
+**Code read:** `QueryDefinition` represents pagination only when both page and size are positive; `Data<TEntity,TKey>`
+passes unpaged `All` unchanged and centralizes explicit page finalization; `FilterPushdownCoordinator`,
+`KeyValueStore`, Mongo, Couchbase, and ordinary relational query paths only page when `HasPagination` is true;
+`EntityController`/`EntityEndpointService` deliberately compile Web policy into an explicit page; relational raw
+predicate paths instead apply `_defaultPageSize` when shaping is unpaged, silently truncating results. The shared
+`IAdapterOptions.DefaultPageSize`, configurator, boot report, and query extensions otherwise have no honest ordinary
+query consumer. Vector adapters alias unrelated `DefaultTopK` into that property solely to satisfy the interface.
+
+**Reusing:** `QueryDefinition.HasPagination`, `WithPagination`, and `WithoutPagination`; Entity `All`/`Page` statics;
+central Data query planning/finalization; Web `PaginationPolicy` and safety bounds; provider-bounded stream contracts.
+
+**Creating new:** none in production. Focused regression methods are added to the existing SQLite provider-paging,
+PostgreSQL CRUD, and SQL Server CRUD specifications because those are the three distinct relational implementations.
+
+| New code | Location | Justification |
+|---|---|---|
+| Unpaged raw-query regression method | Existing SQLite provider-paging spec | Proves SQLite does not append an adapter-owned default limit. |
+| Unpaged raw-query regression method | Existing PostgreSQL CRUD spec | Proves the shared Npgsql implementation used by PostgreSQL/Cockroach is unbounded. |
+| Unpaged raw-query regression method | Existing SQL Server CRUD spec | Proves SQL Server's separate dialect is unbounded. |
+
+**Coalescence:** the closest correct pattern is every adapter's ordinary `Query(QueryDefinition)` path: it accepts an
+explicit page and otherwise returns the full visible set. This is framework law, owned by `QueryDefinition` plus the
+Data coordinator. Keep explicit paging and Web policy; absorb no policy into adapters; rebuild relational raw-query SQL
+to append paging only when requested; delete `IAdapterOptions.DefaultPageSize`, Core paging configuration/reporting
+helpers, provider page-size options/config/provenance, relational `_defaultPageSize`, and vector compatibility aliases.
+The application/consumer is too narrow to enforce adapter honesty, while each adapter is too narrow to own the common
+meaning.
+
+**Ergonomics:** humans and coding models can trust the verb: `All` means all and `Page` means page. IntelliSense no
+longer advertises provider knobs that cannot honestly affect ordinary Entity queries, and vector search no longer
+pretends top-K is row paging. Module authors implement readiness plus real provider mechanics rather than ceremony.
+
+**Constraints satisfied:** Entity-first public examples; no HTTP route work; no new literals/options/types; explicit
+paging or qualified streams remain the guidance for large sets; current docs and package companions will be aligned;
+no placeholder, repository-first, or inline-endpoint path is introduced.
+
+**Risks:** removing public pre-1.0 adapter option properties is intentionally breaking. Raw predicate queries without
+shaping can return materially more rows than before; that is the requested honest behavior, but documentation must
+continue to steer large operations toward explicit pages or qualified streams. Vector top-K remains separately bounded
+because nearest-neighbor candidate count is part of that operation's own semantics, not adapter row pagination.
+
+### Document Data provider-family discovery
+
+**Task:** graduate MongoDB and Couchbase as the server-backed document family by preserving their common Entity
+semantics, centralizing identical route mechanics, making readiness participation-owned, and deleting public/config
+surfaces that do not affect behavior.
+
+**Application intent:** “Reference MongoDB or Couchbase, define an Entity, and use normal Entity verbs against the
+selected document store. Discover local infrastructure automatically when appropriate, or configure an exact
+provider endpoint and physical database/bucket when placement is a business or operations decision.”
+
+**Public expression:** reference `Sylin.Koan.Data.Connector.Mongo` or
+`Sylin.Koan.Data.Connector.Couchbase`, retain the application's single `AddKoan()`, and define the Entity. A concrete
+`ConnectionStrings:Mongo` / `ConnectionStrings:Couchbase` plus `Koan:Data:<Provider>:Database|Bucket` is the shortest
+explicit placement; `auto` uses provider-owned discovery. `[DataAdapter]`, an Entity/source selection, or the
+configured default is required only when multiple direct providers make placement ambiguous. Entity `Get`, `Query`,
+`Page`, supported streams, `Save`, `Remove`, and the existing expert `QueryRaw` escape hatch remain the complete code
+surface. There is no connector registration, repository, public serializer, or provider-specific query wrapper in
+ordinary application code.
+
+**Guarantee/correction:** Data selects one provider/source route and caches its repository. The selected factory owns
+connection pooling and supplies its naming decision directly to the document-family base; a repository operation must
+not re-elect a provider merely to resolve its container. A referenced but unelected/unused connector remains available,
+non-critical, and connection-free. Once selected, an unavailable endpoint, bucket/database, required collection/index,
+or unsupported guarantee fails through the existing corrective Data/readiness boundary rather than silently using a
+different provider or reporting healthy. Mongo/Couchbase streaming remains provider-bounded only within DATA-0107's
+explicit sort/buffer/snapshot limits.
+
+**Complete intent surface:** package reference, `AddKoan()`, Entity definition, and reachable provider runtime.
+Optional exact provider/source selection, endpoint, Mongo database, Couchbase bucket/scope/collection, naming policy,
+Couchbase query timeout/durability, credentials, and discovery controls express real placement or guarantee choices.
+Adapter-owned `DefaultPageSize` options, Couchbase's ignored separator, generic cross-provider configuration aliases,
+public BSON conventions/store formatters, and `CouchbaseQueryDefinition` are not required actions and are removed.
+
+**Public concepts:** Entity verbs express document persistence; Data adapter/source expresses physical placement;
+provider options express endpoint and native database/bucket hierarchy; Couchbase durability changes acknowledged-write
+semantics; query timeout bounds provider work; naming overrides change physical container identity; `QueryRaw` is the
+existing explicitly provider-specific escape hatch. Provider factories, connection providers, fixed options monitors,
+BSON conventions, N1QL definition carriers, and identifier sanitizers are module-author/runtime mechanics.
+
+**Docs read:** `docs/engineering/index.md` requires Entity-first access, one constants owner, typed effective options,
+package companions, and focused validation; `docs/architecture/principles.md` requires one compiled route, thin hot
+paths, participation-owned defaults, and visible corrective failures; `docs/reference/data/index.md` defines exact
+selection order and denies universal provider parity; `docs/engineering/adding-a-connector.md` requires reference-driven
+modules, autonomous discovery, health, orchestration, real integration evidence, and no application registration, but
+its “repository per request” and removed typed-helper guidance are stale; `docs/reference/data/adapter-diagnostics.md`
+describes the retired mutable augmenter model and is evidence of documentation drift, not current runtime authority.
+Both provider README/TECHNICAL companions were read fully: Mongo is compact but lacks a complete meaningful-result
+expression/evidence; Couchbase lacks package-title/install/meaningful-use structure and overstates swapability and eager
+readiness.
+
+**Code read:** `DocumentStore<TEntity,TKey>` already owns the common operation, readiness, schema, batch, capability,
+and telemetry shell but leaves both dialects to call `AdapterNaming`, which re-runs route election on their operation
+path. `MongoAdapterFactory`/`CouchbaseAdapterFactory` already own source-specific connection pooling and identical
+fixed-options-monitor mechanics. Mongo's selection-aware health is the correct closest pattern. Couchbase instead
+registers its connection provider as an eager initializer/readiness service and has an always-critical bespoke health
+contributor. Both `DefaultPageSize` options are never read and the cross-family pagination discovery above assigns no
+default-page policy to adapters; Couchbase's `Separator` is ignored in favor of the required
+`_`; `CouchbaseQueryDefinition.Statement` is ignored by the public `QueryRaw` path. Mongo spreads vocabulary across
+`Constants`, `ConfigurationConstants`, and unused `MongoConstants`; several BSON types are public without consumers;
+`JObjectSerializer` captures an ambient host logger in a process-global driver registration and silently changes a
+failed document serialization into a string. Live searches found no application/sample consumers of those leaked
+types or removed option/config branches.
+
+**Reusing:** `DocumentStore`, `INamingProvider.ResolveStorage`, ambient Entity partition, Data's provider/source
+catalog and repository cache, `DataAdapterHealthContributorBase`, provider-owned discovery/orchestration, standard
+.NET options/DI, existing per-source provider pools, native Mongo/Couchbase translators and drivers, DATA-0107 stream
+coordination, connector integration suites, and package-quality/product-surface compilers.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| `FixedOptionsMonitor<T>` | `src/Koan.Data.Core/Configuration/FixedOptionsMonitor.cs` | Mongo and Couchbase need the identical immutable per-source `IOptionsMonitor` mechanism; Data route construction is the narrow shared owner, while Core-wide or adapter-local ownership is respectively too broad or duplicated. |
+| Couchbase participation specs | `tests/Suites/Data/Connector.Couchbase/.../Specs/Health/` | Docker-free owner tests must prove package availability does not create eager connection/readiness, while existing real-container cells continue to prove selected behavior. |
+
+**Coalescence:** keep `DocumentStore` as the document-family semantic owner and add only selected-provider naming to
+that base; pass each factory into its dialect and delete both `AdapterNaming` re-election calls. Absorb the two local
+options-monitor clones into one Data Core mechanism. Rebuild Couchbase health on Mongo's Data-owned participation base,
+extract its route decision for both repository construction and health, and delete eager initializer/readiness aliases.
+Consolidate Mongo's stable vocabulary into its existing `Infrastructure.Constants`, delete dead option/provenance and
+legacy alias branches in both providers, internalize provider mechanics, and make JObject serialization fail normally
+instead of retaining a host logger or silently changing storage shape. Do not merge Mongo and Couchbase connection
+providers, translators, schema logic, or repositories: their driver lifecycle, physical hierarchy, query language,
+identity encoding, and transaction semantics differ materially; `DocumentStore` is already the correct shared depth.
+
+**Ergonomics:** application C# does not grow. Humans and models retain “reference provider, AddKoan, Entity,” with
+standard .NET connection strings and only effective native knobs. IntelliSense loses dead paging/separator/query-wrapper
+branches and BSON/identifier machinery. Operators see an unused Couchbase connector as available but non-critical,
+then see the exact selected sources become readiness dependencies. Module authors reuse one fixed-route monitor and one
+document naming seam; hot operations consume the selected factory instead of renegotiating it.
+
+**Constraints satisfied:**
+
+- Entity statics remain the common data path; no HTTP/controller surface changes;
+- stable provider/config IDs move to one project constants owner; effective tunables remain typed options;
+- DATA-0107 streaming constraints and provider-specific native query behavior remain explicit;
+- no new application abstraction, registration helper, attribute, or magic activation metadata is introduced;
+- README/TECHNICAL, current connector guidance, topology, generated product truth, focused tests, packages, and
+  vulnerability evidence update together; ADRs remain dated and untouched;
+- only Data Core/document and Mongo/Couchbase focused proof runs before R11-07.
+
+**Risks:** Couchbase's real integration suite requires a healthy Docker engine and has slower bucket/index startup;
+removing broad legacy config aliases is intentionally breaking under the greenfield mandate; selected-factory naming
+must preserve ambient partition isolation; Couchbase participation health must reuse exactly the same per-source route
+as repositories; BSON serializer visibility/failure cleanup must preserve valid JObject round trips. Support maturity
+will not be promoted beyond the exact focused evidence observed in this slice.
+
+### Data pagination-ownership evidence
+
+- `IAdapterOptions` now carries readiness only. The dead Core paging configuration/reporting path, provider
+  `DefaultPageSize` options and provenance, relational repository defaults, and vector compatibility aliases are
+  deleted. A production-code search finds no remaining adapter-owned row-page default.
+- SQLite, SQL Server, and shared Npgsql raw-predicate paths append paging SQL only when the caller supplied explicit
+  shaping. Focused regressions seed 75 rows and prove that an unpaged request returns all 75 while an explicit page
+  returns the requested 7 on SQLite, PostgreSQL, and SQL Server (1/1 each).
+- Data Core, Npgsql, Mongo, Couchbase, PostgreSQL, CockroachDB, SQLite, SQL Server, Redis, Qdrant, Milvus, Weaviate,
+  Elasticsearch, and OpenSearch build with zero warnings and errors after the contract removal.
+- Current Data reference prose states the invariant directly: `All()` means the complete visible set; consumer
+  boundaries such as Web may compile a documented policy into an explicit `QueryDefinition`, while adapters only
+  execute that intent. The generated adapter matrix no longer advertises adapter row-pagination guardrails.
+
+### Document Data provider-family evidence
+
+- `DocumentStore` consumes the naming provider selected by its factory, so Mongo and Couchbase resolve ambient Entity
+  partitions without re-entering provider election on the operation path. Their identical immutable per-source
+  options-monitor clones are replaced by one Data Core `FixedOptionsMonitor<T>`.
+- Mongo retains selection-aware participation and passes its complete focused connector suite 68/68. Its BSON support
+  is internal driver machinery, and failed `JObject` serialization now fails honestly rather than changing the stored
+  shape to a string.
+- Couchbase no longer registers an eager adapter initializer/readiness alias. Three Docker-free participation cells
+  prove that an available but unelected connector is non-critical and connection-free, while selected participation
+  becomes critical. One real-container CRUD cell passes through lazy cluster, bucket, collection, and query setup.
+- The real Couchbase first-use cell took approximately 64 seconds. This is recorded as an observed operational rough
+  edge, not a performance guarantee. The full connector suite exceeded this slice's five-minute focused budget without
+  failure output and is not claimed as certified; the exact release ratchet remains R11-07's responsibility.
+- Both package companions now present the exact package identity, install/reference expression, smallest meaningful
+  Entity result, placement and configuration rules, complete-set pagination contract, readiness behavior, and native
+  limitations. Both packages are structurally ready with zero objective quality findings. Focused Release packages
+  contain the connector DLL/XML, build-transitive composition metadata, package-owned README, canonical icon, and
+  symbols; current NuGet audit reports no known vulnerable direct or transitive packages for either connector.
+- Generated product truth contains 111 packages: 26 repair-required, 45 review-required, and 40 structurally ready
+  across 17 claims. The new demonstrated document-provider claim names both packages and their focused evidence.
+  Strict documentation generation passes, and public documentation truth passes across 204 current files and 38
+  navigation targets.
+
+The pagination invariant and document Data provider family pass this R11-05 slice. No release candidate, full
+certification run, package feed, or remote state was created; the complete release ratchet remains the single R11-07
+boundary.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

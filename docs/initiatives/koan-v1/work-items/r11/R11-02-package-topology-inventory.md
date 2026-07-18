@@ -97,11 +97,11 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Data.AI` | `capability` | `assess` |
 | `Sylin.Koan.Data.Backup` | `capability` | `assess` |
 | `Sylin.Koan.Data.Connector.Cockroach` | `provider` | `keep` |
-| `Sylin.Koan.Data.Connector.Couchbase` | `provider` | `assess` |
+| `Sylin.Koan.Data.Connector.Couchbase` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.ElasticSearch` | `provider` | `assess` |
 | `Sylin.Koan.Data.Connector.InMemory` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Json` | `provider` | `keep` |
-| `Sylin.Koan.Data.Connector.Mongo` | `provider` | `assess` |
+| `Sylin.Koan.Data.Connector.Mongo` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.OpenSearch` | `provider` | `assess` |
 | `Sylin.Koan.Data.Connector.Postgres` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Redis` | `provider` | `keep` |

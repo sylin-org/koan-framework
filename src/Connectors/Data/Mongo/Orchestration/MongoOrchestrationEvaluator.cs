@@ -20,7 +20,7 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
     }
 
-    public override string ServiceName => "mongodb";
+    public override string ServiceName => Constants.Discovery.WellKnownServiceName;
     public override int StartupPriority => 150; // After infrastructure, before application services
 
     protected override bool IsServiceEnabled(IConfiguration configuration)
@@ -51,8 +51,8 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         var candidates = new List<string>();
 
-        // Check legacy environment variable for additional hosts
-        var envList = Environment.GetEnvironmentVariable(Constants.Discovery.EnvList);
+        var envList = Environment.GetEnvironmentVariable(Constants.Discovery.MongoUrls)
+            ?? Environment.GetEnvironmentVariable(Constants.Discovery.MongoDbUrls);
         if (!string.IsNullOrWhiteSpace(envList))
         {
             var urls = envList.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
@@ -77,11 +77,11 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
             // Get configured credentials
             var databaseName = GetDatabaseName(configuration);
             var username = Configuration.ReadFirst(configuration, "",
-                Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Username),
-                Infrastructure.ConfigurationConstants.DataFallback.Username);
+                Constants.Configuration.Username,
+                Constants.Configuration.DefaultSourceUsername);
             var password = Configuration.ReadFirst(configuration, "",
-                Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Password),
-                Infrastructure.ConfigurationConstants.DataFallback.Password);
+                Constants.Configuration.Password,
+                Constants.Configuration.DefaultSourcePassword);
 
             // Build connection string for validation
             var connectionString = MongoConnectionString.Build(hostResult.HostEndpoint!, databaseName, username, password);
@@ -104,11 +104,11 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
         // Get configuration values
         var databaseName = GetDatabaseName(configuration);
         var username = Configuration.ReadFirst(configuration, "root",
-            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Username),
-            Infrastructure.ConfigurationConstants.DataFallback.Username);
+            Constants.Configuration.Username,
+            Constants.Configuration.DefaultSourceUsername);
         var password = Configuration.ReadFirst(configuration, "mongodb",
-            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Password),
-            Infrastructure.ConfigurationConstants.DataFallback.Password);
+            Constants.Configuration.Password,
+            Constants.Configuration.DefaultSourcePassword);
 
         // Create environment variables for the container
         var environment = new Dictionary<string, string>(context.EnvironmentVariables)
@@ -138,9 +138,8 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
     private string GetDatabaseName(IConfiguration configuration)
     {
         return Configuration.ReadFirst(configuration, "KoanDatabase",
-            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Database),
-            Infrastructure.ConfigurationConstants.DataFallback.Database,
-            "ConnectionStrings:Database");
+            Constants.Configuration.Database,
+            Constants.Configuration.DefaultSourceDatabase);
     }
 
     private static bool TryMongoPing(string connectionString, TimeSpan timeout)

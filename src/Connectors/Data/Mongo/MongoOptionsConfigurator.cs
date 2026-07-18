@@ -12,6 +12,7 @@ using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.ZenGarden;
 using MongoItems = Koan.Data.Connector.Mongo.Infrastructure.MongoProvenanceItems;
+using MongoConstants = Koan.Data.Connector.Mongo.Infrastructure.Constants;
 
 namespace Koan.Data.Connector.Mongo;
 
@@ -23,7 +24,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
 {
     private readonly IServiceDiscoveryCoordinator? _discoveryCoordinator;
 
-    protected override string ProviderName => "Mongo";
+    protected override string ProviderName => MongoConstants.Provider.ConfigurationName;
 
     public MongoOptionsConfigurator(
         IConfiguration config,
@@ -47,17 +48,16 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
 
         // MongoDB-specific configuration
         var databaseName = ReadProviderConfiguration(options.Database,
-            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Database),
-            Infrastructure.ConfigurationConstants.DataFallback.Database,
-            "ConnectionStrings:Database");
+            MongoConstants.Configuration.Database,
+            MongoConstants.Configuration.DefaultSourceDatabase);
 
         var username = ReadProviderConfiguration("",
-            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Username),
-            Infrastructure.ConfigurationConstants.DataFallback.Username);
+            MongoConstants.Configuration.Username,
+            MongoConstants.Configuration.DefaultSourceUsername);
 
         var password = ReadProviderConfiguration("",
-            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Password),
-            Infrastructure.ConfigurationConstants.DataFallback.Password);
+            MongoConstants.Configuration.Password,
+            MongoConstants.Configuration.DefaultSourcePassword);
 
         var configuredConnectionString = ReadProviderConfiguration(
             "",
@@ -111,7 +111,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         string? username,
         string? password)
     {
-        var fallback = MongoConnectionString.Build("localhost", 27017, databaseName, username, password);
+        var fallback = MongoConnectionString.Build("localhost", MongoConstants.Discovery.DefaultPort, databaseName, username, password);
         try
         {
             if (IsAutoDetectionDisabled())
@@ -135,7 +135,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
                 ("user", username ?? "(none)"));
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverService("mongo", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService(MongoConstants.Discovery.ServiceName, context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)
@@ -166,7 +166,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.DisableAutoDetection), false);
+        return Koan.Core.Configuration.Read(Configuration, MongoConstants.Configuration.DisableAutoDetection, false);
     }
 
     private string ResolveRequiredConnection(
@@ -184,7 +184,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         }
 
         var result = _discoveryCoordinator.ResolveServiceIntent(
-                "mongo",
+                MongoConstants.Discovery.ServiceName,
                 rawIntent,
                 CreateDiscoveryContext(databaseName, username, password))
             .GetAwaiter()

@@ -11,6 +11,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
 
 namespace Koan.Data.Core.Document;
@@ -43,6 +44,22 @@ public abstract class DocumentStore<TEntity, TKey> :
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
+    private readonly INamingProvider _naming;
+    private readonly IServiceProvider _services;
+
+    protected DocumentStore(INamingProvider naming, IServiceProvider services)
+    {
+        _naming = naming;
+        _services = services;
+    }
+
+    /// <summary>
+    /// Resolves the current ambient-partition container through the provider already selected for this repository.
+    /// Document dialects must not re-enter Data provider election from their operation path.
+    /// </summary>
+    protected string ResolveStorageName() =>
+        _naming.ResolveStorage(typeof(TEntity), EntityContext.Current?.Partition, _services);
+
     // ==================== The native seam (the dialect supplies these) ====================
     // (Readiness — the connection provider — and the readiness config Policy/Timeout/EnableReadinessGating are inherited
     // from AdapterReadinessForwardingBase; the dialect overrides them.)

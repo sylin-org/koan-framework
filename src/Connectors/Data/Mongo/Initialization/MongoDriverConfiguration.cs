@@ -277,7 +277,7 @@ internal static class MongoDriverConfiguration
 /// Custom discriminator convention that disables discriminator serialization entirely.
 /// This prevents MongoDB from adding _t fields to documents.
 /// </summary>
-public class NoDiscriminatorConvention : IDiscriminatorConvention
+internal sealed class NoDiscriminatorConvention : IDiscriminatorConvention
 {
     public string ElementName => "_t";
     public Type GetActualType(MongoDB.Bson.IO.IBsonReader bsonReader, Type nominalType) => nominalType;
@@ -287,7 +287,7 @@ public class NoDiscriminatorConvention : IDiscriminatorConvention
 /// <summary>
 /// Convention to handle nulls for BsonValue properties globally.
 /// </summary>
-public class NullBsonValueConvention : IMemberMapConvention
+internal sealed class NullBsonValueConvention : IMemberMapConvention
 {
     public string Name => "NullBsonValueConvention";
     public void Apply(BsonMemberMap memberMap)
@@ -303,7 +303,7 @@ public class NullBsonValueConvention : IMemberMapConvention
 /// Smart BSON serializer that handles string-to-GUID conversion for MongoDB driver v3.5.0.
 /// Only converts strings that are valid GUIDs to BinData, leaves other strings as-is.
 /// </summary>
-public class SmartStringGuidSerializer : SerializerBase<string>
+internal sealed class SmartStringGuidSerializer : SerializerBase<string>
 {
     public override string Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
     {

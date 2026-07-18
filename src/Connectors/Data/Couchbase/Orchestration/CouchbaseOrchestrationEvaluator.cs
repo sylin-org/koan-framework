@@ -27,9 +27,8 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         var cs = Configuration.ReadFirst(configuration, "",
             Constants.Configuration.Keys.ConnectionString,
-            Constants.Configuration.Keys.AltConnectionString,
             Constants.Configuration.Keys.ConnectionStringsCouchbase,
-            Constants.Configuration.Keys.ConnectionStringsDefault);
+            Constants.Configuration.Keys.DefaultSourceConnectionString);
         return !string.IsNullOrWhiteSpace(cs);
     }
 
@@ -37,9 +36,8 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         var cs = Configuration.ReadFirst(configuration, "",
             Constants.Configuration.Keys.ConnectionString,
-            Constants.Configuration.Keys.AltConnectionString,
             Constants.Configuration.Keys.ConnectionStringsCouchbase,
-            Constants.Configuration.Keys.ConnectionStringsDefault);
+            Constants.Configuration.Keys.DefaultSourceConnectionString);
         return !string.IsNullOrWhiteSpace(cs) && !string.Equals(cs.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -50,7 +48,7 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
         var hosts = new List<string>();
         var configured = configuration.GetSection(Constants.Configuration.Keys.Hosts).Get<string[]>() ?? [];
         hosts.AddRange(configured.Where(h => !string.IsNullOrWhiteSpace(h))!);
-        var env = Environment.GetEnvironmentVariable("COUCHBASE_HOSTS");
+        var env = Environment.GetEnvironmentVariable(Constants.Discovery.CouchbaseHosts);
         if (!string.IsNullOrWhiteSpace(env))
         {
             hosts.AddRange(env.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
@@ -70,8 +68,8 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
         try
         {
             var (host, _) = ParseHost(hostResult.HostEndpoint);
-            var username = Configuration.ReadFirst(configuration, "", Constants.Configuration.Keys.Username, Constants.Configuration.Keys.AltUsername);
-            var password = Configuration.ReadFirst(configuration, "", Constants.Configuration.Keys.Password, Constants.Configuration.Keys.AltPassword);
+            var username = Configuration.ReadFirst(configuration, "", Constants.Configuration.Keys.Username, Constants.Configuration.Keys.DefaultSourceUsername);
+            var password = Configuration.ReadFirst(configuration, "", Constants.Configuration.Keys.Password, Constants.Configuration.Keys.DefaultSourcePassword);
             var connectionString = $"couchbase://{host}";
             var options = new global::Couchbase.ClusterOptions();
             if (!string.IsNullOrWhiteSpace(username))
@@ -95,14 +93,13 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         var bucket = Configuration.ReadFirst(configuration, "Koan",
             Constants.Configuration.Keys.Bucket,
-            Constants.Configuration.Keys.AltBucket,
-            Constants.Configuration.Keys.ConnectionStringsDatabase);
+            Constants.Configuration.Keys.DefaultSourceBucket);
         var username = Configuration.ReadFirst(configuration, "Administrator",
             Constants.Configuration.Keys.Username,
-            Constants.Configuration.Keys.AltUsername);
+            Constants.Configuration.Keys.DefaultSourceUsername);
         var password = Configuration.ReadFirst(configuration, "couchbase",
             Constants.Configuration.Keys.Password,
-            Constants.Configuration.Keys.AltPassword);
+            Constants.Configuration.Keys.DefaultSourcePassword);
 
         var descriptor = new DependencyDescriptor
         {

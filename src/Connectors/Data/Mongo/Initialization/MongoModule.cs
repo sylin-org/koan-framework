@@ -13,7 +13,6 @@ using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Core.Provenance;
 using Koan.Data.Abstractions;
-using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Mongo.Discovery;
 using Koan.Data.Connector.Mongo.Orchestration;
 using MongoItems = Koan.Data.Connector.Mongo.Infrastructure.MongoProvenanceItems;
@@ -43,7 +42,6 @@ public sealed class MongoModule : KoanModule
         services.AddKoanOptions<MongoOptions>();
         services.AddSingleton<IConfigureOptions<MongoOptions>, MongoOptionsConfigurator>();
         services.AddSingleton<MongoClientProvider>();
-        services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.AddSingleton<IDataAdapterFactory, MongoAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MongoHealthContributor>());
 
@@ -76,11 +74,6 @@ public sealed class MongoModule : KoanModule
             defaultOptions.Database,
             MongoItems.DatabaseKeys);
 
-        var defaultPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.DefaultPageSize,
-            MongoItems.DefaultPageSizeKeys);
-
         var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
         var connectionSourceKey = connection.ResolvedKey ?? MongoItems.ConnectionString.Key;
         var effectiveConnectionString = connection.Value ?? defaultOptions.ConnectionString;
@@ -93,13 +86,13 @@ public sealed class MongoModule : KoanModule
             var username = Configuration.ReadFirst(
                 cfg,
                 "",
-                Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Username),
-                Infrastructure.ConfigurationConstants.DataFallback.Username);
+                Infrastructure.Constants.Configuration.Username,
+                Infrastructure.Constants.Configuration.DefaultSourceUsername);
             var password = Configuration.ReadFirst(
                 cfg,
                 "",
-                Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Password),
-                Infrastructure.ConfigurationConstants.DataFallback.Password);
+                Infrastructure.Constants.Configuration.Password,
+                Infrastructure.Constants.Configuration.DefaultSourcePassword);
 
             var parameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
             if (!string.IsNullOrWhiteSpace(resolvedDatabase)) parameters["database"] = resolvedDatabase!;
@@ -135,7 +128,6 @@ public sealed class MongoModule : KoanModule
             usedDefault: true,
             sanitizeOverride: false);
 
-        module.PublishConfigValue(MongoItems.DefaultPageSize, defaultPageSize);
     }
 
     private static string BuildFallbackConnectionString(
@@ -154,7 +146,7 @@ public sealed class MongoModule : KoanModule
         // ARCH-0068: Use static ConnectionStringParser for unified connection string building
         var components = new Koan.Core.Orchestration.ConnectionStringComponents(
             Host: "localhost",
-            Port: 27017,
+            Port: Infrastructure.Constants.Discovery.DefaultPort,
             Database: string.IsNullOrWhiteSpace(database) ? defaults.Database : database,
             Username: username,
             Password: password,

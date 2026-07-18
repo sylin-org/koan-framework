@@ -10,10 +10,11 @@ using Koan.Core;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Core.Services;
+using Koan.Data.Connector.Mongo.Infrastructure;
 
 namespace Koan.Data.Connector.Mongo;
 
-[ProviderPriority(20)]
+[ProviderPriority(Constants.Provider.Priority)]
 [KoanService(ServiceKind.Database, shortCode: "mongo", name: "MongoDB",
     ContainerImage = "mongo",
     DefaultTag = "7",
@@ -41,8 +42,8 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
     /// any Default-coinciding source reuse the DI-managed provider and are NOT counted here).</summary>
     internal int SourceProviderCount => _sourceProviders.Count;
 
-    public string Provider => "mongo";
-    public IReadOnlyCollection<string> Aliases => ["mongodb"];
+    public string Provider => Constants.Provider.Name;
+    public IReadOnlyCollection<string> Aliases => [Constants.Provider.Alias];
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,
@@ -51,7 +52,7 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
         where TKey : notnull
     {
         var route = ResolveRoute(sp, source);
-        return new MongoDocumentStore<TEntity, TKey>(route.Provider, route.Options, sp, route.Source);
+        return new MongoDocumentStore<TEntity, TKey>(route.Provider, route.Options, this, sp, route.Source);
     }
 
     internal MongoSourceRoute ResolveRoute(IServiceProvider sp, string source)
@@ -74,16 +75,15 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
         // (so the per-source pool never keys on the unresolved literal) — the fleet hoist of the local
         // MongoConnectionString.ResolveRoutedConnection, which stays as the test-pinned pure 2-arg helper.
         var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "Mongo", source, baseOptions.ConnectionString, this);
+            config, sourceRegistry, Constants.Provider.ConfigurationName, source, baseOptions.ConnectionString, this);
         var database = AdapterConnectionResolver.GetSourceSetting(
-            config, sourceRegistry, "Mongo", source, "Database", baseOptions.Database, this);
+            config, sourceRegistry, Constants.Provider.ConfigurationName, source, "Database", baseOptions.Database, this);
 
         // Dedup (ARCH-0103 §9.15): a routed source whose resolved physical placement (connection + database) coincides
         // with Default — e.g. a source that relies on discovery, so ResolveRoutedConnection collapsed its sentinel onto
         // the Default connection — reuses the DI-managed provider (one MongoClient/pool + shared readiness) and Default's
         // full options (globalOptions), instead of opening a SECOND client to the same server+db keyed under a different
-        // cache entry. Reusing globalOptions also sidesteps the partial-copy naming gap of the per-source path below
-        // (sourceOptions copies only ConnectionString/Database/DefaultPageSize/Readiness, not NamingStyle/Separator/etc).
+        // cache entry.
         if (!string.IsNullOrWhiteSpace(baseOptions.ConnectionString)
             && string.Equals(connectionString, baseOptions.ConnectionString, StringComparison.Ordinal)
             && string.Equals(database, baseOptions.Database, StringComparison.Ordinal))
@@ -96,10 +96,12 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
         {
             ConnectionString = connectionString,
             Database = database,
-            DefaultPageSize = baseOptions.DefaultPageSize,
+            CollectionName = baseOptions.CollectionName,
+            NamingStyle = baseOptions.NamingStyle,
+            Separator = baseOptions.Separator,
             Readiness = baseOptions.Readiness,
         };
-        var optionsMonitor = new SimpleOptionsMonitor<MongoOptions>(sourceOptions);
+        var optionsMonitor = new Core.Configuration.FixedOptionsMonitor<MongoOptions>(sourceOptions);
 
         // One provider per (connection, database) — shared across every entity on this source.
         var provider = _sourceProviders.GetOrAdd(

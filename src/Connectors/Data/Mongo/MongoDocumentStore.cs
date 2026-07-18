@@ -13,6 +13,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Pipeline;
+using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Configuration;
@@ -59,7 +60,13 @@ internal sealed class MongoDocumentStore<TEntity, TKey> :
     // ensures-once per collection key.
     private readonly ConcurrentDictionary<string, IMongoCollection<TEntity>> _collections = new(StringComparer.Ordinal);
 
-    public MongoDocumentStore(MongoClientProvider provider, IOptionsMonitor<MongoOptions> options, IServiceProvider sp, string source)
+    internal MongoDocumentStore(
+        MongoClientProvider provider,
+        IOptionsMonitor<MongoOptions> options,
+        INamingProvider naming,
+        IServiceProvider sp,
+        string source)
+        : base(naming, sp)
     {
         _provider = provider;
         _options = options;
@@ -100,11 +107,7 @@ internal sealed class MongoDocumentStore<TEntity, TKey> :
 
     // ==================== Container resolution + schema (Container mode) ====================
 
-    private string CollectionName()
-    {
-        var sp = Koan.Core.Hosting.App.AppHost.Current ?? _sp;
-        return AdapterNaming.GetOrCompute<TEntity, TKey>(sp);
-    }
+    private string CollectionName() => ResolveStorageName();
 
     private string CollectionKey(string name) => $"{_source}|{_options.CurrentValue.Database}|{name}";
 
