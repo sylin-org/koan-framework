@@ -1313,6 +1313,139 @@ must stay inert unless the engine is active. Maturity cannot exceed focused evid
 The external vector provider family passes this R11-05 slice. No release candidate, full certification run, package
 feed, or remote state was created; the complete release ratchet remains the single R11-07 boundary.
 
+### AI runtime and local-inference provider-family discovery
+
+**Task:** graduate the functional AI runtime with Ollama, LM Studio, and ONNX after replacing mutable, provider-owned
+startup registration with one host-compiled activation plan. Move Hugging Face and the Zen Garden orchestrator onto
+the same activation law so AI has one topology even though those packages retain separate product assessments.
+
+**Application intent:** “Reference one AI provider, call `AddKoan()`, then use `Client.Chat`, `Client.Embed`, or the
+Entity AI ring. With one eligible provider, Koan makes the obvious route work; explicit source/model intent wins; when
+several choices remain meaningful, Koan asks for one routing decision rather than guessing.”
+
+**Public expression:** the provider package reference brings the functional AI pillar. Application code does not call
+provider registration extensions. Ollama and LM Studio discover their conventional local/container endpoints when no
+placement is supplied; ONNX activates only when its model path is configured. Exact provider configuration remains
+under `Koan:Ai:<Provider>` and standard `ConnectionStrings:<Provider>` where a single endpoint is meaningful.
+
+**Guarantee/correction:** structural provider availability compiles once during `AddKoan()`. The AI runtime owns
+activation order, duplicate identity rejection, adapter/source consistency, routing-index mutation, and startup
+projection. Provider activators own only configuration, endpoint discovery, native/client construction, and native
+capabilities. The routing registry never owns or disposes adapters; every registered adapter is rooted in DI and is
+disposed exactly once with its host. Explicit placement never loses to discovery, and a referenced but presently
+unavailable local runtime remains inspectable without manufacturing a healthy source.
+
+**Complete intent surface:** provider references; `AddKoan()`; chat/embed/stream/model-management intent; optional
+source, member, model, endpoint, credentials, request/concurrency limits, ONNX model/vocabulary paths, discovery
+policy, readiness, startup facts, and URL overrides. Runtime registry mutation, contributor execution order,
+registration timestamps, provider-specific registration extensions, duplicate configuration aliases, and legacy
+Ollama reporting inside AI Core are not application decisions.
+
+**Public concepts:** AI categories express business operation; sources express logical routing groups; members
+express endpoints within a source; adapters translate the elected request to one native protocol; provider references
+express availability; provider configuration expresses deliberate placement or native guarantees. Structural module
+contribution and runtime provider activation are framework/module-author mechanics, hidden from ordinary IntelliSense.
+
+**Docs read:** engineering and architecture guardrails require reference-as-availability, functional pillar ownership,
+standard .NET configuration, immutable compiled decisions, package-owned companions, and Entity-first application
+surfaces. Current AI package pages instead teach nonexistent `AddOllama`, `AddLMStudioFromConfig`, and legacy `Engine`
+setup; claim retry/TLS/multi-instance weighting behavior not represented by current options; and describe Ollama as a
+default backend even though the router elects sources by configured capability and priority.
+
+**Code read:** AI currently has a mutable adapter registry with public `Add`/`Remove`, silent duplicate suppression,
+registration-time ordering, and a second mutable source registry. Functional AI executes arbitrary
+`IAiAdapterContributor` callbacks during `Start`; providers both discover and mutate those registries. Ollama and LM
+Studio duplicate discovery gating, member/source construction, probing, capability mapping, policy defaults,
+singleton HTTP/adapter creation, and boot narration. LM Studio additionally performs endpoint resolution three ways:
+an options configurator, a Core discovery adapter, and its contributor. AI Core still parses and reports legacy
+Ollama configuration. Provider packages reference only contracts, so a provider reference alone does not carry the
+functional runtime whose startup callback it requires. ONNX creates a disposable inference session outside DI and the
+registry has no defensible lifetime contract; this is the recorded PMC-030 defect.
+
+**Constants/options/DTO inventory:** stable AI capability, request/result, source/member, route, and adapter contracts
+already live in `Sylin.Koan.AI.Contracts`. Core already owns the generic semantic-contribution compiler and provider
+identity catalog. Each connector owns typed options and provider constants, but Ollama omits its endpoint/source shape
+from options while LM Studio maintains long/short/generic aliases and unused Weight/Labels. No new public application
+DTO or registration extension is needed.
+
+**Reusing:** Core semantic contribution compilation; `KoanModule`; `ProviderCatalog<T>` identity mechanics; existing AI
+request/result, source/member, category/router, health, provenance, provider adapters, service discovery, Zen Garden
+contracts, focused AI unit/bootstrap suites, package compiler, and public truth gate.
+
+**Creating new:** one AI-owned contribution target, immutable activation plan, and provider-activation result contract.
+These replace the callback collection and public registry mutation rather than forming a parallel provider system. A
+small framework-facing scheduling extension may expose Core's existing contribution compiler to functional pillars;
+it must remain hidden from application IntelliSense and preserve one compiler per target.
+
+**Coalescence:** compile provider activator identities/types through the existing generic contribution engine at
+`AddKoan()` time. At `Start`, the AI runtime resolves the plan in deterministic order, asks each provider for a
+DI-owned adapter plus zero or more discovered/configured sources, validates the whole contribution, then commits it
+through one registry chokepoint. Delete `IAiAdapterContributor`, registry removal, silent duplicate behavior, and
+registration timestamps. Use Core discovery once per HTTP provider instead of retaining provider-local competing
+election machinery; retain native probes/protocols and source-member semantics where they change actual routing.
+
+**Ergonomics:** ordinary application code shrinks to reference + `AddKoan()` + business call. Module authors implement
+one provider activator and declare it from their existing `KoanModule`; they do not mutate registries, invent module
+IDs, or coordinate startup ordering. Humans/models get one routing vocabulary and corrective ambiguity. Operators see
+which providers were available, activated, inactive, or rejected and why, with source/member placement and capability
+truth projected from the same plan used at runtime.
+
+**Constraints satisfied:** Entity/Client remain the public intent surfaces; no provider-specific application
+registration ceremony; contracts stay isolated; no inert functional references; discovery remains layered and only
+activates when its engine is present; explicit intent fails correctively; ADRs remain dated and untouched; focused
+proof only during the slice; no release certification before R11-07.
+
+**Risks:** changing module and registry contracts is intentionally breaking under the greenfield mandate; existing
+tests that mutate registries after host startup must become real test providers or use an internal builder before plan
+freeze. Ollama/LM Studio discovery must not turn endpoint absence into startup failure. ONNX must dispose one native
+session exactly once across repeated hosts. Zen Garden activation must remain inert without its runtime and must not
+capture a stale endpoint. Maturity cannot exceed focused behavior observed in this slice.
+
+### AI runtime and local-inference provider-family evidence
+
+- Core's existing semantic-contribution compiler now exposes one framework-facing, IntelliSense-hidden scheduling
+  seam. AI uses it to compile one deterministic provider plan from referenced modules. Duplicate provider ids/types,
+  adapter identity drift, non-DI adapter instances, and source/provider disagreement reject composition before the
+  adapter catalog or provider sources are published.
+- The public adapter registry is read-only and the callback/registration model is gone: no `Add`, `Remove`, silent
+  duplicate suppression, timestamps, weights, descriptor attribute, or `IAiAdapterContributor` remains. Providers
+  return one DI-owned singleton plus source descriptions; AI owns validation and the single commit boundary. The
+  isolated host proof confirms provider references alone bring functional AI, explicit placement survives discovery
+  being off, and a disposable adapter is disposed exactly once.
+- Ollama and LM Studio now share Core discovery, the AI-owned endpoint-source builder, exact provider option sections,
+  standard `ConnectionStrings:<Provider>`, deterministic member naming, and the same explicit-versus-automatic law.
+  LM Studio's configurator, second probe loop, orchestration evaluator, no-op registration extension, generic aliases,
+  fictitious container promise, and provider-local weighting metadata are deleted. It is truthfully an external
+  runtime. Ollama's duplicated probe/source builder is likewise deleted.
+- Explicit endpoint meshes are authoritative in every environment and conflict with a simultaneous connection string.
+  Invalid or unresolved explicit intent fails startup correctively; an absent automatic runtime is normal inactivity.
+  The AI concern no longer translates provider options into a shadow legacy `Default` Ollama source.
+- ONNX remains safely inert without `ModelPath`. Configuring a model is explicit intent: missing model/vocabulary now
+  fails boot instead of being swallowed. The adapter and native `InferenceSession` are DI-owned and disposed with the
+  host. Ollama and LM Studio memoize their per-endpoint clients and own their disposal.
+- Hugging Face and the Zen Garden orchestrator now obey the same compiled provider-activation law without receiving a
+  maturity promotion. The Zen Garden AI connector remains inert unless its functional engine resolves an offering,
+  aligns source/provider identity, owns its client lifetime, and refuses to advertise a capability catalog it could
+  not observe. Their distinct package/docs/product assessments remain future slices.
+- `DiscoveryContext.RequiredCapabilities` is the neutral typed handoff for layered sources. Ollama and LM Studio
+  declare model/capability requirements once; the Zen Garden discovery contributor turns them into capability-bearing
+  offering intent and keeps wish scheduling inside the layered engine. Focused Zen Garden discovery passes 3/3.
+- The complete focused AI unit project passes 160/160; AI integration passes 49/49; clean-host provider activation
+  passes 2/2. The affected Data.AI project compiles and passes 77/87; all ten host-start failures are the already
+  recorded PMC-033 eager unused-Storage activation, before the AI test body, and are not hidden or charged to this
+  provider slice. The bootstrap infrastructure project builds with only the recorded PMC-032 stale test reference.
+- Release packs for AI Contracts, AI Core, Ollama, LM Studio, and ONNX contain their DLL/XML, package-owned README,
+  canonical icon, and build-transitive composition metadata. Current NuGet audit reports no known vulnerable direct
+  or transitive package for all five. All five are structurally ready with no objective quality findings.
+- Public package pages now teach reference plus `AddKoan()` plus `Client`, exact placement and failure semantics, and
+  honest runtime/model boundaries. The `local-ai-provider-composition` claim is conservatively `demonstrated`; broad
+  AI/vector semantics remain `experimental`. Generated truth contains 111 packages: 22 repair-required, 37
+  review-required, and 52 structurally ready across 21 claims. Public documentation truth passes across 212 current
+  files and 38 navigation targets.
+
+The AI runtime and local-inference provider family passes this R11-05 slice. No release candidate, full certification
+run, package feed, or remote state was created; the complete release ratchet remains the single R11-07 boundary.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

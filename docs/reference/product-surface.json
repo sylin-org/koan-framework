@@ -200,6 +200,28 @@
       ]
     },
     {
+      "id": "local-ai-provider-composition",
+      "title": "Local AI provider composition",
+      "summary": "Ollama, LM Studio, and in-process ONNX providers join one compiled AddKoan topology with explicit-intent precedence, provider-owned discovery mechanics, DI-owned lifetime, and source routing within their stated runtime and model boundaries.",
+      "maturity": "demonstrated",
+      "packages": [
+        "Sylin.Koan.AI.Connector.LMStudio",
+        "Sylin.Koan.AI.Connector.Ollama",
+        "Sylin.Koan.AI.Connector.Onnx"
+      ],
+      "documentation": [
+        "src/Connectors/AI/LMStudio/README.md",
+        "src/Connectors/AI/Ollama/README.md",
+        "src/Connectors/AI/Onnx/README.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "tests/Suites/AI/ProviderActivation/Koan.AI.ProviderActivation.Tests",
+        "tests/Suites/AI/Unit/Koan.Tests.AI.Unit",
+        "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap.Infrastructure/Specs/OnnxEmbeddingsPillarBootstrapSpec.cs"
+      ]
+    },
+    {
       "id": "local-data-providers",
       "title": "Local JSON and InMemory Entity persistence",
       "summary": "JSON supplies Koan\u0027s inspectable automatic local floor while InMemory supplies an explicitly ephemeral host-scoped provider and conformance oracle.",
@@ -382,7 +404,7 @@
     {
       "packageId": "Sylin.Koan.AI",
       "shape": "library",
-      "description": "Koan AI facade and runtime glue.",
+      "description": "Koan AI semantic client, capability-aware routing, provider composition, source health, and startup inspection.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -443,6 +465,7 @@
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.AI",
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.AI.Contracts.Shared",
         "Sylin.Koan.AI.Models",
@@ -461,13 +484,16 @@
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.AI",
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core"
       ],
       "readme": "src/Connectors/AI/LMStudio/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/AI/LMStudio/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "local-ai-provider-composition"
+      ]
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.Ollama",
@@ -477,6 +503,7 @@
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.AI",
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
         "Sylin.Koan.ZenGarden.Contracts"
@@ -484,7 +511,9 @@
       "readme": "src/Connectors/AI/Ollama/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/AI/Ollama/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "local-ai-provider-composition"
+      ]
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.Onnx",
@@ -494,13 +523,16 @@
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.AI",
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
-      "claims": []
+      "readme": "src/Connectors/AI/Onnx/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Connectors/AI/Onnx/TECHNICAL.md",
+      "claims": [
+        "local-ai-provider-composition"
+      ]
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.ZenGarden",
@@ -510,6 +542,7 @@
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.AI",
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
         "Sylin.Koan.ZenGarden.Contracts"

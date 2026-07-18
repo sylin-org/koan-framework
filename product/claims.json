@@ -101,6 +101,15 @@
       "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.AI", "src/Koan.Data.Vector"]
     },
     {
+      "id": "local-ai-provider-composition",
+      "title": "Local AI provider composition",
+      "summary": "Ollama, LM Studio, and in-process ONNX providers join one compiled AddKoan topology with explicit-intent precedence, provider-owned discovery mechanics, DI-owned lifetime, and source routing within their stated runtime and model boundaries.",
+      "maturity": "demonstrated",
+      "packages": ["Sylin.Koan.AI.Connector.Ollama", "Sylin.Koan.AI.Connector.LMStudio", "Sylin.Koan.AI.Connector.Onnx"],
+      "documentation": ["src/Connectors/AI/Ollama/README.md", "src/Connectors/AI/LMStudio/README.md", "src/Connectors/AI/Onnx/README.md"],
+      "evidence": ["tests/Suites/AI/Unit/Koan.Tests.AI.Unit", "tests/Suites/AI/ProviderActivation/Koan.AI.ProviderActivation.Tests", "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap.Infrastructure/Specs/OnnxEmbeddingsPillarBootstrapSpec.cs", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
+    },
+    {
       "id": "search-engine-vector-providers",
       "title": "Elasticsearch and OpenSearch vector providers",
       "summary": "Elasticsearch and OpenSearch execute Koan vector semantics through one shared runtime while preserving native kNN dialects, selected-provider naming, and participation-owned readiness within stated limits.",

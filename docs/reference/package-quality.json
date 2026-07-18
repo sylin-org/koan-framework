@@ -3,12 +3,12 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 111,
-    "repairRequired": 23,
-    "reviewRequired": 40,
-    "structurallyReady": 48,
-    "ownedReadmes": 88,
-    "technicalCompanions": 78,
-    "findings": 165
+    "repairRequired": 22,
+    "reviewRequired": 37,
+    "structurallyReady": 52,
+    "ownedReadmes": 89,
+    "technicalCompanions": 79,
+    "findings": 157
   },
   "findingDefinitions": [
     {
@@ -82,8 +82,8 @@
       "projectPath": "src/Koan.AI/Koan.AI.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
-      "description": "Koan AI facade and runtime glue.",
+      "status": "structurally-ready",
+      "description": "Koan AI semantic client, capability-aware routing, provider composition, source health, and startup inspection.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -95,10 +95,7 @@
       "readme": "src/Koan.AI/README.md",
       "technicalDocumentation": "src/Koan.AI/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "metadata.description.terse"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI.Agents",
@@ -164,6 +161,7 @@
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.AI",
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.AI.Contracts.Shared",
         "Sylin.Koan.AI.Models",
@@ -182,34 +180,33 @@
       "projectPath": "src/Connectors/AI/LMStudio/Koan.AI.Connector.LMStudio.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "LM Studio provider for Koan AI (chat, streaming, embeddings) with auto-discovery.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.AI",
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core"
       ],
       "readme": "src/Connectors/AI/LMStudio/README.md",
       "technicalDocumentation": "src/Connectors/AI/LMStudio/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.Ollama",
       "projectPath": "src/Connectors/AI/Ollama/Koan.AI.Connector.Ollama.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Ollama provider for Koan AI (chat, streaming, embeddings) with Dev auto-discovery.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.AI",
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
         "Sylin.Koan.ZenGarden.Contracts"
@@ -217,32 +214,27 @@
       "readme": "src/Connectors/AI/Ollama/README.md",
       "technicalDocumentation": "src/Connectors/AI/Ollama/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.Onnx",
       "projectPath": "src/Connectors/AI/Onnx/Koan.AI.Connector.Onnx.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "repair-required",
+      "status": "structurally-ready",
       "description": "In-process embedding generation for Koan via ONNX Runtime. Runs a local sentence-embedding model (e.g. all-MiniLM-L6-v2) with a WordPiece tokenizer entirely in-process \u2014 no model server, no network. The embeddings rung of the single-binary tier.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.AI",
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Connectors/AI/Onnx/README.md",
+      "technicalDocumentation": "src/Connectors/AI/Onnx/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.ZenGarden",
@@ -255,6 +247,7 @@
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.AI",
         "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.Core",
         "Sylin.Koan.ZenGarden.Contracts"

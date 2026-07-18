@@ -248,16 +248,16 @@ Mongo (`MongoOptionsConfigurator`):
 
 Ollama (`OllamaAdapterContributor`):
 
-- `Koan:Ai:Ollama:ConnectionString` supports `zen-garden://...` or direct URL
-- `Koan:Ai:Ollama:Urls[*]` also accepts Zen Garden intents per entry
-- auto path runs Zen Garden first, then host/container/local probes
-- unresolved explicit Zen Garden members fail and are not replaced by automatic or additional members
-- required capability hints forwarded to Zen Garden:
-  - `Koan:Ai:Ollama:RequiredCapabilities`
-  - `Koan:Ai:Ollama:RequiredModels`
-  - `Koan:Ai:Ollama:ZenGarden:Capabilities`
-- contributor passes capability-bearing intent to initialization provider
-- provider performs centralized wish scheduling when capabilities are missing and contributor continues registration
+- `ConnectionStrings:Ollama` accepts one native HTTP endpoint or one `zen-garden://...` required intent
+- `Koan:Ai:Ollama:Endpoints[*]` accepts an ordered native HTTP/HTTPS mesh
+- explicit connection string and endpoint mesh are mutually exclusive
+- automatic discovery receives Zen Garden candidates through Core's compiled discovery plan, then conventional
+  container/host/local candidates; Ollama health-checks the elected endpoint
+- unresolved explicit Zen Garden intent fails and is not replaced by an automatic candidate
+- `DefaultModel` plus `RequiredCapabilities` use `DiscoveryContext.RequiredCapabilities`; the Zen Garden source turns
+  them into a capability-bearing offering intent
+- the initialization provider schedules a wish when capabilities are missing and returns without waiting for
+  fulfillment
 
 ## Centralized Orchestration Flow
 

@@ -370,23 +370,21 @@ removed when Zen Garden became a discovery contributor.)
 
 ### Ollama adapter behavior
 
-- Explicit single connection intent:
-  - `Koan:Ai:Ollama:ConnectionString = "zen-garden://ollama?cap=llama3.2,nomic-embed-text"`
-- Explicit URL list still works, and each URL can also be a Zen Garden URI:
-  - `Koan:Ai:Ollama:Urls:0 = "zen-garden://ollama"`
-- An explicit Zen Garden member that cannot resolve fails correctively; it is not replaced by local discovery or `AdditionalUrls`.
-- Auto path (no explicit members):
-  - resolves `ollama` through Zen Garden first
-  - forwards requested capability intent to Zen Garden initialization provider
-  - provider handles wishful ensure scheduling centrally and continues startup non-blocking
-  - falls back to existing host/container/local Ollama discovery
-  - `AdditionalUrls` are then merged as fallback members
+- Explicit Zen Garden intent uses standard .NET connection-string configuration:
+  - `ConnectionStrings:Ollama = "zen-garden://ollama?cap=llama3.2,nomic-embed-text"`
+- An explicit Zen Garden intent that cannot resolve or pass Ollama's health check fails correctively; it is never
+  weakened into automatic fallback.
+- `Koan:Ai:Ollama:Endpoints` is the native HTTP mesh surface. It deliberately accepts only absolute HTTP/HTTPS
+  endpoints; use `ConnectionStrings:Ollama` for a source intent.
+- With no explicit placement, Core runs one composed discovery election. The active Zen Garden source contributes a
+  candidate ahead of conventional container, Docker-host, and local guesses; Ollama health-checks every candidate.
+- `DefaultModel` and `RequiredCapabilities` travel through the neutral discovery context. Zen Garden can schedule a
+  wish for missing capabilities, but startup does not wait for fulfillment.
 
 Ollama capability requirements passed to Zen Garden are sourced from:
 
+- `Koan:Ai:Ollama:DefaultModel`
 - `Koan:Ai:Ollama:RequiredCapabilities`
-- `Koan:Ai:Ollama:RequiredModels`
-- `Koan:Ai:Ollama:ZenGarden:Capabilities`
 
 Non-blocking behavior:
 

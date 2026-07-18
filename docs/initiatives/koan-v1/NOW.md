@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-18
   status: in-progress
-  scope: R11-05 through external vector provider-family graduation and caller-owned pagination
+  scope: R11-05 through AI runtime and local-inference provider-family graduation
 ---
 
 # Koan V1 reorganization current handoff
@@ -164,8 +164,14 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - Data pagination is now caller-owned end to end. `All()` means the complete visible set; adapters have no row-page
   default and append paging only for explicit shaping. SQLite, PostgreSQL/shared Npgsql, and SQL Server regressions each
   prove 75 unpaged rows versus an explicitly requested page of 7.
-- Current generated truth contains 111 packages: 23 repair-required, 40 review-required, 48 structurally ready across
-  20 claims.
+- The AI runtime and local-inference provider family now passes. One host-compiled provider plan replaces mutable
+  contributor callbacks and adapter registration. Provider references bring functional AI; Ollama and LM Studio use
+  one Core discovery/AI source law; ONNX native lifetime is DI-owned; explicit intent fails correctively; layered Zen
+  Garden capability requirements use one neutral discovery contract. AI Unit passes 160/160, AI Integration 49/49,
+  clean-host activation 2/2, and Zen Garden discovery 3/3. Data.AI's ten host-start failures remain the recorded
+  PMC-033 unused-Storage activation rather than an AI regression.
+- Current generated truth contains 111 packages: 22 repair-required, 37 review-required, 52 structurally ready across
+  21 claims.
   Redis Cache 6/6 and Redis Data 12/12 pass; seven affected packages and their dependency boundaries were inspected,
   and the three new packages have no known vulnerable direct or transitive packages. Earlier Storage evidence remains
   green. Seven relational packages also inspect cleanly, with clear current vulnerability checks for the two new
@@ -194,9 +200,10 @@ Replace this file at every handoff. It is a restart point, not a diary.
 ## Next safe action
 
 Continue [R11-05](work-items/r11/R11-05-package-family-graduation.md) with the next terminally unassessed semantic or
-projection/tool family. Start with focused topology/coalescence discovery, choose the smallest family whose boundary can become
-executable in one slice, and graduate package prose and artifacts only after its responsibility chokepoints and
-guarantees are proved.
+projection/tool family. Keep Hugging Face and the Zen Garden AI connector as separate product assessments: they now
+obey the provider law but have not earned package graduation. Start the next slice with focused
+topology/coalescence discovery and graduate prose/artifacts only after its responsibility chokepoints and guarantees
+are proved.
 
 Keep [R08-05](work-items/r08/R08-05-initial-public-observation.md) prepared. Do not mutate remote settings, push,
 tag, release, or publish until package polish is accepted and separate remote-operation authorization is renewed.

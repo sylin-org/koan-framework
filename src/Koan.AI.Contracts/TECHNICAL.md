@@ -9,8 +9,7 @@ Its only external dependency is Newtonsoft.Json for the existing `AiPromptOption
 ## Contract groups
 
 - `Koan.AI.Contracts`: `IAiPipeline`, `AiCapability`, `IAiRecipeProvider`, and `IAiModelAdvisor`.
-- `.Adapters`: the base adapter identity, operation-specific adapter interfaces, model management, contributor SPI,
-  and adapter election metadata.
+- `.Adapters`: the base adapter identity, operation-specific adapter interfaces, and model management.
 - `.Routing` and `.Sources`: registry, source/member, health-state, and capability-configuration vocabulary.
 - `.Models`: prompt, conversation, request/response, streaming, provenance, route-hint, and result shapes.
 - `.Options` and `.Categories`: typed operation and category configuration.
@@ -20,10 +19,10 @@ that do not reference AI therefore do not carry AI vocabulary in their mandatory
 
 ## Runtime handoff
 
-Functional provider modules register `IAiAdapterContributor` implementations. `Sylin.Koan.AI` owns when those
-contributors execute, compiles the adapter/source registries, and consumes optional `IAiRecipeProvider` and
-`IAiModelAdvisor` implementations. A module may reference and register one of these contracts without activating AI;
-the behavior appears only when the AI runtime resolves it.
+Functional provider modules implement these adapter contracts and contribute activation through the runtime-owned
+provider-plan seam in `Sylin.Koan.AI`. The AI runtime owns when providers activate, compiles the adapter/source
+registries, and consumes optional `IAiRecipeProvider` and `IAiModelAdvisor` implementations. A module may reference
+and register one of these contracts without activating AI; behavior appears only when the AI runtime is present.
 
 `IAiAdapter.Capabilities` is string-based by design. `AiCapability` supplies interoperable in-box identifiers while
 allowing providers to declare additional capabilities without changing this package.

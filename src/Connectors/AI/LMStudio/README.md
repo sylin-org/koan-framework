@@ -1,15 +1,6 @@
 # Sylin.Koan.AI.Connector.LMStudio
 
-> **Contract**  
-> Inputs: Koan AI chat or embedding requests mapped to LM Studio's OpenAI-compatible API.  
-> Outputs: Text completions, streaming deltas, embedding vectors, and model metadata.  
-> Error Modes: HTTP failures, model not found, readiness timeout, serialization faults.  
-> Criteria: `LMStudioAiModule` participates through `AddKoan()`, discovery resolves the base URL, and readiness reports default-model reachability.
-
-LM Studio adapter for Koan. Provides local OpenAI-compatible chat, streaming, and embeddings routed through LM Studio runtimes (desktop or headless) with Koan's autonomous discovery.
-
-- Target framework: net10.0
-- License: Apache-2.0
+LM Studio provider for Koan AI: OpenAI-compatible chat, streaming, embeddings, model listing, and readiness.
 
 ## Install
 
@@ -17,80 +8,62 @@ LM Studio adapter for Koan. Provides local OpenAI-compatible chat, streaming, an
 dotnet add package Sylin.Koan.AI.Connector.LMStudio
 ```
 
-## Minimal setup
-
-Register Koan with the LM Studio provider (typical ASP.NET `Program.cs`):
-
-```csharp
-// using Koan.AI; using Koan.AI.Connector.LMStudio; using Koan.AI.Web;
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services
-    .AddKoan()
-    .AddAi()
-    .AddLMStudioFromConfig() // options resolved via configuration + discovery
-    .AddAiWeb(); // optional HTTP endpoints under /ai
-
-var app = builder.Build();
-app.MapControllers();
-await app.RunAsync();
-```
-
-Then prompt LM Studio through the engine facade:
+The reference activates the provider through the normal Koan boot path; no provider-specific setup method exists:
 
 ```csharp
 using Koan.AI;
+using Koan.Core;
 
-var response = await Engine.Prompt(
-    "Summarize Koan adapter discovery in one sentence.",
-    model: "phi3:mini"
-);
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
 
-Console.WriteLine(response.Text);
+var app = builder.Build();
+app.MapGet("/ask", async () => await Client.Chat("Summarize this release in one sentence."));
+await app.RunAsync();
 ```
 
-Enable HTTP access (when `AddAiWeb()` is registered):
+In Development, Koan discovers a healthy LM Studio server at its conventional local address. LM Studio is modeled
+honestly as an external runtime: Koan does not claim to install or launch the desktop application.
 
-```
-POST /ai/chat
+## Exact configuration
+
+```json
 {
-  "model": "phi3:mini",
-  "messages": [
-    { "role": "user", "content": "Summarize Koan adapter discovery in one sentence." }
-  ]
+  "Koan": {
+    "Ai": {
+      "LMStudio": {
+        "Endpoints": ["http://localhost:1234"],
+        "DefaultModel": "qwen3-4b",
+        "ApiKey": "optional-token",
+        "RequestTimeoutSeconds": 120
+      }
+    }
+  }
 }
 ```
 
-## Discovery and configuration
+For one endpoint, `ConnectionStrings:LMStudio` is supported instead of `Endpoints`. Do not configure both.
+Environment configuration uses ordinary .NET key mapping, for example
+`Koan__Ai__LMStudio__ApiKey` and `ConnectionStrings__LMStudio`.
 
-- `ConnectionString` defaults to `auto`. The adapter probes LM Studio on host-first addresses (`http://localhost:1234`) and container fallbacks.
-- Environment variables:
-  - `LMSTUDIO_API_BASE_URL` single endpoint override.
-  - `Koan_AI_LMSTUDIO_URLS` semicolon/comma separated list for multiple runtimes.
-  - `LMSTUDIO_API_KEY` attaches a Bearer token when LM Studio enforces auth.
-- Configuration keys (appsettings):
-  - `Koan:Ai:Provider:LMStudio:BaseUrl`
-  - `Koan:Ai:Provider:LMStudio:DefaultModel`
-  - `Koan:Ai:Provider:LMStudio:ApiKey`
+Explicit placement works in every environment. Automatic discovery follows `Koan:Ai:AutoDiscoveryEnabled` and,
+outside Development, `Koan:Ai:AllowDiscoveryInNonDev`. Discovery validates `/v1/models` and, when a default model is
+declared, requires that model to appear in the catalog.
 
-## Features
+## Runtime contract
 
-- Non-streaming chat completions via `/v1/chat/completions`.
-- Streaming chat deltas (Server-Sent Events) surfaced through `Engine.PromptStream`.
-- Embeddings via `/v1/embeddings` with multi-input batching.
-- Model enumeration and readiness detection through `/v1/models`.
-- Koan orchestration metadata describes required container image, ports, and health endpoints.
+- A ready provider publishes one source named `lmstudio`; ordered endpoint meshes are supported.
+- When `DefaultModel` is absent, requests must supply a model.
+- A configured default model that is unavailable produces degraded readiness; an explicit per-request model may
+  still work.
+- Authentication, serialization, HTTP, and cancellation failures surface to the caller.
+- No reachable automatic candidate is normal inactivity, allowing another AI provider to serve the application.
+- Conflicting explicit placement and unresolved explicit Zen Garden intent fail startup correctively.
 
-## Edge cases to watch
+## Boundaries
 
-- Default model missing: readiness downgrades to `Degraded`, requests still work when explicit model supplied.
-- Large payloads: LM Studio inherits OpenAI-compatible limits; monitor HTTP 413/429 responses.
-- Streaming cancel: cancellation tokens immediately abort SSE consumption and close the HTTP stream.
-- Auth failures: missing/invalid `LMSTUDIO_API_KEY` returns HTTP 401; surfaced as adapter exceptions.
-- Multiple instances: when `Koan_AI_LMSTUDIO_URLS` enumerates several endpoints, all are registered with routing weights/labels from options.
+The provider requires a separately installed and running LM Studio server. Koan does not launch the desktop app,
+load a model, manufacture credentials, retry inference, or guarantee OpenAI compatibility beyond the operations
+implemented by this adapter.
 
-## Links
-
-- LM Studio: https://lmstudio.ai
-- Koan AI adapters ADR: ../../../../docs/decisions/AI-0008-adapters-and-registry.md
-- OpenAI compatibility (Koan): ../../../../docs/decisions/AI-0005-protocol-surfaces.md
+See [TECHNICAL.md](./TECHNICAL.md) for discovery, ownership, and readiness details.
