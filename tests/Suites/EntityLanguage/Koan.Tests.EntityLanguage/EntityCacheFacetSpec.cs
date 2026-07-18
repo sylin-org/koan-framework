@@ -3,6 +3,7 @@ using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Core.Hosting.App;
+using Koan.Cache.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics.CodeAnalysis;
 
@@ -66,7 +67,7 @@ public sealed class EntityCacheFacetSpec
     {
         var registry = new StubPolicyRegistry(Policy(TimeSpan.FromMinutes(5)));
         var client = new StubCacheClient();
-        using var provider = Services(registry).AddSingleton<ICacheClient>(client).BuildServiceProvider();
+        using var provider = Services(registry).AddSingleton<ICacheSubjectClient>(client).BuildServiceProvider();
         using var scope = AppHost.PushScope(provider);
 
         (await Todo.Cache.Count()).Should().Be(2);
@@ -85,15 +86,12 @@ public sealed class EntityCacheFacetSpec
             CacheScope.Entity,
             CacheableAttribute.DefaultKeyTemplate,
             CacheStrategy.GetOrSet,
-            CacheConsistencyMode.Strict,
             CacheTier.Layered,
             ttl,
             TimeSpan.FromSeconds(30),
             null,
             null,
             [nameof(Todo)],
-            null,
-            null,
             null,
             null,
             true,
@@ -126,7 +124,7 @@ public sealed class EntityCacheFacetSpec
         }
     }
 
-    private sealed class StubCacheClient : ICacheClient
+    private sealed class StubCacheClient : ICacheClient, ICacheSubjectClient
     {
         public IReadOnlyCollection<string> CountedTags { get; private set; } = [];
         public IReadOnlyCollection<string> FlushedTags { get; private set; } = [];
@@ -142,6 +140,15 @@ public sealed class EntityCacheFacetSpec
             CountedTags = tags;
             return ValueTask.FromResult(2L);
         }
+
+        public ValueTask<long> FlushTags(IReadOnlyCollection<string> tags, Type? subject, CancellationToken ct)
+            => FlushTags(tags, ct);
+
+        public ValueTask<long> CountTags(IReadOnlyCollection<string> tags, Type? subject, CancellationToken ct)
+            => CountTags(tags, ct);
+
+        public ValueTask<bool> Remove(CacheKey key, Type? subject, CancellationToken ct)
+            => ValueTask.FromResult(false);
 
         public ICacheEntryBuilder<T> CreateEntry<T>(CacheKey key) => throw new NotSupportedException();
         public CacheScopeHandle BeginScope(string scopeId, string? region = null) => throw new NotSupportedException();

@@ -15,9 +15,12 @@ public static class CacheConstants
         public const string RemoteProvider = "Cache:RemoteProvider";
         public const string CoherenceMode = "Cache:CoherenceMode";
         public const string DefaultRegion = "default";
-        public const string EnableDiagnosticsEndpoint = "Cache:EnableDiagnosticsEndpoint";
         public const string DefaultSingleflightTimeout = "Cache:DefaultSingleflightTimeout";
         public const string DefaultRegionKey = "Cache:DefaultRegion";
+        public const string DefaultTier = "Cache:DefaultTier";
+        public const string DefaultTtlSeconds = "Cache:DefaultTtlSeconds";
+        public const string DefaultL1TtlSeconds = "Cache:DefaultL1TtlSeconds";
+        public const string BroadcastInvalidationByDefault = "Cache:BroadcastInvalidationByDefault";
 
         public static class Redis
         {

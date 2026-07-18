@@ -9,11 +9,15 @@ using Koan.Communication.Signals;
 using Koan.Tests.Cache.Topology.Support;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Tests.Cache.Topology.Specs;
 
 public sealed class CacheHealthCheckSpec
 {
+    private static CacheTopology Compile(params ICacheStore[] stores)
+        => new(stores, Options.Create(new CacheOptions()), NullLogger<CacheTopology>.Instance);
+
     private sealed class ThrowingStore : FakeCacheStore
     {
         public ThrowingStore(CacheStorePlacement placement) : base($"throwing-{placement}", placement) { }
@@ -48,7 +52,7 @@ public sealed class CacheHealthCheckSpec
     {
         var l1 = new FakeCacheStore("memory", CacheStorePlacement.Local);
         var l2 = new FakeCacheStore("redis", CacheStorePlacement.Remote);
-        var health = BuildHealthCheck(new CacheTopology(l1, l2));
+        var health = BuildHealthCheck(Compile(l1, l2));
 
         var result = await health.CheckHealthAsync(EmptyContext, CancellationToken.None);
 
@@ -61,7 +65,7 @@ public sealed class CacheHealthCheckSpec
     public async Task LocalOnly_with_only_L1_returns_Healthy()
     {
         var l1 = new FakeCacheStore("memory", CacheStorePlacement.Local);
-        var health = BuildHealthCheck(new CacheTopology(l1, null));
+        var health = BuildHealthCheck(Compile(l1));
 
         var result = await health.CheckHealthAsync(EmptyContext, CancellationToken.None);
 
@@ -73,7 +77,7 @@ public sealed class CacheHealthCheckSpec
     [Fact]
     public async Task No_tiers_at_all_returns_Unhealthy()
     {
-        var health = BuildHealthCheck(CacheTopology.Empty);
+        var health = BuildHealthCheck(Compile());
 
         var result = await health.CheckHealthAsync(EmptyContext, CancellationToken.None);
 
@@ -85,7 +89,7 @@ public sealed class CacheHealthCheckSpec
     public async Task Health_reports_node_id_and_coherence_state()
     {
         var l1 = new FakeCacheStore("memory", CacheStorePlacement.Local);
-        var health = BuildHealthCheck(new CacheTopology(l1, null));
+        var health = BuildHealthCheck(Compile(l1));
 
         var result = await health.CheckHealthAsync(EmptyContext, CancellationToken.None);
 

@@ -48,7 +48,7 @@ public sealed class CachePillarBootstrapSpec(RedisFixture redis, ITestOutputHelp
         using var dbPath = CreateTempSqlitePath();
 
         // The "Reference = Intent" headline test: with the four cache packages referenced,
-        // ICacheClient must resolve end-to-end without any explicit AddKoanCache() call in user
+        // ICacheClient must resolve end-to-end without any pillar-specific registration in user
         // code. Going through host startup also exercises the full hosted-service lifecycle, so
         // descriptor-class bugs (e.g., the TryAddEnumerable indistinguishable bug fixed in 14a5e8ce)
         // would surface here.
@@ -122,7 +122,6 @@ public sealed class CachePillarBootstrapSpec(RedisFixture redis, ITestOutputHelp
             .WithSetting(CacheConstants.Configuration.Redis.ChannelName, $"boot-cache-{token}")
             // SQLite adapter config.
             .WithSetting("Koan:Cache:Adapters:Sqlite:DatabasePath", sqliteDbPath)
-            .WithSetting("Koan:Cache:Adapters:Sqlite:SweepIntervalSeconds", "3600")
             .ConfigureServices(services => services.AddKoan());
     }
 

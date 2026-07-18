@@ -4,7 +4,7 @@ domain: data
 title: "Cache — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-07-16
+last_updated: 2026-07-17
 framework_version: v0.19.0
 validation:
   date_last_tested: 2026-07-16
@@ -16,7 +16,7 @@ validation:
 
 > One-screen map of the Cache pillar — transparent L1/L2 caching for `Entity<T>` with cross-node coherence. Full detail: [data/cache.md](../data/cache.md).
 
-**What it does** — Annotate an entity `[Cacheable(...)]` and its reads become transparently cached (L1 in-process, L2 remote) with writes evicting through every node. The same `Todo.Get(id)` / `todo.Save()` code is unchanged; the decorator short-circuits reads and broadcasts evicts. **Reference = Intent** chooses the topology: reference `Koan.Cache.Adapter.Redis` and Redis becomes L2 with coherence auto-activating ([ARCH-0075](../../decisions/ARCH-0075-koan-cache-pillar.md)) — no `services.AddX()`. Reads are **fresh-or-null** by default; stale-while-revalidate is opt-in only ([ARCH-0078](../../decisions/ARCH-0078-stale-while-revalidate-opt-in.md)).
+**What it does** — Annotate an entity `[Cacheable(...)]` and its reads become transparently cached (L1 in-process, L2 remote) with writes evicting through every node. The same `Todo.Get(id)` / `todo.Save()` code is unchanged; the decorator short-circuits reads and broadcasts evicts. **Reference = Intent** chooses the topology: reference `Koan.Cache.Adapter.Redis` and Redis becomes L2 with coherence auto-activating ([ARCH-0075](../../decisions/ARCH-0075-koan-cache-pillar.md)) — no `services.AddX()`. Reads are **fresh-or-null** by default; bounded stale serving is explicit and does not claim background revalidation.
 
 ## The one canonical pattern
 
@@ -38,13 +38,13 @@ await todo.Save();                            // write-through; peers get an evi
 var policy = Todo.Cache.Explain();            // read-only materialized policy facts
 ```
 
-Stale-while-revalidate is **opt-in**: `[Cacheable(300, AllowStaleForSeconds = 60)]`. Past `AbsoluteTtl` a default read returns `null`, not stale data.
+Bounded stale serving is **opt-in**: `[Cacheable(300, AllowStaleForSeconds = 60)]`. Past `AbsoluteTtl` a default read returns `null`, not stale data.
 
 ## ≤5 attributes you'll use
 
 | Attribute | What it does |
 |---|---|
-| `[Cacheable(ttlSeconds)]` | The 90% entry point. Opts an `Entity<T>` into Layered L1/L2 caching with sane defaults (`L1TtlSeconds`, `SlidingTtlSeconds`, `AllowStaleForSeconds` for SWR). |
+| `[Cacheable(ttlSeconds)]` | The 90% entry point. Opts an `Entity<T>` into Layered L1/L2 caching with sane defaults (`L1TtlSeconds`, `SlidingTtlSeconds`, `AllowStaleForSeconds` for bounded stale reads). |
 | `[CachePolicy(scope, keyTemplate)]` | Power-user base. Class / method / controller-action scope, custom key templates (`{Id}`, `{TypeName}`, `{Partition}`), `Tags`, `Region`, multiple policies per type. |
 
 ## The escape hatch

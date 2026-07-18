@@ -1,6 +1,5 @@
 using Koan.Cache.Abstractions;
 using Koan.Cache.Diagnostics;
-using Koan.Cache.Extensions;
 using Koan.Cache.Pillars;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
@@ -21,17 +20,13 @@ public sealed class CacheModule : KoanModule
     public override void Register(IServiceCollection services)
     {
         CachingPillarManifest.EnsureRegistered();
-        services.AddKoanCache();
+        CacheServices.Register(services);
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
 
-        var diagnosticsEnabled = Configuration.ReadWithSource(
-            cfg,
-            CacheConstants.Configuration.EnableDiagnosticsEndpoint,
-            true);
         var defaultRegion = Configuration.ReadWithSource(
             cfg,
             CacheConstants.Configuration.DefaultRegionKey,
@@ -40,6 +35,22 @@ public sealed class CacheModule : KoanModule
             cfg,
             CacheConstants.Configuration.DefaultSingleflightTimeout,
             TimeSpan.FromSeconds(5));
+        var defaultTier = Configuration.ReadWithSource(
+            cfg,
+            CacheConstants.Configuration.DefaultTier,
+            Abstractions.Primitives.CacheTier.Layered);
+        var defaultTtl = Configuration.ReadWithSource(
+            cfg,
+            CacheConstants.Configuration.DefaultTtlSeconds,
+            300);
+        var defaultL1Ttl = Configuration.ReadWithSource<int?>(
+            cfg,
+            CacheConstants.Configuration.DefaultL1TtlSeconds,
+            null);
+        var broadcastInvalidation = Configuration.ReadWithSource(
+            cfg,
+            CacheConstants.Configuration.BroadcastInvalidationByDefault,
+            true);
         var memoryTagIndexCapacity = Configuration.Read(
             cfg,
             CacheConstants.Configuration.Memory.TagIndexCapacity,
@@ -51,15 +62,14 @@ public sealed class CacheModule : KoanModule
             source: defaultRegion.Source,
             consumers: ["Koan.Cache.RegionResolver"]);
         module.AddSetting(
-            "DiagnosticsEnabled",
-            diagnosticsEnabled.Value.ToString(),
-            source: diagnosticsEnabled.Source,
-            consumers: ["Koan.Cache.DiagnosticsEndpoint"]);
-        module.AddSetting(
             "DefaultSingleflightTimeout",
             singleflightTimeout.Value.ToString(),
             source: singleflightTimeout.Source,
             consumers: ["Koan.Cache.Singleflight"]);
+        module.AddSetting("DefaultTier", defaultTier.Value.ToString(), source: defaultTier.Source, consumers: ["Koan.Cache.Client"]);
+        module.AddSetting("DefaultTtlSeconds", defaultTtl.Value.ToString(), source: defaultTtl.Source, consumers: ["Koan.Cache.Client"]);
+        module.AddSetting("DefaultL1TtlSeconds", defaultL1Ttl.Value?.ToString() ?? "derived", source: defaultL1Ttl.Source, consumers: ["Koan.Cache.Layered"]);
+        module.AddSetting("BroadcastInvalidationByDefault", broadcastInvalidation.Value.ToString(), source: broadcastInvalidation.Source, consumers: ["Koan.Cache.Coherence"]);
         module.AddSetting("BuiltInProvider", "memory ([ProviderPriority] floor)");
         module.AddSetting("MemoryTagIndexCapacity", memoryTagIndexCapacity.ToString());
 

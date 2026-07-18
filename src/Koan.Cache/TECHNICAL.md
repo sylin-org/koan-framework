@@ -56,12 +56,16 @@ commit; the current item may be partly removed when a failure is reported.
 
 ## Topology and coherence
 
-The built-in Memory store is the minimum-priority local floor. `CacheTopologyResolver` independently
-elects local and remote stores from explicit pins, provider priority, then stable identity.
-Core's immutable provider catalog owns exact name lookup, duplicate rejection, memoized priority, and
-the final stable tie; Cache alone owns Local/Remote placement and whether a missing tier is valid. Each
-selected tier carries one safe receipt that startup facts and the resolved lock project directly.
-`LayeredCache` reads L1 then L2, backfills L1, writes selected tiers, and evicts both selected tiers.
+The built-in Memory store is the minimum-priority local floor. Standard .NET DI supplies `ICacheStore`
+candidates; the singleton `CacheTopology` compiles Core's immutable provider catalog and independently
+elects Local and Remote routes once. Core owns exact lookup, duplicate rejection, memoized priority, and
+the stable tie. Cache owns placement, host-wide pins, tier availability, and operation negotiation. Each
+candidate and selected route retains one capability set and one safe election receipt for facts.
+
+`LayeredCache` executes `CacheTier`: LocalOnly and RemoteOnly touch exactly the requested route and fail
+when it does not exist; Layered uses both when available and degrades to the available route. Reads use
+Local then Remote and backfill Local after a Remote hit. Broad removal intentionally invalidates every
+selected route.
 
 Successful removals publish one Cache-owned key invalidation through Communication's every-node
 framework route. Peers filter their own origin and evict L1 only; they never mutate shared L2 or

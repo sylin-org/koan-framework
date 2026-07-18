@@ -260,6 +260,121 @@ supported hidden reload path.
 
 The Storage provider subfamily passes. The complete release ratchet remains reserved for R11-07.
 
+### Cache and SQLite provider-family discovery
+
+**Task:** graduate the Cache core and persistent-local provider boundary by making its existing public semantics
+executable, deleting framework-author ceremony, and refusing to overstate the adjacent Redis package.
+
+**Application intent:** “Cache this Entity for five minutes; if I reference SQLite, keep the local cache across
+process restarts, without changing normal Entity reads or writes.”
+
+**Public expression:** reference `Sylin.Koan.Cache`, retain the application's one `AddKoan()`, and declare
+`[Cacheable(300)]` on the Entity. Reference `Sylin.Koan.Cache.Adapter.Sqlite` to replace the memory floor with the
+higher-priority persistent Local store. Optional host-wide `Koan:Cache:LocalProvider` / `RemoteProvider` pins and
+SQLite `DatabasePath` are the only provider-selection/configuration additions. No cache registration belongs in
+`Program.cs`.
+
+**Guarantee/correction:** one host-owned topology compiles all referenced stores once using exact pins, placement,
+priority, and stable identity. A missing or contradictory pin fails boot with registered choices. `CacheTier` must
+actually constrain reads/writes; a requested unavailable tier fails with a correction instead of becoming a no-op.
+`AllowStaleFor` means bounded stale serving only—Koan does not claim background revalidation. SQLite tags match
+exactly, sliding expiry refreshes when declared, and persistence remains process-local rather than distributed.
+
+**Complete intent surface:** package reference, `AddKoan()`, `[Cacheable(ttlSeconds)]`, and optional host-wide
+provider/database configuration are complete. Ordinary Entity operations and `entity.Cache.Evict()` do not add
+services, repositories, transport code, or provider branches. Provider authors implement `ICacheStore`, stable
+`Name`, placement, unified capability description, optional priority, and standard DI registration in their module.
+
+**Public concepts:** `[Cacheable]` expresses Entity cache intent and TTL; `CacheTier` expresses the meaningful
+Local/Remote/Layered operation choice and therefore survives only after it is enforced; `AllowStaleFor` expresses a
+bounded stale-read window; host-wide provider pins express infrastructure intent; `CacheCaps` describes provider
+guarantees. Per-policy provider pins, `CacheConsistencyMode`, manual `AddKoanCache`, a mutable store registry, and a
+Cache-specific DI registration helper/analyzer do not create a real business guarantee and will not survive.
+
+**Docs read:** `docs/engineering/index.md` establishes Entity/controller/constants/package guardrails;
+`docs/architecture/principles.md` requires one compiled pillar plan and standard .NET before custom machinery;
+`docs/architecture/koan-cache-module.md` assigns topology/policy/coherence meaning to Cache and physical storage to
+adapters; `docs/architecture/cache-scope-key-convergence.md` requires repository and explicit eviction to share one
+identity plan; accepted ARCH-0075 records the four Cache concerns while its amendments supersede the speculative
+coherence surface; current Cache README/TECHNICAL/reference/card state the zero-registration Entity story but
+currently overclaim working tier/provider controls and stale revalidation.
+
+**Code read:** `CacheTopologyResolver` already uses Core `ProviderCatalog<T>` but is fed through a second mutable
+registry; `CacheServiceCollectionExtensions` exposes unsupported manual setup and registers that duplicate path;
+`ICacheStore` carries an unused boolean capability bag; `LayeredCache` always uses every available tier and therefore
+ignores public `CacheTier`; `CachePolicyAttribute`/descriptor materialize dead per-policy pins and consistency values;
+Memory, SQLite, and Redis implement the same K/V contract, while SQLite uses substring tag matching and exposes an
+unused sweep option; the Cache analyzer exists only to require `AddCacheStore<T>` instead of standard two-generic DI.
+
+**Reusing:** Core `ProviderCatalog<T>`, `ProviderSelectionReceipt`, unified `CapabilitySet`/
+`IDescribesCapabilities`, standard `TryAddEnumerable(ServiceDescriptor.Singleton<TService,TImplementation>())`,
+standard Options/DI/health, existing `CacheIdentityPlan`, `LayeredCache`, Entity cache plan, cache conformance suites,
+and SQLite transactions/indexes already provide the required laws or mechanisms.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| `CacheCaps` | `src/Koan.Cache.Abstractions/Capabilities/CacheCaps.cs` | Shared provider/runtime vocabulary belongs in the inert contract package. |
+| compiled candidate state inside `CacheTopology` | `src/Koan.Cache/Topology/CacheTopology.cs` | Cache topology is simple enough for one plan; a second public/dynamic catalog owner is unnecessary. |
+| SQLite constants | `src/Koan.Cache.Adapter.Sqlite/Infrastructure/Constants.cs` | Stable provider/config/schema identifiers belong to the adapter, not literals across module/store code. |
+| Redis constants | `src/Koan.Cache.Adapter.Redis/Infrastructure/Constants.cs` | Stable provider/config/channel identifiers remain adapter-owned while its larger activation boundary is assessed. |
+| package companions | Cache Abstractions, SQLite, and Redis project roots | Each retained package must state exact reference intent, first result, and limits. |
+
+**Coalescence:** closest pattern is the newly graduated Storage plan over Core provider law, but Cache needs only one
+Local/Remote topology rather than profile routing. Rebuild `CacheTopology` as the single immutable owner; absorb
+resolver/catalog projection there; delete `ICacheStoreRegistry`, `CacheStoreRegistry`, manual `AddKoanCache`,
+`AddCacheStore<T>`, and the entire Cache analyzer package/test project. Keep LayeredCache as the runtime chokepoint,
+but make it enforce the already-public tier decision. Delete dead consistency/per-policy-pin knobs rather than
+inventing runtime branches. The next wider owner (Core) cannot decide Local/Remote cache meaning; each adapter is too
+narrow to elect peers. Redis's borrowed functional Data owner is not normalized in this slice: it requires a joint
+backend-capability decision and remains ungraduated.
+
+**Ergonomics:** human and model code remains `[Cacheable(300)]` plus normal Entity verbs. IntelliSense loses false
+provider/consistency knobs and a framework-specific registration helper. Module authors use the standard .NET DI
+shape plus one Cache contract; operators and agents see selected stores, capabilities, receipts, exact tier posture,
+and honest stale-serving/persistence bounds from the compiled authority.
+
+**Constraints satisfied:** no HTTP route is added; no data scan is introduced; Entity statics remain the application
+path; tag enumeration is provider-bounded; stable identifiers move to adapter constants; options retain only working
+decisions; README/TECHNICAL/reference/TOC and generated truth update with behavior; ADRs remain unchanged historical
+records; focused Cache/SQLite/tenancy/bootstrap/artifact evidence runs without release certification.
+
+**Risks:** SQLite schema migration must preserve existing rows while replacing comma/substring tag semantics; tier
+enforcement affects tests that previously asserted only materialization; removing the analyzer is a release-lineage
+retirement; Redis's current transitive Data activation is an explicit remaining boundary and prevents Redis package
+graduation even if its prose becomes structurally complete.
+
+### Cache and SQLite provider-family evidence
+
+- Cache now has one immutable composition authority. Standard .NET DI supplies `ICacheStore` candidates; Core's
+  `ProviderCatalog<T>` owns normalized identity/priority/stable ties; `CacheTopology` owns Local/Remote placement,
+  exact host pins, capability sets, election receipts, and one-time selection. The mutable registry and separate
+  resolver are deleted.
+- `CacheTier` is executable: LocalOnly and RemoteOnly touch only their required route and fail with a correction
+  when absent; Layered uses both selected routes when available and gracefully uses the one that exists. Cache
+  operations negotiate tags, sliding expiry, bounded stale serving, and binary payloads through unified `CacheCaps`.
+- Dead public concepts are gone without aliases: per-policy provider pins, `CacheConsistencyMode`, manual
+  `AddKoanCache`, the Cache registration helper, its package-specific analyzer/test project, the mutable registry,
+  unused diagnostics/tag-capacity settings, and SQLite's unused sweeper option. One internal subject-aware Cache
+  client now keeps Entity facets thin while Cache owns segmentation and physical identity.
+- SQLite stores exact tags in a normalized case-insensitive table, serializes compatibility tag data as JSON,
+  migrates old rows/schema in place, updates entries and tags transactionally, and genuinely renews sliding expiry.
+  Its provider/config identifiers are centralized and its persistence claim remains Local/process-bound.
+- Focused behavior passes: Cache Abstractions 51/51; Cache topology 62/62; SQLite persistence/exact-tag/sliding/
+  expiry-cleanup behavior 5/5; Memory/SQLite cross-engine contract 14/14; Cache Web 23/23; Entity Cache facet 4/4; and real Redis
+  adapter behavior 5/5. The two focused Cache/Tenancy classes are currently blocked before Cache execution by an
+  unrelated Local Storage `BasePath` fixture validation and are preserved as PMC-031 rather than hidden or widened.
+- All four Cache package projects build, and evidence packages contain their DLL/XML, package-owned README,
+  canonical `icon.png`, symbols, and build-transitive package metadata. Generated truth contains 107 packages:
+  28 repair-required, 48 review-required, and 31 structurally ready. Cache, Cache Abstractions, SQLite, and Redis
+  have zero objective package-quality findings; Redis remains `assess`, not graduated, because its Cache reference
+  still activates the functional Data Redis connection owner.
+
+The Cache core/contracts and SQLite provider subfamily pass. Redis behavior and expression are evidenced, but its
+package boundary remains open for a joint backend/Data decision. The complete release ratchet remains reserved for
+R11-07.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

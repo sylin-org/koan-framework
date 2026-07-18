@@ -43,9 +43,6 @@ public class CachePolicyAttribute : Attribute
     /// <summary>Read/write behavior. Default <c>GetOrSet</c> (read-through, write-back).</summary>
     public CacheStrategy Strategy { get; set; } = CacheStrategy.GetOrSet;
 
-    /// <summary>Consistency mode when cache is unavailable or stale. Default <c>StaleWhileRevalidate</c>.</summary>
-    public CacheConsistencyMode Consistency { get; set; } = CacheConsistencyMode.StaleWhileRevalidate;
-
     /// <summary>Which tiers to use. Default <c>Layered</c> (L1 + L2 with auto-fallback).</summary>
     public CacheTier Tier { get; set; } = CacheTier.Layered;
 
@@ -58,7 +55,7 @@ public class CachePolicyAttribute : Attribute
     /// <summary>Sliding expiration window. Refreshed on each read when supported.</summary>
     public TimeSpan? SlidingTtl { get; set; }
 
-    /// <summary>How long to serve stale data while a background refresh runs. SWR consistency only.</summary>
+    /// <summary>Maximum bounded window in which callers that opt in may receive an expired value.</summary>
     public TimeSpan? AllowStaleFor { get; set; }
 
     /// <summary>Tags applied to entries created under this policy. Used for bulk invalidation.</summary>
@@ -69,12 +66,6 @@ public class CachePolicyAttribute : Attribute
 
     /// <summary>Optional scope-id for fine-grained isolation within a region.</summary>
     public string? ScopeId { get; set; }
-
-    /// <summary>Pin L1 (local) tier to a specific store by <c>ICacheStore.Name</c>. Null = let the resolver pick.</summary>
-    public string? LocalProvider { get; set; }
-
-    /// <summary>Pin L2 (remote) tier to a specific store by <c>ICacheStore.Name</c>. Null = let the resolver pick.</summary>
-    public string? RemoteProvider { get; set; }
 
     /// <summary>Whether writes under this policy broadcast a coherence message. Default <c>true</c>.</summary>
     public bool ForceCoherenceBroadcast { get; set; } = true;

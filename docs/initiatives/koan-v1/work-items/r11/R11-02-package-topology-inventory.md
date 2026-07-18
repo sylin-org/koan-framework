@@ -81,11 +81,10 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.AI.Training` | `capability` | `assess` |
 | `Sylin.Koan.AI.Web` | `projection` | `assess` |
 | `Sylin.Koan.App` | `entry` | `keep` |
-| `Sylin.Koan.Cache` | `capability` | `assess` |
-| `Sylin.Koan.Cache.Abstractions` | `contracts` | `assess` |
+| `Sylin.Koan.Cache` | `capability` | `keep` |
+| `Sylin.Koan.Cache.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Cache.Adapter.Redis` | `provider` | `assess` |
-| `Sylin.Koan.Cache.Adapter.Sqlite` | `provider` | `assess` |
-| `Sylin.Koan.Cache.Analyzers` | `analyzer` | `assess` |
+| `Sylin.Koan.Cache.Adapter.Sqlite` | `provider` | `keep` |
 | `Sylin.Koan.Canon` | `capability` | `assess` |
 | `Sylin.Koan.Canon.Contracts` | `contracts` | `assess` |
 | `Sylin.Koan.Canon.Web` | `projection` | `assess` |
@@ -206,6 +205,11 @@ terminal package decisions; the listed boundary repairs happen before graduation
 | `Sylin.Koan.Data.Vector` | `keep` | Entity-first vector runtime and the single owner of provider election, memoized repository resolution, isolation-aware naming, active participation, health, and application facades. It activates no backend by itself. |
 | `Sylin.Koan.Storage.Abstractions` | `split` (implemented) | Inert provider/service/object/binding vocabulary independently consumed by providers and modules. It was extracted from functional Storage so contract references no longer activate routing, segmentation, replication, or IO. |
 | `Sylin.Koan.Storage` | `keep` | Entity-first object-storage runtime and the single owner of profile routing, physical identity, segmentation, validation, replication, transfer fallback, and lifecycle helpers. |
+| `Sylin.Koan.Cache.Abstractions` | `keep` | Inert Cache store/policy/value/capability vocabulary consumed independently by providers and the runtime. It depends only on Core's shared capability contract and activates no Cache runtime, routing, or IO. |
+| `Sylin.Koan.Cache` | `keep` | Entity-first Cache runtime and the single owner of policy materialization, physical identity, compiled Local/Remote election, tier execution, serialization, coherence meaning, health, and facts. |
+| `Sylin.Koan.Cache.Adapter.Sqlite` | `keep` | Persistent Local provider selected by one reference. It proves exact tags, schema migration, sliding expiration, and restart persistence without adding application registration. |
+| `Sylin.Koan.Cache.Analyzers` | `retire` (implemented) | It enforced a Cache-specific DI helper that duplicated standard two-generic `TryAddEnumerable`. The helper, analyzer, test package, and package identity were removed; modules now use ordinary .NET DI. |
+| `Sylin.Koan.Cache.Adapter.Redis` | `assess` | Its Cache and layered Communication behavior is real, but it currently borrows `IConnectionMultiplexer` from the functional Data Redis connector, so referencing Cache Redis also activates Data Redis. A joint backend-contract decision is required before terminal graduation. |
 | `Sylin.Koan.Media.Abstractions` | `keep` | Inert recipe, pipeline, registry, output, and media-object vocabulary. Functional `MediaEntity<TEntity>` moved out; the package now depends only on Data and Storage contract assemblies. |
 | `Sylin.Koan.Media.Core` | `keep` | Functional owner of Entity-backed originals, content-addressed storage semantics, recipe discovery/validation, image planning/execution, and Media runtime facts. The application type now lives in the honest `Koan.Media` namespace. |
 | `Sylin.Koan.Data.Abstractions` | `keep` | Entity and repository vocabulary independently consumed by providers, projections, and modules without selecting a data runtime or backend. Its legacy ASP.NET JSON Patch dependency and duplicate object-shaped patch path were removed; the boundary now exposes one provider-neutral `PatchPayload`. |

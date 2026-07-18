@@ -1,8 +1,9 @@
 using Koan.Cache.Abstractions;
+using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Adapter.Redis.Coherence;
 using Koan.Cache.Adapter.Redis.Options;
 using Koan.Cache.Adapter.Redis.Stores;
-using Koan.Cache.Abstractions.Extensions;
+using Koan.Cache.Adapter.Redis.Infrastructure;
 using Koan.Communication.Adapters;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
@@ -44,25 +45,23 @@ public sealed class RedisCacheModule : KoanModule
     public override void Register(IServiceCollection services)
     {
         // Options
-        services.AddKoanOptions<RedisCacheAdapterOptions>(CacheConstants.Configuration.Redis.Section);
-        services.AddKoanOptions<RedisCacheBroadcastOptions>(CacheConstants.Configuration.Redis.Section);
+        services.AddKoanOptions<RedisCacheAdapterOptions>(Constants.Configuration.Section);
+        services.AddKoanOptions<RedisCacheBroadcastOptions>(Constants.Configuration.Section);
         services.PostConfigure<RedisCacheAdapterOptions>(opts =>
         {
-            if (string.IsNullOrWhiteSpace(opts.KeyPrefix)) opts.KeyPrefix = "cache:";
-            if (string.IsNullOrWhiteSpace(opts.TagPrefix)) opts.TagPrefix = "cache:tag:";
+            if (string.IsNullOrWhiteSpace(opts.KeyPrefix)) opts.KeyPrefix = Constants.DefaultKeyPrefix;
+            if (string.IsNullOrWhiteSpace(opts.TagPrefix)) opts.TagPrefix = Constants.DefaultTagPrefix;
         });
         services.PostConfigure<RedisCacheBroadcastOptions>(opts =>
         {
-            if (string.IsNullOrWhiteSpace(opts.ChannelName)) opts.ChannelName = "koan-cache";
+            if (string.IsNullOrWhiteSpace(opts.ChannelName)) opts.ChannelName = Constants.DefaultChannelName;
         });
 
         // IConnectionMultiplexer is registered by Koan.Data.Connector.Redis (the canonical
         // owner, per ARCH-0080). This adapter does not duplicate that registration; it just
         // injects the multiplexer into RedisCacheStore and RedisCacheCommunicationAdapter via DI.
 
-        // Typed registration helpers hide the descriptor shape so the indistinguishable-
-        // descriptor bug class can't return through this adapter.
-        services.AddCacheStore<RedisCacheStore>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheStore, RedisCacheStore>());
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<ICommunicationAdapter, RedisCacheCommunicationAdapter>());
     }
@@ -70,13 +69,13 @@ public sealed class RedisCacheModule : KoanModule
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
-        var channel = Configuration.Read(cfg, CacheConstants.Configuration.Redis.ChannelName, "koan-cache");
-        var prefix = Configuration.Read(cfg, CacheConstants.Configuration.Redis.KeyPrefix, "cache:");
+        var channel = Configuration.Read(cfg, Constants.Configuration.ChannelName, Constants.DefaultChannelName);
+        var prefix = Configuration.Read(cfg, Constants.Configuration.KeyPrefix, Constants.DefaultKeyPrefix);
 
-        module.AddSetting("CacheStore", "redis (Remote, [ProviderPriority(100)])");
-        module.AddSetting("FrameworkBroadcasts", "redis-cache ([ProviderPriority(100)], active with Redis L2)");
-        module.AddSetting("ChannelName", channel ?? "koan-cache");
-        module.AddSetting("KeyPrefix", prefix ?? "cache:");
+        module.AddSetting("CacheStore", $"{Constants.ProviderId} (Remote, [ProviderPriority({Constants.ProviderPriority})])");
+        module.AddSetting("FrameworkBroadcasts", $"{Constants.BroadcastProviderId} ([ProviderPriority({Constants.ProviderPriority})], active with Redis L2)");
+        module.AddSetting("ChannelName", channel ?? Constants.DefaultChannelName);
+        module.AddSetting("KeyPrefix", prefix ?? Constants.DefaultKeyPrefix);
         module.AddNote("IConnectionMultiplexer is owned by Koan.Data.Connector.Redis (per ARCH-0080); this adapter injects it.");
     }
 }

@@ -3,6 +3,7 @@ using System.Text;
 using System.Threading.Channels;
 using Koan.Cache.Adapter.Redis.Options;
 using Koan.Cache.Adapter.Redis.Stores;
+using Koan.Cache.Adapter.Redis.Infrastructure;
 using Koan.Cache.Options;
 using Koan.Cache.Topology;
 using Koan.Communication;
@@ -19,12 +20,9 @@ namespace Koan.Cache.Adapter.Redis.Coherence;
 /// Layered Redis capability for Communication's every-node framework-broadcast route. It remains dormant unless
 /// Redis is the active remote cache tier and Cache coherence is enabled.
 /// </summary>
-[ProviderPriority(100)]
+[ProviderPriority(Constants.ProviderPriority)]
 internal sealed class RedisCacheCommunicationAdapter : ICommunicationAdapter
 {
-    private const string ProviderId = "redis-cache";
-    private const string ReferenceIdentity = "Koan.Cache.Adapter.Redis";
-
     private readonly CommunicationAdapterDescriptor _descriptor;
     private readonly RedisCacheBroadcastOptions _options;
     private readonly ILogger<RedisCacheCommunicationAdapter> _logger;
@@ -55,7 +53,7 @@ internal sealed class RedisCacheCommunicationAdapter : ICommunicationAdapter
         var active = topology.Remote is RedisCacheStore
                      && cacheOptions.Value.CoherenceMode != Koan.Cache.Abstractions.Coherence.CoherenceMode.Disabled;
         _descriptor = new CommunicationAdapterDescriptor(
-            ProviderId,
+            Constants.BroadcastProviderId,
             active ? [CommunicationLane.FrameworkBroadcasts] : [],
             CommunicationDeliveryAssurance.BestEffort,
             CommunicationAdapterCapabilities.ContractIdentity
@@ -63,7 +61,7 @@ internal sealed class RedisCacheCommunicationAdapter : ICommunicationAdapter
             | CommunicationAdapterCapabilities.NodeFanOut
             | CommunicationAdapterCapabilities.MessageIdentity
             | CommunicationAdapterCapabilities.BoundedAcceptance,
-            [ReferenceIdentity],
+            [Constants.ReferenceIdentity],
             IsLayered: true);
     }
 
@@ -238,7 +236,7 @@ internal sealed class RedisCacheCommunicationAdapter : ICommunicationAdapter
 
     private RedisChannel Channel(string meshId, string contractId)
     {
-        var prefix = string.IsNullOrWhiteSpace(_options.ChannelName) ? "koan-cache" : _options.ChannelName.Trim();
+        var prefix = string.IsNullOrWhiteSpace(_options.ChannelName) ? Constants.DefaultChannelName : _options.ChannelName.Trim();
         return new RedisChannel(
             $"{prefix}:{Hash(meshId)}:{Hash(contractId)}",
             RedisChannel.PatternMode.Literal);

@@ -4,7 +4,7 @@ using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
-using Koan.Cache.Stores;
+using Koan.Cache.Identity;
 
 namespace Koan.Data.Core.Model;
 
@@ -104,7 +104,7 @@ public readonly struct EntityCacheFacet<TEntity, TKey>
             return ValueTask.FromResult(0L);
         }
 
-        return AppHost.GetRequiredService<CacheClient>(ControlOperation)
+        return AppHost.GetRequiredService<ICacheSubjectClient>(ControlOperation)
             .FlushTags(resolved, typeof(TEntity), ct);
     }
 
@@ -116,7 +116,7 @@ public readonly struct EntityCacheFacet<TEntity, TKey>
             return ValueTask.FromResult(0L);
         }
 
-        return AppHost.GetRequiredService<CacheClient>(ControlOperation)
+        return AppHost.GetRequiredService<ICacheSubjectClient>(ControlOperation)
             .CountTags(resolved, typeof(TEntity), ct);
     }
 
@@ -187,7 +187,6 @@ public sealed record EntityCacheExplanation(
 public sealed record EntityCachePolicyExplanation(
     CacheScope Scope,
     CacheStrategy Strategy,
-    CacheConsistencyMode Consistency,
     CacheTier Tier,
     TimeSpan? AbsoluteTtl,
     TimeSpan? LocalAbsoluteTtl,
@@ -195,15 +194,12 @@ public sealed record EntityCachePolicyExplanation(
     TimeSpan? AllowStaleFor,
     IReadOnlyList<string> Tags,
     string? Region,
-    string? LocalProvider,
-    string? RemoteProvider,
     bool BroadcastInvalidations)
 {
     internal static EntityCachePolicyExplanation From(CachePolicyDescriptor policy)
         => new(
             policy.Scope,
             policy.Strategy,
-            policy.Consistency,
             policy.Tier,
             policy.AbsoluteTtl,
             policy.L1AbsoluteTtl,
@@ -211,7 +207,5 @@ public sealed record EntityCachePolicyExplanation(
             policy.AllowStaleFor,
             policy.Tags.ToArray(),
             policy.Region,
-            policy.LocalProvider,
-            policy.RemoteProvider,
             policy.ForceCoherenceBroadcast);
 }

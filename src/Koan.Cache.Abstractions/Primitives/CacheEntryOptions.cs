@@ -24,17 +24,14 @@ public sealed record CacheEntryOptions
     /// <summary>Sliding TTL — refreshed on each read when the store supports it.</summary>
     public TimeSpan? SlidingTtl { get; init; }
 
-    /// <summary>How long to serve stale data while a background refresh runs.</summary>
+    /// <summary>Maximum bounded window in which this read may receive an expired value.</summary>
     public TimeSpan? AllowStaleFor { get; init; }
 
     /// <summary>Per-call override for singleflight gate wait. Null = use <c>CacheOptions.DefaultSingleflightTimeout</c>.</summary>
     public TimeSpan? SingleflightTimeout { get; init; }
 
-    /// <summary>
-    /// Consistency guarantees expected from the store when serving reads. Per ARCH-0078, default
-    /// is <see cref="CacheConsistencyMode.Strict"/> — SWR is opted in by setting <see cref="AllowStaleFor"/>.
-    /// </summary>
-    public CacheConsistencyMode Consistency { get; init; } = CacheConsistencyMode.Strict;
+    /// <summary>Which selected topology tiers participate in this entry operation.</summary>
+    public CacheTier Tier { get; init; } = CacheTier.Layered;
 
     /// <summary>Whether writes should broadcast a coherence invalidation. Default <c>true</c>.</summary>
     public bool ForceCoherenceBroadcast { get; init; } = true;
@@ -91,7 +88,7 @@ public sealed record CacheEntryOptions
 
     /// <summary>Project the read-side options consumed by <c>LayeredCache.Read</c> and <c>ICacheStore.Fetch</c>.</summary>
     public CacheReadOptions ToReadOptions()
-        => new(Region: Region, ScopeId: ScopeId, Consistency: Consistency, AllowStaleFor: AllowStaleFor);
+        => new(Region: Region, ScopeId: ScopeId, AllowStaleFor: AllowStaleFor);
 
     /// <summary>Project the write-side options consumed by <c>LayeredCache.Write</c> and <c>ICacheStore.Set</c>.</summary>
     public CacheWriteOptions ToWriteOptions()

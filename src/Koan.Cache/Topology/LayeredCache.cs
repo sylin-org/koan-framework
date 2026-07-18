@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Cache.Abstractions.Capabilities;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Microsoft.Extensions.Logging;
@@ -40,25 +41,30 @@ internal sealed class LayeredCache
 
     public CacheTopology Topology => _topology;
 
-    public async ValueTask<CacheFetchResult> Read(CacheKey key, CacheReadOptions options, CancellationToken ct)
+    public async ValueTask<CacheFetchResult> Read(CacheKey key, CacheReadOptions options, CacheTier tier, CancellationToken ct)
     {
-        if (_topology.Local is { } l1)
+        _topology.Require(tier, "read");
+
+        if (tier != CacheTier.RemoteOnly && _topology.LocalRoute is { } local)
         {
-            var l1Result = await l1.Fetch(key, options, ct).ConfigureAwait(false);
+            RequireReadCapabilities(local, options);
+            var l1Result = await local.Store.Fetch(key, options, ct).ConfigureAwait(false);
             if (l1Result.Hit) return l1Result;
         }
 
-        if (_topology.Remote is { } l2)
+        if (tier != CacheTier.LocalOnly && _topology.RemoteRoute is { } remote)
         {
-            var l2Result = await l2.Fetch(key, options, ct).ConfigureAwait(false);
+            RequireReadCapabilities(remote, options);
+            var l2Result = await remote.Store.Fetch(key, options, ct).ConfigureAwait(false);
             if (l2Result.Hit)
             {
-                if (_topology.Local is { } backfillTarget && l2Result.Value is not null)
+                if (tier == CacheTier.Layered && _topology.LocalRoute is { } backfillTarget && l2Result.Value is not null)
                 {
                     var backfillWrite = BuildBackfillWriteOptions(l2Result);
                     try
                     {
-                        await backfillTarget.Set(key, l2Result.Value, backfillWrite, ct).ConfigureAwait(false);
+                        RequireWriteCapabilities(backfillTarget, l2Result.Value, backfillWrite);
+                        await backfillTarget.Store.Set(key, l2Result.Value, backfillWrite, ct).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
@@ -72,15 +78,23 @@ internal sealed class LayeredCache
         return CacheFetchResult.Miss(new CacheEntryOptions());
     }
 
-    public async ValueTask Write(CacheKey key, CacheValue value, CacheWriteOptions options, CancellationToken ct)
+    public async ValueTask Write(CacheKey key, CacheValue value, CacheWriteOptions options, CacheTier tier, CancellationToken ct)
     {
+        _topology.Require(tier, "write");
         var writes = new List<ValueTask>(2);
 
-        if (_topology.Local is { } l1)
-            writes.Add(l1.Set(key, value, ApplyL1Ttl(options), ct));
+        if (tier != CacheTier.RemoteOnly && _topology.LocalRoute is { } local)
+        {
+            var localOptions = ApplyL1Ttl(options);
+            RequireWriteCapabilities(local, value, localOptions);
+            writes.Add(local.Store.Set(key, value, localOptions, ct));
+        }
 
-        if (_topology.Remote is { } l2)
-            writes.Add(l2.Set(key, value, options, ct));
+        if (tier != CacheTier.LocalOnly && _topology.RemoteRoute is { } remote)
+        {
+            RequireWriteCapabilities(remote, value, options);
+            writes.Add(remote.Store.Set(key, value, options, ct));
+        }
 
         foreach (var write in writes)
             await write.ConfigureAwait(false);
@@ -99,20 +113,22 @@ internal sealed class LayeredCache
         return anyRemoved;
     }
 
-    public async ValueTask Touch(CacheKey key, TimeSpan? newAbsoluteTtl, CancellationToken ct)
+    public async ValueTask Touch(CacheKey key, TimeSpan? newAbsoluteTtl, CacheTier tier, CancellationToken ct)
     {
-        if (_topology.Local is { } l1)
+        _topology.Require(tier, "touch");
+        if (tier != CacheTier.RemoteOnly && _topology.Local is { } l1)
             await l1.Touch(key, newAbsoluteTtl, ct).ConfigureAwait(false);
 
-        if (_topology.Remote is { } l2)
+        if (tier != CacheTier.LocalOnly && _topology.Remote is { } l2)
             await l2.Touch(key, newAbsoluteTtl, ct).ConfigureAwait(false);
     }
 
-    public async ValueTask<bool> Exists(CacheKey key, CancellationToken ct)
+    public async ValueTask<bool> Exists(CacheKey key, CacheTier tier, CancellationToken ct)
     {
-        if (_topology.Local is { } l1 && await l1.Exists(key, ct).ConfigureAwait(false))
+        _topology.Require(tier, "exists");
+        if (tier != CacheTier.RemoteOnly && _topology.Local is { } l1 && await l1.Exists(key, ct).ConfigureAwait(false))
             return true;
-        if (_topology.Remote is { } l2 && await l2.Exists(key, ct).ConfigureAwait(false))
+        if (tier != CacheTier.LocalOnly && _topology.Remote is { } l2 && await l2.Exists(key, ct).ConfigureAwait(false))
             return true;
         return false;
     }
@@ -168,6 +184,22 @@ internal sealed class LayeredCache
             Region: null,
             ScopeId: null,
             ForceCoherenceBroadcast: false);
+    }
+
+    private static void RequireReadCapabilities(CacheStoreRoute route, CacheReadOptions options)
+    {
+        if (options.AllowStaleFor is not null)
+            route.Capabilities.Require(CacheCaps.BoundedStaleServing);
+    }
+
+    private static void RequireWriteCapabilities(CacheStoreRoute route, CacheValue value, CacheWriteOptions options)
+    {
+        if (options.Tags.Count > 0)
+            route.Capabilities.Require(CacheCaps.Tags);
+        if (options.SlidingTtl is not null)
+            route.Capabilities.Require(CacheCaps.SlidingExpiration);
+        if (value.ContentKind == CacheContentKind.Binary)
+            route.Capabilities.Require(CacheCaps.BinaryPayload);
     }
 
 }

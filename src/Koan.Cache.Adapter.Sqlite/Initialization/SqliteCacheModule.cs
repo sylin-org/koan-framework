@@ -1,12 +1,14 @@
 using Koan.Cache.Adapter.Sqlite.Options;
 using Koan.Cache.Adapter.Sqlite.Stores;
-using Koan.Cache.Abstractions.Extensions;
+using Koan.Cache.Adapter.Sqlite.Infrastructure;
+using Koan.Cache.Abstractions.Stores;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace Koan.Cache.Adapter.Sqlite.Initialization;
@@ -21,19 +23,20 @@ public sealed class SqliteCacheModule : KoanModule
 {
     public override void Register(IServiceCollection services)
     {
-        services.AddKoanOptions<SqliteCacheOptions>("Koan:Cache:Adapters:Sqlite");
-        services.AddCacheStore<SqliteCacheStore>();
+        services.AddKoanOptions<SqliteCacheOptions>(Constants.Configuration.Section);
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheStore, SqliteCacheStore>());
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
 
-        var databasePath = Configuration.Read(cfg, "Koan:Cache:Adapters:Sqlite:DatabasePath", ".Koan/cache/cache.db");
-        var sweepInterval = Configuration.Read(cfg, "Koan:Cache:Adapters:Sqlite:SweepIntervalSeconds", 60);
+        var databasePath = Configuration.Read(
+            cfg,
+            Constants.Configuration.DatabasePath,
+            Constants.Configuration.DefaultDatabasePath);
 
-        module.AddSetting("CacheStore", "sqlite (Local, [ProviderPriority(50)])");
+        module.AddSetting("CacheStore", $"{Constants.ProviderId} (Local, [ProviderPriority({Constants.ProviderPriority})])");
         module.AddSetting("DatabasePath", databasePath);
-        module.AddSetting("SweepIntervalSeconds", sweepInterval.ToString());
     }
 }

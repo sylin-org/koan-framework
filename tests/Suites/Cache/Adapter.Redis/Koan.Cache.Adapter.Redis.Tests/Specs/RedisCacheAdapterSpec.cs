@@ -72,7 +72,7 @@ public sealed class RedisCacheAdapterSpec(RedisFixture fixture, ITestOutputHelpe
         await using var node = await RedisCacheNode.Start(fixture.ConnectionString!, keyPrefix, tagPrefix, channel, ct);
         var client = node.Provider.GetRequiredService<ICacheClient>();
 
-        // Per ARCH-0078: caller explicitly opts into SWR via .AllowStaleFor(...). The same
+        // The caller explicitly opts into bounded stale serving via .AllowStaleFor(...). The same
         // option is used for the write (records staleUntil at write time) and the read
         // (signals "I'll accept stale within this window").
         var key = new CacheKey($"redis-swr-optin-{token}");
@@ -82,12 +82,12 @@ public sealed class RedisCacheAdapterSpec(RedisFixture fixture, ITestOutputHelpe
 
         await entry.Set("payload", ct);
 
-        // Past absolute TTL but within SWR window → opted-in caller gets stale value.
+        // Past absolute TTL but within the bounded stale window → opted-in caller gets stale value.
         await Task.Delay(TimeSpan.FromMilliseconds(300), ct);
         var stale = await entry.Get(ct);
         stale.Should().Be("payload");
 
-        // Past SWR allowance → null even for opted-in caller.
+        // Past the bounded stale allowance → null even for opted-in caller.
         await Task.Delay(TimeSpan.FromMilliseconds(2500), ct);
         var final = await entry.Get(ct);
         final.Should().BeNull();
@@ -123,6 +123,6 @@ public sealed class RedisCacheAdapterSpec(RedisFixture fixture, ITestOutputHelpe
         // Past TTL → null (no opt-in, default strict).
         await Task.Delay(TimeSpan.FromMilliseconds(300), ct);
         var after = await entry.Get(ct);
-        after.Should().BeNull("default consistency is strict — no SWR without explicit AllowStaleFor (ARCH-0078)");
+        after.Should().BeNull("fresh-or-miss is the default; stale serving requires explicit AllowStaleFor");
     }
 }

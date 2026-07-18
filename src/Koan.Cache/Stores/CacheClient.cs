@@ -25,7 +25,7 @@ namespace Koan.Cache.Stores;
 /// Public typed surface over <see cref="LayeredCache"/>. Owns serializer resolution,
 /// scope projection, singleflight gating, and developer-facing options shaping.
 /// </summary>
-internal sealed class CacheClient : ICacheClient, ICacheIdentityWriter
+internal sealed class CacheClient : ICacheClient, ICacheSubjectClient
 {
     private const string LayeredProviderTag = "layered";
 
@@ -54,7 +54,7 @@ internal sealed class CacheClient : ICacheClient, ICacheIdentityWriter
         _layered = layered ?? throw new ArgumentNullException(nameof(layered));
         _serializers = serializers?.ToArray() ?? Array.Empty<ICacheSerializer>();
         if (_serializers.Count == 0)
-            throw new InvalidOperationException("No cache serializers registered. Ensure AddKoanCache() was called.");
+            throw new InvalidOperationException("No cache serializers are registered. Reference Sylin.Koan.Cache and call AddKoan().");
 
         _singleflight = singleflight ?? throw new ArgumentNullException(nameof(singleflight));
         _coherence = coherence ?? throw new ArgumentNullException(nameof(coherence));
@@ -73,12 +73,18 @@ internal sealed class CacheClient : ICacheClient, ICacheIdentityWriter
 
     public ICacheEntryBuilder<T> CreateEntry<T>(CacheKey key)
     {
-        // Per ARCH-0078: default consistency is Strict. Callers opt into SWR via .AllowStaleFor(...)
-        // on the builder, or via [Cacheable(AllowStaleForSeconds = N)] at the entity level.
+        var defaults = _options.CurrentValue;
         var options = new CacheEntryOptions
         {
-            Consistency = CacheConsistencyMode.Strict,
-            SingleflightTimeout = _options.CurrentValue.DefaultSingleflightTimeout
+            AbsoluteTtl = defaults.DefaultTtlSeconds > 0
+                ? TimeSpan.FromSeconds(defaults.DefaultTtlSeconds)
+                : null,
+            L1AbsoluteTtl = defaults.DefaultL1TtlSeconds is > 0
+                ? TimeSpan.FromSeconds(defaults.DefaultL1TtlSeconds.Value)
+                : null,
+            Tier = defaults.DefaultTier,
+            ForceCoherenceBroadcast = defaults.BroadcastInvalidationByDefault,
+            SingleflightTimeout = defaults.DefaultSingleflightTimeout
         };
 
         var scope = _scopeAccessor.Current;
@@ -99,7 +105,7 @@ internal sealed class CacheClient : ICacheClient, ICacheIdentityWriter
     {
         var normalized = ApplyScope(options);
         var physical = _identity.Bind(key, normalized.Tags, subject, "cache read");
-        var result = await _layered.Read(physical.Key, normalized.ToReadOptions(), ct).ConfigureAwait(false);
+        var result = await _layered.Read(physical.Key, normalized.ToReadOptions(), normalized.Tier, ct).ConfigureAwait(false);
         if (result.Hit) _instrumentation.RecordHit(physical.Key.Value, LayeredProviderTag);
         else _instrumentation.RecordMiss(physical.Key.Value, LayeredProviderTag);
         return result;
@@ -145,7 +151,7 @@ internal sealed class CacheClient : ICacheClient, ICacheIdentityWriter
     {
         var normalized = ApplyScope(options);
         var physical = _identity.Bind(key, normalized.Tags, subject, "cache exists");
-        return _layered.Exists(physical.Key, ct);
+        return _layered.Exists(physical.Key, normalized.Tier, ct);
     }
 
     public ValueTask SetAsync<T>(CacheKey key, T value, CacheEntryOptions options, CancellationToken ct)
@@ -178,7 +184,7 @@ internal sealed class CacheClient : ICacheClient, ICacheIdentityWriter
     {
         var serializer = ResolveSerializer(typeof(T), normalized.ContentKind);
         var cacheValue = await serializer.Serialize(value!, typeof(T), normalized, ct).ConfigureAwait(false);
-        await _layered.Write(key, cacheValue, normalized.ToWriteOptions(), ct).ConfigureAwait(false);
+        await _layered.Write(key, cacheValue, normalized.ToWriteOptions(), normalized.Tier, ct).ConfigureAwait(false);
         _instrumentation.RecordSet(key.Value, LayeredProviderTag);
 
         if (normalized.ForceCoherenceBroadcast)
@@ -217,13 +223,13 @@ internal sealed class CacheClient : ICacheClient, ICacheIdentityWriter
     {
         var normalized = ApplyScope(options);
         var physical = _identity.Bind(key, normalized.Tags, subject, "cache touch");
-        return _layered.Touch(physical.Key, normalized.AbsoluteTtl, ct);
+        return _layered.Touch(physical.Key, normalized.AbsoluteTtl, normalized.Tier, ct);
     }
 
     public async ValueTask<long> FlushTags(IReadOnlyCollection<string> tags, CancellationToken ct)
         => await FlushTags(tags, subject: null, ct).ConfigureAwait(false);
 
-    internal async ValueTask<long> FlushTags(
+    public async ValueTask<long> FlushTags(
         IReadOnlyCollection<string> tags,
         Type? subject,
         CancellationToken ct)
@@ -237,6 +243,7 @@ internal sealed class CacheClient : ICacheClient, ICacheIdentityWriter
         ct.ThrowIfCancellationRequested();
 
         var keys = new HashSet<CacheKey>();
+        var expiredKeys = new HashSet<CacheKey>();
         var now = DateTimeOffset.UtcNow;
 
         foreach (var tag in normalized)
@@ -247,12 +254,18 @@ internal sealed class CacheClient : ICacheClient, ICacheIdentityWriter
             {
                 if (entry.IsExpired(now))
                 {
-                    await RemovePhysical(entry.Key, ct).ConfigureAwait(false);
+                    expiredKeys.Add(entry.Key);
                     continue;
                 }
 
                 keys.Add(entry.Key);
             }
+        }
+
+        foreach (var expiredKey in expiredKeys)
+        {
+            ct.ThrowIfCancellationRequested();
+            await RemovePhysical(expiredKey, ct).ConfigureAwait(false);
         }
 
         var removed = 0L;
@@ -270,7 +283,7 @@ internal sealed class CacheClient : ICacheClient, ICacheIdentityWriter
     public async ValueTask<long> CountTags(IReadOnlyCollection<string> tags, CancellationToken ct)
         => await CountTags(tags, subject: null, ct).ConfigureAwait(false);
 
-    internal async ValueTask<long> CountTags(
+    public async ValueTask<long> CountTags(
         IReadOnlyCollection<string> tags,
         Type? subject,
         CancellationToken ct)
@@ -284,6 +297,7 @@ internal sealed class CacheClient : ICacheClient, ICacheIdentityWriter
         ct.ThrowIfCancellationRequested();
 
         var keys = new HashSet<CacheKey>();
+        var expiredKeys = new HashSet<CacheKey>();
         var now = DateTimeOffset.UtcNow;
 
         foreach (var tag in normalized)
@@ -294,12 +308,18 @@ internal sealed class CacheClient : ICacheClient, ICacheIdentityWriter
             {
                 if (entry.IsExpired(now))
                 {
-                    await RemovePhysical(entry.Key, ct).ConfigureAwait(false);
+                    expiredKeys.Add(entry.Key);
                     continue;
                 }
 
                 keys.Add(entry.Key);
             }
+        }
+
+        foreach (var expiredKey in expiredKeys)
+        {
+            ct.ThrowIfCancellationRequested();
+            await RemovePhysical(expiredKey, ct).ConfigureAwait(false);
         }
 
         return keys.Count;
@@ -310,7 +330,7 @@ internal sealed class CacheClient : ICacheClient, ICacheIdentityWriter
         CacheEntryOptions normalized,
         CancellationToken ct)
     {
-        var result = await _layered.Read(key, normalized.ToReadOptions(), ct).ConfigureAwait(false);
+        var result = await _layered.Read(key, normalized.ToReadOptions(), normalized.Tier, ct).ConfigureAwait(false);
         if (result.Hit) _instrumentation.RecordHit(key.Value, LayeredProviderTag);
         else _instrumentation.RecordMiss(key.Value, LayeredProviderTag);
         if (!result.Hit || result.Value is null)

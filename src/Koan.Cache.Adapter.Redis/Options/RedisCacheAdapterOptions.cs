@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Koan.Cache.Adapter.Redis.Infrastructure;
 
 namespace Koan.Cache.Adapter.Redis.Options;
 
@@ -18,9 +19,9 @@ public sealed class RedisCacheAdapterOptions
 {
     public string? InstanceName { get; set; }
 
-    public string KeyPrefix { get; set; } = "cache:";
+    public string KeyPrefix { get; set; } = Constants.DefaultKeyPrefix;
 
-    public string TagPrefix { get; set; } = "cache:tag:";
+    public string TagPrefix { get; set; } = Constants.DefaultTagPrefix;
 
     public int Database { get; set; } = -1;
 

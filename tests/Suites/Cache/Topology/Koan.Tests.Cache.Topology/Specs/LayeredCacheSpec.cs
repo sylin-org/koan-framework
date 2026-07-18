@@ -1,8 +1,10 @@
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Topology;
+using Koan.Cache.Options;
 using Koan.Tests.Cache.Topology.Support;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Tests.Cache.Topology.Specs;
 
@@ -18,7 +20,11 @@ public sealed class LayeredCacheSpec
 
     private static LayeredCache BuildLayered(FakeCacheStore? local, FakeCacheStore? remote)
     {
-        var topology = new global::Koan.Cache.Topology.CacheTopology(local, remote);
+        var stores = new ICacheStore?[] { local, remote };
+        var topology = new global::Koan.Cache.Topology.CacheTopology(
+            stores.OfType<ICacheStore>(),
+            Options.Create(new CacheOptions()),
+            NullLogger<global::Koan.Cache.Topology.CacheTopology>.Instance);
         return new LayeredCache(topology, NullLogger<LayeredCache>.Instance);
     }
 
@@ -30,7 +36,7 @@ public sealed class LayeredCacheSpec
         await l1.Set(Key, Value, WriteOpts, CancellationToken.None);
 
         var layered = BuildLayered(l1, l2);
-        var result = await layered.Read(Key, ReadOpts, CancellationToken.None);
+        var result = await layered.Read(Key, ReadOpts, CacheTier.Layered, CancellationToken.None);
 
         result.Hit.Should().BeTrue();
         l2.FetchCount.Should().Be(0);
@@ -45,7 +51,7 @@ public sealed class LayeredCacheSpec
         l2.SetCount = 0;  // reset after seed
 
         var layered = BuildLayered(l1, l2);
-        var result = await layered.Read(Key, ReadOpts, CancellationToken.None);
+        var result = await layered.Read(Key, ReadOpts, CacheTier.Layered, CancellationToken.None);
 
         result.Hit.Should().BeTrue();
         l1.SetCount.Should().Be(1, "L1 should be backfilled from L2");
@@ -58,7 +64,7 @@ public sealed class LayeredCacheSpec
             new FakeCacheStore("memory", CacheStorePlacement.Local),
             new FakeCacheStore("remote", CacheStorePlacement.Remote));
 
-        var result = await layered.Read(Key, ReadOpts, CancellationToken.None);
+        var result = await layered.Read(Key, ReadOpts, CacheTier.Layered, CancellationToken.None);
 
         result.Hit.Should().BeFalse();
     }
@@ -70,7 +76,7 @@ public sealed class LayeredCacheSpec
         var l2 = new FakeCacheStore("remote", CacheStorePlacement.Remote);
         var layered = BuildLayered(l1, l2);
 
-        await layered.Write(Key, Value, WriteOpts, CancellationToken.None);
+        await layered.Write(Key, Value, WriteOpts, CacheTier.Layered, CancellationToken.None);
 
         l1.Contains(Key.Value).Should().BeTrue();
         l2.Contains(Key.Value).Should().BeTrue();
@@ -83,7 +89,7 @@ public sealed class LayeredCacheSpec
         var l2 = new FakeCacheStore("remote", CacheStorePlacement.Remote);
         var layered = BuildLayered(l1, l2);
 
-        await layered.Write(Key, Value, WriteOpts, CancellationToken.None);
+        await layered.Write(Key, Value, WriteOpts, CacheTier.Layered, CancellationToken.None);
         await layered.Evict(Key, CancellationToken.None);
 
         l1.Contains(Key.Value).Should().BeFalse();
@@ -97,7 +103,7 @@ public sealed class LayeredCacheSpec
         var l2 = new FakeCacheStore("remote", CacheStorePlacement.Remote);
         var layered = BuildLayered(l1, l2);
 
-        await layered.Write(Key, Value, WriteOpts, CancellationToken.None);
+        await layered.Write(Key, Value, WriteOpts, CacheTier.Layered, CancellationToken.None);
 
         await layered.EvictLocal(Key, CancellationToken.None);
 
@@ -126,7 +132,7 @@ public sealed class LayeredCacheSpec
         await l1.Set(Key, Value, WriteOpts, CancellationToken.None);
 
         var layered = BuildLayered(local: l1, remote: null);
-        var result = await layered.Read(Key, ReadOpts, CancellationToken.None);
+        var result = await layered.Read(Key, ReadOpts, CacheTier.Layered, CancellationToken.None);
 
         result.Hit.Should().BeTrue();
     }
@@ -138,18 +144,46 @@ public sealed class LayeredCacheSpec
         await l2.Set(Key, Value, WriteOpts, CancellationToken.None);
 
         var layered = BuildLayered(local: null, remote: l2);
-        var result = await layered.Read(Key, ReadOpts, CancellationToken.None);
+        var result = await layered.Read(Key, ReadOpts, CacheTier.Layered, CancellationToken.None);
 
         result.Hit.Should().BeTrue();
     }
 
     [Fact]
-    public async Task Empty_topology_returns_miss()
+    public async Task Empty_topology_fails_with_a_correction()
     {
         var layered = BuildLayered(local: null, remote: null);
-        var result = await layered.Read(Key, ReadOpts, CancellationToken.None);
+        var read = async () => await layered.Read(Key, ReadOpts, CacheTier.Layered, CancellationToken.None);
+
+        await read.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Reference a Cache store provider*");
+    }
+
+    [Fact]
+    public async Task LocalOnly_write_skips_the_remote_store()
+    {
+        var l1 = new FakeCacheStore("memory", CacheStorePlacement.Local);
+        var l2 = new FakeCacheStore("remote", CacheStorePlacement.Remote);
+        var layered = BuildLayered(l1, l2);
+
+        await layered.Write(Key, Value, WriteOpts, CacheTier.LocalOnly, CancellationToken.None);
+
+        l1.Contains(Key.Value).Should().BeTrue();
+        l2.Contains(Key.Value).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RemoteOnly_read_skips_a_populated_local_store()
+    {
+        var l1 = new FakeCacheStore("memory", CacheStorePlacement.Local);
+        var l2 = new FakeCacheStore("remote", CacheStorePlacement.Remote);
+        await l1.Set(Key, Value, WriteOpts, CancellationToken.None);
+        var layered = BuildLayered(l1, l2);
+
+        var result = await layered.Read(Key, ReadOpts, CacheTier.RemoteOnly, CancellationToken.None);
 
         result.Hit.Should().BeFalse();
+        l1.FetchCount.Should().Be(0);
     }
 
 }

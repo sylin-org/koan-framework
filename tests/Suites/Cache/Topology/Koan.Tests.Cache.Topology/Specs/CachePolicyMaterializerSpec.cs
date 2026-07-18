@@ -59,13 +59,11 @@ public sealed class CachePolicyMaterializerSpec
     }
 
     [Fact]
-    public void CachePolicy_with_all_pin_fields_propagates_to_descriptor()
+    public void CachePolicy_with_explicit_tier_propagates_to_descriptor()
     {
         var attr = new CachePolicyAttribute(CacheScope.Entity, "x:{Id}")
         {
             Tier = CacheTier.LocalOnly,
-            LocalProvider = "memory",
-            RemoteProvider = "redis",
             ForceCoherenceBroadcast = false,
             Strategy = CacheStrategy.GetOnly,
         };
@@ -73,8 +71,6 @@ public sealed class CachePolicyMaterializerSpec
         var descriptor = CachePolicyMaterializer.Materialize(attr, member: null, declaringType: typeof(Product));
 
         descriptor.Tier.Should().Be(CacheTier.LocalOnly);
-        descriptor.LocalProvider.Should().Be("memory");
-        descriptor.RemoteProvider.Should().Be("redis");
         descriptor.ForceCoherenceBroadcast.Should().BeFalse();
         descriptor.Strategy.Should().Be(CacheStrategy.GetOnly);
     }

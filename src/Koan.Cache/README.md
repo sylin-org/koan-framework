@@ -1,78 +1,94 @@
-# Koan Cache
+# Sylin.Koan.Cache
 
-Koan Cache adds transparent, policy-driven caching to Koan Entities. Reference
-`Sylin.Koan.Cache`, keep the normal `AddKoan()` application boot, and declare intent on the model:
+Business-shaped caching for Koan Entities, with a process-local provider that works immediately and deterministic
+provider composition when adapters are referenced.
+
+## Install
+
+```powershell
+dotnet add package Sylin.Koan.Cache
+```
+
+Keep the normal Koan boot and declare the policy where the business type lives:
 
 ```csharp
-using Koan.Cache.Abstractions.Policies;
-using Koan.Data.Core.Model;
+builder.Services.AddKoan();
 
 [Cacheable(300)]
 public sealed class Todo : Entity<Todo>
 {
     public string Title { get; set; } = "";
 }
-
-var todo = await Todo.Get(id, ct); // read-through under the elected topology
-todo.Title = "done";
-await todo.Save(ct);               // cache state follows the normal business write
 ```
 
-No cache service belongs in application code. The module supplies a process-memory local floor;
-direct adapter references can add a persistent local tier, a remote tier, and peer invalidation
-without changing Entity operations.
+That is the complete shortest path. `Todo.Get`, `Save`, and `Delete` retain their normal meaning; Cache applies
+read-through and invalidation behind the Entity repository. No cache-specific registration belongs in
+`Program.cs`.
 
-## Entity language
-
-Ordinary `Save` and `Delete` operations already maintain cache state. Explicit entry eviction exists
-for writes that deliberately bypass the Entity repository:
+## Meaningful result
 
 ```csharp
-var one = await todo.Cache.Evict(ct);
-var many = await todos.Cache.Evict(ct);
-var stream = await Todo.QueryStream(x => x.Done, ct).Cache.Evict(ct);
+var todo = await Todo.Get(id, ct);     // cache-aware read
+todo.Title = "done";
+await todo.Save(ct);                   // business write; cache state follows
 
-var policy = Todo.Cache.Explain();
-var flushed = await Todo.Cache.Flush(ct);
+var policy = Todo.Cache.Explain();     // inspect the effective Entity policy
+var removed = await todo.Cache.Evict(ct); // after an out-of-band write
+var flushed = await Todo.Cache.Flush(ct); // type/tag control plane
 ```
 
-Instance/set/stream `Cache.Evict()` is the entry plane. It preserves source order and multiplicity,
-captures Data and registered Koan context once, applies sequential backpressure, and returns a
-fixed-size `EntityCacheEviction`. `Removed` means an entry existed in the selected topology;
-`Absent` is a successful idempotent removal whose peer invalidation was still requested; `Skipped`
-means an unset identifier could never have been cached.
+Scalar, finite, and async-stream `Cache.Evict()` forms preserve source order and apply sequential backpressure.
+Ordinary Entity writes already maintain cache state; explicit eviction is for writes that intentionally bypassed
+the repository.
 
-`Todo.Cache` is the type/control plane: policy explanation and tag-based `Flush`, `Count`, and `Any`.
-It is deliberately not a pointwise entry API.
+## Direct cache entries
 
-## Policy and topology
+Use `ICacheClient` or the `Cache` facade when the cached value is not an Entity repository result:
 
-`[Cacheable]` is the normal policy. `[CachePolicy]` is the power-user form for strategy, tier, tags,
-provider pins, or a custom key template. One host-owned Entity cache plan selects the effective
-policy, template, partition/source tokens, and managed equality-axis scope for repository caching and
-explicit eviction, so the two paths cannot drift.
+```csharp
+var report = await Cache.WithJson<UsageReport>($"usage:{tenantId}")
+    .WithAbsoluteTtl(TimeSpan.FromMinutes(10))
+    .WithTags("usage")
+    .GetOrAdd(ct => BuildReport(tenantId, ct), ct);
+```
+
+Fresh-or-miss is the default. `AllowStaleFor` opts a read into a bounded stale-serving window; it does not promise
+background revalidation. `WithTier(CacheTier.LocalOnly)` and `WithTier(CacheTier.RemoteOnly)` express an explicit
+operation requirement and fail clearly when that tier is unavailable. `Layered` is the default and uses every
+available selected tier.
+
+## Composition by reference
 
 | Direct reference | Effect |
 |---|---|
-| `Sylin.Koan.Cache` | Process-memory local floor |
-| `Sylin.Koan.Cache.Adapter.Sqlite` | Eligible persistent local store |
-| `Sylin.Koan.Cache.Adapter.Redis` | Eligible remote tier; its peer-broadcast capability activates only when Redis owns L2 |
-| `Sylin.Koan.Communication.Connector.RabbitMq` | Direct Communication intent may carry peer invalidation |
+| `Sylin.Koan.Cache` | Built-in process-memory Local floor |
+| `Sylin.Koan.Cache.Adapter.Sqlite` | Persistent Local candidate; wins automatic Local election |
+| `Sylin.Koan.Cache.Adapter.Redis` | Remote Redis candidate plus layered peer-broadcast capability |
 
-Provider pins fail when unavailable. External intent does not silently fall back to local reach.
-Startup facts and health report effective L1/L2 election, coherence posture, provider assurance,
-policy count, every resolved Entity entry plan or safety exclusion, and the L1 TTL safety bound.
+Koan compiles Local and Remote election once from standard .NET DI candidates. An optional host-wide
+`Cache:LocalProvider` or `Cache:RemoteProvider` pin overrides priority and fails closed when unavailable. Per-policy
+provider pins do not exist; a policy chooses semantic tier, while the host owns infrastructure selection.
 
-## Failure and non-claims
+Each store declares guarantees through `CacheCaps`. Operations negotiate the capabilities they require—tags,
+sliding expiry, bounded stale serving, or binary payloads—before invoking the provider.
 
-Source and removal failures throw `EntityCacheEvictionException`; cancellation throws
-`EntityCacheEvictionCanceledException`. Both carry the confirmed fixed-size prefix. Cache-tier
-removal and peer publication are not atomic, so a failing current item may already be partly removed
-even though it is not counted as confirmed.
+## Startup and operations
 
-Koan does not claim batch atomicity, durable invalidation replay, remote handler settlement, or
-cross-store transactions. Use type/tag flush for broad maintenance; pointwise stream eviction emits
-one key invalidation per Entity and is intentionally sequential.
+Boot reporting and composition facts expose:
 
-See the [Cache reference](../../docs/reference/data/cache.md) and
-[technical notes](TECHNICAL.md).
+- every available store, placement, priority, and declared capabilities;
+- selected Local/Remote receipts and effective topology;
+- default tier, TTL, L1 TTL, and invalidation posture;
+- peer-broadcast provider and assurance; and
+- materialized Entity policies, resolved entry plans, and safety exclusions.
+
+`CacheHealthCheck` probes each selected tier and reports coherence posture. Facts can be projected through Koan's
+operator and agent surfaces when those host modules are present.
+
+## Honest limits
+
+Cache does not claim cross-store transactions, batch atomicity, durable invalidation replay, remote handler
+settlement, or automatic stale-value revalidation. Peer invalidation is a bounded best-effort hint; L1 TTL remains
+part of the correctness posture.
+
+See the [Cache reference](../../docs/reference/data/cache.md) and [technical notes](TECHNICAL.md).

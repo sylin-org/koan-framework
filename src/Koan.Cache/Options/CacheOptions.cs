@@ -13,14 +13,10 @@ public sealed class CacheOptions
 
     public TimeSpan DefaultSingleflightTimeout { get; set; } = TimeSpan.FromSeconds(5);
 
-    public bool EnableDiagnosticsEndpoint { get; set; } = true;
-
     public IList<string> PolicyAssemblies { get; } = new List<string>();
 
-    public bool PublishInvalidationByDefault { get; set; }
+    public bool BroadcastInvalidationByDefault { get; set; }
         = true;
-
-    public int DefaultTagCapacity { get; set; } = 256;
 
     // ── Tiering ───────────────────────────────────────────────────────────────
 

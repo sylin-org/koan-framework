@@ -5,11 +5,14 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Primitives;
+using Koan.Cache.Abstractions.Capabilities;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Adapter.Redis.Options;
 using Koan.Cache.Adapter.Redis.Serialization;
+using Koan.Cache.Adapter.Redis.Infrastructure;
 using Koan.Data.Abstractions;
 using Koan.Core;
+using Koan.Core.Capabilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
@@ -20,7 +23,7 @@ namespace Koan.Cache.Adapter.Redis.Stores;
 /// Distributed L2 cache store backed by Redis. Pure storage; Cache owns invalidation meaning and
 /// the layered Redis Communication capability owns physical node broadcast.
 /// </summary>
-[ProviderPriority(100)]
+[ProviderPriority(Constants.ProviderPriority)]
 public sealed class RedisCacheStore : ICacheStore
 {
     private readonly IConnectionMultiplexer _multiplexer;
@@ -42,20 +45,19 @@ public sealed class RedisCacheStore : ICacheStore
 
         _database = _multiplexer.GetDatabase(_options.Database >= 0 ? _options.Database : -1);
         _instancePrefix = NormalizePrefix(_options.InstanceName);
-        _keyPrefix = NormalizePrefix(string.IsNullOrWhiteSpace(_options.KeyPrefix) ? "cache" : _options.KeyPrefix!);
-        _tagPrefix = NormalizePrefix(string.IsNullOrWhiteSpace(_options.TagPrefix) ? "cache:tag" : _options.TagPrefix!);
+        _keyPrefix = NormalizePrefix(string.IsNullOrWhiteSpace(_options.KeyPrefix) ? Constants.DefaultKeyPrefix : _options.KeyPrefix!);
+        _tagPrefix = NormalizePrefix(string.IsNullOrWhiteSpace(_options.TagPrefix) ? Constants.DefaultTagPrefix : _options.TagPrefix!);
     }
 
-    public string Name => "redis";
+    public string Name => Constants.ProviderId;
 
     public CacheStorePlacement Placement => CacheStorePlacement.Remote;
 
-    public CacheStoreCapabilities Capabilities { get; } = new(
-        SupportsTags: true,
-        SupportsSlidingTtl: true,
-        SupportsStaleWhileRevalidate: true,
-        SupportsBinary: true,
-        SupportsPersistence: true);
+    public void Describe(ICapabilities caps)
+        => caps.Add(CacheCaps.Tags)
+            .Add(CacheCaps.SlidingExpiration)
+            .Add(CacheCaps.BoundedStaleServing)
+            .Add(CacheCaps.BinaryPayload);
 
     public async ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheReadOptions options, CancellationToken ct)
     {

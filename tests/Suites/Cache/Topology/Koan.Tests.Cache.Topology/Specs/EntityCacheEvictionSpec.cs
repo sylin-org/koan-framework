@@ -208,10 +208,16 @@ public sealed class EntityCacheEvictionSpec
             new KoanContextCarrierRegistry(Array.Empty<IKoanContextCarrier>()));
     }
 
-    private sealed class IdentityWriter(ICacheWriter inner) : ICacheIdentityWriter
+    private sealed class IdentityWriter(ICacheWriter inner) : ICacheSubjectClient
     {
         public ValueTask<bool> Remove(CacheKey key, Type? subject, CancellationToken ct)
             => inner.Remove(key, ct);
+
+        public ValueTask<long> FlushTags(IReadOnlyCollection<string> tags, Type? subject, CancellationToken ct)
+            => ValueTask.FromResult(0L);
+
+        public ValueTask<long> CountTags(IReadOnlyCollection<string> tags, Type? subject, CancellationToken ct)
+            => ValueTask.FromResult(0L);
     }
 
     private static CachePolicyDescriptor Policy(string template, Type? entityType = null)
@@ -219,15 +225,12 @@ public sealed class EntityCacheEvictionSpec
             CacheScope.Entity,
             template,
             CacheStrategy.GetOrSet,
-            CacheConsistencyMode.Strict,
             CacheTier.Layered,
             TimeSpan.FromMinutes(5),
             TimeSpan.FromMinutes(1),
             null,
             null,
             [(entityType ?? typeof(Note)).Name],
-            null,
-            null,
             null,
             null,
             true,

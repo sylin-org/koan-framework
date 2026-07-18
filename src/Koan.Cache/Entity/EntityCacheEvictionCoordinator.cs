@@ -9,7 +9,7 @@ namespace Koan.Cache.Entity;
 
 /// <summary>Executes one bounded, context-stable Entity cache eviction source.</summary>
 internal sealed class EntityCacheEvictionCoordinator(
-    ICacheIdentityWriter writer,
+    ICacheSubjectClient writer,
     EntityCachePlan plans,
     KoanContextCarrierRegistry contextCarriers)
 {

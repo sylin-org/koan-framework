@@ -163,7 +163,7 @@ built-in provider is process-local. Layered or directly intended Communication a
 same contract across nodes without exposing a cache-specific transport SPI to applications.
 
 **Fresh-or-null** — The default cache read contract: a read past the entry's absolute TTL
-returns `null` (a cache miss), never stale data. Stale-while-revalidate is an explicit
-per-call opt-in via an `AllowStaleFor` window — there is no global toggle, so staleness is
-never a surprise. Defined by `CacheReadOptions.Default` in
+returns `null` (a cache miss), never stale data. Bounded stale serving is an explicit
+per-call opt-in via an `AllowStaleFor` window; it does not claim background revalidation.
+There is no global toggle, so staleness is never a surprise. Defined by `CacheReadOptions.Default` in
 [`CacheReadOptions`](../../src/Koan.Cache.Abstractions/Primitives/CacheReadOptions.cs).

@@ -13,7 +13,7 @@ namespace Koan.Cache.Abstractions.Policies;
 /// History: prior to consolidation, the derivation was implemented independently in two
 /// places. The boot-time path correctly clamped to L2; the per-write path did not. Result:
 /// for any L2 TTL under 60 seconds, the per-write derivation produced an L1 TTL longer
-/// than L2 — surfaced by an SWR integration test on <c>feat/koan-cache-pillar</c>.
+/// than L2 so local staleness remains bounded independently of shared storage.
 /// Extracting the rule eliminates the bug class (one implementation, no drift).
 /// </para>
 /// <para>

@@ -86,29 +86,24 @@
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Cache
-- Depends on: Koan.Cache.Abstractions, Koan.Cache.Analyzers, Koan.Communication, Koan.Core, Koan.Data.Abstractions, Koan.Data.Core
+- Depends on: Koan.Cache.Abstractions, Koan.Communication, Koan.Core, Koan.Data.Abstractions, Koan.Data.Core
 - Depended by: Koan.Cache.Adapter.Redis, Koan.Cache.Adapter.Sqlite, Koan.Mcp.Operations
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Cache.Abstractions
-- Depends on: –
+- Depends on: Koan.Core
 - Depended by: Koan.Cache, Koan.Cache.Adapter.Redis, Koan.Cache.Adapter.Sqlite, Koan.Data.Core, Koan.Web.OpenGraph
-- Documentation: README ❌ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Cache.Adapter.Redis
-- Depends on: Koan.Cache, Koan.Cache.Abstractions, Koan.Cache.Analyzers, Koan.Communication, Koan.Data.Connector.Redis
+- Depends on: Koan.Cache, Koan.Cache.Abstractions, Koan.Communication, Koan.Data.Connector.Redis
 - Depended by: –
-- Documentation: README ❌ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Cache.Adapter.Sqlite
-- Depends on: Koan.Cache, Koan.Cache.Abstractions, Koan.Cache.Analyzers, Koan.Core
+- Depends on: Koan.Cache, Koan.Cache.Abstractions, Koan.Core
 - Depended by: –
-- Documentation: README ❌ · TECHNICAL ❌
-
-### Koan.Cache.Analyzers
-- Depends on: –
-- Depended by: Koan.Cache, Koan.Cache.Adapter.Redis, Koan.Cache.Adapter.Sqlite
-- Documentation: README ❌ · TECHNICAL ❌
+- Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Canon
 - Depends on: Koan.Canon.Contracts, Koan.Core, Koan.Data.Core

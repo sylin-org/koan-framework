@@ -617,10 +617,12 @@
       "targetFrameworks": [
         "net10.0"
       ],
-      "dependencies": [],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "dependencies": [
+        "Sylin.Koan.Core"
+      ],
+      "readme": "src/Koan.Cache.Abstractions/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Cache.Abstractions/TECHNICAL.md",
       "claims": []
     },
     {
@@ -636,9 +638,9 @@
         "Sylin.Koan.Communication",
         "Sylin.Koan.Data.Connector.Redis"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Cache.Adapter.Redis/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Cache.Adapter.Redis/TECHNICAL.md",
       "claims": []
     },
     {
@@ -653,22 +655,9 @@
         "Sylin.Koan.Cache.Abstractions",
         "Sylin.Koan.Core"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
-      "claims": []
-    },
-    {
-      "packageId": "Sylin.Koan.Cache.Analyzers",
-      "shape": "analyzer",
-      "description": "Roslyn analyzer for Koan.Cache: enforces typed registration helpers (KOAN0001). See ARCH-0081.",
-      "targetFrameworks": [
-        "netstandard2.0"
-      ],
-      "dependencies": [],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Cache.Adapter.Sqlite/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Cache.Adapter.Sqlite/TECHNICAL.md",
       "claims": []
     },
     {

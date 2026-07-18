@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Primitives;
+using Koan.Core.Capabilities;
 
 namespace Koan.Cache.Abstractions.Stores;
 
@@ -17,16 +18,13 @@ namespace Koan.Cache.Abstractions.Stores;
 /// implementation class controls precedence when multiple stores share a placement.
 /// </para>
 /// </remarks>
-public interface ICacheStore
+public interface ICacheStore : IDescribesCapabilities
 {
     /// <summary>Unique store identifier, matched against <c>CacheOptions.LocalProvider</c> / <c>RemoteProvider</c>.</summary>
     string Name { get; }
 
     /// <summary>Whether this store is process-local or shared across nodes.</summary>
     CacheStorePlacement Placement { get; }
-
-    /// <summary>Declared K/V capabilities (tags, sliding TTL, SWR, binary, persistence).</summary>
-    CacheStoreCapabilities Capabilities { get; }
 
     /// <summary>Fetch a single entry. Returns a miss result rather than throwing on absence.</summary>
     ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheReadOptions options, CancellationToken ct);

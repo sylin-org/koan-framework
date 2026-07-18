@@ -204,8 +204,8 @@ Three commits on `feat/koan-cache-pillar` proved the canon's value before it was
 
 | Bug class | Surfaced by | Why unit tests missed it |
 |---|---|---|
-| `TryAddEnumerable<TService>(factory)` indistinguishable-descriptor throw | SQLite integration test (first thing to combine `AddKoanCache + adapter` in one DI graph) | Unit tests hand-roll their DI graphs and skip `AddKoanCache` |
-| `CacheWriteOptions.GetEffectiveL1Ttl` not clamped to L2 | Redis SWR integration test | Unit assertions encoded the buggy behavior as "expected" |
+| `TryAddEnumerable<TService>(factory)` indistinguishable-descriptor throw | SQLite integration test (first real `AddKoan()` Cache + adapter graph) | Unit tests hand-roll their DI graphs and skip compiled module composition |
+| `CacheWriteOptions.GetEffectiveL1Ttl` not clamped to L2 | Redis bounded-stale integration test | Unit assertions encoded the buggy behavior as "expected" |
 | Cross-pillar `IConnectionMultiplexer` registration race | Full-DI bootstrap smoke | Unit tests never compose adapter packages |
 | `StartupProbeService` aborts host startup on any infra adapter unavailability | Attempt to write per-pillar boot smokes against a project transitively referencing Redis | Unit tests never start real hosted services through `IHost.StartAsync` |
 | Durable Jobs entities never schema-created on Postgres / SQL Server (host defaulted to Production → DDL guard) | Jobs per-DB convergence matrix — the first integration suite to drive a DDL-gated adapter through `KoanIntegrationHost` | Unit tests and the SQLite tier never hit the production-DDL guard |

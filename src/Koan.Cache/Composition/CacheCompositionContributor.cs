@@ -32,6 +32,19 @@ internal static class CacheCompositionFacts
             { IsRemoteOnly: true } => "remote-only",
             _ => "none"
         };
+        foreach (var candidate in topology.Candidates)
+        {
+            builder.AddCapability(
+                $"cache:provider:{candidate.Id}",
+                candidate.Capabilities.All.Select(static capability => capability.Id));
+            builder.AddObservation(
+                "koan.cache.provider.available",
+                $"cache:provider:{candidate.Id}",
+                $"Cache provider '{candidate.Id}' is available as {candidate.Placement} with priority {candidate.Priority}.",
+                "provider-catalog",
+                source);
+        }
+
         builder.AddElection(
             "cache:topology",
             topologySelection,
@@ -39,15 +52,25 @@ internal static class CacheCompositionFacts
             source: source,
             factCode: "koan.cache.topology.selected");
         if (topology.LocalReceipt is not null)
+        {
             builder.AddElection(
                 topology.LocalReceipt,
                 source: source,
                 factCode: "koan.cache.local.selected");
+            builder.AddCapability(
+                "cache:local",
+                topology.LocalRoute!.Capabilities.All.Select(static capability => capability.Id));
+        }
         if (topology.RemoteReceipt is not null)
+        {
             builder.AddElection(
                 topology.RemoteReceipt,
                 source: source,
                 factCode: "koan.cache.remote.selected");
+            builder.AddCapability(
+                "cache:remote",
+                topology.RemoteRoute!.Capabilities.All.Select(static capability => capability.Id));
+        }
         builder.AddObservation(
             "koan.cache.topology.bounds",
             "cache:topology:bounds",
@@ -83,6 +106,10 @@ internal static class CacheCompositionFacts
         builder.AddConfigKey(CacheConstants.Configuration.RemoteProvider);
         builder.AddConfigKey(CacheConstants.Configuration.CoherenceMode);
         builder.AddConfigKey(CacheConstants.Configuration.DefaultRegionKey);
+        builder.AddConfigKey(CacheConstants.Configuration.DefaultTier);
+        builder.AddConfigKey(CacheConstants.Configuration.DefaultTtlSeconds);
+        builder.AddConfigKey(CacheConstants.Configuration.DefaultL1TtlSeconds);
+        builder.AddConfigKey(CacheConstants.Configuration.BroadcastInvalidationByDefault);
         builder.AddObservation(
             "koan.cache.policies.discovered",
             "cache:policies",

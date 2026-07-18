@@ -6,9 +6,11 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Primitives;
+using Koan.Cache.Abstractions.Capabilities;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Data.Abstractions;
 using Koan.Core;
+using Koan.Core.Capabilities;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -38,12 +40,11 @@ internal sealed class MemoryCacheStore : ICacheStore
 
     public CacheStorePlacement Placement => CacheStorePlacement.Local;
 
-    public CacheStoreCapabilities Capabilities { get; } = new(
-        SupportsTags: true,
-        SupportsSlidingTtl: true,
-        SupportsStaleWhileRevalidate: true,
-        SupportsBinary: true,
-        SupportsPersistence: false);
+    public void Describe(ICapabilities caps)
+        => caps.Add(CacheCaps.Tags)
+            .Add(CacheCaps.SlidingExpiration)
+            .Add(CacheCaps.BoundedStaleServing)
+            .Add(CacheCaps.BinaryPayload);
 
     public ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheReadOptions options, CancellationToken ct)
     {

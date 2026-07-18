@@ -24,7 +24,7 @@ namespace Koan.Tests.Cache.CrossEngine.Specs;
 /// <remarks>
 /// <para>
 /// <b>Koan-canonical wiring:</b> the spec calls <c>services.AddKoan()</c> — never
-/// <c>AddKoanCache()</c> or manual module invocation.
+/// pillar-specific registration or manual module invocation.
 /// The test project references both <c>Koan.Cache</c> (Memory default) AND
 /// <c>Koan.Cache.Adapter.Sqlite</c>; their compiled modules are activated from ordinary references.
 /// <c>Koan:Cache:LocalProvider</c> tells the topology resolver which one wins.
@@ -68,16 +68,16 @@ public abstract class CrossEngineCacheBehaviorSpecBase : IAsyncDisposable
 
         _host = await builder
             // Reference = Intent: AddKoan() activates compiled modules from referenced Koan packages.
-            // No AddKoanCache and no manual module invocation.
+            // No pillar-specific registration and no manual module invocation.
             .ConfigureServices(services => services.AddKoan())
             .StartAsync(ct);
 
         // Sanity (public API only): the adapter module must have activated — i.e., Reference = Intent
-        // worked and the store is present in the registry. Without this, a
+        // worked and the store is present in standard DI. Without this, a
         // future refactor that breaks adapter discovery would silently degrade both subclasses
         // to whatever the default is, and the behavioral tests would still pass.
-        var registry = _host.Services.GetRequiredService<ICacheStoreRegistry>();
-        registry.FindByName(LocalProvider).Should().NotBeNull(
+        var stores = _host.Services.GetServices<ICacheStore>();
+        stores.Should().Contain(store => string.Equals(store.Name, LocalProvider, StringComparison.OrdinalIgnoreCase),
             $"adapter '{LocalProvider}' must be discovered via Reference = Intent. Either the package " +
             $"reference is missing from the test csproj or the adapter module did not activate.");
 

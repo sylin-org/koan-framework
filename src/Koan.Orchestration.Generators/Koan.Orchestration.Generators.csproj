@@ -38,7 +38,7 @@
   <PropertyGroup>
     <!-- Mark this assembly as an analyzer for consumers -->
     <IsRoslynComponent>true</IsRoslynComponent>
-    <!-- See Koan.Cache.Analyzers.csproj for the rationale on these symbol/pack settings. -->
+    <!-- Analyzer assemblies ship under analyzers/dotnet/cs and do not publish symbols or sources. -->
     <IncludeSymbols>false</IncludeSymbols>
     <IncludeSource>false</IncludeSource>
     <NoWarn>$(NoWarn);RS2007;RS1035;RS1042;NU5017;NU5019;NU5128</NoWarn>

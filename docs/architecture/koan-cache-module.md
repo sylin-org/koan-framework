@@ -69,8 +69,9 @@ touches L2 and never republishes.
 
 ## Store election
 
-The built-in memory store is the local floor. Adapter packages append typed `ICacheStore` candidates.
-`CacheTopologyResolver` resolves local and remote tiers independently:
+The built-in memory store is the local floor. Adapter packages append typed `ICacheStore` candidates through
+standard .NET DI. One singleton `CacheTopology` compiles the candidate catalog and resolves local and remote tiers
+independently:
 
 1. explicit `LocalProvider` / `RemoteProvider` pin;
 2. highest `[ProviderPriority]` for that placement;
@@ -78,6 +79,10 @@ The built-in memory store is the local floor. Adapter packages append typed `ICa
 4. no tier.
 
 An invalid explicit pin fails boot with the registered choices. It does not fall back.
+
+The compiled topology retains each candidate's `CacheCaps`, selected-route capability sets, and election receipts.
+`LayeredCache` negotiates operation requirements against those sets. `LocalOnly` and `RemoteOnly` are hard
+requirements; `Layered` gracefully uses the selected routes that exist.
 
 ## Framework broadcast topology
 

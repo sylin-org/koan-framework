@@ -74,7 +74,7 @@ public class CacheableAttribute : CachePolicyAttribute
         }
     }
 
-    /// <summary>How long to serve stale data while a refresh runs, in seconds. SWR consistency only.</summary>
+    /// <summary>Maximum bounded window in which callers that opt in may receive an expired value.</summary>
     /// <remarks>Read-write projection of <see cref="CachePolicyAttribute.AllowStaleFor"/> (see <see cref="L1TtlSeconds"/>).</remarks>
     public int AllowStaleForSeconds
     {

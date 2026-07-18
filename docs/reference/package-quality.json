@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 108,
-    "repairRequired": 32,
-    "reviewRequired": 49,
-    "structurallyReady": 27,
-    "ownedReadmes": 76,
-    "technicalCompanions": 66,
-    "findings": 201
+    "packages": 107,
+    "repairRequired": 28,
+    "reviewRequired": 48,
+    "structurallyReady": 31,
+    "ownedReadmes": 79,
+    "technicalCompanions": 69,
+    "findings": 191
   },
   "findingDefinitions": [
     {
@@ -505,7 +505,7 @@
       "projectPath": "src/Koan.Cache/Koan.Cache.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Koan Cache: transparent Entity caching, policy and topology negotiation, bounded explicit eviction, coherence, health, and inspection.",
       "targetFrameworks": [
         "net10.0"
@@ -520,36 +520,32 @@
       "readme": "src/Koan.Cache/README.md",
       "technicalDocumentation": "src/Koan.Cache/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Cache.Abstractions",
       "projectPath": "src/Koan.Cache.Abstractions/Koan.Cache.Abstractions.csproj",
       "shape": "library",
       "role": "contracts",
-      "status": "repair-required",
+      "status": "structurally-ready",
       "description": "Shared cache contracts for the Koan framework: policies, builders, serializers, and capability descriptors.",
       "targetFrameworks": [
         "net10.0"
       ],
-      "dependencies": [],
-      "readme": null,
-      "technicalDocumentation": null,
+      "dependencies": [
+        "Sylin.Koan.Core"
+      ],
+      "readme": "src/Koan.Cache.Abstractions/README.md",
+      "technicalDocumentation": "src/Koan.Cache.Abstractions/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Cache.Adapter.Redis",
       "projectPath": "src/Koan.Cache.Adapter.Redis/Koan.Cache.Adapter.Redis.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "repair-required",
+      "status": "structurally-ready",
       "description": "Redis-backed L2 cache store and layered every-node Communication provider for Koan.Cache, sharing Koan.Data.Connector.Redis\u0027s IConnectionMultiplexer.",
       "targetFrameworks": [
         "net10.0"
@@ -560,20 +556,17 @@
         "Sylin.Koan.Communication",
         "Sylin.Koan.Data.Connector.Redis"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Cache.Adapter.Redis/README.md",
+      "technicalDocumentation": "src/Koan.Cache.Adapter.Redis/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Cache.Adapter.Sqlite",
       "projectPath": "src/Koan.Cache.Adapter.Sqlite/Koan.Cache.Adapter.Sqlite.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "repair-required",
+      "status": "structurally-ready",
       "description": "SQLite-backed persistent L1 cache store for Koan.Cache. Provides on-disk cache persistence with tag indexing and TTL eviction. Preempts the default Memory store by ProviderPriority.",
       "targetFrameworks": [
         "net10.0"
@@ -583,32 +576,10 @@
         "Sylin.Koan.Cache.Abstractions",
         "Sylin.Koan.Core"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Cache.Adapter.Sqlite/README.md",
+      "technicalDocumentation": "src/Koan.Cache.Adapter.Sqlite/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
-    },
-    {
-      "packageId": "Sylin.Koan.Cache.Analyzers",
-      "projectPath": "src/Koan.Cache.Analyzers/Koan.Cache.Analyzers.csproj",
-      "shape": "analyzer",
-      "role": "analyzer",
-      "status": "repair-required",
-      "description": "Roslyn analyzer for Koan.Cache: enforces typed registration helpers (KOAN0001). See ARCH-0081.",
-      "targetFrameworks": [
-        "netstandard2.0"
-      ],
-      "dependencies": [],
-      "readme": null,
-      "technicalDocumentation": null,
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Canon",

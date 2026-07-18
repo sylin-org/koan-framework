@@ -61,8 +61,8 @@ publish peer invalidations after writes. When no L2 exists, the effective topolo
 L1 expiry never exceeds L2 expiry. With no explicit L1 TTL, Koan derives a shorter L1 lifetime; this is
 the bounded-staleness fallback when a best-effort invalidation is lost. Invalid `L1 > L2` policies fail boot.
 
-Fresh-or-null is the default. Stale-while-revalidate exists only when a policy or call explicitly sets
-`AllowStaleFor`:
+Fresh-or-null is the default. Bounded stale serving exists only when a policy or call explicitly sets
+`AllowStaleFor`; this does not schedule or promise background revalidation:
 
 ```csharp
 var report = await Cache.WithJson<UsageReport>("report:" + tenantId)
@@ -71,11 +71,23 @@ var report = await Cache.WithJson<UsageReport>("report:" + tenantId)
     .GetOrAdd(ct => BuildReport(tenantId, ct), ct);
 ```
 
-Use `[CachePolicy]` when a custom key template, tier, strategy, tags, or provider pin is genuinely needed.
-Provider pins match `ICacheStore.Name` exactly (case-insensitive) and fail closed when unavailable. Within
+Use `[CachePolicy]` when a custom key template, tier, strategy, or tags are genuinely needed. Provider selection
+is host infrastructure, not Entity policy: optional `Cache:LocalProvider` and `Cache:RemoteProvider` pins match
+`ICacheStore.Name` case-insensitively and fail closed when unavailable. Within
 each Local/Remote tier, provider priority and then stable provider identity make automatic selection
 deterministic; DI registration order does not decide. Startup facts report the selected `cache:local` and
 `cache:remote` receipts as well as the resulting topology.
+
+Direct entry operations can express semantic tier intent:
+
+```csharp
+var local = await Cache.WithJson<UsageReport>("usage:" + tenantId)
+    .WithTier(CacheTier.LocalOnly)
+    .Get(ct);
+```
+
+`LocalOnly` and `RemoteOnly` fail clearly if the requested route is unavailable. `Layered` uses both selected
+routes when present and degrades to whichever route exists.
 
 ## Request-scoped behavior
 
@@ -162,6 +174,7 @@ materialize a real use case and semantics before the surface grows.
 
 Startup logs and Koan composition facts report:
 
+- every available store's placement, priority, and declared `CacheCaps` guarantees;
 - L1/L2 store election and topology;
 - coherence mode and active/inactive posture;
 - the elected `FrameworkBroadcasts` provider and assurance;
