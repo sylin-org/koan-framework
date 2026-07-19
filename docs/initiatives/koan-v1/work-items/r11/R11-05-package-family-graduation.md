@@ -4,12 +4,12 @@ domain: framework
 title: "R11-05 - Graduate Package Families"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
-last_updated: 2026-07-18
+last_updated: 2026-07-19
 framework_version: source-first
 validation:
-  date_last_tested: 2026-07-18
+  date_last_tested: 2026-07-19
   status: in-progress
-  scope: dependency-ordered family graduation; Observability implementation and focused package proof complete
+  scope: dependency-ordered family graduation; bespoke Orchestration CLI family deferred outside V1
 ---
 
 # R11-05 — Graduate package families
@@ -39,10 +39,10 @@ and generated quality report. It does not run the complete release ratchet.
 | Family | Scope | Status |
 |---|---|---|
 | foundation runtime | Core, Data contracts/runtime, JSON, SQLite, Web, Communication | passed |
-| contract isolation | ZenGarden, AI contracts, Vector/Media/Storage abstractions, Orchestration CLI contracts | passed |
-| provider families | Data, Vector, AI, Cache, Storage, Auth, Orchestration providers | Orchestration pending; other current families passed |
+| contract isolation | ZenGarden, AI contracts, Vector/Media/Storage abstractions, former Orchestration CLI contracts | passed; CLI family later shelved |
+| provider families | Data, Vector, AI, Cache, Storage, Auth, Orchestration providers | bespoke CLI providers deferred; Aspire pending; other current families passed |
 | semantic capabilities | Jobs, MCP, AI, Cache, Tenancy, Identity, Canon, Media, Classification, Security | Security and ZenGarden pending; other current families passed |
-| projections and tools | Web add-ons, testing, analyzers, generators, CLI and operator surfaces | pending |
+| projections and tools | Web add-ons, testing, analyzers, generators, CLI and operator surfaces | bespoke Orchestration CLI/generator deferred; remaining families pending |
 
 ## Foundation discovery
 
@@ -81,9 +81,9 @@ into a support claim.
   tool, and capability vocabulary now states its inert role directly and functional activation remains in
   `Sylin.Koan.ZenGarden`.
 - `Sylin.Koan.Orchestration.Cli.Core` was dissolved. Its public package claim was false—the containing types were
-  internal and consumed only by the executable—so planning and command mechanics now live with their only runtime
-  owner in `Sylin.Koan.Orchestration.Cli`. The retained Abstractions package remains the independent provider/exporter
-  SPI.
+  internal and consumed only by the executable—so planning and command mechanics moved to their only runtime owner in
+  `Sylin.Koan.Orchestration.Cli`. At that intermediate checkpoint, Abstractions remained the independent
+  provider/exporter SPI; the later family-level decision below shelves that entire source topology outside V1.
 - focused CLI proof: restored dependency graph, warning-free Release build, executable `--help`, and a clean tool
   package containing the owned README and canonical icon; the quality compiler now recognizes standard
   `dotnet tool install --global` first-use instructions.
@@ -4630,6 +4630,69 @@ The package README, technical contract, reference card, ARCH-0088 refinement, ca
 R11-02 disposition now state the same public promise and limits. No live collector/container, Core/Web suite,
 completed family suite, private downstream application, full release ratchet, publication, push, tag, release, or
 remote mutation ran.
+
+## Orchestration CLI family deferral
+
+### V1 application contract
+
+**Application intent:** V1 applications use standard .NET, Aspire, Compose, Docker, or Podman tooling for local
+topology and lifecycle; Koan makes no V1 promise to infer and operate that topology from application metadata.
+
+**Complete public expression:** none. V1 has no supported Koan orchestration tool to install, no hosting-provider or
+artifact-exporter SPI to reference, and no generated orchestration manifest to depend on. Runtime service discovery,
+connector health, connection resolution, and the Core `KoanApp` identity remain independent runtime capabilities.
+
+**Guarantee and correction:** the first public V1 wave cannot select or publish the shelved package identities. The
+projects remain directly buildable source under `shelved/orchestration-cli/` but are absent from `Koan.sln`, so the
+experiment is recoverable without appearing active. A future return must begin with a
+fresh business contract, reconcile standard Aspire/container capabilities, repair current application discovery, add
+focused owner/consumer evidence, and deliberately restore packability; source presence alone is not support.
+
+### Discovery and coalescence decision
+
+The bespoke stack is 4,881 lines of C# across six packages. Its unique user value is one command that derives an
+application/dependency plan and performs inspect, Compose export, doctor, up/down, status, and logs without an authored
+AppHost or Compose file. Current focused exploration proved service discovery against a scratch Postgres consumer but
+also proved that application discovery is empty: the generator still looks for the obsolete class-level orchestration
+`KoanApp` shape while current applications use Core's assembly-level identity. No dedicated CLI/provider/renderer
+suite or V1 product claim establishes the larger promise.
+
+`Sylin.Koan.Orchestration.Abstractions` has no source consumer outside the CLI, Docker/Podman providers, and Compose
+renderer. The generator's emitted `__KoanOrchestrationManifest.Json` is read only by the CLI. Deferring only the
+executable would therefore retain five ownerless package promises and impose generator work on active connector and
+sample builds. The correct lifecycle boundary is the whole bespoke family:
+
+| Package | V1 disposition | Shelving boundary |
+|---|---|---|
+| `Sylin.Koan.Orchestration.Cli` | `defer` (outside V1) | Remains a source-buildable executable but is not a V1 tool package or supported workflow. |
+| `Sylin.Koan.Orchestration.Abstractions` | `defer` (outside V1) | Retains the experimental SPI in source; it has no independent V1 consumer or package promise. |
+| `Sylin.Koan.Orchestration.Generators` | `defer` (outside V1) | Remains available to the shelved CLI project but is no longer packaged or injected into active connector/sample builds. |
+| `Sylin.Koan.Orchestration.Connector.Docker` | `defer` (outside V1) | Retains Docker mechanics only as part of the source experiment. |
+| `Sylin.Koan.Orchestration.Connector.Podman` | `defer` (outside V1) | Retains Podman mechanics only as part of the source experiment. |
+| `Sylin.Koan.Orchestration.Renderers.Connector.Compose` | `defer` (outside V1) | Retains Compose rendering only as part of the source experiment. |
+
+This is shelving, not package retirement: projects, code, and local version intent remain together under one physical
+boundary. Their location outside the release compiler's active `src/`, `packaging/`, and top-level `templates/` roots,
+plus their absence from `Koan.sln`, is the publication boundary. No six-project flag spread, compatibility package,
+feature flag, package-selection exception, or new Koan lifecycle concept is introduced. The six projects receive no
+V1 package polish, support claim, or release-certification obligation.
+
+The Aspire family is deliberately not part of this decision. `Sylin.Koan.Orchestration.Aspire` and
+`.Aspire.Abstractions` remain separately assessable because they do not depend on the CLI stack and must earn their
+own thin, standard-.NET boundary or disposition.
+
+### Focused completion evidence
+
+- all six projects moved intact under `shelved/orchestration-cli/` and were removed from `Koan.sln`;
+- the root, connector, and sample build props contain no active orchestration-generator injection or opt-in flag;
+- the shelved CLI Release build succeeds with zero warnings/errors from its new location, proving the preserved source
+  graph remains coherent;
+- representative active Postgres connector and FirstUse Release builds succeed with zero warnings/errors after the
+  generator removal;
+- release inventory and generated product truth contain 95 active packages and 26 claims, with none of the six
+  shelved identities; generated quality is 3 repair / 11 review / 81 structurally ready;
+- no behavior suite, pack, live container, private downstream inspection, full release ratchet, publication, push,
+  tag, release, or remote mutation ran.
 
 ## Acceptance
 

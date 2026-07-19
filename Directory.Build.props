@@ -68,21 +68,8 @@
   <None Include="$(MSBuildProjectDirectory)\README.md" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildProjectDirectory)\README.md')" />
   <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="/" />
   </ItemGroup>
-  <!-- In-repo Roslyn generators attached as analyzers. See ARCH-0077 (orchestration generator
-       scope-narrowing rationale; deprecation path toward .NET Aspire). -->
+  <!-- In-repo Roslyn generators attached as analyzers. -->
   <ItemGroup>
-    <!--
-      Orchestration manifest generator (legacy ISourceGenerator). Only attach to projects that
-      actually declare [KoanService] / [KoanApp] / [assembly: AuthProviderDescriptor]. Connectors
-      and samples opt in via Directory.Build.props files in their roots; the lone non-connector
-      service that declares [KoanService] (Koan.Service.Translation) sets the property in its csproj.
-      Unrelated framework projects (Koan.Web.Auth, Koan.Core, etc.) no longer pay the analyzer
-      load cost and cannot be blocked by generator-side compile errors.
-    -->
-    <ProjectReference Include="$(MSBuildThisFileDirectory)src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false"
-                      Condition="Exists('$(MSBuildThisFileDirectory)src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj') and '$(KoanRequiresOrchestrationGenerator)' == 'true'" />
     <!--
       Registry generator (modern IIncrementalGenerator). Harmless on projects with no registry
       entries — emits nothing. Still attached broadly because some downstream Koan projects do

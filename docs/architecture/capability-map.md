@@ -137,9 +137,10 @@ startup prose or loaded assemblies.
 
 ## Development-host tooling boundary
 
-`Sylin.Koan.Orchestration.Abstractions` is inert vocabulary for hosting providers, artifact exporters,
-plans, and profiles. Docker, Podman, Compose rendering, CLI execution, and Aspire integration are
-separate functional choices. Referencing application Core does not activate any of them.
+Koan V1 does not publish a bespoke development-host CLI, hosting-provider SPI, manifest generator, or Compose
+renderer. Applications use standard Aspire, Compose, Docker, or Podman tooling. Runtime service discovery,
+connection resolution, connector health, and application identity remain Core/connector concerns and do not imply
+that Koan owns the local container lifecycle. The separate Aspire integration remains under package-family review.
 
 ## Choosing deliberately
 

@@ -1716,19 +1716,6 @@
       ]
     },
     {
-      "packageId": "Sylin.Koan.Orchestration.Abstractions",
-      "shape": "library",
-      "description": "Contracts for Koan DevHost orchestration: descriptors, planner models, hosting provider and artifact exporter SPIs.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [],
-      "readme": "src/Koan.Orchestration.Abstractions/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": "src/Koan.Orchestration.Abstractions/TECHNICAL.md",
-      "claims": []
-    },
-    {
       "packageId": "Sylin.Koan.Orchestration.Aspire",
       "shape": "library",
       "description": "Aspire resource registration for Koan modules: auto-register distributed dependencies and align with Koan orchestration metadata.",
@@ -1755,80 +1742,6 @@
       "readme": "src/Koan.Orchestration.Aspire.Abstractions/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Orchestration.Aspire.Abstractions/TECHNICAL.md",
-      "claims": []
-    },
-    {
-      "packageId": "Sylin.Koan.Orchestration.Cli",
-      "shape": "tool",
-      "description": "Koan development-host CLI: discover application services, compile plans, render Compose bundles, and execute provider workflows.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [],
-      "readme": "src/Koan.Orchestration.Cli/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": "src/Koan.Orchestration.Cli/TECHNICAL.md",
-      "claims": []
-    },
-    {
-      "packageId": "Sylin.Koan.Orchestration.Connector.Docker",
-      "shape": "library",
-      "description": "Docker provider for Koan orchestration: container metadata discovery, Compose generation hooks, and runtime probing.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Orchestration.Abstractions"
-      ],
-      "readme": "src/Connectors/Orchestration/Docker/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": "src/Connectors/Orchestration/Docker/TECHNICAL.md",
-      "claims": []
-    },
-    {
-      "packageId": "Sylin.Koan.Orchestration.Connector.Podman",
-      "shape": "library",
-      "description": "Podman provider for Koan orchestration: pod lifecycle adapters, container discoverability, and Compose parity helpers.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Orchestration.Abstractions"
-      ],
-      "readme": "src/Connectors/Orchestration/Podman/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": "src/Connectors/Orchestration/Podman/TECHNICAL.md",
-      "claims": []
-    },
-    {
-      "packageId": "Sylin.Koan.Orchestration.Generators",
-      "shape": "analyzer",
-      "description": "Source generator analyzers for Koan orchestration manifests, module metadata inspection, and diagnostics.",
-      "targetFrameworks": [
-        "netstandard2.0"
-      ],
-      "dependencies": [],
-      "readme": "src/Koan.Orchestration.Generators/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": "src/Koan.Orchestration.Generators/TECHNICAL.md",
-      "claims": []
-    },
-    {
-      "packageId": "Sylin.Koan.Orchestration.Renderers.Connector.Compose",
-      "shape": "library",
-      "description": "Compose (docker-compose) exporter for Koan DevHost orchestration.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Orchestration.Abstractions"
-      ],
-      "readme": "src/Connectors/Orchestration/Renderers/Compose/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": "src/Connectors/Orchestration/Renderers/Compose/TECHNICAL.md",
       "claims": []
     },
     {

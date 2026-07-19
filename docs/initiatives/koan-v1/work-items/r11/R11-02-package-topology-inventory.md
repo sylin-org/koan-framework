@@ -4,10 +4,10 @@ domain: framework
 title: "R11-02 - Reconcile Package Topology"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
-last_updated: 2026-07-18
+last_updated: 2026-07-19
 framework_version: source-first
 validation:
-  date_last_tested: 2026-07-18
+  date_last_tested: 2026-07-19
   status: pending
   scope: exact evaluated package inventory and terminal architecture dispositions
 ---
@@ -25,7 +25,8 @@ Inventory every evaluated package before mass documentation work. Each package r
 `keep`, `merge`, `split`, `rename`, or `retire`. A temporary `assess` state is allowed only while its family discovery
 is active; it is not an R11 outcome.
 
-The disposition answers whether the package earns a distinct reference intent. It does not restate support maturity.
+The disposition answers whether the package earns a distinct reference intent. A family may instead be moved outside
+the active source/package graph and explicitly deferred beyond V1 without recording package retirement. It does not restate support maturity.
 Product capability maturity remains in `product/claims.json`; evaluated MSBuild remains package availability truth.
 
 ## Assessment questions
@@ -46,8 +47,8 @@ generated package-quality and product-surface references.
 
 R11-01 opened with 109 packages: 37 required an objective repair, 72 required review, and none was inferred
 graduated. Subsequent family work retired unearned identities and introduced only independently useful contract or
-shared-mechanism boundaries. The current evaluated graph contains 101 packages: 3 repair-required, 15
-review-required, and 83 structurally ready across 26 claims. The active matrix contains only present package projects;
+shared-mechanism boundaries. The current evaluated graph contains 95 packages: 3 repair-required, 11
+review-required, and 81 structurally ready across 26 claims. The active matrix contains only present package projects;
 implemented retirements remain in the disposition tables as release-lineage decisions.
 
 ## Exact active matrix
@@ -124,14 +125,8 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Media.Core` | `capability` | `keep` |
 | `Sylin.Koan.Media.Web` | `projection` | `keep` |
 | `Sylin.Koan.Observability` | `capability` | `keep` (implemented) |
-| `Sylin.Koan.Orchestration.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Orchestration.Aspire.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Orchestration.Aspire` | `projection` | `assess` |
-| `Sylin.Koan.Orchestration.Cli` | `tool` | `assess` |
-| `Sylin.Koan.Orchestration.Connector.Docker` | `provider` | `assess` |
-| `Sylin.Koan.Orchestration.Connector.Podman` | `provider` | `assess` |
-| `Sylin.Koan.Orchestration.Generators` | `analyzer` | `assess` |
-| `Sylin.Koan.Orchestration.Renderers.Connector.Compose` | `provider` | `assess` |
 | `Sylin.Koan.Redis` | `provider` | `keep` |
 | `Sylin.Koan.Redis.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Security.Trust` | `capability` | `assess` |
@@ -161,6 +156,22 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.ZenGarden` | `capability` | `assess` |
 | `Sylin.Koan.ZenGarden.Contracts` | `contracts` | `keep` |
 
+### Shelved source outside the active package matrix
+
+The bespoke Orchestration CLI family is deferred beyond V1 rather than retired. Its six projects live together under
+`shelved/orchestration-cli/`, are absent from `Koan.sln`, and sit outside the release compiler's active `src/`,
+`packaging/`, and top-level `templates/` discovery roots. The source remains directly buildable for later product
+reassessment; it has no V1 package identity, claim, polish, or certification obligation.
+
+| Shelved project identity | Disposition |
+|---|---|
+| `Sylin.Koan.Orchestration.Cli` | `defer` (outside V1) |
+| `Sylin.Koan.Orchestration.Abstractions` | `defer` (outside V1) |
+| `Sylin.Koan.Orchestration.Generators` | `defer` (outside V1) |
+| `Sylin.Koan.Orchestration.Connector.Docker` | `defer` (outside V1) |
+| `Sylin.Koan.Orchestration.Connector.Podman` | `defer` (outside V1) |
+| `Sylin.Koan.Orchestration.Renderers.Connector.Compose` | `defer` (outside V1) |
+
 ## First review order
 
 1. **Foundations and entry points:** `Sylin.Koan.Core`, the former Core adapter mechanism, Orchestration contracts, both bundles,
@@ -188,7 +199,7 @@ terminal package decisions; the listed boundary repairs happen before graduation
 | `Sylin.Koan.App` | `keep` | Web application entry bundle: the foundation plus `Koan.Web`. Its independent intent is the shortest `AddKoan` + entity-controller application, not a second framework runtime. |
 | `Sylin.Koan.Core` | `keep` | Mandatory composition, context, provenance, health, discovery, and module substrate shared by every functional concern. Remove the reverse dependency on DevHost orchestration contracts; runtime service description belongs at this always-present boundary. |
 | `Sylin.Koan.Core.Adapters` | `merge` (implemented) | It did not state an application capability or provider choice. Generic readiness/lifecycle now belongs to Core; data paging and schema behavior belong to Data; discovery reporting belongs to the Core discovery owner. Dead orchestration bridge types and the public package were removed. |
-| `Sylin.Koan.Orchestration.Abstractions` | `keep` | Inert DevHost vocabulary for CLI hosting providers, exporters, plans, and renderers. Slim it to that contract and keep functional activation in CLI/provider packages; application Core must not depend on it. |
+| `Sylin.Koan.Orchestration.Abstractions` | `defer` (outside V1) | Contract isolation remains valid source shaping, but every consumer belongs to the shelved bespoke CLI family. Keep the project buildable outside the active solution/package graph with that family; application Core remains independent. |
 | `Sylin.Koan.Orchestration.Cli.Core` | `merge` (implemented) | Every implementation type was internal and visible only to the CLI, despite package prose claiming a reusable public surface. Planning, discovery, endpoint formatting, and launch-manifest behavior now have one honest owner: the CLI executable. |
 | `Sylin.Koan.AI.Contracts` | `keep` | Inert inference/provider boundary used independently by adapters and layered modules. AI-only capability and model-selection SPIs moved here from mandatory Core; the false Core dependency was removed. |
 | `Sylin.Koan.AI.Contracts.Shared` | `keep` | Dependency-free lifecycle exchange vocabulary retained for model, dataset, compute, job, evaluation, and lineage extensions, including the accepted cross-repository transition boundary. It activates no runtime. |

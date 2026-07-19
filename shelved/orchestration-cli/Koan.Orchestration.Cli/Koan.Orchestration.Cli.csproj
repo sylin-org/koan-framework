@@ -14,9 +14,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
-    <ProjectReference Include="..\Connectors\Orchestration\Renderers\Compose\Koan.Orchestration.Renderers.Connector.Compose.csproj" />
-    <ProjectReference Include="..\Connectors\Orchestration\Docker\Koan.Orchestration.Connector.Docker.csproj" />
-    <ProjectReference Include="..\Connectors\Orchestration\Podman\Koan.Orchestration.Connector.Podman.csproj" />
+    <ProjectReference Include="..\Koan.Orchestration.Renderers.Connector.Compose\Koan.Orchestration.Renderers.Connector.Compose.csproj" />
+    <ProjectReference Include="..\Koan.Orchestration.Connector.Docker\Koan.Orchestration.Connector.Docker.csproj" />
+    <ProjectReference Include="..\Koan.Orchestration.Connector.Podman\Koan.Orchestration.Connector.Podman.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Reflection.MetadataLoadContext" Version="10.0.8" />

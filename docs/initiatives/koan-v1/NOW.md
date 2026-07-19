@@ -4,12 +4,12 @@ domain: framework
 title: "Koan V1 Reorganization Current Handoff"
 audience: [maintainers, ai-agents]
 status: current
-last_updated: 2026-07-18
+last_updated: 2026-07-19
 framework_version: source-first
 validation:
-  date_last_tested: 2026-07-18
+  date_last_tested: 2026-07-19
   status: tested
-  scope: R11-05 Observability graduation and focused owner/package proof
+  scope: R11-05 bespoke Orchestration CLI shelving and focused source/package-graph proof
 ---
 
 # Koan V1 reorganization current handoff
@@ -23,16 +23,29 @@ Replace this file at every handoff. It is a restart point, not a diary.
   R11-07 release-certification boundary.
 - Foundation, package identity, templates, Storage, Cache, Redis, relational/Data providers, Vector, AI, MCP, Web,
   Media, OpenGraph, Identity, Tenancy, Classification, Canon, RabbitMQ, Web request context/Data Access, Data
-  Backup/SoftDelete, Jobs, and now Observability have completed their current R11 family work.
-- The evaluated graph remains 101 packages and 26 claims. Generated package quality is 3 repair-required, 15
-  review-required, and 83 structurally ready.
+  Backup/SoftDelete, Jobs, and Observability have completed their current R11 family work. The bespoke Orchestration
+  CLI family is now shelved beyond V1 without package retirement.
+- The evaluated V1 graph is 95 packages and 26 claims. Generated package quality is 3 repair-required, 11
+  review-required, and 81 structurally ready.
 
 The accepted architecture remains business intent first: fewer meaningful moving parts, Entity-first application
 language, references express capability intent, `AddKoan()` compiles host-owned decisions, pillars own meaning and
 runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive only
 when genuinely inert and independently consumed.
 
-## Most recent completed slice: Observability
+## Most recent completed slice: Orchestration CLI shelving
+
+The six-project bespoke CLI stack now lives under `shelved/orchestration-cli/`, outside `Koan.sln` and outside the
+release compiler's active discovery roots. This is a physical V1 scope boundary, not a rewrite or deletion: the CLI,
+its provider/exporter SPI, legacy manifest generator, Docker/Podman providers, and Compose renderer remain directly
+buildable source for a future product reassessment.
+
+Active connector and sample builds no longer receive the legacy orchestration manifest generator. V1 publishes no
+Koan CLI/topology promise and uses standard Aspire, Compose, Docker, or Podman tooling instead. Core runtime service
+discovery, connector health, connection resolution, and `KoanApp` identity remain unchanged. The independent Aspire
+family was not included in this decision and remains the next Orchestration assessment.
+
+## Previous completed slice: Observability
 
 `Sylin.Koan.Observability` remains one optional functional leaf: reference it and the application's existing
 `AddKoan()` call composes standard OpenTelemetry traces and metrics. Core retains only the inert
@@ -48,22 +61,22 @@ Invalid booleans, sample rates, and endpoints reject boot with the exact correct
 disabled, or Production without a package-owned endpoint creates no providers. Startup/provenance/composition facts
 explain active state, signals, wildcard boundary, and exporter kind without exposing endpoint or headers.
 
-## Focused proof
+## Focused proof for CLI shelving
 
-- Observability Release suite: 8/8.
-- Observability and affected Web Release builds: zero warnings/errors.
-- Observability Release pack is clean. The nupkg contains its owned README, canonical icon, DLL/XML,
-  build-transitive props, exact Core/OpenTelemetry dependencies, repository commit, and matching symbols package.
-- Current NuGet audit reports no known vulnerable direct or transitive package.
-- Observability has zero generated structural findings. Package quality is 3 repair / 15 review / 83 structurally
-  ready; product truth remains 101 packages and 26 claims, with operations/diagnostics now verified.
-- No live collector/container or full release ratchet ran; complete certification remains R11-07 work.
+- Shelved CLI family Release build: zero warnings/errors from its new physical location.
+- Representative active Postgres connector and FirstUse Release builds: zero warnings/errors without manifest-generator
+  injection.
+- Evaluated inventory: 95 active package projects; none of the six shelved identities is selectable for the first
+  public wave.
+- Generated package quality: 3 repair / 11 review / 81 structurally ready; product truth remains 26 claims.
+- No behavior suite, live container, pack, audit, or full release ratchet ran; the decision changes V1 scope rather
+  than runtime behavior, and complete certification remains R11-07 work.
 
 ## Current repository state
 
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
-- Branch: `dev`; the Observability graduation is the current local HEAD after its handoff commit. The branch is
-  expected to be 151 commits ahead of `origin/dev` and 0 behind; verify exact HEAD.
+- Branch: `dev`; the CLI shelving handoff commit is expected to be the current local HEAD. The branch is expected to
+  be 152 commits ahead of `origin/dev` and 0 behind; verify exact HEAD.
 - `tmp/` remains untracked scratch/evaluator/artifact material and must never be staged.
 - No push, publication, tag, release, deployment, remote mutation, private downstream inspection, or full release
   certification occurred.
@@ -72,16 +85,16 @@ explain active state, signals, wildcard boundary, and exporter kind without expo
 
 1. Verify `git status`, HEAD, and the focused evidence recorded in
    [R11-05](work-items/r11/R11-05-package-family-graduation.md).
-2. Continue R11-05 with fresh exploration of the next unresolved family, currently the remaining Orchestration CLI,
-   Aspire, generator, Docker/Podman provider, and Compose renderer topology. Contract isolation work already completed
-   for `Orchestration.Abstractions`, `Aspire.Abstractions`, and the former CLI Core; do not repeat it.
+2. Continue R11-05 with fresh exploration of the separate `Sylin.Koan.Orchestration.Aspire` family. The bespoke CLI,
+   its Abstractions/generator, Docker/Podman providers, and Compose renderer are shelved outside V1; do not graduate,
+   retire, polish, or re-inject them without a new explicit scope decision.
 3. Preserve the contributor mandate for context-aware Web behavior, but do not force persistent Entity semantics or
    operational work into Web contributors merely because contributors are the correct request-context chokepoint.
 
 ## Remaining temporary dispositions
 
-The remaining Orchestration CLI, Aspire, generator, container-provider, and Compose renderer family; Security Trust;
-Testing, Containers, and Hosting; Web Admin; and ZenGarden still require terminal R11-02 decisions.
+The Aspire family; Security Trust; Testing, Containers, and Hosting; Web Admin; and ZenGarden still require terminal
+R11-02 decisions.
 
 ## Do not redo
 
@@ -92,6 +105,8 @@ Testing, Containers, and Hosting; Web Admin; and ZenGarden still require termina
   state, pool registrar alias, or a Contracts package without new independent-consumer evidence.
 - Do not rebuild Observability, restore `AddKoanObservability`, enumerate source names, introduce a Koan exporter or
   contributor registry, or move the inert options/health contract out of Core.
+- Do not move the shelved Orchestration CLI family back into `src/`/`Koan.sln`, restore manifest-generator injection,
+  or treat its preserved source as a V1 package promise without a new explicit scope decision.
 - Do not rerun Classification, standalone Tenancy, Jobs, or earlier family suites without an affected dependency.
 - Do not run the full release ratchet before R11-07.
 - Do not stage `tmp/`, inspect private dogfood applications, or use private identities in public docs.
