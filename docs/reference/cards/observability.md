@@ -2,67 +2,67 @@
 type: REF
 domain: observability
 title: "Observability — pillar map"
-audience: [developers, ai-agents]
+audience: [developers, operators, ai-agents]
 status: current
-last_updated: 2026-06-18
-framework_version: v0.17.0
+last_updated: 2026-07-18
+framework_version: source-first
 validation:
-  date_last_tested: 2026-06-18
+  date_last_tested: 2026-07-18
   status: verified
-  scope: docs/reference/cards/observability.md
+  scope: Koan.Observability focused reference-intent suite 8/8
 ---
 
 # Observability — pillar map
 
-> One-screen map of the Observability pillar — the opt-in OpenTelemetry leaf. Full detail: [ARCH-0088](../../decisions/ARCH-0088-extract-koan-observability-package.md).
+> One-screen map of the optional OpenTelemetry capability. Full contracts:
+> [package README](../../../src/Koan.Observability/README.md),
+> [technical contract](../../../src/Koan.Observability/TECHNICAL.md), and
+> [ARCH-0088](../../decisions/ARCH-0088-extract-koan-observability-package.md).
 
-**What it does** — Referencing `Koan.Observability` is the whole switch: `ObservabilityModule.Register` wires an OpenTelemetry pipeline at boot — traces + metrics + OTLP export — with **zero** `Program.cs` code. Tracing adds the framework `ActivitySource`s (`AddSource("Koan.Core", "Koan.Data", "Koan.Communication", "Koan.Web")`) plus ASP.NET Core / HttpClient instrumentation; metrics add runtime instrumentation. The package is a leaf — `ObservabilityOptions` and the health/probe primitives stay in `Koan.Core` so referencing OTel is a pure addition that can't cycle ([ARCH-0088](../../decisions/ARCH-0088-extract-koan-observability-package.md)). In Production with **no** OTLP endpoint configured the pipeline disables itself (off-by-default in prod until you point it somewhere).
+**What it does** — Reference `Sylin.Koan.Observability` and keep the application's ordinary `AddKoan()` call. The
+module composes one OpenTelemetry pipeline for every `Koan.*` trace source and meter, ASP.NET Core and `HttpClient`
+traces, and runtime metrics. A configured OTLP endpoint exports both signals with the same optional headers. Core
+health and diagnostic primitives remain available independently in `Sylin.Koan.Core`.
 
-## The one canonical pattern
+## The canonical pattern
 
-There is no call to write — add the package reference and configure the `Koan:Observability` section (or `OTEL_EXPORTER_OTLP_ENDPOINT`). The pipeline builds itself at boot.
-
-```xml
-<!-- Reference = Intent: this single line enables traces + metrics + OTLP export -->
-<ProjectReference Include="..\..\src\Koan.Observability\Koan.Observability.csproj" />
+```powershell
+dotnet add package Sylin.Koan.Observability
 ```
 
 ```jsonc
-// appsettings.json — point it at a collector; in Production this is what flips it on
 {
   "Koan": {
     "Observability": {
-      "Enabled": true,
       "Traces": { "Enabled": true, "SampleRate": 0.1 },
       "Metrics": { "Enabled": true },
-      "Otlp": { "Endpoint": "http://localhost:4317" }
+      "Otlp": { "Endpoint": "http://collector:4317" }
     }
   }
 }
 ```
 
-## ≤5 attributes you'll use
+There is no Observability-specific `Program.cs` call. In Production the endpoint is required for package activation;
+outside Production the providers compose without one so tests and local exporters can extend them.
 
-These are `ObservabilityOptions` keys under `Koan:Observability` (set via config, not attributes).
+## Operational decisions
 
-| Option | What it does |
+| Decision | Meaning |
 |---|---|
-| `Enabled` | Master switch for the whole pipeline (default `true` in dev; auto-`false` in Production when no OTLP endpoint is set). |
-| `Traces.Enabled` / `Traces.SampleRate` | Toggle tracing and set the ratio-based sampler (`0.0`–`1.0`, clamped; `0.1` = 10% dev default) via a `ParentBasedSampler`. |
-| `Metrics.Enabled` | Toggle the metrics pipeline (runtime instrumentation + OTLP). |
-| `Otlp.Endpoint` | OTLP collector URI; also read from `OTEL:EXPORTER:OTLP:ENDPOINT`. Presence in prod is what enables export. |
-| `Otlp.Headers` | Optional OTLP export headers; also read from `OTEL:EXPORTER:OTLP:HEADERS`. |
+| package absent | no OpenTelemetry SDK dependency or Koan-owned provider |
+| package present, non-Production | enabled signals compose; export occurs only when an exporter/reader exists |
+| package present, Production, no endpoint | deliberately inert |
+| `Enabled=false` | deliberately inert in every environment |
+| `Traces.SampleRate` | parent-based ratio sampling, inclusive `0..1` |
+| OTLP endpoint + headers | shared by trace and metric exporters; values remain redacted from facts |
 
-## The escape hatch
+Inspect the module boot report or shared composition facts for active state, signal switches, `Koan.*` subscription,
+and exporter kind. Invalid booleans, sample rates, or endpoint URIs reject boot and name the exact correction.
 
-For tests or non-config wiring, call the public idempotent extension directly — it stacks with the auto-registrar without double-building the pipeline (a `KoanObservabilityMarker` sentinel guards it, so the second call is a no-op):
+## Standard extension path
 
-```csharp
-services.AddKoanObservability(o =>
-{
-    o.Traces.SampleRate = 1.0;          // full sampling for a repro
-    o.Otlp.Endpoint = "http://otel:4317";
-});
-```
+Use `services.AddOpenTelemetry()` to add application sources, processors, readers, or exporters. Those registrations
+coalesce with Koan's providers. There is no Koan callback, marker, source catalog, or exporter abstraction.
 
-Because the pipeline is built once at boot, a post-boot `configure` updates the options seen by readers but does **not** rebuild the already-wired pipeline — supply pipeline-affecting settings via configuration (ARCH-0088).
+The package does not promise log export, delivery, collector/backend health, retention, tail sampling,
+application-specific spans, tag redaction, or safe cardinality for instruments it does not own.

@@ -46,8 +46,8 @@ generated package-quality and product-surface references.
 
 R11-01 opened with 109 packages: 37 required an objective repair, 72 required review, and none was inferred
 graduated. Subsequent family work retired unearned identities and introduced only independently useful contract or
-shared-mechanism boundaries. The current evaluated graph contains 101 packages: 4 repair-required, 15
-review-required, and 82 structurally ready across 26 claims. The active matrix contains only present package projects;
+shared-mechanism boundaries. The current evaluated graph contains 101 packages: 3 repair-required, 15
+review-required, and 83 structurally ready across 26 claims. The active matrix contains only present package projects;
 implemented retirements remain in the disposition tables as release-lineage decisions.
 
 ## Exact active matrix
@@ -123,7 +123,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Media.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Media.Core` | `capability` | `keep` |
 | `Sylin.Koan.Media.Web` | `projection` | `keep` |
-| `Sylin.Koan.Observability` | `capability` | `assess` |
+| `Sylin.Koan.Observability` | `capability` | `keep` (implemented) |
 | `Sylin.Koan.Orchestration.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Orchestration.Aspire.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Orchestration.Aspire` | `projection` | `assess` |
@@ -364,6 +364,17 @@ and must establish or re-resolve their own service context.
 Jobs therefore remains one functional capability rather than exposing its runtime topology as package topology. Live
 resource pools use standard DI through `IJobPoolResolver`; provider mechanics remain Data-owned, and request context
 remains Web-owned.
+
+## Observability family disposition
+
+| Package | Disposition | Distinct reference intent and implemented boundary work |
+|---|---|---|
+| `Sylin.Koan.Observability` | `keep` (implemented) | One reference opts a host into standard OpenTelemetry trace and metric composition without placing the SDK in Core. One internal immutable plan replaces the public manual callback, sentinel, temporary service provider, and fixed instrumentation list. The package subscribes to the general `Koan.*` trace/meter boundary, applies OTLP configuration consistently, rejects invalid configuration at composition, and projects safe operational facts. Core retains only the independently consumed inert options and health/diagnostic primitives. Standard OpenTelemetry APIs remain the extension path; no Contracts, Web, exporter, source-registry, or contributor package is created. |
+
+Observability is a functional leaf rather than a framework-wide default: package absence keeps the OpenTelemetry SDK
+out of the application graph, while package presence states the telemetry intent. Production without a Koan OTLP
+endpoint remains deliberately inactive; collector delivery, backend retention/query, log export, and application
+instrumentation remain outside the package guarantee.
 
 ## Acceptance
 

@@ -443,13 +443,23 @@ not itself promote a product claim: compatibility boundaries remain pre-V1 work.
   and core health under [`Koan.Core/Observability`](../../../src/Koan.Core/Observability), plus
   [`Sylin.Koan.Observability`](../../../src/Koan.Observability/Koan.Observability.csproj) and module
   contributors.
+- **OpenTelemetry reference intent:** referencing `Sylin.Koan.Observability` makes its discovered module compile one
+  host plan and subscribe traces and metrics to the general `Koan.*` boundary. ASP.NET Core, `HttpClient`, and runtime
+  instrumentation join the same providers; optional OTLP endpoint and headers apply consistently to both signals.
+  There is no Observability-specific registration call or Koan exporter/source registry; standard OpenTelemetry APIs
+  are the advanced extension path. Production without a package-owned OTLP destination is deliberately inert.
 - **Executable evidence:** focused facts pass 7/7; Core 211/211, Data.Core 349/349, Web WellKnown 3/3,
   Web relationship 7/7, MCP relationship 2/2, and MCP conformance 74/74. These prove ordering, schema round-trip, redaction, host isolation,
   unknown/degraded health, and identical Web/MCP serialization for the vertical slice. FirstUse proves
   the operator and agent projections against the same running SQLite-backed business application.
+- **OpenTelemetry evidence:** the focused reference-intent suite passes 8/8 for automatic trace/metric provider
+  composition, future `Koan.*` source/meter coverage with a standard metric reader, Production and explicit-disable
+  inertness, corrective invalid configuration, and standard OpenTelemetry co-composition.
 - **Inspection and failure:** collection starts incomplete/unknown; safe collection failures and
   rejected/degraded facts cannot silently become healthy. Human output is a projection and machine
   views use canonical schema-1 JSON.
+- **OpenTelemetry limits:** current proof does not certify live collector delivery, backend retention/query, log
+  export, tail sampling, application-specific instruments, user-tag redaction, or arbitrary metric cardinality.
 - **Unsupported / compatibility:** exhaustive composition, all provider negotiations, production
   telemetry pipelines, alerting/SLO contracts, and every provider health contributor are not
   certified. Schema changes require a new version; exact human formatting is not a contract.

@@ -375,17 +375,19 @@
     {
       "id": "operations-diagnostics",
       "title": "Operations, health, and diagnostics",
-      "summary": "Runtime facts, health, startup reporting, and observability expose bounded operational decisions.",
-      "maturity": "demonstrated",
+      "summary": "Runtime facts and health expose bounded host decisions; the optional Observability reference composes one inspectable OpenTelemetry pipeline across every Koan trace source and meter.",
+      "maturity": "verified",
       "packages": [
         "Sylin.Koan.Observability"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md"
+        "docs/initiatives/koan-v1/CAPABILITIES.md",
+        "docs/reference/cards/observability.md",
+        "src/Koan.Observability/README.md"
       ],
       "evidence": [
-        "docs/initiatives/koan-v1/R02-EVIDENCE.md",
-        "src/Koan.Observability"
+        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "tests/Suites/Observability/Koan.Observability.Tests"
       ]
     },
     {
@@ -1699,16 +1701,16 @@
     {
       "packageId": "Sylin.Koan.Observability",
       "shape": "library",
-      "description": "OpenTelemetry wiring for Koan (Reference = Intent): referencing this package enables traces \u002B metrics \u002B OTLP export at boot. Health and probe primitives stay in Koan.Core.",
+      "description": "Reference-activated OpenTelemetry traces and metrics for Koan, with optional OTLP export and standard OpenTelemetry customization.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Observability/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Observability/TECHNICAL.md",
       "claims": [
         "operations-diagnostics"
       ]

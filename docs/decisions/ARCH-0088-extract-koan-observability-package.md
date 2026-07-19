@@ -54,5 +54,28 @@ Empirical re-derivation (read of `ServiceCollectionExtensions.cs`, `Observabilit
 - One new project (`+1` part). Justified: it converts an always-on kernel dependency into an opt-in leaf — a net reduction in the kernel's hard surface, consistent with the "Koan.Core diet".
 - The namespace stays `Koan.Core.Observability` despite living in the `Koan.Observability` assembly — a deliberate minimal-churn choice (assembly ≠ namespace). Noted here so it is not mistaken for an error.
 
+## R11-05 refinement (2026-07-18)
+
+The extraction remains correct, but the retained public `AddKoanObservability` branch did not survive package-product
+graduation. Automatic module activation and a manual callback required a sentinel, allowed callback timing to diverge
+from the already-compiled provider, and built a temporary service provider during registration. The fixed source list
+also omitted most current `Koan.*` instruments, metrics did not subscribe to Koan meters, and OTLP headers applied only
+to traces.
+
+The current contract supersedes only those implementation details:
+
+- the package reference plus the application's existing `AddKoan()` call is the sole Koan activation path;
+- one internal immutable plan compiles host configuration and environment without a temporary provider;
+- standard OpenTelemetry builder APIs are the advanced extension path;
+- tracing and metrics subscribe to the single `Koan.*` namespace boundary, so new framework instruments join
+  automatically;
+- OTLP endpoint and headers apply consistently to trace and metric exporters;
+- invalid booleans, sample rates, and endpoints reject module composition correctively;
+- module reporting and shared composition facts explain active signals and exporter kind without disclosing endpoint
+  or header values.
+
+Core still owns the inert `ObservabilityOptions` and health/probe primitives. Production without an OTLP endpoint
+remains deliberately inactive. No Contracts, Web, exporter, contributor, or source-registry package is introduced.
+
 **Follow-up (out of scope)**
 - The separately-migrated Agyo observability *bundle* (`Sylin.Agyo.Observability`, card C5) MAY consume `Sylin.Koan.Observability` for its OTel piece now that this exists.

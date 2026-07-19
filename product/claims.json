@@ -220,11 +220,11 @@
     {
       "id": "operations-diagnostics",
       "title": "Operations, health, and diagnostics",
-      "summary": "Runtime facts, health, startup reporting, and observability expose bounded operational decisions.",
-      "maturity": "demonstrated",
+      "summary": "Runtime facts and health expose bounded host decisions; the optional Observability reference composes one inspectable OpenTelemetry pipeline across every Koan trace source and meter.",
+      "maturity": "verified",
       "packages": ["Sylin.Koan.Observability"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
-      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Observability"]
+      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md", "docs/reference/cards/observability.md", "src/Koan.Observability/README.md"],
+      "evidence": ["docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md", "tests/Suites/Observability/Koan.Observability.Tests"]
     },
     {
       "id": "canonical-entities",

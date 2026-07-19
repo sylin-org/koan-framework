@@ -3,12 +3,12 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 101,
-    "repairRequired": 4,
+    "repairRequired": 3,
     "reviewRequired": 15,
-    "structurallyReady": 82,
-    "ownedReadmes": 97,
-    "technicalCompanions": 92,
-    "findings": 59
+    "structurallyReady": 83,
+    "ownedReadmes": 98,
+    "technicalCompanions": 93,
+    "findings": 57
   },
   "findingDefinitions": [
     {
@@ -1395,21 +1395,18 @@
       "projectPath": "src/Koan.Observability/Koan.Observability.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "repair-required",
-      "description": "OpenTelemetry wiring for Koan (Reference = Intent): referencing this package enables traces \u002B metrics \u002B OTLP export at boot. Health and probe primitives stay in Koan.Core.",
+      "status": "structurally-ready",
+      "description": "Reference-activated OpenTelemetry traces and metrics for Koan, with optional OTLP export and standard OpenTelemetry customization.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Observability/README.md",
+      "technicalDocumentation": "src/Koan.Observability/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Orchestration.Abstractions",

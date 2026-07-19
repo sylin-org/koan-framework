@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Description>OpenTelemetry wiring for Koan (Reference = Intent): referencing this package enables traces + metrics + OTLP export at boot. Health and probe primitives stay in Koan.Core.</Description>
+    <Description>Reference-activated OpenTelemetry traces and metrics for Koan, with optional OTLP export and standard OpenTelemetry customization.</Description>
     <PackageTags>$(CommonPackageTags);observability;opentelemetry;otel;tracing;metrics</PackageTags>
   </PropertyGroup>
   <ItemGroup>

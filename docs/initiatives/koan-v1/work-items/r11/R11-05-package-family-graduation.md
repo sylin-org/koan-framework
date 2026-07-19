@@ -9,7 +9,7 @@ framework_version: source-first
 validation:
   date_last_tested: 2026-07-18
   status: in-progress
-  scope: dependency-ordered family graduation; Data Backup/SoftDelete implementation and focused package proof complete
+  scope: dependency-ordered family graduation; Observability implementation and focused package proof complete
 ---
 
 # R11-05 — Graduate package families
@@ -40,8 +40,8 @@ and generated quality report. It does not run the complete release ratchet.
 |---|---|---|
 | foundation runtime | Core, Data contracts/runtime, JSON, SQLite, Web, Communication | passed |
 | contract isolation | ZenGarden, AI contracts, Vector/Media/Storage abstractions, Orchestration CLI contracts | passed |
-| provider families | Data, Vector, AI, Cache, Storage, Auth, Orchestration providers | Storage passed; remaining pending |
-| semantic capabilities | Jobs, MCP, AI, Cache, Tenancy, Identity, Canon, Media, Classification, Security | pending |
+| provider families | Data, Vector, AI, Cache, Storage, Auth, Orchestration providers | Orchestration pending; other current families passed |
+| semantic capabilities | Jobs, MCP, AI, Cache, Tenancy, Identity, Canon, Media, Classification, Security | Security and ZenGarden pending; other current families passed |
 | projections and tools | Web add-ons, testing, analyzers, generators, CLI and operator surfaces | pending |
 
 ## Foundation discovery
@@ -4459,6 +4459,177 @@ structurally ready to 4 / 15 / 82 across the unchanged 101-package graph. Jobs h
 `Koan.Core.Adapters` warning remains limited to focused test projects and is unrelated. No provider-container suite,
 full release ratchet, publication, push, tag, release, remote mutation, private downstream inspection, Classification
 suite, or standalone Tenancy suite ran.
+
+## Observability family discovery and autonomous architecture checkpoint
+
+No Observability production file has been edited during this assessment. The existing 1/1 reference-intent test is
+green; this section re-derives the current package from source after ARCH-0088 rather than repeating its historical
+Core-extraction assessment.
+
+**Task:** graduate `Sylin.Koan.Observability` as the one opt-in OpenTelemetry integration, preserving package-reference
+activation while collapsing the manual Koan registration branch, temporary service provider, and stale fixed
+instrument list into one package-owned composition decision.
+
+**Application intent:** “Include this package because I want the service's Koan and standard .NET traces and metrics
+collected automatically; point it at OTLP when I want export, and keep Production inert when I have not configured an
+export destination.”
+
+**Public expression:** one package reference is the entire activation path; optional host configuration expresses the
+only additional decisions:
+
+```xml
+<PackageReference Include="Sylin.Koan.Observability" Version="$(KoanVersion)" />
+```
+
+```json
+{
+  "Koan": {
+    "Observability": {
+      "Enabled": true,
+      "Traces": { "Enabled": true, "SampleRate": 0.1 },
+      "Metrics": { "Enabled": true },
+      "Otlp": { "Endpoint": "http://collector:4317" }
+    }
+  }
+}
+```
+
+There is no required `Program.cs` call, registrar, instrumentation catalog, exporter wrapper, or Koan callback. An
+application that needs processors, another exporter, or non-Koan sources/meters extends the same standard
+`services.AddOpenTelemetry()` pipeline through OpenTelemetry's own APIs.
+
+**Guarantee/correction:** when active, one host-owned OpenTelemetry pipeline subscribes to every `Koan.*`
+`ActivitySource` and `Meter`, plus ASP.NET Core, HttpClient, and runtime instrumentation according to the configured
+trace/metric switches. One resource identity describes the entry service. A configured OTLP endpoint applies to both
+traces and metrics, including the same optional headers. `Enabled=false`, or Production without an endpoint, creates
+no Koan-owned providers and performs no export. An invalid endpoint or sample rate rejects host composition with the
+exact configuration key and correction rather than failing later inside an exporter. This package does not guarantee
+delivery, collector availability, backend retention/query, tail sampling, log export, application-specific spans,
+secret redaction inside user tags, or bounded custom metric cardinality.
+
+**Complete intent surface:** reference the package; optionally set `Koan:Observability:Enabled`, trace enablement and
+sample rate, metric enablement, OTLP endpoint, and secret OTLP headers through ordinary host configuration. No action
+beyond the reference is required outside Production. Production export requires an endpoint. Standard OpenTelemetry
+configuration is the only advanced extension path.
+
+**Public concepts:** `Sylin.Koan.Observability` is the activation decision. The existing Core-owned
+`ObservabilityOptions` is the inert configuration contract already consumed by Core/Web diagnostics and remains below
+the functional package to avoid a dependency cycle. Standard `ActivitySource`, `Meter`, `OpenTelemetryBuilder`, OTLP
+configuration, hosting, DI, and configuration remain .NET/OpenTelemetry concepts. No Koan telemetry contributor,
+source registry, public plan, custom exporter, or second package is required.
+
+**Docs read:** `docs/engineering/index.md` requires package-owned README/TECHNICAL, standard placement, and focused
+artifact proof; `docs/architecture/principles.md` requires reference intent, compile-once plans, standard .NET before
+Koan ceremony, and truthful failure; root `CLAUDE.md` establishes the same business-first and self-explaining laws;
+ARCH-0088 earns the opt-in leaf and deliberately leaves the inert options contract in Core; ARCH-0033 is the
+historical behavior record for tracing, metrics, OTLP, Web correlation, and the diagnostic snapshot; the current
+Observability reference card states reference-only activation but still teaches the misleading manual callback;
+R11-02 assigns the package temporary `assess`; generated quality marks it `repair-required` only because it has no
+owned README/TECHNICAL.
+
+**Code read:** `ServiceCollectionExtensions.cs` owns the whole OTel pipeline but calls `BuildServiceProvider()` during
+registration, snapshots incomplete options/environment/logging, carries a sentinel solely to reconcile an automatic
+module with a manual wrapper, subscribes to four fixed names that do not match the current adapter/cache/transaction
+sources, and exports headers only on traces. `ObservabilityModule` is the correct sole reference-intent owner but
+currently reports version only. Core's `ObservabilityOptions` and constants already own the configuration vocabulary;
+Core `AppRuntime` and Web's well-known controller are the reason that inert vocabulary remains below the functional
+package. Cache, Data transaction, relational/document/vector connector, and Data AI code use ordinary
+`ActivitySource`/`Meter` names under `Koan.*`; current Observability does not subscribe to most of them. The single
+focused test proves only that a `TracerProvider` exists in Test, not source/meter coverage, Production safety,
+configuration rejection, standard OpenTelemetry co-composition, or a metrics provider.
+
+**Reusing:** the existing functional package and domain-named `KoanModule`; Core's inert options/configuration
+contract; standard `HostBuilderContext`, `IConfiguration`, `IHostEnvironment`, service identity, OpenTelemetry
+builder, instrumentation packages, wildcard source/meter matching, resource builder, sampler, and OTLP exporter;
+Koan provenance/composition facts; and the existing real-`AddKoan()` integration host.
+
+**Creating new:** no new package or public type is required.
+
+| New code | Location | Justification |
+|---|---|---|
+| internal immutable `ObservabilityPlan` | `src/Koan.Observability/Infrastructure/ObservabilityPlan.cs` | compile configuration and environment once into the exact activation/export guarantee instead of building a temporary container |
+| internal stable diagnostics/source constants | `src/Koan.Observability/Infrastructure/Constants.cs` | own `Koan.*` subscription and fact identifiers without scattering literals |
+| internal pipeline composer | `src/Koan.Observability/Initialization/ObservabilityPipeline.cs` | let the one module install standard OTel mechanics from the compiled plan; replaces the public manual extension and sentinel |
+| package companions | `src/Koan.Observability/README.md`, `TECHNICAL.md` | provide install, meaningful result, exact Production/export boundary, and internal ownership |
+| expanded focused behavior specs | `tests/Suites/Observability/Koan.Observability.Tests/ObservabilityReferenceIntentSpec.cs` | prove reference activation, wildcard spans/meters, Production inertness, corrective invalid configuration, and standard OTel composition |
+
+**Coalescence:** closest pattern is the package's own ARCH-0088 leaf composed through the standard
+`OpenTelemetryBuilder`; Canon/Jobs provide the current Koan pattern of one domain module compiling one immutable plan
+and projecting it through facts. The decision owner is the Observability pillar, its state lifetime is one host, its
+consumers are OTel providers/exporters, and its hot-path cost is the SDK listener/sampler selected once at
+composition. Repeated mechanics are not another Koan contributor problem: framework pillars already emit standard
+`ActivitySource`/`Meter` instruments, and OTel wildcard subscriptions are the one general chokepoint. Specificity is
+therefore a functional capability leaf. Disposition proposal: `keep/refine` `Sylin.Koan.Observability`; `keep` Core's
+inert configuration contract and Web/Core diagnostics without reopening completed families; `delete` the public
+`AddKoanObservability` branch, marker, temporary provider, fixed source list, missing metric subscription, and
+swallowed missing-dependency fallback; `create` no Contracts/Web/exporter package. Observability is the exact owner;
+Core is too broad because optional OTel dependencies must not burden every app, individual pillars are too narrow to
+own export, and application code is too late/repetitive to enumerate framework instruments.
+
+**Ergonomics:** people and coding models see one semantic switch—the package reference—and one conventional config
+section. IntelliSense is unnecessary on the happy path; advanced users recognize the standard OpenTelemetry builder
+instead of learning a Koan wrapper whose callback may be ignored. `Koan.*` means newly instrumented pillars join
+automatically without edits to a central name list or decorations across models. Facts and startup explain active
+signals/export posture without exposing headers or an endpoint value.
+
+**Constraints satisfied:**
+
+- No Entity, Data, controller, route, request-context, or large-data behavior changes.
+- No inline endpoint, placeholder, process-global provider, assembly scan, public registry, or contributor pipeline.
+- Stable identifiers live in package `Infrastructure/Constants`; tunables remain the existing typed Core options and
+  host configuration.
+- The module compiles structure once; runtime spans/meters use standard OTel listeners and do no Koan rediscovery.
+- Cross-module contracts remain genuinely inert in Core; the functional package alone activates OTel.
+- README/TECHNICAL, reference card, ADR amendment, product claim, generated truth, and R11 topology will move together.
+- Validation is limited to Observability owner behavior, the affected Web/Core build/test boundary, Release pack, and
+  generated quality/product truth; the full release ratchet remains R11-07.
+
+**Risks:** wildcard `Koan.*` intentionally captures every framework instrument, so individual pillars remain
+responsible for low-cardinality tags and safe values. Removing the unused public wrapper is a pre-V1 break for an
+external caller repository search cannot observe; standard OTel configuration is the replacement. Production without
+OTLP remains deliberately inert even if a user adds only a custom standard exporter after Koan composition; such an
+application must configure the endpoint or own the complete standard OTel pipeline instead of expecting Koan to infer
+an exporter. No live collector/container proof is needed to prove SDK composition and would exceed this focused slice.
+
+**Autonomous architecture checkpoint:** proceed with `keep/refine`: preserve one reference-activated package and the
+Core-owned inert options contract; replace the manual wrapper/temp-container/sentinel/fixed-name implementation with
+one internal immutable plan and standard OTel wildcard pipeline; apply OTLP headers consistently; reject invalid
+configuration correctively; explain the decision through module facts/startup; add no package, public abstraction,
+contributor pipeline, model decoration, or Web/Core redesign.
+
+## Observability family completion
+
+`Sylin.Koan.Observability` now earns terminal `keep` as one optional functional leaf. Its discovered module compiles
+one immutable host plan and directly composes the standard OpenTelemetry providers. The public
+`AddKoanObservability` branch, marker, temporary `BuildServiceProvider`, fixed source catalog, and swallowed
+dependency fallback are removed. There is no replacement Koan builder: application-owned sources, readers,
+processors, and exporters use `AddOpenTelemetry()` and coalesce into the same SDK providers.
+
+Tracing and metrics now share the `Koan.*` namespace boundary. This automatically covers existing Cache, Data
+transaction, Data/Vector connector, relational, and embedding instruments as well as future framework instruments
+without decorations or central catalog edits. Trace export includes ASP.NET Core and `HttpClient`; metrics include
+runtime instrumentation. One resource identity describes both providers, and an OTLP endpoint plus optional headers
+applies consistently to trace and metric exporters.
+
+The plan validates boolean values, finite inclusive sample rate `0..1`, and an absolute HTTP(S) endpoint before the
+providers are built. Invalid values surface through the intentional `KoanBootException` wrapper with the exact key,
+value, correction, and underlying configuration failure. `Enabled=false`, both signals disabled, and Production
+without a package-owned endpoint remain inert and register no providers. Startup, module provenance, and composition
+facts disclose only active state, signals, wildcard boundary, and exporter kind; endpoint and headers remain secret.
+
+| Focused cell | Result | What it proves |
+|---|---:|---|
+| `Koan.Observability.Tests` Release | 8/8 | automatic reference activation, trace + metric providers, future `Koan.*` source/meter coverage through a standard metric reader, Production/explicit-disable inertness, corrective invalid configuration, and standard OTel co-composition |
+| `Sylin.Koan.Observability` Release build | clean | zero warnings/errors with the internal plan/module boundary |
+| `Sylin.Koan.Web` Release build | clean | Core/Web consumption of the retained inert `ObservabilityOptions` remains intact |
+| exact package pack | clean | nupkg contains owned README, canonical icon, DLL/XML, build-transitive module props, expected Core/OpenTelemetry dependencies, repository commit, and matching symbols package |
+| current NuGet audit | clean | no known vulnerable direct or transitive dependency in the package graph |
+| generated quality/product truth | 101 packages / 26 claims | Observability has zero structural findings; totals advance to 3 repair / 15 review / 83 structurally ready and the operations claim is verified |
+
+The package README, technical contract, reference card, ARCH-0088 refinement, capability ledger, product claim, and
+R11-02 disposition now state the same public promise and limits. No live collector/container, Core/Web suite,
+completed family suite, private downstream application, full release ratchet, publication, push, tag, release, or
+remote mutation ran.
 
 ## Acceptance
 
