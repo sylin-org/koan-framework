@@ -1,3 +1,13 @@
+---
+type: ARCH
+domain: framework
+audience: [architects, maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # Tenancy delight synthesis — 5-persona blind harvest
 
 - Date: 2026-06-22

@@ -2,11 +2,9 @@
 uid: reference.modules.Koan.data.abstractions
 title: Koan.Data.Abstractions - Technical Reference
 description: Provider-facing entity, query, result, and capability contracts.
-since: 0.2.x
 packages: [Sylin.Koan.Data.Abstractions]
 source: src/Koan.Data.Abstractions/
 last_updated: 2026-07-17
-framework_version: source-first
 validation:
   date_last_tested: 2026-07-15
   status: reviewed

@@ -5,7 +5,7 @@ title: "Test authoring guidance"
 audience: [developers, maintainers]
 status: current
 last_updated: 2026-07-15
-framework_version: pre-1.0
+framework_version: v0.20.0
 validation:
   status: verified
   scope: tests/README.md and the three-ring execution policy

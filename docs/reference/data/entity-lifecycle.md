@@ -4,7 +4,7 @@ domain: data
 title: "Entity Lifecycle"
 audience: [developers, architects, ai-agents]
 last_updated: 2026-07-17
-framework_version: v0.18.0
+framework_version: v0.20.0
 status: current
 validation:
   date_last_tested: 2026-07-17

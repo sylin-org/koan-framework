@@ -1,3 +1,13 @@
+---
+type: GUIDE
+domain: ai
+audience: [maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # Koan.Context - Implementation Roadmap to Production
 
 **Created:** 2025-11-08

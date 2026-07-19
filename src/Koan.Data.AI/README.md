@@ -142,5 +142,5 @@ if (meta is not null)
 
 - **ADR**: `docs/decisions/AI-0021-category-driven-ai-with-convention-defaults.md`
 - **Guide**: `docs/guides/ai-integration.md`
-- **Sample**: `samples/S18.Prism/` (real-world media analysis usage)
+- **Maturity**: consult the generated product surface before relying on this unassessed package in a preview application
 - **Related**: `Koan.Data.Vector` for raw vector storage, `Koan.AI` for the chat/embed facade

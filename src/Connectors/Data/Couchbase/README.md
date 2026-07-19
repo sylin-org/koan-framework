@@ -9,9 +9,8 @@ scope and collection routing, schema ensure, and readiness participation.
 
 ## Install
 
-> Current release status: the coherent package path is specified and exercised from staged artifacts, but the
-> existing public 0.17 package set is not a supported clean-room install. Until the next coherent publication, use
-> a source checkout/project reference. See the [repository installation status](https://github.com/sylin-org/Koan-framework#installation-status).
+> **Maturity:** This provider is available below the supported 0.20 boundary. Package presence is not a support
+> claim; check the [generated product surface](https://github.com/sylin-org/Koan-framework/blob/main/docs/reference/product-surface.md).
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Couchbase

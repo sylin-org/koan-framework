@@ -5,18 +5,24 @@ Rails for agentic .NET.” It is designed to move from V0 to V1 in meaningful sm
 code states business intent while the framework owns composition, backend negotiation, lifecycle,
 and explanation.
 
-> **Status:** pre-1.0 and source-first. Packages use independent NBGV versions; there is no single
-> framework package version. The current coherent package wave is proved locally but has not yet been
-> published and observed from public feeds. Use this checkout for the supported first-use path and
-> consult the [generated product surface](docs/reference/product-surface.md) for evidence-backed maturity.
+> **Status:** Koan 0.20 is the preview line. Its supported foundation and extensions are explicit;
+> other available packages remain demonstrated, experimental, specified, or unassessed. Public-feed
+> publication follows the final package-only proof. Until then, run the checkout directly and use the
+> [generated product surface](docs/reference/product-surface.md) as the maturity authority.
 
 ## Reach a meaningful result
 
+The package-first entry is a normal .NET template:
+
 ```powershell
-git clone https://github.com/sylin-org/koan-framework
-cd koan-framework
-dotnet run --project samples/FirstUse
+dotnet new install Sylin.Koan.Templates
+dotnet new koan-web -o TodoApi
+cd TodoApi
+dotnet run
 ```
+
+While the 0.20 packages are awaiting public-feed observation, run the same proved path from this
+checkout with `dotnet run --project samples/FirstUse`.
 
 In another shell, create a business request and inspect what composed it:
 

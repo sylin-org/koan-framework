@@ -5,7 +5,7 @@ title: "Agent-native projection — surface map"
 audience: [developers, ai-agents]
 status: current
 last_updated: 2026-06-20
-framework_version: v0.17.0
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-06-20
   status: verified

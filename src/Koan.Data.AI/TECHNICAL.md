@@ -2,7 +2,6 @@
 uid: reference.modules.Koan.data.ai
 title: Sylin.Koan.Data.AI - Technical Reference
 description: Entity-oriented embedding, semantic search, and media-analysis runtime contracts.
-since: 0.6.x
 packages: [Sylin.Koan.Data.AI]
 source: src/Koan.Data.AI/
 ---

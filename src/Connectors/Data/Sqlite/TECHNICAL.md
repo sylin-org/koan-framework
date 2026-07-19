@@ -2,11 +2,9 @@
 uid: reference.modules.Koan.data.sqlite
 title: Koan.Data.Connector.Sqlite - Technical Reference
 description: SQLite adapter for Koan data.
-since: 0.2.x
 packages: [Sylin.Koan.Data.Connector.Sqlite]
 source: src/Connectors/Data/Sqlite/
 last_updated: 2026-07-17
-framework_version: source-first
 ---
 
 ## Contract

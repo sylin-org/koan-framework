@@ -1,3 +1,13 @@
+---
+type: GUIDE
+domain: ai
+audience: [maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # Koan.Context: AI-Powered Semantic Code Search and Context Engine
 
 **Version:** 1.0.0

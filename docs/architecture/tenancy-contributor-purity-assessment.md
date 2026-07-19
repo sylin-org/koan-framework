@@ -1,3 +1,13 @@
+---
+type: ARCH
+domain: framework
+audience: [architects, maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # Tenancy contributor-purity assessment — is it a golden example?
 
 > **Historical assessment, superseded by ARCH-0115 / R09-05 (2026-07-16).** Its problem discovery

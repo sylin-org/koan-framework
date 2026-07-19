@@ -1,3 +1,13 @@
+---
+type: ARCH
+domain: framework
+title: "Adapter registration and external topology"
+audience: [developers, architects, maintainers]
+status: current
+last_updated: 2026-07-19
+framework_version: v0.20.0
+---
+
 # Adapter registration and external topology
 
 > **Contract**

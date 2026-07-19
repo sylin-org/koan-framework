@@ -14,9 +14,8 @@ SQLite provider for Koan relational data—suited to local development, tests, a
 
 ## Install
 
-> Current release status: the coherent package path is specified and exercised from staged artifacts, but the
-> existing public 0.17 package set is not a supported clean-room install. Until the next coherent publication, use
-> a source checkout/project reference. See the [repository installation status](https://github.com/sylin-org/Koan-framework#installation-status).
+> **0.20 preview:** SQLite belongs to the supported foundation. Public-feed publication follows the final
+> package-only proof; until then, use the source checkout or the exact staged candidate feed.
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Sqlite

@@ -100,7 +100,7 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
         markdown.AppendLine("audience: [developers, support-engineers, architects, ai-agents]");
         markdown.AppendLine("status: current");
         markdown.AppendLine("last_updated: 2026-07-17");
-        markdown.AppendLine("framework_version: source-first");
+        markdown.Append("framework_version: ").AppendLine(PackagingConstants.PreviewFrameworkVersion);
         markdown.AppendLine("validation:");
         markdown.AppendLine("  date_last_tested: 2026-07-17");
         markdown.AppendLine("  status: passed");

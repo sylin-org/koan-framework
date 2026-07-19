@@ -2,11 +2,9 @@
 uid: reference.modules.Koan.data.json
 title: Koan.Data.Connector.Json - Technical Reference
 description: JSON file storage adapter for Koan data.
-since: 0.2.x
 packages: [Sylin.Koan.Data.Connector.Json]
 source: src/Connectors/Data/Json/
 last_updated: 2026-07-17
-framework_version: source-first
 ---
 
 ## Contract

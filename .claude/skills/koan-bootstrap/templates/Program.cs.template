@@ -13,4 +13,4 @@ var app = builder.Build();
 // Framework auto-configures middleware based on referenced packages
 // No manual app.UseRouting(), app.UseAuthorization(), etc. needed
 
-app.Run();
+await app.RunAsync();

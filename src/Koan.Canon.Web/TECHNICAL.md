@@ -2,11 +2,9 @@
 uid: reference.modules.Koan.canon.web
 title: Koan.Canon.Web - Technical Reference
 description: ASP.NET projection and inspection surfaces for the Canon host composition plan.
-since: source-first
 packages: [Sylin.Koan.Canon.Web]
 source: src/Koan.Canon.Web/
 last_updated: 2026-07-18
-framework_version: pre-1.0
 validation:
   date_last_tested: 2026-07-18
   status: tested

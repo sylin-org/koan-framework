@@ -13,7 +13,7 @@ validation:
 related_guides:
   - entity-capabilities-howto.md
   - data-modeling.md
-  - building-apis.md
+  - ../reference/web/index.md
   - performance.md
 ---
 
@@ -396,7 +396,7 @@ public static IServiceCollection ConfigureKoanOptions<TOptions>(
 #### Usage Example
 
 ```csharp
-// In connector auto-registrar
+// In the connector's KoanModule
 public void Register(IServiceCollection services, IConfiguration configuration)
 {
     // Basic registration
@@ -539,7 +539,7 @@ builder.AddDevCors();           // CORS for local development
 
 var app = builder.Build();
 app.ConfigureSamplePipeline();  // Standard middleware setup
-app.Run();
+await app.RunAsync();
 ```
 
 #### When to Use
@@ -890,11 +890,11 @@ See [ARCH-0068: Refactoring Strategy](../decisions/ARCH-0068-refactoring-strateg
 5. Update CLAUDE.md if it affects AI assistant guidance
 6. Add unit tests in appropriate test suite
 
-**Questions?**
-Refer to [REFACTORING-LEDGER.md](../archive/refactoring/REFACTORING-LEDGER.md) for planned utilities or propose new ones via ADR.
+When a new utility would establish durable framework law, record that law in an ADR. Do not use an
+implementation ledger as current API guidance.
 
 ---
 
 **Last Updated**: 2026-03-26
 **Maintained By**: Koan Framework Core Team
-**Related**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md), [Refactoring Ledger](../archive/refactoring/REFACTORING-LEDGER.md)
+**Related**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md)

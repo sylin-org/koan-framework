@@ -1,3 +1,13 @@
+---
+type: DEV
+domain: framework
+title: "Operational workbook template"
+audience: [maintainers, contributors]
+status: current
+last_updated: 2026-07-19
+framework_version: v0.20.0
+---
+
 # [Workbook title — what task this covers, in plain English]
 
 > **Replace this whole template with your workbook content.** Required sections are marked REQUIRED; recommended sections are marked OPTIONAL.
@@ -96,6 +106,6 @@ Things NOT to do, with the lesson behind each. Keep these short and concrete.
 
 ## References *(OPTIONAL — include when relevant)*
 
-- [ARCH-XXXX — title](../decisions/ARCH-XXXX-...md) — the decision this workbook operationalizes
+- `ARCH-XXXX — title` — replace with the decision this workbook operationalizes
 - [scripts/path/to/Script.ps1](../../scripts/...) — the tool this workbook drives
-- [docs/workbooks/sibling.md](sibling.md) — related workbook
+- `sibling.md` — replace with a related workbook

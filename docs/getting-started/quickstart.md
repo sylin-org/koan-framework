@@ -4,20 +4,29 @@ domain: core
 title: "Koan quickstart"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-07-17
-framework_version: source-first
+last_updated: 2026-07-19
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-17
+  date_last_tested: 2026-07-19
   status: passed
-  scope: samples/FirstUse source-checkout contract
+  scope: 0.20 package-first contract plus source-built FirstUse fallback
 ---
 
 # Koan quickstart
 
-The supported first-use path is the source checkout. Public package installation is not yet a
-certified coherent path.
+The 0.20 preview begins with an ordinary .NET template package:
 
-## Clone, run, achieve one business result
+```powershell
+dotnet new install Sylin.Koan.Templates
+dotnet new koan-web -o TodoApi
+cd TodoApi
+dotnet run
+```
+
+Public-feed publication follows the final package-only proof. Until that exact preview is visible on the feed,
+exercise the same application grammar from the repository checkout.
+
+## Run the source-built preview today
 
 ```powershell
 git clone https://github.com/sylin-org/koan-framework
@@ -67,8 +76,8 @@ FirstUse is exercised through its real host. Focused evidence covers REST, SQLit
 filtered query, readiness, composition facts, MCP discovery, access policy, dry-run, and an agent
 write observed through REST. Its checked-in `koan.lock.json` records referenced composition.
 
-The release tooling also rebuilds the same application from a locally staged package closure. That
-proves a candidate; it does not claim that the coherent wave is already available from public feeds.
+The release tooling also rebuilds the templates and this application from the exact locally staged package closure.
+That proves the candidate path; only public-feed observation will make the install command externally available.
 
 ## Continue
 

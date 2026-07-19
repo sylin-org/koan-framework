@@ -1,3 +1,13 @@
+---
+type: ARCH
+domain: framework
+audience: [architects, maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # SnapVault — Product Spec & Greenfield Harvest Map
 
 > **Historical build plan, not current product truth.** It preserves the June 2026 greenfield decisions and completed

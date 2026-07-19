@@ -9,8 +9,9 @@ The package composes Koan's foundation and controller-based ASP.NET Core project
 dotnet add package Sylin.Koan.App
 ```
 
-Koan remains source-first until its first coherent package wave is published and observed. Today this command is
-executable against a feed containing the locally compiled candidate; it is also the exact post-publication contract.
+This package belongs to Koan's supported 0.20 preview foundation. Public-feed publication follows the final
+package-only proof; the same command already runs against the exact locally compiled candidate used by release
+validation.
 
 ## Meaningful result
 
@@ -82,5 +83,5 @@ source or Entity routing still wins when the application states a narrower inten
 - This package contains no runtime assembly of its own and intentionally emits no symbol package.
 
 Use `Sylin.Koan.Templates` for the same path as an ordinary `dotnet new` project, or read the
-[FirstUse sample](https://github.com/sylin-org/Koan-framework/tree/main/samples/FirstUse) for the cumulative
-source-first experience with SQLite, MCP, and shared operator/agent facts.
+[FirstUse sample](https://github.com/sylin-org/Koan-framework/tree/main/samples/FirstUse) for the cumulative 0.20
+preview experience with SQLite, MCP, and shared operator/agent facts.

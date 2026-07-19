@@ -2,7 +2,6 @@
 uid: reference.modules.Koan.mcp
 title: Koan.Mcp - Technical Reference
 description: Model Context Protocol tools, resources, transports, and runtime inspection for Koan applications.
-since: 0.2.x
 packages: [Sylin.Koan.Mcp]
 source: src/Koan.Mcp/
 ---

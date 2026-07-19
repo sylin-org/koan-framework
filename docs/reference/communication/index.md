@@ -5,7 +5,7 @@ title: "Communication — Entity Events and Transport"
 audience: [developers, architects, operators, ai-agents]
 status: current
 last_updated: 2026-07-16
-framework_version: source-first
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-16
   status: verified
@@ -189,8 +189,8 @@ dotnet add package Sylin.Koan.Communication.Connector.RabbitMq
 
 That direct reference elects RabbitMQ for `Transport/default` and both internal default routes;
 Events remain process-local. A
-transitive connector remains inert. Koan orchestration can provision the broker automatically, or an
-existing endpoint can be supplied with
+transitive connector remains inert. Standard Aspire, Compose, Docker/Podman, Kubernetes, or another
+application-owned topology supplies the broker; Koan consumes
 `ConnectionStrings:RabbitMq=amqp://user:password@host:5672`.
 
 The Entity and receiver code does not change. RabbitMQ creates a durable queue per stable receiver
@@ -228,6 +228,3 @@ cross nodes, retry, deduplicate, dead-letter, replay, or couple to a Data transa
 election, RabbitMQ Transport, Jobs wake, Cache coherence, and startup-declared business channels are
 supported. Dynamic channels, RabbitMQ Events, additional providers, automatic branching, mirroring,
 and failover are not.
-
-Do not use the deprecated generic [Messaging](../messaging/index.md) API as an alias. It has different
-copy, cardinality, context, and failure semantics.

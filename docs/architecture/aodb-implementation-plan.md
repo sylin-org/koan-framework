@@ -1,3 +1,13 @@
+---
+type: ARCH
+domain: data
+audience: [architects, maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # ARCH-0102 (AODB) — the break-and-rebuild convergence plan
 
 > **R07 context amendment (2026-07-15):** This plan's shipped Data/AODB history remains useful, but

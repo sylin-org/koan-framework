@@ -5,14 +5,14 @@ title: "Background Jobs How-To"
 audience: [developers, architects]
 status: current
 last_updated: 2026-07-16
-framework_version: source-first
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-16
   status: verified
   scope: in-memory Jobs; focused SQLite submission transaction
 related_guides:
   - data-modeling.md
-  - building-apis.md
+  - ../reference/web/index.md
   - performance.md
 ---
 
@@ -26,24 +26,23 @@ Each section follows a gentle rhythm: **Concept** (what is this?), **Recipe** (h
 
 **Related Guides:**
 - Modeling the entity itself? → [Data Modeling](data-modeling.md)
-- Kicking jobs off from an API? → [Building APIs](building-apis.md)
+- Kicking jobs off from an API? → [Web reference](../reference/web/index.md)
 - Throughput and tuning? → [Performance](performance.md)
 
 ---
 
 ## 0. Prerequisites
 
-Koan is currently supported from a source checkout. Reference the Jobs project alongside the Koan
-application baseline (repository samples use the equivalent relative path):
+Jobs belongs to the supported 0.20 extension surface. The package reference is the activation intent:
 
 ```xml
-<ProjectReference Include="path/to/koan-framework/src/Koan.Jobs/Koan.Jobs.csproj" />
+<PackageReference Include="Sylin.Koan.Jobs" />
 ```
 
-The intended package identity is `Sylin.Koan.Jobs`, but the repository does not yet claim a coherent
-public-package installation path. Do not copy old fixed-version package recipes.
+Public-feed publication follows the final package-only proof. From a source checkout, repository samples use the
+equivalent project reference without changing application code.
 
-That's all the wiring there is. **Reference = Intent**: adding `Koan.Jobs` and implementing the job interface is enough—`AddKoan()` discovers your jobs and starts the orchestrator automatically.
+That's all the wiring there is. **Reference = Intent**: adding Jobs and implementing the job interface is enough—`AddKoan()` activates your jobs and starts the orchestrator automatically.
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
@@ -202,7 +201,7 @@ public sealed class PresetPackage : Entity<PresetPackage>, IKoanJob<PresetPackag
 - **`MaxAttempts`** — failed runs retry with exponential backoff; once exhausted the job is **Failed**.
 - **`OnFailure`** — `Abort` (default) stops a chain on failure; `Continue` proceeds to the next stage anyway.
 - **`Lane` / `MaxConcurrency`** — a lane is a concurrency pool. By default each action is its own lane, so a slow `Fetch` never starves `Publish`. Set `Lane` to share a pool, `MaxConcurrency` to cap it.
-  - **Cross-lane fairness (JOBS-0008).** The worker multiplexes claims **fairly across all non-empty lanes** (weighted fair queuing): a perpetually-fed or older lane can no longer monopolize dispatch and starve another lane — including a downstream pipeline stage whose jobs are *newer* than a deep upstream backlog. You don't configure anything to get this; equal-share fairness is the default. To bias the split, give a lane a relative weight: `AddKoanJobs(o => o.LaneWeights["translation"] = 3)` gives `translation` ~3× the dispatch share of a weight-1 lane. Weights are *relative*, never strict priority — a low-weight lane is throttled, never starved.
+  - **Cross-lane fairness (JOBS-0008).** The worker multiplexes claims **fairly across all non-empty lanes** (weighted fair queuing): a perpetually-fed or older lane can no longer monopolize dispatch and starve another lane — including a downstream pipeline stage whose jobs are *newer* than a deep upstream backlog. You don't configure anything to get this; equal-share fairness is the default. To bias the split, use standard options configuration: `services.Configure<JobsOptions>(o => o.LaneWeights["translation"] = 3)` gives `translation` ~3× the dispatch share of a weight-1 lane. Weights are *relative*, never strict priority — a low-weight lane is throttled, never starved.
 
 **One entity, one job at a time.** Independently of lanes, Koan serializes jobs by work-item id: two different actions on the *same* entity (say `FetchPreview` and `DriftCheck` on one `Package`) never run concurrently—the entity is processed in order, like a FIFO group keyed by its id. Different entities still run fully in parallel. If a type's actions are genuinely independent and you want them to overlap on one instance, opt out with `[ParallelSafe]` on the class—an assertion that they don't conflict.
 
@@ -499,7 +498,7 @@ Set any window to zero to disable it. For a high-throughput type, prefer a short
 **Throughput metrics (opt-in).** Active counts ("how many Queued/Running?") come straight from the indexed ledger and need nothing extra. For **throughput/trend history that survives retention** — completed/failed per period — turn on the rollup:
 
 ```csharp
-builder.Services.AddKoanJobs(o => o.MetricsEnabled = true);
+builder.Services.Configure<JobsOptions>(o => o.MetricsEnabled = true);
 ```
 
 Each node tallies terminal outcomes in memory and periodically flushes its own internal rollup shard, so dashboards read pre-aggregated counts cheaply and they **outlive the rows they counted** (retention deletes the `JobRecord`s; the counts remain):
@@ -524,7 +523,7 @@ Off by default (the zero-config path stays write-free); the flush cadence is `Me
 **Sample.**
 
 ```csharp
-services.AddKoanJobs(o => o.Mode = JobMode.Inline);
+services.Configure<JobsOptions>(o => o.Mode = JobMode.Inline);
 
 await new ThumbnailJob { SourceUrl = url }.Job.Submit();   // runs now, synchronously
 var saved = await ThumbnailJob.Get(id);
@@ -658,7 +657,7 @@ await MyJob.Jobs.Trigger(action);         // type-level action, no instance (sch
 ctx.Progress(0.4, "…");  ctx.ContinueWith(next);  ctx.StopChain();
 ctx.Reschedule(5.Minutes());  ctx.Backoff(retryAfter);  // (TimeSpan helpers are illustrative)
 
-// Tune — AddKoanJobs(o => …)
+// Tune — services.Configure<JobsOptions>(o => …)
 o.ArchiveAfter;  o.FailedAfter;  o.RetainPerWorkType;   // retention: completed/failed windows + per-type cap (§10)
 o.ClaimScanBatch;                                       // bounded per-lane claim seek window (§10)
 o.LaneWeights["translation"] = 3;                       // lane-fair dispatch: relative per-lane weight (default 1 = equal share, §4)

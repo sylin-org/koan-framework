@@ -4,12 +4,12 @@ domain: core
 title: "Getting started with Koan"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-17
-framework_version: source-first
+last_updated: 2026-07-19
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-17
-  status: in-progress
-  scope: current Entity-first application grammar and graduated capability examples
+  date_last_tested: 2026-07-19
+  status: passed
+  scope: source-built 0.20 Entity-first grammar and graduated capability examples
 ---
 
 # Getting started with Koan
@@ -18,8 +18,9 @@ Koan's golden path is V0 to V1 in meaningful small steps. Each new line should e
 decision or a deliberate capability; framework and adapter mechanics stay behind stable semantic
 chokepoints.
 
-> **Pre-1.0 boundary:** use the source checkout today. The coherent candidate package wave has local
-> clean-room evidence but has not yet been published and observed from public feeds.
+> **0.20 preview:** the canonical entry is `dotnet new install Sylin.Koan.Templates`. The exact candidate has
+> local package evidence; public-feed publication and observation still belong to the release phase. Use the source
+> checkout until that external step completes.
 
 ## Step 1 — make one Entity useful
 

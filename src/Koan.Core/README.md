@@ -37,7 +37,7 @@ Core also provides:
 - `KoanContext` and `IKoanContextCarrier` for immutable logical-flow meaning and explicit durable carriage;
 - one memoized provider catalog and priority model used by concern-owned election pipelines;
 - generic adapter readiness, initialization, monitoring, and operation gating;
-- service-description and discovery contracts shared by runtime providers and optional DevHost tooling;
+- service-description and discovery contracts shared by runtime providers and external topology tooling;
 - `IKoanRuntimeFacts` and `KoanFactJson`, the redacted envelope shared by startup, health, Web, and MCP;
 - `AppHost` ownership for terse framework surfaces that must reach the current Koan host; and
 - transitive build targets that emit `koan.lock.json`, direct-reference provenance, semantic activation manifests,

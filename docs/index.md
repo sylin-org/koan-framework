@@ -5,7 +5,7 @@ title: "Koan documentation"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-17
-framework_version: source-first
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-17
   status: in-progress
@@ -20,11 +20,17 @@ lifecycle, and explanation.
 
 ## Start with a result
 
-From a new checkout:
+Koan 0.20 starts through an ordinary .NET template:
 
 ```powershell
-dotnet run --project samples/FirstUse
+dotnet new install Sylin.Koan.Templates
+dotnet new koan-web -o ApprovalApi
+cd ApprovalApi
+dotnet run
 ```
+
+Public-feed publication follows the final package-only proof. Until then, run the same validated
+journey from this checkout with `dotnet run --project samples/FirstUse`.
 
 Then create and inspect one approval:
 
@@ -72,11 +78,10 @@ runtime facts, and agent resources explain the same resolved composition.
 
 ## Current support boundary
 
-Koan is pre-1.0 and source-first. Package versions are owned independently; a coherent candidate wave
-has local clean-room evidence, but public-feed installation has not yet been observed. Package presence
-does not imply support, production certification, or backend parity. The generated
-[product surface](reference/product-surface.md) is the authority for assessed, experimental,
-specified, and unassessed capabilities.
+Koan 0.20 is a preview, not a 1.0 compatibility promise. Package patches remain independently owned,
+and package presence does not imply support, production certification, or backend parity. The generated
+[product surface](reference/product-surface.md) names the supported foundation, supported extensions,
+demonstrations, experiments, specifications, and unassessed packages.
 
 Use canonical `/health/live` and `/health/ready` probes. Use `/.well-known/Koan/facts` or
 `koan://facts` to understand runtime decisions. Unsupported configured intent should reject with a

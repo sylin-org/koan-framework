@@ -1,3 +1,13 @@
+---
+type: ARCH
+domain: framework
+audience: [architects, maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # Tenancy prior-art findings — control planes + config/policy layering
 
 > **Research input, not current product truth.** Proposed invitation, lifecycle, and configuration surfaces below

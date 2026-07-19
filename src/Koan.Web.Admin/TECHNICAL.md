@@ -2,7 +2,6 @@
 uid: reference.modules.koan.web.admin
 title: Koan.Web.Admin - Technical Reference
 description: Development-only Admin routing, authorization, provenance projection, and sanitization contract.
-since: 0.17.0
 packages: [Sylin.Koan.Web.Admin]
 source: src/Koan.Web.Admin/
 ---

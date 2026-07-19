@@ -5,7 +5,7 @@ title: "MCP over HTTP"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-19
-framework_version: source-first
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-19
   status: verified
@@ -33,8 +33,8 @@ related_guides:
 
 ## Shortest supported path
 
-The repository verifies this path from source and staged clean-room artifacts. The coherent candidate
-package wave has not yet been published and observed from public feeds.
+MCP belongs to the supported 0.20 extension surface. The repository verifies the same path from source and the
+exact staged candidate; public-feed publication and observation remain release-phase work.
 
 Reference Koan MCP and Web in the application closure, then expose business data or workflows:
 

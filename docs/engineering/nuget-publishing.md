@@ -1,3 +1,13 @@
+---
+type: DEV
+domain: framework
+title: "NuGet publishing"
+audience: [maintainers, release-engineers]
+status: current
+last_updated: 2026-07-19
+framework_version: v0.20.0
+---
+
 # NuGet publishing
 
 Every push that advances `dev`—direct or merged—is a release event. The

@@ -1,4 +1,4 @@
-name: koan-s10-devportal
+name: koan-devportal
 
 services:
   mongo:

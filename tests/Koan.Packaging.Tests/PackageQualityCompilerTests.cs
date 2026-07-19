@@ -126,6 +126,7 @@ public sealed class PackageQualityCompilerTests : IDisposable
 
         Assert.Equal(PackageQualityCompiler.ToJson(first), PackageQualityCompiler.ToJson(second));
         Assert.Equal(PackageQualityCompiler.ToMarkdown(first), PackageQualityCompiler.ToMarkdown(second));
+        Assert.Contains("framework_version: v0.20.0", PackageQualityCompiler.ToMarkdown(first), StringComparison.Ordinal);
         Assert.Equal([firstPackage.PackageId, secondPackage.PackageId], first.Packages.Select(package => package.PackageId));
         Assert.Contains($"[`{firstPackage.ProjectPath}`]", PackageQualityCompiler.ToMarkdown(first), StringComparison.Ordinal);
     }

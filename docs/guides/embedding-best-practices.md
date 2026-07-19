@@ -1,3 +1,13 @@
+---
+type: GUIDE
+domain: ai
+audience: [developers, ai-engineers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # Embedding Best Practices
 
 > **Production Guidance** for Koan Framework's attribute-driven embedding system

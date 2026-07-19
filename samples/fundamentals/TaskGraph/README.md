@@ -83,7 +83,8 @@ The source checkout also emits [koan.lock.json](koan.lock.json) through the repo
 ## Inspect what Koan decided
 
 - Runtime facts: <http://localhost:5000/.well-known/Koan/facts>
-- Health: <http://localhost:5000/api/health>
+- Liveness: <http://localhost:5000/health/live>
+- Readiness: <http://localhost:5000/health/ready>
 - Repeatable requests: [requests.http](requests.http)
 
 Startup reporting and the facts document expose selected modules, providers, capability decisions, and any failed collections. The dashboard depends only on the public HTTP surface; it has no private testing hooks.

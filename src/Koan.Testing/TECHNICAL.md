@@ -2,7 +2,6 @@
 uid: reference.modules.koan.testing
 title: Koan.Testing - Technical Reference
 description: Entity conformance batteries, host ownership, capability gating, and failure behavior.
-since: 0.17.0
 packages: [Sylin.Koan.Testing]
 source: src/Koan.Testing/
 ---

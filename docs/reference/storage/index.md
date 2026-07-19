@@ -4,7 +4,7 @@ domain: storage
 title: "Storage reference"
 audience: [developers, architects, ai-agents]
 last_updated: 2026-07-17
-framework_version: source-first
+framework_version: v0.20.0
 status: current
 validation:
   date_last_tested: 2026-07-17

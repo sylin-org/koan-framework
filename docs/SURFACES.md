@@ -1,3 +1,13 @@
+---
+type: DEV
+domain: framework
+audience: [maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # Surface Ledger
 
 > **Rotation contract.** Before the lane leaves this repo or surface: tag; CI green;

@@ -4,7 +4,7 @@ domain: core
 title: "Enterprise Adoption Guide"
 audience: [architects, developers, ai-agents]
 last_updated: 2025-02-14
-status: current
+status: archived
 nav: true
 ---
 
@@ -150,8 +150,7 @@ Create a guild of "Koan champions" who review architecture proposals, run office
 ## 6. Next Steps
 
 - Start with the [Getting Started Hub](./overview.md) to ground teams in the basics and staged rollout plan.
-- Compare Koan to adjacent stacks using the [architecture comparison](../architecture/comparison.md).
-- Coordinate distributed deployments with the [ASPIRE integration guide](../guides/aspire-integration-reference.md).
+- Keep deployment topology in standard tooling; see the [external-topology boundary](../reference/cards/orchestration.md).
 
 ---
 

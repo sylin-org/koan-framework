@@ -2,7 +2,6 @@
 uid: reference.modules.koan.testing.containers
 title: Koan.Testing.Containers - Technical Reference
 description: xUnit v3 fixtures and host ownership for engine-backed Koan integration specs.
-since: 0.17.0
 packages: [Sylin.Koan.Testing.Containers]
 source: src/Koan.Testing.Containers/
 ---

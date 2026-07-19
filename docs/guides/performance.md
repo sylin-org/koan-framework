@@ -5,7 +5,7 @@ title: "Performance Optimization with Koan"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-15
-framework_version: v0.17.0
+framework_version: v0.20.0
 validation:
   status: not-yet-tested
   scope: docs/guides/performance.md
@@ -13,7 +13,7 @@ related_guides:
   - entity-capabilities-howto.md
   - data-modeling.md
   - ai-vector-howto.md
-  - building-apis.md
+  - ../reference/web/index.md
 ---
 
 # Performance Optimization with Koan
@@ -21,7 +21,7 @@ related_guides:
 **Document Type**: GUIDE
 **Target Audience**: Developers, Architects
 **Last Updated**: 2026-07-15
-**Framework Version**: v0.17.0
+**Preview line**: 0.20
 
 ---
 
@@ -379,27 +379,18 @@ public async Task<Product[]> SearchProducts(string query)
 
 ## Background Services Performance
 
-### Efficient Message Processing
+### Efficient Entity transport
 
 ```csharp
-using Koan.Messaging;
+using Koan.Communication;
 
-// Register one business-readable handler during composition
-builder.Services.On<OrderCreated>(async message =>
-{
-    var order = new Order
-    {
-        UserId = message.UserId,
-        Total = message.Total
-    };
-
-    await order.Save();
-});
+await Order.QueryStream(order => order.Ready)
+    .Transport.Send(ct);
 ```
 
-`On<T>` handles one message at a time. If the application deliberately buffers messages, persist a
-completed buffer with `Order.UpsertMany(batch, ct)`; buffer size and flush policy remain
-application-owned.
+The stream stays provider-bounded and Transport applies the same pointwise semantics as a scalar
+send. Receiver discovery, carriage bounds, and settlement remain Communication concerns; selection
+and batching stay in Data.
 
 ## Performance Monitoring
 

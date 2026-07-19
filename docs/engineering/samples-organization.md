@@ -1,3 +1,13 @@
+---
+type: DEV
+domain: framework
+title: "Sample portfolio standard"
+audience: [maintainers, contributors]
+status: current
+last_updated: 2026-07-19
+framework_version: v0.20.0
+---
+
 # Sample portfolio standard
 
 Koan samples are product evidence and curriculum, not a numbered inventory of repository experiments.

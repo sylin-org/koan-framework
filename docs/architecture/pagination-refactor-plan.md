@@ -1,3 +1,13 @@
+---
+type: ARCH
+domain: data
+audience: [architects, maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # Pagination & Data Stack Refactoring Plan
 
 > **Historical plan.** This document records an earlier pagination refactor and is not the current

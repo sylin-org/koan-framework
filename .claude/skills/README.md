@@ -1,103 +1,75 @@
-# Koan Framework Agent Skills Catalog
+# Koan agent skills
 
-Specialized, progressively-disclosed guidance for Koan Framework development — for both human
-developers (DX) and AI agents (AX). Skills load on demand based on conversation context.
+These focused guides help coding agents apply Koan's current application language. They are indexes,
+not a second API reference: each skill points to the package/reference owner, a runnable sample, and
+the generated maturity boundary.
 
-> **Architecture: card-anchored skills ([DX-0048](../../docs/decisions/DX-0048-card-anchored-skill-architecture.md)).**
-> The pillar **cards** under [`docs/reference/cards/`](../../docs/reference/cards/) are the
-> source-verified, one-screen **API truth**. A skill is the **activation layer** that *leans on*
-> its card — it carries the trigger, the one (compile-gated) canonical pattern, the anti-patterns,
-> and see-also links; it does **not** re-document the full API. One fact, one home.
->
-> This set is mid-overhaul under the **H10 program**
-> ([card](../../docs/assessment/prompts/06/H10-skills-overhaul.md)): realigning every skill to its
-> card, fixing the API drift the 2026-06 audit found, and adding the missing pillars. Status flags
-> below: ✅ current · ⟳ overhaul pending · ＋ planned.
+## How to use them
 
-## What are Agent Skills?
+Load the smallest skill that matches the user's business intent. Begin with standard .NET and Koan's
+public Entity language; add framework-specific concepts only when the referenced capability earns
+them. A package being present in the repository does not make its behavior supported—check the
+[product surface](../../docs/reference/product-surface.md).
 
-Filesystem-based capability packages that **load progressively** (only when relevant),
-**stay focused** (one domain each), and **reference** the authoritative cards/guides/samples
-rather than duplicating them.
+Every recommended web host uses the same four lines:
 
-## The skill contract (DX-0048)
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
+var app = builder.Build();
+await app.RunAsync();
+```
 
-Every skill conforms — exemplars: **koan-caching**, **koan-jobs**.
+## Supported 0.20 paths
 
-- **Frontmatter**: `name` (== directory name), `description` (trigger-rich — the AX activation
-  surface), optional `pillar` / `card` / `status` / `last_validated`.
-- **Sections**: `Trigger this skill when you see` → `Core principle` + **the one canonical pattern**
-  (a `<!-- validate -->`-marked, self-contained, compile-clean block) → activation table →
-  `Anti-patterns to flag` → `Escape hatches` → `See also` (card anchor + guide + sample + ADR).
-- **Gate**: `scripts/skills-lint.ps1` (dir==name, frontmatter, no version pins, link/card resolution)
-  + the canonical pattern compiles under `scripts/validate-code-examples.ps1` — both wired into
-  `green-ratchet.ps1` (Leg D) and the PR gate, so drift breaks the build.
+| Skill | Use it for |
+|---|---|
+| [koan-quickstart](koan-quickstart/SKILL.md) | Create the first template application and reach one Entity result. |
+| [koan-entity-first](koan-entity-first/SKILL.md) | Model business state with `Entity<T>` and its canonical verbs. |
+| [koan-bootstrap](koan-bootstrap/SKILL.md) | Understand `AddKoan()`, Reference = Intent, and `KoanModule`. |
+| [koan-debugging](koan-debugging/SKILL.md) | Read startup, health, facts, lock drift, and corrective failures. |
+| [koan-data-modeling](koan-data-modeling/SKILL.md) | Model keys, aggregates, relationships, lifecycle, and value objects. |
+| [koan-caching](koan-caching/SKILL.md) | Apply Entity cache semantics and inspect topology limits. |
+| [koan-jobs](koan-jobs/SKILL.md) | Express durable Entity-owned work, retry, progress, and schedules. |
+| [koan-web](koan-web/SKILL.md) | Project Entities and business actions through ASP.NET Core. |
+| [koan-communication](koan-communication/SKILL.md) | Use Entity Events, Transport, channels, local settlement, and RabbitMQ carriage. |
+| [koan-auth](koan-auth/SKILL.md) | Compose authentication, durable identity, authorization, trust, and tenant-aware identity. |
+| [koan-tenancy](koan-tenancy/SKILL.md) | Apply tenant isolation and host-authorized administration. |
+| [koan-mcp-integration](koan-mcp-integration/SKILL.md) | Project governed Entity/tool surfaces through MCP. |
+| [koan-observability](koan-observability/SKILL.md) | Add one OpenTelemetry pipeline and application health contributions. |
 
-## Catalog
+## Available capabilities with narrower maturity
 
-### Foundation (cross-cutting — no single card)
+These skills explain real current APIs, but their packages or provider combinations are not part of
+the complete supported 0.20 closure. State the limitation and check the generated claim before
+recommending one for production use.
 
-| Skill | Card | Status | When to use |
-|-------|------|--------|-------------|
-| **koan-quickstart** | — | ✅ | Zero to first Koan app; S0 + S1 patterns |
-| **koan-entity-first** | data.md | ✅ | `Entity<T>`, GUID v7, static methods vs manual repositories |
-| **koan-bootstrap** | — | ✅ | Auto-registration, `KoanAutoRegistrar`/`KoanModule`, minimal `Program.cs` |
-| **koan-debugging** | — | ✅ | Boot-report analysis, capability/provider diagnostics, common errors |
+| Skill | Use it for |
+|---|---|
+| [koan-ai](koan-ai/SKILL.md) | Prompt, model, and AI provider semantics. |
+| [koan-vector](koan-vector/SKILL.md) | Vector indexing/search and provider-specific limits. |
+| [koan-media](koan-media/SKILL.md) | Entity-backed media recipes and HTTP rendering. |
+| [koan-storage](koan-storage/SKILL.md) | Named storage profiles and provider boundaries. |
+| [koan-multi-provider](koan-multi-provider/SKILL.md) | Deliberate provider/source selection without claiming parity. |
+| [koan-performance](koan-performance/SKILL.md) | Paging, streaming, batching, and measured provider-aware tuning. |
 
-### Pillar skills (1:1 with a card)
+## Deployment boundary
 
-| Skill | Card | Status | When to use |
-|-------|------|--------|-------------|
-| **koan-caching** | cache.md | ✅ | `[Cacheable]`, L1/L2, coherence, `EntityContext.NoCache()` |
-| **koan-jobs** | jobs.md | ✅ | `IKoanJob<T>`, `.Job`/`.Jobs`, scheduled/retried work, conveyors |
-| **koan-web** | web.md | ✅ | `EntityController<T>`, custom routes, `IEntityTransformer`, auth policies |
-| **koan-vector** | vector.md | ✅ | Vector search (`Vector<T>.Search`), `[Embedding]`, provider-migration export |
-| **koan-ai** | ai-data.md | ✅ | `EntityAi.Embed/Chat/Ocr`, `[Embedding]`, `[MediaAnalysis]`, `Client` facade |
-| **koan-mcp-integration** → koan-mcp | mcp.md | ⟳ (deferred) | `[McpEntity]`/`[McpTool]`, MCP server, Code Mode |
-| **koan-auth** | auth.md | ✅ | OAuth2/OIDC connectors, `[Authorize]`/roles, `Can*` gates, Security.Trust bearer |
+[koan-orchestration](koan-orchestration/SKILL.md) explains the current non-package boundary: ordinary
+.NET, Aspire, Compose, Docker/Podman, Kubernetes, or another platform owns topology. Koan connectors
+consume standard endpoints and configuration; the shelved bespoke CLI/Aspire bridge is not a 0.20
+product surface.
 
-### Data facets (anchored to data.md)
+## Maintenance contract
 
-| Skill | Status | When to use |
-|-------|--------|-------------|
-| **koan-data-modeling** | ✅ (absorbed relationships) | Aggregates, persistence `Lifecycle`, value objects, `[Parent]`/`Relatives()` |
-| **koan-multi-provider** | ✅ | Provider transparency, capability detection (`CapabilitySet`/`DataCaps`), context routing |
-| **koan-performance** | ✅ | Streaming, pagination (`QueryDefinition`), count strategies, bulk operations |
-| **koan-relationships** | ⟳ (retiring → data-modeling; dir removed in Phase 6) | Entity navigation, batch loading |
+- Directory name and frontmatter `name` agree.
+- The description is the activation surface.
+- A canonical example is compile-checked where the skill teaches code.
+- Relative links resolve and package IDs use `Sylin.Koan.*`.
+- Current instructions use generated module composition and `await app.RunAsync()`.
+- Skills link to canonical product docs instead of duplicating full API inventories.
 
-### New pillars (card-anchored; added under H10)
+Run `pwsh scripts/skills-lint.ps1 -Strict` and `pwsh scripts/validate-code-examples.ps1` after changing
+skills. The public-document gate also treats every tracked skill asset as public narrative.
 
-| Skill | Card | Status | When to use |
-|-------|------|--------|-------------|
-| **koan-storage** | storage.md | ✅ | `StorageEntity<T>` + `[StorageBinding]`, profiles, streaming, `MoveTo`/`CopyTo` tiering |
-| **koan-messaging** | messaging.md | ✅ | Entity `Events.Raise`/`Transport.Send`, typed handlers, local outcomes, legacy Messaging boundary |
-| **koan-media** | media.md | ✅ | `MediaEntity<T>`, content-addressed `Store`, `[MediaRecipe]` transforms, `[MediaAnalysis]` |
-| **koan-tenancy** | tenancy.md | ✅ | Automatic tenant isolation (data/blob/cache), `Tenant.Use`/`None`, `[HostScoped]`, dev-open/prod-closed posture, `AssertNoLeak` |
-| **koan-orchestration** | orchestration.md | ✅ | `[KoanService]` descriptors, DevHost CLI, `OrchestrationMode` self-orchestration, Aspire |
-| **koan-observability** | observability.md | ✅ | opt-in OTel leaf (ARCH-0088), traces/metrics, `IHealthContributor` self-reporting |
-
-## Automatic activation
-
-Skills load on conversation context via their `description`. Examples: entity work →
-`koan-entity-first`; project setup → `koan-bootstrap`; API work → `koan-api-building`; caching →
-`koan-caching`; background jobs → `koan-jobs`; errors → `koan-debugging`. Explicit invocation via
-the Skill tool also works.
-
-## Skill resources
-
-Most skills are a single `SKILL.md` — the overhaul folds the canonical pattern (compile-gated)
-and escape hatches inline, retiring the old uncompiled `.cs`/`.template` bundles that drifted.
-Two skills keep a focused extra: **koan-bootstrap** (`templates/` — a minimal `Program.cs` +
-`appsettings.json`) and **koan-entity-first** (`anti-patterns/manual-repositories.md`). New
-bundled directories are added per-skill only when they earn their keep — not promised by default.
-
-## Relationship to the rest of the docs
-
-Skills are intelligent indexes, not replacements: **cards** own the API truth, **guides**
-(`docs/guides/`) the deep how-to, **ADRs** (`docs/decisions/`) the rationale, **samples**
-(`samples/`) the working proof. A skill routes to all four.
-
----
-
-**Aligned with:** Koan Framework v0.17.x (NBGV-versioned — see `version.json`; do not pin a patch here)
-**Last Updated:** 2026-06-18 · **Architecture:** [DX-0048](../../docs/decisions/DX-0048-card-anchored-skill-architecture.md)
+Aligned with the Koan 0.20 preview on 2026-07-19.

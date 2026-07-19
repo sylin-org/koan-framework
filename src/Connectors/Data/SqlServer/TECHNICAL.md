@@ -2,7 +2,6 @@
 uid: reference.modules.Koan.data.sqlserver
 title: Koan.Data.Connector.SqlServer - Technical Reference
 description: SQL Server adapter for Koan data.
-since: 0.2.x
 packages: [Sylin.Koan.Data.Connector.SqlServer]
 source: src/Koan.Data.Connector.SqlServer/
 ---

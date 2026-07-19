@@ -138,7 +138,7 @@ internal sealed class PackageQualityCompiler(string repositoryRoot)
         markdown.AppendLine("audience: [developers, maintainers, support-engineers, architects, ai-agents]");
         markdown.AppendLine("status: current");
         markdown.Append("last_updated: ").AppendLine(PackagingConstants.PackageQuality.AssessmentDate);
-        markdown.AppendLine("framework_version: source-first");
+        markdown.Append("framework_version: ").AppendLine(PackagingConstants.PreviewFrameworkVersion);
         markdown.AppendLine("validation:");
         markdown.Append("  date_last_tested: ").AppendLine(PackagingConstants.PackageQuality.AssessmentDate);
         markdown.AppendLine("  status: generated");

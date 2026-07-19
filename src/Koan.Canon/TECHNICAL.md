@@ -2,11 +2,9 @@
 uid: reference.modules.Koan.canon
 title: Koan.Canon - Technical Reference
 description: Canon model composition, deterministic pipelines, persistence, and commit ownership.
-since: source-first
 packages: [Sylin.Koan.Canon]
 source: src/Koan.Canon/
 last_updated: 2026-07-18
-framework_version: pre-1.0
 validation:
   date_last_tested: 2026-07-18
   status: tested

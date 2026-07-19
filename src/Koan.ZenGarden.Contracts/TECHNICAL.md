@@ -5,7 +5,6 @@ description: Inert client, discovery, connection-intent, and capability contract
 packages: [Sylin.Koan.ZenGarden.Contracts]
 source: src/Koan.ZenGarden.Contracts/
 last_updated: 2026-07-17
-framework_version: source-first
 validation:
   date_last_tested: 2026-07-17
   status: reviewed

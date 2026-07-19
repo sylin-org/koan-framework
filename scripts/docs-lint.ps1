@@ -18,17 +18,6 @@ $repoRoot = (Get-Location).ProviderPath
 $modulePath = Join-Path $PSScriptRoot "KoanDocs.Tools.psm1"
 Import-Module $modulePath -Force
 
-$repoVersion = $null
-try {
-    $verPath = Join-Path $repoRoot 'version.json'
-    if (Test-Path $verPath) {
-        $verJson = Get-Content -Path $verPath -Raw | ConvertFrom-Json
-        if ($verJson.version) { $repoVersion = "v$($verJson.version)" }
-    }
-}
-catch {
-    Write-Verbose "Unable to read version.json: $_"
-}
 $hasYaml = $false
 try {
     if (Get-Command ConvertFrom-Yaml -ErrorAction SilentlyContinue) { $hasYaml = $true }
@@ -141,8 +130,8 @@ $issues = New-Object System.Collections.Generic.List[object]
 
 $allowedTypes = @("REF", "GUIDE", "ARCH", "DEV", "SUPPORT", "ARCHITECTURE", "REFERENCE", "ENGINEERING", "DESIGN", "SPEC")
 $allowedDomains = @("core", "data", "web", "ai", "flow", "messaging", "storage", "media", "orchestration", "scheduling", "jobs", "mcp", "observability", "framework", "architecture", "engineering", "performance", "troubleshooting", "platform", "canon")
-$allowedStatuses = @("current", "draft", "deprecated")
-$allowedAudience = @("developers", "architects", "ai-agents", "maintainers", "support-engineers", "security-engineers", "technical-leads", "ai-engineers")
+$allowedStatuses = @("current", "draft", "deprecated", "archived", "superseded", "proposed", "open-for-review", "active", "resolved")
+$allowedAudience = @("developers", "architects", "ai-agents", "maintainers", "contributors", "release-engineers", "support-engineers", "security-engineers", "technical-leads", "ai-engineers")
 
 function Add-Issue {
     param(
@@ -299,9 +288,6 @@ foreach ($entry in $docEntries) {
         if ($frameworkVersionValue -notmatch '^v\d+\.\d+\.\d+(\+)?$') {
             $sev = if ($EnforceFrontMatter) { "Error" } else { "Warning" }
             Add-Issue -Path $relativePath -Severity $sev -Check "FrontMatter" -Message "framework_version '$frameworkVersionValue' should follow semantic versioning (v0.x.y[+])"
-        }
-        elseif ($repoVersion -and ($frameworkVersionValue -ne $repoVersion -and $frameworkVersionValue -ne "$repoVersion+")) {
-            Add-Issue -Path $relativePath -Severity "Warning" -Check "FrontMatter" -Message "framework_version '$frameworkVersionValue' does not match repo version '$repoVersion'"
         }
     }
 

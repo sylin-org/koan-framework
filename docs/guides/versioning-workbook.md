@@ -1,3 +1,13 @@
+---
+type: DEV
+domain: engineering
+audience: [maintainers, release-engineers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # Versioning workbook
 
 > **Moved.** The content of this page now lives under `docs/engineering/`, split into two operationally-focused docs:

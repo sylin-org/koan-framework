@@ -74,7 +74,7 @@ public sealed class FeedHealthContributor : IHealthContributor
 ## Escape hatches
 
 - **Tests and custom settings**: supply the same `Koan:Observability` configuration used by production. Pipeline-affecting settings are configuration-owned and compiled once at boot ([ARCH-0088](../../../docs/decisions/ARCH-0088-extract-koan-observability-package.md)).
-- **Emit your own spans/metrics**: create an `ActivitySource` / `Meter` named under the `Koan.*` prefix and it rides the existing pipeline — tracing already does `AddSource("Koan.Core", "Koan.Data", "Koan.Messaging", "Koan.Web")`. (App-named sources need their own `AddSource` registration; the framework prefixes are wired by default.)
+- **Emit your own spans/metrics**: create an `ActivitySource` / `Meter` and add the application source through standard OpenTelemetry configuration. Koan's own Core, Data, Communication, and Web sources are already included.
 - **Per-signal toggles**: `Koan:Observability:Traces:Enabled` / `:Metrics:Enabled` flip a single signal; `Koan:Observability:Enabled` is the master kill switch.
 - **OTLP headers / endpoint via env**: `OTEL:EXPORTER:OTLP:ENDPOINT` and `OTEL:EXPORTER:OTLP:HEADERS` are read as fallbacks to the `Otlp.Endpoint` / `Otlp.Headers` options.
 - **Custom readiness**: implement `IHealthContributor` (`Name`, `IsCritical`, `Check → HealthReport`); for low-level control push directly via `IHealthAggregator.Push(component, status, ...)` and invite probes with `RequestProbe(...)`.
@@ -84,5 +84,3 @@ public sealed class FeedHealthContributor : IHealthContributor
 - [Reference card: observability.md](../../../docs/reference/cards/observability.md) — one-screen pillar map
 - [ARCH-0088 — extract the Koan.Observability package](../../../docs/decisions/ARCH-0088-extract-koan-observability-package.md) — the leaf-extraction decision (why options stay in Core, the dead-ref cleanup, the no-cycle rule)
 - [Koan.Observability package guide](../../../src/Koan.Observability/README.md) — Reference=Intent activation, configuration, and operator-facing behavior
-</skill_md>
-</invoke>

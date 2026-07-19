@@ -15,7 +15,7 @@ last_validated: 2026-06-18
 - A first `Entity<T>` being declared, or someone unsure how to save/read it
 - `EntityController<T>` for the first auto-CRUD endpoint
 - "how do I expose an API", "where's the repository", "how do I switch to Postgres"
-- Prototypes, proofs of concept, demos, `samples/S0.*` / `samples/S1.*` references
+- Prototypes, proofs of concept, and the FirstUse or GoldenJourney samples
 
 ## Core principle
 
@@ -46,14 +46,12 @@ await todo.Remove();                                         // delete
 
 ## 10-minute first app
 
-**1. Create the project + add references** (each reference is intent — see the table below):
+**1. Create the project from the supported 0.20 template:**
 
 ```bash
-dotnet new web -n MyKoanApp && cd MyKoanApp
-dotnet add package Koan.Core
-dotnet add package Koan.Data.Core
-dotnet add package Koan.Data.Connector.Json   # dev-friendly file store
-dotnet add package Koan.Web                    # EntityController<T>
+dotnet new install Sylin.Koan.Templates
+dotnet new koan-web -o MyKoanApp
+cd MyKoanApp
 ```
 
 **2. `Program.cs` — one call wires the whole framework:**
@@ -64,8 +62,7 @@ using Koan.Core;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();          // discovers every referenced Koan module
 var app = builder.Build();
-app.MapControllers();
-app.Run();
+await app.RunAsync();
 ```
 
 **3. Declare the entity** — the canonical pattern above (`Todo : Entity<Todo>`).
@@ -86,11 +83,9 @@ public sealed class TodosController : EntityController<Todo> { }   // body inten
 
 | Add this reference | Effect |
 |---|---|
-| `Koan.Core` | Bootstrap + discovery (`AddKoan()`) |
-| `Koan.Data.Core` | Entity facade — `Get` / `Query` / `Save` / `Remove`, GUID v7 ids |
-| `Koan.Data.Connector.Json` | JSON file store (great for dev) — the default when it's the only adapter |
-| `Koan.Web` | `EntityController<T>` auto-CRUD + query/paging/patch |
-| swap `Json` → `Koan.Data.Connector.Postgres` | Same entity code, Postgres-backed. **Provider transparency** — no code change |
+| `Sylin.Koan.App` | Bootstrap, Entity/Data foundation, local Communication, JSON, and Web projection |
+| `Sylin.Koan.Data.Connector.Sqlite` | Durable embedded storage; selected automatically by direct reference |
+| `Sylin.Koan.Templates` | The proved web and console application shapes |
 
 ## Relationships: use the primitive, don't hand-roll nav
 
@@ -113,23 +108,17 @@ var graph = await todo.GetRelatives();        // single entity → its parents
 var graphs = await todos.Relatives<Todo, string>();   // batch (no N+1)
 ```
 
-The full relationship/aggregate story (batch loading, multi-parent, lifecycle hooks) lives in **koan-data-modeling** and **koan-relationships**.
+The full relationship/aggregate story (batch loading, multi-parent, lifecycle hooks) lives in **koan-data-modeling**.
 
-## Switch to a real database (no code change)
+## Choose durable embedded storage (no code change)
 
 ```bash
-dotnet add package Koan.Data.Connector.Postgres
+dotnet add package Sylin.Koan.Data.Connector.Sqlite
 ```
 
-```jsonc
-// appsettings.json
-{ "Koan": { "Data": { "Sources": { "Default": {
-  "Adapter": "postgres",
-  "ConnectionString": "Host=localhost;Database=myapp;Username=koan;Password=dev"
-}}}}}
-```
-
-Entity code, controllers, and verbs are untouched — that's provider transparency. See **koan-multi-provider**.
+SQLite derives a safe local path. Entity code, controllers, and verbs stay unchanged. Remote providers
+remain available at their generated maturity level and require their own endpoint, credential, and
+operational guarantees.
 
 ## Anti-patterns to flag
 

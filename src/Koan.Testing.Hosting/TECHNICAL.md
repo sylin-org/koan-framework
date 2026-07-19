@@ -2,7 +2,6 @@
 uid: reference.modules.koan.testing.hosting
 title: Koan.Testing.Hosting - Technical Reference
 description: Generic-host construction, startup ownership, disposal, and concurrency boundaries.
-since: 0.17.0
 packages: [Sylin.Koan.Testing.Hosting]
 source: src/Koan.Testing.Hosting/
 ---

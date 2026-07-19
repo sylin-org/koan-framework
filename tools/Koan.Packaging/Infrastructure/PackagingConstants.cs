@@ -19,6 +19,7 @@ internal static class PackagingConstants
     public const string NuGetSource = "https://api.nuget.org/v3/index.json";
     public const string NuGetFlatContainer = "https://api.nuget.org/v3-flatcontainer";
     public const string PackagePrefix = "Sylin.Koan";
+    public const string PreviewFrameworkVersion = "v0.20.0";
     public const string CorePackageId = "Sylin.Koan.Core";
     public const string CoreCompositionTargetPackagePath = "buildTransitive/Sylin.Koan.Core.targets";
     public const string CoreSemanticActivationTargetPackagePath =

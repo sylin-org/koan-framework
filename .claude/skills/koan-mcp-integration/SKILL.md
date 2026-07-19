@@ -16,14 +16,14 @@ description: MCP server patterns, Code Mode integration, tool building
 ```csharp
 using Koan.Mcp;
 
-// Reference = Intent: referencing the Koan.Mcp package IS the whole opt-in — its auto-registrar wires the MCP
-// server (STDIO is hosted; HTTP/SSE is config-gated) and AddKoan() discovers it. There is NO AddKoanMcp() to
+// Reference = Intent: referencing the Koan.Mcp package IS the whole opt-in — its module contributes the MCP
+// server (STDIO is hosted; HTTP is config-gated) and AddKoan() discovers it. There is NO AddKoanMcp() to
 // call, and no MapKoanMcpEndpoints() either (the MCP endpoint contributor maps them inside Koan's pipeline).
 // Any [McpEntity] in the app is then exposed automatically.
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
 var app = builder.Build();
-app.Run();
+await app.RunAsync();
 ```
 
 ### Expose entities and custom verbs
@@ -64,7 +64,10 @@ public static class TodoTools
 
 ### Transports
 
-STDIO (default, local-trust, ungated) plus the HTTP edge. `EnableHttpSseTransport` is the master HTTP switch — when on, the modern **Streamable HTTP** transport (AI-0037: a single `{baseRoute}` endpoint serving POST/GET/DELETE, spec 2025-06-18) is mounted by default. The deprecated legacy `/sse`+`/rpc` pair is a separate opt-in (`EnableLegacySseTransport`); both ride one session/dispatch core.
+STDIO is the default local process-owner transport. Set `EnableStreamableHttpTransport` to add the modern
+**Streamable HTTP** edge: one `{baseRoute}` endpoint serving POST/GET/DELETE. The deprecated legacy
+`/sse` + `/rpc` pair is a separate opt-in (`EnableLegacySseTransport`); both HTTP shapes use one
+session/dispatch core.
 
 ### Configuration (real `Koan:Mcp` keys)
 
@@ -73,7 +76,7 @@ STDIO (default, local-trust, ungated) plus the HTTP edge. `EnableHttpSseTranspor
   "Koan": {
     "Mcp": {
       "EnableStdioTransport": true,
-      "EnableHttpSseTransport": false,
+      "EnableStreamableHttpTransport": false,
       "EnableLegacySseTransport": false,
       "RequireAuthentication": false,
       "Exposure": "Auto",
@@ -107,6 +110,6 @@ An agent can send one sandboxed JavaScript script (`koan.code.execute`) over an 
 ## Reference Documentation
 
 - **Walkthrough (start here):** `docs/guides/mcp-agent-native-howto.md` — one entity from `[McpEntity]` to governed access (grants/audit/door), what you write vs what the agent sees
-- **Transport guide:** `docs/guides/mcp-http-sse-howto.md` — STDIO vs HTTP/SSE, auth, sessions, streaming
-- **Conformance suite (end-to-end exercise):** `tests/Suites/Mcp/Koan.Mcp.Conformance.Tests` (a dedicated MCP showcase sample is being reworked)
+- **Transport guide:** `docs/guides/mcp-http-sse-howto.md` — STDIO vs Streamable HTTP, auth, sessions, streaming
+- **Conformance suite (end-to-end exercise):** `tests/Suites/Mcp/Koan.Mcp.Conformance.Tests`
 - **Module:** `src/Koan.Mcp/`

@@ -2,11 +2,9 @@
 uid: reference.modules.Koan.data.couchbase
 title: Koan.Data.Connector.Couchbase - Technical Reference
 description: Couchbase adapter for Koan Entity data.
-since: 0.2.x
 packages: [Sylin.Koan.Data.Connector.Couchbase]
 source: src/Connectors/Data/Couchbase/
 last_updated: 2026-07-17
-framework_version: source-first
 ---
 
 ## Contract

@@ -2,7 +2,6 @@
 uid: reference.modules.Koan.data.postgres
 title: Koan.Data.Connector.Postgres - Technical Reference
 description: PostgreSQL adapter for Koan data.
-since: 0.2.x
 packages: [Sylin.Koan.Data.Connector.Postgres]
 source: src/Koan.Data.Connector.Postgres/
 ---

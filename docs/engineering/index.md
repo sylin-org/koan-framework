@@ -5,7 +5,7 @@ title: "Koan Engineering Guardrails"
 audience: [developers, maintainers, ai-agents]
 status: current
 last_updated: 2026-07-14
-framework_version: v0.17.0
+framework_version: v0.20.0
 validation:
   date_last_tested: 2025-09-29
   status: verified

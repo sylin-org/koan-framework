@@ -2,7 +2,6 @@
 uid: reference.modules.Koan.data.redis
 title: Koan.Data.Connector.Redis - Technical Reference
 description: Redis adapter for Koan data.
-since: 0.2.x
 packages: [Sylin.Koan.Data.Connector.Redis]
 source: src/Koan.Data.Connector.Redis/
 ---

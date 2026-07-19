@@ -5,7 +5,7 @@ title: "NuGet packaging policy"
 audience: [developers, maintainers, ai-agents]
 status: current
 last_updated: 2026-07-19
-framework_version: v0.17.0
+framework_version: v0.20.0
 validation:
   status: tested
   scope: tools/Koan.Packaging and PackageCleanRoom

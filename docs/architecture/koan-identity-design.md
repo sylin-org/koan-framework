@@ -1,3 +1,13 @@
+---
+type: ARCH
+domain: framework
+audience: [architects, maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # Koan.Identity — design & capability plan
 
 > **Historical design input only.** This draft and its accepted [SEC-0007](../decisions/SEC-0007-koan-identity-module.md)

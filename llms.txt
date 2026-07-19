@@ -4,13 +4,21 @@ Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applicati
 V0 to V1 in meaningful small steps: application code should read as business intent while framework
 pillars own composition, backend negotiation, lifecycle, and explanation.
 
-Status: pre-1.0 and source-first. Packages own independent NBGV versions. A coherent candidate wave
-has local clean-room evidence but has not yet been published and observed from public feeds. Package
-existence is not a support claim; use docs/reference/product-surface.md for maturity.
+Status: 0.20 preview. Supported package owners share the 0.20 compatibility signal while package
+patches remain independently owned. Other available packages are not promoted by proximity. Public-
+feed publication follows the final package-only proof; docs/reference/product-surface.md is the
+maturity authority.
 
 ## First supported action
 
-Run:
+The canonical package entry is:
+
+    dotnet new install Sylin.Koan.Templates
+    dotnet new koan-web -o TodoApi
+    cd TodoApi
+    dotnet run
+
+Until the 0.20 package wave is observed on the public feed, run the proved checkout path:
 
     dotnet run --project samples/FirstUse
 

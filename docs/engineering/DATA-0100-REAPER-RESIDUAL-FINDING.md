@@ -1,3 +1,13 @@
+---
+type: DEV
+domain: data
+audience: [maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # DATA-0100 post-merge finding — reaper still throws on `Job<T>`-derived entities
 
 **Date**: 2026-06-04

@@ -157,7 +157,7 @@ At most one window is in flight, so the source drains through a handful of ledge
 await myJob.Job.Status();      await MyJob.Jobs.Status(id);     await MyJob.Jobs.WithStatus(JobStatus.Running);
 await myJob.Job.Cancel();      await MyJob.Jobs.Cancel(id);     await MyJob.Jobs.Trigger(action);   // schedule's on-demand twin
 
-// Tune — AddKoanJobs(o => …) (registrar-driven; never hand-register the worker)
+// Tune — services.Configure<JobsOptions>(o => …); the referenced module owns worker registration
 o.ArchiveAfter; o.FailedAfter; o.RetainPerWorkType;   // retention windows + per-type cap
 o.ClaimStrategy; o.ClaimScanBatch;                    // claim contention strategy + bounded per-lane seek
 o.LaneWeights["translation"] = 3;                     // lane-fair dispatch weight (default 1 = equal share)

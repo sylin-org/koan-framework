@@ -21,7 +21,7 @@ last_validated: 2026-06-18
 
 ## Core principle
 
-**Name a profile, never a vendor.** Storage is a thin orchestration seam (`IStorageService`) over named **profiles**; each profile maps to a provider + container. The same `Onboard`/`OpenRead`/`Head`/`Delete` calls run against local disk or S3 unchanged. Bind an `Entity<T>` to a profile with `[StorageBinding]` and the entity's own helpers resolve their target from the attribute — the metadata row persists with `Save()` like any entity, while the bytes stream through the seam (never buffered). Provider activation is **Reference = Intent**: referencing `Koan.Storage.Connector.Local` or `Koan.Storage.Connector.S3` registers an `IStorageProvider` via that package's `KoanAutoRegistrar` — no manual wiring ([STOR-0001](../../../docs/decisions/STOR-0001-storage-module-and-contracts.md)).
+**Name a profile, never a vendor.** Storage is a thin orchestration seam (`IStorageService`) over named **profiles**; each profile maps to a provider + container. The same `Onboard`/`OpenRead`/`Head`/`Delete` calls run against local disk or S3 unchanged. Bind an `Entity<T>` to a profile with `[StorageBinding]` and the entity's own helpers resolve their target from the attribute — the metadata row persists with `Save()` like any entity, while the bytes stream through the seam (never buffered). Provider activation is **Reference = Intent**: a connector's `KoanModule` contributes its `IStorageProvider`; application code adds no provider-registration list.
 
 <!-- validate -->
 ```csharp

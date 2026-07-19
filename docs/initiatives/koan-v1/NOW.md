@@ -51,16 +51,23 @@ supported-extension owners. Exactly those 38 owners declare project-local 0.20 i
 Koan dependency stays inside the supported closure, and no other package carries 0.20. The existing
 product-surface compiler enforces claim/version/dependency agreement in both directions; there is no
 maintained allowlist or stamping layer. Focused graph/version tests pass 41/41, lineage/planner tests
-pass 39/39, the packaging tool builds warning-clean, public docs pass 233/42, and structural docs lint
-has zero errors. No full ratchet or remote mutation ran.
+pass 39/39, and the packaging tool builds warning-clean.
 
 [R12-04](work-items/r12/R12-04-coherent-public-narrative.md) is active. Compile the exact public-content
-graph, classify each reader outcome, then align root, site, package, template, sample, tool, and agent
-surfaces around one present-tense path: purpose, install, four-line host, first Entity result,
-progressive capability references, common runtime explanation/correction, application responsibilities,
-and the generated maturity boundary. Historical ADRs and initiatives remain evidence outside the
-ordinary learning graph. Extend the existing public-doc truth owner rather than creating a narrative
-ledger, and do not publish or run the full release ratchet.
+graph now covers 667 current assets, 656 current text surfaces, 107 historical boundaries, 42 navigation
+targets, and 11 graduated sample roots. Root, site, package, template, sample, tool, contributor, and
+agent-skill surfaces now tell one present-tense path: package install, four-line host, first Entity result,
+progressive capability references, runtime facts and correction, application responsibilities, and the
+generated maturity boundary. Obsolete duplicate Web/OpenAPI/AI/transaction/CLI/Aspire/Flow/Messaging
+instruction was removed or classified as history; the competing docs inventory and hand-maintained adapter
+matrix were retired. Historical ADRs and initiatives remain evidence outside the ordinary learning graph.
+
+Focused R12-04 evidence passes: public-doc truth, 16/16 product/quality compiler tests, warning-clean
+packaging build, byte-identical generated reports, all ten graduated sample Release builds and their exact
+selective-0.20 lock audit, 20 strict skills, 20/20 instructional examples, whitespace checks, and broad
+documentation structure with zero errors / 1,377 non-gating warnings. No full ratchet or remote mutation
+ran. R12-04 remains open only for the two required independent public-context-only cold reads and any
+corrections they uncover; package-only external-consumer proof remains downstream.
 
 ## Recently completed preview foundation
 
@@ -206,18 +213,20 @@ bounded process-exit observation so GoldenJourney can prove fail-fast startup tr
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
 - Branch: `dev`; R11 completion is `3f7ca5186`, followed by R08-05 repairs `5aeabb2a6` and `844449dd8`,
   local-candidate closeout `e40cd4525`, API-key architecture amendment `5c346082c`, workflow wiring
-  `f1a816b02`, and the current R12 opening. Verify exact HEAD and ahead/behind counts before continuing.
+  `f1a816b02`, and R12 selective-boundary commit `679ae4f97`. Verify exact HEAD and ahead/behind counts
+  before continuing.
 - `tmp/` is untracked certification/evaluator/artifact material and must never be staged.
-- The tracked worktree is expected clean after the R12 opening commit.
+- The tracked worktree contains the coherent R12-04 public-narrative tranche until it is committed.
 
 ## Resume here
 
-1. Verify `git status`, HEAD, and the R12/R12-01 decisions before work.
-2. Complete R12-01's read-only version, claim, guarantee, and dependency-boundary inventory.
-3. Present the exact 0.20 channel, promoted package set, compatibility contract, and version-expression
-   checkpoint before editing any `version.json`.
-4. Do not begin the R12-04 mass narrative rewrite until R12-01 through R12-03 settle what the public
-   product guarantees; inventory and contradiction collection are safe earlier.
+1. Verify `git status`, HEAD, and the R12-04 implementation/evidence record before work.
+2. Obtain two independent public-context-only cold reads against the compiled public learning path;
+   record anonymous findings and make repository-owned corrections without exposing initiative history.
+3. Re-run the focused R12-04 public-doc, structural-doc, skill, example, packaging-generation, sample-lock,
+   and whitespace checks affected by those corrections; do not substitute the full release ratchet.
+4. Close R12-04 only when both readers reproduce the intended story with no unresolved contradiction,
+   then advance to the next R12 maturity slice.
 5. Preserve the R08 release compiler and API-key promotion path unless current evidence identifies a
    defect required by the selective preview.
 6. Stop before repository-secret or repository/branch/environment settings, push/merge, tag, GitHub

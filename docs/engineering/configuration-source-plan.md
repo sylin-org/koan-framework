@@ -6,7 +6,7 @@ audience:
    - developers
    - maintainers
    - ai-agents
-status: current
+status: archived
 last_updated: 2025-10-15
 framework_version: v0.2.18+
 validation:

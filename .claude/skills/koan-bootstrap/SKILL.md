@@ -6,7 +6,7 @@ status: current
 last_validated: 2026-06-18
 ---
 
-# Koan Bootstrap & Auto-Registration
+# Koan bootstrap and composition
 
 ## Trigger this skill when you see
 
@@ -76,7 +76,7 @@ using Koan.Core;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();                 // discovers every module + adapter by reference
 var app = builder.Build();
-app.Run();                                  // middleware auto-configured by referenced packages
+await app.RunAsync();                       // middleware is contributed by referenced packages
 ```
 
 ## Reference = Intent activation
@@ -133,14 +133,14 @@ Use `KoanEnv.EnvironmentName` (not a fictional `CurrentEnvironment`). For multi-
 | `Configuration.Read(cfg, default, "A", "B")` (multi-key) | `Configuration.ReadFirst(cfg, default, "A", "B")` — `Read` is single-key |
 | `KoanEnv.CurrentEnvironment` | `KoanEnv.EnvironmentName` |
 | Hand-rolled `AppDomain.GetAssemblies()` plug-in scan | `[KoanDiscoverable]` on the interface + `KoanRegistry.GetDiscoveredImplementors(...)` |
-| Implementing `IKoanAutoRegistrar` for new app modules | Extend `KoanModule` (ARCH-0086) — id + DI + `Start` + `Report` in one unit |
+| A second registration/discovery lifecycle for new app modules | Extend `KoanModule` — DI + `Start` + `Report` in one unit |
 
 ## Escape hatches
 
 - **Need ordering vs another module?** Annotate the module with `[Before(typeof(OtherModule))]` / `[After(...)]` — discovery topologically sorts; never sequence by hand in `Program.cs`.
 - **Conditional registration** — branch on `KoanEnv.*` or `cfg.GetValue<bool>(...)` inside `Register`. (Reading config there needs a built provider; prefer feature flags resolved at use-site.)
 - **Truly framework-foreign service** that must run before the container is built — that work belongs in `Register`, not `Start`.
-- **Raw `IKoanAutoRegistrar`** remains supported when you can't take the `KoanModule` base (e.g. an existing class hierarchy).
+- **Existing class hierarchy** — keep it as an ordinary service and let one small `KoanModule` register it.
 
 ## See also
 

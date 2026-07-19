@@ -3,9 +3,9 @@ type: REF
 domain: core
 title: "Guard Utilities Reference"
 audience: [developers, architects]
-status: current
+status: archived
 last_updated: 2025-10-12
-framework_version: v0.6.3
+framework_version: v0.20.0
 validation:
   date_last_tested: 2025-10-12
   status: verified
@@ -743,7 +743,7 @@ public void CreateTodo_WithValidInputs_Succeeds()
 4. Automatic parameter name capture
 5. Use `RangeType` for precise range control: `Between(min, max, RangeType.InclusiveExclusive)`
 6. Comprehensive type coverage: strings, numbers, collections, enums
-7. Integrates seamlessly with Entity<T>, EntityController<T>, and Flow pipelines
+7. Integrates with `Entity<T>`, `EntityController<T>`, and Jobs pipelines
 
 ---
 

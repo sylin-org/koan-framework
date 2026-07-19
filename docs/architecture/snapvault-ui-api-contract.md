@@ -1,3 +1,13 @@
+---
+type: ARCH
+domain: framework
+audience: [architects, maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # SnapVault — UI API Contract (functional acceptance gate)
 
 > **Historical migration contract, not the current endpoint reference.** It preserves the June 2026 SPA/backend map.

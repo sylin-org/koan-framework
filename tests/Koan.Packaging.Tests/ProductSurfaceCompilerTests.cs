@@ -180,6 +180,7 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
             Claims(Claim(library.PackageId)));
 
         Assert.Equal(ProductSurfaceCompiler.ToJson(first), ProductSurfaceCompiler.ToJson(second));
+        Assert.Contains("framework_version: v0.20.0", ProductSurfaceCompiler.ToMarkdown(first), StringComparison.Ordinal);
         Assert.Equal("library", first.Packages.Single(package => package.PackageId == library.PackageId).Shape);
         Assert.Equal("bundle", first.Packages.Single(package => package.PackageId == bundle.PackageId).Shape);
         Assert.Equal("template", first.Packages.Single(package => package.PackageId == template.PackageId).Shape);

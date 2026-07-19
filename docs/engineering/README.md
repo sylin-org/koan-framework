@@ -1,3 +1,13 @@
+---
+type: DEV
+domain: framework
+title: "Koan operational workbooks"
+audience: [maintainers, contributors]
+status: current
+last_updated: 2026-07-19
+framework_version: v0.20.0
+---
+
 # Koan workbooks
 
 Operational runbooks for day-to-day tasks. **When you have a goal and want to know exactly what to run — start here.**

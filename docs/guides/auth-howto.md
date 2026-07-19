@@ -5,7 +5,7 @@ title: "Authentication & Identity How-To"
 audience: [developers, architects, security-engineers]
 status: current
 last_updated: 2026-07-18
-framework_version: source-first
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-18
   status: verified
@@ -13,7 +13,7 @@ validation:
 related_guides:
   - authentication-setup.md
   - authorization-howto.md
-  - building-apis.md
+  - ../reference/web/index.md
 ---
 
 # Koan Authentication & Identity: From Public to the Fleet
@@ -256,4 +256,4 @@ A complete, runnable example lives in `tests/Suites/Security/Koan.Security.Trust
 
 - **What may they do?** → [Authorization How-To](authorization-howto.md)
 - **Provider OAuth2/OIDC reference** → [Authentication Setup](authentication-setup.md)
-- **Building the API around it** → [Building APIs](building-apis.md)
+- **Building the API around it** → [Web reference](../reference/web/index.md)

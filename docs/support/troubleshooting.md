@@ -36,7 +36,7 @@ When an item fails, jump to the matching section below.
 
 ---
 
-## Boot & Auto-Registration
+## Boot and module activation
 
 ### Ensure Koan Loaded
 
@@ -45,7 +45,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan(); // Required for module discovery
 ```
 
-Missing `AddKoan()` prevents Koan from wiring controllers, Flow, and adapters. Verify the capability package is referenced and its assembly contains one concrete `KoanModule`.
+Missing `AddKoan()` prevents Koan from activating referenced controllers, capabilities, and adapters. Verify the
+capability package is referenced and its assembly contributes one concrete `KoanModule`.
 
 ### Review Boot Reports
 
@@ -266,9 +267,6 @@ those policies through the selected provider or the application's owning resilie
 
 ## AI Indexing Health
 
-###### Flow Pipeline Health
-<!-- Legacy anchor preserved for inbound deep links. -->
-
 ### Embedding lifecycle and migration failures
 
 For ordinary indexing, declare the intent on the Entity and save normally:
@@ -330,7 +328,7 @@ When opening a support ticket or escalating internally, include:
 
 - Koan version and list of referenced packages.
 - Full boot logs (from process start to failure) highlighting `Koan:` lines.
-- Health endpoint outputs and stage counts for Flow workloads.
+- Health endpoint outputs, runtime facts, and relevant Job or embedding status.
 - Adapter configuration snippets (mask secrets) and provider health results.
 - Reproduction steps or minimal failing pipeline/controller code.
 

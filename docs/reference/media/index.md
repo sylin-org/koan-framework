@@ -4,7 +4,7 @@ domain: media
 title: "Media Pillar Reference"
 audience: [developers, architects, support-engineers, ai-agents]
 last_updated: 2026-07-18
-framework_version: v0.18.0
+framework_version: v0.20.0
 status: current
 validation:
   date_last_tested: 2026-07-18

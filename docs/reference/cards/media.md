@@ -5,7 +5,7 @@ title: "Media Capability Card"
 audience: [developers, ai-agents]
 status: current
 last_updated: 2026-07-18
-framework_version: v0.18.0
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-18
   status: verified

@@ -2,11 +2,9 @@
 uid: reference.modules.Koan.data.mongo
 title: Koan.Data.Connector.Mongo - Technical Reference
 description: MongoDB adapter for Koan Entity data.
-since: 0.2.x
 packages: [Sylin.Koan.Data.Connector.Mongo]
 source: src/Connectors/Data/Mongo/
 last_updated: 2026-07-17
-framework_version: source-first
 ---
 
 ## Contract

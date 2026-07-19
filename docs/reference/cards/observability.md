@@ -5,7 +5,7 @@ title: "Observability — pillar map"
 audience: [developers, operators, ai-agents]
 status: current
 last_updated: 2026-07-18
-framework_version: source-first
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-18
   status: verified

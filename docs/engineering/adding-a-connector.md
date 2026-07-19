@@ -1,3 +1,13 @@
+---
+type: DEV
+domain: framework
+title: "Adding a connector"
+audience: [maintainers, contributors]
+status: current
+last_updated: 2026-07-19
+framework_version: v0.20.0
+---
+
 # Adding a connector
 
 Wire a new external system (database, vector store, message broker, AI provider, storage backend) into the Koan framework. The result is a NuGet-publishable adapter package that consumers enable by reference alone.
@@ -207,7 +217,7 @@ The class name is business-facing, not conventional magic. It must be the assemb
 
 ### Step 7 — Tests (ARCH-0079 mandate)
 
-Scaffold the test project. Model after [`tests/Suites/Data/Connector.Weaviate/`](../../tests/Suites/Data/Connector.Weaviate/).
+Scaffold the test project. Model after [`tests/Suites/Data/Connector.Sqlite/`](../../tests/Suites/Data/Connector.Sqlite/).
 
 ```pwsh
 mkdir tests/Suites/Data/Connector.Acme/Koan.Data.Connector.Acme.Tests
@@ -394,7 +404,7 @@ Re-run the release compiler inventory, then package verification for the affecte
 - [Weaviate connector](../../src/Connectors/Data/Vector/Weaviate/) — canonical example for the full pattern
 - [Mongo connector](../../src/Connectors/Data/Mongo/) — example for data store pillar
 - [Redis backend](../../src/Koan.Redis/) and [Data Redis connector](../../src/Connectors/Data/Redis/) — example of backend-owned lifecycle with a thin pillar adapter
-- [tests/Suites/Data/Connector.Weaviate/](../../tests/Suites/Data/Connector.Weaviate/) — test layout template
+- [tests/Suites/Data/Connector.Sqlite/](../../tests/Suites/Data/Connector.Sqlite/) — test layout template
 - [Koan.Packaging](../../tools/Koan.Packaging/README.md) — evaluated inventory and release proof
 - [versioning.md](versioning.md) — when your connector bumps
 - [nuget-publishing.md](nuget-publishing.md) — how it reaches nuget.org

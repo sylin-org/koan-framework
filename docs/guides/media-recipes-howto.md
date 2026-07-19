@@ -5,13 +5,13 @@ title: "Media Recipes How-To"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-16
-framework_version: v0.18.0
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-16
   status: verified
   scope: direct pipeline, Entity source, named/config recipes, HTTP rendering, and inspection
 related_guides:
-  - building-apis.md
+  - ../reference/web/index.md
   - entity-capabilities-howto.md
 related_adrs:
   - MEDIA-0004

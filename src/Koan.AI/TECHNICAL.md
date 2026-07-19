@@ -2,7 +2,6 @@
 uid: reference.modules.Koan.ai
 title: Koan.AI - Technical Reference
 description: AI provider compilation, source routing, health, and semantic operations.
-since: 0.2.x
 packages: [Sylin.Koan.AI]
 source: src/Koan.AI/
 ---

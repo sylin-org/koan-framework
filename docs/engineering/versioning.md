@@ -1,3 +1,13 @@
+---
+type: DEV
+domain: framework
+title: "Package versioning"
+audience: [maintainers, release-engineers]
+status: current
+last_updated: 2026-07-19
+framework_version: v0.20.0
+---
+
 # Package versioning
 
 Koan packages version independently with Nerdbank.GitVersioning (NBGV). A package's `version.json`
@@ -28,7 +38,7 @@ root stamping pass, or package checklist. A typical file is:
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/dotnet/Nerdbank.GitVersioning/main/src/NerdBank.GitVersioning/version.schema.json",
-  "version": "0.17",
+  "version": "0.20",
   "versionHeightOffset": -1,
   "pathFilters": ["."]
 }
@@ -76,7 +86,7 @@ the version file for an ordinary patch.
 
 Edit that package's `version.json` `version` field as part of the breaking/feature change. Before 1.0,
 the minor is the breaking tier; at 1.0 and later, the major is. Internal dependencies pack as bounded
-ranges (`[0.17.x,0.18.0)` before 1.0), so incompatible combinations fail during restore.
+ranges (`[0.20.x,0.21.0)` for a 0.20 owner), so incompatible combinations fail during restore.
 
 The release compiler derives the complete transitive reverse-dependent closure from evaluated
 ProjectReferences. A closure member whose source already created a fresh identity is left alone; an

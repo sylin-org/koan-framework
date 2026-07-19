@@ -2,13 +2,13 @@
 
 This directory hosts the Koan testing platform. Suites are organized by Koan runtime module and run
 under **xUnit v3** with **Testcontainers 4.x** module fixtures (ARCH-0091), booting real Koan through
-`AddKoan()` reflective discovery (ARCH-0079).
+`AddKoan()` and the same generated module registry used by applications.
 
 ## Contract
 
 - **Suites** live under `Suites/<Domain>/<Scope>/` and map 1:1 with Koan runtime modules.
 - **Shared testing packages** live under `src/` and are consumed by suites via project references:
-  - `src/Koan.Testing.Hosting/` — the xUnit-agnostic ARCH-0079 reflective host (`KoanIntegrationHost`,
+  - `src/Koan.Testing.Hosting/` — the xUnit-agnostic ARCH-0079 integration host (`KoanIntegrationHost`,
     namespace `Koan.Testing.Integration`). Carries no xUnit dependency, so it is referenced by both
     the xUnit-v2 fenced Jobs projects and the xUnit-v3 suites without an assembly collision.
   - `src/Koan.Testing.Containers/` — the xUnit-v3 Testcontainers fixtures (`KoanContainerFixture` + the
@@ -187,7 +187,7 @@ The helper:
   services lifecycle are available — bare `ServiceCollection.BuildServiceProvider()` lacks both
   and silently breaks tests that touch hosted services.
 - Seeds in-memory configuration from a dictionary (`WithSetting` / `WithSettings`).
-- Stays bootstrap-agnostic — tests choose `s.AddKoan()` (full reflective discovery), `s.AddKoanCore()`
+- Stays bootstrap-agnostic — tests choose `s.AddKoan()` (full generated module activation), `s.AddKoanCore()`
   + manual registrations (partial), or mock-injection variants.
 - Returns an `IntegrationHost` wrapper that implements `IAsyncDisposable` (so `await using` works
   cleanly — `IHost` itself only declares `IDisposable`).
@@ -220,9 +220,8 @@ Without the integration tests, these would have shipped. With them, they're caug
 2. Reference `src/Koan.Testing.Hosting` and `src/Koan.Testing.Containers`, plus the
    adapter's project + its pillar core.
 3. Use `KoanIntegrationHost.Configure().ConfigureServices(s => s.AddKoan()).StartAsync(ct)` to build
-   the host (or derive from `KoanDataSpec<TFixture>` and call `BootAsync()`). Don't invoke
-   `new KoanAutoRegistrar().Initialize(services)` manually — that bypasses the reflective-discovery
-   path that production apps actually use.
+   the host (or derive from `KoanDataSpec<TFixture>` and call `BootAsync()`). Do not hand-register
+   module internals; that bypasses the compiled activation path production applications use.
 4. For adapters that need real infrastructure, take the matching `KoanContainerFixture` as an
    `IClassFixture<T>` and gate the body with `Assert.SkipWhen(!fixture.IsAvailable, fixture.Reason)`.
    The container starts once per test class and is torn down on dispose.

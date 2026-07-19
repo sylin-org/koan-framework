@@ -5,7 +5,7 @@ title: "Entity Data Foundation"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-15
-framework_version: source-first
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-15
   status: verified
@@ -32,9 +32,10 @@ var open = await Todo.Query(todo => !todo.Done);
 await saved.Remove();
 ```
 
-This is a pre-1.0 candidate boundary, not a blanket production-support claim. Build from source today.
-The staged coherent package closure proves the intended path locally but has not been published and
-observed from public feeds.
+Entity persistence, query, and SQLite belong to the supported 0.20 foundation. That guarantee does not extend to
+every available provider: use the [generated product surface](../product-surface.md) for the exact boundary.
+Public-feed publication and observation follow the final package-only proof; the source checkout and staged
+candidate exercise the same application contract today.
 
 ## Smallest durable application path
 

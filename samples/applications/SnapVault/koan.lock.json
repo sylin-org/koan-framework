@@ -2,7 +2,7 @@
   "schema": 2,
   "app": {
     "name": "SnapVault",
-    "koan": "0.18",
+    "koan": "0.20",
     "tfm": "net10.0"
   },
   "modules": [
@@ -16,7 +16,7 @@
     },
     {
       "id": "Koan.Cache.Abstractions",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Communication",
@@ -24,7 +24,7 @@
     },
     {
       "id": "Koan.Core",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.AI",
@@ -32,23 +32,23 @@
     },
     {
       "id": "Koan.Data.Abstractions",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.Connector.Sqlite",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.Core",
-      "version": "0.19"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.Relational",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.Relational.Abstractions",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.Vector",
@@ -60,15 +60,15 @@
     },
     {
       "id": "Koan.Identity",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Identity.Tenancy",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Jobs",
-      "version": "0.19"
+      "version": "0.20"
     },
     {
       "id": "Koan.Media.Abstractions",
@@ -84,7 +84,7 @@
     },
     {
       "id": "Koan.Security.Trust",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Storage",
@@ -100,19 +100,19 @@
     },
     {
       "id": "Koan.Tenancy",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Web",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Web.Auth",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Web.Auth.Abstractions",
-      "version": "0.1"
+      "version": "0.20"
     },
     {
       "id": "Koan.Web.Auth.Connector.Test",
@@ -120,11 +120,11 @@
     },
     {
       "id": "Koan.Web.Extensions",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Web.Sse",
-      "version": "0.17"
+      "version": "0.20"
     }
   ],
   "directReferences": [

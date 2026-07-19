@@ -5,7 +5,7 @@ title: "Web Pillar Reference"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-18
-framework_version: source-first
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-18
   status: tested
@@ -181,8 +181,10 @@ the adapters, authentication setup, safety limits, and topology used by each app
 
 ## References
 
-- [HTTP API](../../api/web-http-api.md)
-- [Detailed Web HTTP reference](http-api.md)
+- [HTTP API](http-api.md)
+- [PATCH normalization](../../api/patch-normalization.md)
+- [Pagination attributes](pagination-attribute.md)
+- [OpenAPI generation](openapi-generation.md)
 - [WEB-0035 — EntityController transformers](../../decisions/WEB-0035-entitycontroller-transformers.md)
 - [ARCH-0092 — Entity exposure surfaces](../../decisions/ARCH-0092-entity-exposure-surfaces.md)
 - [ARCH-0112 — bounded relationship negotiation](../../decisions/ARCH-0112-bounded-relationship-negotiation.md)

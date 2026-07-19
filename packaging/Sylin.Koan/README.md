@@ -9,8 +9,9 @@ Transport, and a bounded JSON provider for an immediate persistent result.
 dotnet add package Sylin.Koan
 ```
 
-Koan remains source-first until its first coherent package wave is published and observed. Today this command is
-executable against a feed containing the locally compiled candidate; it is also the exact post-publication contract.
+This package belongs to Koan's supported 0.20 preview foundation. Public-feed publication follows the final
+package-only proof; the same command already runs against the exact locally compiled candidate used by release
+validation.
 
 ## Meaningful result
 

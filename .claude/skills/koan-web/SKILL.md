@@ -116,7 +116,6 @@ public static class WebRegistration
 | Attribute | What it does |
 |---|---|
 | `[Pagination(DefaultSize, MaxSize, Mode)]` | Per-controller page sizing + `PaginationMode.On` / `Optional` / `Off`. |
-| `[KoanDataBehavior(MustPaginate, DefaultPageSize, MaxPageSize)]` | Declarative per-controller data behavior (the S1.Web form). |
 | `[RequireCapability("action")]` | Method-level capability-authorization gate (SEC-0002 `IAuthorize` seam, `Koan.Web.Extensions`). |
 | `[Authorize]` / `[Authorize(Policy = "…")]` / `[Authorize(Roles = "…")]` | Standard ASP.NET authn/authz (see the [auth card](../../../docs/reference/cards/auth.md)). |
 
@@ -145,6 +144,6 @@ public static class WebRegistration
 
 - [Reference card: web.md](../../../docs/reference/cards/web.md) — one-screen pillar map
 - [Web pillar reference](../../../docs/reference/web/index.md) — full controller / negotiation detail
-- [Building APIs guide](../../../docs/guides/building-apis.md) · [HTTP API conventions](../../../docs/api/web-http-api.md)
+- [Web reference](../../../docs/reference/web/index.md) · [HTTP API conventions](../../../docs/reference/web/http-api.md)
 - [TaskGraph](../../../samples/fundamentals/TaskGraph/README.md) — `EntityController<Todo>` CRUD + custom relationship routes
 - [WEB-0068 — read-path visibility predicates](../../../docs/decisions/WEB-0068-query-options-predicates.md)

@@ -1,3 +1,13 @@
+---
+type: ARCH
+domain: framework
+audience: [architects, maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # SnapVault — Delight Research & Direction
 
 > **Historical product research, not current framework capability truth.** The invite and signed/atomic-erasure ideas

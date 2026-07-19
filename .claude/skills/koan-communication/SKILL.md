@@ -1,10 +1,10 @@
 ---
-name: koan-messaging
-description: Entity communication through Events.Raise and Transport.Send, typed discovered handlers, local acceptance/settlement, context carriage, and the boundary from legacy Koan.Messaging or RabbitMQ
+name: koan-communication
+description: Entity Communication through Events.Raise and Transport.Send, discovered handlers, local settlement, business channels, context carriage, and supported RabbitMQ Transport
 pillar: communication
-card: docs/reference/cards/messaging.md
+card: docs/reference/communication/index.md
 status: current
-last_validated: 2026-07-15
+last_validated: 2026-07-19
 ---
 
 # Koan Entity Communication
@@ -15,8 +15,7 @@ last_validated: 2026-07-15
 - `entity.Transport.Send()`, Entity distribution, or `IReceiveEntity<TEntity>`
 - the same operation over `IEnumerable<TEntity>` or `IAsyncEnumerable<TEntity>`
 - acceptance, settlement, local fan-out, immutable copies, or context carriage
-- questions about message buses, RabbitMQ, `Koan.Messaging`, `.Send()` on arbitrary objects, or
-  `services.On<T>()`
+- questions about message buses, RabbitMQ, delivery acceptance, or remote settlement
 
 ## Core principle
 
@@ -95,10 +94,12 @@ independently.
 - The built-in adapter is process-local, memory-only, and has no retry, durability, outbox, replay,
   dead-letter, or transaction-coupling guarantee.
 
-External connector/channel election and RabbitMQ parity are not yet shipped. The old arbitrary-object
-`Koan.Messaging` surface (`message.Send()`, `services.On<T>()`, startup proxy/buffer, interceptors) is
-deprecated and remains only for unmigrated internal bridges and repository demonstrations. Do not
-teach it as the application path or adapt it beneath Entity Communication.
+The local provider is part of the supported foundation. A direct
+`Sylin.Koan.Communication.Connector.RabbitMq` reference is the supported cross-process Transport
+extension: it confirms mandatory persistent broker publication, restores authenticated context at
+ingress, and never silently falls back to local reach. RabbitMQ does not currently claim Events,
+remote handler settlement, schema negotiation, retries, deduplication, inbox/outbox, dead letters,
+replay, or exactly-once side effects.
 
 ## Anti-patterns to flag
 
@@ -111,12 +112,11 @@ teach it as the application path or adapt it beneath Entity Communication.
 | Assuming Raise waits for side effects | Inspect `EventAcceptance`, then explicitly wait for local settlement when needed. |
 | Treating a collection Raise as one group fact | Model the group as its own Entity; collection terminals mean one occurrence per yielded Entity. |
 | Claiming tenant isolation from Communication-specific code | Context axes are owned by their modules; Communication carries opaque sealed context. |
-| Claiming RabbitMQ/durability because a legacy connector is referenced | The current supported ring is local-only until connector conformance ships. |
+| Treating broker acceptance as handler completion | Inspect `SettlementObservable`; RabbitMQ cannot provide remote handler settlement. |
 
 ## See also
 
 - [Communication reference](../../../docs/reference/communication/index.md) — current supported API
-- [Messaging card](../../../docs/reference/cards/messaging.md) — legacy boundary and replacement
 - [ARCH-0113](../../../docs/decisions/ARCH-0113-entity-capability-communication.md) — semantic laws
 - [Entity semantics contract](../../../docs/architecture/entity-semantics-contract.md) — capability ring
 - [koan-jobs](../koan-jobs/SKILL.md) — choose durable work when delivery is not enough

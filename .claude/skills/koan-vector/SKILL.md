@@ -114,7 +114,7 @@ public sealed class SemanticSearch
 | `Vector<Media>.Search(text: "...")` with no `vector:` | `vector` is required; pass the precomputed embedding. `text` is only the optional hybrid-BM25 keyword channel. |
 | `repo.ExportAllAsync(...)` | `repo.ExportAll(int? batchSize, ct)` → `IAsyncEnumerable<VectorExportBatch<TKey>>` (no `…Async` suffix). |
 | Re-running `Client.Embed` on every row during a store-to-store migration | Reuse the stored vector: `ExportAll` → `Upsert(batch.Id, batch.Embedding, ...)`. Migration costs zero AI calls. |
-| `EmbeddingCache` referenced as a framework type | It is a **sample-only** type (S7.Meridian) — not part of the framework surface. |
+| `EmbeddingCache` referenced as a framework type | Treat it as application-local caching; it is not part of the framework surface. |
 | `pgvector` / `Pinecone` connector | Live vector connectors are **Weaviate / Qdrant / Milvus** (ElasticSearch / OpenSearch via their general connectors). |
 | `Task<List<VectorMatch<string>>>` return type | `IReadOnlyList<VectorMatch<string>>` — `VectorQueryResult.Matches` is read-only. |
 | `new Vector<Media>()` / injecting `IVectorSearchRepository<T,K>` | `Vector<T>` is a static facade; drop to the repo only via `IVectorService.TryGetRepository<T,K>()`. |

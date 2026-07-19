@@ -1,3 +1,13 @@
+---
+type: GUIDE
+domain: ai
+audience: [developers, architects]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # The wedge demo — a working multi-provider AI app in one session
 
 > **What this is.** A real, replayable transcript (P5.2) of building `Recs` — an anime catalog that grows

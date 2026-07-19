@@ -3,6 +3,10 @@
 Samples are Koan's public curriculum. Names describe the business result; numbers appear only where
 order has meaning inside a cumulative journey.
 
+These applications teach the Koan 0.20 preview. A sample proves behavior, not package maturity; check
+the [generated product surface](../docs/reference/product-surface.md) before treating a capability as
+supported.
+
 ## Start here
 
 | Sample | Meaningful result | Start |

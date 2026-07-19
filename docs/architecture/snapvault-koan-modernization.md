@@ -1,3 +1,13 @@
+---
+type: ARCH
+domain: framework
+audience: [architects, maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # SnapVault → Koan modernization — the break-and-rebuild ADR
 
 > **⚠️ Approach superseded (2026-06-26):** the *in-place 6-phase* rebuild below is replaced by a **greenfield harvest** — build a clean Koan-native backend, port the genuine domain verbatim, keep the SPA (add tenant affordances), and delete the legacy backend in one swap once green. The reason, grounded in the understand-pass (workflow `wf_2024d47f-292`): the strip-list dwarfs the keep-list, so in-place mutation pays to carefully un-wire code that's being deleted anyway, and a clean build lets "fewer, more meaningful parts" be a *design* decision rather than a subtraction (and stays green throughout — no red window). **The STRIP/BUILD/KEEP table and the kept-domain list below remain accurate and are the harvest map.** The authoritative plan is now [snapvault-product-spec.md](./snapvault-product-spec.md) + [snapvault-ui-api-contract.md](./snapvault-ui-api-contract.md).

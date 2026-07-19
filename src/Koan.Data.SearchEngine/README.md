@@ -23,9 +23,8 @@ Provider authors extending the shared mechanism can reference it directly:
 dotnet add package Sylin.Koan.Data.SearchEngine
 ```
 
-> Current release status: the coherent package path is specified and exercised from staged artifacts, but the
-> existing public 0.17 package set is not a supported clean-room install. Until the next coherent publication, use
-> a source checkout/project reference. See the repository installation status.
+> **Maturity:** This shared provider layer is available below the supported 0.20 boundary. Package presence is not a
+> support claim; check the [generated product surface](https://github.com/sylin-org/Koan-framework/blob/main/docs/reference/product-surface.md).
 
 ## What it adds
 

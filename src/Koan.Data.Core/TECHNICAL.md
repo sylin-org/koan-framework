@@ -2,11 +2,9 @@
 uid: reference.modules.Koan.data.core
 title: Koan.Data.Core - Technical Reference
 description: Contracts, options, design and operations for the Koan data core.
-since: 0.2.x
 packages: [Sylin.Koan.Data.Core]
 source: src/Koan.Data.Core/
 last_updated: 2026-07-17
-framework_version: source-first
 validation:
   date_last_tested: 2026-07-15
   status: reviewed

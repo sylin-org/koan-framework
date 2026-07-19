@@ -4,12 +4,12 @@ domain: data
 title: "Data Modeling Playbook"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-11-09
-framework_version: v0.6.3
+last_updated: 2026-07-19
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2025-11-09
-  status: verified
-  scope: all-examples-tested
+  date_last_tested: 2026-07-19
+  status: reviewed
+  scope: Entity, Jobs, and Communication terminology plus canonical links
 related_guides:
   - entity-capabilities-howto.md
   - canon-capabilities-howto.md
@@ -24,7 +24,7 @@ related_guides:
 - **Inputs**: A Koan application with `builder.Services.AddKoan()`, at least one data adapter, and baseline knowledge of entities and dependency injection.
 - **Outputs**: An entity-first domain model with encapsulated rules, safe relationships, and streaming/vector patterns ready for downstream systems.
 - **Error Modes**: Capability mismatches, missing lifecycle opt-ins when `ProtectAll()` is active, or unbounded materialization in interactive endpoints.
-- **Success Criteria**: Entities expose clear static helpers, business invariants live with the model, and AI/Messaging integrations avoid custom repositories.
+- **Success Criteria**: Entities expose clear static helpers, business invariants live with the model, and AI/Communication integrations avoid custom repositories.
 
 ### Edge Cases
 
@@ -42,7 +42,7 @@ related_guides:
 - 📌 Reference hub: [Data Pillar Reference](../reference/data/index.md)
 - 🔁 Lifecycle matrix: [Entity Lifecycle](../reference/data/entity-lifecycle.md)
 - 🧠 Capability partner: [Entity Capabilities](entity-capabilities-howto.md)
-- 📮 Delivery surface: [API Delivery Playbook](./building-apis.md)
+- 📮 Delivery surface: [Web reference](../reference/web/index.md)
 
 Treat each section as a readiness checklist before shipping a model.
 
@@ -189,13 +189,13 @@ Use this checklist before exposing the model:
 - [ ] Lifecycle hooks guard critical invariants and emit meaningful error codes.
 - [ ] Relationships expose navigation helpers or dedicated query methods.
 - [ ] Paging is explicit, and any stream is backed by `ProviderBoundedPaging`.
-- [ ] Downstream pillars (Flow, Messaging, AI) know which helpers to call.
+- [ ] Downstream capabilities (Web, Jobs, Communication, AI) know which Entity operations to call.
 
 ---
 
 ## Pattern Recipes
 
-Leverage these recipes as living examples. Full walkthroughs live in the [Entity Pattern Recipe Catalog](../examples/entity-pattern-recipes.md).
+Use these stages as a progression. Each adds one business capability without changing the Entity grammar.
 
 ### Stage 1 – CRUD Backbone
 
@@ -213,42 +213,24 @@ public class InventoryItem : Entity<InventoryItem>
 }
 ```
 
-### Stage 2 – Event-Driven Messaging
+### Stage 2 – Entity communication
 
-- Pair domain updates with events using the same entity patterns.
-- Flow handlers subscribe to create/update hooks to broadcast changes.
+- Name a business occurrence and raise it from the application operation that owns that decision.
+- Let the Communication ring choose local or connector-backed delivery without changing the Entity terminal.
 
 ```csharp
-public class PriceChanged : Entity<PriceChanged>
-{
-    public string ProductId { get; set; } = "";
-    public decimal OldPrice { get; set; }
-    public decimal NewPrice { get; set; }
-}
+public sealed record PriceChanged(decimal OldPrice, decimal NewPrice);
 
-public static class ProductEvents
-{
-    public static void Configure(FlowPipeline pipeline) =>
-        pipeline.OnUpdate<Product>(async (updated, previous) =>
-        {
-            if (updated.Price == previous.Price) return UpdateResult.Continue();
-
-            await new PriceChanged
-            {
-                ProductId = updated.Id,
-                OldPrice = previous.Price,
-                NewPrice = updated.Price
-            }.Send();
-
-            return UpdateResult.Continue();
-        });
-}
+var previousPrice = product.Price;
+product.Price = newPrice;
+await product.Save(ct);
+await product.Events.Raise(new PriceChanged(previousPrice, newPrice), ct);
 ```
 
 ### Stage 3 – AI-Enriched Domain
 
 - Store embeddings alongside domain data.
-- Generate vectors during writes or in Flow background jobs.
+- Generate vectors during writes or from a durable `IKoanJob<T>` when the work should be retried.
 
 ```csharp
 [DataAdapter("weaviate")]
@@ -338,12 +320,5 @@ public class Product : Entity<Product>
 ## Next Steps
 
 - Automate enrichment with the [AI & Vector How-To](./ai-vector-howto.md).
-- Publish APIs with the [API Delivery Playbook](./building-apis.md).
+- Publish APIs with the [Web reference](../reference/web/index.md).
 - Expose diagnostics and runbooks inside the [Koan Troubleshooting Hub](../support/troubleshooting.md).
-
----
-
-## Validation
-
-- Last reviewed: 2025-09-28
-- Verified against Koan v0.6.2 sample services.

@@ -140,7 +140,7 @@ snapshot-consistent, mutation-safe, resumable, or cursor-based ([DATA-0107](../.
 - [Reference card: data](../../../docs/reference/cards/data.md)
 - [Performance guide](../../../docs/guides/performance.md)
 - [Entity capabilities how-to](../../../docs/guides/entity-capabilities-howto.md)
-- [Adapter matrix](../../../docs/reference/_generated/adapter-matrix.md)
+- [Entity data reference](../../../docs/reference/data/index.md)
 - [DATA-0096 — unified filter pipeline](../../../docs/decisions/DATA-0096-unified-filter-pipeline.md)
 - [DATA-0107 — provider-bounded Entity streams](../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
 - [ARCH-0084 — unified capability model](../../../docs/decisions/ARCH-0084-unified-capability-model.md)

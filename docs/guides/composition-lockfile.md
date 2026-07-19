@@ -5,7 +5,7 @@ title: "Composition Lockfile How-To"
 audience: [developers, architects]
 status: current
 last_updated: 2026-07-15
-framework_version: source-first
+framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-15
   status: verified
@@ -64,11 +64,11 @@ Koan assemblies only.
 ```jsonc
 {
   "schema": 2,
-  "app": { "name": "Koan.FirstUse", "koan": "0.18", "tfm": "net10.0" },
+  "app": { "name": "Koan.FirstUse", "koan": "0.20", "tfm": "net10.0" },
   "modules": [
     { "id": "Koan.Communication", "version": "0.20" },
-    { "id": "Koan.Core", "version": "0.18" },
-    { "id": "Koan.Data.Connector.Sqlite", "version": "0.17" }
+    { "id": "Koan.Core", "version": "0.20" },
+    { "id": "Koan.Data.Connector.Sqlite", "version": "0.20" }
   ],
   "directReferences": [
     { "kind": "project", "id": "Koan.Data.Connector.Sqlite" },
@@ -86,8 +86,8 @@ otherwise churn it on every build) so a diff means a *real* composition change, 
 ```jsonc
 {
   "schema": 2,
-  "app": { "name": "Koan.FirstUse", "koan": "0.18", "tfm": "net10.0" },
-  "modules": [ { "id": "Koan.Core", "version": "0.18" } /* … */ ],
+  "app": { "name": "Koan.FirstUse", "koan": "0.20", "tfm": "net10.0" },
+  "modules": [ { "id": "Koan.Core", "version": "0.20" } /* … */ ],
   "elections": { "data:default": { "adapter": "sqlite", "via": "entity-attribute" } },
   "configKeys": [ "Koan:Data:Sqlite:ConnectionString" ],
   "entities": [ { "type": "Approval", "traits": [] } ]

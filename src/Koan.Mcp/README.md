@@ -13,8 +13,8 @@
 
 ## Install and shortest supported path
 
-The repository demonstrates this contract from source and from staged clean-room artifacts; the
-coherent candidate wave has not yet been published and observed from public feeds.
+MCP belongs to the supported 0.20 extension surface. Public-feed publication follows the final
+package-only proof; until then, use the source checkout or the exact staged candidate feed.
 
 ```powershell
 dotnet add package Sylin.Koan.Mcp

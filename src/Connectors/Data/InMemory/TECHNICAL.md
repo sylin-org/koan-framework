@@ -2,7 +2,6 @@
 uid: reference.modules.Koan.data.inmemory
 title: Koan.Data.Connector.InMemory - Technical Reference
 description: Process-local Entity data adapter and conformance oracle.
-since: 0.17.0
 packages: [Sylin.Koan.Data.Connector.InMemory]
 source: src/Connectors/Data/InMemory/
 ---

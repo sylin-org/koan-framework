@@ -2,11 +2,9 @@
 uid: reference.modules.Koan.web
 title: Koan.Web - Technical Reference
 description: Contracts, configuration, and architecture for Koan’s ASP.NET Core integration.
-since: 0.2.x
 packages: [Sylin.Koan.Web]
 source: src/Koan.Web/
 last_updated: 2026-07-18
-framework_version: source-first
 ---
 
 ## Contract

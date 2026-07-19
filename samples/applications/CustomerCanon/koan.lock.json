@@ -2,45 +2,45 @@
   "schema": 2,
   "app": {
     "name": "CustomerCanon",
-    "koan": "0.18",
+    "koan": "0.20",
     "tfm": "net10.0"
   },
   "modules": [
     {
       "id": "Koan.Cache.Abstractions",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Canon",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Canon.Web",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Core",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.Abstractions",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.Connector.Json",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.Core",
-      "version": "0.19"
+      "version": "0.20"
     },
     {
       "id": "Koan.Web",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Web.Extensions",
-      "version": "0.17"
+      "version": "0.20"
     }
   ],
   "directReferences": [

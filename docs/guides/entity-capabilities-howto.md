@@ -5,7 +5,7 @@ title: "Entity Capabilities How-To"
 audience: [developers, architects]
 status: current
 last_updated: 2026-07-15
-framework_version: v0.17.0
+framework_version: v0.20.0
 validation:
   status: not-yet-tested
   scope: docs/guides/entity-capabilities-howto.md
@@ -69,7 +69,7 @@ Before we dive in, let's get your environment ready. Don't worry—Koan is desig
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();  // That's it—Koan handles the rest
 var app = builder.Build();
-app.Run();
+await app.RunAsync();
 ```
 
 Everything below builds on this foundation. Let's go!
@@ -1282,16 +1282,11 @@ Here's where to go next:
 - `samples/journeys/GardenCoop/02-LocalDiscovery` - the same application plus local Entity embedding and vector search
 
 **Keep exploring:**
-- Combine Flow + Jobs with transfers for safe large-scale migrations
+- Combine provider-bounded Entity streams with durable Jobs for large migrations
 - Add lifecycle hooks to enforce business rules
 - Use context routing for multi-tenant isolation
 
 When in doubt, remember: Koan's entity-first patterns keep your code declarative, provider-agnostic, and ready to scale. Start simple, add complexity only when you need it.
 
-Happy building! 🚀
-
----
-
-**Validation status:** Not yet tested end-to-end
 **Streaming validation:** SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB, and Couchbase qualify;
 InMemory, JSON, and Redis fail closed before query or yield.
