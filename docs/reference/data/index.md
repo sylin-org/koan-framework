@@ -130,6 +130,20 @@ explicit page before Data executes it.
 The low-level `Data<TEntity,TKey>` facade, direct provider instructions, and raw access remain expert
 escape hatches. They do not replace Entity statics in ordinary business code.
 
+## Optional semantics and recovery
+
+Reference optional Data packages only when their business meaning applies:
+
+- `Sylin.Koan.Data.SoftDelete` lets `[SoftDelete]` Entities retain ordinary `Remove()` grammar while hiding rows
+  through one Data axis. `T.WithDeleted()` is a type-targeted recycle-bin scope; `.Restore()` and `.HardDelete()` are
+  the explicit recovery and purge verbs. It supplies no generic HTTP workflow or authorization bypass.
+- `Sylin.Koan.Data.Backup` supplies one DI-owned, single-Entity archive/recovery round trip through Koan Storage.
+  Create requires provider-bounded paging; restore validates the complete archive before its first batched upsert.
+  It does not claim whole-application coordination, encryption, retention, schema migration, or transactional restore.
+
+Both packages compose through the application's existing `AddKoan()` call. See their package-owned README and
+technical contracts for the complete operation surface and limits.
+
 ## Testing the contract
 
 Reference `Sylin.Koan.Testing` and add one class per Entity:

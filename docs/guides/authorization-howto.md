@@ -69,7 +69,7 @@ services.AddKoanAuthorization(); // registers the seam + RBAC floor + policy pro
 `AddCapabilityAuthorization(...)` also registers the seam, so the capability controllers enforce whenever
 capability authz is configured.
 
-## Capability gates (moderation / soft-delete / audit)
+## Capability gates (moderation / audit)
 
 The generic capability controllers are gated with `[RequireCapability]`, which routes through `IAuthorize`.
 Configure who may do what with the WEB-0047 resolution (Entity → Defaults → DefaultBehavior):
@@ -78,7 +78,7 @@ Configure who may do what with the WEB-0047 resolution (Entity → Defaults → 
 services.AddKoanAuthorization(configureCapabilities: caps =>
 {
     caps.DefaultBehavior = CapabilityDefaultBehavior.Deny;              // strict: only mapped actions allowed
-    caps.Defaults.SoftDelete.Delete = "can-delete";                    // map an action to an ASP.NET policy
+    caps.Defaults.Audit.Snapshot = "can-snapshot";                    // map an action to an ASP.NET policy
     caps.Entities["Article"] = new CapabilityPolicy                     // per-entity override
     {
         Moderation = { Approve = "is-editor" }
@@ -86,7 +86,7 @@ services.AddKoanAuthorization(configureCapabilities: caps =>
 });
 ```
 
-`"can-delete"` / `"is-editor"` are ordinary ASP.NET authorization policies (`AddAuthorization(o => o.AddPolicy(...))`).
+`"can-snapshot"` / `"is-editor"` are ordinary ASP.NET authorization policies (`AddAuthorization(o => o.AddPolicy(...))`).
 The `PolicyAuthorizationProvider` evaluates them through `IAuthorizationService` — so your existing policies,
 requirements, and handlers keep working unchanged.
 

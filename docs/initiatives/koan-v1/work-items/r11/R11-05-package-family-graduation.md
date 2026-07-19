@@ -9,7 +9,7 @@ framework_version: source-first
 validation:
   date_last_tested: 2026-07-18
   status: in-progress
-  scope: dependency-ordered family graduation; Canon implementation and focused package proof complete
+  scope: dependency-ordered family graduation; Data Backup/SoftDelete implementation and focused package proof complete
 ---
 
 # R11-05 — Graduate package families
@@ -4088,6 +4088,161 @@ per-surface hooks. The implementation follows that mandate without reopening R10
 No Classification or standalone Tenancy suite and no full release ratchet ran. The known PMC-032 stale
 `Koan.Core.Adapters` reference warning appeared only in the Web suite and remains unrelated; every affected suite is
 green. Generated package/product and module truth are regenerated after the retirement as part of this slice.
+
+## Backup and SoftDelete discovery
+
+These packages are adjacent Data-semantic leaves, not one business capability. They were assessed together only to
+find shared Data-law chokepoints and conflicting meanings. No production edit follows this checkpoint until the
+maintainer accepts or adjusts the proposed dispositions.
+
+### Application intent and smallest honest expression
+
+- **SoftDelete:** “Deleting this Entity hides it from ordinary Entity reads while preserving an explicit recycle-bin,
+  restore, and purge path.” The existing `[SoftDelete]`, ordinary `Remove()`, `T.WithDeleted()`, `.Restore()`, and
+  `.HardDelete()` expression is earned because deletion persistence is a model semantic rather than request context.
+  Referencing the package activates one Data axis; no startup call or Web dependency is required.
+- **Backup:** “Create a restorable, integrity-checked archive of this Entity data in Koan Storage, then prove recovery
+  through the same capability.” The smallest honest V1 expression is one injected backup service with explicit
+  generic create/restore operations, a storage profile/partition request, and immutable receipts. Package reference
+  plus `AddKoan()` remains activation. Whole-application discovery, decoration, HTTP, progress polling, retention,
+  and adapter preparation are not required to deliver that result.
+
+### Current-code findings
+
+SoftDelete is a compact, genuine Data-axis capability and its focused suite passes 9/9. Its current ambient is
+nevertheless process-flow scoped as one `AsyncLocal<bool>`: `using (Order.WithDeleted())` also reveals deleted rows
+for every other `[SoftDelete]` Entity read in that logical flow. The public expression is type-specific, and the
+ambient-scope charter says one bypass must not widen an unrelated concern. This is a current R11 defect, not an
+R10-11 Canon finding.
+
+`Koan.Web.Extensions` independently exposes a partition-moving `EntitySoftDeleteController`, registration helpers,
+DTO-like options, actions, and policy. It neither references nor consumes `Koan.Data.SoftDelete`; it manually copies
+rows into a `deleted` partition and therefore gives “soft delete” a second persistence meaning. Repository search
+finds no application/source consumer and only policy-name proof. Standard `EntityController<T>` deletion already
+inherits the Data-axis override when the Entity opts into SoftDelete; a future recycle-bin HTTP workflow can be an
+explicit authorized controller over the Data capability when a real consumer earns it.
+
+Data Backup's focused suite passes 7/7, but five cases prove only explicit single-Entity export mechanics and provider
+qualification; one proves host-owned discovery state, and one proves that archive deletion fails loudly. There is no
+executable restore proof. The package currently exposes more than forty public types across attributes, assembly
+policy, global reflection discovery, backup, restore, selection, provider filtering, catalog/query/validation,
+progress, cancellation, retention, health, adapter optimization, static facades, instance-shaped extensions, manual
+registrars, and inline diagnostics endpoints. Repository search finds no supported application/source consumer.
+
+The breadth is not merely unproved. Backup/restore cancellation changes a status object but does not cancel work;
+unknown operation IDs fabricate `Completed`; scoped progress disappears when an operation finishes; global backup can
+publish a failed partial archive and still marks progress completed; malformed archived rows can be logged and
+silently skipped during restore; type resolution is simple-name based; stored manifests precede final archive hash
+and size; selection mutates caller options; and the archive is assembled in one `MemoryStream`. The inline endpoint
+mapper is not automatically mounted, has no authorization owner, and is the package's sole reason for an ASP.NET Core
+framework reference. Attribute encryption/schema promises are metadata only. These findings are current production
+truth and are separate from the already retired `Koan.Web.Backup` defects recorded in R11-02.
+
+### Coalescence and proposed topology
+
+**SoftDelete — `keep/rebuild`:** keep the independently referenced Data semantic and its one `IDataAxis`; rebuild the
+ambient as a type-targeted, correctly nested scope so `T.WithDeleted()` affects only `T`. Add cross-type and nesting
+proof, then package-owned README/TECHNICAL and artifact evidence. Do not move it into Data Core: reference must remain
+the opt-in capability signal. Do not generalize persistent Entity semantics into Web contributors: contributors are
+the chokepoint for request-derived context, while soft deletion changes durable operation meaning.
+
+**Web Extensions soft delete — `retire surface`:** remove the duplicate partition-backed controller, registration
+helpers, contracts, actions, and policy rather than making Web Extensions reference and activate Data SoftDelete for
+every consumer. Base Entity HTTP continues to inherit the selected Data law automatically. There is no compatibility
+shim or generic replacement controller.
+
+**Data Backup — `keep/rebuild`:** retain one independently referenced operational Data capability, but rebuild around
+one service owner and one proved entity-archive round trip. Create validates and publishes one complete archive;
+restore validates the entire archive before the first mutation, fails on malformed data or type/key mismatch, and
+returns an honest receipt. Cancellation is the standard operation `CancellationToken`, not a separate status API.
+The implementation remains provider-bounded and uses bounded temporary storage rather than retaining the complete
+archive in memory. Restore is explicitly upsert-based and cannot claim cross-record/provider transactionality.
+
+Delete the unearned global discovery/attribute policy, static and fake-instance facades, manual registration
+variants, catalog/query/health/retention/background maintenance, progress/cancel facades, adapter-optimization SPI,
+inline endpoints, ASP.NET Core dependency, and performance/schema/encryption claims. Do not create a contracts
+package: there is no independent cross-module consumer. Whole-application coordinated recovery and an HTTP/operator
+control plane remain future capabilities and must be rebuilt over durable Jobs, explicit authorization, resource
+bounds, and recovery drills if demand earns them.
+
+### Placement and reuse inventory
+
+- **Already exists and stays authoritative:** Data's provider-bounded streaming/query path, operation override and
+  managed-field `IDataAxis` expansion, target-scoped `OperationOverrideBypass`, standard DI/options/cancellation,
+  Storage's host-scoped service and compiled routing plan, and `BackupArchiveNaming`'s sanitized storage-key rule.
+- **Needs focused creation inside `Koan.Data.Backup`:** a minimal immutable create request/receipt and restore
+  request/receipt around the one service boundary, plus an internal archive codec/validator. These are operation
+  contracts, not HTTP DTOs or a new package. Existing `BackupOptions`, `BackupManifest`, and the many mutable report
+  models are not retained merely for their names.
+- **Needs focused correction inside `Koan.Data.SoftDelete`:** type-targeted ambient state consumed by the existing
+  axis and extensions. No new options, constants, registrar, contributor, or package is needed.
+- **Existing constants/options audit:** Backup already centralizes `Koan:Backup` keys and owns mutable options, but
+  most keys/options describe the proposed retired breadth. Web Extensions already centralizes capability action and
+  policy names; the duplicate soft-delete entries retire with that surface. SoftDelete needs neither configuration
+  nor stable string constants.
+
+### Constraints, proof, and risks
+
+Entity-first access and controller-only HTTP remain intact. Data Backup continues to depend on Data and Storage
+contracts/runtime for actual mechanics, but no Data package learns ASP.NET Core. SoftDelete adds one type-map lookup
+only inside an explicit recycle-bin scope; ordinary reads retain the current axis path. Backup remains explicit
+operational work and performs no hidden application-wide scan. Package docs, generated truth, focused owner/affected
+consumer tests, warning-clean builds, and exact artifact audits update in the implementation slice; the complete
+release ratchet remains R11-07.
+
+The deliberate V1 break is substantial for Backup, but repository truth shows no supported consumer and the current
+surface manufactures confidence that its restore path has never earned. The rebuild must not graduate until a real
+SQLite + Local Storage create/corrupt/restore drill proves round-trip recovery and fail-before-mutation behavior.
+Removing Web Extensions' duplicate soft-delete API changes a previously documented package promise; its absence of
+consumers lowers migration risk but does not erase the need to update that package's docs and focused policy proof.
+
+**Architecture checkpoint:** accept or adjust three decisions before production work: keep/rebuild Data SoftDelete
+with type-targeted recycle-bin scope; retire Web Extensions' unrelated partition-backed soft-delete meaning; and
+keep/rebuild Data Backup as one DI-owned, integrity-first, bounded Entity archive/recovery round trip while deleting
+its unproved global, operational-dashboard, decoration, optimization, and inline-Web surface.
+
+## Backup and SoftDelete implementation result
+
+The maintainer accepted all three checkpoint decisions.
+
+**Implemented topology:**
+
+- `Sylin.Koan.Data.SoftDelete` remains one independently referenced Data-axis capability. Its ambient is now an
+  immutable type stack: `T.WithDeleted()` affects only `T`, cross-type/nested scopes compose and unwind correctly,
+  and `.HardDelete()` enters the same type-targeted recycle-bin scope while retaining target/read constraints.
+- `Sylin.Koan.Web.Extensions` no longer contains the unrelated partition-moving soft-delete controller, registration
+  helper, request contracts, action/policy model, or role policy. Ordinary Entity HTTP deletion automatically inherits
+  Data SoftDelete when the model/reference selects that law; recycle-bin HTTP remains an explicit authorized product
+  controller. Moderation, audit, terse REST, host-owned generic composition, and capability authorization remain.
+- `Sylin.Koan.Data.Backup` now has one scoped `IBackupService`, two operations, two immutable requests, and two
+  immutable receipts. Create uses provider-bounded Entity pages, a disk-bounded temporary ZIP, logical-data SHA-256,
+  a versioned manifest, stable type/key identities, original partition, and collision-proof archive ID before one
+  host-scoped Storage publication. Restore downloads to temporary storage and validates ZIP, manifest, type/key,
+  every record, count, and checksum before the first batched upsert.
+- Removed Backup surface has no compatibility branch: per-model/assembly decoration, reflection inventory and global
+  operations, static/fake-instance facades, mutable manifest/performance models, catalog/query/validation, retention,
+  hosted maintenance, health, progress/cancel simulation, adapter optimization SPI, manual registrars, inline
+  endpoints, ASP.NET Core, and Newtonsoft.Json. No contracts or Web package was added.
+- DATA-0108 records the integrity-first recovery decision. Package pages state that restore is idempotent upsert, not
+  replacement or a multi-batch/provider transaction; encryption, schema migration, coordinated application recovery,
+  scheduling, retention, archive deletion, and an operator control plane remain deliberate non-guarantees.
+
+**Focused evidence (2026-07-18):**
+
+| Cell | Result | What it proves |
+|---|---:|---|
+| `Koan.Data.Backup.Tests` | 8/8 | real SQLite + Local create/restore, bounded pages, partition preservation, corrupt/type-mismatch fail-before-mutation, cancellation/no publication, resident-provider rejection, and collision-proof repeated names |
+| `Koan.Data.SoftDelete.Tests` | 10/10 | ordinary hide/restore/purge/batch behavior plus type-targeted cross-type and nested recycle-bin lifetime |
+| `Koan.Web.Extensions.Tests` | 113/113 | retained REST/moderation/audit/controller registry and capability-policy behavior after duplicate soft-delete retirement |
+| Entity-language focused consumer | 21/21 | package reference still contributes the SoftDelete Entity facet through normal module composition |
+| Tenancy × SoftDelete focused consumer | 4/4 | type targeting preserves tenant isolation, purge constraints, adapter correction, and Production fail-closed behavior |
+| Backup, SoftDelete, Web Extensions Release packs | clean | warning/error-free builds; owned README, canonical icon, DLL/XML, build-transitive props, symbols, and expected dependency graphs; Backup has no ASP.NET Core or Newtonsoft.Json dependency |
+
+Generated truth remains 101 packages and 26 claims; quality advances from 4 repair / 18 review / 79 structurally ready
+to 4 repair / 16 review / 81 structurally ready. Backup, SoftDelete, and Web Extensions each have zero structural
+findings. The known PMC-032 stale `Koan.Core.Adapters` test-project warning remains in the SoftDelete suite only and
+is unrelated. No full release ratchet, Classification suite, standalone Tenancy suite, push, publication, tag, or
+remote mutation ran.
 
 ## Acceptance
 

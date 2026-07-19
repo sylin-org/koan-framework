@@ -94,11 +94,11 @@ extension appears in IntelliSense without an import.
 - The retired `Send<T>(this T) where T : class` Messaging extension attached messaging to every class.
   R07 replaced it with the Entity-only Events and Transport facets documented by
   [Communication](../../reference/communication/index.md).
-- [backup extensions](../../../src/Koan.Data.Backup/Extensions/EntityBackupExtensions.cs) attach
-  type-wide backup/restore/catalog operations to an arbitrary entity instance; the receiver is unused
-  for identity and state.
-- at inventory time the same backup surface contained `DeleteBackup`, which returned `true` from a
-  placeholder rather than performing deletion. R04-01 now makes it fail loudly without touching storage.
+- [backup service](../../../src/Koan.Data.Backup/Abstractions/IBackupService.cs) now provides explicit type-wide
+  create/restore operations at an injected operational boundary; the arbitrary-instance and static facades found by
+  this inventory were retired in R11-05.
+- At inventory time the old backup surface also contained `DeleteBackup`, which returned `true` from a placeholder.
+  R04-01 first made it fail loudly; R11-05 then retired the unimplemented deletion surface entirely.
 - `RebuildViews(this entity, IServiceProvider, ...)` uses an entity instance to trigger a type-wide
   administrative operation and exposes DI plumbing in application code.
 

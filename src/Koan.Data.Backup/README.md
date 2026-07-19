@@ -1,77 +1,61 @@
-# Koan.Data.Backup
+# Sylin.Koan.Data.Backup
 
-Reference-driven backup and restore services for Koan entities. The package discovers opted-in
-entities, writes JSON Lines payloads and a manifest into a ZIP archive, stores it through
-`IStorageService`, and can restore records through the entity repository surface.
+Create and restore one integrity-checked Entity archive through Koan Storage.
 
-> **Maturity: experimental.** Registration, policy discovery, archive construction, and restore
-> implementations exist. A real SQLite-to-local-storage lane now proves multi-page export,
-> cancellation, archive publication, and fail-closed resident adapters, but restore and the wider
-> adapter/storage matrix remain uncertified. Do not treat this module as a production recovery
-> guarantee yet.
+## Install
 
-## Reference and declare intent
-
-Referencing `Sylin.Koan.Data.Backup` is sufficient for registration through `AddKoan()`; do not add a
-second backup registrar in application code. Backup participation is explicit by default:
-
-```csharp
-using Koan.Data.Backup.Attributes;
-using Koan.Data.Core.Model;
-
-[EntityBackup]
-public sealed class Order : Entity<Order>
-{
-    public decimal Total { get; set; }
-}
+```powershell
+dotnet add package Sylin.Koan.Data.Backup
 ```
 
-Use `[assembly: EntityBackupScope(BackupScope.All)]` when every entity in an assembly should
-participate unless explicitly excluded. `[EntityBackup(Enabled = false, Reason = "derived view")]`
-records an intentional exclusion.
+Reference a provider-bounded Data connector and a Storage provider as well. The package composes through the
+application's existing `AddKoan()` call; there is no Backup-specific registration.
 
-## Invoke the current API
+## Usage: create and restore
+
+Resolve the standard DI service at the operational boundary that owns recovery:
 
 ```csharp
-using Koan.Data.Backup.Extensions;
+var backup = services.GetRequiredService<IBackupService>();
 
-var manifest = await DataBackup.BackupTo<Order, string>(
-    "orders-nightly",
-    "Nightly order snapshot",
+var created = await backup.Create<Order, string>(
+    "orders-before-import",
+    new BackupRequest
+    {
+        StorageProfile = "recovery",
+        Partition = "customer-a",
+        PageSize = 500
+    },
     cancellationToken);
 
-await DataBackup.RestoreFrom<Order, string>(
-    "orders-nightly",
-    new RestoreOptions { DryRun = true },
+var restored = await backup.Restore<Order, string>(
+    created.StorageKey,
+    new RestoreRequest
+    {
+        StorageProfile = "recovery",
+        BatchSize = 500
+    },
     cancellationToken);
-
-var backups = await DataBackup.ListBackups<Order, string>(cancellationToken);
 ```
 
-`IBackupService`, `IRestoreService`, and `IBackupDiscoveryService` expose global, selective,
-progress, viability, validation, and catalog operations for orchestration code. Per-operation options
-select the storage profile, partition, batch size, compression, verification, and restore posture.
+`Create` pages through the selected provider, writes a bounded temporary ZIP, and publishes only after the Entity
+data and manifest are complete. `Restore` downloads to bounded temporary storage, validates format, Entity/key
+identity, every JSON record, count, and SHA-256 before the first upsert. Its receipt identifies exactly what was
+applied.
 
-## Important boundaries
+## Boundaries
 
-- Archives are assembled in a `MemoryStream` before upload. Entity enumeration is streaming, but the
-  complete compressed archive is currently held in memory; large-backup memory safety is unproven.
-- Entity enumeration requires `ProviderBoundedPaging`. SQLite, PostgreSQL, SQL Server, CockroachDB,
-  MongoDB, and Couchbase are qualified. InMemory, JSON, and Redis reject before export rather than
-  hiding a complete-source scan. `BatchSize` bounds Koan-visible candidates, not the archive or opaque
-  provider buffers.
-- `EntityBackupAttribute.Encrypt` is policy metadata today. The archive writer does not encrypt entity
-  payloads, so the flag must not be presented as data-at-rest protection.
-- Retention settings identify and log cleanup candidates; managed deletion is not implemented.
-  `DeleteBackup(...)` always returns a faulted task with `NotSupportedException` and changes nothing.
-- Progress and cancellation state are process-local. Cancellation through the service status API does
-  not replace the caller's `CancellationToken` for stopping active I/O.
-- Restore compatibility across schema changes, renamed types, partitions, and every adapter/storage
-  combination is not currently certified.
-- No `BackupPlan`, `BackupSession`, `RestoreSession`, `IDataBackupService`, or `IDataRestoreService`
-  public API exists in this package.
+- The selected Data provider must advertise provider-bounded paging. InMemory, JSON, and Redis reject before query
+  or publication rather than pretending to stream.
+- Restore is batched upsert, not replacement and not a cross-record/provider transaction. Provider failure or caller
+  cancellation after mutation begins can leave a partial restore; retry is expected to be idempotent for Entity IDs.
+- The archive contains one Entity type and one source partition. An explicit restore target overrides the original
+  partition; otherwise the original partition is used.
+- The archive is compressed and integrity-checked, but it is not encrypted. Use a Storage provider and operational
+  policy appropriate for the data.
+- There is no whole-application scan, attribute policy, retention scheduler, catalog, progress dashboard, HTTP
+  control plane, or archive deletion API. Orchestrate recurring/durable work with the application's operations layer.
+- Archive compatibility is format-versioned, but long-term schema migration is not promised. The current Entity type
+  must remain JSON-compatible with the archived records.
 
-Configuration is under `Koan:Backup`; see [`TECHNICAL.md`](TECHNICAL.md) for the current types and
-workflow. Before production use, add an application-owned restore drill that writes representative
-data, backs it up to the intended storage profile, restores into isolation, and verifies business
-invariants.
+See [TECHNICAL.md](TECHNICAL.md) for archive invariants and failure ordering.

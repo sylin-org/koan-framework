@@ -53,7 +53,7 @@ application only owns explicit pipeline mapping when it disables that default.
 
 ## Optional projection references
 
-- `Sylin.Koan.Web.Extensions` adds `[RestEntity]` terse CRUD exposure and explicit audit, moderation, and soft-delete
+- `Sylin.Koan.Web.Extensions` adds `[RestEntity]` terse CRUD exposure and explicit audit and moderation
   controller realizations. It keeps generic controller declarations host-owned; package presence does not expose the
   richer capability controllers automatically.
 - `Sylin.Koan.Web.OpenApi` publishes `/openapi/v1.json` from the existing `AddKoan()` composition. Its interactive UI

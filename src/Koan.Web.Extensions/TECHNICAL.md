@@ -6,7 +6,7 @@ This package owns optional Entity-oriented HTTP realizations above `Sylin.Koan.W
 
 - `[RestEntity]` discovery and a concrete closure of `EntityController<TEntity,TKey>`;
 - generic controller materialization and route conventions;
-- moderation, audit, and soft-delete controller bases and request contracts; and
+- moderation and audit controller bases and request contracts; and
 - named capability-policy providers that participate in Koan Web's shared `IAuthorize` ladder when configured.
 
 It does not own MVC hosting, the base Entity CRUD service, authentication, the shared gate/constrain/project access
@@ -38,13 +38,14 @@ providers remain ordered participants in the same `IAuthorize` ladder.
 
 ## Data behavior
 
-The capability controllers use Entity/data partition scopes for draft, submitted, approved, denied, deleted, and audit
+The capability controllers use Entity/data partition scopes for draft, submitted, approved, denied, and audit
 sets. Paging limits reuse Koan Web defaults. Backend support, atomicity, and cost remain adapter-specific; the package
 does not add a transaction coordinator or streaming fallback.
 
 ## Deliberate non-guarantees
 
-- no automatic moderation/audit/soft-delete exposure from a package reference alone;
+- no automatic moderation/audit exposure from a package reference alone;
+- no second soft-delete persistence model; `Sylin.Koan.Data.SoftDelete` owns that Data semantic;
 - no multi-route generic controller realization;
 - no compliance-grade append-only audit store or retention engine;
 - no cross-partition atomic workflow guarantee; and

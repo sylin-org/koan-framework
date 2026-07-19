@@ -1,133 +1,54 @@
-﻿---
-uid: reference.modules.koan.data.backup
-title: Koan.Data.Backup – Technical Reference
-description: Streaming backup and restore services with discovery, storage integration, and maintenance workflows for Koan entities.
-since: 0.6.3
-packages: [Sylin.Koan.Data.Backup]
-source: src/Koan.Data.Backup/
-validation:
-  date: 2026-07-14
-  status: source-reviewed
----
+# Sylin.Koan.Data.Backup technical contract
 
-## Contract
+## Responsibility
 
-- Stream entity enumeration during backup through capability-qualified, provider-bounded Entity
-  pages. The current ZIP archive is still assembled in memory before upload; restore reads archive
-  entries incrementally but has a separate certification boundary.
-- Auto-register backup, restore, discovery, and optional maintenance services when the package is referenced.
-- Persist manifests, verification data, and entity payloads through Koan storage providers while exposing progress, viability checks, and catalog discovery.
-- Support selective restore paths with optimization hooks (`IRestoreOptimizedRepository`) so adapters can disable constraints, batch, or bulk-load data safely.
+The package owns one operational capability: a provider-bounded, single-Entity archive and its integrity-first
+upsert recovery path. `DataBackupModule` registers one scoped `IBackupService` automatically. Standard DI replacement
+before module composition remains the customization seam.
 
-## Key components
+It does not own scheduling, whole-application inventory, retention, authorization, HTTP, provider election, schema
+migration, encryption, or transactions.
 
-| Area                  | Types                                                                                          | Notes                                                                                                                                            |
-| --------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Registration & DI     | `Initialization.DataBackupModule`, `Extensions.ServiceCollectionExtensions`                    | Auto-wires services via `AddKoanBackupRestore*`, binds `BackupRestoreOptions`, and contributes capability notes to the boot report.              |
-| Backup pipeline       | `StreamingBackupService`, `IBackupService`, `EntityDiscoveryService`, `BackupDiscoveryService` | Discovers entity metadata, streams records with `Data<TEntity, TKey>.AllStream`, builds manifests, and tracks progress in-memory.                |
-| Restore pipeline      | `OptimizedRestoreService`, `IRestoreService`, `IRestoreOptimizedRepository`                    | Restores entities with optional adapter-specific preparation/cleanup, reflection fallbacks, and batch `UpsertManyAsync` calls.                   |
-| Storage integration   | `BackupStorageService`, models under `Models/*`                                                | Writes JSON Lines payloads into ZIP archives, stores manifests & verification metadata, uploads via `IStorageService`, and reads during restore. |
-| Background operations | `BackupMaintenanceService`                                                                     | Optional hosted service that warms discovery, refreshes catalogs, validates samples, and surfaces retention candidates based on options.         |
-| Models & options      | `BackupManifest`, `BackupOptions`, `RestoreOptions`, `BackupRestoreOptions`, `BackupQuery`     | Provide manifest schema, per-operation knobs, and module-wide defaults (batch sizes, profiles, retention).                                       |
+## Archive creation
 
-## Backup workflow
+1. Validate the name and positive page size.
+2. Resolve the source partition from `BackupRequest.Partition` or the current `EntityContext`.
+3. Stream `Data<TEntity,TKey>.AllStream(pageSize)` into `entity.jsonl` in a temporary ZIP while computing SHA-256.
+   Provider capability qualification occurs before the first page; unsupported resident providers fail before
+   publication.
+4. Write `manifest.json` with format version, collision-proof archive ID, stable assembly/type identities, source
+   partition, record count, data entry, and checksum.
+5. Close the ZIP and publish the complete seekable file through host-scoped `IStorageService.Put` in the `backups`
+   container. The returned `BackupReceipt` includes logical-data integrity and provider object evidence.
+6. Remove temporary storage in `finally`. Cleanup is best-effort and never replaces the operation result.
 
-1. **Reference and policy declaration** – `DataBackupModule` calls `AddKoanBackupRestore()` during `AddKoan()` composition.
-   `[EntityBackup]` and assembly-level `[EntityBackupScope]` control discovery participation.
-2. **Entity discovery** – `EntityDiscoveryService` scans Koan aggregates, caching `EntityTypeInfo` records (entity type, key type, provider). Its pre-scan fallback consumes Data Core's provider-free registered-type facts and resolves provider metadata against the service's injected host; it does not inspect Data Core private caches or inherit a prior host's repository. Optional warmup occurs during maintenance startup when `WarmupEntitiesOnStartup` is enabled.
-3. **Streaming export** – `StreamingBackupService` orchestrates backups:
-   - Creates a manifest and progress record (stored in `_activeBackups`).
-   - Builds a ZIP archive in memory via `BackupStorageService.CreateBackupArchive`.
-   - Streams each entity using `Data<TEntity, TKey>.AllStream(batchSize)` (single-entity) or reflection-based enumeration for global backups.
-   - Requires `DataCaps.Query.ProviderBoundedPaging`. SQLite, PostgreSQL, SQL Server, CockroachDB,
-     MongoDB, and Couchbase are qualified; InMemory, JSON, and Redis reject before query/yield.
-   - Serializes records as JSON Lines and collects schema metadata, sizes, checksums, and timing metrics per entity.
-   - After all entities are processed, writes manifest & verification files (`manifest.json`, `verification/*`) and uploads the archive using `IStorageService` under the configured storage profile.
-4. **Progress & cancellation** – `GetBackupProgress` returns process-local aggregate metrics, while
-   `CancelBackup` marks the process-local record as `Cancelled`. Use the caller cancellation token to
-   stop active I/O. Backups run sequentially inside a single archive to avoid ZIP concurrency issues.
+No complete archive is retained in memory. The selected provider's `Put` semantics govern physical publication; the
+package supplies a complete closed archive and never publishes its working file while records are still being read.
 
-## Restore workflow
+## Restore failure ordering
 
-1. **Manifest loading** – `OptimizedRestoreService` locates backup archives through `BackupStorageService` and loads the stored `BackupManifest`.
-2. **Adapter preparation** – If the entity repository implements `IRestoreOptimizedRepository`, `PrepareForRestoreAsync` receives `RestorePreparationOptions` (estimated counts, flags for disabling constraints/indexes, bulk mode). The returned context is restored after the operation.
-3. **Data import** – Entities are read from stored JSON Lines via `BackupStorageService.ReadEntityDataAsync<T>` or reflection fallback (`ReadEntityDataAsObjects`). Records are upserted using `Data<TEntity, TKey>.UpsertManyAsync` in batches, respecting dry-run and continue-on-error settings.
-4. **Progress & viability** – Global restores manage concurrent operations with a configurable
-   `SemaphoreSlim`. `TestRestoreViability` inspects manifests, checks entity types, and estimates
-   restore time, capturing adapter optimization availability in a report.
-5. **Error handling** – Failures per entity capture messages in `EntityBackupInfo.ErrorMessage` and log warnings without halting entire global runs unless `ContinueOnError=false`.
+Restore downloads the object to a fresh temporary file and completes a validation pass before entering the target
+partition or calling `UpsertMany`:
 
-## Storage artifacts
+- ZIP and manifest must parse;
+- format version, Entity identity, and key identity must match the generic operation;
+- the declared fixed data entry must exist;
+- every non-empty JSON line must deserialize to the current Entity type; and
+- observed count and logical SHA-256 must match the manifest.
 
-- **Archive layout**: `entities/{EntityType}[#set].jsonl`, `manifest.json`, `verification/checksums.json`, `verification/schema-snapshots.json`.
-- **Content format**: JSON Lines per entity with deterministic SHA-256 content hashes. Overall checksum is derived from ordered entity hashes to detect tampering.
-- **Upload target**: `IStorageService.Put` writes to the `backups` container using the requested `storageProfile`. The returned `ContentHash` replaces the manifest-level checksum for end-to-end verification.
+Any failure throws `InvalidDataException` and zero records are mutated. A second pass deserializes validated records
+into bounded batches and applies `Data<TEntity,TKey>.UpsertMany`. The target is
+`RestoreRequest.TargetPartition ?? manifest.SourcePartition`.
 
-## Configuration
+Once the first upsert begins, adapter errors and cancellation can leave an honest partial restore because Koan does
+not claim a transaction spanning all batches. Reapplying the same archive is the recovery path for ID-stable Entity
+models.
 
-`BackupRestoreOptions` controls module defaults and is bound from `Koan:Backup`:
+## Public surface
 
-- `DefaultStorageProfile`: fallback profile when per-operation options omit `StorageProfile`.
-- `DefaultBatchSize`: base streaming batch size (per entity) used by both backup and restore services.
-- `WarmupEntitiesOnStartup`: triggers discovery warmup in `BackupMaintenanceService` at application boot.
-- `EnableBackgroundMaintenance`: toggles recurring maintenance (discovery refresh, validation, retention logging).
-- `MaintenanceInterval`: cadence for maintenance cycles; defaults to 6 hours.
-- `RetentionPolicy`: high-level keep counts for daily/weekly/monthly/yearly backups and exclusion tags (currently logged as candidates).
-- `MaxConcurrency`: caps parallel work in global backup/restore helpers.
-- `AutoValidateBackups`: determines whether newly written backups run verification immediately after upload.
-- `CompressionLevel`: forwarded to ZIP entry creation for adjusting archive size vs speed.
+- `IBackupService` — the single operation owner;
+- `BackupRequest` / `BackupReceipt` — source/storage/resource intent and publication evidence; and
+- `RestoreRequest` / `RestoreReceipt` — target/resource intent and applied recovery evidence.
 
-Per-operation options (`BackupOptions`, `GlobalBackupOptions`, `RestoreOptions`, `GlobalRestoreOptions`) manage batch sizes, inclusion/exclusion filters, concurrency, bulk options, dry run, continue-on-error, and validation toggles.
-
-## Background maintenance
-
-`BackupMaintenanceService` runs only when `EnableBackgroundMaintenance=true`. It:
-
-- Optionally warms entity discovery (`WarmupEntitiesOnStartup`).
-- Refreshes discovery caches and backup catalogs.
-- Validates a limited number of older backups per cycle and logs issues without interrupting the loop.
-- Logs cleanup candidates based on `BackupRestoreOptions.RetentionPolicy`; deletion requires additional storage hooks.
-- Catches and logs exceptions to keep the hosted service resilient.
-
-## Diagnostics & integration
-
-- Boot report settings include default storage profile, batch size, maintenance flags, and advertised capabilities (`AutoEntityDiscovery`, `StreamingBackup`, `SchemaSnapshots`, etc.).
-- In-progress backups/restores expose `BackupProgress` / `RestoreProgress` through process-local service state for
-  application-owned orchestration. Koan ships no backup HTTP control plane.
-- Logging uses structured messages (entity type, duration, counts) and emits warnings for partial failures (deserialization issues, missing entity types).
-- Manifests capture performance metrics (`BackupPerformanceInfo`) for later analysis of throughput and resource usage.
-
-## Edge cases & guidance
-
-- Backup deletion: managed deletion is not implemented. `EntityBackupExtensions.DeleteBackup(...)`
-  returns a faulted task with `NotSupportedException`, explicitly states that nothing was deleted, and
-  does not resolve services or touch storage. Retain the archive until a verified backup-management
-  operation and deletion receipt contract exist.
-- Large archives: entity iteration is streamed and batched, but `BackupStorageService` currently holds
-  the complete compressed archive in a `MemoryStream` until upload. Large-backup memory safety is not
-  established.
-- Encryption: `EntityBackupAttribute.Encrypt` is recorded as policy/manifest metadata; the archive
-  writer currently performs no payload encryption.
-- Partial availability: discovery still records entities on adapters without provider-bounded paging.
-  A single-entity backup propagates corrective `QueryStreamRejectedException` before provider query
-  or archive publication; a global backup records the per-entity failure in its manifest. Filter via
-  `GlobalBackupOptions.IncludeProviders` when a mixed topology intentionally excludes those entities.
-- Schema drift: manifests store schema snapshots; use them during validation or restore planning to detect incompatible changes.
-- Restore to missing types: viability testing attempts to resolve entity types by name; consider providing custom mapping or reconciling renamed entities ahead of time.
-- Cancellation: marking a backup/restore as cancelled stops progress reporting but does not abort the running stream; integrate with caller-provided `CancellationToken` for hard aborts.
-
-## Validation notes
-
-- Export proof: `Koan.Data.Backup.Tests` runs a real `AddKoan()` host with SQLite and local storage,
-  observes candidate pages `2/2/1` without count work, reopens the archive, and verifies stable IDs.
-  It also proves caller cancellation stops before page 2 completes and publishes nothing.
-- Capability-boundary proof: the same acceptance surface proves InMemory and JSON reject before
-  repository query or archive publication. Shared Data conformance separately proves Redis rejection.
-- Safety proof: the suite also pins fail-loud deletion behavior and its non-success message.
-- Host-ownership proof: registered-type fallback discovery resolves provider metadata against an
-  explicitly supplied host through the supported Data Core inspection surface.
-- Source review: `StreamingBackupService`, `OptimizedRestoreService`, `BackupStorageService`,
-  `BackupMaintenanceService`, `Initialization/DataBackupModule`, and related models as of 2026-07-17.
-- Maturity boundary: the SQLite/local export lane is not a restore drill or a certification of the
-  wider data-adapter/storage matrix, schema evolution, or production recovery.
-- DocFX strict build executed via `pwsh -File scripts/build-docs.ps1 -ConfigPath docs/api/docfx.json -LogLevel Warning -Strict`.
+Archive manifest, codec, naming, storage constants, and implementation remain internal. There is no manual registrar,
+static facade, model decoration, adapter optimization SPI, discovery service, or projection contract.

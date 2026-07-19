@@ -1,6 +1,6 @@
 # Sylin.Koan.Web.Extensions
 
-Add terse Entity REST exposure or explicit moderation, audit, and soft-delete HTTP capabilities without writing
+Add terse Entity REST exposure or explicit moderation and audit HTTP capabilities without writing
 framework hosting code.
 
 ## Install
@@ -35,7 +35,7 @@ Use an explicit capability controller when the business surface needs more than 
 public sealed class TodoModerationController : EntityModerationController<Todo>;
 ```
 
-Equivalent bases exist for audit and soft delete. The declaration is the opt-in; the package does not expose those
+An equivalent base exists for audit. The declaration is the opt-in; the package does not expose those
 surfaces for every Entity merely because it is referenced.
 
 ## Guarantees and boundaries
@@ -45,10 +45,12 @@ surfaces for every Entity merely because it is referenced.
   controller when multiple route projections are genuinely required.
 - `[RestEntity]` declares exposure only. Entity `[Access(...)]`, `EntityAccess<T>`, authentication, and configured
   capability policies remain the authorization authority shared by REST and MCP.
-- Audit, moderation, and soft delete are partition-backed Entity workflows. They do not promise cross-partition
+- Audit and moderation are partition-backed Entity workflows. They do not promise cross-partition
   transactions, immutable compliance logging, legal retention, or a universal workflow engine.
 - List operations are explicitly paged. This package does not turn an adapter's unsupported query or streaming
   capability into a supported one.
+- Soft deletion is owned by `Sylin.Koan.Data.SoftDelete`. Referencing that package makes ordinary Entity controller
+  deletion inherit its Data-axis semantics; recycle-bin HTTP workflows remain explicit application controllers.
 
 Use `AddKoanAuthorization(...)` only when the application needs named ASP.NET policies or capability-policy mappings.
 The ordinary `[RestEntity]` path requires no additional registration.

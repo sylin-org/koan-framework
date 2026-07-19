@@ -88,7 +88,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Core` | `foundation` | `keep` |
 | `Sylin.Koan.Data.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Data.AI` | `capability` | `keep` |
-| `Sylin.Koan.Data.Backup` | `capability` | `assess` |
+| `Sylin.Koan.Data.Backup` | `capability` | `keep` (implemented) |
 | `Sylin.Koan.Data.Connector.Cockroach` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.Couchbase` | `provider` | `keep` |
 | `Sylin.Koan.Data.Connector.ElasticSearch` | `provider` | `keep` |
@@ -105,7 +105,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Data.Relational.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Data.Relational.Npgsql` | `capability` | `keep` |
 | `Sylin.Koan.Data.SearchEngine` | `capability` | `keep` |
-| `Sylin.Koan.Data.SoftDelete` | `capability` | `assess` |
+| `Sylin.Koan.Data.SoftDelete` | `capability` | `keep` (implemented) |
 | `Sylin.Koan.Data.Vector` | `capability` | `keep` |
 | `Sylin.Koan.Data.Vector.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Data.Vector.Connector.InMemory` | `provider` | `keep` |
@@ -222,7 +222,7 @@ terminal package decisions; the listed boundary repairs happen before graduation
 | `Sylin.Koan.Data.Connector.Cockroach` | `keep` | CockroachDB provider with independent identity/discovery/health and an explicit primary-key stable-order delta over shared Npgsql mechanics. It no longer references PostgreSQL. |
 | `Sylin.Koan.Data.Connector.SqlServer` | `keep` | SQL Server provider with distinct driver, JSON-computed projection, paging, and DDL mechanics; its repository does not yet justify forced convergence with SQLite or Npgsql. |
 | `Sylin.Koan.Web` | `keep` | Controller-first ASP.NET Core projection, health, and well-known inspectability. It is the direct owner of `EntityController<T>`. |
-| `Sylin.Koan.Web.Extensions` | `keep` | Optional terse REST exposure plus moderation, audit, soft-delete, and capability policy. Generic controller composition is host-owned; explicit controllers win; the package page states the real activation, persistence, and authorization boundaries. |
+| `Sylin.Koan.Web.Extensions` | `keep` | Optional terse REST exposure plus moderation, audit, and capability policy. Generic controller composition is host-owned; explicit controllers win; the package page states the real activation, persistence, and authorization boundaries. |
 | `Sylin.Koan.Communication` | `keep` | Entity-first local Events and Transport semantic ring. Its in-process default is meaningful without a network adapter and network providers remain separately elected. |
 | `Sylin.Koan.Templates` | `keep` | `dotnet new` acquisition surface. It is content-only and independently valuable even though the documented source-first path does not require it. Give the isolated pack project the same canonical package assets explicitly. |
 
@@ -298,11 +298,22 @@ All three boundaries have independent reference value and pass focused source be
 Merging either leaf into Core would make the shortest agent path carry unrelated human UI or privileged operational
 dependencies; splitting Code Mode is not justified without measured demand, security, and artifact evidence.
 
+## Data semantic leaf dispositions
+
+| Package | Disposition | Distinct reference intent and boundary |
+|---|---|---|
+| `Sylin.Koan.Data.SoftDelete` | `keep/rebuild` (implemented) | One opt-in persistent Entity deletion semantic authored as a Data axis. `T.WithDeleted()` is type-targeted; restore and purge remain explicit Entity verbs; no Web workflow or authorization bypass is implied. |
+| `Sylin.Koan.Data.Backup` | `keep/rebuild` (implemented) | One DI-owned, provider-bounded Entity archive and integrity-first upsert recovery path through Koan Storage. The unproved global discovery, decoration, dashboard, optimization, maintenance, and inline-Web surface is removed. |
+
+Both references retain independent business value. SoftDelete changes durable operation meaning for selected models;
+Backup is explicit operational work and performs no hidden model/application scan. Neither belongs in Data Core, and
+neither earns a separate contracts or Web bridge package.
+
 ## Web projection family dispositions
 
 | Package | Disposition | Distinct reference intent and boundary |
 |---|---|---|
-| `Sylin.Koan.Web.Extensions` | `keep` | Optional Entity HTTP realizations: `[RestEntity]`, moderation, audit, soft delete, and named capability policy. Per-host generic controller composition prevents process leakage without burdening base Web. |
+| `Sylin.Koan.Web.Extensions` | `keep` | Optional Entity HTTP realizations: `[RestEntity]`, moderation, audit, and named capability policy. Per-host generic controller composition prevents process leakage without burdening base Web. |
 | `Sylin.Koan.Web.OpenApi` | `keep` | Optional wire-faithful OpenAPI 3.1 document plus development-default interactive UI. One option/startup owner controls document, routes, UI, and authentication posture. |
 | `Sylin.Koan.Web.Sse` | `keep` | Optional controller/framework SSE projection. One `Sse.Stream(...)`/`SseResult` model provides typed, text, and explicit-envelope streaming without claiming replay, heartbeat, or delivery. |
 
