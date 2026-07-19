@@ -35,7 +35,7 @@ the concern does not enter the stated 0.20 guarantee; it does not mean the packa
 
 | PMCs | Current disposition | 0.20 consequence |
 |---|---|---|
-| 001 | repair in R12-02 | Jobs cannot carry a confusing collision in its guaranteed Entity language. |
+| 001 | repaired and closed | The framework-owned row is internal with unchanged persistence identity; one public `JobMetrics.Summary(...)` operation replaces the accidental Entity surface. |
 | 002, 004 | repair in R12-02 | MCP needs one canonical transport vocabulary and JSON wire contract, with a deliberate pre-0.20 compatibility decision. |
 | 003, 028, 032 | close by current evidence | R11-07 built the complete Release solution with zero warnings and ran the SQLite/connector projects; the historical warning and missing-reference premises no longer hold. |
 | 005 | exclude from supported workflow | Linked-worktree release execution is convenience, not the supported clean-checkout release path. |
@@ -137,6 +137,67 @@ instead of removing user providers or adding a Koan-specific toggle for a stale 
 
 The next dependency-ordered exploration is PMC-001's Jobs Entity-language collision. MCP public shape
 corrections follow; Data/Web parity and model identity follow their current convergence audit.
+
+## Second chokepoint exploration — Jobs metrics boundary
+
+**Task:** Remove the `JobMetric.Count` collision from Jobs' 0.20 public Entity language without
+inventing a migration, alias window, or analyzer subsystem for framework-owned persistence mechanics.
+
+**Application intent:** An operator asks Jobs for retained throughput totals by work type, time range,
+and outcome. Applications do not author, save, or query framework metric rows as business Entities.
+
+**Public expression:** `await JobMetrics.Summary(workType, from, to)`. This is one operation-oriented
+concept; the persisted shard row is not public application vocabulary.
+
+**Guarantee/correction:** The summary continues to aggregate node shards and survive JobRecord
+retention. The existing storage type and field identity remain unchanged. Direct public `JobMetric`
+Entity access is removed before the 0.20 guarantee rather than preserved as a misleading compatibility
+surface.
+
+**Complete intent surface:** `JobsOptions.MetricsEnabled`, per-node recording/flush, metric retention,
+the summary query, Tenancy ambient exemption, Jobs package docs/guides, and exported CLR surface.
+
+**Public concepts:** One plural standard .NET static API class, `JobMetrics`; existing options and
+return types. No new Entity facet, attribute, configuration, DTO, service, or analyzer.
+
+**Docs read:** PMC-001, Jobs README/TECHNICAL, Jobs how-to/framework-utilities guidance, generated
+product surface, and the R11 Jobs graduation evidence.
+
+**Code read:** `JobMetric`, `JobMetricsRecorder`, `JobOrchestrator`, `JobsOptions`, Jobs project friend
+boundaries, behavior harness/suite, compatibility surface specs, Tenancy ledger-exemption spec,
+`Entity<T>.Count`, and Data projection/storage-name resolution.
+
+**Reusing:** Keep the existing `JobMetric` CLR name, `Count` field, Entity persistence, shard key,
+retention, and summary query internally so stored data does not migrate. Reuse the existing focused
+Jobs behavior and Tenancy isolation suites.
+
+**Creating new:** One public static `JobMetrics` facade containing the already-public summary
+operation. No other production type or mechanism.
+
+**Coalescence:** Internalize the existing row instead of renaming its persisted fields or teaching
+users a framework ledger Entity. Do not add a compatibility alias or a general analyzer without a
+current application-level collision corpus.
+
+**Ergonomics:** The public name describes the question, not its storage. `JobMetrics.Summary(...)`
+reads as operator intent and cannot shadow `Entity<T>.Count`.
+
+**Constraints satisfied:** fewer public moving parts; Entity remains application language rather
+than framework storage leakage; standard static API; unchanged persistence; no cross-module contract;
+focused tests only.
+
+**Risks:** An undocumented consumer may have queried `JobMetric` directly. That surface is deliberately
+broken before 0.20 because its public persistence shape was not an accepted guarantee. Reflection and
+generated-surface tests must prove the row is no longer exported, while behavior proves retained totals
+and Tenancy exemption remain intact.
+
+## Second slice outcome
+
+PMC-001 is closed by making the architecture match the application sentence. `JobMetric` remains the
+same internal Entity and retains its type/field persistence identity; `JobMetrics.Summary(...)` is the
+one exported operation. Package guidance now teaches that API and explicitly describes metrics as
+derived and lossy-tolerant. Jobs passes 84/84, Tenancy passes 16/16, and the Jobs Release build has zero
+warnings/errors. No general analyzer was added because the current defect was framework storage leakage,
+not evidence for another public toolchain.
 
 ## Stop conditions
 

@@ -87,9 +87,9 @@ public sealed class JobsOptions
     public int JobPerRowWarnThreshold { get; set; } = 100_000;
 
     /// <summary>Opt-in throughput rollup (JOBS-0005 §20.2). When true, each node accumulates terminal outcomes in
-    /// memory and periodically flushes a node-sharded <see cref="JobMetric"/> — cheap throughput/trend dashboards that
-    /// survive retention. Off by default: the zero-config path stays write-free. (Active counts don't need this — they
-    /// come from the indexed ledger, §20.1.)</summary>
+    /// memory and periodically flushes a node-sharded internal rollup. <see cref="JobMetrics"/> provides cheap
+    /// throughput/trend summaries that survive retention. Off by default: the zero-config path stays write-free.
+    /// (Active counts don't need this — they come from the indexed ledger, §20.1.)</summary>
     public bool MetricsEnabled { get; set; }
 
     /// <summary>How often the worker flushes the in-memory metrics accumulator to its shard rows (when

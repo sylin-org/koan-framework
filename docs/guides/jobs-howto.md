@@ -502,12 +502,12 @@ Set any window to zero to disable it. For a high-throughput type, prefer a short
 builder.Services.AddKoanJobs(o => o.MetricsEnabled = true);
 ```
 
-Each node tallies terminal outcomes in memory and periodically flushes its own shard of a `JobMetric` rollup, so dashboards read pre-aggregated counts cheaply and they **outlive the rows they counted** (retention deletes the `JobRecord`s; the counts remain):
+Each node tallies terminal outcomes in memory and periodically flushes its own internal rollup shard, so dashboards read pre-aggregated counts cheaply and they **outlive the rows they counted** (retention deletes the `JobRecord`s; the counts remain):
 
 ```csharp
 var since = DateTimeOffset.UtcNow.AddDays(-1);
 IReadOnlyDictionary<string, long> byOutcome =
-    await JobMetric.Summary(typeof(ImportJob).FullName!, since, DateTimeOffset.UtcNow);
+    await JobMetrics.Summary(typeof(ImportJob).FullName!, since, DateTimeOffset.UtcNow);
 // { "Completed": 18234, "Failed": 12, … }
 ```
 

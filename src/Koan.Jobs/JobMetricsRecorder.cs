@@ -5,7 +5,7 @@ namespace Koan.Jobs;
 
 /// <summary>
 /// Per-node throughput accumulator (JOBS-0005 §20.2). Bumps an in-memory delta on each terminal settle; a periodic
-/// <see cref="FlushAsync"/> folds the deltas into this node's own <see cref="JobMetric"/> shard rows via read-add-write
+/// <see cref="FlushAsync"/> folds the deltas into this node's own metric shard rows via read-add-write
 /// — contention-free because only this node writes its shard, and restart-safe because it adds to (never overwrites)
 /// the persisted count. Opt-in and lossy-tolerant: a delta lost to a crash mid-flush is acceptable (the ledger is the
 /// source of truth). Lives inside the per-node <see cref="JobOrchestrator"/>; not a DI service.

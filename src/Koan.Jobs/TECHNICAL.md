@@ -105,7 +105,8 @@ Koan does not imply cross-provider transactions.
   shared control-plane ledger, Data-owned state isolation, at-least-once execution, and context-free wake;
 - `/health/ready` reports bounded aggregate queue facts in Development and aggregate status in production;
 - `JobRecord` queries provide per-work-item transitions, progress, and failure text;
-- optional metrics preserve aggregate outcomes beyond ledger retention.
+- optional `JobMetrics.Summary(...)` reads an internal node-sharded rollup that preserves aggregate
+  outcomes beyond ledger retention without exposing the framework persistence row as an application Entity.
 
 Health inspection is intentionally bounded and does not scan every lane. `QueueAgeWarning` opts into a
 degraded signal; the underlying age and depth facts are always returned.

@@ -46,7 +46,7 @@ internal sealed class JobOrchestrator
         _metrics = new JobMetricsRecorder(_options.MetricsEnabled, _owner, _clock);
     }
 
-    /// <summary>Fold this node's accumulated throughput deltas into its <see cref="JobMetric"/> shard rows (§20.2).
+    /// <summary>Fold this node's accumulated throughput deltas into its internal metric shard rows (§20.2).
     /// No-op unless <see cref="JobsOptions.MetricsEnabled"/>. Driven by the worker on <c>MetricsFlushInterval</c>.</summary>
     public Task FlushMetricsAsync(CancellationToken ct = default) => _metrics.FlushAsync(ct);
 

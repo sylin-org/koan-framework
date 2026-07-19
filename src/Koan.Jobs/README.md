@@ -73,6 +73,16 @@ The standard `/health/ready` response includes queue depth, running depth, recla
 queued age in Development; production returns only aggregate readiness. Per-work-item status and history
 are available through `entity.Job` and `Entity.Jobs`.
 
+Optional retained throughput is one operation surface rather than a framework Entity. Enable
+`JobsOptions.MetricsEnabled`, then read outcome totals that survive ledger retention:
+
+```csharp
+var outcomes = await JobMetrics.Summary(
+    typeof(ReviewRequest).FullName!,
+    DateTimeOffset.UtcNow.AddDays(-1),
+    DateTimeOffset.UtcNow);
+```
+
 ## Boundaries
 
 - Execution is at-least-once; handlers must be idempotent.
@@ -83,6 +93,7 @@ are available through `entity.Job` and `Entity.Jobs`.
 - Source submission is pointwise, sequential, and not collection-atomic. A provider call that throws
   is not reported as confirmed acceptance; retry that item under the job's declared idempotency policy.
 - A custom MCP or HTTP action that submits work remains responsible for its business authorization.
+- Metrics are derived, opt-in, and lossy-tolerant; the Jobs ledger remains the source of truth.
 - Use a window or batch as the job for large sources; do not create an unbounded job per input row.
 
 Use the [Jobs pillar reference](../../docs/reference/cards/jobs.md) for the compact API map and the

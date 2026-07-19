@@ -65,7 +65,13 @@ and GardenCoop C2 1/1. No full ratchet ran.
 PMC-025 is closed as stale current-state evidence, not repaired code. Current source and package-only
 FirstUse run on Windows without any EventLog override; the fresh focused source proof passes 1/1, and
 .NET 10.0.8 already disables only the EventLog sink on `SecurityException`. Koan retains standard
-host logging ownership. Resume at PMC-001's Jobs Entity-language collision, then MCP and Data/Web.
+host logging ownership.
+
+PMC-001 is now repaired without renaming stored data or adding an analyzer. The framework-owned
+`JobMetric` row is internal; its existing CLR/storage/`Count` identity remains unchanged. Applications
+see one business-facing `JobMetrics.Summary(...)` operation. Jobs passes 84/84, Tenancy 16/16, and the
+Jobs Release build is warning-clean. Resume R12-02 at MCP configuration/wire shape (PMC-002/004), then
+Data/Web correctness seams. Do not run the full ratchet.
 
 ## Most recent completed slice: R08-05 local exact candidate
 

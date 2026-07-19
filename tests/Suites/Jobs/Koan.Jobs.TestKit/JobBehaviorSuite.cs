@@ -798,14 +798,14 @@ public abstract class JobBehaviorSuite
         await host.FlushMetrics();       // fold into this node's JobMetric shard row
 
         var from = host.Clock.GetUtcNow().AddHours(-1);
-        (await JobMetric.Summary(wt, from, host.Clock.GetUtcNow().AddHours(1))).GetValueOrDefault("Completed").Should().Be(5);
+        (await JobMetrics.Summary(wt, from, host.Clock.GetUtcNow().AddHours(1))).GetValueOrDefault("Completed").Should().Be(5);
 
         // Purge the ledger: the 5 Completed JobRecords are deleted, but the rollup (retained 30d) is not.
         host.Advance(TimeSpan.FromMinutes(2));
         await host.Archive();
         (await host.Ledger.Query(new JobQuery(WorkType: wt, Status: JobStatus.Completed), default)).Should().BeEmpty();
 
-        (await JobMetric.Summary(wt, from, host.Clock.GetUtcNow().AddHours(1))).GetValueOrDefault("Completed").Should().Be(5);
+        (await JobMetrics.Summary(wt, from, host.Clock.GetUtcNow().AddHours(1))).GetValueOrDefault("Completed").Should().Be(5);
     }
 
     [Fact]

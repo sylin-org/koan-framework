@@ -11,7 +11,7 @@ namespace Koan.Jobs;
 /// ledger stays the source of truth; this rollup is derived and lossy-tolerant. Opt-in via
 /// <see cref="JobsOptions.MetricsEnabled"/>.
 /// </summary>
-public sealed class JobMetric : Entity<JobMetric>, IAmbientExempt
+internal sealed class JobMetric : Entity<JobMetric>, IAmbientExempt
 {
     /// <summary>Time bucket "yyyy-MM-ddTHH" (hourly) — lexicographic order is chronological.</summary>
     [Index(Group = "ix_metric", Order = 1)]
@@ -41,18 +41,4 @@ public sealed class JobMetric : Entity<JobMetric>, IAmbientExempt
     public static string KeyOf(string bucket, string workType, string outcome, string nodeShard)
         => $"{bucket}|{workType}|{outcome}|{nodeShard}";
 
-    /// <summary>Throughput summary for a work-type over [from, to]: outcome → count summed across all shards/buckets.
-    /// Reads the rollup (independent of ledger size, immune to retention), not the ledger.</summary>
-    public static async Task<IReadOnlyDictionary<string, long>> Summary(
-        string workType, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default)
-    {
-        var fromB = BucketOf(from);
-        var toB = BucketOf(to);
-        // WorkType equality is pushed (indexed); the bucket-range + grouping run over the small per-work-type row set.
-        var rows = await Query(m => m.WorkType == workType, ct);
-        return rows
-            .Where(r => string.CompareOrdinal(r.Bucket, fromB) >= 0 && string.CompareOrdinal(r.Bucket, toB) <= 0)
-            .GroupBy(r => r.Outcome, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => g.Sum(r => r.Count), StringComparer.Ordinal);
-    }
 }

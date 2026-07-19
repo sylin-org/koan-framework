@@ -705,8 +705,8 @@ Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
 > (`JobPerRowWarnThreshold`) when a work-type's active set looks like job-per-row. See the how-to §8.1.
 
 > Observability: active counts come from the indexed ledger; opt into `JobsOptions.MetricsEnabled` for a
-> node-sharded `JobMetric` throughput rollup that **survives retention** — read it with
-> `JobMetric.Summary(workType, from, to)`. See the how-to §10. (JOBS-0005 §20.2)
+> node-sharded throughput rollup that **survives retention** — read it with
+> `JobMetrics.Summary(workType, from, to)`. See the how-to §10. (JOBS-0005 §20.2)
 
 ---
 

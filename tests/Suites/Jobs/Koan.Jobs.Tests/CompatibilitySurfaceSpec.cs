@@ -28,6 +28,15 @@ public sealed class CompatibilitySurfaceSpec
     }
 
     [Fact]
+    public void Metrics_expose_summary_intent_without_exporting_the_persistence_entity()
+    {
+        typeof(JobMetrics).IsPublic.Should().BeTrue();
+        typeof(JobMetric).IsNotPublic.Should().BeTrue();
+        typeof(JobMetric).GetProperty(nameof(JobMetric.Count))!.GetMethod!.IsPublic.Should().BeTrue(
+            "the existing persisted field remains unchanged inside the non-exported row");
+    }
+
+    [Fact]
     public void DataStore_requirement_rejects_a_host_without_durable_data()
     {
         var services = new ServiceCollection();

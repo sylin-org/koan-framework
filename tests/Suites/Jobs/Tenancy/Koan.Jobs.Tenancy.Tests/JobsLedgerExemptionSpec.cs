@@ -14,8 +14,8 @@ namespace Koan.Jobs.Tenancy.Tests;
 /// <summary>
 /// ARCH-0100 §6 / phase 3 — the durable job ledger is <b>ambient-exempt infrastructure</b>. Proven through a real
 /// <c>AddKoan()</c> boot (ARCH-0079) with the <c>Koan.Tenancy</c> module live at the secure-by-default
-/// <b>Closed</b> posture (Test env). The three ledger entities (<see cref="JobRecord"/>, <see cref="JobMetric"/>,
-/// <see cref="JobGateRecord"/>) are written during settle and read at claim with NO
+/// <b>Closed</b> posture (Test env). The ledger entities, including Jobs' internal metric row, are written during
+/// settle and read at claim with NO
 /// ambient tenant on the worker thread — so if they were tenant-scoped, claiming would throw the fail-closed guard
 /// and the cooperative gate would fail open cross-tenant. They must carry the generic <see cref="IAmbientExempt"/>
 /// marker so the restored ambient never stamps them and claim-time reads are never tenant-filtered — without a
@@ -27,10 +27,12 @@ public sealed class JobsLedgerExemptionSpec
     public void All_jobs_ledger_entities_are_recognized_exempt_by_the_tenancy_predicate()
     {
         // The single cached exemption predicate (used by both the guard and the __koan_tenant managed field) must
-        // treat each ledger entity as exempt via the generic marker — covers JobMetric, which the lifecycle test
-        // below does not separately drive.
+        // treat each ledger entity as exempt via the generic marker — covers the internal metric row, which the
+        // lifecycle test below does not separately drive.
+        var metricRow = typeof(JobRecord).Assembly.GetType("Koan.Jobs.JobMetric", throwOnError: true)!;
         TenantScopeMetadata.IsHostScopedType(typeof(JobRecord)).Should().BeTrue();
-        TenantScopeMetadata.IsHostScopedType(typeof(JobMetric)).Should().BeTrue();
+        metricRow.IsNotPublic.Should().BeTrue();
+        TenantScopeMetadata.IsHostScopedType(metricRow).Should().BeTrue();
         TenantScopeMetadata.IsHostScopedType(typeof(JobGateRecord)).Should().BeTrue();
     }
 
