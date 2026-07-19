@@ -641,7 +641,7 @@ using (EntityContext.Partition("tenant/7")) { /* throws ArgumentException — wo
 **Purpose**: Durable, edge + level-triggered background work with a single orchestrator concern and a
 ledger-as-truth model. A job is a normal `Entity<T>` carrying its own behavior — no queues, workers, or
 repositories to wire. The same job code runs unchanged across tiers; the infrastructure you reference
-(a data adapter, multiple nodes, a message bus) decides durability and scale, never correctness.
+(a durable data adapter, multiple nodes, a Communication connector) decides durability and scale, never correctness.
 
 #### Entry points
 
@@ -667,7 +667,7 @@ await mailbatch.Submit();                  // batch (IEnumerable<T>)
 | `[JobChain(a,b,c)]` | linear pipeline (auto-advance, one ledger entry per stage) |
 | `[JobIdempotent(keys)]` | collapse concurrent / duplicate submits |
 | `[JobGate(member)]` | shared resource gate for cooperative backoff; `member` is a property **or** an async resolver method `Task<string?>(IServiceProvider, CancellationToken)` for runtime-derived keys (§18) |
-| `[JobPersistence(Auto\|InMemory\|DataStore)]` | per-type durability routing (`RoutingJobLedger`) |
+| `[JobPersistence(Auto\|InMemory\|DataStore)]` | per-type durability intent; `DataStore` rejects when no durable provider can honor it |
 | `[ParallelSafe]` | opt out of per-entity serialization (default: jobs for one entity run one at a time) |
 | `JobContext` verbs | `Reschedule(after\|until)` (defer, no retry consumed), `Backoff(after, key)` (cross-node gate), `ContinueWith` / `StopChain`, `Progress` |
 
@@ -680,19 +680,19 @@ Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
 
 #### Capability ladder
 
-`in-memory → durable → distributed → +bus` — constant at-least-once + idempotent contract across all of them.
+`in-memory → durable → distributed → +Communication wake` — constant at-least-once + idempotent contract across all of them.
 
-- **In-memory** (no data adapter): fast, ephemeral; `InMemoryJobLedger`.
-- **Durable** (any data adapter — SQLite/Postgres/Mongo/SQL Server): `DataJobLedger` over `Entity<JobRecord>`;
+- **In-memory** (no durable data adapter): fast and explicitly ephemeral.
+- **Durable** (SQLite/Postgres/Mongo/SQL Server or another durable Data provider): a Data-backed ledger over `Entity<JobRecord>`;
   transactional outbox (a `Submit` inside an ambient transaction enqueues on commit) and **retention** are automatic —
   the sweep purges Completed/Cancelled past `ArchiveAfter` (7d) and Failed/Dead past `FailedAfter` (30d), with an
   optional per-work-type count cap (`RetainPerWorkType`). On a TTL-capable store (Mongo) a native TTL index on the
   per-outcome `ExpireAt` (`[Index(Ttl)]` / `DataCaps.Retention.TtlIndex`) expires terminal rows continuously between
   sweeps; the sweep stays the universal backstop (§20.4). Ledger reads are pushed down (indexed claim/dashboard queries).
-- **Distributed** (several nodes on one store): competing consumers claim **contention-free** — on adapters that
-  support an atomic conditional claim (SQLite/Postgres/SqlServer/Mongo), the default `Optimistic` strategy marks
-  `Running` via a compare-and-set, so each ready job runs on **exactly one** node (no duplicate executions); `Ticket`
-  is the leaderless-election alternative. Resource gates are honored cross-node. (JOBS-0005 §20.3)
+- **Distributed** (several nodes on one store): competing consumers use the adapter's conditional compare-and-set
+  capability automatically. SQLite/Postgres/SqlServer/Mongo admit only one claimant per ready ledger row; adapters
+  without that capability retain the honest optimistic at-least-once fallback. Resource gates are honored cross-node.
+  (JOBS-0005 §20.3)
 - **+Communication connector**: cross-node wake — a submit emits one bounded hint to
   the elected worker group; no Jobs-specific transport package or application bus API
   instead of waiting out the poll interval. Latency upgrade only; the ledger stays the truth.

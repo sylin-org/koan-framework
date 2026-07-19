@@ -67,7 +67,7 @@
     {
       "id": "jobs-scheduling",
       "title": "Jobs and scheduling",
-      "summary": "Applications declare and observe in-process work and schedules through Koan job semantics.",
+      "summary": "Entities own inspectable background work with retries, cancellation, schedules, context restoration, and capability-graded durability.",
       "maturity": "verified",
       "packages": ["Sylin.Koan.Jobs"],
       "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],

@@ -14,6 +14,11 @@
 > deterministic resolved fallback, preventing different nodes from independently choosing context
 > while leaving genuinely host-scoped work unscoped.
 
+> **2026-07-18 amendment:** R11-05 removes the superseded probabilistic Jobs claim-ticket path after
+> conditional compare-and-set became the automatic durable primitive. The current host-scoped ledger
+> entities are `JobRecord`, `JobMetric`, and `JobGateRecord`; the exemption and fail-closed context
+> conclusions below are unchanged.
+
 **Status**: Proposed (2026-06-24) · adversarially reviewed (3 lenses, all *ratifiable-with-fixes* — folded below)
 **Date**: 2026-06-24
 **Deciders**: Enterprise Architect

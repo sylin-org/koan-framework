@@ -451,15 +451,17 @@ public sealed class PingJob : Entity<PingJob>, IKoanJob<PingJob> { … }
 
 `Auto` (default) follows your adapters; `InMemory` keeps a job's queue state volatile even when a store is present (the orchestration is ephemeral—handy for a torrent of fire-and-forget work you don't want touching the database); `DataStore` insists on durability. Mixed tiers coexist in one app: durable and in-memory jobs run side by side, and a cooperative gate (§6) set by one is honored by the other—so a 429 backoff still protects a shared host across tiers.
 
-**Claim strategy.** When several nodes compete for the same job, choose how they settle it in `JobsOptions`:
+`DataStore` is corrective rather than aspirational: when no durable Data adapter is available, host composition fails
+and names the affected work types. Koan never silently weakens that declaration to in-memory execution.
 
-```csharp
-builder.Services.AddKoanJobs(o => o.ClaimStrategy = ClaimStrategy.Ticket);
-```
+**Claim behavior.** When several nodes compete, Jobs automatically uses the selected Data adapter's conditional
+compare-and-set capability. SQLite, PostgreSQL, SQL Server, and MongoDB each mark a ready job `Running` atomically,
+so competing consumers cannot both win that ledger row. An adapter that does not declare conditional replace retains
+the constant at-least-once contract through an honest optimistic fallback; handler idempotency remains required on
+every tier. There is no claim-strategy setting or clock-skew-sensitive election protocol to choose.
 
-`Optimistic` (default) is cheapest; on durable adapters that support an atomic conditional claim (SQLite, Postgres, SqlServer, Mongo) it marks a job `Running` with a **compare-and-set** — so under competing consumers each ready job is claimed by **exactly one** node (no duplicate runs), with idempotency as the backstop where a store can't. `Ticket` runs a leaderless GUIDv7 election (each contender drops a ticket, the earliest wins). Both work on every adapter.
-
-**When to use which.** Single service → defaults. Multiple replicas pulling the same queue → `Ticket`. A torrent of fire-and-forget pings you don't want cluttering the store → `[JobPersistence(InMemory)]`.
+**When to use which.** Single service or multiple replicas → use the automatic claim path. A torrent of
+fire-and-forget pings you do not want cluttering the store → `[JobPersistence(InMemory)]`.
 
 **Lane fairness is per node.** Each worker fairly multiplexes the lanes *it* claims (§4), so no lane starves on any node. Lane weights are honored per node too — so across many nodes the global split tracks the weights when feed is balanced across them, and stays approximate (but never starving) under node-asymmetric feed. Exact global weight proportions are deliberately *not* bought with per-claim cross-node coordination; see ADR JOBS-0008.
 
@@ -658,7 +660,7 @@ ctx.Reschedule(5.Minutes());  ctx.Backoff(retryAfter);  // (TimeSpan helpers are
 
 // Tune — AddKoanJobs(o => …)
 o.ArchiveAfter;  o.FailedAfter;  o.RetainPerWorkType;   // retention: completed/failed windows + per-type cap (§10)
-o.ClaimStrategy;  o.ClaimScanBatch;                     // claim: contention strategy + bounded per-lane seek window (§10)
+o.ClaimScanBatch;                                       // bounded per-lane claim seek window (§10)
 o.LaneWeights["translation"] = 3;                       // lane-fair dispatch: relative per-lane weight (default 1 = equal share, §4)
 o.QueueAgeWarning = TimeSpan.FromMinutes(5);            // health: oldest-queued-age tripwire → /health Degraded (default off, §10)
 o.JobPerRowWarnThreshold;                               // warn when a work-type looks like job-per-row (§8.1)

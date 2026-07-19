@@ -46,8 +46,8 @@ generated package-quality and product-surface references.
 
 R11-01 opened with 109 packages: 37 required an objective repair, 72 required review, and none was inferred
 graduated. Subsequent family work retired unearned identities and introduced only independently useful contract or
-shared-mechanism boundaries. The current evaluated graph contains 101 packages: 5 repair-required, 17
-review-required, and 79 structurally ready across 26 claims. The active matrix contains only present package projects;
+shared-mechanism boundaries. The current evaluated graph contains 101 packages: 4 repair-required, 15
+review-required, and 82 structurally ready across 26 claims. The active matrix contains only present package projects;
 implemented retirements remain in the disposition tables as release-lineage decisions.
 
 ## Exact active matrix
@@ -116,7 +116,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Identity` | `capability` | `keep` |
 | `Sylin.Koan.Identity.Tenancy` | `capability` | `keep (implemented)` |
 | `Sylin.Koan.Identity.Web` | `projection` | `keep` |
-| `Sylin.Koan.Jobs` | `capability` | `assess` |
+| `Sylin.Koan.Jobs` | `capability` | `keep` (implemented) |
 | `Sylin.Koan.Mcp` | `capability` | `keep` |
 | `Sylin.Koan.Mcp.Explorer` | `capability` | `keep` |
 | `Sylin.Koan.Mcp.Operations` | `capability` | `keep` |
@@ -354,6 +354,16 @@ Dev Identity and Identity Tenancy now use the same lifecycle without changing th
 owns its `event` selector, durable grant lookup, and write authorization in one application contributor; the link is
 evidence, never authority. Headless and durable-job authorization are deliberately outside the Web request contract
 and must establish or re-resolve their own service context.
+
+## Jobs family disposition
+
+| Package | Disposition | Distinct reference intent and implemented boundary work |
+|---|---|---|
+| `Sylin.Koan.Jobs` | `keep` (implemented) | One reference states that Entities own inspectable deferred work. The package retains the `IKoanJob<T>` + static `Execute` + `.Job`/`.Jobs` application grammar, durable context restoration, scheduling, retries, cancellation, and capability-graded ledger behavior. Built-in orchestrator, scheduler, registry, selector, and ledger implementations are internal; automatic Data CAS replaces the unproved claim-ticket branch; a declared `DataStore` requirement fails composition without durable Data infrastructure. No Contracts or transport package is created because the only cross-module consumer deliberately activates Jobs through `IJobCoordinator`, while Communication owns only the neutral wake signal. |
+
+Jobs therefore remains one functional capability rather than exposing its runtime topology as package topology. Live
+resource pools use standard DI through `IJobPoolResolver`; provider mechanics remain Data-owned, and request context
+remains Web-owned.
 
 ## Acceptance
 

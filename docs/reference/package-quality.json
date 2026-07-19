@@ -4,11 +4,11 @@
   "summary": {
     "packages": 101,
     "repairRequired": 4,
-    "reviewRequired": 16,
-    "structurallyReady": 81,
+    "reviewRequired": 15,
+    "structurallyReady": 82,
     "ownedReadmes": 97,
     "technicalCompanions": 92,
-    "findings": 62
+    "findings": 59
   },
   "findingDefinitions": [
     {
@@ -1251,8 +1251,8 @@
       "projectPath": "src/Koan.Jobs/Koan.Jobs.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
-      "description": "Koan Jobs: a durable, edge\u002Blevel-triggered job orchestrator. Entity-first IKoanJob authoring, a ledger that is the queue, capability-graded backend (in-memory / data-backed / distributed), and scheduled reconciliation (JOBS-0005).",
+      "status": "structurally-ready",
+      "description": "Run Entity-owned background work with inspectable progress, retries, cancellation, schedules, and capability-graded durability through AddKoan().",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1265,11 +1265,7 @@
       "readme": "src/Koan.Jobs/README.md",
       "technicalDocumentation": "src/Koan.Jobs/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Mcp",

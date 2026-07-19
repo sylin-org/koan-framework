@@ -9,7 +9,7 @@ framework_version: source-first
 validation:
   date_last_tested: 2026-07-18
   status: tested
-  scope: R11-05 Data Backup/SoftDelete graduation and affected-consumer proof green
+  scope: R11-05 Jobs graduation and focused owner/consumer/package proof
 ---
 
 # Koan V1 reorganization current handoff
@@ -23,57 +23,53 @@ Replace this file at every handoff. It is a restart point, not a diary.
   R11-07 release-certification boundary.
 - Foundation, package identity, templates, Storage, Cache, Redis, relational/Data providers, Vector, AI, MCP, Web,
   Media, OpenGraph, Identity, Tenancy, Classification, Canon, RabbitMQ, Web request context/Data Access, and now Data
-  Backup/SoftDelete have completed their current R11 family work.
-- The evaluated graph remains 101 packages and 26 claims. Generated package quality is 4 repair-required, 16
-  review-required, and 81 structurally ready.
+  Backup/SoftDelete and Jobs have completed their current R11 family work.
+- The evaluated graph remains 101 packages and 26 claims. Generated package quality is 4 repair-required, 15
+  review-required, and 82 structurally ready.
 
 The accepted architecture remains business intent first: fewer meaningful moving parts, Entity-first application
 language, references express capability intent, `AddKoan()` compiles host-owned decisions, pillars own meaning and
 runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive only
 when genuinely inert and independently consumed.
 
-## Most recent completed slice: Data semantic leaves
+## Most recent completed slice: Jobs
 
-`Sylin.Koan.Data.SoftDelete` remains one opt-in persistent Entity semantic expressed by a single Data axis.
-`T.WithDeleted()` now carries a type-targeted immutable ambient stack, so opening one recycle bin cannot reveal deleted
-rows of another Entity. Nested scopes unwind independently; restore, target-scoped purge, tenancy, and other read
-filters retain their prior guarantees.
+`Sylin.Koan.Jobs` remains one functional capability and one Entity-first application promise: implement
+`IKoanJob<T>`, provide static `Execute`, submit or inspect through `.Job`/`.Jobs`, and let `AddKoan()` compose the
+coordinator, ledger, context restoration, worker, scheduler, and Communication wake. No Contracts or transport
+package was introduced because the only cross-module consumer intentionally activates Jobs through
+`IJobCoordinator`; Communication owns only the neutral wake signal.
 
-`Koan.Web.Extensions` no longer exposes a second partition-moving “soft delete” meaning. Its generic controller,
-registration helper, contracts, capability actions/policy, and role policy are retired. Ordinary Entity HTTP deletion
-inherits `Koan.Data.SoftDelete` automatically when the application selects that Data law; a recycle-bin HTTP workflow
-must be an explicit authorized product controller.
+Built-in orchestrator, scheduler, registry, selector, compiled binding/policy, and ledger implementations are now
+internal host mechanics. Durable claims automatically use Data conditional replace when the elected adapter declares
+it and otherwise retain the explicit optimistic at-least-once fallback. The unproved probabilistic Ticket path,
+claim-window option, and fourth claim-ticket Entity are removed.
 
-`Sylin.Koan.Data.Backup` was rebuilt from more than forty public concepts into one scoped `IBackupService`, create and
-restore operations, immutable requests, and immutable receipts. Create writes a disk-bounded, provider-paged,
-single-Entity ZIP with a versioned manifest, stable type/key identity, original partition, collision-proof ID, count,
-and logical SHA-256 before publication through host-scoped Koan Storage. Restore validates the entire archive and
-every record before its first batched upsert.
-
-Removed Backup surface has no compatibility shim: model/assembly decoration, reflection/global discovery, static and
-fake-instance facades, mutable manifest/performance models, catalog/query, validation dashboard, retention, hosted
-maintenance, health, progress/cancel simulation, adapter optimization SPI, manual registrars, inline HTTP endpoints,
-ASP.NET Core, and Newtonsoft.Json. DATA-0108 records the resulting recovery contract and honest non-guarantees.
+`[JobPersistence(DataStore)]` now fails host composition correctively when no durable Data adapter is available;
+`Auto` remains explicitly ephemeral in that topology. The unused provider pin, never-produced `Blocked` status,
+redundant pool registrar, stale runtime-constructor compatibility requirement, and nonexistent handler-class promise
+are removed. Live resource pools use standard DI through the retained `IJobPoolResolver` seam.
 
 ## Focused proof
 
-- Data Backup: 8/8 — SQLite + Local round-trip, bounded paging, partition preservation, corrupt/type mismatch
-  fail-before-mutation, cancellation/no publication, resident-provider rejection, and repeated-name isolation.
-- Data SoftDelete: 10/10 — ordinary semantics plus cross-type/nested type targeting.
-- Web Extensions: 113/113 after duplicate-surface retirement.
-- Entity-language SoftDelete consumer: 21/21.
-- Tenancy × SoftDelete focused consumer: 4/4; the standalone Tenancy suite was not run.
-- Backup, SoftDelete, and Web Extensions Release builds/packs are warning/error-free. Artifacts contain owned README,
-  icon, DLL/XML, build-transitive props, symbols, and expected dependencies; Backup has no ASP.NET/Newtonsoft edge.
-- Backup, SoftDelete, and Web Extensions have zero generated structural findings.
-- The known PMC-032 stale `Koan.Core.Adapters` warning remains only in the SoftDelete test project.
+- Jobs core: 83/83.
+- Jobs SQLite: 80/80, including durable routing/schema/CAS and the corrected 100,000-row buried-lane guard.
+- Jobs × Tenancy: 16/16; the standalone Tenancy suite was not run.
+- Entity-language consumer: 25/25; MCP Operations: 5/5; OrderIntake: 1/1; SnapVault: 28/28.
+- GoldenJourney builds Release cleanly.
+- The focused Bootstrap Jobs spec compiles but its host stops before Jobs assertions on the unrelated existing required
+  `LocalStorageOptions.BasePath` fixture configuration.
+- The Jobs Release build/pack is warning/error-free. The artifact contains owned README, canonical icon, DLL/XML,
+  build-transitive props, symbols package, and the expected dependency graph.
+- Jobs has zero generated structural findings. Package quality is 4 repair / 15 review / 82 structurally ready.
+- The known PMC-032 stale `Koan.Core.Adapters` warning remains limited to focused test projects.
 - No full release ratchet ran; that remains R11-07 work.
 
 ## Current repository state
 
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
-- Branch: `dev`; implementation/tests are committed locally as `a39edffa4`, followed by the documentation/truth
-  commit. At handoff the branch is expected to be 148 commits ahead of `origin/dev` and 0 behind; verify exact HEAD.
+- Branch: `dev`; the Jobs graduation is the current local HEAD after handoff commit. The branch is expected to be 150
+  commits ahead of `origin/dev` and 0 behind; verify exact HEAD.
 - `tmp/` remains untracked scratch/evaluator/artifact material and must never be staged.
 - No push, publication, tag, release, deployment, remote mutation, private downstream inspection, or full release
   certification occurred.
@@ -83,21 +79,22 @@ ASP.NET Core, and Newtonsoft.Json. DATA-0108 records the resulting recovery cont
 1. Verify `git status`, HEAD, and the focused evidence recorded in
    [R11-05](work-items/r11/R11-05-package-family-graduation.md).
 2. Continue R11-05 with fresh exploration of the next unresolved semantic/operational capability, currently
-   `Sylin.Koan.Jobs`; do not presume its disposition or repeat completed package-family work.
+   `Sylin.Koan.Observability`; do not presume its disposition or repeat completed package-family work.
 3. Preserve the contributor mandate for context-aware Web behavior, but do not force persistent Entity semantics or
    operational work into Web contributors merely because contributors are the correct request-context chokepoint.
 
 ## Remaining temporary dispositions
 
-Jobs; Observability; the remaining Orchestration CLI, Aspire, generator, container-provider, and Compose renderer
-family; Security Trust; Testing, Containers, and Hosting; Web Admin; and ZenGarden still require terminal R11-02
-decisions.
+Observability; the remaining Orchestration CLI, Aspire, generator, container-provider, and Compose renderer family;
+Security Trust; Testing, Containers, and Hosting; Web Admin; and ZenGarden still require terminal R11-02 decisions.
 
 ## Do not redo
 
 - Do not reopen R10-11 Canon or rebuild CustomerCanon.
 - Do not recreate Data Access, ambient subjects, `[AccessScoped]`, or durable arbitrary-filter carriage.
 - Do not recreate Backup discovery/attributes/dashboard/inline HTTP or Web Extensions' partition-backed soft delete.
+- Do not rebuild Jobs or reintroduce public runtime implementations, the claim-ticket branch, provider pin, Blocked
+  state, pool registrar alias, or a Contracts package without new independent-consumer evidence.
 - Do not rerun Classification, standalone Tenancy, or earlier family suites without an affected dependency.
 - Do not run the full release ratchet before R11-07.
 - Do not stage `tmp/`, inspect private dogfood applications, or use private identities in public docs.

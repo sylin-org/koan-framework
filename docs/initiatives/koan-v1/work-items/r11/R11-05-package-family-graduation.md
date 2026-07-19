@@ -4244,6 +4244,222 @@ findings. The known PMC-032 stale `Koan.Core.Adapters` test-project warning rema
 is unrelated. No full release ratchet, Classification suite, standalone Tenancy suite, push, publication, tag, or
 remote mutation ran.
 
+## Jobs discovery and topology proposal (architecture checkpoint)
+
+No Jobs production or package file has been edited in this slice. This is a fresh assessment of current code after the
+accepted JOBS-0005 rebuild and its later correctness work; it does not repeat the superseded pre-rebuild audit.
+
+**Task:** graduate `Sylin.Koan.Jobs` by preserving its earned Entity-owned work promise, collapsing superseded public
+mechanisms, and correcting the few places where configuration currently advertises a guarantee it does not enforce.
+
+**Application intent:** “This Entity owns business work that should continue outside the initiating request; accept it
+now, run it under the captured Koan context with durable progress/retry/cancellation semantics appropriate to the
+composed infrastructure, and let the application inspect what happened.”
+
+**Public expression:** the smallest path remains one package reference, one ordinary Entity implementing one static
+handler, normal `AddKoan()`, and one submission:
+
+```xml
+<PackageReference Include="Sylin.Koan.Jobs" Version="$(KoanVersion)" />
+```
+
+```csharp
+public sealed class ReviewRequest : Entity<ReviewRequest>, IKoanJob<ReviewRequest>
+{
+    public static Task Execute(ReviewRequest request, JobContext context, CancellationToken ct)
+        => ReviewService.Assess(request, context, ct);
+}
+
+await review.Job.Submit();
+```
+
+No registrar, queue, transport, hosted service, or handler catalog belongs in application code. Attributes and
+`JobsOptions` are optional decisions only when the business needs actions/chains, idempotent coalescing, resource
+gating/pools, per-Entity concurrency, scheduling, persistence override, retention, metrics, or host throughput tuning.
+The existing scalar/set/stream lift remains pointwise ledger acceptance; very large sources model a bounded window as
+the job instead of minting one row per input.
+
+**Guarantee/correction:** an accepted job is ledger truth, executes at least once, restores every required compiled
+context axis before loading the work Entity, preserves per-Entity serialization by default, and remains recoverable
+only to the degree the elected ledger states. Without a durable Data adapter, `Auto` is explicitly ephemeral. A
+declared `DataStore` requirement must reject correctively during host composition when no durable adapter is present;
+it must not silently run in memory as current code does. Invalid durable context fails before application code.
+Submission or source failure reports only its confirmed accepted prefix. Exactly-once external effects,
+collection-atomic submission, arbitrary request-filter carriage, and unbounded ledger growth remain non-guarantees.
+
+**Complete intent surface:** reference the package; implement `IKoanJob<T>`; submit through `entity.Job` or a finite /
+provider-bounded Entity source; optionally inspect/cancel through `entity.Job` or `T.Jobs`; optionally declare static
+job policy on the work type; optionally configure `JobsOptions`; and, only for a live runtime resource pool, register
+an `IJobPoolResolver` through standard .NET DI. There is no other required user action. Jobs context carriage is
+automatic and axis-opaque; authorization for the business action that submits or executes work remains application
+policy.
+
+**Public concepts:**
+
+- `IKoanJob<T>`, the static `Execute`, `.Job`/`.Jobs`, and `JobContext` are the application language: work ownership,
+  execution, submission/control, and one execution context.
+- `JobAction`, `JobChain`, `JobIdempotent`, `JobGate`, `JobPool`, `JobPersistence`, and `ParallelSafe` each represent a
+  distinct scheduling, convergence, resource, durability, or concurrency decision. They are optional policy, not a
+  second handler framework.
+- `JobHandle`/`JobOutcome`, `JobStatus`, `JobQuery`/`JobRecord`, `JobSubmission`, and the two typed partial-submission
+  exceptions are the earned acceptance and inspection vocabulary used by GoldenJourney, OrderIntake, and SnapVault.
+- `JobsOptions` is the host tuning/control surface. `TimeProvider`, standard options, health, hosted services, and DI
+  remain .NET concepts rather than Koan substitutes.
+- `IJobCoordinator` is the one string-keyed operational seam legitimately consumed across a module boundary by
+  `Koan.Mcp.Operations`; that package intentionally references and activates Jobs, so an inert Contracts package
+  would add topology without isolating an independently useful vocabulary.
+- `IJobPoolResolver` is the one runtime availability seam. A new generic contributor pipeline is not earned: static
+  policy already compiles once into `JobTypeBinding`, and dynamic pool membership is already centralized at claim.
+- `IJobLedger` remains the advanced mechanical/conformance seam; built-in ledger, scheduler, registry, selector, and
+  orchestrator implementations are not application concepts and should no longer be public merely for compatibility.
+
+**Docs read:** `docs/engineering/index.md` establishes Entity-first, controller-only, package-owned documentation and
+focused validation; `docs/architecture/principles.md` establishes business-language APIs, one owner and standard .NET
+composition; the root README and `docs/toc.yml` establish Jobs as a first-class capability; `src/Koan.Jobs/README.md`
+and `TECHNICAL.md` state the current package/result and runtime boundary; `docs/guides/jobs-howto.md` and the Jobs
+reference card enumerate the complete public grammar; JOBS-0005 records the accepted greenfield orchestrator and
+capability ladder; JOBS-0006 fixes trailing-edge coalescing; JOBS-0007 centralizes dispatch-time resource pools;
+JOBS-0008 replaces flat-row starvation with per-node weighted-fair lane selection; ARCH-0113 owns cardinality lifting,
+opaque context, and the internal Communication wake boundary. Historical JOBS-0001 is superseded and supplies no
+compatibility mandate.
+
+**Code read:** `IKoanJob.cs` owns the one discovered static handler shape; `JobAccessor.cs` owns scalar/type/source
+grammar; `JobContext.cs`, `JobAttributes.cs`, `JobPersistenceAttribute.cs`, and `JobsOptions.cs` own execution and
+policy; `JobCoordinator.cs` is the single acceptance/control chokepoint; `JobOrchestrator.cs` is the single
+claim/execute/settle owner; `IJobLedger.cs` plus the in-memory/data/routing ledgers own queue mechanics and the
+capability ladder; `JobTypeBinding.cs`/`JobTypeRegistry.cs` compile reflection once; `JobsContextPlan.cs` centralizes
+all context capture/restoration; `JobsServiceCollectionExtensions.cs`, `KoanJobsModule.cs`, the worker, scheduler,
+wake coordinator, health contributor, and composition projector own host lifetime and explanation. The three public
+application consumers use the typed grammar and ledger inspection; only MCP Operations consumes the coordinator.
+
+**Current findings:**
+
+- The post-R10 architecture is earned and coherent: one package, one coordinator, one orchestrator, ledger-as-queue,
+  one worker loop, one compiled type registry, one compiled context realization, and Communication-owned wake. There
+  is no second Jobs package to merge and no independently consumed contract to split.
+- The core baseline is behavior-green but reports 81/82 because `CompatibilitySurfaceSpec` requires a six-argument
+  public `JobOrchestrator` constructor deliberately removed when the compiled context plan landed. Restoring that
+  constructor would reintroduce an invalid context-free runtime path. The stale compatibility test should retire and
+  the host-owned implementation should become internal.
+- SQLite is functionally 79/80. The repeatable scale failure is a stale raw-ledger fixture: it seeds 100,000 records
+  with `Lane=""`, although `JobRecordFactory` has long normalized the single-action lane to `default`. That violates
+  the current claim-plan invariant and forces the buried-lane guard down its degenerate scan path. Correct the fixture
+  to production shape, retain the 1.5-second guard, and only optimize production if the corrected proof remains red.
+- `ClaimStrategy.Ticket`, its clock-skew-sensitive `ClaimWindow`, and `JobClaimTicket` have no behavior spec or source
+  consumer. They predate the general Data `ConditionalReplace` capability now used by every certified durable Jobs
+  provider. The universal law is simpler: use conditional CAS when the selected adapter declares it; otherwise retain
+  the honest optimistic at-least-once fallback. The probabilistic bakery election is now redundant.
+- `[JobPersistence(DataStore)]` currently degrades silently to the in-memory ledger when no durable adapter exists,
+  contradicting its “insists on durability” documentation. `JobPersistenceAttribute.Provider` is public but explicitly
+  reserved and never honored. The first must fail composition; the second must be removed rather than advertised.
+- `JobStatus.Blocked` is a reserved, never-produced state. `AddJobPoolResolver<T>` is an unused wrapper around standard
+  `AddSingleton<IJobPoolResolver,T>`. `JobContext` XML promises a nonexistent `IKoanJobHandler<T>` escape hatch. These
+  are unearned branches and documentation debt, not compatibility obligations.
+- `DataJobLedger`, `InMemoryJobLedger`, `RoutingJobLedger`, `JobOrchestrator`, `JobScheduler`, `JobTypeRegistry`,
+  `JobTypeBinding`, `ResolvedActionPolicy`, and `LaneFairSelector` have no production consumer outside Jobs. Their
+  public visibility exposes host mechanics while the actual application and MCP contracts already sit in front.
+- Package quality is `review-required` only because the README title/install/meaningful-result shapes predate the R11
+  evaluator. The README already contains the substance; it needs evaluator-honest structure and current package
+  installation wording, not another tutorial or architectural rebuild.
+
+**Reusing:** Entity statics and source cardinality normalization; `[KoanDiscoverable]` and the generated registry;
+standard DI/options/hosting/health/logging/`TimeProvider`; Data conditional replace, pushed query/paging, indexes,
+transactions, TTL, and provider election; Core segmentation/context plans; Communication framework signals; the
+existing coordinator/orchestrator/ledger chokepoints; package facts; and the shared cross-tier Jobs behavior kit.
+
+**Creating new:** no new package, public abstraction, contributor pipeline, runtime service, DTO family, option, or
+constant is required.
+
+| New code | Location | Justification |
+|---|---|---|
+| durable-requirement validation inside the existing ledger election | `src/Koan.Jobs/JobsServiceCollectionExtensions.cs` | fail at the one host-composition chokepoint instead of weakening `DataStore` per submit or per worker |
+
+**Coalescence:** the closest pattern is Jobs' own accepted JOBS-0005 architecture, now reinforced by ARCH-0113: a
+pillar-owned semantic coordinator fronts one internal runtime and consumes framework-owned provider/context plans.
+Specificity is the Jobs pillar. Disposition proposal: `keep` the single `Sylin.Koan.Jobs` package and its application
+grammar; `absorb/internalize` runtime implementations behind the coordinator/ledger seams; `delete` the stale
+constructor compatibility assertion, Ticket/claim-ticket branch, reserved provider pin, unused Blocked state, and
+manual pool-registration wrapper; `correct` durable fail-fast behavior and current docs/tests. Jobs is the target
+owner because it alone owns deferred Entity work. Core/Data are too wide to own scheduling policy, Communication owns
+only the context-free wake carriage, Web contributors own request-derived context rather than durable work, and a new
+Contracts package has no independent consumer or activation value.
+
+**Ergonomics:** the human path remains “Entity + Execute + Submit,” discoverable from `IKoanJob<T>` and `.Job` without
+knowing the ledger, worker, registry, wake, or context plan. Advanced policy stays beside the work type only where it
+changes business execution; live pool membership uses one standard-DI service. Coding models see one happy path and
+honest optional branches rather than a compatibility constructor, two claim algorithms, a fake provider pin, a
+never-produced status, and a registrar alias. Context-aware work remains centralized through one compiled
+`JobsContextPlan`; no access decoration or durable arbitrary-filter carriage is reintroduced.
+
+**Constraints satisfied:**
+
+- Entity-first access and scalar/set/stream semantics remain unchanged.
+- Jobs owns no HTTP route; no inline endpoint or Web projection is introduced.
+- Existing stable identifiers remain in `Infrastructure/Constants`; tuning remains in typed `JobsOptions`.
+- Built-in durable reads use pushed filters, explicit pagination, and the current provider-qualified Data path.
+- Cross-module activation remains intentional: MCP Operations references Jobs functionality; Communication and Core
+  expose only their neutral signal/context contracts.
+- Package README/TECHNICAL, Jobs guide/reference, ADR implementation notes, generated truth, and focused evidence will
+  be updated together.
+- Validation remains focused on core, SQLite, affected application/MCP consumers, Release pack, and generated package
+  truth. No full provider/release ratchet runs before R11-07.
+
+**Risks:** internalizing runtime implementations and deleting pre-V1 knobs is intentionally breaking for consumers
+that bypassed the documented Entity/coordinator path, though repository search finds none. `IJobLedger` remains a
+large advanced SPI and should be documented as such; a future redesign should not split it merely to reduce namespace
+size. The corrected 100k SQLite proof must pass before claiming the scale guard is intact. Provider-container and
+multi-node certification remain prior evidence and R11-07 work, not part of this focused graduation.
+
+**Architecture checkpoint:** accept or adjust this `keep/refine` proposal before production edits: retain one Jobs
+package and its Entity-first promise; preserve the coordinator/orchestrator/ledger/context/wake architecture; make
+runtime implementations internal; delete the obsolete constructor compatibility demand, probabilistic Ticket path,
+reserved provider pin, unused Blocked state, and pool registrar alias; fail loud when `DataStore` lacks durable
+infrastructure; correct the stale SQLite fixture and product/package prose; add no Contracts package or generic
+contributor pipeline.
+
+### Jobs family implementation and evidence
+
+**Disposition:** `keep` `Sylin.Koan.Jobs` as one functional capability. No package was split, merged, renamed, or
+introduced. The public application promise remains Entity + `IKoanJob<T>` + static `Execute` + `.Job`/`.Jobs`; the
+coordinator, ledger SPI, context restoration, Communication wake, optional static policy, and standard-DI pool seam
+remain. The built-in orchestrator, scheduler, registry, selector, compiled binding/policy, and ledger implementations
+are internal host mechanics rather than application concepts.
+
+The durable claim path now selects Data conditional replace automatically when the elected adapter declares that
+capability and otherwise retains the honest optimistic at-least-once fallback. The unproved probabilistic Ticket
+branch, claim window, and fourth claim-ticket Entity are removed. `[JobPersistence(DataStore)]` now fails host
+composition with the affected job types and a corrective durable-adapter instruction when no durable Data provider is
+available; `Auto` remains explicitly ephemeral in that topology. The reserved provider pin, never-produced `Blocked`
+status, redundant pool-registration alias, stale public-constructor requirement, and nonexistent handler-class XML
+promise are removed.
+
+This is a refinement of the accepted JOBS-0005 architecture, not another Jobs rebuild. Submission, source lifting,
+scheduling, reconciliation, coalescing, fair lanes, per-Entity serialization, context capture/restoration, retry,
+cancellation, inspection, MCP operations, and the three application journeys retain their existing owners. The
+corrected SQLite scale fixture now writes the production `default` lane invariant; the 100,000-row buried-lane guard
+passes without a production optimization or widened scan contract.
+
+| Focused cell | Result | What it proves |
+|---|---:|---|
+| `Koan.Jobs.Tests` | 83/83 | application grammar, execution/state-machine behavior, internal runtime boundary, and corrective `DataStore` composition failure |
+| `Koan.Jobs.Adapter.Sqlite.Tests` | 80/80 | durable ledger behavior, automatic CAS, routing, crash recovery, schema shape, and the corrected 100k scale guard |
+| `Koan.Jobs.Tenancy.Tests` | 16/16 | the remaining three ledger Entities stay ambient-exempt and durable job context remains isolated |
+| Entity-language focused consumer | 25/25 | ordinary Entity grammar remains compatible with Jobs' Data dependency |
+| `Koan.Mcp.Operations.IntegrationTests` | 5/5 | the deliberate `IJobCoordinator` cross-module activation seam remains intact |
+| OrderIntake focused consumer | 1/1 | scheduled durable application work composes through the retained public grammar |
+| SnapVault focused consumer | 28/28 | progress/cancellation projection and durable context-aware application work remain intact |
+| GoldenJourney Release build | clean | the minimal public Jobs journey compiles without runtime implementation access |
+| `Sylin.Koan.Jobs` Release build/pack | clean | zero warnings/errors; owned README, canonical icon, DLL/XML, build-transitive props, symbols package, and expected dependency graph |
+
+The focused Bootstrap Jobs spec also compiles against the internalized runtime but its host stops before Jobs
+assertions on the unrelated existing `LocalStorageOptions.BasePath` validation requirement; this slice does not turn
+that Storage fixture defect into Jobs work. Generated package quality advances from 4 repair / 16 review / 81
+structurally ready to 4 / 15 / 82 across the unchanged 101-package graph. Jobs has zero structural findings, and the
+26-claim product surface compiles with the business-facing Jobs result. The known PMC-032 stale
+`Koan.Core.Adapters` warning remains limited to focused test projects and is unrelated. No provider-container suite,
+full release ratchet, publication, push, tag, release, remote mutation, private downstream inspection, Classification
+suite, or standalone Tenancy suite ran.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

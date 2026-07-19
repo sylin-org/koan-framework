@@ -4,10 +4,10 @@ domain: jobs
 title: "Jobs — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-07-16
+last_updated: 2026-07-18
 framework_version: source-first
 validation:
-  date_last_tested: 2026-07-16
+  date_last_tested: 2026-07-18
   status: verified
   scope: docs/reference/cards/jobs.md
 ---
@@ -53,7 +53,7 @@ Typed failure and cancellation exceptions preserve the accepted prefix; source s
 one-pass, sequentially backpressured, and not collection-atomic. Streaming bounds producer memory,
 not ledger growth—model a window/conveyor as the job for very large sources.
 
-## ≤5 attributes you'll use
+## Policy attributes
 
 | Attribute | What it does |
 |---|---|
@@ -61,9 +61,11 @@ not ledger growth—model a window/conveyor as the job for very large sources.
 | `[JobChain("a", "b", "c")]` | Linear pipeline; on a step's success the orchestrator persists the work-item and auto-advances to the next stage. |
 | `[JobIdempotent("Key1", "Key2")]` | Declares the coalesce key; re-delivery is deduped and concurrent duplicates collapse into one run. |
 | `[JobGate("PropertyName")]` | Names the work-item property whose value forms a shared-resource gate, checked at dispatch *before* the handler runs. |
-| `[JobPersistence(JobPersistenceMode.DataStore)]` | Pins the durability tier (`Auto` / `InMemory` / `DataStore`) for this work-type, overriding the capability election. |
+| `[JobPool("pool-name")]` | Defers member election to one standard-DI `IJobPoolResolver` at claim time for a live resource pool. |
+| `[JobPersistence(JobPersistenceMode.DataStore)]` | Requires durable Data-backed execution for this work type; host composition rejects if no durable provider can honor it. |
+| `[ParallelSafe]` | Opts out of the default per-instance serialization when actions on one Entity are proven independent. |
 
-`[ParallelSafe]` opts a type out of the default per-instance serialization (jobs for one work-item id run one-at-a-time unless asserted independent).
+These are optional business/operational decisions. The single-action path requires none of them.
 
 ## The escape hatch
 

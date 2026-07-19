@@ -20,6 +20,17 @@
 > removed. This is ordered fan-out, not collection atomicity; streaming bounds producer memory, not
 > ledger growth.
 
+> **Implementation update (R11-05, 2026-07-18):** the general Data conditional-replace capability
+> now owns durable claim atomicity on every certified Jobs provider, with the constant optimistic
+> at-least-once fallback for adapters that do not declare it. The older probabilistic `Ticket` choice,
+> `ClaimWindow`, and `JobClaimTicket` store are removed: they had no behavior proof and added clock-skew
+> mechanics after CAS made them redundant. `DataStore` now rejects composition without a durable Data
+> provider; the reserved provider pin and unused `Blocked` state are removed. Built-in orchestrator,
+> scheduler, registry, selector, and ledger implementations are internal; `IJobCoordinator`,
+> `IJobLedger`, and `IJobPoolResolver` remain the deliberate operational/mechanical seams. The proposed
+> `IKoanJobHandler<T>` branch was never implemented and is not part of the public promise; handlers use
+> the one static `Execute` plus the execution scope's standard `IServiceProvider`.
+
 ---
 
 ## 1. Context

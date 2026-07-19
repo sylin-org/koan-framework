@@ -4,6 +4,10 @@
 **Pillar**: Jobs
 **Depends on**: JOBS-0005 §6 (gate keys), JOBS-0005 §18 (runtime gate resolution), ARCH-0079 (integration tests are canon)
 
+> **Implementation update (R11-05, 2026-07-18):** `IJobPoolResolver` remains the single live-pool
+> seam, but the redundant `AddJobPoolResolver<T>()` alias is removed. Register implementations through
+> standard .NET DI: `services.AddSingleton<IJobPoolResolver, AiServerPoolResolver>()`.
+
 ---
 
 ## Problem
@@ -49,7 +53,7 @@ Key properties:
 | `DataJobLedger` | Pool-aware `ClaimNext` + `ElectTarget` + member-slot helpers (see the 2026-06-13 addendum for the paging fix) |
 | `RoutingJobLedger` | Passes `pools` through to both delegated ledgers |
 | `JobOrchestrator` | Injects `IEnumerable<IJobPoolResolver>`; calls `ResolvePoolContextsAsync` before each claim |
-| `JobsServiceCollectionExtensions` | `AddJobPoolResolver<T>()` extension |
+| standard .NET DI | register one `IJobPoolResolver` implementation per distinct pool name |
 
 ### Invariants preserved
 
@@ -81,7 +85,7 @@ On the durable tier with `ConditionalReplace`, a CAS loss on a pool candidate ab
 
 ```csharp
 // App startup
-services.AddJobPoolResolver<AiServerPoolResolver>();
+services.AddSingleton<IJobPoolResolver, AiServerPoolResolver>();
 
 // The resolver
 public sealed class AiServerPoolResolver : IJobPoolResolver

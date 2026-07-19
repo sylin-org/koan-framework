@@ -22,7 +22,7 @@ This report separates objective package repairs from human review. `structurally
 
 | Packages | Repair required | Review required | Structurally ready | Owned READMEs | Technical companions | Findings |
 |---:|---:|---:|---:|---:|---:|---:|
-| 101 | 4 | 16 | 81 | 97 | 92 | 62 |
+| 101 | 4 | 15 | 82 | 97 | 92 | 59 |
 
 ## Packages
 
@@ -85,7 +85,7 @@ This report separates objective package repairs from human review. `structurally
 | `Sylin.Koan.Identity`<br>[`src/Koan.Identity/Koan.Identity.csproj`](../../src/Koan.Identity/Koan.Identity.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Identity/README.md)<br>[TECHNICAL](../../src/Koan.Identity/TECHNICAL.md) | none |
 | `Sylin.Koan.Identity.Tenancy`<br>[`src/Koan.Identity.Tenancy/Koan.Identity.Tenancy.csproj`](../../src/Koan.Identity.Tenancy/Koan.Identity.Tenancy.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Identity.Tenancy/README.md)<br>[TECHNICAL](../../src/Koan.Identity.Tenancy/TECHNICAL.md) | none |
 | `Sylin.Koan.Identity.Web`<br>[`src/Koan.Identity.Web/Koan.Identity.Web.csproj`](../../src/Koan.Identity.Web/Koan.Identity.Web.csproj) | projection / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Identity.Web/README.md)<br>[TECHNICAL](../../src/Koan.Identity.Web/TECHNICAL.md) | none |
-| `Sylin.Koan.Jobs`<br>[`src/Koan.Jobs/Koan.Jobs.csproj`](../../src/Koan.Jobs/Koan.Jobs.csproj) | capability / library<br>net10.0 | `review-required` | [README](../../src/Koan.Jobs/README.md)<br>[TECHNICAL](../../src/Koan.Jobs/TECHNICAL.md) | `docs.readme.install.missing` (warning): The README does not show the package-specific install or reference expression.<br>`docs.readme.meaningful-use.missing` (warning): The README has no recognizable meaningful-use or behavior section.<br>`docs.readme.package-title.missing` (warning): The README does not use the exact package ID as its primary title. |
+| `Sylin.Koan.Jobs`<br>[`src/Koan.Jobs/Koan.Jobs.csproj`](../../src/Koan.Jobs/Koan.Jobs.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Jobs/README.md)<br>[TECHNICAL](../../src/Koan.Jobs/TECHNICAL.md) | none |
 | `Sylin.Koan.Mcp`<br>[`src/Koan.Mcp/Koan.Mcp.csproj`](../../src/Koan.Mcp/Koan.Mcp.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Mcp/README.md)<br>[TECHNICAL](../../src/Koan.Mcp/TECHNICAL.md) | none |
 | `Sylin.Koan.Mcp.Explorer`<br>[`src/Koan.Mcp.Explorer/Koan.Mcp.Explorer.csproj`](../../src/Koan.Mcp.Explorer/Koan.Mcp.Explorer.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Mcp.Explorer/README.md)<br>[TECHNICAL](../../src/Koan.Mcp.Explorer/TECHNICAL.md) | none |
 | `Sylin.Koan.Mcp.Operations`<br>[`src/Koan.Mcp.Operations/Koan.Mcp.Operations.csproj`](../../src/Koan.Mcp.Operations/Koan.Mcp.Operations.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Mcp.Operations/README.md)<br>[TECHNICAL](../../src/Koan.Mcp.Operations/TECHNICAL.md) | none |
