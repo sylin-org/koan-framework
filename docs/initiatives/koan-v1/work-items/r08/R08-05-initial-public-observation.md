@@ -68,6 +68,70 @@ local implementation work.
 
 All cells must be checked against the exact intended source commit immediately before authorization.
 
+### 2026-07-19 exact-candidate exploration checkpoint
+
+**Task:** Repair the local lineage compiler's false package-rename rejection, then prove the exact
+current candidate without remote mutation.
+
+**Application intent:** A maintainer advances `dev` once; Git and evaluated package identity determine
+which owners continue, retire, or begin, without package-by-package interpretation.
+
+**Public expression:** The operator surface remains the normal reviewed `dev` advancement. There is no
+new application API, reference, decoration, configuration, context, or runtime prerequisite.
+
+**Guarantee/correction:** An unchanged package ID must remain at its recorded owner path; an unchanged
+owner path must retain its package ID; retired IDs and paths remain permanently unavailable. A real
+move or identity swap fails with the existing continuity correction. Deleting an old owner and adding
+a genuinely new ID at a genuinely new path is accepted even when their `version.json` bytes happen to
+match.
+
+**Complete intent surface:** No additional user action exists beyond advancing `dev`; the release
+compiler evaluates ordinary MSBuild/NuGet project identity and Git history.
+
+**Public concepts:** None. This removes a conflicting internal heuristic and preserves the existing
+Git, MSBuild project, NuGet package ID, and owner-path vocabulary.
+
+**Docs read:** `docs/engineering/index.md` requires a disposable clone for controlled release
+rehearsals; `docs/architecture/principles.md` requires standard .NET identity and one decision owner;
+`docs/engineering/packaging.md` defines deletion plus a new identity/path as retirement and creation;
+ARCH-0110 makes evaluated package lineage authoritative; this card owns the exact local proof and
+remote stop boundary.
+
+**Code read:** `ReleaseLineageCompiler` owns both evaluated continuity and the conflicting Git rename
+heuristic; `RepositoryInspector` already returns changed paths with `--no-renames` and evaluates the
+canonical package graph; `ProcessRunner` supplies the one process boundary; `PackagingConstants`
+contains existing lineage identity and requires no new literal or option; lineage compiler/Git tests
+already prove real move rejection, retirement, and new-package creation but not same-byte replacement.
+
+**Reusing:** `ReconcilePackageContinuity`, `PackageGraph`, evaluated `PackageProject` identity,
+`LineageRepository`, and the existing focused Packaging test project.
+
+**Creating new:**
+
+| New code | Location | Justification |
+| --- | --- | --- |
+| same-byte retirement/new-owner regression cell | `tests/Koan.Packaging.Tests/ReleaseLineageGitTests.cs` | proves the real repository failure through the existing Git-backed lineage boundary |
+
+**Coalescence:** The closest pattern is `ReconcilePackageContinuity`, whose decision owner is the
+lineage compiler and whose consumers are bootstrap and later waves. Keep that evaluated, identity-aware
+owner; delete `RejectPackageRenamesAsync` and both calls. A Git similarity heuristic is too narrow to
+know package identity and duplicates the semantic owner. No replacement service, option, threshold, or
+exception list is introduced.
+
+**Ergonomics:** The operator keeps one decision and receives one identity/path-specific correction.
+Maintainers and agents can read the rule directly from evaluated package continuity instead of
+reconciling it with an undocumented similarity score. IntelliSense and the application coding model do
+not change.
+
+**Constraints satisfied:** no HTTP or data-access surface is involved; no magic literal, option, DTO,
+contract, module, or public concept is added; existing companion docs remain authoritative; the focused
+test and disposable exact candidate are the bounded verification. The accepted packaging policy and
+ADR do not change, so no new ADR or TOC entry is required.
+
+**Risks:** The regression must continue rejecting a true same-ID path move and a same-path ID change;
+the existing focused continuity cells cover both. The full candidate may expose later independent
+preflight defects after this fail-fast repair.
+
 | Gate | Required evidence | Stop condition |
 |---|---|---|
 | source boundary | intended changes reviewed; privacy gate and changed-doc lint green; no scratch/evaluator material | source contains private downstream identity, unintended files, or unexplained generated drift |

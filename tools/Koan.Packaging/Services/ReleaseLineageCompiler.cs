@@ -40,7 +40,6 @@ internal sealed class ReleaseLineageCompiler(
             previousSourceCommit = await repository.ResolveCommitAsync(fallbackPreviousSourceRevision, cancellationToken);
             previousVersionCommit = previousSourceCommit;
             await RequireForwardSourceAsync(previousSourceCommit, sourceCommit, cancellationToken);
-            await RejectPackageRenamesAsync(previousSourceCommit, sourceCommit, cancellationToken);
             await SwitchBranchAsync(branchName, previousVersionCommit, cancellationToken);
             var previousProjects = await repository.DiscoverPackagesAsync(cancellationToken);
             var bootstrapPreviousVersions = await repository.CalculateVersionsAsync(
@@ -72,7 +71,6 @@ internal sealed class ReleaseLineageCompiler(
             }
 
             await RequireForwardSourceAsync(previousSourceCommit, sourceCommit, cancellationToken);
-            await RejectPackageRenamesAsync(previousSourceCommit, sourceCommit, cancellationToken);
             await SwitchBranchAsync(branchName, previousVersionCommit, cancellationToken);
             await ApplySourceDeltaAsync(previousSourceCommit, sourceCommit, cancellationToken);
         }
@@ -851,29 +849,6 @@ internal sealed class ReleaseLineageCompiler(
                 StringComparer.OrdinalIgnoreCase);
     }
 
-    private async Task RejectPackageRenamesAsync(
-        string previousSourceCommit,
-        string sourceCommit,
-        CancellationToken cancellationToken)
-    {
-        var output = await processRunner.RequireAsync(
-            "git",
-            ["diff", "--name-status", "--find-renames", previousSourceCommit, sourceCommit],
-            repositoryRoot,
-            cancellationToken);
-        foreach (var line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
-        {
-            var fields = line.Split('\t');
-            var status = fields[0];
-            if (status.Length == 0 || status[0] != 'R') continue;
-            var paths = fields.Skip(1).Where(IsPackageOwnershipPath).ToArray();
-            if (paths.Length == 0) continue;
-            throw new InvalidOperationException(
-                $"Package rename is not supported by automatic lineage: {string.Join(" -> ", paths)}. " +
-                "Delete the old owner and introduce a genuinely new package identity/path if replacement is required.");
-        }
-    }
-
     private async Task RequireForwardSourceAsync(
         string previousSourceCommit,
         string sourceCommit,
@@ -1012,17 +987,6 @@ internal sealed class ReleaseLineageCompiler(
 
     private static bool IsLineageMarkerPath(string path) =>
         string.Equals(Path.GetFileName(Normalize(path)), PackagingConstants.LineageMarkerFileName, StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsPackageOwnershipPath(string path)
-    {
-        var normalized = Normalize(path);
-        var inPackageRoot = normalized.StartsWith("src/", StringComparison.OrdinalIgnoreCase) ||
-                            normalized.StartsWith("packaging/", StringComparison.OrdinalIgnoreCase) ||
-                            normalized.StartsWith("templates/", StringComparison.OrdinalIgnoreCase);
-        return inPackageRoot &&
-               (normalized.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) ||
-                normalized.EndsWith("/version.json", StringComparison.OrdinalIgnoreCase));
-    }
 
     private static ReleaseLineagePackage ToLineagePackage(PackageProject project, string? version) =>
         new(project.PackageId, Normalize(project.ProjectPath), version)

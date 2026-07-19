@@ -426,6 +426,44 @@ public sealed class ReleaseLineageGitTests
     }
 
     [Fact]
+    public async Task DistinctRetirementAndNewOwnerIgnoreGitFileSimilarity()
+    {
+        const string newPackageId = "Sylin.Koan.Test.Replacement";
+        await using var fixture = await LineageRepository.CreateAsync();
+        var process = new ProcessRunner();
+        var repository = new RepositoryInspector(fixture.Root, process);
+        var compiler = new ReleaseLineageCompiler(fixture.Root, process, repository);
+        var bootstrap = await compiler.CompileAsync(
+            fixture.BaseCommit,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            previousLineageRevision: null,
+            CancellationToken.None);
+        var retiredIdentity = Versions(bootstrap)[LineageRepository.UnrelatedId];
+
+        await fixture.SwitchAsync("dev");
+        fixture.RemoveProject(LineageRepository.UnrelatedId);
+        fixture.AddProject("Replacement", newPackageId);
+        var source = await fixture.CommitAsync("retire one owner and add a distinct package");
+        var lineage = await compiler.CompileAsync(
+            source,
+            fixture.BaseCommit,
+            "automation/package-lineage-dev",
+            bootstrap.VersionCommit,
+            CancellationToken.None);
+        var manifest = await new ReleasePlanner(repository, new NuGetRegistry(new HttpClient()))
+            .CreateAsync(lineage, offline: true, CancellationToken.None);
+
+        var retired = Assert.Single(lineage.RetiredPackages);
+        Assert.Equal(LineageRepository.UnrelatedId, retired.PackageId);
+        Assert.Equal(retiredIdentity, retired.Version);
+        Assert.Contains(lineage.Packages, package => package.PackageId == newPackageId);
+        var added = Assert.Single(manifest.Packages, package => package.PackageId == newPackageId);
+        Assert.Null(added.PreviousVersion);
+        Assert.DoesNotContain(manifest.Packages, package => package.PackageId == LineageRepository.UnrelatedId);
+    }
+
+    [Fact]
     public async Task EvaluatedExternalInputHistorySelectsOnlyItsOwnerAcrossEveryMutation()
     {
         const string firstInput = "shared/catalog-a.txt";
