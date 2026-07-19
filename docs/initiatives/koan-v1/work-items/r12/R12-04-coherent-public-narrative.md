@@ -208,11 +208,10 @@ The first coalescence pass:
   baseline after removing the obsolete lockstep-root-version assumption;
 - whitespace validation: tracked and staged diffs clean.
 
-R12-04 remains in progress. The maintainer is the sole human validation authority for this cycle; no second human
-reader is required. At least one independent public-context-only coding-agent read supplies adversarial cold-read
-evidence, and the maintainer accepts or rejects every finding. Readers reproduce the story and identify
-contradictions but do not claim that unpublished install commands execute. Exact local package behavior belongs to
-R12-05; genuine public-feed installation and independent coding-agent execution belong to R12-06.
+R12-04 remains in progress. The maintainer is the sole validation authority for this cycle. The completed
+independent coding-agent read supplied adversarial cold-read evidence, and the maintainer accepted or rejected every
+finding. No second agent or human review is a completion gate. Exact local package behavior belongs to R12-05;
+genuine public-feed installation belongs to R12-06.
 
 ## Cold-read correction checkpoint — 2026-07-19
 
@@ -235,8 +234,8 @@ Any future drift fails at the public-doc or generated-product owner with the con
 **Complete intent surface:** Reorder pre-public first-use instructions; define maturity dispositions in generated
 truth; rebuild the troubleshooting hub around startup/facts/health and current pillar references; clarify security
 responsibility, aggregate capability inspection, Jobs discovery, Communication reach, and the LLM front door; fix
-the README template/sample mismatch; rerun one independent coding-agent read and maintainer review. No package
-installation or external human recruitment is part of R12-04.
+the README template/sample mismatch; then run the documented sample commands for maintainer validation. No package
+installation or additional reviewer recruitment is part of R12-04.
 
 **Public concepts:** Reuse standard source checkout, NuGet availability, package reference, configuration, health,
 and HTTP vocabulary plus existing Entity, Reference = Intent, facts, lockfile, and generated maturity labels. Add no
@@ -301,9 +300,9 @@ changing all ports to placeholders would add ceremony without correcting current
 6. Reconcile every package and sample surface with the same story at proportional depth.
 7. Extend the existing public-doc truth gate so the complete inventory and critical narrative invariants
    fail automatically when they drift.
-8. Run at least one comprehension-only public-context coding-agent read; the maintainer is the sole human
-   validation authority and turns accepted confusion into repository-owned corrections without presenting
-   unpublished installation as executable public proof.
+8. Use the completed coding-agent cold read as evidence, turn accepted confusion into repository-owned corrections,
+   and leave final acceptance solely to the maintainer without presenting unpublished installation as executable
+   public proof.
 
 ## Acceptance
 
@@ -317,9 +316,8 @@ changing all ports to placeholders would add ceremony without correcting current
 6. Historical evidence remains accessible but is never required to understand or operate current Koan.
 7. Templates, active samples, snippets, links, generated pages, and strict public-doc checks pass from source;
    R12-05 owns their exact package-only candidate proof.
-8. At least one independent public-context-only coding agent reproduces the intended story, accurately distinguishes
-   candidate readiness from public availability, and identifies no unresolved contradiction after correction; the
-   maintainer reviews the anonymous evidence and is the sole human acceptance authority.
+8. The independent cold-read findings have explicit maintainer dispositions, accepted defects are corrected, and
+   the maintainer identifies no unresolved contradiction. No second agent or human review is required.
 9. A newly added public-facing file cannot silently escape the inventory or introduce a competing current path.
 
 ## Stop conditions
@@ -329,3 +327,36 @@ changing all ports to placeholders would add ceremony without correcting current
 - Stop if a mechanical vocabulary replacement changes meaning or presents lint as proof of narrative quality.
 - Stop if the work edits dated ADR conclusions merely to make current marketing cleaner.
 - Stop before public publication; R12-06 owns the exact external mutation and observation boundary.
+
+## Graduated sample start-command checkpoint — 2026-07-19
+
+**Application intent:** A maintainer runs any graduated sample from the repository root with its one documented
+`dotnet run --project ...` command and reaches the named local result without hidden infrastructure.
+
+**Complete expression:** One console command for each of the ten executable sample projects; only TaskGraph and the
+two GardenCoop chapters add their documented standard ASP.NET Core `--urls` argument. Optional Docker services remain
+optional and no Koan runner or wrapper script exists.
+
+**Guarantee/correction:** The console sample exits with its result. Every Web sample starts on its documented port,
+serves liveness and runtime facts, and reaches its sample-specific entry surface. A command that loses its project
+content root, ignores its settings/assets, or activates an optional dependency is a sample-owned failure.
+
+**Coalescence:** Keep ordinary `dotnet run` as the single start owner. The GardenCoop projects retain their existing
+plain-SDK/explicit-ASP.NET shape because Chapter 1 owns a measured NativeAOT deployment; switching it to the Web SDK
+changes native compilation behavior. Both chapters and the LocalChecklist console project declare the standard
+MSBuild `RunWorkingDirectory` so settings, assets, relative local data, and generated lockfiles resolve against each
+sample rather than the caller's directory. Add no launcher, path calculation, environment variable, or Koan convention.
+
+**Ergonomics:** One copyable command works from the repository root, local state stays under the sample directory,
+and the printed URL remains authoritative. The maintainer is the only acceptance authority.
+
+**Focused evidence:** All ten graduated commands were executed from the repository root. LocalChecklist reaches its
+deterministic console result and reports `lockfile ok`. The nine Web hosts start on their documented ports, return
+HTTP 200 from liveness and runtime facts, and reach their named root/API surface. Chapter 2 additionally activates
+the bundled ONNX provider and returns semantic search successfully. The LocalChecklist, GardenCoop C01, and
+GardenCoop C02 focused suites each pass 1/1. All processes started by the audit were stopped.
+
+**Transferred concern:** A focused win-x64 NativeAOT publish currently fails inside the .NET 10.0.10 ILC analyzer
+with `IndexOutOfRangeException`. The same failure occurs with GardenCoop C01's original plain SDK, so it is not a
+regression from the start-command correction. Its public deployment claim must be re-proved or narrowed before the
+R12-05 candidate freeze; it does not invalidate the now-working ordinary start command.

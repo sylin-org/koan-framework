@@ -66,18 +66,31 @@ Focused R12-04 evidence passes: public-doc truth, 17/17 product/quality compiler
 packaging build, byte-identical generated reports, all ten graduated sample Release builds and their exact
 selective-0.20 lock audit, 20 strict skills, 20/20 instructional examples, whitespace checks, and broad
 documentation structure with zero errors / 1,375 non-gating warnings. No full ratchet or remote mutation
-ran. The maintainer is the sole human validation authority; no second human reader is required. R12-04 remains
-open for correction of the first independent coding-agent read and one post-correction coding-agent confirmation;
-package-only external-consumer proof remains downstream.
+ran. The maintainer is the sole validation authority. The first independent coding-agent read supplied useful
+cold-read evidence and its accepted corrections are committed; no second agent or human review is a completion
+gate. Direct sample-command validation is the remaining maintainer handoff before R12-04 closes.
+
+All ten graduated sample commands have now been executed from the repository root. LocalChecklist and both
+GardenCoop chapters needed one standard MSBuild `RunWorkingDirectory` declaration so relative data, settings,
+assets, and lockfiles resolve under the owning sample. After correction, LocalChecklist exits with its expected
+result and `lockfile ok`; all nine Web hosts start on their documented ports, return liveness/runtime facts, and
+reach their named entry surface. The three affected focused sample suites pass 1/1 each. No sample-owned wrapper
+script exists or is needed. The maintainer's direct validation is next.
+
+A separate focused check found that GardenCoop Chapter 1's previously measured NativeAOT publication currently
+fails inside the .NET 10.0.10 ILC analyzer with an `IndexOutOfRangeException`. It fails with the original plain SDK
+as well as the rejected Web-SDK experiment, so the start-command repair did not introduce it. R12-05 must either
+re-prove or narrow that public deployment claim before freezing the candidate; do not expand the present sample-run
+slice into a framework-wide trim/AOT repair without a checkpoint.
 
 [R12-05](work-items/r12/R12-05-public-consumer-journey.md) now owns only the frozen local candidate: final
 release-ready copy, one exact source SHA, the complete local ratchet, selective package graph, clean-room
 templates/FirstUse/GoldenJourney, and deterministic escrow. It adds no second harness or CLI and waits for
-R12-04's comprehension-only readers.
+R12-04's maintainer disposition.
 
 [R12-06](work-items/r12/R12-06-publish-and-observe-first-wave.md) owns the separately authorized `dev`
 advancement, existing API-key promotion, immutable Release/NuGet observation, and the first genuine public-feed
-maintainer/agent journey. Local-feed automation is not external-consumer evidence. R12-07 stays unopened until
+maintainer journey. Optional coding-agent evidence is not a gate. Local-feed automation is not external-consumer evidence. R12-07 stays unopened until
 that wave supplies a real public upgrade baseline.
 
 ## Recently completed preview foundation
@@ -232,13 +245,12 @@ bounded process-exit observation so GoldenJourney can prove fail-fast startup tr
 ## Resume here
 
 1. Verify `git status`, HEAD, and the R12-04 implementation/evidence record before work.
-2. Give the corrected public-context packet to one coding agent for post-correction confirmation. The maintainer is
-   the sole human validator; do not wait for or imply another human gate. The agent must distinguish candidate
-   readiness from public availability but does not execute an unpublished NuGet install.
-3. Re-run the focused R12-04 public-doc, structural-doc, skill, example, packaging-generation, sample-lock,
-   and whitespace checks affected by those corrections; do not substitute the full release ratchet.
-4. Close R12-04 only when the pre-correction and post-correction coding-agent reads leave no unresolved
-   contradiction after maintainer disposition. Then begin
+2. Have the maintainer validate the corrected start commands for all ten graduated sample executables. No second
+   agent or human review is required.
+3. Re-run only the focused checks affected by those corrections; do not substitute the full release ratchet.
+4. Before the exact candidate freeze, re-prove or narrow GardenCoop Chapter 1's NativeAOT claim; the current
+   .NET 10.0.10 ILC analyzer crashes during publication. Close R12-04 when the maintainer leaves no unresolved
+   public contradiction. Then begin
    R12-05, finalize release-ready public copy, freeze one exact source commit, and run the single complete local
    candidate boundary without further tracked changes.
 5. Preserve the R08 release compiler and API-key promotion path unless current evidence identifies a
