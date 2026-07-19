@@ -1,5 +1,14 @@
 # SEC-0008 — Access enforcement at the data layer (the ambient subject + the access read-axis)
 
+> **R11 supersession amendment (2026-07-18):** The model-decorated ambient-subject implementation described below
+> was retired before V1. `Koan.Data.Access`, `[AccessScoped]`, `Subject`, and durable arbitrary-filter carriage no
+> longer exist. The surviving guarantee is smaller and more reusable: ordered `IWebContextContributor`s validate
+> request evidence once after authentication and contribute typed Entity predicates through `WebContext.Where<T>`;
+> Web projects those predicates into Data's existing `IReadFilterContributor` fold. SnapVault's `event` link is the
+> consumer proof: the query value selects a durable grant but never authorizes by itself. This is request-lifetime
+> read visibility, not headless/job authorization; durable work must establish or re-resolve its own service context.
+> The original decision remains below as historical evidence for the superseded implementation.
+>
 > **R07 context amendment (2026-07-15):** Subject semantics and the access read-axis remain
 > module-owned, but `Subject` now scopes `Koan.Core.Context.KoanContext` directly. Its
 > `SubjectContextCarrier : IKoanContextCarrier` is registered independently from `AccessAxis`;

@@ -9,7 +9,7 @@ framework_version: source-first
 validation:
   date_last_tested: 2026-07-18
   status: tested
-  scope: R11-05 RabbitMQ Communication provider graduation implemented and focused-proof green
+  scope: R11-05 Web request-context coalescence and Data Access retirement focused-proof green
 ---
 
 # Koan V1 reorganization current handoff
@@ -18,107 +18,114 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Outcome so far
 
-- R00 through R07, R09, and R10 are passed. R08 is locally prepared but publication remains deliberately gated.
+- R00 through R07, R09, and R10 pass. R08 is locally prepared but publication remains deliberately gated.
 - R11-01 through R11-04 pass. R11-05 is active and graduates package families in dependency order before the single
   R11-07 release-certification boundary.
 - Foundation, package identity, templates, Storage, Cache, Redis, relational/Data providers, Vector, AI, MCP, Web,
-  Media, OpenGraph, Identity, Tenancy, Classification, Canon, and now the RabbitMQ Communication provider have
-  completed their current R11 family slices.
-- The current evaluated product graph contains 102 packages and 26 claims. Generated package quality reports 6
+  Media, OpenGraph, Identity, Tenancy, Classification, Canon, RabbitMQ, and now the Web request-context/Data Access
+  slice have completed their current R11 family work.
+- The current evaluated graph contains 101 packages and 26 claims. Generated package quality reports 5
   repair-required, 17 review-required, and 79 structurally ready packages.
 
-The accepted architecture remains business intent first: Entity-first application language, references express
-capability intent, `AddKoan()` compiles one host-owned semantic constitution, pillars own meaning and runtime
-chokepoints, adapters own mechanics, and applications own business rules. Cross-module contract packages survive only
-when they are genuinely inert and independently consumed.
+The accepted architecture remains business intent first: fewer meaningful moving parts, Entity-first application
+language, references express capability intent, `AddKoan()` compiles host-owned decisions, pillars own meaning and
+runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive only
+when genuinely inert and independently consumed.
 
-## Most recent completed slice: RabbitMQ Communication provider
+## Most recent completed slice: ordered Web request context
 
-R07-10 was not rebuilt. Its direct-reference provider election, named-channel topology, broker-confirmed acceptance,
-authenticated context, typed group/node fan-out, selection-aware health, internal framework routes, no remote
-settlement, and fail-closed external reach remain the product contract.
+The initial Data Access `keep` proposal was explicitly rejected before production edits because model decoration,
+token-prefix metadata, an ambient subject/carrier, a Data axis, middleware, and application services spread one link
+decision across too many places. The accepted checkpoint generalized context-aware Web behavior as contributors.
 
-R11-05 records and implements `keep` for `Sylin.Koan.Communication.Connector.RabbitMq`:
+Implemented result:
 
-- standard `ConnectionStrings:RabbitMq` is the single explicit endpoint;
-- `RABBITMQ_URL`, Aspire discovery, and Koan orchestration remain;
-- the duplicate public endpoint option and legacy Koan endpoint aliases are gone;
-- discovery/orchestration evaluators are internal mechanics;
-- stable broker/protocol values have one existing constants owner;
-- module reporting names candidate lanes rather than fixed default routes; and
-- package/current reference/product claim evidence states the exact meaningful result and limits.
+- `Koan.Web` owns public `IWebContextContributor` plus `WebContext` and one automatic post-authentication runner;
+- contributors execute by order, and each resolved principal/capability/filter scope is synchronously entered before
+  the next contributor runs, then all scopes unwind after downstream execution;
+- `Where<TEntity>` AND-composes typed predicates and one Web-owned bridge supplies them to Data's existing neutral
+  `IReadFilterContributor`/`ReadScopeFold` chokepoint;
+- Dev Identity contributes the principal at order 0 and Identity Tenancy contributes authorized roles plus tenant at
+  order 100, without their former middleware wrappers;
+- SnapVault contributes its validated gallery context at order 200: `_as` identifies the person; `event` selects one
+  exact active durable grant and is never authorization by itself; the contributor supplies that grant's tenant and
+  `PhotoAsset.EventId` predicate or rejects before endpoints;
+- raw Entity/key/Vector/Entity-backed Media reads inherit the filter automatically; proofing writes retain explicit
+  grant-permission authorization;
+- active request predicates bypass global Entity cache reads and cannot seed global entries; and
+- `Sylin.Koan.Data.Access`, `[AccessScoped]`, `Subject`, its carrier/options/axis/test project, SnapVault subject
+  middleware, and `GuestScopeService` are retired with no replacement package or compatibility shim.
 
-The application path remains one package reference, ordinary `AddKoan()`, the existing receiver, and
-`Entity.Transport.Send`. No new registration surface, package, abstraction, or broker grammar was added.
+Request predicates are intentionally Web-lifetime read visibility. They do not authorize writes, secure raw storage
+or SQL, or serialize arbitrary filters into jobs. Durable work establishes or re-resolves its own business context.
 
-## Focused RabbitMQ proof
+## Focused proof
 
-- Release connector build: zero warnings and zero errors.
-- Real RabbitMQ connector suite: 9/9.
-- Provider-neutral provider-election facts: 8/8.
-- The known PMC-032 stale `Koan.Core.Adapters` test-project reference warning remains; execution is green.
-- The Release nupkg contains the package README, icon, DLL/XML pair, build-transitive props, exact dependencies, and a
-  symbol package; current direct/transitive vulnerability audit reports no known vulnerable package.
-- Generated quality/product truth is 102 packages — 6 repair, 17 review, 79 structurally ready — and 26 claims.
-  RabbitMQ is structurally ready with no findings and current claim links.
+- Web context lifecycle: 4/4.
+- Security Trust development identity: 30/30.
+- Identity and Identity Tenancy: 85/85.
+- Cache topology including dynamic read context: 63/63.
+- Media Web context inheritance: 7/7.
+- SnapVault real link/grant/proof/media/revocation/operator journey: 28/28.
+- `Sylin.Koan.Web` Release pack is warning/error-free and contains DLL/XML, owned README, icon,
+  build-transitive props, and a symbol package.
+- Generated truth: 101 packages — 5 repair, 17 review, 79 structurally ready — and 26 claims.
+- The known PMC-032 stale `Koan.Core.Adapters` test-project reference warning remains in Web WellKnown; execution is
+  green and this slice did not affect it.
 - No full solution/release ratchet ran; that remains R11-07 work.
 
 ## Current repository state
 
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
-- Branch: `dev`; verify the exact HEAD and ahead/behind count before the next action.
-- Canon is already committed locally in `64bf83d69` and `ef037a479`; RabbitMQ implementation/docs are the current
-  uncommitted slice until intentionally committed.
+- Branch: `dev`; the slice is committed locally as `4b0acd7a2` (implementation/tests) plus its following docs/truth
+  commit. At handoff the branch is 146 commits ahead of `origin/dev` and 0 behind; verify exact HEAD before the next
+  action.
 - `tmp/` remains untracked scratch/evaluator material and must never be staged.
 - No push, publication, tag, release, deployment, remote mutation, private downstream inspection, or full release
   certification occurred.
 
 ## Resume here
 
-1. Verify `git status`, `HEAD`, and the focused RabbitMQ evidence in
+1. Verify `git status`, HEAD, and the focused evidence recorded in
    [R11-05](work-items/r11/R11-05-package-family-graduation.md).
-2. Review the implemented RabbitMQ disposition and exact 102-row matrix in
-   [R11-02](work-items/r11/R11-02-package-topology-inventory.md).
-3. If the slice is not yet committed, commit code/tests separately from docs/generated truth and never stage `tmp/`.
-4. Continue R11-05 with the next dependency-ordered `assess` family. The first unresolved active row is
-   `Sylin.Koan.Data.Access`; begin with fresh exploration rather than presuming its disposition.
+2. Continue R11-05 with fresh exploration of the next dependency-ordered unresolved Data semantic leaf. The active
+   rows are `Sylin.Koan.Data.Backup` and `Sylin.Koan.Data.SoftDelete`; do not presume either disposition.
+3. Preserve the contributor mandate when assessing future request-context behavior: seek the problem-space chokepoint
+   and reusable lifecycle before adding model decoration, per-surface hooks, or new package ceremony.
 
 ## Remaining temporary dispositions
 
-Data Access, Backup, and SoftDelete; Jobs; Observability; the remaining Orchestration CLI, Aspire, generator,
+Data Backup and SoftDelete; Jobs; Observability; the remaining Orchestration CLI, Aspire, generator,
 container-provider, and Compose renderer family; Security Trust; Testing, Containers, and Hosting; Web Admin; and
 ZenGarden still require terminal R11-02 decisions.
 
 ## Do not redo
 
-- Do not reopen R07-10's RabbitMQ transport/provider architecture or rerun its historical assessment.
-- Do not reopen R10-11's historical Canon assessment or rebuild CustomerCanon.
-- Do not rerun Classification, Tenancy, or earlier family suites without an affected dependency.
+- Do not reopen R10-11 Canon or rebuild CustomerCanon.
+- Do not recreate Data Access, ambient subjects, `[AccessScoped]`, or durable arbitrary-filter carriage.
+- Do not rerun Classification, standalone Tenancy, or earlier family suites without an affected dependency.
 - Do not run the full release ratchet before R11-07.
 - Do not stage `tmp/`, inspect private dogfood applications, or use private identities in public docs.
 - Do not push, tag, publish, release, deploy, or mutate remote configuration without separate authorization.
-- Do not preserve a legacy surface solely for compatibility, but do not remove a current public concept without proving
-  that it lacks an earned V1 intent.
 
 ## Accepted design laws
 
 - Design from the application inward: business sentence, smallest honest C# expression, exact guarantee, corrective
   failure, then internal types.
+- Assess context-aware Web behavior first as ordered contributors. Evidence is not authority; validate once at the
+  edge and project the resulting context through the existing centralized enforcement seam.
 - `AddKoan()` / `Entity<T>` / `EntityController<T>` is the golden business-to-code comparison. Extra public concepts
   must express a real business decision, guarantee, or deliberate override.
 - Complexity is centralized at typed responsibility chokepoints. Core owns generic law; pillars own meaning and policy;
   adapters own mechanics; applications own business intent.
 - Standard .NET hosting, DI, options, assembly, MSBuild, and NuGet concepts come before Koan-specific parts.
-- Structural composition runs once per host/shape. Runtime operations consume immutable plans without contributor
-  discovery, reflection, or provider negotiation.
 - Startup, facts, health, errors, HTTP/MCP, tests, and future tooling project canonical decisions; no projection becomes
   a second authority.
-- Break-and-rebuild is preferred when compatibility would preserve duplicate owners or crutches, but every rebuild is
-  justified against current code, not remembered history.
-- The neutral operation model remains a V1.1 target outside this release-readiness slice.
+- Break-and-rebuild is preferred when compatibility preserves duplicate owners or crutches, but every rebuild is
+  justified against current code rather than remembered history.
 
 ## Validation economy
 
-- Start every new R11 family slice with focused exploration and coalescence assessment.
+- Start each new R11 family slice with focused exploration and coalescence assessment.
 - Run only affected owner/consumer, package, documentation, and security cells during implementation.
 - Run the complete public-release ratchet only at the explicit R11-07 certification boundary.

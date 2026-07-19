@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 102,
-    "repairRequired": 6,
+    "packages": 101,
+    "repairRequired": 5,
     "reviewRequired": 17,
     "structurallyReady": 79,
     "ownedReadmes": 96,
     "technicalCompanions": 91,
-    "findings": 69
+    "findings": 67
   },
   "findingDefinitions": [
     {
@@ -641,29 +641,6 @@
       "technicalDocumentation": "src/Koan.Data.Abstractions/TECHNICAL.md",
       "packageIcon": "icon.png",
       "findings": []
-    },
-    {
-      "packageId": "Sylin.Koan.Data.Access",
-      "projectPath": "src/Koan.Data.Access/Koan.Data.Access.csproj",
-      "shape": "library",
-      "role": "capability",
-      "status": "repair-required",
-      "description": "Access scoping for Koan (SEC-0008): one module-owned logical-flow subject contributes an independent Core context carrier and Data read axis. [AccessScoped] opts an entity in; reads are narrowed to the current subject\u0027s matching scope tokens through a pushable row-visibility predicate and fail closed when the subject is absent. Jobs carries that context across durable hops without Data.Core naming subjects. Reference = Intent.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core"
-      ],
-      "readme": null,
-      "technicalDocumentation": null,
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
     },
     {
       "packageId": "Sylin.Koan.Data.AI",

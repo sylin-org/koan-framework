@@ -4,12 +4,12 @@ domain: web
 title: "Web Pillar Reference"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-15
+last_updated: 2026-07-18
 framework_version: source-first
 validation:
-  date_last_tested: 2026-07-15
-  status: reviewed
-  scope: public controller, endpoint, hook, transformer, relationship, health, and facts source inventory
+  date_last_tested: 2026-07-18
+  status: tested
+  scope: controller/endpoint surfaces plus ordered request-context contribution and read projection
 ---
 
 # Web Pillar Reference
@@ -104,6 +104,41 @@ For custom business actions, use first-class model APIs such as `Todo.Query(...)
 consumer-paced work only when the elected adapter advertises `ProviderBoundedPaging`. SQLite,
 PostgreSQL, SQL Server, CockroachDB, MongoDB, and Couchbase qualify today; InMemory, JSON, and Redis
 reject before query/yield.
+
+## Request-context contributors
+
+Use one scoped `IWebContextContributor` when request evidence establishes business context that several downstream
+surfaces must share. Koan invokes contributors automatically after authentication and before endpoints. A contributor
+reads the standard `HttpContext`, validates evidence against server-side authority, and uses `WebContext` to contribute
+a principal, a capability scope, typed Entity predicates, or rejection.
+
+```csharp
+public sealed class GalleryContext : IWebContextContributor
+{
+    public int Order => 200;
+
+    public async ValueTask ContributeAsync(WebContext context)
+    {
+        var eventId = context.HttpContext.Request.Query["event"].ToString();
+        if (!await Grants.Allows(context.SubjectId, eventId))
+        {
+            context.Reject();
+            return;
+        }
+
+        context.Where<Photo>(photo => photo.EventId == eventId);
+    }
+}
+```
+
+The query value selects the scope to validate; it never grants access by itself. Contributors execute by `Order`, and
+each contributor's accepted state is entered before the next contributor runs. Multiple predicates AND-compose and
+flow through Data's existing read-filter fold, so raw Entity/key/Vector and Entity-backed Media reads inherit them.
+Dynamic Entity cache access bypasses global entries while a predicate is active.
+
+This is request-lifetime read context. Standard authorization policies still own writes. Raw storage and raw SQL do
+not pass through Entity read filters, and request predicates are not serialized into durable jobs; those boundaries
+must establish or re-resolve their own application authority.
 
 ## Extension seams
 

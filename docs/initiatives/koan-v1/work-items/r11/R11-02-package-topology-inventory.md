@@ -46,7 +46,7 @@ generated package-quality and product-surface references.
 
 R11-01 opened with 109 packages: 37 required an objective repair, 72 required review, and none was inferred
 graduated. Subsequent family work retired unearned identities and introduced only independently useful contract or
-shared-mechanism boundaries. The current evaluated graph contains 102 packages: 6 repair-required, 17
+shared-mechanism boundaries. The current evaluated graph contains 101 packages: 5 repair-required, 17
 review-required, and 79 structurally ready across 26 claims. The active matrix contains only present package projects;
 implemented retirements remain in the disposition tables as release-lineage decisions.
 
@@ -87,7 +87,6 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Communication.Connector.RabbitMq` | `provider` | `keep` (implemented) |
 | `Sylin.Koan.Core` | `foundation` | `keep` |
 | `Sylin.Koan.Data.Abstractions` | `contracts` | `keep` |
-| `Sylin.Koan.Data.Access` | `capability` | `assess` |
 | `Sylin.Koan.Data.AI` | `capability` | `keep` |
 | `Sylin.Koan.Data.Backup` | `capability` | `assess` |
 | `Sylin.Koan.Data.Connector.Cockroach` | `provider` | `keep` |
@@ -333,6 +332,17 @@ surfaces without rebuilding CustomerCanon.
 | `Sylin.Koan.Canon.Contracts` | `merge` (implemented) | No source package consumed it independently, and its `CanonEntity<T>` vocabulary already resolved the functional runtime and depended on Data. Its useful model, metadata, annotation, contributor, persistence, runtime-result, and audit vocabulary now belongs to functional Canon; the package project and identity are retired with no compatibility shim. |
 | `Sylin.Koan.Canon` | `keep` (implemented) | One reference states canonical-Entity intent. The package owns one immutable host composition plan for every discovered model, built-in/custom pipelines, first-terminal-wins execution, stage behavior, headless rebuild, persistence/audit seams, and a fail-loud canonical → indexes → audit commit whose non-atomic and partial-write boundary is explicit. Manual builder/configuration, observer/replay, disconnected optimization, value-object auto-CRUD, and the legacy pillar mutation were retired. |
 | `Sylin.Koan.Canon.Web` | `keep` (implemented) | Optional HTTP projection is independently useful. It consumes Canon's exact host plan, rejects ambiguous route slugs, and exposes Canon-aware Entity plus model-inspection routes. It does not rediscover models or generate admin, replay, rebuild, or value-object routes. |
+
+## Web request-context and Data Access disposition
+
+| Package | Disposition | Distinct reference intent and implemented boundary work |
+|---|---|---|
+| `Sylin.Koan.Data.Access` | `merge` into `Sylin.Koan.Web`, then `retire` (implemented) | The package split one Web grant decision across model decoration, token-prefix metadata, ambient subject state, durable carriage, a Data axis, and application middleware/service choreography. Its earned behavior is now one ordered Web request-context lifecycle: scoped `IWebContextContributor`s validate request evidence and contribute principal, tenant, capability scopes, rejection, and typed Entity read predicates. Web projects predicates through Data's existing neutral read-filter contract; dynamic cache bypass prevents global-cache leaks. The package, public access vocabulary, test project, and solution identity are removed. |
+
+Dev Identity and Identity Tenancy now use the same lifecycle without changing their own business guarantees. SnapVault
+owns its `event` selector, durable grant lookup, and write authorization in one application contributor; the link is
+evidence, never authority. Headless and durable-job authorization are deliberately outside the Web request contract
+and must establish or re-resolve their own service context.
 
 ## Acceptance
 

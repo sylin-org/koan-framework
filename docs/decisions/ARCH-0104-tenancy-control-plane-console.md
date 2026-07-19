@@ -140,7 +140,7 @@ erase submitted under an act-as tenant ambient (`Erase_job_dispatched_under_an_a
 
 The **Activation layer** got its own review→verify workflow (3 lenses), folded: **(HIGH — the important
 one)** the "no master backdoor" invariant was guarded only on the invite *write* path — but the real
-enforcement point is the tenant-resolution role *projection*: `TenantResolutionMiddleware.ProjectRoles`
+enforcement point is the tenant-resolution role *projection*: `TenantResolutionContributor.ProjectRoles`
 (`Koan.Identity.Tenancy`) copied **every** `Membership.Role` onto the request principal, so a membership
 carrying `koan:tenancy-operator` (via any non-invite write path) would pass the host gate. Fixed
 structurally at the chokepoint — `ProjectRoles` now strips reserved host roles (`IsReservedHostRole`), so a

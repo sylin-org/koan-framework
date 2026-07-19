@@ -3588,6 +3588,507 @@ or changing Communication's application grammar:
 R11-02 now records the implemented `keep` disposition. No full solution/release ratchet, publication, remote mutation,
 or unrelated family suite ran; those boundaries remain R11-07 work.
 
+## Superseded Data Access discovery and disposition proposal
+
+**Task:** Graduate `Sylin.Koan.Data.Access` from temporary `assess` as the opt-in Entity row-visibility capability,
+preserving its proven headless/job/media moat while removing the unearned configurable fail-open path and narrowing
+implementation mechanics from the public/package promise.
+
+**Application intent:** An application resolves the current person and their grants once at the request or work edge;
+every Koan read of an opted-in Entity then returns only rows covered by that immutable subject snapshot, including raw
+Entity calls inside services, durable jobs, media serving, and vector search where the selected adapter can enforce the
+predicate.
+
+**Public expression:**
+
+```powershell
+dotnet add package Sylin.Koan.Data.Access
+```
+
+```csharp
+[AccessScoped(nameof(Photo.EventId), "event:")]
+public sealed class Photo : Entity<Photo>
+{
+    public string EventId { get; set; } = "";
+}
+
+using (Subject.Use(personId, ["event:" + grantedEventId]))
+{
+    var visible = await Photo.All(ct);
+    var maybePhoto = await Photo.Get(photoId, ct);
+}
+```
+
+The ordinary host remains `AddKoan()`. The application owns authentication and grant resolution, then enters one
+logical-flow subject scope before Entity work. An operator with full row visibility states that decision explicitly
+with `Subject.Unconstrained(operatorId)`; platform/control-plane work uses the louder `Subject.System()` scope. Grant
+tables remain undecorated so the edge can build the snapshot without recursive filtering. No repository, controller
+hook, query wrapper, provider registration, or access configuration is part of the expression.
+
+**Guarantee/correction:** For an `[AccessScoped]` Entity, Data's canonical read fold ANDs a pushable `Field IN (...)`
+predicate into Query/All/Count and key-based reads; cross-scope IDs become existence-hiding `null`, an absent or empty
+subject sees no rows, and viewer-scoped Entities are excluded from shared Entity caching. The same authenticated Core
+context carriage preserves the snapshot across durable/communication hops, and the Vector chokepoint reuses the same
+fold for filter-capable search. A selected adapter that cannot guarantee row-scoped pushdown fails closed. Malformed
+carrier data or invalid attribute declarations reject correctively rather than widening access.
+
+This is a read-visibility guarantee, not complete authorization. Data Access does not authenticate people, resolve
+grants, emit HTTP 401/403, authorize actions, stamp/freeze ownership on writes, secure direct/raw SQL, provide database
+RLS, revoke an already captured snapshot mid-operation, or make unfiltered vector by-id/admin operations safe. The
+application/Web/MCP surface continues to own coarse gates and write decisions.
+
+**Complete intent surface:**
+
+- Reference `Sylin.Koan.Data.Access` and call ordinary `AddKoan()`.
+- Decorate only persisted Entity types whose named CLR property is filter-pushable; use `nameof` and a non-empty stable
+  scope-token prefix.
+- At the authenticated edge, resolve authorized scope tokens once and enter `Subject.Use(id, tokens)` around all
+  downstream work; use `Unconstrained` or `System` only for a deliberate full-read decision.
+- Leave grant/control-plane types undecorated, and implement coarse action/write authorization separately.
+- Use a selected Data/vector provider that advertises and realizes the required row-scoped/filter capability.
+
+There is no configuration surface in the proposed V1 contract. Absence always denies. Trusted batch or development
+work already has the explicit, greppable `Subject.System()`/`Subject.Unconstrained(...)` vocabulary and therefore does
+not earn a global fail-open switch.
+
+**Public concepts:**
+
+- `AccessScopedAttribute` — the Entity-level business declaration mapping one persisted field to one scope-token
+  namespace; retain and validate its field/prefix inputs.
+- `Subject` — the complete application facade for constrained, unconstrained, system, and current logical-flow scope;
+  retain.
+- `SubjectContext` — immutable inspection value returned by `Subject.Current`, used by application gates such as
+  SnapVault's operator/proofing boundary; retain the value while keeping construction behind `Subject`.
+- `AccessAxis` — public only because the current `IDataAxis` generated-discovery contract requires a public
+  parameterless implementation; retain as framework authoring machinery, not application setup.
+- `DataAccessModule` — the one functional activation/reporting identity discovered from the package; retain.
+- `SubjectContextCarrier` — concrete Core carriage mechanics with no repository application/sample consumer; make
+  internal while preserving `IKoanContextCarrier` registration and exact authenticated wire behavior.
+- `AccessOptions` / `FailClosedOnAbsentSubject` — retire. The sole consumer is the module's own per-read options lookup,
+  and the only repository test proves the unsafe opt-out. Explicit subject scopes already express every legitimate
+  full-access decision more safely.
+
+**Docs read:**
+
+- `CLAUDE.md` — requires Entity-first language, reference-as-intent, module-owned composition, axis-neutral Data, and
+  focused evidence; directly governing.
+- `docs/engineering/index.md` — requires Entity statics, centralized constants/options, package companions, and
+  focused package validation; directly governing.
+- `docs/architecture/principles.md` — assigns cross-cutting meaning to its functional capability, generic predicate
+  law to Data/Core, and application grant resolution to the application; directly governing.
+- `docs/toc.yml` — already routes Entity data through the current Data reference; no new navigation branch is earned.
+- root `README.md` — the unchanged host and Entity grammar remain the golden comparison.
+- `samples/CATALOG.md` — the historical catalog is retired; the graduated SnapVault application is the consumer
+  authority.
+- `SEC-0008-access-enforcement-at-the-data-layer.md` — accepted the ambient subject/read-axis split and explicit
+  read/write boundary, but its configurable dev fallback and original vector deferral need an R11 current-context
+  amendment rather than historical prose rewrite.
+- `R09-05-hard-segmentation-data-cache-storage.md` — explicitly keeps non-equality row visibility as Data's separate
+  typed predicate concern instead of forcing it into equality segmentation.
+- `R10-10-snapvault.md` — proves the real studio/client journey, `[AccessScoped]` declaration, subject edge, job/media
+  propagation, fail-closed production posture, and separate write authorization; directly governing consumer truth.
+- `docs/reference/data/index.md` — current Entity grammar and adapter-honesty reference; it does not yet teach the
+  optional Data Access package or its non-claims.
+- generated quality/product references — classify the package as a capability with exactly two structural defects
+  (missing owned README and TECHNICAL) and no current product claim.
+
+**Code read:**
+
+- `AccessAxis.cs`, `AccessAmbient.cs`, and `AccessScopedMetadata.cs` — one Data-owned predicate axis, memoized type
+  metadata, and a cheap ambient scope fold; retain the boundary but remove the per-read `AppHost`/options lookup and
+  always deny an absent subject.
+- `Subject.cs` and `SubjectContext.cs` — one immutable Core logical-flow value with explicit constrained,
+  unconstrained, and system verbs; the earned application surface and closest Tenancy-like context pattern.
+- `SubjectContextCarrier.cs` and `Infrastructure/Constants.cs` — deterministic authenticated v1 carriage is correct,
+  but the concrete type is unearned publicly and the unit separator is duplicated outside the constants owner.
+- `DataAccessModule.cs` and the package project — one functional owner registers policy/carriage and depends only on
+  Core plus Data contracts/runtime; after option retirement it registers only the carrier and activates no Web,
+  Identity, Jobs, Media, or provider package.
+- `IDataAxis`, `Axis`, `DataAxisExpander`, `DelegatingReadFilterContributor`, and `ReadScopeFold` — Data Core already
+  owns discovery, validation, row-scoped capability enforcement, cache exclusion, and AND composition; Data Access
+  must remain a thin semantic declaration.
+- `SoftDeleteAxis` — closest predicate-axis sibling: a separate reference contributes one attribute-gated Data
+  behavior without moving its meaning into Data Core.
+- `Tenant`, `TenantContext`, `TenantContextCarrier`, and `TenancyModule` — closest ambient-context sibling: a business
+  facade owns meaning while Core owns neutral carriage; evidence, not an instruction to merge access into Tenancy.
+- SnapVault's `PhotoAsset`, subject middleware, guest-scope service, operator filter, proofing controller, and job —
+  the consumer uses Entity decoration plus all three deliberate subject verbs and keeps authentication/grant/write
+  policy in the application.
+- Media Web's `MediaEntitySourceSpec` — independent framework consumer proves that Entity-mediated blob serving
+  inherits the access read gate without Storage learning subjects.
+- `AccessAxisSpec` — current focused baseline passes 22/22, including carrier trust/round-trip/malformed input,
+  constrained/unconstrained/system/absent states, IDOR hiding, no-op types, durable Jobs carriage, and the obsolete
+  fail-open option. The known PMC-032 stale `Koan.Core.Adapters` test-project warning remains unrelated.
+
+**Reusing:** `Entity<T>` read terminals, `AccessScopedAttribute`, `Subject`/`SubjectContext`, Core `KoanContext` and
+`IKoanContextCarrier`, Data's discovered `IDataAxis`/immutable read fold/capability correction/cache exclusion,
+Vector's shared read-fold projection, SnapVault's grant resolution and explicit write gates, Media's Entity-backed
+source, the 22-cell package suite, and generated package/product compilers.
+
+**Creating new:** No new production service, abstraction, option, contracts package, controller, DTO, registry, or
+runtime plan is proposed.
+
+| New code | Location | Justification |
+|---|---|---|
+| stable access axis id and the one carriage separator owner | existing `src/Koan.Data.Access/Infrastructure/Constants.cs` | Remove the remaining stable literal/duplicate without introducing another owner. |
+| attribute correction cells and module-resolved carrier proof | existing `tests/Suites/Data/Access/Koan.Data.Access.Tests/AccessAxisSpec.cs` | Prove invalid declarations fail loudly, absence cannot be configured open, and the internal carrier remains correctly registered. |
+| package-owned current promise | `src/Koan.Data.Access/README.md` and `TECHNICAL.md` | Required package identity, meaningful result, trust/read/write/adapter boundaries, and focused evidence. |
+
+Existing edits remain narrow: delete `AccessOptions`; make absent subjects unconditionally deny; internalize the
+concrete carrier; keep raw `SubjectContext` construction behind `Subject`; validate non-empty, separator-safe attribute
+inputs; centralize stable identifiers; remove the fail-open fixture; and align current Data/SEC/product/R11 prose.
+
+**Coalescence:** Closest patterns are `SoftDeleteAxis` for separate attribute-gated row semantics and Tenancy's
+`Tenant`/context/carrier for business-owned logical flow. Data Access's current decision owner is `AccessAxis`; its
+application consumers are SnapVault and Media Web, while Data/Vector/Jobs/Communication consume only neutral
+predicate/carriage contracts. Subject state is immutable per async logical flow and captured once per hop. Type
+metadata is process-stable and memoized; each read performs only a current-context lookup, prefix filter over the
+already-resolved scope snapshot, and immutable filter construction. The only repeated mechanics are already Core/Data
+law. Specificity is therefore capability. Disposition: `keep` the package; absorb nothing into Data Core, Identity,
+Web, Tenancy, or the application; split no contracts package; rebuild no SEC-0008 axis. The one target owner remains
+Data Access because ambient subject meaning and the row predicate form one user guarantee. Data Core is too wide and
+must stay subject-neutral; Identity/Web are too narrow for headless/jobs/media use; Tenancy is a different equality
+segmentation guarantee; a contracts split is unjustified because no module consumes these types without wanting
+functional activation. Delete only the unsafe option/configuration branch and unearned public mechanic.
+
+**Ergonomics:** Human code reads as one declaration plus one edge scope: `Photo` is access-scoped by `EventId`, and
+the current person may see named events. `nameof` keeps the field discoverable/refactor-safe; `Subject.Use`,
+`Unconstrained`, and `System` make narrowing/elevation visible in IntelliSense. Removing configuration eliminates the
+most dangerous cognitive branch: no subject always means no rows. Coding models can map the package reference,
+attribute, scope, read guarantee, and write non-claim without learning an options toggle, concrete carrier, repository,
+or web hook. The package retains fewer public/moving parts while preserving the business moat.
+
+**Constraints satisfied:**
+
+- Entity-first data access: the common path is `Photo.All/Get/Query`; no repository or `Data<TEntity,TKey>` wrapper is
+  introduced.
+- Controllers-only HTTP: the package exposes no route; SnapVault's coarse gates remain attribute-routed controllers,
+  filters, and standard middleware.
+- Constants/options: stable identifiers use the existing constants owner; the unearned option family is deleted
+  rather than replaced.
+- Structural composition/hot path: Data expands the discovered axis once; type applicability remains memoized; the
+  per-read host/options resolution is removed.
+- Cross-module isolation: neutral context/predicate contracts stay in Core/Data; no functional package or new
+  contracts assembly leaks across modules.
+- Large data: the capability narrows existing reads and adds no materialization/streaming path; callers still use
+  explicit paging or capability-qualified streams.
+- Docs: package companions, current Data reference, SEC-0008 amendment, product claim, R11-02, generated truth,
+  progress, and handoff will agree; no new TOC branch is needed.
+- Focused proof only: Data Access owner, Media/SnapVault affected consumers, package build/pack/audit, and generated
+  docs; no Tenancy/Classification rerun or release ratchet.
+
+**Risks:** Removing `Koan:Data:Access:FailClosedOnAbsentSubject=false` is intentionally breaking before 1.0. Repository
+history shows it was introduced once with SEC-0008 and never used outside its own proof; all legitimate full-access
+code already uses explicit `Subject.System()` or `Subject.Unconstrained(...)`. Internalizing the concrete carrier is
+also a public-surface break, but repository consumers resolve only `IKoanContextCarrier`; package tests will move to
+the supported module registration. Scope tokens remain application-issued bearer-like facts: Data Access authenticates
+carriage provenance, not whether the edge was entitled to mint a token. Revocation affects the next resolved snapshot,
+not already running work. Raw SQL and write authorization remain explicitly outside the guarantee.
+
+**Architecture checkpoint:** No Data Access production edit follows this record until the maintainer accepts or
+adjusts the `keep` disposition and promise reduction: always fail closed on absent subject; retire `AccessOptions` and
+its configuration; internalize the concrete carrier; retain one package (no merge/split); preserve the existing
+subject, row-filter, cache-exclusion, authenticated-carriage, Data/vector correction, and explicit read/write boundary.
+
+This proposal was rejected during the checkpoint. It started from the existing model decoration and ambient-subject
+implementation rather than the smallest reusable expression of the business journey. The maintainer's governing
+correction is that a share link selects a request scope, one Web API pipeline contributor validates that selector and
+contributes the resulting filters, and framework enforcement should flow from that centralized decision. The revised
+proposal below supersedes every disposition and planned production edit in this section.
+
+## Web request context discovery and revised topology proposal (architecture checkpoint)
+
+**Task:** Replace Data Access's per-model decoration and separate subject/carriage subsystem with one reusable Web
+request-context contribution seam. Access scope becomes one contribution: it resolves a link selector once and
+projects validated filters through Data's existing canonical read chokepoint. Existing Web identity and tenant setup
+converge on the same ordered lifecycle; merge the earned behavior into Web and retire `Sylin.Koan.Data.Access`.
+
+**Application intent:** A user follows a link that identifies the business scope they intend to enter. The application
+validates that selector against current server-side grants once, at the authenticated Web request edge, and every Koan
+Entity read performed during that request sees only the contributed rows without decorating each model or manually
+opening an ambient subject scope.
+
+**Public expression:** The host and Entity models remain ordinary:
+
+```csharp
+public sealed class PhotoAsset : MediaEntity<PhotoAsset>
+{
+    public string EventId { get; set; } = "";
+}
+
+public sealed class GalleryContext : IWebContextContributor
+{
+    public int Order => 200;
+
+    public async ValueTask ContributeAsync(WebContext request)
+    {
+        var eventId = request.HttpContext.Request.Query[Constants.Query.Event].ToString();
+        if (string.IsNullOrEmpty(eventId)) return;
+
+        var subjectId = request.SubjectId;
+        if (string.IsNullOrEmpty(subjectId))
+        {
+            request.Reject();
+            return;
+        }
+
+        var grants = await GalleryGrant.Query(
+            grant => grant.EventId == eventId
+                && grant.IdentityId == subjectId
+                && grant.IsActive,
+            request.HttpContext.RequestAborted);
+
+        if (grants.Count == 0)
+        {
+            request.Reject();
+            return;
+        }
+
+        request.Where<PhotoAsset>(photo => photo.EventId == eventId);
+    }
+}
+```
+
+```csharp
+services.AddScoped<IWebContextContributor, GalleryContext>();
+```
+
+The query value is a selector, never authorization. The contributor owns its query/path/header vocabulary and the
+business lookup that proves the current principal may enter that scope. `WebContext.Where<TEntity>(...)`
+accepts a typed LINQ predicate, lowers it through the existing normalized Data filter compiler, and AND-composes it
+with filters from any other contributor. `Reject()` ends the request with an existence-hiding not-found result before
+controller execution. The standard `AddKoan()` host, Entity model, controller, and provider setup do not change.
+
+**Guarantee/correction:** Koan invokes ordered `IWebContextContributor`s once after ASP.NET Core authentication and
+before authorization/endpoints. After each contributor resolves asynchronously, the runner enters its pending ambient
+contributions synchronously before invoking the next contributor; a later access contributor therefore sees the
+principal and authorized tenant contributed earlier, without relying on an `AsyncLocal` mutation to flow backward
+across `await`. Contributions wrap downstream execution and dispose in reverse order. Rejection stops contribution and
+endpoint execution.
+
+Accepted read filters are installed as one immutable logical-flow request scope. A Web-owned
+`IReadFilterContributor` projects that scope into Data's existing `ReadScopeFold`, so raw
+`Entity<T>` calls in controllers/services, Entity Web endpoints, Entity-backed media, Count/key reads, and filter-capable
+Vector search during the request all receive the same AND-folded predicate. Unsupported adapter pushdown continues to
+fail closed through Data's existing row-scoped capability correction. Invalid selectors reject before downstream
+work; a contributor exception establishes no scope and reaches no endpoint.
+
+Development identity contribution (principal), durable tenant resolution (ambient tenant plus projected roles), and
+application link scope (read predicates) move onto this one lifecycle. OpenGraph rendering, console exposure, rate
+limiting, and endpoint mapping are not request context; they remain ordinary middleware/endpoint contributions through
+`IKoanWebPipelineContributor`/`IKoanEndpointContributor`. One contribution protocol does not turn unlike capability
+semantics into a global property bag.
+
+The corrective boundary is intentionally narrower and more honest than SEC-0008's current package promise. This is a
+Web-request read-visibility seam. It does not treat raw link values as trusted grants; authenticate people; invent
+grant storage; authorize writes; stamp ownership; secure raw SQL; provide database RLS; or serialize arbitrary filters
+through Jobs/Communication. Durable work must establish its own service/system context or carry a business command
+whose handler re-resolves current authorization. MCP/headless callers do not silently inherit an HTTP query scope.
+
+**Complete intent surface:**
+
+- Implement one `IWebContextContributor` for the business boundary and register it with ordinary scoped DI.
+- Read the selector from the standard `HttpContext`; validate it against durable server-side authority and the current
+  principal/tenant before calling `Where<TEntity>`.
+- Contribute every affected Entity predicate from that one class; no Entity decoration or per-type Web hook is needed.
+- Call `Reject()` for an applicable but invalid/expired/revoked selector; absence may remain non-applicable only when
+  the application's coarse authorization genuinely provides another path, such as an operator request.
+- Keep action/write authorization in standard controller/authorization policy code.
+- Use a provider that can push every contributed predicate under Data's existing row-scoped guarantee.
+
+There is no framework query-key option, model attribute, subject token namespace, fail-open option, context-carrier
+configuration, or package-specific host call. The application owns meaningful business vocabulary such as `event`;
+Koan owns invocation, composition, enforcement, cache safety, and correction.
+
+**Public concepts:**
+
+- `IWebContextContributor` — one ordered scoped-DI seam for deriving any validated request-lifetime context after
+  authentication; required because framework code cannot know application identity, tenant, locale, or grant semantics.
+- `WebContext` — the request's standard `HttpContext`, canonical claims-based `SubjectId`, typed
+  `Where<TEntity>(...)`, corrective `Reject()`, and an advanced disposable-scope contribution verb used by capability
+  modules such as Tenancy. The runner, not the async contributor, enters those scopes.
+
+No public `AccessScopedAttribute`, `Subject`, `SubjectContext`, `SubjectContextCarrier`, `AccessOptions`, access axis,
+scope-token grammar, or access-specific module survives. The normalized `Filter`, `IReadFilterContributor`, and Web
+pipeline contribution machinery already exist and remain framework-facing contracts rather than new application
+concepts.
+
+**Docs read:**
+
+- `CLAUDE.md` — requires reference-as-intent, Entity-first code, framework-owned chokepoints, and capability meaning
+  to live at the narrowest honest owner; directly governing.
+- `docs/engineering/index.md` — requires standard .NET concepts first, centralized constants, focused proof, and
+  package docs only for packages that survive; directly governing.
+- `docs/architecture/principles.md` — requires few coherent concepts, isolated cross-module contracts, and composition
+  by meaning rather than historic namespace; directly governing.
+- `docs/toc.yml`, root `README.md`, and `samples/CATALOG.md` — preserve the four-line host/Entity grammar and confirm no
+  new product navigation or standalone sample family is earned.
+- `SEC-0008-access-enforcement-at-the-data-layer.md` — records the historical attribute/subject design; its current
+  contract must be superseded, not silently described as the revised architecture.
+- `R09-05-hard-segmentation-data-cache-storage.md` — keeps arbitrary row visibility on Data's generic predicate fold;
+  it does not require a per-model access attribute.
+- `R10-10-snapvault.md` — the authoritative consumer journey requires event-limited raw Entity/media reads and separate
+  proofing-write authorization, but does not require SEC-0008's generic durable subject-carriage promise.
+- `docs/reference/data/index.md` — establishes normalized Entity reads/provider correction as the enforcement floor.
+- generated package/product truth and R11-02 — show `Sylin.Koan.Data.Access` has no product claim and remains `assess`,
+  so merge/retire is still available before V1 rather than constrained by a graduated promise.
+
+**Code read:**
+
+- `IKoanWebPipelineContributor`, `KoanWebPipelineStage`, and `KoanWebStartupFilter` — the existing ordering-safe owner
+  for one post-authentication request contribution; reuse rather than adding another startup abstraction.
+- Web Auth's `DevIdentityContributor`/`KoanDevIdentityMiddleware` — a request-derived principal currently expressed as
+  a middleware plus mounting wrapper; preserve Development-only behavior while moving its context decision to the
+  shared contributor lifecycle.
+- Identity Tenancy's `TenantResolutionContributor`/middleware — closest business pattern: read client evidence once,
+  authorize it server-side, then push validated context around the remainder of the pipeline; keep the pattern, not
+  its tenant-specific contract.
+- `IRequestOptionsHook<TEntity>`, `QueryOptions`, and `EntityAccessConstrainHook<TEntity>` — existing Web-only,
+  per-entity predicate rails; they prove typed predicates work but are too narrow and dispersed for one link scope
+  that must also cover service/media Entity calls.
+- `IReadFilterContributor`, `ReadScopeFold`, `RepositoryFacade`, and `ScopedVectorRepository` — the existing single
+  Data/Vector enforcement and fail-closed correction path; reuse unchanged as the semantic destination.
+- `EntityCachePlan` and `CacheRepositoryDecorator` — cache currently decides exclusion from ambient-independent type
+  declarations; a dynamic request scope requires one generic active-filter cache bypass so a pre-scope cache hit can
+  never escape Data's fold.
+- all `Koan.Data.Access` sources — attribute metadata, token prefixes, four-state subjects, a global fail-open option,
+  axis wrapper, and durable carrier are mechanics of the superseded model and have no residual owner after the Web
+  bridge exists.
+- SnapVault's `PhotoAsset`, subject middleware/contributor, `GuestScopeService`, operator filter, proofing controller,
+  and focused security proof — the application currently spreads one grant decision across model metadata, service,
+  ambient verbs, middleware, and registration; coalesce it into one request contributor while retaining explicit
+  write gates.
+- Media Web's `MediaEntitySourceSpec` — proves an Entity-backed media fetch inherits Data read filters; it needs no
+  access-specific package once the request scope enters the canonical fold.
+
+**Reusing:** Standard ASP.NET Core `HttpContext` and scoped DI; `IKoanWebPipelineContributor` ordering; typed LINQ
+predicates and `LinqFilterCompiler`; `IReadFilterContributor`, `ReadScopeFold`, adapter capability correction, key-op
+IDOR lowering, Vector composition, and Entity-backed Media reads. Existing authorization policies continue to own
+writes and coarse route access.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| `IWebContextContributor` | `src/Koan.Web/Context/IWebContextContributor.cs` | Web owns request evidence/lifetime; a Data or Core contract would leak `HttpContext`, while a separate package would add topology for an inert two-concept seam. |
+| `WebContext` | `src/Koan.Web/Context/WebContext.cs` | One typed contribution target owns request access, ordered pending-scope entry, filter compilation/AND composition, and rejection without a global property bag. |
+| internal Web-context runner/pipeline contribution | `src/Koan.Web/Context/WebContextPipelineContributor.cs` | Execute scoped DI contributors once at the existing post-authentication stage, enter each resolved contribution synchronously, and dispose the complete context around downstream middleware/endpoints. |
+| internal Data projection | `src/Koan.Web/Context/WebContextReadFilterContributor.cs` | Adapt Web-owned contributed read state to the existing neutral Data read-filter contract; Data Core remains unaware of HTTP/access vocabulary. |
+| Development identity contributor conversion | existing `src/Koan.Web.Auth` hosting/initialization files | Replace its middleware plus pipeline-contributor pair with one ordered context contributor while retaining Development-only activation and exact principal behavior. |
+| Identity Tenancy contributor conversion | existing `src/Koan.Identity.Tenancy` resolution/initialization files | Replace its middleware plus pipeline-contributor pair with one ordered context contributor; the runner enters `Tenant.Use` before later contributors and keeps membership/role validation unchanged. |
+| active-scope cache bypass | existing `src/Koan.Cache/Entity/EntityCachePlan.cs` and cache decorator path | General cache correctness: when any read contributor supplies a predicate now, do not serve or write an unscoped Entity entry. Static axis exclusion remains the zero-hot-path optimization. |
+| SnapVault request selector constant | `samples/applications/SnapVault/Infrastructure/Constants.cs` | Keep the application-owned stable `event` link vocabulary out of framework configuration and out of policy magic literals. |
+| focused Web-context proof | new focused suite under `tests/Suites/Web/` | Prove ordering, synchronous scope entry, rejection, multi-Entity AND composition, raw Entity/key/media behavior, cache bypass, and provider correction without reviving package-specific abstractions. |
+
+Existing production edits delete `src/Koan.Data.Access`, remove its solution/package/test/sample references, replace
+SnapVault's model decoration/subject middleware/service choreography with one context contributor, and update current
+Web/Data/Media/SEC/product/R11 documentation. No new package, options family, controller, endpoint, DTO, contracts
+assembly, grant entity, or framework query-key constant is proposed; the one stable SnapVault selector is
+application-owned.
+
+**Coalescence:** Closest pattern is the common lifecycle hidden inside Dev Identity, Identity Tenancy, and SnapVault
+subject setup: each mounts post-authentication middleware, reads request evidence, derives validated state, wraps the
+remainder of the request, and cleans up. That lifecycle—not identity, tenancy, or access meaning—is the reusable Web
+law. Current Data Access additionally splits one grant decision across an Entity attribute, token-prefix convention,
+ambient subject, application middleware, service, Data axis, and carrier. Specificity is therefore a Web-pillar
+request-context seam; individual contributed values remain capability/application owned, and the generic enforcement
+destination remains Data law.
+
+Disposition: `merge` the context orchestration and earned read-scope behavior into `Koan.Web`; `rebuild` Dev Identity
+and Identity Tenancy as context contributors without changing their business guarantees; `delete` their redundant
+middleware/pipeline-contributor wrappers; `delete` the Data Access package and durable-subject promise; `absorb` no
+access vocabulary into Data Core; retain application-owned grant lookup and write gates. Web is the one lifecycle
+owner. Data is too wide to know `HttpContext`; Identity/Tenancy/Access are too narrow to own common orchestration; a
+new bridge package would add topology; and per-model Web hooks are too dispersed. `IReadFilterContributor` remains the
+genuine isolated Web-to-Data contract. Low-level `IKoanWebPipelineContributor` remains for non-context middleware and
+mounts the single context runner, rather than being repeated for every contextual capability.
+
+**Ergonomics:** Human code reads in business order in one place: read the link's `event`, prove this principal has an
+active grant, reject or constrain `PhotoAsset`. IntelliSense exposes only contributor/context plus standard
+`HttpContext`, expressions, and DI. Models remain domain models. There is no token-prefix string coupling, manual
+`Subject.Use`, special operator/system branch, undecorated-control-plane rule, package option, or hidden job-carriage
+prerequisite. A coding model can locate all request-derived state through `IWebContextContributor` implementations,
+then read each contributor in business order instead of correlating attributes, startup wrappers, middleware,
+services, and ambient calls.
+
+**Constraints satisfied:**
+
+- Entity-first data access remains `Entity<T>`; no repository/query wrapper is introduced.
+- Controllers-only HTTP remains intact; the contributor is middleware composition and adds no inline endpoint.
+- Stable framework identifiers remain internal constants; the business query key stays beside the business policy,
+  and no unearned option is created.
+- Cross-module isolation reuses Web -> Data's existing neutral filter contract; Data never references Web or access.
+- The request resolver runs once; the Data hot path performs one immutable type-map lookup plus its existing fold.
+- Cache safety is corrected at the actual read-short-circuit chokepoint rather than requiring static model decoration.
+- Large-data behavior is unchanged: filters push into existing explicit paging/capability-qualified paths.
+- Current Web/Data/Media/SEC docs and generated truth will be updated; the retired package earns no README/TECHNICAL.
+- Focused affected proof only: the Web context owner, affected Dev Identity and Identity Tenancy cells, SnapVault,
+  Media, and cache safety. No complete Tenancy/Classification suite or full release ratchet runs.
+
+**Risks:** Retiring `Sylin.Koan.Data.Access` is deliberately breaking before V1 and removes headless/manual subject and
+automatic arbitrary-filter carriage. Repository truth shows only SnapVault and one Media test consume it, while the
+actual SnapVault customer promise is request-scoped reads plus separate writes. Arbitrary predicate carriage would be
+unsafe and would freeze authorization snapshots across durable hops; re-resolution in a job handler is the safer
+business contract. An absent selector cannot universally mean deny because operator and non-link routes exist, so the
+application contributor must explicitly distinguish `not applicable` from `Reject()`; focused proof and docs must
+make that branch conspicuous. Multiple contributors AND-compose. Cache bypass adds one current-scope check to cached
+Entity operations; it is centralized and only changes behavior while a filter is active.
+
+**Architecture checkpoint:** No production/package edit follows this record until the maintainer accepts or adjusts
+the `merge/rebuild/delete` disposition: one Web-owned `IWebContextContributor` plus `WebContext`; one automatic ordered
+post-authentication lifecycle for Dev Identity, Identity Tenancy, and application link scope; synchronous entry after
+each async resolution; projection of contributed reads into the existing Data/Vector fold; dynamic cache safety; no
+model decoration, subject vocabulary, access option, durable filter carriage, or separate Data Access/Web bridge
+package. Non-context middleware remains on the existing low-level pipeline seam.
+
+## Web request-context implementation result
+
+The maintainer accepted the revised checkpoint and generalized the mandate: context-aware Web behavior should be
+assessed first as contributors, with centralized application delight and reuse preferred over model decoration or
+per-surface hooks. The implementation follows that mandate without reopening R10-11 Canon or rebuilding CustomerCanon.
+
+**Implemented topology:**
+
+- `Koan.Web` now owns `IWebContextContributor` and `WebContext`. One internal post-authentication runner resolves
+  scoped contributors in order, awaits each decision, synchronously enters that contributor's pending scopes before
+  invoking the next contributor, wraps downstream execution, and unwinds in reverse order. `UsePrincipal`, `Use`,
+  typed `Where<TEntity>`, claims-based `SubjectId`, and existence-hiding `Reject` are the complete public verbs.
+- Web's one internal `IReadFilterContributor` projects the immutable current type-to-filter map into Data's existing
+  `ReadScopeFold`. Multiple contributors AND-compose. Raw Entity reads, key reads, vector reads, and Entity-backed
+  Media therefore inherit request context without model decoration or controller/service cooperation.
+- Development `_as` identity is now a context contributor at order 0. Its framework-independent resolver remains in
+  Security Trust; it is Development-only and still does nothing without explicit `_as` evidence.
+- Identity Tenancy is now a context contributor at order 100. Carrier candidates remain untrusted until the same
+  active membership and durable identity checks pass; role projection and `Tenant.Use` retain their previous promise.
+- Cache checks current read contributors dynamically. While any read predicate is active, cached `Get` bypasses the
+  global entry and scoped writes invalidate rather than seed it. Unscoped operations retain ordinary caching.
+- SnapVault has one application contributor at order 200. It treats `event` as a selector, validates the exact active
+  `GalleryGrant` for the current principal, selects that grant's studio tenant, contributes the matching
+  `PhotoAsset.EventId` predicate, and rejects invalid/revoked guest links before controllers. Operators may use the
+  same selector only as a narrowing view. Proofing retains explicit grant-permission write authorization.
+- Entity-backed Media remains policy-neutral and inherits the contributed Entity predicate. Raw storage controllers
+  remain tenant/storage-only and now state that boundary directly. Request filters are not serialized into jobs;
+  durable work re-resolves business authority or establishes its own service context.
+- `Sylin.Koan.Data.Access`, its test project, `[AccessScoped]`, `Subject`, access options/carrier/axis, SnapVault's
+  subject middleware and `GuestScopeService`, and all project/solution references are retired with no compatibility
+  package. The active package graph therefore loses one package and gains none.
+
+**Focused evidence (2026-07-18):**
+
+| Cell | Result | What it proves |
+|---|---:|---|
+| `Koan.Web.WellKnown.Tests` | 4/4 | ordered contribution, synchronous inter-contributor visibility, automatic raw Entity filtering, rejection before endpoint execution, and context unwind |
+| `Koan.Security.Trust.Tests` | 30/30 | `_as` parsing and Development identity behavior after middleware removal |
+| `Koan.Identity.Tests` | 85/85 | tenant carrier authorization, durable identity activity, role projection, ambient tenant lifetime, and deprovisioning consumers |
+| `Koan.Tests.Cache.Topology` | 63/63 | active request predicates bypass global reads and cannot seed globally visible cache entries |
+| `Koan.Media.Web.Tests` | 7/7 | Entity-backed media inherits a contributed read predicate; headless Media invents no Web policy |
+| `Koan.Samples.SnapVault.Tests` | 28/28 | real link journey, exact multi-studio grant selection, cross-event IDOR closure, proof/media inheritance, revocation, and operator boundary |
+| `Sylin.Koan.Web` Release pack | clean | warning/error-free Release build; nupkg contains DLL/XML, owned README, icon, build-transitive props, and symbol package |
+
+No Classification or standalone Tenancy suite and no full release ratchet ran. The known PMC-032 stale
+`Koan.Core.Adapters` reference warning appeared only in the Web suite and remains unrelated; every affected suite is
+green. Generated package/product and module truth are regenerated after the retirement as part of this slice.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;
