@@ -38,8 +38,9 @@ references describe the graph; Koan does not admit `Inert`, `Required`, or equiv
 metadata to compensate for a misplaced contract.
 
 `[Before]` and `[After]` order `KoanModule` types when exceptional type-safe sequencing is necessary.
-Optional capabilities on the same assembly owner use typed .NET interfaces—for example
-`IKoanAspireResources`—rather than a second lifecycle object or a class-name convention.
+Optional capabilities on the same assembly owner use typed .NET interfaces only when another active consumer earns
+that contract, rather than a second lifecycle object or class-name convention. The former `IKoanAspireResources`
+experiment was subsequently shelved by R11-05 because standard Aspire already owns AppHost resource construction.
 
 ## Runtime contract
 

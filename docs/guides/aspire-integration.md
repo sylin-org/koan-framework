@@ -1,15 +1,15 @@
 ﻿---
 type: GUIDE
-domain: orchestration
-title: "Aspire Integration"
+domain: architecture
+title: "Run a Koan application with Aspire"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-11-09
-framework_version: v0.6.3
+last_updated: 2026-07-19
+framework_version: source-first
 validation:
-  date_last_tested: 2025-11-09
-  status: verified
-  scope: all-examples-tested
+  date_last_tested: 2026-07-19
+  status: reviewed
+  scope: R11-05 standard Aspire boundary
 related_guides:
   - entity-capabilities-howto.md
   - data-modeling.md
@@ -17,26 +17,25 @@ related_guides:
   - building-apis.md
 ---
 
-# Aspire Integration
+# Run a Koan application with Aspire
 
-This guide summarizes practical steps to run Koan apps under .NET Aspire, consolidating the long-form content in [aspire-integration-reference.md](aspire-integration-reference.md).
+Aspire owns application topology. Koan connectors consume the connection strings and service endpoints Aspire injects;
+no Koan Aspire package is required. See the [reference](aspire-integration-reference.md) for the ownership boundary.
 
 ## Contract
 
 - Inputs: Web app with `builder.Services.AddKoan()`, Aspire AppHost, and referenced adapters.
-- Outputs: Koan auto-discovers services via Aspire; service defaults and health endpoints are wired.
+- Outputs: standard Aspire references inject endpoints; Koan connectors discover and use them.
 - Error modes: AppHost reference omissions, health dependencies not ready, discovery not configured.
 - Success criteria: App runs under Aspire with Postgres/Redis wired and visible in the Aspire dashboard.
 
 ## Steps (short)
 
-1. Create an Aspire AppHost and add service references (Postgres/Redis).
-2. Reference the web project and call `builder.AddServiceDefaults()`.
-3. In your web app, call `builder.Services.AddKoan();` and `app.MapDefaultEndpoints();`.
+1. Create an Aspire AppHost and add standard Postgres/Redis resources.
+2. Reference the application with `AddProject` and connect resources with `WithReference`.
+3. In the application, reference the matching Koan connectors and call `builder.Services.AddKoan()` normally.
 4. Run the AppHost; verify health and service discovery.
 
 ## Related
 
-- Reference: Orchestration index
-- Support: Troubleshooting hub
-- Samples: KoanAspireIntegration/**
+- Detailed boundary: [Using Koan applications with .NET Aspire](aspire-integration-reference.md)

@@ -15,7 +15,6 @@ using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
 using Koan.Data.Connector.Couchbase.Discovery;
 using Koan.Data.Connector.Couchbase.Infrastructure;
-using Koan.Data.Connector.Couchbase.Orchestration;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Koan.Data.Connector.Couchbase.Initialization;
@@ -29,8 +28,6 @@ public sealed class CouchbaseDataModule : KoanModule
         services.AddSingleton<CouchbaseClusterProvider>();
         services.AddSingleton<IDataAdapterFactory, CouchbaseAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, CouchbaseHealthContributor>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, CouchbaseOrchestrationEvaluator>());
-
         // Register Couchbase discovery adapter (maintains "Reference = Intent")
         // Adding Koan.Data.Connector.Couchbase automatically enables Couchbase discovery capabilities
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, CouchbaseDiscoveryAdapter>());

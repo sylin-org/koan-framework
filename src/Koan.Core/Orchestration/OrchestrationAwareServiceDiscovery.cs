@@ -150,10 +150,9 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
         // Use existing hint resolution logic as fallback
         return CurrentMode switch
         {
-            OrchestrationMode.DockerCompose or OrchestrationMode.Kubernetes => hints.DockerCompose ?? hints.SelfOrchestrated ?? "localhost",
+            OrchestrationMode.DockerCompose or OrchestrationMode.Kubernetes => hints.DockerCompose ?? hints.Local ?? "localhost",
             OrchestrationMode.AspireAppHost => hints.AspireManaged ?? hints.DockerCompose ?? "localhost",
-            OrchestrationMode.SelfOrchestrating => hints.SelfOrchestrated ?? "localhost",
-            _ => hints.External ?? hints.SelfOrchestrated ?? "localhost"
+            _ => hints.External ?? hints.Local ?? "localhost"
         };
     }
 }

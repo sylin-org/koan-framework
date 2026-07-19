@@ -1,11 +1,9 @@
 using Koan.Communication.Adapters;
 using Koan.Communication.Connector.RabbitMq.Discovery;
 using Koan.Communication.Connector.RabbitMq.Infrastructure;
-using Koan.Communication.Connector.RabbitMq.Orchestration;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Orchestration.Abstractions;
-using Koan.Core.Orchestration;
 using Koan.Core.Provenance;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,8 +26,6 @@ public sealed class RabbitMqModule : KoanModule
             .ValidateOnStart();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, RabbitMqDiscoveryAdapter>());
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, RabbitMqOrchestrationEvaluator>());
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<ICommunicationAdapter, RabbitMqCommunicationAdapter>());
         services.TryAddEnumerable(

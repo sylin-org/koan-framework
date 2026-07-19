@@ -3,7 +3,7 @@
 Wire a new external system (database, vector store, message broker, AI provider, storage backend) into the Koan framework. The result is a NuGet-publishable adapter package that consumers enable by reference alone.
 
 > Companion ADRs:
-> - [ARCH-0049 — `[KoanService]` orchestration metadata](../decisions/) (referenced by the orchestration generator)
+> - [ARCH-0049 — `[KoanService]` service metadata](../decisions/) (runtime discovery and inspectability)
 > - [ARCH-0079 — Integration tests as canon](../decisions/) (every connector ships at least one integration spec)
 > - [ARCH-0080 — Shared transport ownership](../decisions/ARCH-0080-shared-transport-ownership.md) (historical context; shared backends now have their own functional owner)
 > - [ARCH-0085 — Versioning](../decisions/ARCH-0085-versioning-compatibility-and-automation.md) (each package owns version intent)
@@ -33,7 +33,7 @@ You want to add a new connector to a pillar that already exists (Data, Data.Vect
 
 A Koan connector is **just** a few standard pieces:
 
-1. **Adapter factory** — implements the pillar's factory interface, decorated with `[KoanService]` so orchestration knows how to spin up a dependency container locally. Decorated with `[ProviderPriority]` for tie-breaking when multiple adapters can handle the same provider name.
+1. **Adapter factory** — implements the pillar's factory interface, decorated with `[KoanService]` so runtime discovery and facts describe its external dependency once. Decorated with `[ProviderPriority]` for tie-breaking when multiple adapters can handle the same provider name.
 2. **Repository / client** — does the actual I/O. Data caches the selected repository per
    Entity/key/provider/source route; the connector pools expensive native clients at the narrow physical-source owner.
 3. **Options + configurator** — strongly-typed config bound from `Koan:Data:<Provider>:*` (or equivalent).
@@ -41,8 +41,7 @@ A Koan connector is **just** a few standard pieces:
 5. **Autonomous discovery adapter** — answers "where is the service?" for local/container/Aspire environments. Optional but expected.
 6. **Health contributor** — reports readiness for elected or runtime-participating routes. Package availability alone
    is non-critical and must not open a connection.
-7. **Orchestration evaluator** — decides whether to inject the dependency into compose/Aspire when the user runs `koan up`.
-8. **Tests** — at minimum, one integration spec hitting a real container via Testcontainers (ARCH-0079).
+7. **Tests** — at minimum, one integration spec hitting a real container via Testcontainers (ARCH-0079).
 
 The connector package publishes as `Sylin.Koan.<Pillar>.Connector.<Name>` and owns an independent
 `version.json`; Git impact and the package graph determine when it mints.
@@ -84,7 +83,8 @@ mkdir src/Connectors/Data/Vector/Acme
 </Project>
 ```
 
-The parent `src/Connectors/Directory.Build.props` imports the root and turns on `KoanRequiresOrchestrationGenerator` — you get the source generator that emits orchestration metadata, plus the `Sylin.*` PackageId prefix and SourceLink for free.
+The parent `src/Connectors/Directory.Build.props` imports the root, so the project receives the `Sylin.*` PackageId
+prefix and SourceLink configuration.
 
 ### Step 2 — Implement the adapter factory with `[KoanService]`
 
@@ -133,7 +133,9 @@ orders only the candidate set already admitted by that pillar—it never overrid
 lane capability, cache placement, or other typed guarantee. An explicit ID/alias resolves exactly or fails
 with a correction; Koan does not substitute an unrelated provider.
 
-The `[KoanService]` attribute feeds the orchestration generator: this is what makes `koan up` know to start an `acme/acme:1.0` container on port 8080. Model the exact field set after [`WeaviateVectorAdapterFactory.cs`](../../src/Connectors/Data/Vector/Weaviate/WeaviateVectorAdapterFactory.cs) — it's the canonical example.
+The `[KoanService]` attribute supplies one service description for runtime discovery, diagnostics, and external tooling
+that chooses to inspect Koan facts. It does not cause Koan to start a container. Model the exact field set after
+[`WeaviateVectorAdapterFactory.cs`](../../src/Connectors/Data/Vector/Weaviate/WeaviateVectorAdapterFactory.cs).
 
 ### Step 3 — Implement Options + Configurator
 
@@ -177,23 +179,7 @@ public sealed class AcmeDiscoveryAdapter(IConfiguration cfg) : IServiceDiscovery
 
 If you skip this, users must always set `Endpoint` explicitly. With it, `Endpoint=auto` Just Works in dev/container/Aspire contexts.
 
-### Step 6 — Orchestration evaluator
-
-```csharp
-// Orchestration/AcmeOrchestrationEvaluator.cs
-public sealed class AcmeOrchestrationEvaluator(...) : IKoanOrchestrationEvaluator
-{
-    public string ServiceName => "acme";
-    public int StartupPriority => 100;
-    public bool IsServiceEnabled(IConfiguration cfg) => /* check explicit config */;
-    public ServiceDependencyDescriptor CreateDependencyDescriptor(...)
-        => /* describe the container to spin up */;
-}
-```
-
-This is what makes `koan up` decide whether to inject your dependency into the generated compose file. Model after [`RedisOrchestrationEvaluator.cs`](../../src/Connectors/Data/Redis/Orchestration/RedisOrchestrationEvaluator.cs).
-
-### Step 7 — the module
+### Step 6 — the module
 
 ```csharp
 // Initialization/AcmeVectorModule.cs
@@ -205,7 +191,6 @@ public sealed class AcmeVectorModule : KoanModule
         services.AddSingleton<IConfigureOptions<AcmeOptions>, AcmeOptionsConfigurator>();
         services.AddSingleton<IVectorAdapterFactory, AcmeVectorAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, AcmeHealthContributor>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, AcmeOrchestrationEvaluator>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, AcmeDiscoveryAdapter>());
     }
 
@@ -220,7 +205,7 @@ public sealed class AcmeVectorModule : KoanModule
 
 The class name is business-facing, not conventional magic. It must be the assembly's single concrete `KoanModule`; identity is derived from the standard `PackageId`/assembly name. The source generator rejects multiple activation owners.
 
-### Step 8 — Tests (ARCH-0079 mandate)
+### Step 7 — Tests (ARCH-0079 mandate)
 
 Scaffold the test project. Model after [`tests/Suites/Data/Connector.Weaviate/`](../../tests/Suites/Data/Connector.Weaviate/).
 
@@ -343,26 +328,13 @@ ls <consumer>/bin/Release/net10.0/ | grep Koan.Data.Vector.Connector.Acme
 
 If the assembly is present but discovery still misses it, check the boot report (run a small console app that calls `services.AddKoan()` and inspect the resolved `IBootReport`). Your module should appear in the published modules list.
 
-### Symptom: `koan up` doesn't include my service in the generated compose
+### Symptom: local infrastructure is not running
 
-**Why it happens:** the orchestration evaluator's `IsServiceEnabled(cfg)` is returning `false`, OR the source generator didn't emit the manifest entry (csproj missing `KoanRequiresOrchestrationGenerator=true` — but inherited from `src/Connectors/Directory.Build.props`, so this is rare).
+**Why it happens:** Koan connectors discover and use infrastructure; they do not own the local container lifecycle.
 
-**Recovery:**
-
-```pwsh
-# 1. Verify your orchestration evaluator is registered.
-#    AcmeVectorModule.Register() should register the evaluator.
-
-# 2. Verify IsServiceEnabled returns true under your test conditions.
-#    Most evaluators return true when the connector's section is present in config.
-
-# 3. Check the orchestration manifest output.
-dotnet build <consumer>/<consumer>.csproj -c Release
-ls <consumer>/obj/Release/net10.0/generated/Koan.Orchestration.Generators/
-#    Look for entries describing your service.
-
-# 4. Run `koan compose generate` and inspect the output.
-```
+**Recovery:** author the resource in a standard Aspire AppHost, Compose file, Testcontainers fixture, or other topology
+owner, then pass the resulting connection string or service endpoint to the application. For Aspire, use its standard
+resource integration and `WithReference` so the AppHost injects configuration automatically.
 
 ### Symptom: pack succeeds but the package ID is `Koan.Data.Vector.Connector.Acme` not `Sylin.Koan.Data.Vector.Connector.Acme`
 

@@ -22,7 +22,7 @@ This report separates objective package repairs from human review. `structurally
 
 | Packages | Repair required | Review required | Structurally ready | Owned READMEs | Technical companions | Findings |
 |---:|---:|---:|---:|---:|---:|---:|
-| 95 | 3 | 11 | 81 | 92 | 87 | 45 |
+| 93 | 3 | 10 | 80 | 90 | 85 | 42 |
 
 ## Packages
 
@@ -93,8 +93,6 @@ This report separates objective package repairs from human review. `structurally
 | `Sylin.Koan.Media.Core`<br>[`src/Koan.Media.Core/Koan.Media.Core.csproj`](../../src/Koan.Media.Core/Koan.Media.Core.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Media.Core/README.md)<br>[TECHNICAL](../../src/Koan.Media.Core/TECHNICAL.md) | none |
 | `Sylin.Koan.Media.Web`<br>[`src/Koan.Media.Web/Koan.Media.Web.csproj`](../../src/Koan.Media.Web/Koan.Media.Web.csproj) | projection / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Media.Web/README.md)<br>[TECHNICAL](../../src/Koan.Media.Web/TECHNICAL.md) | none |
 | `Sylin.Koan.Observability`<br>[`src/Koan.Observability/Koan.Observability.csproj`](../../src/Koan.Observability/Koan.Observability.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Observability/README.md)<br>[TECHNICAL](../../src/Koan.Observability/TECHNICAL.md) | none |
-| `Sylin.Koan.Orchestration.Aspire`<br>[`src/Koan.Orchestration.Aspire/Koan.Orchestration.Aspire.csproj`](../../src/Koan.Orchestration.Aspire/Koan.Orchestration.Aspire.csproj) | projection / library<br>net10.0 | `review-required` | [README](../../src/Koan.Orchestration.Aspire/README.md)<br>[TECHNICAL](../../src/Koan.Orchestration.Aspire/TECHNICAL.md) | `docs.readme.install.missing` (warning): The README does not show the package-specific install or reference expression.<br>`docs.readme.meaningful-use.missing` (warning): The README has no recognizable meaningful-use or behavior section.<br>`docs.readme.package-title.missing` (warning): The README does not use the exact package ID as its primary title. |
-| `Sylin.Koan.Orchestration.Aspire.Abstractions`<br>[`src/Koan.Orchestration.Aspire.Abstractions/Koan.Orchestration.Aspire.Abstractions.csproj`](../../src/Koan.Orchestration.Aspire.Abstractions/Koan.Orchestration.Aspire.Abstractions.csproj) | contracts / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Orchestration.Aspire.Abstractions/README.md)<br>[TECHNICAL](../../src/Koan.Orchestration.Aspire.Abstractions/TECHNICAL.md) | none |
 | `Sylin.Koan.Redis`<br>[`src/Koan.Redis/Koan.Redis.csproj`](../../src/Koan.Redis/Koan.Redis.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Redis/README.md)<br>[TECHNICAL](../../src/Koan.Redis/TECHNICAL.md) | none |
 | `Sylin.Koan.Redis.Abstractions`<br>[`src/Koan.Redis.Abstractions/Koan.Redis.Abstractions.csproj`](../../src/Koan.Redis.Abstractions/Koan.Redis.Abstractions.csproj) | contracts / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Redis.Abstractions/README.md)<br>[TECHNICAL](../../src/Koan.Redis.Abstractions/TECHNICAL.md) | none |
 | `Sylin.Koan.Security.Trust`<br>[`src/Koan.Security.Trust/Koan.Security.Trust.csproj`](../../src/Koan.Security.Trust/Koan.Security.Trust.csproj) | capability / library<br>net10.0 | `repair-required` | root README fallback | `docs.readme.owned.missing` (error): The package falls back to the framework root README.<br>`docs.technical.missing` (warning): No package-owned technical companion describes runtime or build ownership. |

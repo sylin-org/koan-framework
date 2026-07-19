@@ -15,7 +15,6 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Connector.Weaviate.Discovery;
-using Koan.Data.Vector.Connector.Weaviate.Orchestration;
 using WeaviateItems = Koan.Data.Vector.Connector.Weaviate.Infrastructure.WeaviateProvenanceItems;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
@@ -30,9 +29,6 @@ public sealed class WeaviateVectorModule : KoanModule
         services.AddSingleton<IConfigureOptions<WeaviateOptions>, WeaviateOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, WeaviateHealthContributor>());
-
-        // Register orchestration evaluator for dependency management
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, WeaviateOrchestrationEvaluator>());
 
         // Register Weaviate discovery adapter (maintains "Reference = Intent")
         // Adding Koan.Data.Vector.Connector.Weaviate automatically enables Weaviate discovery capabilities

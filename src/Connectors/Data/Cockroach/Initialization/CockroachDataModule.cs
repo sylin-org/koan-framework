@@ -14,7 +14,6 @@ using Koan.Core.Provenance;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Cockroach.Discovery;
-using Koan.Data.Connector.Cockroach.Orchestration;
 using Koan.Data.Relational.Orchestration;
 using CockroachItems = Koan.Data.Connector.Cockroach.Infrastructure.CockroachProvenanceItems;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
@@ -22,9 +21,7 @@ using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExt
 namespace Koan.Data.Connector.Cockroach.Initialization;
 
 // CockroachDB rides the PostgreSQL wire protocol (Npgsql) and the PostgreSQL SQL dialect — this adapter is a thin
-// delta over the shipped Postgres connector (ARCH-0094 blueprint §2.4 reuse). Aspire orchestration is intentionally
-// dropped here (no Aspire.Hosting Cockroach resource provider ships); Reference = Intent registration + discovery is
-// sufficient for the conformance gate.
+// delta over the shipped Postgres connector (ARCH-0094 blueprint §2.4 reuse).
 public sealed class CockroachDataModule : KoanModule
 {
     public override void Register(IServiceCollection services)
@@ -34,9 +31,6 @@ public sealed class CockroachDataModule : KoanModule
             configuratorLifetime: ServiceLifetime.Singleton);
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, CockroachHealthContributor>());
-
-        // Register orchestration evaluator for dependency management
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, CockroachOrchestrationEvaluator>());
 
         // Register CockroachDB discovery adapter (maintains "Reference = Intent")
         // Adding Koan.Data.Connector.Cockroach automatically enables CockroachDB discovery capabilities

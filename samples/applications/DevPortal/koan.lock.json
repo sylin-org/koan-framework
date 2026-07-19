@@ -47,10 +47,6 @@
       "version": "0.1"
     },
     {
-      "id": "Koan.Orchestration.Aspire.Abstractions",
-      "version": "0.18"
-    },
-    {
       "id": "Koan.Web",
       "version": "0.17"
     },

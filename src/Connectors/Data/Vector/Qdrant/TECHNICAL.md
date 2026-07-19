@@ -2,8 +2,8 @@
 
 ## Activation and routing
 
-`QdrantVectorModule` registers the provider, discovery adapter, typed options, HTTP client, orchestration evaluator,
-and participation-aware health contributor. The factory identity is `qdrant`. Automatic election uses the shared
+`QdrantVectorModule` registers the provider, discovery adapter, typed options, HTTP client, and participation-aware
+health contributor. The factory identity is `qdrant`. Automatic election uses the shared
 vector provider catalog; `[VectorAdapter("qdrant")]` requests it exactly.
 
 Repository instances receive the already-elected factory and source. `VectorAdapterNaming` compiles the collection

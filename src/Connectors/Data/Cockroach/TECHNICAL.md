@@ -3,7 +3,7 @@
 ## Ownership
 
 The connector owns CockroachDB provider identity and priority, options/configuration, source connection resolution,
-autonomous discovery, orchestration evaluation, health participation, naming limits, and startup reporting. It maps
+autonomous discovery, health participation, naming limits, and startup reporting. It maps
 those decisions into the module-free `Sylin.Koan.Data.Relational.Npgsql` repository mechanism.
 
 It does not reference `Sylin.Koan.Data.Connector.Postgres`. PostgreSQL and CockroachDB can therefore coexist without

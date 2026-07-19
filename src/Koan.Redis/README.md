@@ -45,6 +45,7 @@ uses the environment-appropriate default endpoint.
   `Sylin.Koan.Redis.Abstractions` does not.
 - The backend owns connectivity, not Cache or Data semantics. Each consuming adapter still owns its database,
   routing, readiness, and capability decisions.
-- Automatic discovery selects an endpoint; it does not provision Redis outside an enabled Koan orchestration host.
+- Automatic discovery selects an endpoint; it does not provision Redis. Use Aspire, Compose, Docker, a managed
+  service, or another standard topology owner to run it.
 
 See [TECHNICAL.md](TECHNICAL.md) for resolution order, ownership, and failure behavior.

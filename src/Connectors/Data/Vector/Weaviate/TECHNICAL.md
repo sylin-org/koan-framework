@@ -2,8 +2,8 @@
 
 ## Activation and routing
 
-`WeaviateVectorModule` registers the provider, discovery adapter, typed options, named HTTP client, orchestration
-evaluator, and participation-aware health contributor. The identity is `weaviate`; `[VectorAdapter("weaviate")]`
+`WeaviateVectorModule` registers the provider, discovery adapter, typed options, named HTTP client, and
+participation-aware health contributor. The identity is `weaviate`; `[VectorAdapter("weaviate")]`
 requests it exactly.
 
 The selected factory/source is passed to the repository. `VectorAdapterNaming` compiles class names from the entity,

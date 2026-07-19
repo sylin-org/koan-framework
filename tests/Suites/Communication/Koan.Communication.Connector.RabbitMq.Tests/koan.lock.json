@@ -35,10 +35,6 @@
       "version": "0.19"
     },
     {
-      "id": "Koan.Orchestration.Abstractions",
-      "version": "0.17"
-    },
-    {
       "id": "Koan.Tenancy",
       "version": "0.17"
     },

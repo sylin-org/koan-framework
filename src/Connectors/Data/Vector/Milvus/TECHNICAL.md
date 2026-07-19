@@ -2,8 +2,8 @@
 
 ## Activation and routing
 
-`MilvusVectorModule` registers the provider, discovery adapter, options, named HTTP client, orchestration evaluator,
-and participation-aware health contributor. The provider identity is `milvus`; `[VectorAdapter("milvus")]` is exact.
+`MilvusVectorModule` registers the provider, discovery adapter, options, named HTTP client, and participation-aware
+health contributor. The provider identity is `milvus`; `[VectorAdapter("milvus")]` is exact.
 
 The repository receives the selected factory/source and uses `VectorAdapterNaming` once to compile its collection
 route. Ambient partition and segmentation contributors therefore affect physical naming without Milvus-specific

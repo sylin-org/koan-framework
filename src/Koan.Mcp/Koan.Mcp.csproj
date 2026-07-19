@@ -11,8 +11,8 @@
     <!-- Transitive-vulnerability override: StreamJsonRpc 2.22.23 pulls MessagePack 2.5.192,
          affected by CVE-2026-48109 (GHSA-hv8m-jj95-wg3x, high/8.2 LZ4 out of bounds read DoS). Pin
          the patched 2.5.301 (API-compatible 2.5.x line). Koan.Mcp is the only direct StreamJsonRpc
-         referencer, so this floor propagates to every MCP consumer; mirrors the same override in
-         Koan.Orchestration.Aspire. Remove once StreamJsonRpc's own MessagePack floor is 2.5.301 or higher. -->
+         referencer, so this floor propagates to every MCP consumer. Remove once StreamJsonRpc's own
+         MessagePack floor is 2.5.301 or higher. -->
     <PackageReference Include="MessagePack" Version="2.5.301" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.JsonPatch" Version="10.0.8" />

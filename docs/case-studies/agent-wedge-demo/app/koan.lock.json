@@ -91,10 +91,6 @@
       "version": "0.17"
     },
     {
-      "id": "Koan.Orchestration.Aspire",
-      "version": "0.17"
-    },
-    {
       "id": "Koan.Security.Trust",
       "version": "0.17"
     },

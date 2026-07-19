@@ -4,10 +4,10 @@ domain: framework
 title: "Koan Capability Map"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-19
 framework_version: source-first
 validation:
-  date_last_tested: 2026-07-17
+  date_last_tested: 2026-07-19
   status: reviewed
   scope: current packable graph, golden application path, and concern-owned capability boundaries
 ---
@@ -55,7 +55,7 @@ bundles rather than referencing it directly.
 | AI and agents | `Sylin.Koan.AI*`, `Sylin.Koan.Data.AI`, `Sylin.Koan.Mcp*` | model/provider routing, agent workflows, Entity AI capabilities, and MCP projections |
 | operations | `Sylin.Koan.Jobs`, `Sylin.Koan.Cache*`, `Sylin.Koan.Observability`, `Sylin.Koan.Data.Backup`, `Sylin.Koan.Storage*` | durable work, caching, telemetry, backup/restore, and object storage |
 | domain capabilities | `Sylin.Koan.Canon*`, `Sylin.Koan.Media*`, `Sylin.Koan.Classification` | opt-in higher-level domain pipelines and projections |
-| development tooling | `Sylin.Koan.Orchestration.*`, `Sylin.Koan.Testing*` | DevHost planning/providers/exporters and test harnesses; not application runtime defaults |
+| development tooling | `Sylin.Koan.Testing*` | test harnesses; application topology uses standard external tooling |
 
 Package availability is not a support or maturity claim. Consult the [product surface](../reference/product-surface.md)
 for current evidence and the package's own README for its explicit limits.
@@ -75,9 +75,8 @@ Providers declare identity, priority, capabilities, normalization, and health. T
 owns election and compiles one plan. Data, Communication, Cache, Storage, and future provider families
 must not let each provider invent a second precedence policy.
 
-`Koan.Core.Services.KoanServiceAttribute` describes service-backed providers once for runtime discovery
-and optional development tooling. It lives in Core so an application connector does not depend on the
-DevHost CLI contract.
+`Koan.Core.Services.KoanServiceAttribute` describes service-backed providers once for runtime discovery. It lives in
+Core because connection resolution and service facts are runtime concerns, without implying that Koan owns topology.
 
 ### Layered capabilities are inert until their engine is active
 
@@ -137,10 +136,11 @@ startup prose or loaded assemblies.
 
 ## Development-host tooling boundary
 
-Koan V1 does not publish a bespoke development-host CLI, hosting-provider SPI, manifest generator, or Compose
-renderer. Applications use standard Aspire, Compose, Docker, or Podman tooling. Runtime service discovery,
-connection resolution, connector health, and application identity remain Core/connector concerns and do not imply
-that Koan owns the local container lifecycle. The separate Aspire integration remains under package-family review.
+Koan V1 does not publish a bespoke development-host CLI, hosting-provider SPI, manifest generator, Compose renderer,
+or Aspire integration package. Applications author topology with standard Aspire, Compose, Docker, or Podman tooling.
+An Aspire AppHost uses ordinary resource integrations and `WithReference`; Koan connectors consume the injected
+connection strings and service endpoints. Runtime discovery, health, and identity remain Core/connector concerns and
+never imply that Koan owns the container lifecycle.
 
 ## Choosing deliberately
 

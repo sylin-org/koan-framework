@@ -56,7 +56,7 @@ Generic cross-provider connection, credential, bucket, and user aliases are not 
 
 ## Initialization and readiness
 
-`CouchbaseDataModule` registers options, discovery/orchestration, the adapter factory, the shared
+`CouchbaseDataModule` registers options, discovery, the adapter factory, the shared
 cluster provider, and health through `AddKoan()`. It does not register Couchbase as an eager
 `IAsyncAdapterInitializer` or global readiness alias.
 

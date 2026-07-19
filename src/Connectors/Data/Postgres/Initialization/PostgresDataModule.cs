@@ -14,16 +14,13 @@ using Koan.Core.Provenance;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Postgres.Discovery;
-using Koan.Data.Connector.Postgres.Orchestration;
 using Koan.Data.Relational.Orchestration;
-using Koan.Orchestration.Aspire;
-using Aspire.Hosting;
 using PostgresItems = Koan.Data.Connector.Postgres.Infrastructure.PostgresProvenanceItems;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Connector.Postgres.Initialization;
 
-public sealed class PostgresDataModule : KoanModule, IKoanAspireResources
+public sealed class PostgresDataModule : KoanModule
 {
     public override void Register(IServiceCollection services)
     {
@@ -32,9 +29,6 @@ public sealed class PostgresDataModule : KoanModule, IKoanAspireResources
             configuratorLifetime: ServiceLifetime.Singleton);
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, PostgresHealthContributor>());
-
-        // Register orchestration evaluator for dependency management
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, PostgresOrchestrationEvaluator>());
 
         // Register PostgreSQL discovery adapter (maintains "Reference = Intent")
         // Adding Koan.Data.Connector.Postgres automatically enables PostgreSQL discovery capabilities
@@ -129,49 +123,6 @@ public sealed class PostgresDataModule : KoanModule, IKoanAspireResources
     {
         var database = defaults.SearchPath ?? "Koan";
         return $"Host=localhost;Port=5432;Database={database};Username=postgres;Password=postgres";
-    }
-
-    // IKoanAspireResources implementation
-    public void RegisterAspireResources(IDistributedApplicationBuilder builder, IConfiguration configuration, IHostEnvironment environment)
-    {
-        var options = new PostgresOptions();
-        new PostgresOptionsConfigurator(configuration).Configure(options);
-
-        // ARCH-0068: Use static ConnectionStringParser for unified parsing
-        var components = Koan.Core.Orchestration.ConnectionStringParser.Parse(
-            options.ConnectionString,
-            "postgres");
-
-        var postgres = builder.AddPostgres("postgres", port: components.Port)
-            .WithDataVolume()
-            .WithEnvironment("POSTGRES_DB", components.Database ?? "Koan")
-            .WithEnvironment("POSTGRES_USER", components.Username ?? "postgres");
-
-        // Only set password if one is provided and not empty
-        if (!string.IsNullOrEmpty(components.Password))
-        {
-            postgres.WithEnvironment("POSTGRES_PASSWORD", components.Password);
-        }
-
-        // TODO: Configure proper health check for PostgreSQL
-        // postgres.WithHealthCheck("/health"); // This pattern doesn't work for database resources
-    }
-
-    public int Priority => 100; // Infrastructure resources register early
-
-    public bool ShouldRegister(IConfiguration configuration, IHostEnvironment environment)
-    {
-        // Register in development environments automatically (Reference = Intent)
-        // or when explicitly configured in other environments
-        return environment.IsDevelopment() || HasExplicitConfiguration(configuration);
-    }
-
-    private bool HasExplicitConfiguration(IConfiguration configuration)
-    {
-        // Check if there's explicit Postgres configuration
-        return !string.IsNullOrEmpty(configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString]) ||
-               !string.IsNullOrEmpty(configuration[Infrastructure.Constants.Configuration.Keys.AltConnectionString]) ||
-               !string.IsNullOrEmpty(configuration[Infrastructure.Constants.Configuration.Keys.ConnectionStringsPostgres]);
     }
 
 }

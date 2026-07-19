@@ -82,7 +82,7 @@ public static class KoanEnv
         catch { /* best effort */ }
     }
 
-    private static OrchestrationMode DetectOrchestrationMode(IConfiguration? cfg, bool isDevelopment, bool inContainer)
+    private static OrchestrationMode DetectOrchestrationMode(IConfiguration? cfg)
     {
         // Priority 1: Forced configuration override (highest priority)
         var forcedModeString = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Orchestration.ForceOrchestrationMode, null);
@@ -109,13 +109,7 @@ public static class KoanEnv
             return OrchestrationMode.Kubernetes;
         }
 
-        // Priority 5: Self-orchestration (development host spawning containers)
-        if (ShouldSelfOrchestrate(cfg, isDevelopment, inContainer))
-        {
-            return OrchestrationMode.SelfOrchestrating;
-        }
-
-        // Default: Standalone mode (production with external dependencies)
+        // Default: Standalone mode with application-supplied or external dependencies.
         return OrchestrationMode.Standalone;
     }
 
@@ -139,21 +133,6 @@ public static class KoanEnv
         return !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.KubernetesServiceHost, null)) ||
                !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.KubernetesServicePort, null)) ||
                Directory.Exists("/var/run/secrets/kubernetes.io/serviceaccount");
-    }
-
-    private static bool ShouldSelfOrchestrate(IConfiguration? cfg, bool isDevelopment, bool inContainer)
-    {
-        // Don't self-orchestrate if already in a container
-        if (inContainer) return false;
-
-        // Don't self-orchestrate in production unless explicitly enabled
-        if (!isDevelopment && !Configuration.Read(cfg, Infrastructure.Constants.Configuration.Orchestration.EnableSelfOrchestration, false))
-        {
-            return false;
-        }
-
-        // In development, self-orchestrate if explicitly enabled or if it's the best option
-        return isDevelopment || Configuration.Read(cfg, Infrastructure.Constants.Configuration.Orchestration.EnableSelfOrchestration, false);
     }
 
     private static SnapshotData ComputeSnapshot(IConfiguration? cfg, IHostEnvironment? env)
@@ -192,7 +171,7 @@ public static class KoanEnv
             );
 
         // Detect orchestration mode using proper precedence
-        var orchestrationMode = DetectOrchestrationMode(cfg, isDev, inContainer);
+        var orchestrationMode = DetectOrchestrationMode(cfg);
         var sessionId = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.KoanSessionId, null) ??
                        Guid.NewGuid().ToString("N")[..8];
 

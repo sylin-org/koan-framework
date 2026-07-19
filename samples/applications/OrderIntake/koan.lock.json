@@ -51,10 +51,6 @@
       "version": "0.19"
     },
     {
-      "id": "Koan.Orchestration.Aspire",
-      "version": "0.17"
-    },
-    {
       "id": "Koan.Web",
       "version": "0.17"
     },

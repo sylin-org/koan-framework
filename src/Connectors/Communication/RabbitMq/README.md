@@ -58,8 +58,8 @@ does not negotiate channel declarations between heterogeneous applications.
 
 ## Connection
 
-With Koan orchestration, the direct reference can provision and discover RabbitMQ with no
-configuration. To use an existing broker, set one endpoint:
+Run RabbitMQ with Aspire, Compose, Docker, a managed service, or another standard topology owner. The connector
+discovers applicable service endpoints; set one explicit endpoint when discovery is not appropriate:
 
 ```json
 {
@@ -69,8 +69,8 @@ configuration. To use an existing broker, set one endpoint:
 }
 ```
 
-`RABBITMQ_URL` and Aspire service discovery are also recognized. When a discovered URL has no
-credentials, `Username` and `Password` default to `koan` for the Koan-provisioned container.
+`RABBITMQ_URL` and Aspire service discovery are also recognized. When a discovered URL has no credentials,
+`Username` and `Password` retain their documented `koan` defaults.
 
 ## What acceptance means
 

@@ -25,7 +25,7 @@ public static class ServiceDiscoveryExtensions
         {
             ServiceName = serviceName,
             DefaultPort = defaultPort,
-            SelfOrchestrated = BuildConnectionString(serviceName, "localhost", defaultPort, databaseName, username, password),
+            Local = BuildConnectionString(serviceName, "localhost", defaultPort, databaseName, username, password),
             DockerCompose = BuildConnectionString(serviceName, serviceName, defaultPort, databaseName, username, password),
             Kubernetes = BuildConnectionString(serviceName, $"{serviceName}.default.svc.cluster.local", defaultPort, databaseName, username, password),
             AspireManaged = null, // Aspire provides via service discovery
@@ -57,7 +57,7 @@ public static class ServiceDiscoveryExtensions
         {
             ServiceName = serviceName,
             DefaultPort = defaultPort,
-            SelfOrchestrated = $"http://localhost:{defaultPort}",
+            Local = $"http://localhost:{defaultPort}",
             DockerCompose = $"http://{serviceName}:{defaultPort}",
             Kubernetes = $"http://{serviceName}.default.svc.cluster.local:{defaultPort}",
             AspireManaged = null, // Aspire provides via service discovery
@@ -152,7 +152,7 @@ public static class ServiceDiscoveryExtensions
         {
             ServiceName = serviceName,
             DefaultPort = defaultPort,
-            SelfOrchestrated = BuildConnectionString(serviceName, "localhost", defaultPort, databaseName, username, password),
+            Local = BuildConnectionString(serviceName, "localhost", defaultPort, databaseName, username, password),
             DockerCompose = BuildConnectionString(serviceName, serviceName, defaultPort, databaseName, username, password),
             Kubernetes = BuildConnectionString(serviceName, $"{serviceName}.default.svc.cluster.local", defaultPort, databaseName, username, password),
             AspireManaged = null,

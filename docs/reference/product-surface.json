@@ -1198,8 +1198,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Relational",
-        "Sylin.Koan.Data.Relational.Npgsql",
-        "Sylin.Koan.Orchestration.Aspire.Abstractions"
+        "Sylin.Koan.Data.Relational.Npgsql"
       ],
       "readme": "src/Connectors/Data/Postgres/README.md",
       "ownsReadme": true,
@@ -1716,44 +1715,14 @@
       ]
     },
     {
-      "packageId": "Sylin.Koan.Orchestration.Aspire",
-      "shape": "library",
-      "description": "Aspire resource registration for Koan modules: auto-register distributed dependencies and align with Koan orchestration metadata.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Orchestration.Aspire.Abstractions"
-      ],
-      "readme": "src/Koan.Orchestration.Aspire/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": "src/Koan.Orchestration.Aspire/TECHNICAL.md",
-      "claims": []
-    },
-    {
-      "packageId": "Sylin.Koan.Orchestration.Aspire.Abstractions",
-      "shape": "library",
-      "description": "Inert Aspire resource-contribution contract for Koan modules and backend adapters.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [],
-      "readme": "src/Koan.Orchestration.Aspire.Abstractions/README.md",
-      "ownsReadme": true,
-      "technicalDocumentation": "src/Koan.Orchestration.Aspire.Abstractions/TECHNICAL.md",
-      "claims": []
-    },
-    {
       "packageId": "Sylin.Koan.Redis",
       "shape": "library",
-      "description": "Shared Redis backend lifecycle, discovery, orchestration, and connection pooling for Koan adapters.",
+      "description": "Shared Redis backend lifecycle, discovery, and connection pooling for Koan adapters.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Orchestration.Aspire.Abstractions",
         "Sylin.Koan.Redis.Abstractions"
       ],
       "readme": "src/Koan.Redis/README.md",

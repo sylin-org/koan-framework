@@ -47,8 +47,8 @@ generated package-quality and product-surface references.
 
 R11-01 opened with 109 packages: 37 required an objective repair, 72 required review, and none was inferred
 graduated. Subsequent family work retired unearned identities and introduced only independently useful contract or
-shared-mechanism boundaries. The current evaluated graph contains 95 packages: 3 repair-required, 11
-review-required, and 81 structurally ready across 26 claims. The active matrix contains only present package projects;
+shared-mechanism boundaries. The current evaluated graph contains 93 packages: 3 repair-required, 10
+review-required, and 80 structurally ready across 26 claims. The active matrix contains only present package projects;
 implemented retirements remain in the disposition tables as release-lineage decisions.
 
 ## Exact active matrix
@@ -125,8 +125,6 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Media.Core` | `capability` | `keep` |
 | `Sylin.Koan.Media.Web` | `projection` | `keep` |
 | `Sylin.Koan.Observability` | `capability` | `keep` (implemented) |
-| `Sylin.Koan.Orchestration.Aspire.Abstractions` | `contracts` | `keep` |
-| `Sylin.Koan.Orchestration.Aspire` | `projection` | `assess` |
 | `Sylin.Koan.Redis` | `provider` | `keep` |
 | `Sylin.Koan.Redis.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Security.Trust` | `capability` | `assess` |
@@ -158,10 +156,10 @@ in the family disposition tables, not as phantom active-package rows.
 
 ### Shelved source outside the active package matrix
 
-The bespoke Orchestration CLI family is deferred beyond V1 rather than retired. Its six projects live together under
-`shelved/orchestration-cli/`, are absent from `Koan.sln`, and sit outside the release compiler's active `src/`,
-`packaging/`, and top-level `templates/` discovery roots. The source remains directly buildable for later product
-reassessment; it has no V1 package identity, claim, polish, or certification obligation.
+The bespoke Orchestration CLI and Aspire experiments are deferred beyond V1 rather than retired. Their projects live
+under `shelved/orchestration-cli/` and `shelved/orchestration-aspire/`, are absent from `Koan.sln`, and sit outside the
+release compiler's active `src/`, `packaging/`, and top-level `templates/` discovery roots. The source remains directly
+buildable for later product reassessment; it has no V1 package identity, claim, polish, or certification obligation.
 
 | Shelved project identity | Disposition |
 |---|---|
@@ -171,6 +169,8 @@ reassessment; it has no V1 package identity, claim, polish, or certification obl
 | `Sylin.Koan.Orchestration.Connector.Docker` | `defer` (outside V1) |
 | `Sylin.Koan.Orchestration.Connector.Podman` | `defer` (outside V1) |
 | `Sylin.Koan.Orchestration.Renderers.Connector.Compose` | `defer` (outside V1) |
+| `Sylin.Koan.Orchestration.Aspire` | `defer` (outside V1) |
+| `Sylin.Koan.Orchestration.Aspire.Abstractions` | `defer` (outside V1) |
 
 ## First review order
 
@@ -214,8 +214,8 @@ terminal package decisions; the listed boundary repairs happen before graduation
 | `Sylin.Koan.Cache.Adapter.Redis` | `keep` | Redis Remote Cache and layered invalidation are distinct, evidenced mechanics. The adapter references the shared Redis backend, activates no Data provider, and adds no Cache-specific bootstrap code. |
 | `Sylin.Koan.Data.Connector.Redis` | `keep` | Redis-backed Entity persistence remains a distinct Data provider. It now owns only repository behavior, logical database/source routing, Data capabilities, and participation-aware health while the shared Redis backend owns physical connectivity. |
 | `Sylin.Koan.Redis.Abstractions` | `keep` | Inert source-aware connection-pool vocabulary shared by Redis-backed modules; simple consumers continue to use StackExchange.Redis's standard `IConnectionMultiplexer`. |
-| `Sylin.Koan.Redis` | `keep` | One functional owner for Redis endpoint configuration, discovery, orchestration, connection pooling, and host-lifetime disposal. It contains no Data, Cache, or Communication semantics and normally arrives transitively. |
-| `Sylin.Koan.Orchestration.Aspire.Abstractions` | `keep` | Inert `IKoanAspireResources` vocabulary independently consumed by resource contributors. Its extraction prevents Redis/Postgres modules from activating the functional Aspire runtime merely to describe AppHost resources. |
+| `Sylin.Koan.Redis` | `keep` | One functional owner for Redis endpoint configuration, discovery, connection pooling, and host-lifetime disposal. It contains no Data, Cache, Communication, or AppHost semantics and normally arrives transitively. |
+| `Sylin.Koan.Orchestration.Aspire.Abstractions` | `defer` (outside V1) | Its isolation was valid source shaping, but Redis/Postgres were its only consumers and standard Aspire already owns resource construction in an explicitly authored AppHost. The contract and discovery projection now remain together as buildable shelved source. |
 | `Sylin.Koan.Media.Abstractions` | `keep` | Inert recipe, pipeline, registry, output, and media-object vocabulary. Functional `MediaEntity<TEntity>` moved out; the package now depends only on Data and Storage contract assemblies. |
 | `Sylin.Koan.Media.Core` | `keep` | Functional owner of Entity-backed originals, content-addressed storage semantics, recipe discovery/validation, image planning/execution, and Media runtime facts. The application type now lives in the honest `Koan.Media` namespace. |
 | `Sylin.Koan.Data.Abstractions` | `keep` | Entity and repository vocabulary independently consumed by providers, projections, and modules without selecting a data runtime or backend. Its legacy ASP.NET JSON Patch dependency and duplicate object-shaped patch path were removed; the boundary now exposes one provider-neutral `PatchPayload`. |
@@ -229,7 +229,7 @@ terminal package decisions; the listed boundary repairs happen before graduation
 | `Sylin.Koan.Data.Connector.OpenSearch` | `keep` | One reference elects OpenSearch's independent service identity, discovery/orchestration vocabulary, and native `knn_vector`/`query.knn` dialect over the shared SearchEngine mechanics. |
 | `Sylin.Koan.Data.Connector.Json` | `keep` | Bounded, file-backed local provider that gives the foundation bundle an immediate meaningful result. Its package page must state its concurrency and deployment limits plainly. |
 | `Sylin.Koan.Data.Connector.Sqlite` | `keep` | Durable embedded relational provider selected by one reference, with a materially different guarantee from JSON. |
-| `Sylin.Koan.Data.Connector.Postgres` | `keep` | PostgreSQL provider with independent discovery, source routing, health, orchestration contribution, and provider identity over shared Npgsql mechanics. |
+| `Sylin.Koan.Data.Connector.Postgres` | `keep` | PostgreSQL provider with independent discovery, source routing, health, and provider identity over shared Npgsql mechanics. External topology remains application/tool owned. |
 | `Sylin.Koan.Data.Connector.Cockroach` | `keep` | CockroachDB provider with independent identity/discovery/health and an explicit primary-key stable-order delta over shared Npgsql mechanics. It no longer references PostgreSQL. |
 | `Sylin.Koan.Data.Connector.SqlServer` | `keep` | SQL Server provider with distinct driver, JSON-computed projection, paging, and DDL mechanics; its repository does not yet justify forced convergence with SQLite or Npgsql. |
 | `Sylin.Koan.Web` | `keep` | Controller-first ASP.NET Core projection, health, and well-known inspectability. It is the direct owner of `EntityController<T>`. |

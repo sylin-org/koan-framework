@@ -6,8 +6,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsNotAsErrors />
-    <Description>Aspire resource registration for Koan modules: auto-register distributed dependencies and align with Koan orchestration metadata.</Description>
-    <PackageTags>$(CommonPackageTags);aspire;orchestration;distributed</PackageTags>
+    <Description>Shelved experiment in automatic Koan resource-contributor discovery for an Aspire AppHost.</Description>
+    <PackageTags>$(CommonPackageTags);shelved;aspire;experiment</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting" Version="13.0.0" />
@@ -17,7 +17,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.Orchestration.Aspire.Abstractions\Koan.Orchestration.Aspire.Abstractions.csproj" />
   </ItemGroup>
 </Project>

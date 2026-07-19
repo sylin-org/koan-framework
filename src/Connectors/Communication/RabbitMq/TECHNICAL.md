@@ -70,9 +70,9 @@ The elected adapter opens one auto-recovering RabbitMQ connection plus publisher
 channels during host start, declares topology, and binds all local receiver groups before reporting
 ready. Graceful host stop closes consumer, publisher, and connection in that order.
 
-Discovery considers the standard `ConnectionStrings:RabbitMq` endpoint, `RABBITMQ_URL`, Aspire
-endpoints, and Koan orchestration. Candidate health is proven with a real AMQP connection. Direct
-reference intent enables orchestration; explicit endpoint configuration also enables it.
+Discovery considers the standard `ConnectionStrings:RabbitMq` endpoint, `RABBITMQ_URL`, Aspire endpoints, and
+environment-appropriate local/container candidates. Candidate health is proven with a real AMQP connection. The
+application or its standard deployment tool owns broker lifecycle.
 
 `communication.rabbitmq` is healthy and non-critical while the connector is merely available. Once
 elected, it is critical and healthy only while the connection and both channels are open. Diagnostic

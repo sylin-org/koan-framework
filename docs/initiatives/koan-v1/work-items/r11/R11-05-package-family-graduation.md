@@ -4631,6 +4631,106 @@ R11-02 disposition now state the same public promise and limits. No live collect
 completed family suite, private downstream application, full release ratchet, publication, push, tag, release, or
 remote mutation ran.
 
+## Aspire family discovery and disposition checkpoint
+
+**Task:** move the two bespoke Aspire projects outside V1 and remove active bridges that have no consumer after that
+move.
+
+**Application intent:** an Aspire AppHost explicitly owns application topology through standard resources and
+`WithReference`; a Koan application consumes the connection strings and service endpoints Aspire injects.
+
+**Public expression:** the AppHost references the applicable standard Aspire hosting integration and uses ordinary
+Aspire C#:
+
+```csharp
+var builder = DistributedApplication.CreateBuilder(args);
+var postgres = builder.AddPostgres("postgres");
+builder.AddProject<Projects.App>("app").WithReference(postgres);
+await builder.Build().RunAsync();
+```
+
+The application project references its Koan connector as usual. There is no Koan Aspire package, contributor
+interface, model decoration, registration call, configuration section, or process mutation. Redis follows the same
+shape with Aspire's standard Redis hosting integration.
+
+**Guarantee and correction:** Aspire owns resource construction, lifecycle, dashboard, references, and its standard
+corrective failures. Koan guarantees no second topology or container lifecycle; its connectors continue to consume
+standard `ConnectionStrings:*` values and Aspire service endpoints through the existing discovery adapters. Missing or
+invalid infrastructure remains a connector/Aspire failure, not an inferred Koan provisioning promise.
+
+**Complete intent surface and public concepts:** beyond the standard AppHost expression and the application's normal
+Koan connector reference, there are none. `IKoanAspireResources`, `AddKoanDiscoveredResources`, `AddKoanModule`,
+`UseKoanProviderSelection`, provider priorities, automatic assembly loading, self-orchestration options, and Koan-owned
+Docker lifecycle are not business decisions V1 users need to learn.
+
+**Docs read:** `CLAUDE.md` and architecture principles require standard .NET before Koan ceremony and one owner for
+lifecycle; ARCH-0077 identifies Aspire as the first-party topology owner but its proposed bridge-package expansion is
+not authority; current R11/NOW require a fresh terminal Aspire decision; current package companions expose both
+AppHost discovery and an unrelated in-application Docker runtime and admit no graduated sample or public guarantee.
+
+**Code read:** `KoanAspireExtensions` force-loads `Koan.*.dll`, constructs modules with `Activator`, builds a temporary
+service provider, mutates process/dashboard environment, swallows discovery failures, and exposes placeholder Docker
+selection. `AspireModule` separately activates a Docker hosted service in Development. Redis and Postgres are the only
+`IKoanAspireResources` implementations and merely call standard `AddRedis`/`AddPostgres`. Core's
+`IKoanOrchestrationEvaluator` and seven connector evaluators are consumed only by that self-orchestration runtime.
+
+**Reusing:** Aspire's `IDistributedApplicationBuilder`, resource integrations, project references, connection-string
+injection, and lifecycle remain the topology owner. Koan retains `KoanEnv` detection for external
+Aspire/Compose/Kubernetes contexts, `IServiceDiscoveryAdapter`, connector options, health, and standard connection
+resolution.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| shelf orientation only | `shelved/orchestration-aspire/README.md` | explain the non-product source boundary and future re-entry gate without creating runtime machinery |
+
+**Coalescence:** closest product pattern is the standard AppHost expression above, not the current reflection-based
+extension. Specificity belongs to the application/AppHost and standard Aspire integrations. Disposition:
+`defer` both Koan Aspire projects outside V1; `delete` the active contributor contract/implementations, Aspire.Hosting
+dependencies in Redis/Postgres, in-app self-orchestration runtime, Core evaluator SPI/base, seven provider evaluators,
+and the false `SelfOrchestrating` mode/configuration. Core is too broad to own application topology, connectors are too
+narrow to decide which resources an AppHost runs, and a Koan Aspire pillar duplicates the standard owner.
+
+**Ergonomics:** humans, IntelliSense, and coding models see one ordinary Aspire topology and one ordinary Koan
+application. No hidden scan, priority ordering, type activation, temporary DI container, environment mutation, or
+parallel lifecycle must be inferred. The application graph is readable where it is authored.
+
+**Constraints satisfied:** no Entity/data-operation semantics, HTTP route, controller, request context, large-data
+path, new constants/options, or new public type; stable external-context detection remains Core-owned; provider
+discovery and health remain adapter-owned; current docs/generated truth move with the source boundary; validation is
+limited to affected Core/connector/source/package/docs cells, with the full release ratchet reserved for R11-07.
+
+**Risks:** changing Development from a false self-orchestration label to `Standalone` affects environment facts and
+fallback selection but starts no previously earned behavior because the Aspire package has no active source consumer.
+Removing evaluator registrations touches seven providers; focused compile and the directly affected RabbitMQ/Core
+evidence must prove ordinary discovery and runtime composition remain intact.
+
+**Autonomous architecture checkpoint:** proceed with the standard Aspire/application owner, physically shelf both
+Aspire projects, and remove the now-ownerless contributor and self-container evaluator branches. The user's explicit
+instruction to move Aspire supplies standing approval for this scope.
+
+### Aspire focused completion evidence
+
+- `Sylin.Koan.Orchestration.Aspire` and `.Aspire.Abstractions` now live under
+  `shelved/orchestration-aspire/`, are absent from `Koan.sln`, and remain source-buildable with zero Release
+  warnings/errors. The shelf retains only the inspectable AppHost discovery experiment; its in-application Docker
+  lifecycle was deleted rather than preserved as a false alternative owner.
+- Redis/Postgres no longer reference the contributor contract or `Aspire.Hosting.Redis`/`.PostgreSQL`; ordinary
+  Release builds for Redis, Postgres, Mongo, Cockroach, Couchbase, Weaviate, and RabbitMQ succeed with zero
+  warnings/errors.
+- Core's ownerless evaluator SPI/base, all seven provider evaluators/registrations, and the false
+  `SelfOrchestrating` mode/configuration were removed. External Aspire, Compose, and Kubernetes detection plus normal
+  connector discovery, health, and connection resolution remain.
+- Focused Core service-discovery evidence passes 15/15, including the Aspire automatic-source slot. The directly
+  affected RabbitMQ suite passes 8/8 after removing its evaluator-only assertion.
+- Current architecture, connector-authoring, Aspire, capability-map, case-study, and generated product docs state one
+  topology owner. The strict docs build passes.
+- Release inventory and generated product truth contain 93 active packages and 26 claims, with neither Aspire identity;
+  generated quality is 3 repair / 10 review / 80 structurally ready.
+- No full release ratchet, pack/publish/audit wave, unrelated family suite, private downstream inspection, push, tag,
+  release, deployment, or remote mutation ran.
+
 ## Orchestration CLI family deferral
 
 ### V1 application contract
@@ -4677,9 +4777,9 @@ plus their absence from `Koan.sln`, is the publication boundary. No six-project 
 feature flag, package-selection exception, or new Koan lifecycle concept is introduced. The six projects receive no
 V1 package polish, support claim, or release-certification obligation.
 
-The Aspire family is deliberately not part of this decision. `Sylin.Koan.Orchestration.Aspire` and
-`.Aspire.Abstractions` remain separately assessable because they do not depend on the CLI stack and must earn their
-own thin, standard-.NET boundary or disposition.
+The later Aspire checkpoint above evaluated that independent family on its own evidence and deferred both Aspire
+projects alongside, but not inside, this CLI shelf. The decisions share a standard external topology owner without
+pretending the two experiments were one implementation family.
 
 ### Focused completion evidence
 

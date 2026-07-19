@@ -68,11 +68,7 @@ public static class Constants
 
         public static class Orchestration
         {
-            public const string Section = "Koan:Orchestration";
             public const string ForceOrchestrationMode = "Koan:Orchestration:ForceOrchestrationMode";
-            public const string EnableSelfOrchestration = "Koan:Orchestration:EnableSelfOrchestration";
-            public const string ValidateNetworking = "Koan:Orchestration:ValidateNetworking";
-            public const string NetworkValidationTimeoutMs = "Koan:Orchestration:NetworkValidationTimeoutMs";
         }
 
         public static class Observability

@@ -14,7 +14,6 @@ using Koan.Core.Orchestration.Abstractions;
 using Koan.Core.Provenance;
 using Koan.Data.Abstractions;
 using Koan.Data.Connector.Mongo.Discovery;
-using Koan.Data.Connector.Mongo.Orchestration;
 using MongoItems = Koan.Data.Connector.Mongo.Infrastructure.MongoProvenanceItems;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
@@ -44,9 +43,6 @@ public sealed class MongoModule : KoanModule
         services.AddSingleton<MongoClientProvider>();
         services.AddSingleton<IDataAdapterFactory, MongoAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MongoHealthContributor>());
-
-        // Register orchestration evaluator for dependency management
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, MongoOrchestrationEvaluator>());
 
         // Register MongoDB discovery adapter (maintains "Reference = Intent")
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, MongoDiscoveryAdapter>());

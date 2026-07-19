@@ -40,7 +40,7 @@ Default-source adapter setting when adding another connector must not move exist
 
 ## Configuration
 
-`auto` is the default and uses Koan's discovery/orchestration path, then the local Couchbase fallback.
+`auto` is the default and uses Koan's discovery path, then the local Couchbase fallback.
 Use exact provider configuration only when placement or native guarantees require it:
 
 ```json

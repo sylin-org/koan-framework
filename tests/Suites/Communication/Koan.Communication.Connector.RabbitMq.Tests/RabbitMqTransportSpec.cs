@@ -1,10 +1,8 @@
 using System.Collections.Concurrent;
-using Koan.Communication.Connector.RabbitMq.Orchestration;
 using Koan.Communication.Signals;
 using Koan.Core.Composition;
 using Koan.Core.Diagnostics;
 using Koan.Core.Observability.Health;
-using Koan.Core.Orchestration;
 using Koan.Tenancy;
 using Microsoft.Extensions.Configuration;
 
@@ -198,36 +196,6 @@ public sealed class RabbitMqTransportSpec(RabbitMqFixture rabbit) : IClassFixtur
         failure.Acceptance.Accepted.Should().Be(0);
         failure.Acceptance.Rejected.Should().Be(1);
         state.Observations.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task Direct_connector_intent_enables_zero_configuration_orchestration()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var state = new RabbitState(expected: 1);
-        await using var host = await Start(state, rabbit.ConnectionString, ct);
-        var references = host.Services.GetRequiredService<KoanApplicationReferenceManifest>();
-        var evaluator = new RabbitMqOrchestrationEvaluator(references);
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Koan:Orchestration:Global"] = "Always"
-            })
-            .Build();
-
-        var decision = await evaluator.Evaluate(configuration, new OrchestrationContext
-        {
-            Mode = OrchestrationMode.Standalone,
-            SessionId = "rabbit-spec",
-            AppId = "rabbit-spec",
-            AppInstance = "one",
-            EnvironmentVariables = []
-        });
-
-        decision.Action.Should().Be(OrchestrationAction.ProvisionContainer);
-        decision.DependencyDescriptor!.Image.Should().Be("rabbitmq:3.13-management");
-        decision.DependencyDescriptor.Environment["RABBITMQ_DEFAULT_USER"].Should().Be("koan");
-        decision.DependencyDescriptor.Environment["RABBITMQ_DEFAULT_PASS"].Should().Be("koan");
     }
 
     [Fact]

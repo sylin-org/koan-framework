@@ -26,7 +26,6 @@ public sealed class IdentityHostFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         _host = await KoanIntegrationHost.Configure()
-            .WithSetting("Koan:Orchestration:EnableSelfOrchestration", "false")
             .ConfigureServices(s => s.AddKoan())
             .StartAsync();
     }

@@ -38,10 +38,10 @@ public interface IOrchestrationAwareServiceDiscovery
 public record OrchestrationConnectionHints
 {
     /// <summary>
-    /// Connection string for self-orchestration mode (app on host, dependencies in containers)
+    /// Connection string for a dependency reachable from the local host.
     /// Default: localhost:{port}
     /// </summary>
-    public string? SelfOrchestrated { get; init; }
+    public string? Local { get; init; }
 
     /// <summary>
     /// Connection string for Docker Compose mode (app and dependencies in containers)

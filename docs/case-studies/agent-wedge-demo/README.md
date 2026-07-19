@@ -52,7 +52,7 @@ checked-in [`koan.lock.json`](app/) emitted at build, P1.1) name every module it
 
 ```text
 │ Name          : Recs
-│ Environment   : Development (SelfOrchestrating)
+│ Environment   : Development (Standalone)
 │ Runtime       : Koan.Core 0.17.0.0
 │ Composition   : 9 modules · lockfile ok        ← P1.1: matches the checked-in koan.lock.json
 │ Koan.Data.Connector.Sqlite: 0.17.0.0
@@ -67,7 +67,6 @@ review would see — `git diff koan.lock.json` is the composition changing:
 ```diff
    "modules": [
 +    { "id": "Koan.Data.Connector.Postgres", "version": "0.17" },
-+    { "id": "Koan.Orchestration.Aspire",    "version": "0.17" },
 ```
 
 ## Beat 3 — swap SQLite → Postgres (zero code change)
@@ -81,8 +80,9 @@ Add the Postgres connector reference and point the default source at it — **no
 { "Koan": { "Data": { "Sources": { "Default": { "Adapter": "postgres" } } } } }
 ```
 
-In Development, Koan **self-orchestrates** the infrastructure — it provisioned a Postgres container and
-connected to it (no `docker run`, no connection string):
+Run Postgres with standard Aspire, Compose, Docker, or another topology owner and provide its standard
+`ConnectionStrings:Postgres` value. Koan elects the connector and discovers the supplied endpoint; it does not create
+a second container lifecycle:
 
 ```text
 │ Composition   : 11 modules · lockfile ok

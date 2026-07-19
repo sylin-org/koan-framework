@@ -1,7 +1,7 @@
 # Sylin.Koan.Redis technical notes
 
-`RedisModule` owns endpoint configuration, autonomous discovery, orchestration/Aspire contribution, connection
-construction, and host-lifetime disposal. It registers StackExchange.Redis's `IConnectionMultiplexer` for ordinary
+`RedisModule` owns endpoint configuration, autonomous discovery, connection construction, and host-lifetime disposal.
+It registers StackExchange.Redis's `IConnectionMultiplexer` for ordinary
 single-endpoint consumers and implements `IRedisConnectionProvider` for source-aware modules.
 
 The provider creates connections lazily and reuses one multiplexer for each distinct connection string. The owning
@@ -17,3 +17,6 @@ Cache-only application does not activate a Data provider merely because both can
 Configuration precedence is `ConnectionStrings:Redis`, `Koan:Redis:ConnectionString`, `REDIS_URL`, then
 `REDIS_CONNECTION_STRING`; absent explicit configuration, Koan discovery resolves the endpoint or falls back to
 `localhost:6379`/`redis:6379` according to the host environment.
+
+The package consumes endpoints supplied by standard Aspire/Compose/container/managed topology; it does not reference
+AppHost packages or create resources.

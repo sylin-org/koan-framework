@@ -303,7 +303,6 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
         {
             await using var host = KoanIntegrationHost.Configure()
                 .WithEnvironment("Test")
-                .WithSetting("Koan:Orchestration:EnableSelfOrchestration", "false")
                 .WithSetting("Koan:Identity:Posture", "Open")
                 .ConfigureServices(s => s.AddKoan())
                 .Build();
@@ -329,7 +328,6 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
         {
             await using var host = KoanIntegrationHost.Configure()
                 .WithEnvironment("Test")
-                .WithSetting("Koan:Orchestration:EnableSelfOrchestration", "false")
                 .WithSetting("Koan:Identity:Posture", "Typo")
                 .ConfigureServices(s => s.AddKoan())
                 .Build();

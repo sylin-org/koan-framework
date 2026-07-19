@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 95,
+    "packages": 93,
     "repairRequired": 3,
-    "reviewRequired": 11,
-    "structurallyReady": 81,
-    "ownedReadmes": 92,
-    "technicalCompanions": 87,
-    "findings": 45
+    "reviewRequired": 10,
+    "structurallyReady": 80,
+    "ownedReadmes": 90,
+    "technicalCompanions": 85,
+    "findings": 42
   },
   "findingDefinitions": [
     {
@@ -847,8 +847,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Relational",
-        "Sylin.Koan.Data.Relational.Npgsql",
-        "Sylin.Koan.Orchestration.Aspire.Abstractions"
+        "Sylin.Koan.Data.Relational.Npgsql"
       ],
       "readme": "src/Connectors/Data/Postgres/README.md",
       "technicalDocumentation": "src/Connectors/Data/Postgres/TECHNICAL.md",
@@ -1409,57 +1408,17 @@
       "findings": []
     },
     {
-      "packageId": "Sylin.Koan.Orchestration.Aspire",
-      "projectPath": "src/Koan.Orchestration.Aspire/Koan.Orchestration.Aspire.csproj",
-      "shape": "library",
-      "role": "projection",
-      "status": "review-required",
-      "description": "Aspire resource registration for Koan modules: auto-register distributed dependencies and align with Koan orchestration metadata.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Orchestration.Aspire.Abstractions"
-      ],
-      "readme": "src/Koan.Orchestration.Aspire/README.md",
-      "technicalDocumentation": "src/Koan.Orchestration.Aspire/TECHNICAL.md",
-      "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
-    },
-    {
-      "packageId": "Sylin.Koan.Orchestration.Aspire.Abstractions",
-      "projectPath": "src/Koan.Orchestration.Aspire.Abstractions/Koan.Orchestration.Aspire.Abstractions.csproj",
-      "shape": "library",
-      "role": "contracts",
-      "status": "structurally-ready",
-      "description": "Inert Aspire resource-contribution contract for Koan modules and backend adapters.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [],
-      "readme": "src/Koan.Orchestration.Aspire.Abstractions/README.md",
-      "technicalDocumentation": "src/Koan.Orchestration.Aspire.Abstractions/TECHNICAL.md",
-      "packageIcon": "icon.png",
-      "findings": []
-    },
-    {
       "packageId": "Sylin.Koan.Redis",
       "projectPath": "src/Koan.Redis/Koan.Redis.csproj",
       "shape": "library",
       "role": "capability",
       "status": "structurally-ready",
-      "description": "Shared Redis backend lifecycle, discovery, orchestration, and connection pooling for Koan adapters.",
+      "description": "Shared Redis backend lifecycle, discovery, and connection pooling for Koan adapters.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Orchestration.Aspire.Abstractions",
         "Sylin.Koan.Redis.Abstractions"
       ],
       "readme": "src/Koan.Redis/README.md",
