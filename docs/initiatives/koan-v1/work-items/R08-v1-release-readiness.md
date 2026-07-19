@@ -4,22 +4,31 @@ domain: framework
 title: "R08 - Make Koan V1 Responsibly Releasable"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-17
-  status: in-progress
-  scope: R08-01 through R08-04 passed locally; R08-05 prepared; public observation and upgrade proof remain
+  date_last_tested: 2026-07-19
+  status: stopped
+  scope: R08-01 through R08-04 and R08-05 local evidence retained; public observation and upgrade tail superseded by R12
 ---
 
 # R08 — Make Koan V1 responsibly releasable
 
 - Tranche: `T7B — V1 release readiness`
-- Status: `pending R10 sample graduation and explicit remote authorization`
+- Status: `stopped — remaining public-observation and upgrade work superseded by R12`
 - Depends on: passed R09; R08-01 preserves its completed release-wave baseline
 - Unlocks: one trustworthy public package generation, coherent package-first first use, and the
   explicit V1 decision
 - Owner: release-wave truth, public product boundary, upgrade contract, and release evidence
+
+## Supersession
+
+R08's local release mechanism and candidate evidence remain authoritative. The maintainer opened
+[R12 — Road to the 0.20 Preview](R12-road-to-020-preview.md) as the product-maturity epic on
+2026-07-19. R12 preserves R08-01 through R08-05's local proof, replaces the earlier publish-everything
+assumption with selective 0.20 promotion for guaranteed packages, and owns coherent public narrative,
+external publication, upgrade, recovery observation, and feedback. Do not resume this card as a
+parallel release plan.
 
 ## Meaningful outcome
 
@@ -66,17 +75,17 @@ configuration changed.
 - Public `Sylin.Koan` and `Sylin.Koan.App` stop at `0.5.2` and their dependency ranges cannot resolve
   against the current public leaf packages. Public Core reaches `0.17.0`; Communication and Templates
   have no public version. NuGet is not a coherent first-use path.
-- The new `release-on-dev` workflow exists only in the local 56-commit advancement and has never been
-  observed. The required non-secret `NUGET_USER` repository variable is absent, so the first run would
-  currently fail.
+- The new `release-on-dev` workflow has never been observed publicly. Its initial OIDC design was later
+  simplified to the established `NUGET_API_KEY` repository secret, scoped only to exact promotion steps.
 - Canonical source intent is now enforced across inventory and historical lineage reads, and
   `src/Koan.AI/version.json` is corrected to `0.18`. Git remains the sole patch-identity owner.
 - The console template pins `Sylin.Koan` to `0.17.*` although the current bundle intent is `0.18`.
   Neither template is installed, instantiated, restored, built, and run by the clean-room gate.
 - PMC-016 and PMC-017 are closed locally. Lineage schema 3 retains prior/current input ownership; one
   exact hash-bound GitHub Release escrow supplies resumable package and symbol custody.
-- The workflow now has six permission boundaries: proof is read-only, staging has contents write but no
-  OIDC credential, and promotion consumes exact prepared evidence with narrow write plus OIDC authority.
+- The workflow now has six authority boundaries: proof is read-only, staging has contents write but no
+  NuGet credential, and promotion consumes exact prepared evidence with narrow write plus a step-scoped
+  API key.
 - Connector-owned configuration, discovery, health-selection, and startup telemetry now crosses one
   credential-safe structured boundary; PMC-019 is resolved by R08-02. This does not yet promote any provider.
 - There is no current public upgrade rehearsal, support window, rollback contract, or single
@@ -108,8 +117,8 @@ configuration changed.
   database.
 - Prefer generated exact template dependency identities over hand-maintained shared minor pins or
   floating-to-any-version restores.
-- Treat one-time trusted-publishing setup as deployment configuration; after setup, normal release
-  events require no operator input.
+- Treat the existing publish-scoped API-key secret and immutable-Release setting as deployment
+  configuration; after setup, normal release events require no operator input.
 
 ### OPEN
 
@@ -139,10 +148,9 @@ configuration changed.
 6. **[R10 — golden sample portfolio](R10-golden-samples.md) — in progress.** Graduate every maintained
    sample as a current, executable Koan example; GardenCoop establishes the evidence template. R08-05 waits so
    the first public wave does not publish a framework whose own curriculum teaches legacy structure.
-7. **[R08-05 — initial coherent public observation](r08/R08-05-initial-public-observation.md) — pending
-   explicit authorization.** One readiness/observation contract covers trusted publishing, immutable evidence
-   custody, exact package-only startup truth, NuGet-only installs, and fail-closed recovery. Preparation performs
-   no remote mutation.
+7. **[R08-05 — initial coherent public observation](r08/R08-05-initial-public-observation.md) — stopped
+   and superseded by R12.** Its local readiness contract and exact evidence remain authoritative; its
+   publish-everything candidate is not the selective 0.20 guarantee wave. Preparation performed no remote mutation.
 8. **Real upgrade/rollback proof.** Stage a later candidate, upgrade an application created from the coherent
    public baseline, restore its prior project/lock state, and publish the compatibility/support contract.
 9. **Explicit V1 decision.** Ask the architect only after observed public and upgrade/rollback evidence agree.

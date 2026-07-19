@@ -4,10 +4,10 @@ domain: framework
 title: "Koan V1 Reorganization Roadmap"
 audience: [architects, maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-16
+last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-16
+  date_last_tested: 2026-07-19
   status: reviewed
   scope: tranche dependencies and exit criteria
 ---
@@ -28,7 +28,8 @@ T0 Privacy and memory boundary
                   -> T5 Golden V0-to-V1 proof
                       -> T6 Capability-ring graduation
                           -> T7A Semantic Composition Kernel
-                              -> T7B V1 release readiness
+                              -> T7B Local release-candidate readiness
+                                  -> T7C 0.20 public-preview maturity
 ```
 
 Feedback may move from later tranches to earlier ones. A later tranche cannot declare an earlier exit
@@ -144,21 +145,36 @@ business code.
 - startup, facts, health, errors, agents, and tests project the same canonical decisions;
 - superseded registries, cross-pillar shortcuts, and post-hoc decision twins are deleted.
 
-## T7B — V1 release readiness
+## T7B — Local release-candidate readiness
 
-**Outcome:** the public product, package set, upgrade contract, documentation, and actual implementation
-describe the same framework.
+**Outcome:** source, package topology, samples, release mechanics, and one exact local candidate describe
+the same framework before external publication.
 
 **Exit gate:**
 
-- atomic packages and templates are published and clean-install verified;
-- SemVer and compatibility policy are enforced;
-- upgrade rehearsal is green;
-- support and provider matrices are current;
-- production guidance covers schema, deployment, recovery, diagnostics, and security posture;
-- public claims are generated from or linked to repository evidence;
-- experimental surfaces cannot be mistaken for foundation;
+- release lineage, exact escrow, package selection, and recovery fail closed locally;
 - every maintained sample has graduated golden-example evidence or an explicit non-maintained disposition;
-- every active NuGet package earns a distinct reference intent, package-owned orientation, truthful metadata,
-  and role-proportional consumer evidence or has a terminal merge/split/rename/retire disposition;
-- the architect makes an explicit V1 release decision.
+- every active NuGet package earns a distinct reference intent, package-owned orientation, truthful
+  metadata, and role-proportional consumer evidence or has a terminal disposition;
+- public claims are generated from or linked to repository evidence;
+- an exact package-only candidate proves templates, FirstUse, GoldenJourney, and immutable-byte custody;
+- no publication occurs implicitly as part of candidate construction.
+
+## T7C — 0.20 public-preview maturity
+
+**Outcome:** the contracts Koan is prepared to guarantee earn the 0.20 version signal and become one
+coherent, externally testable public product. Other packages retain truthful lower maturity and version
+signals rather than inheriting promotion from repository membership.
+
+**Exit gate:**
+
+- the exact NuGet/SemVer preview, compatibility, support, and feedback contract is explicit;
+- each package promoted to 0.20 maps to a supported guarantee and a defensible public dependency boundary;
+- preview-blocking runtime, safety, configuration, and lifecycle concerns are fixed, removed, or excluded;
+- all public-facing content tells one present-tense greenfield narrative and is guarded against drift;
+- the recommended spine, advanced extensions, experiments, and non-claims are unmistakable;
+- the coherent preview packages and templates are published and clean-install verified;
+- an independent later wave proves upgrade and interrupted-publication recovery;
+- production guidance covers schema, deployment, recovery, diagnostics, secrets, and security posture;
+- external public-context-only readers reproduce the intended journey and their anonymous feedback is triaged;
+- the architect receives an explicit go/no-go record for the next maturity band.

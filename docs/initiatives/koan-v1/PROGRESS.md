@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-19
   status: in-progress
-  scope: R11 completion, R08-05 exact 93-package local candidate, and focused API-key promotion contract
+  scope: R12 opening, selective 0.20 guarantee promotion, and coherent-public-narrative mandate
 ---
 
 # Koan V1 Reorganization Progress
@@ -20,14 +20,14 @@ or completes a work item. The roadmap describes order; it does not report progre
 ## Initiative state
 
 - Overall: `active`
-- Current tranche: `T7B — responsible release / public observation`
-- Active work item: [R08 — Make Koan V1 responsibly releasable](work-items/R08-v1-release-readiness.md)
-- Active child: [R08-05 — Initial coherent public observation](work-items/r08/R08-05-initial-public-observation.md)
+- Current tranche: `T7C — 0.20 public-preview maturity`
+- Active work item: [R12 — Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md)
+- Active child: [R12-01 — Preview contract and version band](work-items/r12/R12-01-preview-contract-and-version-band.md)
 - Most recently passed child: [R11-07 — Certify the release boundary](work-items/r11/R11-07-release-certification-boundary.md)
-- Pending release boundary: local exact-candidate proof is current; remote API-key/immutable-Release setup and one public
-  `dev` observation still require separate explicit authorization
-- V1 readiness: `not ready`; public observation, later upgrade/rollback proof,
-  and an explicit release decision remain
+- Pending release boundary: decide which guarantees earn 0.20, repair their exact public boundaries,
+  realign all public-facing content, and compile a fresh selective candidate before remote observation
+- Preview readiness: `not ready`; version semantics, guarantee admission, coherent narrative, public
+  observation, later upgrade/recovery proof, and an explicit maturity decision remain
 
 ## Work items
 
@@ -41,10 +41,11 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 | R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
 | R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | passed | R06 | Codex · 2026-07-16 | R07-01 through [R07-18](work-items/r07/R07-18-business-channels.md) pass. Lifecycle, Events, Transport, cardinality, context, provider election, internal convergence, pointwise pillar operations, and inspectability now share explicit owners; stable heterogeneous Communication evolution remains PMC-023. |
-| R08 | [Make Koan V1 responsibly releasable](work-items/R08-v1-release-readiness.md) | T7B | in-progress | R09; R10; R11 | Codex · 2026-07-19 | R08-01 through R08-04 pass. R08-05 now proves the exact 93-package current candidate, both templates, FirstUse, GoldenJourney, and local escrow; the established `NUGET_API_KEY` is isolated to exact promotion steps; remote prerequisite verification/public observation remains separately unauthorized. |
+| R08 | [Make Koan V1 responsibly releasable](work-items/R08-v1-release-readiness.md) | T7B | stopped | R09; R10; R11 | Maintainer + Codex · 2026-07-19 | R08-01 through R08-04 and R08-05's exact local candidate/API-key evidence remain valid. Its unexecuted publish-everything observation and upgrade tail are superseded by R12's selective guarantee promotion; no remote mutation occurred. |
 | R09 | [Compile the Semantic Composition Kernel](work-items/R09-semantic-composition-kernel.md) | T7A | passed | R07; protects R08-01 | Codex · 2026-07-17 | R09-01 through R09-09 passed. One retained module lifecycle, compiled semantic constitution, typed contribution/election mechanics, hard capability overlays, canonical evidence, contract isolation, and legacy-kernel deletion are proved. ARCH-0115 and ARCH-0116 record the result. |
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
 | R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | passed | R09; R10; guards R08-05 | Architect + Codex · 2026-07-19 | R11-01 through R11-07 pass. All 93 active packages have terminal topology, package-owned presentation, and zero objective findings; the complete public-release ratchet passed 4,648 tests with 30 intentional skips and no failures. |
+| R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-19 | 0.20 is an earned guarantee signal, not a mass version repaint. R12-01 will define exact channel, support admission, dependency boundary, and compatibility before selective version edits. R12-04 is reserved as a full coherent-narrative pass across every public-facing surface. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -61,12 +62,15 @@ item should normally be `in-progress`.
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 | R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
 | R07 | passed | All 18 children and the parent acceptance pass. The zero-config local ring, direct provider intent, startup-declared business channels, pointwise capability law, canonical docs, focused packages, and truthful non-claims agree. |
-| R08 | in-progress | R08-01 through R08-04 pass. R08-05's exact 93-package local candidate, both templates, FirstUse, GoldenJourney, and local escrow pass; focused API-key workflow proof is the current local change, while remote prerequisite verification/public observation and later real upgrade/rollback remain separate gates. Publication remains unauthorized. |
+| R08 | stopped | Local release-wave, exact 93-package candidate, template, application, escrow, and API-key evidence are retained. R12 owns a fresh selective 0.20 candidate, public observation, and later upgrade/recovery proof. |
 | R09 | passed | All nine children pass. Functional assemblies use one module lifecycle, contracts are isolated without activation metadata, the duplicate bootstrap kernel is deleted, and focused source/package journeys remain meaningful. |
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
 | R11 | passed | R11-01 through R11-07 pass. The 93-package graph, 26 claims, package-owned prose, objective zero-finding quality report, clean packs, focused family evidence, and complete public-release ratchet agree. |
+| R12 | in-progress | R12-01 must define which guaranteed contracts and defensible package boundaries earn 0.20. Promise-level repair, generated maturity boundary, coherent public narrative, package-only readers, publication, and later preview evolution follow in that order. |
 
 ## Divergence and risk log
+
+| 2026-07-19 | R12 opening | The repository is internally coherent but public content still mixes generations of initiatives, while a repository-wide 0.20 bump would make package version look like a guarantee that many demonstrated, experimental, or unassessed packages have not earned. | Open R12 as the 0.20 maturity epic. Promote only accepted guaranteed package contracts and their defensible public boundaries; leave other packages on truthful version/maturity lines. Make coherent narrative across all public-facing content an acceptance-tested child after the guarantee and product boundary settle. Preserve R08's local release evidence, but require a fresh selective candidate before publication. |
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|

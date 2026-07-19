@@ -8,18 +8,22 @@ last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-19
-  status: pending
-  scope: exact 93-package local candidate and API-key promotion contract; no remote configuration or publication performed
+  status: stopped
+  scope: exact 93-package local candidate and API-key promotion contract retained; public observation superseded by R12
 ---
 
 # R08-05 — Observe the initial coherent public wave
 
 - Tranche: `T7B — V1 release readiness / public observation`
-- Status: `pending explicit remote-operation authorization`
+- Status: `stopped — local evidence retained; public observation superseded by R12-06`
 - Depends on: passed R08-01 through R08-04
 - Unlocks: a later real public-to-candidate upgrade and rollback proof
 - Owner: the `release-on-dev.yml` coordinator owns selection, proof, custody, promotion, and recovery;
   the maintainer owns only one-time trust setup and authorization to advance `dev`
+
+R12 preserves this card's exact local release evidence and API-key boundary. Its selective 0.20
+guarantee set invalidates using the historical 93-package all-owner bootstrap as the next public
+candidate, so R12-06 owns a fresh exact public observation after the maturity and narrative work.
 
 ## Meaningful outcome
 

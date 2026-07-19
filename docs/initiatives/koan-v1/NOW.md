@@ -1,7 +1,7 @@
 ---
 type: GUIDE
 domain: framework
-title: "Koan V1 Reorganization Current Handoff"
+title: "Koan 0.20 Preview Current Handoff"
 audience: [maintainers, ai-agents]
 status: current
 last_updated: 2026-07-19
@@ -9,18 +9,25 @@ framework_version: source-first
 validation:
   date_last_tested: 2026-07-19
   status: tested
-  scope: passed R11 and exact R08-05 93-package local candidate without remote mutation
+  scope: R12 opening, selective 0.20 guarantee promotion, and coherent-public-narrative mandate
 ---
 
-# Koan V1 reorganization current handoff
+# Koan 0.20 preview current handoff
 
 Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Outcome
 
 - R00 through R07, R09, R10, and R11 pass.
-- R08-01 through R08-04 pass. R08-05's exact local candidate passes; remote trust setup and public observation remain
-  separately authorized.
+- R08 is stopped with all local release/candidate evidence retained; its unexecuted public-observation
+  and upgrade tail are superseded by R12.
+- [R12 — Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) is active. The preview is a
+  maturity cycle, not a feature campaign.
+- Only packages whose public contracts Koan explicitly guarantees earn the 0.20 version signal.
+  Demonstrated, experimental, and unassessed packages do not inherit 0.20 from build success,
+  repository membership, or transitive dependency.
+- [R12-04](work-items/r12/R12-04-coherent-public-narrative.md) owns the maintainer-mandated realignment
+  of every public-facing surface into one greenfield, present-tense narrative.
 - All 93 active packages have terminal topology dispositions, meaningful reference intent, package-owned presentation,
   and objective package-quality finding count zero. Evaluated product truth is 93 packages and 26 claims.
 - The exact R11-07 local public-release ratchet is green from repair commit `736b82cc3`.
@@ -35,6 +42,23 @@ The accepted architecture remains business intent first: fewer meaningful moving
 language, references express capability intent, `AddKoan()` compiles host-owned decisions, pillars own meaning and
 runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive only
 when genuinely inert and independently consumed.
+
+## Active slice: R12-01 preview contract and version band
+
+Before any version file changes, R12-01 must:
+
+- inventory every active owner's current version intent, exact projected package identity, maturity
+  evidence, claim ownership, and public dependency boundary;
+- decide the exact NuGet/SemVer meaning of “0.20 preview”;
+- select which capability contracts become `supported-foundation` or `supported-extension`;
+- map those guarantees to exact package owners without mechanically promoting their entire dependency graph;
+- prove that any promoted package has no lower-maturity dependency that invalidates its guarantee;
+- define compatibility, support, platform, security, and feedback expectations;
+- present the resulting architecture checkpoint before selective `version.json` edits.
+
+The product currently has 26 assessed capability claims: 15 verified, 9 demonstrated, one
+experimental, and one specified. `verified` is evidence strength, not yet a compatibility guarantee;
+R12-01 decides which verified contracts earn supported status and 0.20 identity.
 
 ## Most recent completed slice: R08-05 local exact candidate
 
@@ -119,24 +143,30 @@ bounded process-exit observation so GoldenJourney can prove fail-fast startup tr
 
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
 - Branch: `dev`; R11 completion is `3f7ca5186`, followed by R08-05 repairs `5aeabb2a6` and `844449dd8`,
-  local-candidate closeout `e40cd4525`, API-key architecture amendment `5c346082c`, and the current
-  focused workflow wiring. Verify exact HEAD and ahead/behind counts before continuing.
+  local-candidate closeout `e40cd4525`, API-key architecture amendment `5c346082c`, workflow wiring
+  `f1a816b02`, and the current R12 opening. Verify exact HEAD and ahead/behind counts before continuing.
 - `tmp/` is untracked certification/evaluator/artifact material and must never be staged.
-- The tracked worktree is expected clean after this R08-05 API-key workflow commit.
+- The tracked worktree is expected clean after the R12 opening commit.
 
 ## Resume here
 
-1. Verify `git status`, HEAD, and the exact local evidence in
-   [R08-05](work-items/r08/R08-05-initial-public-observation.md).
-2. R08-05 remains `pending explicit remote-operation authorization`; local evidence is not authorization.
-3. Immediately before any separately authorized public operation, refresh source/privacy/docs status and the exact
-   candidate because workflow/documentation commits follow the proved package source.
-4. Stop before repository-secret or repository/branch/environment settings, push/merge, tag, GitHub Release,
-   NuGet publication, deployment, or any remote mutation unless the user explicitly authorizes that named operation.
+1. Verify `git status`, HEAD, and the R12/R12-01 decisions before work.
+2. Complete R12-01's read-only version, claim, guarantee, and dependency-boundary inventory.
+3. Present the exact 0.20 channel, promoted package set, compatibility contract, and version-expression
+   checkpoint before editing any `version.json`.
+4. Do not begin the R12-04 mass narrative rewrite until R12-01 through R12-03 settle what the public
+   product guarantees; inventory and contradiction collection are safe earlier.
+5. Preserve the R08 release compiler and API-key promotion path unless current evidence identifies a
+   defect required by the selective preview.
+6. Stop before repository-secret or repository/branch/environment settings, push/merge, tag, GitHub
+   Release, NuGet publication, deployment, or other remote mutation until R12-06 records and rechecks
+   its exact terminal target and gates.
 
 ## Do not redo
 
 - Do not reopen R10-11 Canon or rebuild CustomerCanon.
+- Do not mass-promote all active packages to 0.20; the version is an earned guarantee signal.
+- Do not equate R11 structural/package quality or `verified` test maturity with an accepted compatibility guarantee.
 - Do not rerun R11 family suites or the complete ratchet without a new affected dependency or explicit certification
   need; R11-07 has the one required green complete boundary.
 - Do not recreate Data Access ambient subjects, `[AccessScoped]`, durable arbitrary-filter carriage, Backup HTTP
