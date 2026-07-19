@@ -20,7 +20,7 @@ namespace Koan.Jobs;
 /// virtual time by <c>1/weight</c> on each claim is clock-independent, deterministic, and starvation-free.
 /// </para>
 /// </summary>
-public static class LaneFairSelector
+internal static class LaneFairSelector
 {
     /// <summary>The fairest eligible lane (least virtual time; ties broken by ordinal lane name for determinism), or
     /// null when no lane is eligible. A lane missing from <paramref name="virtualTime"/> reads as 0.</summary>

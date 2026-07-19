@@ -7,7 +7,7 @@ namespace Koan.Jobs;
 /// <em>clones</em> so behavior converges with the durable tier (which round-trips through a store), and serializes
 /// all mutations under one lock so <see cref="ClaimNext"/> is an atomic CAS. Non-durable: lost on restart.
 /// </summary>
-public sealed class InMemoryJobLedger : IJobLedger
+internal sealed class InMemoryJobLedger : IJobLedger
 {
     private readonly object _gate = new();
     private readonly Dictionary<string, JobRecord> _records = new(StringComparer.Ordinal);

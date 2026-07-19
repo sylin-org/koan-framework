@@ -32,7 +32,7 @@ public sealed class DurableSqliteSpec
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
             command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
-            Convert.ToInt64(await command.ExecuteScalarAsync()).Should().BeGreaterThanOrEqualTo(4,
+            Convert.ToInt64(await command.ExecuteScalarAsync()).Should().BeGreaterThanOrEqualTo(3,
                 "the configured file must contain the framework-owned job ledger schema, not merely a readiness probe");
             File.Exists(fallback).Should().BeFalse(
                 "the unused provider fallback must not be materialized alongside the authoritative Default source");

@@ -12,6 +12,11 @@ Ledger election is capability-driven:
   in-memory ledger and `Auto`/`DataStore` work to `DataJobLedger`;
 - custom registrations may replace the default interfaces before the host is built.
 
+`[JobPersistence(DataStore)]` is a required guarantee. If any discovered work type declares it while the host has
+no durable Data adapter, ledger composition throws one corrective `InvalidOperationException` naming the affected
+types. `Auto` remains the explicit capability-graded default; `InMemory` remains an explicit volatile override.
+Built-in ledger, registry, scheduler, selector, and orchestrator implementations are internal host mechanics.
+
 The retained module's `JobsCompositionFacts` projector publishes this decision into the shared composition model:
 
 | Subject | Selection | Reason |
@@ -55,7 +60,11 @@ though a provider-specific side effect at that failing boundary can be intrinsic
 
 ## Delivery and recovery
 
-The ledger is the queue. `JobWakeCoordinator` emits one internal, bounded Communication signal after
+The ledger is the queue. A provider-declared Data conditional replace is the durable atomic claim primitive;
+an adapter without it retains the documented optimistic at-least-once fallback. There is no user-selected claim
+algorithm, clock-skew election window, or claim-ticket store.
+
+`JobWakeCoordinator` emits one internal, bounded Communication signal after
 a non-transactional submit. The process-local provider is automatic; directly referencing a
 Communication connector transparently changes its reach. A dropped or duplicated signal costs at
 most one poll interval. Claims, leases, retries, and reclaim behavior remain ledger-owned.

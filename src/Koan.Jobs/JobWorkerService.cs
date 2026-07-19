@@ -39,8 +39,8 @@ internal sealed class JobWorkerService : BackgroundService
         if (_options.Mode == JobMode.Inline || !_options.EnableWorker) return;
 
         var scheduled = _registry.All.Sum(b => b.ScheduledActions(_options).Count());
-        _logger.LogInformation("[Koan.Jobs] ledger={Ledger} · {Types} job types · {Scheduled} scheduled · claim={Claim}",
-            _ledger.GetType().Name, _registry.Count, scheduled, _options.ClaimStrategy);
+        _logger.LogInformation("[Koan.Jobs] ledger={Ledger} · {Types} job types · {Scheduled} scheduled",
+            _ledger.GetType().Name, _registry.Count, scheduled);
 
         try
         {

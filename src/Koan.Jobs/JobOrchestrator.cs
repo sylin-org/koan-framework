@@ -14,7 +14,7 @@ namespace Koan.Jobs;
 /// by design: <see cref="DrainAsync"/> processes all currently-ready work to completion (the test driver); the worker
 /// service drives the same loop continuously in production. All time comes from an injected <see cref="TimeProvider"/>.
 /// </summary>
-public sealed class JobOrchestrator
+internal sealed class JobOrchestrator
 {
     private readonly IJobLedger _ledger;
     private readonly JobTypeRegistry _registry;

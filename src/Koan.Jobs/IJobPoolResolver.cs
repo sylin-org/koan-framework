@@ -2,7 +2,7 @@ namespace Koan.Jobs;
 
 /// <summary>
 /// Provides the live member set for a named resource pool, consulted at claim time (JOBS-0007).
-/// Implement this interface and register via <c>AddJobPoolResolver&lt;T&gt;()</c>; the orchestrator calls
+/// Implement this interface and register it through standard .NET DI as an <c>IJobPoolResolver</c>; the orchestrator calls
 /// <see cref="GetMembersAsync"/> before each claim attempt so the pool reflects runtime state (members added,
 /// paused, or removed since the job was submitted). Implementations must be thread-safe and cheap on the
 /// hot path; do not perform expensive fanout here — cache the member list and refresh it on a background timer.

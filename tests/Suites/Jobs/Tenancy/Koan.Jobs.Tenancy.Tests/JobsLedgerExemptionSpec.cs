@@ -14,8 +14,8 @@ namespace Koan.Jobs.Tenancy.Tests;
 /// <summary>
 /// ARCH-0100 §6 / phase 3 — the durable job ledger is <b>ambient-exempt infrastructure</b>. Proven through a real
 /// <c>AddKoan()</c> boot (ARCH-0079) with the <c>Koan.Tenancy</c> module live at the secure-by-default
-/// <b>Closed</b> posture (Test env). The four ledger entities (<see cref="JobRecord"/>, <see cref="JobMetric"/>,
-/// <see cref="JobGateRecord"/>, <see cref="JobClaimTicket"/>) are written during settle and read at claim with NO
+/// <b>Closed</b> posture (Test env). The three ledger entities (<see cref="JobRecord"/>, <see cref="JobMetric"/>,
+/// <see cref="JobGateRecord"/>) are written during settle and read at claim with NO
 /// ambient tenant on the worker thread — so if they were tenant-scoped, claiming would throw the fail-closed guard
 /// and the cooperative gate would fail open cross-tenant. They must carry the generic <see cref="IAmbientExempt"/>
 /// marker so the restored ambient never stamps them and claim-time reads are never tenant-filtered — without a
@@ -24,7 +24,7 @@ namespace Koan.Jobs.Tenancy.Tests;
 public sealed class JobsLedgerExemptionSpec
 {
     [Fact]
-    public void All_four_jobs_ledger_entities_are_recognized_exempt_by_the_tenancy_predicate()
+    public void All_jobs_ledger_entities_are_recognized_exempt_by_the_tenancy_predicate()
     {
         // The single cached exemption predicate (used by both the guard and the __koan_tenant managed field) must
         // treat each ledger entity as exempt via the generic marker — covers JobMetric, which the lifecycle test
@@ -32,7 +32,6 @@ public sealed class JobsLedgerExemptionSpec
         TenantScopeMetadata.IsHostScopedType(typeof(JobRecord)).Should().BeTrue();
         TenantScopeMetadata.IsHostScopedType(typeof(JobMetric)).Should().BeTrue();
         TenantScopeMetadata.IsHostScopedType(typeof(JobGateRecord)).Should().BeTrue();
-        TenantScopeMetadata.IsHostScopedType(typeof(JobClaimTicket)).Should().BeTrue();
     }
 
     [Fact]
@@ -67,8 +66,8 @@ public sealed class JobsLedgerExemptionSpec
 
 /// <summary>
 /// A durable job whose work-item is itself <see cref="IAmbientExempt"/> — so this spec isolates the variable under
-/// test to the four <i>ledger</i> entities, not the (phase-6) work-item rehydration. It backs off once via a
-/// declared <c>[JobGate]</c> so the JobGateRecord write + the claim ticket are exercised through the real path.
+/// test to the three <i>ledger</i> entities, not the work-item rehydration. It backs off once via a
+/// declared <c>[JobGate]</c> so the JobGateRecord write is exercised through the real path.
 /// </summary>
 [JobGate(nameof(Resource))]
 public sealed class TenantGatedProbe : Entity<TenantGatedProbe>, IKoanJob<TenantGatedProbe>, IAmbientExempt

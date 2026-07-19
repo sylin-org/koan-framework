@@ -8,7 +8,7 @@ namespace Koan.Jobs;
 /// <see cref="IKoanJob"/> implementors — load/save/execute delegates (no per-dispatch reflection), the chain,
 /// per-action policy, persistence mode, and the coalesce/gate accessors. JOBS-0005 §4.1.
 /// </summary>
-public sealed class JobTypeBinding
+internal sealed class JobTypeBinding
 {
     private readonly IReadOnlyDictionary<string, JobActionAttribute> _actions;
     private readonly PropertyInfo[] _coalesceProps;
@@ -25,7 +25,6 @@ public sealed class JobTypeBinding
         Func<string, object> newSingleton,
         string[] chain,
         JobPersistenceMode persistence,
-        string? pinnedProvider,
         bool parallelSafe,
         IReadOnlyDictionary<string, JobActionAttribute> actions,
         PropertyInfo[] coalesceProps,
@@ -42,7 +41,6 @@ public sealed class JobTypeBinding
         NewSingleton = newSingleton;
         Chain = chain;
         Persistence = persistence;
-        PinnedProvider = pinnedProvider;
         ParallelSafe = parallelSafe;
         _actions = actions;
         _coalesceProps = coalesceProps;
@@ -63,7 +61,6 @@ public sealed class JobTypeBinding
     public Func<string, object> NewSingleton { get; }
     public string[] Chain { get; }
     public JobPersistenceMode Persistence { get; }
-    public string? PinnedProvider { get; }
 
     /// <summary>True when the type opts out of per-entity serialization (<c>[ParallelSafe]</c>): its actions may
     /// run concurrently on one instance. Default false — jobs for the same instance are serialized (JOBS-0005 §17.2).</summary>
@@ -202,7 +199,7 @@ internal static class JobTypeBinder
 
         return new JobTypeBinding(
             clr.FullName!, clr, load, save, execute, getId, newSingleton, chain,
-            persist?.Mode ?? JobPersistenceMode.Auto, persist?.Provider, parallelSafe,
+            persist?.Mode ?? JobPersistenceMode.Auto, parallelSafe,
             actions, coalesceProps, gateProp, gateResolver, pool?.PoolName);
     }
 }

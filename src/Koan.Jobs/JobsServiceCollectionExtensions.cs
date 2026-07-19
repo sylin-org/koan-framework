@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 namespace Koan.Jobs;
 
 /// <summary>DI wiring for the Jobs pillar. Invoked by <see cref="KoanJobsModule"/> (Reference = Intent); also callable
-/// directly by tests. Idempotent (TryAdd). Phase 0 registers the in-memory ledger; the durable election is wired later.</summary>
+/// directly by tests. Idempotent (TryAdd); ledger election follows the composed Data capabilities.</summary>
 public static class JobsServiceCollectionExtensions
 {
     public static IServiceCollection AddKoanJobs(this IServiceCollection services, Action<JobsOptions>? configure = null)
@@ -25,12 +25,7 @@ public static class JobsServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         // Capability election. No durable adapter → in-memory only (Local tier). Durable adapter present →
         // RoutingJobLedger so [JobPersistence(InMemory)] types stay volatile while Auto/DataStore types persist.
-        services.TryAddSingleton<IJobLedger>(sp => HasDurableDataAdapter(sp)
-            ? new RoutingJobLedger(
-                new InMemoryJobLedger(sp.GetRequiredService<IOptions<JobsOptions>>()),
-                new DataJobLedger(sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IOptions<JobsOptions>>(), sp.GetRequiredService<JobTypeRegistry>()),
-                sp.GetRequiredService<JobTypeRegistry>())
-            : new InMemoryJobLedger(sp.GetRequiredService<IOptions<JobsOptions>>()));
+        services.TryAddSingleton<IJobLedger>(CreateLedger);
         services.TryAddSingleton(_ => JobTypeRegistry.FromDiscovery());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<
             ISegmentationRealization,
@@ -51,13 +46,32 @@ public static class JobsServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>Register a custom pool resolver so the orchestrator knows how to dispatch pool jobs (JOBS-0007).
-    /// Multiple resolvers may be registered; each handles a distinct pool name.</summary>
-    public static IServiceCollection AddJobPoolResolver<T>(this IServiceCollection services)
-        where T : class, IJobPoolResolver
+    private static IJobLedger CreateLedger(IServiceProvider services)
     {
-        services.AddSingleton<IJobPoolResolver, T>();
-        return services;
+        var options = services.GetRequiredService<IOptions<JobsOptions>>();
+        var registry = services.GetRequiredService<JobTypeRegistry>();
+        if (!HasDurableDataAdapter(services))
+        {
+            var required = registry.All
+                .Where(binding => binding.Persistence == JobPersistenceMode.DataStore)
+                .Select(binding => binding.WorkType)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            if (required.Length > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Koan Jobs cannot honor [JobPersistence(DataStore)] for {string.Join(", ", required)} because " +
+                    "the host has no durable Data adapter. Reference SQLite, PostgreSQL, SQL Server, MongoDB, or " +
+                    "another durable Koan Data provider; otherwise use Auto or InMemory explicitly.");
+            }
+
+            return new InMemoryJobLedger(options);
+        }
+
+        return new RoutingJobLedger(
+            new InMemoryJobLedger(options),
+            new DataJobLedger(options, registry),
+            registry);
     }
 
     /// <summary>True when a durable data adapter (Mongo/Postgres/SqlServer/SQLite/…) is registered — i.e. anything

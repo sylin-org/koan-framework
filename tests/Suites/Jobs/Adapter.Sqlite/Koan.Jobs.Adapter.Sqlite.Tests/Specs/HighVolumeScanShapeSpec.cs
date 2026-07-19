@@ -106,6 +106,7 @@ public sealed class HighVolumeScanShapeSpec
         WorkId = id,
         Action = "",
         Status = status,
+        Lane = "default", // JobTypeBinding's production invariant for the empty single-action token
         VisibleAt = submitted,
         FirstSubmittedAt = submitted,
         LastSettledAt = settled,

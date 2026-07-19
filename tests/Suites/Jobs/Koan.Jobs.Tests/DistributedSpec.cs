@@ -14,7 +14,7 @@ public sealed class DistributedSpec
     private static JobOrchestrator SecondNode(JobsHarness host)
         => new(
             host.Ledger,
-            host.Registry,
+            host.Services.GetRequiredService<JobTypeRegistry>(),
             host.Services.GetRequiredService<IOptions<JobsOptions>>(),
             host.Clock,
             NullLogger<JobOrchestrator>.Instance,

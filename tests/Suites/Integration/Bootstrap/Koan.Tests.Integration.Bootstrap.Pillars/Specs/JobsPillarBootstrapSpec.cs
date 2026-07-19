@@ -33,7 +33,7 @@ public sealed class JobsPillarBootstrapSpec
         host.Services.GetRequiredService<IJobCoordinator>().Should().NotBeNull();
         host.Services.GetRequiredService<IJobLedger>().Should().NotBeNull();
 
-        // The worker's boot summary ("[Koan.Jobs] ledger=… · N job types · M scheduled · claim=…") and the
+        // The worker's boot summary ("[Koan.Jobs] ledger=… · N job types · M scheduled") and the
         // module's boot-report both read the registry; prove those reads resolve and never throw.
         var registry = host.Services.GetRequiredService<JobTypeRegistry>();
         registry.Should().NotBeNull();

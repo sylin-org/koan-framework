@@ -2,7 +2,8 @@ namespace Koan.Jobs;
 
 /// <summary>
 /// The single source of truth and the single writer (JOBS-0005 §7). The ledger <em>is</em> the queue: dispatch
-/// claims the next ready row by atomic CAS; there is no separate volatile queue to reconcile. Physical layout
+/// claims the next ready row directly; there is no separate volatile queue to reconcile. Data-backed implementations
+/// use provider CAS when available and retain an explicit optimistic at-least-once fallback otherwise. Physical layout
 /// (in-memory, data-backed, hot/cold partitions) hides behind this interface; the orchestrator is storage-agnostic.
 /// </summary>
 public interface IJobLedger
@@ -23,7 +24,8 @@ public interface IJobLedger
     /// whose lane is not in <paramref name="saturatedLanes"/> and whose <c>GateKey</c> is not under an active gate;
     /// for pool jobs, elects a free member from <paramref name="pools"/> and stamps it as <c>GateKey</c>;
     /// CAS to <see cref="JobStatus.Running"/>, stamping <paramref name="owner"/> + <paramref name="leaseUntil"/>.
-    /// Returns null if nothing is claimable. This is the hot path and must be atomic under contention.
+    /// Returns null if nothing is claimable. This is the hot path; implementations use their strongest available
+    /// concurrency primitive while preserving the documented at-least-once floor.
     /// </summary>
     Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
         IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,

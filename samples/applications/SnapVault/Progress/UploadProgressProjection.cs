@@ -147,7 +147,7 @@ public static class UploadProgressProjection
 
     private static string MapStatus(JobRecord? rec) => rec?.Status switch
     {
-        null or JobStatus.Created or JobStatus.Queued or JobStatus.Blocked => "queued",   // Blocked = waiting, not failed
+        null or JobStatus.Created or JobStatus.Queued => "queued",
         JobStatus.Running => "processing",
         JobStatus.Completed => "completed",
         JobStatus.Cancelled => "cancelled",

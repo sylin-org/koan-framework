@@ -7,15 +7,14 @@ using Microsoft.Extensions.Options;
 namespace Koan.Jobs;
 
 /// <summary>
-/// Durable <see cref="IJobLedger"/> riding the existing data layer — the ledger, gates, and claim tickets are each
+/// Durable <see cref="IJobLedger"/> riding the existing data layer — the ledger and gates are each
 /// an <see cref="Koan.Data.Core.Model.Entity{T}"/> persisted via the ambient adapter, so there are no per-DB job
-/// adapters and durability follows whatever data provider is present (JOBS-0005 §7/§8). The claim is
-/// strategy-graded: <see cref="ClaimStrategy.Optimistic"/> (last-write-wins, idempotency backstop) or
-/// <see cref="ClaimStrategy.Ticket"/> (the leaderless GUIDv7 bakery election over a parallel ticket set).
+/// adapters and durability follows whatever data provider is present (JOBS-0005 §7/§8). A provider-declared
+/// conditional replace is the atomic claim primitive; adapters without it retain the honest optimistic
+/// at-least-once fallback.
 /// </summary>
-public sealed class DataJobLedger : IJobLedger
+internal sealed class DataJobLedger : IJobLedger
 {
-    private readonly TimeProvider _clock;
     private readonly JobsOptions _options;
     private readonly JobTypeRegistry _registry;
     // JOBS-0008: per-node WFQ virtual time held in-process (contention-free). Deliberately NOT a durable shared row:
@@ -27,9 +26,8 @@ public sealed class DataJobLedger : IJobLedger
     private readonly Dictionary<string, double> _virtual = new(StringComparer.Ordinal);
     private readonly Func<string, double> _weight;
 
-    public DataJobLedger(TimeProvider clock, IOptions<JobsOptions> options, JobTypeRegistry registry)
+    public DataJobLedger(IOptions<JobsOptions> options, JobTypeRegistry registry)
     {
-        _clock = clock;
         _options = options.Value;
         _registry = registry;
         _weight = lane => _options.LaneWeights.GetValueOrDefault(lane, 1.0);
@@ -134,11 +132,7 @@ public sealed class DataJobLedger : IJobLedger
             }
 
             JobRecord? claimed;
-            if (_options.ClaimStrategy == ClaimStrategy.Ticket)
-            {
-                claimed = await ClaimViaTicket(candidate, owner, now, leaseUntil, elected, ct);
-            }
-            else if (cas is null)
+            if (cas is null)
             {
                 claimed = await ClaimOptimistic(candidate, owner, now, leaseUntil, ct);   // GateKey already stamped above
             }
@@ -151,7 +145,7 @@ public sealed class DataJobLedger : IJobLedger
 
             if (claimed is not null) { _virtual[lane] = LaneFairSelector.Charged(_virtual.GetValueOrDefault(lane), _weight(lane)); return claimed; }
 
-            // CAS / ticket loss on a pool job means our slot snapshot is stale — bail so the next drain iteration
+            // CAS loss on a pool job means our slot snapshot is stale — bail so the next drain iteration
             // re-elects with fresh counts; a non-pool loss just falls through to the next-fairest lane.
             if (elected is not null) return null;
         }
@@ -356,40 +350,6 @@ public sealed class DataJobLedger : IJobLedger
         return candidate;
     }
 
-    private async Task<JobRecord?> ClaimViaTicket(JobRecord candidate, string owner, DateTimeOffset now, DateTimeOffset leaseUntil, string? electedMember, CancellationToken ct)
-    {
-        var ticket = new JobClaimTicket { JobId = candidate.Id, Owner = owner, CreatedAt = now };
-        var ticketId = ticket.Id; // GUIDv7 — the bakery number
-        await JobClaimTicket.Upsert(ticket, ct);
-
-        await Task.Delay(_options.ClaimWindow, _clock, ct); // reserve the window so contenders become visible
-
-        var tickets = await JobClaimTicket.Query(t => t.JobId == candidate.Id, ct);
-        var winner = tickets.OrderBy(t => t.Id, StringComparer.Ordinal).FirstOrDefault();
-        if (winner is null || winner.Id != ticketId)
-        {
-            await SafeRemoveTicket(ticketId, ct);
-            return null; // lost the election — back off
-        }
-
-        // Re-read: another claimer/cancel may have changed it during the window.
-        var fresh = await JobRecord.Get(candidate.Id, ct);
-        if (fresh is null || fresh.Status != JobStatus.Queued || fresh.CancelRequestedAt is not null)
-        {
-            await RemoveTicketsFor(candidate.Id, ct);
-            return null;
-        }
-
-        // Stamp the elected pool member onto the fresh record (pre-election stamp on `candidate` is not persisted).
-        if (electedMember is not null)
-            fresh.GateKey = electedMember;
-
-        Mark(fresh, owner, now, leaseUntil);
-        await JobRecord.Upsert(fresh, ct);
-        await RemoveTicketsFor(candidate.Id, ct);
-        return fresh;
-    }
-
     private static void Mark(JobRecord r, string owner, DateTimeOffset now, DateTimeOffset leaseUntil)
     {
         r.Attempt++;
@@ -399,14 +359,4 @@ public sealed class DataJobLedger : IJobLedger
         r.LeaseUntil = leaseUntil;
     }
 
-    private static async Task RemoveTicketsFor(string jobId, CancellationToken ct)
-    {
-        foreach (var t in await JobClaimTicket.Query(x => x.JobId == jobId, ct))
-            await JobClaimTicket.Remove(t.Id, ct);
-    }
-
-    private static async Task SafeRemoveTicket(string ticketId, CancellationToken ct)
-    {
-        try { await JobClaimTicket.Remove(ticketId, ct); } catch { /* GC is best-effort */ }
-    }
 }

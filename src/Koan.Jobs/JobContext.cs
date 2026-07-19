@@ -40,7 +40,7 @@ public sealed class JobContext
     /// <summary>The ledger entry id (the Job id), distinct from the work-item id.</summary>
     public string JobId { get; }
 
-    /// <summary>DI for handler bodies (the common case; an <c>IKoanJobHandler&lt;T&gt;</c> class is the escape hatch).</summary>
+    /// <summary>The execution scope's standard .NET service provider for handler dependencies.</summary>
     public IServiceProvider Services { get; }
 
     public ILogger Logger { get; }

@@ -4,7 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Description>Koan Jobs: a durable, edge+level-triggered job orchestrator. Entity-first IKoanJob authoring, a ledger that is the queue, capability-graded backend (in-memory / data-backed / distributed), and scheduled reconciliation (JOBS-0005).</Description>
+    <Description>Run Entity-owned background work with inspectable progress, retries, cancellation, schedules, and capability-graded durability through AddKoan().</Description>
     <PackageTags>$(CommonPackageTags);jobs;orchestrator;ledger;scheduling;background</PackageTags>
   </PropertyGroup>
   <ItemGroup>
@@ -24,5 +24,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Koan.Jobs.Tests" />
     <InternalsVisibleTo Include="Koan.Jobs.TestKit" />
+    <InternalsVisibleTo Include="Koan.Jobs.Adapter.Sqlite.Tests" />
+    <InternalsVisibleTo Include="Koan.Tests.Integration.Bootstrap.Pillars" />
+    <InternalsVisibleTo Include="Koan.Samples.SnapVault.Tests" />
   </ItemGroup>
 </Project>

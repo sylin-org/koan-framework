@@ -1,7 +1,19 @@
-# Koan Jobs
+# Sylin.Koan.Jobs
 
 Reference `Sylin.Koan.Jobs` when an Entity-owned business transition should run outside the request
 that requested it, survive retries, and remain inspectable.
+
+## Install
+
+```powershell
+dotnet add package Sylin.Koan.Jobs
+```
+
+The package composes through the application's existing `AddKoan()` call. No Jobs-specific registration is
+required. With no durable Data provider, the automatic ledger is deliberately in-memory; reference SQLite,
+PostgreSQL, SQL Server, MongoDB, or another durable Koan Data provider when work must survive restart.
+
+## Usage: run Entity-owned work
 
 ```csharp
 public sealed class ReviewRequest : Entity<ReviewRequest>, IKoanJob<ReviewRequest>
@@ -65,6 +77,8 @@ are available through `entity.Job` and `Entity.Jobs`.
 
 - Execution is at-least-once; handlers must be idempotent.
 - The in-memory tier is development/test convenience, not durability.
+- `[JobPersistence(JobPersistenceMode.DataStore)]` fails host composition when no durable Data adapter is available;
+  Koan never silently weakens that declared requirement to in-memory execution.
 - Durable SQLite behavior does not prove every distributed provider or topology.
 - Source submission is pointwise, sequential, and not collection-atomic. A provider call that throws
   is not reported as confirmed acceptance; retry that item under the job's declared idempotency policy.

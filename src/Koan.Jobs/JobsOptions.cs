@@ -49,12 +49,6 @@ public sealed class JobsOptions
     /// (deterministic tests advance the clock and call Drain/Reap/ReleaseScheduled themselves).</summary>
     public bool EnableWorker { get; set; } = true;
 
-    /// <summary>How the durable tier secures a claim under competing consumers (default <see cref="ClaimStrategy.Optimistic"/>).</summary>
-    public ClaimStrategy ClaimStrategy { get; set; } = ClaimStrategy.Optimistic;
-
-    /// <summary>The reservation window for <see cref="ClaimStrategy.Ticket"/> — must exceed clock skew + write propagation.</summary>
-    public TimeSpan ClaimWindow { get; set; } = TimeSpan.FromSeconds(1);
-
     /// <summary>Max ready rows the per-lane claim seek pulls per page (ordered, pushed down) before applying the
     /// in-memory pool/gate/exclusive filter. Bounds each lane's head seek to O(batch); a lane pages forward past its
     /// own unclaimable head (gated / pool-exhausted / busy) to its oldest claimable row (JOBS-0008).</summary>

@@ -36,11 +36,11 @@ public sealed class JobsHarness : IAsyncDisposable
 
     public FakeTimeProvider Clock { get; }
     public IServiceProvider Services => _host.Services;
-    public JobOrchestrator Orchestrator { get; }
-    public JobScheduler Scheduler { get; }
+    internal JobOrchestrator Orchestrator { get; }
+    internal JobScheduler Scheduler { get; }
     public IJobCoordinator Coordinator { get; }
     public IJobLedger Ledger { get; }
-    public JobTypeRegistry Registry { get; }
+    internal JobTypeRegistry Registry { get; }
 
     /// <summary>In-memory tier — uses whatever (non-durable) data adapter the consuming project references.</summary>
     public static Task<JobsHarness> StartInMemoryAsync(Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
@@ -105,7 +105,6 @@ public sealed class JobsHarness : IAsyncDisposable
             // document delete has no DDL and is reliable on every tier.
             await JobRecord.RemoveAll(RemoveStrategy.Safe);
             await JobGateRecord.RemoveAll(RemoveStrategy.Safe);
-            await JobClaimTicket.RemoveAll(RemoveStrategy.Safe);
             await JobMetric.RemoveAll(RemoveStrategy.Safe);
         }
         return new JobsHarness(host, clock, dbPath);
@@ -119,7 +118,6 @@ public sealed class JobsHarness : IAsyncDisposable
         var ensure = new Instruction(DataInstructions.EnsureCreated);
         try { await Data<JobRecord, string>.Execute<object?>(ensure); } catch { /* no-op on adapters without schema */ }
         try { await Data<JobGateRecord, string>.Execute<object?>(ensure); } catch { }
-        try { await Data<JobClaimTicket, string>.Execute<object?>(ensure); } catch { }
         try { await Data<JobMetric, string>.Execute<object?>(ensure); } catch { }
     }
 

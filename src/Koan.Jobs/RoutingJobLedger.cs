@@ -11,7 +11,7 @@ namespace Koan.Jobs;
 /// mirrored to both ledgers so a cooperative backoff set by a durable job is honored by an in-memory job and
 /// vice versa. This keeps the orchestrator entirely storage-agnostic — it still sees one <see cref="IJobLedger"/>.
 /// </remarks>
-public sealed class RoutingJobLedger : IJobLedger
+internal sealed class RoutingJobLedger : IJobLedger
 {
     private readonly IJobLedger _inMemory;
     private readonly IJobLedger _durable;

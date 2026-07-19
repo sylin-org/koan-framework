@@ -21,20 +21,6 @@ public enum DeadReason
     CarrierRestoreFailed = 2,
 }
 
-/// <summary>How the durable tier secures a ready job under competing consumers (JOBS-0005 §7).</summary>
-public enum ClaimStrategy
-{
-    /// <summary>Read a candidate and write Running (last-write-wins). Correct under at-least-once + idempotent; cheapest.
-    /// Right for single-node / low-contention. Default.</summary>
-    Optimistic = 0,
-
-    /// <summary>Leaderless GUIDv7 "bakery" election: write a claim ticket to a parallel set, reserve a window, the
-    /// smallest GUIDv7 (time-ordered) wins. Adapter-generic (only Upsert+Query), no native CAS needed. Probabilistic:
-    /// needs NTP and a window &gt; clock-skew + write-propagation; idempotency remains the backstop. A proper
-    /// consensus/sync module is a future Koan primitive (the hard-guarantee tier).</summary>
-    Ticket = 1,
-}
-
 /// <summary>The control signal a handler raised via <see cref="JobContext"/> verbs, read by the orchestrator post-execute.
 /// Exposed publicly so integration tests can assert the exact signal without querying the ledger.</summary>
 public enum JobSignal
