@@ -132,6 +132,37 @@ ADR do not change, so no new ADR or TOC entry is required.
 the existing focused continuity cells cover both. The full candidate may expose later independent
 preflight defects after this fail-fast repair.
 
+### 2026-07-19 initial-lineage migration checkpoint
+
+The repaired rehearsal reached the next fail-fast boundary: `origin/dev` predates the project-local
+version-intent contract, so using that legacy event predecessor as the first lineage base fails before
+projection (`Sylin.Koan.AI.Connector.Onnx` is the first noncanonical owner). This would affect the real
+161-commit advancement exactly as it affects the disposable rehearsal.
+
+**Application intent:** The first normal `dev` advancement establishes release automation from the
+coherent current package graph; the maintainer does not manufacture a historical graph, seed a branch,
+or choose package identities.
+
+**Public expression and complete surface:** The expression remains one normal `dev` advancement with
+no additional input. When no durable lineage exists, `prove_current` supplies the current source event
+as its own bootstrap base and mints every current owner once. When durable lineage exists, the existing
+previous-source/previous-lineage path remains unchanged.
+
+**Guarantee/correction:** Initial authority covers every package active at the coherent bootstrap and
+all continuity/retirement decisions afterward. The workflow never interprets a legacy tree with newer
+ownership rules. A non-bootstrap wave still fails closed on missing/tampered lineage, a true owner move,
+or a non-forward source event.
+
+**Coalescence and ergonomics:** Keep bootstrap selection in the existing `prove_current` coordinator,
+which alone knows whether durable lineage exists. Reuse `lineage` unchanged; do not add a legacy
+evaluator, migration manifest, manual seed command, or second workflow. The operator retains one
+decision and the compiler retains one evaluated package grammar.
+
+**Placement and proof:** The conditional base belongs in
+`.github/workflows/release-on-dev.yml`; one structural cell in `ReleaseWorkflowContractTests` pins it.
+ARCH-0110, the packaging policy, and the tool README must describe the current-owner bootstrap. No
+runtime API, constant, option, DTO, module, HTTP route, data access, or application concept is added.
+
 | Gate | Required evidence | Stop condition |
 |---|---|---|
 | source boundary | intended changes reviewed; privacy gate and changed-doc lint green; no scratch/evaluator material | source contains private downstream identity, unintended files, or unexplained generated drift |

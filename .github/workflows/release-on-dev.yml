@@ -407,11 +407,17 @@ jobs:
           PREVIOUS_LINEAGE: ${{ needs.prepare_prior.outputs.previous-lineage }}
         run: |
           $tool = (Resolve-Path 'artifacts/current/tool/Koan.Packaging.dll').Path
+          $lineageBase = if ([string]::IsNullOrWhiteSpace($env:PREVIOUS_LINEAGE)) {
+            $env:SOURCE_COMMIT
+          }
+          else {
+            $env:PREVIOUS_SOURCE
+          }
           $arguments = @(
             $tool,
             'lineage',
             '--source', $env:SOURCE_COMMIT,
-            '--previous-source', $env:PREVIOUS_SOURCE,
+            '--previous-source', $lineageBase,
             '--branch', 'automation/package-lineage-dev',
             '--output', 'artifacts/current/release-lineage.json'
           )

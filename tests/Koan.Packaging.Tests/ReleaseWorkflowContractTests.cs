@@ -188,6 +188,20 @@ public sealed class ReleaseWorkflowContractTests
     }
 
     [Fact]
+    public void FirstDurableLineageBootstrapsFromTheCurrentCoherentSource()
+    {
+        var proveCurrent = JobBlock(ReadWorkflow(), ExpectedReleaseJobs, "prove_current");
+
+        AssertOrdered(proveCurrent,
+            "$lineageBase = if ([string]::IsNullOrWhiteSpace($env:PREVIOUS_LINEAGE))",
+            "$env:SOURCE_COMMIT",
+            "else",
+            "$env:PREVIOUS_SOURCE",
+            "'--previous-source', $lineageBase");
+        Assert.DoesNotContain("'--previous-source', $env:PREVIOUS_SOURCE", proveCurrent, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CurrentLineagePersistenceIsAnExactReplaySafeCompareAndAdvance()
     {
         var stageCurrent = JobBlock(ReadWorkflow(), ExpectedReleaseJobs, "stage_current");

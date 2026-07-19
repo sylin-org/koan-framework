@@ -22,7 +22,7 @@ validation:
 - **Selection**: exact identities stored by the prior/current lineage commits, automatic
   reverse-dependent closure for breaking roots, conservative mapped shared-input consumers, plus
   reconciliation of a current identity absent from nuget.org. The initial lineage is a one-time
-  all-owner bootstrap.
+  all-current-owner bootstrap rooted at the coherent source event; durable continuity begins there.
 - **Output**: an exact, dependency-ordered manifest, hashed nupkg/snupkg artifacts, and one
   deterministic release-wave escrow.
 - **Proof**: the canonical public-release green ratchet, advisory enforcement, package inspection, internal dependency

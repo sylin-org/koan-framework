@@ -67,9 +67,11 @@ dotnet run --project tools/Koan.Packaging -- wave-bundle `
 
 `lineage` intentionally switches a clean checkout to its dedicated local lineage branch and creates
 one commit. Run it only in the protected workflow or a disposable rehearsal checkout. Omit
-`--previous-lineage` only when initializing lineage. That first projection is an explicit all-owner
-bootstrap: every active owner receives a fresh identity. Bootstrap evaluates its predecessor with the
-pinned toolchain, so that predecessor must remain evaluable.
+`--previous-lineage` only when initializing lineage. The protected workflow roots that first
+projection at the current coherent source event: every active owner receives a fresh identity, and no
+legacy tree is reinterpreted with newer ownership rules. The standalone command also supports a
+source-range bootstrap when its explicitly supplied predecessor remains evaluable by the pinned
+toolchain.
 
 Deleting a package project plus its version owner is complete retirement intent. The compiler removes
 it from the active graph, permanently records its last package ID/path/version, and plans no artifact.

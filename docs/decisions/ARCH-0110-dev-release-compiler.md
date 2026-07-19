@@ -40,10 +40,12 @@ MSBuild. Every packable project must own a project-local `version.json`.
 `SourceCommit` records the `dev` event. The compiler applies the exact source-tree delta onto the
 previous `automation/package-lineage-dev` tip and commits one linear `VersionCommit`. Linear
 projection is load-bearing: importing source merge topology would advance unrelated NBGV heights.
-The first lineage is an explicit all-owner bootstrap and requires its predecessor's package inventory
-to remain evaluable by the pinned toolchain. Each lineage commit then stores every package owner's
-exact minted identity. Later events compare that durable inventory with the checked-out
-`VersionCommit`; they do not recalculate an old release with a newer SDK or NBGV tool.
+The first protected-workflow lineage is an explicit all-current-owner bootstrap rooted at the current
+coherent source event. There is no earlier durable compiler state to reinterpret with newer package
+ownership rules and no manual lineage seed. Each lineage commit then stores every package owner's exact
+minted identity. Later events compare that durable inventory with the checked-out `VersionCommit`; they
+do not recalculate an old release with a newer SDK or NBGV tool. The standalone compiler can still
+project a source range for controlled rehearsals when the supplied predecessor remains evaluable.
 
 A deliberate pre-1.0 minor or post-1.0 major advance is a breaking root. The evaluated package graph
 derives its complete transitive reverse-dependent closure. After a provisional commit exposes actual
