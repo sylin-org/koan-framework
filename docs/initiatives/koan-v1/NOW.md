@@ -9,7 +9,7 @@ framework_version: source-first
 validation:
   date_last_tested: 2026-07-19
   status: tested
-  scope: passed R11 package graduation and exact complete local public-release ratchet
+  scope: passed R11 and exact R08-05 93-package local candidate without remote mutation
 ---
 
 # Koan V1 reorganization current handoff
@@ -19,10 +19,13 @@ Replace this file at every handoff. It is a restart point, not a diary.
 ## Outcome
 
 - R00 through R07, R09, R10, and R11 pass.
-- R08-01 through R08-04 pass. R08-05 remains the separately authorized exact-candidate/public-observation boundary.
+- R08-01 through R08-04 pass. R08-05's exact local candidate passes; remote trust setup and public observation remain
+  separately authorized.
 - All 93 active packages have terminal topology dispositions, meaningful reference intent, package-owned presentation,
   and objective package-quality finding count zero. Evaluated product truth is 93 packages and 26 claims.
 - The exact R11-07 local public-release ratchet is green from repair commit `736b82cc3`.
+- The exact R08-05 local candidate from source `844449dd8c` compiled version `378f43beb54f`, packed all 93 active
+  packages, proved both templates plus package-only FirstUse/GoldenJourney, and produced deterministic local escrow.
 - The bespoke Orchestration CLI and Aspire families remain shelved beyond V1 under `shelved/`, outside `Koan.sln`,
   active package discovery, and the release graph. Standard .NET/Aspire/Compose/Docker/Podman/Kubernetes tooling owns
   application topology.
@@ -32,6 +35,26 @@ The accepted architecture remains business intent first: fewer meaningful moving
 language, references express capability intent, `AddKoan()` compiles host-owned decisions, pillars own meaning and
 runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive only
 when genuinely inert and independently consumed.
+
+## Most recent completed slice: R08-05 local exact candidate
+
+The first rehearsal exposed and repaired two release-boundary defects without reopening package architecture:
+
+- `5aeabb2a6` deletes Git file-similarity rename guessing; evaluated package ID/path continuity remains the one owner.
+- `844449dd8` makes the first protected lineage bootstrap all current owners from the coherent source event instead of
+  requiring a manual seed or interpreting a legacy noncanonical tree.
+
+Focused lineage/workflow evidence passes 43/43 and focused docs lint passes. From exact source
+`844449dd8c4927881853d315cba5a569cdb817c9`, the local candidate produced:
+
+- version commit `378f43beb54f0e8ee8ca0876013526dc97597b4f`;
+- 93 bootstrap packages, 93 markers, 93 nupkgs, and 90 expected snupkgs;
+- clean-room pack in 723.2 seconds;
+- `Sylin.Koan.Templates` `0.17.613`, with both public shapes reaching their business result;
+- FirstUse in 3.546 seconds and GoldenJourney in 6.863 seconds with truthful lock/facts/readiness/rejection evidence;
+- local bundle SHA-256 `79a9305f77d63c520fcf4a41b7daf0a27a98568ca9479fad1a3ba0ea4a2999dc`.
+
+The bundle and evidence remain under `tmp/` and are not remote authority. No candidate process remains running.
 
 ## Most recent completed slice: R11-07 certification
 
@@ -95,18 +118,18 @@ bounded process-exit observation so GoldenJourney can prove fail-fast startup tr
 ## Current repository state
 
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
-- Branch: `dev`; R11-07 repairs are commit `736b82cc3`, followed by the R11 completion/handoff commit. Verify exact HEAD
-  and ahead/behind counts before continuing.
+- Branch: `dev`; R11 completion is `3f7ca5186`, followed by R08-05 repairs `5aeabb2a6` and `844449dd8`, then this
+  evidence-only closeout. Verify exact HEAD and ahead/behind counts before continuing.
 - `tmp/` is untracked certification/evaluator/artifact material and must never be staged.
-- The tracked worktree is expected clean after the R11 completion commit.
+- The tracked worktree is expected clean after this R08-05 local-evidence closeout commit.
 
 ## Resume here
 
-1. Verify `git status`, HEAD, and the passed evidence in
-   [R11-07](work-items/r11/R11-07-release-certification-boundary.md).
-2. Read [R08-05](work-items/r08/R08-05-initial-public-observation.md) before taking any next action.
-3. The next safe local work is R08-05 exact-candidate/preflight evidence. It must not be conflated with authorization to
-   push or mutate remote/public state.
+1. Verify `git status`, HEAD, and the exact local evidence in
+   [R08-05](work-items/r08/R08-05-initial-public-observation.md).
+2. R08-05 remains `pending explicit remote-operation authorization`; local evidence is not authorization.
+3. Immediately before any separately authorized public operation, refresh source/privacy/docs status and the exact
+   candidate because this evidence-only closeout follows the proved source commit.
 4. Stop before trusted-publishing setup, repository/branch/environment settings, push/merge, tag, GitHub Release,
    NuGet publication, deployment, or any remote mutation unless the user explicitly authorizes that named operation.
 

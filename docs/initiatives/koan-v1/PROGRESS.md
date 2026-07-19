@@ -4,12 +4,12 @@ domain: framework
 title: "Koan V1 Reorganization Progress"
 audience: [architects, maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-18
+last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-18
+  date_last_tested: 2026-07-19
   status: in-progress
-  scope: R11-05 through RabbitMQ Communication provider graduation
+  scope: R11 completion and R08-05 exact 93-package local candidate
 ---
 
 # Koan V1 Reorganization Progress
@@ -20,12 +20,12 @@ or completes a work item. The roadmap describes order; it does not report progre
 ## Initiative state
 
 - Overall: `active`
-- Current tranche: `T7B — package-product graduation before public observation`
-- Active work item: [R11 — Graduate the NuGet product surface](work-items/R11-package-product-quality.md)
-- Active child: [R11-05 — Graduate package families](work-items/r11/R11-05-package-family-graduation.md)
-- Most recently passed child: [R11-04 — Prove the golden package journey](work-items/r11/R11-04-golden-package-journey.md)
-- Pending release item: [R08-05 — Initial coherent public observation](work-items/r08/R08-05-initial-public-observation.md);
-  its local contract is prepared, but R11 graduation and separate remote authorization come first
+- Current tranche: `T7B — responsible release / public observation`
+- Active work item: [R08 — Make Koan V1 responsibly releasable](work-items/R08-v1-release-readiness.md)
+- Active child: [R08-05 — Initial coherent public observation](work-items/r08/R08-05-initial-public-observation.md)
+- Most recently passed child: [R11-07 — Certify the release boundary](work-items/r11/R11-07-release-certification-boundary.md)
+- Pending release boundary: local exact-candidate proof is current; remote trust setup and one public
+  `dev` observation still require separate explicit authorization
 - V1 readiness: `not ready`; public observation, later upgrade/rollback proof,
   and an explicit release decision remain
 
@@ -41,10 +41,10 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R05 | [Prove the golden V0-to-V1 journey](work-items/R05-golden-v0-v1-journey.md) | T5 | passed | R04 | Maintainer + Codex · 2026-07-15 | FirstUse and GoldenJourney pass source/package clean rooms; independent readers produced two completed repair queues; the maintainer explicitly accepted the triangulated evidence. See `R05-BACKLOG.md`. |
 | R06 | [Graduate the foundation capability ring](work-items/R06-foundation-capability-ring.md) | T6 | passed | R05 | Codex · 2026-07-15 | R06-01 makes conformance host isolation framework-owned; R06-02 publishes SQLite/InMemory/JSON's distinct local roles and removes stale universal-provider claims. Public packages remain a T7 gate. |
 | R07 | [Rebuild the semantic capability ring](work-items/R07-semantic-capability-ring.md) | T6 | passed | R06 | Codex · 2026-07-16 | R07-01 through [R07-18](work-items/r07/R07-18-business-channels.md) pass. Lifecycle, Events, Transport, cardinality, context, provider election, internal convergence, pointwise pillar operations, and inspectability now share explicit owners; stable heterogeneous Communication evolution remains PMC-023. |
-| R08 | [Make Koan V1 responsibly releasable](work-items/R08-v1-release-readiness.md) | T7B | pending | R09; R10 and R11 guard R08-05 | Codex · 2026-07-17 | R08-01 through R08-04 passed locally and R08-05 is prepared but unauthorized. R10 graduated the maintained sample portfolio; R11 now graduates the package product surface before public observation. |
+| R08 | [Make Koan V1 responsibly releasable](work-items/R08-v1-release-readiness.md) | T7B | in-progress | R09; R10; R11 | Codex · 2026-07-19 | R08-01 through R08-04 pass. R08-05 now proves the exact 93-package current candidate, both templates, FirstUse, GoldenJourney, and local escrow; remote trust/public observation remains separately unauthorized. |
 | R09 | [Compile the Semantic Composition Kernel](work-items/R09-semantic-composition-kernel.md) | T7A | passed | R07; protects R08-01 | Codex · 2026-07-17 | R09-01 through R09-09 passed. One retained module lifecycle, compiled semantic constitution, typed contribution/election mechanics, hard capability overlays, canonical evidence, contract isolation, and legacy-kernel deletion are proved. ARCH-0115 and ARCH-0116 record the result. |
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
-| R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | in-progress | R09; R10; guards R08-05 | Architect + Codex · 2026-07-18 | R11-01 through R11-04 pass. R11-05 has also graduated Canon and RabbitMQ, then merged request read-context behavior into Web and retired Data Access after responsibility coalescence and focused proof. Current truth: 101 packages — 5 repair, 17 review, 79 structurally ready — across 26 claims. Backup/SoftDelete, Jobs/Observability/Security, orchestration, testing, Web Admin, and ZenGarden still require terminal treatment. |
+| R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | passed | R09; R10; guards R08-05 | Architect + Codex · 2026-07-19 | R11-01 through R11-07 pass. All 93 active packages have terminal topology, package-owned presentation, and zero objective findings; the complete public-release ratchet passed 4,648 tests with 30 intentional skips and no failures. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -61,15 +61,16 @@ item should normally be `in-progress`.
 | R05 | passed | All three child cards pass; source/package proofs, independent evaluations, both repair queues, and maintainer evidence acceptance are recorded. |
 | R06 | passed | Entity/data/composition/testing have an explicit pre-1.0 boundary, current local-provider evidence, framework-owned conformance isolation, and staged-package proof. |
 | R07 | passed | All 18 children and the parent acceptance pass. The zero-config local ring, direct provider intent, startup-declared business channels, pointwise capability law, canonical docs, focused packages, and truthful non-claims agree. |
-| R08 | pending | R08-01 through R08-04 passed locally. R08-05's preparation checklist is complete; R10 sample graduation, remote trust setup/public observation, and later real upgrade/rollback remain separate gates. Publication remains unauthorized. |
+| R08 | in-progress | R08-01 through R08-04 pass. R08-05's exact 93-package local candidate, both templates, FirstUse, GoldenJourney, and local escrow pass; remote trust setup/public observation and later real upgrade/rollback remain separate gates. Publication remains unauthorized. |
 | R09 | passed | All nine children pass. Functional assemblies use one module lifecycle, contracts are isolated without activation metadata, the duplicate bootstrap kernel is deleted, and focused source/package journeys remain meaningful. |
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
-| R11 | in-progress | R11-01 through R11-04 pass. R11-05 now includes Canon, RabbitMQ, and the Web request-context/Data Access coalescence alongside Classification, Tenancy, Identity, Auth Server, and the previously graduated families. Backup/SoftDelete, Jobs/Observability/Security, orchestration, testing, Web Admin, and ZenGarden still require terminal topology, prose, and focused evidence before R11-07. |
+| R11 | passed | R11-01 through R11-07 pass. The 93-package graph, 26 claims, package-owned prose, objective zero-finding quality report, clean packs, focused family evidence, and complete public-release ratchet agree. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-19 | R08-05 exact local candidate | The first current rehearsal found that Git's similarity heuristic invented package-owner renames from identical `version.json` files, then found that the protected workflow tried to evaluate a 162-commit-old predecessor that predates project-local version ownership. After deleting the duplicate heuristic and rooting a fresh bootstrap at the coherent source event, the exact 93-owner wave packed and proved both templates, FirstUse, GoldenJourney, and deterministic local escrow. | Keep evaluated ID/path continuity as the one owner and the current-source all-owner bootstrap as the one initial migration. Focused lineage/workflow tests pass 43/43. Exact source `844449dd8c49`, version `378f43beb54f`, and bundle SHA-256 `79a9305f77d63c520fcf4a41b7daf0a27a98568ca9479fad1a3ba0ea4a2999dc` are local evidence only. No remote state changed; refresh exact source immediately before separately authorized trust setup/public observation. |
 | 2026-07-18 | R11-05 Web request-context / Data Access closure | A share-link grant decision was spread across `[AccessScoped]` model decoration, token prefixes, an ambient subject/carrier, a Data axis, SnapVault middleware/service choreography, and manual system scopes. Dev Identity and Identity Tenancy independently repeated the same post-authentication context lifecycle. | Merge the reusable lifecycle and read-filter projection into Web; retire Data Access and its public subject vocabulary. Ordered scoped contributors now supply principal, tenant, rejection, capability scopes, and typed Entity predicates. SnapVault validates `event` once as evidence for one exact durable grant; Data/Vector/Media inherit the predicate automatically; dynamic cache operations bypass global entries. Web 4/4, Trust 30/30, Identity 85/85, Cache 63/63, Media 7/7, and SnapVault 28/28 pass. Generated truth is 101 packages: 5 repair, 17 review, 79 structurally ready across 26 claims. No full certification ran. |
 | 2026-07-18 | R11-05 RabbitMQ Communication provider closure | R07-10's transport/provider architecture was already complete, but RabbitMQ still exposed a duplicate endpoint option, three legacy Koan configuration branches, public discovery/orchestration mechanics, scattered stable broker/protocol values, default-only module claim text, and provisional package prose/evidence. | Keep the distinct provider package without rebuilding R07. Standardize on `ConnectionStrings:RabbitMq`, retain `RABBITMQ_URL`/Aspire/orchestration, internalize mechanics, centralize constants, and publish the exact acceptance/non-claim boundary. RabbitMQ passes 9/9, provider election 8/8, Release build/pack/audit are clean, and generated truth is 102 packages: 6 repair, 17 review, 79 structurally ready across 26 claims. No full certification ran. |
 | 2026-07-18 | R11-05 Canon closure | R10-11's automatic contributor journey was complete, but runtime and Web compiled different model decisions; contributor-free models bypassed built-ins; terminal events could be overwritten; Contracts was not inert or independently consumed; commit failure/partial-write posture was unstated; and admin/replay/value-object/optimization surfaces lacked an earned V1 guarantee. | Keep functional Canon and optional Canon Web; merge Contracts without a shim. Compile one host plan for every Canon Entity, make first terminal event win, expose canonical → indexes → audit as an ordered non-atomic fail-loud boundary, and project Web from the same plan with slug-collision rejection. Retire the unearned surfaces while retaining headless rebuild and standard-DI persistence/audit seams. Canon passes 35/35, integration 7/7, and CustomerCanon 1/1. Both packages build/pack/audit cleanly. Generated truth is 102 packages: 6 repair, 18 review, 78 structurally ready across 26 claims. No full certification ran. |

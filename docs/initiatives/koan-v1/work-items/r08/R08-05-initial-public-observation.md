@@ -4,12 +4,12 @@ domain: framework
 title: "R08-05 - Observe the Initial Coherent Public Wave"
 audience: [architects, maintainers, ai-agents]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-17
+  date_last_tested: 2026-07-19
   status: pending
-  scope: local readiness contract only; no remote configuration or publication performed
+  scope: exact 93-package local candidate and readiness contract; no remote configuration or publication performed
 ---
 
 # R08-05 — Observe the initial coherent public wave
@@ -35,7 +35,7 @@ GitHub Release creation, or NuGet publication.
 
 The operator makes one business decision: **advance `dev` with these source changes**. Git owns package
 intent. Automation derives every touched owner, version, dependency closure, template band, package order,
-tag, and recovery action. The operator observes one wave; they do not shepherd 108 packages.
+tag, and recovery action. The operator observes one wave; they do not shepherd a package catalog.
 
 The developer's first public experience remains:
 
@@ -261,11 +261,33 @@ maintained ledger.
 
 - R08-01 proves release-wave failure/recovery mechanics locally, including exact binary custody and six
   least-privilege workflow boundaries.
-- R08-04 proves one exact 108-package candidate, both generated templates, and package-only
-  FirstUse/GoldenJourney locally.
+- R08-04's historical 108-package candidate proved the package-first gate before R11 graduation. The
+  current graph is now 93 active packages; the historical count is not current release evidence.
 - ARCH-0119 repairs the console lifecycle root behind PMC-029; focused source-equivalent evidence is green.
+- The first current rehearsal exposed two fail-fast release-boundary defects. Commit `5aeabb2a6`
+  deletes Git file-similarity guessing in favor of the existing evaluated package ID/path continuity
+  owner; commit `844449dd8` makes a fresh protected workflow bootstrap from the coherent current source
+  rather than reinterpret a legacy noncanonical predecessor. Focused lineage/workflow evidence passes
+  43/43, and focused docs lint passes.
+- From exact source `844449dd8c4927881853d315cba5a569cdb817c9`, the disposable canonical
+  bootstrap compiled version commit `378f43beb54f0e8ee8ca0876013526dc97597b4f`, selected all 93 active
+  owners once for `lineage-bootstrap`, and generated 93 owner markers. `pack --clean-room` passed in
+  723.2 seconds with 93 nupkgs and the expected 90 snupkgs; the two dependency-only bundles and template
+  package intentionally carry no symbols.
+- The exact `Sylin.Koan.Templates` identity was `0.17.613`; both public template shapes created, restored,
+  built, and reached their business result. Package-only FirstUse passed in 3.546 seconds with SQLite,
+  lockfile, REST, facts, MCP, dry-run, mutation, and deletion truth. GoldenJourney passed in 6.863
+  seconds with persistence, business rule, reactive work, Jobs, facts, truthful agent schema/boundary,
+  configured-adapter rejection/readiness/calm logs, and recovery.
+- Local escrow preparation produced
+  `release-wave-378f43beb54f0e8ee8ca0876013526dc97597b4f.zip` (6,898,090 bytes), SHA-256
+  `79a9305f77d63c520fcf4a41b7daf0a27a98568ca9479fad1a3ba0ea4a2999dc`; lineage SHA-256 is
+  `977cc4bc1abda811b19b49372ef25844a334742b002b74c37aef17f5f2079147`, and manifest SHA-256 is
+  `3894bcb91f74a62a6fa1f7b2e1a3b107a88033eb79531285e87837aac89b25ae`. These are local
+  preflight evidence, not uploaded authority.
 - No real NuGet publication or immutable GitHub Release has been observed. Remote prerequisites remain
-  deliberately unmodified pending explicit authorization.
+  deliberately unmodified pending explicit authorization. Refresh the exact-source cell immediately
+  before that authorization because this evidence-recording commit follows the proved source.
 
 ## References
 
