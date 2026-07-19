@@ -1960,16 +1960,16 @@
     {
       "packageId": "Sylin.Koan.Web.Admin",
       "shape": "library",
-      "description": "Web dashboard surface for Koan Admin: prefix-aware routing, diagnostics APIs, and LaunchKit scaffolding.",
+      "description": "Development-only, read-only dashboard for sanitized Koan runtime, health, and provenance insight.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Web"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Web.Admin/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Web.Admin/TECHNICAL.md",
       "claims": []
     },
     {

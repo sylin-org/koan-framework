@@ -9,7 +9,7 @@ framework_version: source-first
 validation:
   date_last_tested: 2026-07-19
   status: tested
-  scope: R11-05 Testing family graduation and focused conformance/host/provider/package proof
+  scope: R11-05 Web Admin graduation and focused real-host/consumer/package proof
 ---
 
 # Koan V1 reorganization current handoff
@@ -23,17 +23,40 @@ Replace this file at every handoff. It is a restart point, not a diary.
   R11-07 release-certification boundary.
 - Foundation, package identity, templates, Storage, Cache, Redis, relational/Data providers, Vector, AI, MCP, Web,
   Media, OpenGraph, Identity, Tenancy, Classification, Canon, RabbitMQ, Web request context/Data Access, Data
-  Backup/SoftDelete, Jobs, Observability, Security Trust, and Testing have completed their current R11 family work. The
-  bespoke Orchestration CLI and Aspire families are now shelved beyond V1 without package retirement.
-- The evaluated V1 graph is 93 packages and 26 claims. Generated package quality is 2 repair-required, 7
-  review-required, and 84 structurally ready.
+  Backup/SoftDelete, Jobs, Observability, Security Trust, Testing, and Web Admin have completed their current R11
+  family work. The bespoke Orchestration CLI and Aspire families are now shelved beyond V1 without package retirement.
+- The evaluated V1 graph is 93 packages and 26 claims. Generated package quality is 1 repair-required, 7
+  review-required, and 85 structurally ready.
 
 The accepted architecture remains business intent first: fewer meaningful moving parts, Entity-first application
 language, references express capability intent, `AddKoan()` compiles host-owned decisions, pillars own meaning and
 runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive only
 when genuinely inert and independently consumed.
 
-## Most recent completed slice: Testing, Containers, and Hosting
+## Most recent completed slice: Web Admin
+
+`Sylin.Koan.Web.Admin` remains one explicit Development diagnostic projection. Reference the package, keep the
+application's existing `AddKoan()`, and provide standard ASP.NET Core authentication: the package automatically mounts
+one authenticated, read-only dashboard at `/.koan/admin/`, plus status and health APIs. It stays separate from base Web
+because a privileged embedded UI is a deliberate reference decision, but no Contracts/Runtime/UI split is earned.
+
+The former implementation's false control plane is gone: no LaunchKit/Compose/Aspire generator, raw manifest,
+OpenAPI-client scaffolder, service-mesh ghost, dynamic route/feature layer, custom network/production bypass,
+destructive/log/transcript/console switches, style-note parser, manual registration method, or public service-interface
+stack remains. Admin now projects Core's canonical provenance, pillar catalog, environment, and health at the HTTP
+chokepoint. The replacement deletes more than 7,700 legacy lines and is over 7,000 lines smaller while retaining the
+useful UI.
+
+Every request crosses the Development/enabled 404 boundary and one standard named authorization policy. The default
+policy requires an authenticated user only when the application has not supplied the named policy. Routes snapshot one
+validated prefix at startup. Secrets are always masked, and user name, command line, executable/working paths, machine
+name, and domain can never be projected. The small embedded UI uses safe DOM text rendering and reads only status.
+
+Package-owned README/TECHNICAL companions now state the exact reference/auth/route expression and non-capabilities.
+Admin is structurally ready, moving generated quality to 1 repair / 7 review / 85 ready while the graph remains 93
+packages and 26 claims.
+
+## Previous completed slice: Testing, Containers, and Hosting
 
 The testing product remains three deliberately meaningful packages. `Sylin.Koan.Testing.Hosting` is the xUnit-free
 real generic-host seam used across framework generations. `Sylin.Koan.Testing` is the lightweight application-facing
@@ -107,7 +130,20 @@ Invalid booleans, sample rates, and endpoints reject boot with the exact correct
 disabled, or Production without a package-owned endpoint creates no providers. Startup/provenance/composition facts
 explain active state, signals, wildcard boundary, and exporter kind without exposing endpoint or headers.
 
-## Focused proof for Testing
+## Focused proof for Web Admin
+
+- Real-host Admin suite: 12/12, covering automatic composition, policy results, redaction, environment/enablement,
+  route relocation/configuration failure, and retired-route absence.
+- Admin and both GardenCoop consumers build Release with zero warnings/errors and no application-code changes.
+- Release pack produces nupkg/snupkg; archive inspection confirms DLL/XML, owned README, icon, build-transitive props,
+  current metadata, and the single expected Web dependency.
+- Evaluated inventory remains 93 active packages / 26 claims; generated quality is 1 repair / 7 review / 85 ready.
+- Strict API/full-site DocFX succeeds; public documentation truth passes 226 current files / 42 navigation targets;
+  broad docs lint has zero errors and 1,620 existing non-gating warnings.
+- No full release ratchet, unrelated family suite, private downstream inspection, push, publication, tag, release,
+  deployment, or remote mutation ran. Scratch package artifacts remain untracked under `tmp/`.
+
+## Previous focused proof for Testing
 
 - Conformance: 13 passed / 3 intentional trait skips; Docker-free in-memory provider: 56/56; failed-start async host
   disposal: 1/1.
@@ -124,8 +160,8 @@ explain active state, signals, wildcard boundary, and exporter kind without expo
 ## Current repository state
 
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
-- Branch: `dev`; the Testing family graduation commit is expected to be the current local HEAD. The branch is expected
-  to be 155 commits ahead of `origin/dev` and 0 behind; verify exact HEAD.
+- Branch: `dev`; the Web Admin graduation commit is expected to be the current local HEAD. Verify exact HEAD and
+  ahead/behind counts.
 - `tmp/` remains untracked scratch/evaluator/artifact material and must never be staged.
 - No push, publication, tag, release, deployment, remote mutation, private downstream inspection, or full release
   certification occurred.
@@ -134,14 +170,15 @@ explain active state, signals, wildcard boundary, and exporter kind without expo
 
 1. Verify `git status`, HEAD, and the focused evidence recorded in
    [R11-05](work-items/r11/R11-05-package-family-graduation.md).
-2. Continue R11-05 with fresh exploration of `Sylin.Koan.Web.Admin`, the next unresolved package. Both Orchestration
-   shelves are outside V1; do not graduate, retire, polish, or re-inject them without a new explicit scope decision.
+2. Continue R11-05 with fresh exploration of `Sylin.Koan.ZenGarden` and its genuinely isolated Contracts package, the
+   final unresolved active family. Do not infer a merge from the package names; prove independent consumers and the
+   smallest honest model/resource orchestration promise from current code.
 3. Preserve the contributor mandate for context-aware Web behavior, but do not force persistent Entity semantics or
    operational work into Web contributors merely because contributors are the correct request-context chokepoint.
 
 ## Remaining temporary dispositions
 
-Web Admin and ZenGarden still require terminal R11-02 decisions.
+ZenGarden is the only remaining temporary R11-02 disposition.
 
 ## Do not redo
 
@@ -157,6 +194,9 @@ Web Admin and ZenGarden still require terminal R11-02 decisions.
   consumer evidence.
 - Do not merge the three Testing packages without new consumer/dependency evidence, restore the unused conformance
   mutation hook, or classify arbitrary host/provider/Entity failures as infrastructure skips.
+- Do not restore Web Admin's LaunchKit/Compose/Aspire generator, raw manifest, service-mesh/style endpoints, custom
+  CIDR/production bypass, destructive/log/console promises, dynamic route services, manual registration methods, or
+  parallel discovery model. Do not weaken its permanent secret/host-identity redaction boundary.
 - Do not move the shelved Orchestration CLI family back into `src/`/`Koan.sln`, restore manifest-generator injection,
   or treat its preserved source as a V1 package promise without a new explicit scope decision.
 - Do not move the shelved Aspire family back into `src/`/`Koan.sln`, restore contributor discovery or provider

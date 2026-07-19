@@ -1,12 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using Koan.Web.Admin.Infrastructure;
 using Koan.Web.Admin.Options;
 
 namespace Koan.Web.Admin.Infrastructure;
 
-internal sealed class KoanAdminDevelopmentPolicySetup(IHostEnvironment environment, IOptionsMonitor<KoanAdminOptions> options)
+internal sealed class KoanAdminDevelopmentPolicySetup(IHostEnvironment environment, IOptions<KoanAdminOptions> options)
     : IConfigureOptions<AuthorizationOptions>
 {
     public void Configure(AuthorizationOptions authorization)
@@ -16,7 +15,7 @@ internal sealed class KoanAdminDevelopmentPolicySetup(IHostEnvironment environme
             return;
         }
 
-        var snapshot = options.CurrentValue;
+        var snapshot = options.Value;
         var policyName = snapshot.Authorization.Policy ?? KoanAdminDefaults.Policy;
 
         if (!snapshot.Authorization.AutoCreateDevelopmentPolicy)

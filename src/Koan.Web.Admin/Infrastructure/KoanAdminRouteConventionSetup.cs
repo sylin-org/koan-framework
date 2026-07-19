@@ -1,4 +1,4 @@
-using Koan.Web.Admin.Services;
+using Koan.Web.Admin.Options;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -6,15 +6,15 @@ namespace Koan.Web.Admin.Infrastructure;
 
 internal sealed class KoanAdminRouteConventionSetup : IConfigureOptions<MvcOptions>
 {
-    private readonly IKoanAdminRouteProvider _routes;
+    private readonly IOptions<KoanAdminOptions> _options;
 
-    public KoanAdminRouteConventionSetup(IKoanAdminRouteProvider routes)
+    public KoanAdminRouteConventionSetup(IOptions<KoanAdminOptions> options)
     {
-        _routes = routes;
+        _options = options;
     }
 
     public void Configure(MvcOptions options)
     {
-        options.Conventions.Add(new KoanAdminRouteConvention(_routes));
+        options.Conventions.Add(new KoanAdminRouteConvention(_options));
     }
 }

@@ -5052,6 +5052,125 @@ package graph that would create a materially larger dependency surface.
   inspection, push, publication, tag, release, deployment, or remote mutation ran. Scratch package artifacts remain
   untracked and must not be staged.
 
+## Web Admin architecture checkpoint
+
+**Task:** Rebuild `Sylin.Koan.Web.Admin` as one automatic, Development-only, read-only projection of canonical Koan
+runtime truth, deleting operational and topology-generation promises the package does not implement honestly.
+
+**Application intent:** While developing a Koan web application, an authenticated developer can open one local
+dashboard and answer: what composed, which effective non-secret settings and corrections were reported, what is the
+current health, and what bounded runtime resources is this process using?
+
+**Public expression:** reference `Sylin.Koan.Web.Admin`, keep the application's existing `AddKoan()`, and provide the
+standard ASP.NET Core authentication used by the application. The package automatically maps `/.koan/admin/`, its
+read-only status API, and its health API in Development. GardenCoop already demonstrates the complete expression by
+referencing the Development test-auth provider; no `AddKoanWebAdmin`, endpoint-map call, contributor, or dashboard
+builder is required.
+
+**Guarantee and correction:** Admin is active only when the host environment is Development and
+`Koan:Admin:Enabled` is not false. Every UI/API request passes one configured ASP.NET Core authorization policy; when
+the policy is absent, Development receives a default policy that requires an authenticated user. Disabled or
+non-Development hosts return 404 before projecting facts. Status masks every secret and never returns user name,
+command line, executable/working paths, machine name, or domain. Invalid route-prefix/policy configuration rejects
+options validation with the exact correction. Route configuration is startup-owned and immutable for the host.
+
+**Complete intent surface and public concepts:** `KoanAdminOptions.Enabled`, `PathPrefix`, and the standard
+authorization `Policy`/Development-policy default are the complete configuration decisions. Public status DTOs map
+canonical provenance modules/settings/notes/tools, health facts, sanitized process/memory/GC/thread-pool facts, the
+current environment snapshot, and the resolved route map. There is no console surface, production bypass,
+network-CIDR substitute for proxy policy, destructive-operation switch, log/transcript promise, raw manifest
+endpoint, LaunchKit, Compose/Aspire generator, OpenAPI-client scaffolder, service-mesh view, or dynamic route reload.
+
+**Docs read:** current architecture principles require a single runtime truth authority and standard .NET concepts;
+the current Web/Security guidance requires explicit authorization at privileged edges; the recently completed CLI
+and Aspire checkpoints establish that applications and standard tools own topology; WEB-0061/0062 establish secret
+masking, health facts, provenance, and pillar visualization as the useful dashboard center; WEB-0063 explicitly
+deferred monitoring and plug-in surfaces. Archived LaunchKit/admin proposals and older service-mesh evidence are not
+current authority.
+
+**Code and consumer graph read:** the entire module/options/controller/service/contract/infrastructure graph, all
+embedded asset entry points, the 1,916-line SPA's fetch/render map, its 445-line HTML navigation, the 2,671-line style
+surface, current package metadata, solution membership, history, and the two GardenCoop consumers were inspected.
+There is no current Admin test project. `AddKoanAdminCore`/`AddKoanWebAdmin` and all four public service interfaces have
+no external source consumer. `EnableConsoleUi`, destructive/log/transcript fields, and their feature snapshot values
+have no implementation. The SPA calls the already deleted `api/service-mesh`. Asset delivery writes debug lines and
+enumerates all embedded resources per request. MVC routes snapshot options during application-model construction
+while route/feature services advertise later `IOptionsMonitor` changes that cannot remap endpoints.
+
+**False topology proof:** `KoanAdminLaunchKitService` emits one fictitious `koan/{module}:latest` Compose service per
+provenance module, assigns arbitrary ports, emits a non-standard Aspire JSON document, exports effective settings as
+if they were deployable input, and generates instructions against a Swagger route the current OpenAPI package does
+not promise. It is disconnected from the now-shelved orchestration CLI/Aspire source and from standard authored
+AppHost/Compose topology. This is misleading output, not a partial implementation, and must be deleted rather than
+documented or hidden behind an option.
+
+**Reusing:** Core's immutable provenance snapshot, health aggregator, pillar catalog, environment snapshot, Web's
+automatic controller discovery, standard `IHostEnvironment`, ASP.NET Core authorization/options/MVC, embedded
+resources, and .NET process/GC/thread-pool facts already supply every earned behavior. No new contributor, registry,
+manifest authority, topology model, contracts package, runtime service interface, or custom security abstraction is
+required.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| real-host Admin suite | `tests/Suites/Web/Koan.Web.Admin.Tests/` | prove automatic `AddKoan()` activation, policy gate, secret masking, Development-only/disabled 404 behavior, and retired route absence |
+| package orientation | `src/Koan.Web.Admin/README.md` | state the shortest reference/auth/dashboard expression, exact routes, failures, and non-capabilities |
+| technical contract | `src/Koan.Web.Admin/TECHNICAL.md` | state startup-owned routing, canonical sources, redaction, authorization, DTO, and lifecycle boundaries |
+
+**Coalescence:** keep one Web Admin projection package. Collapse feature/route/manifest service layers into the actual
+HTTP chokepoint and standard options because no independent source consumer replaces them. Replace the style-note
+parser/dynamic stylesheet with direct `KoanPillarCatalog` classification. Replace the multi-mode ghost SPA with one
+small self-contained status/configuration dashboard over the one status payload. Keep status contracts public because
+they are the actual wire contract; internal runtime mechanics remain internal. Core is too broad to own an embedded
+privileged UI, while separate Admin contracts/runtime/UI packages would recreate the already removed false split.
+
+**Ergonomics:** humans and coding models see one reference, one route, one policy, one read-only snapshot, and one
+correction. The dashboard cannot suggest it generated deployable topology, stream logs, mutate resources, or monitor a
+service mesh when it does none of those things. Startup facts, HTTP, and the UI project the same canonical provenance
+instead of maintaining parallel discovery models.
+
+**Constraints and risks:** the rebuild intentionally breaks unused public service interfaces/options and removes
+LaunchKit/manifest/style routes. GardenCoop consumes only automatic package activation and therefore should require no
+application-code change. The existing package has no focused suite or other source consumer establishing compatibility
+value. Only Admin, its two public sample consumers, exact package artifact, and docs/generated truth will be validated;
+no unrelated Web/Auth suite, live infrastructure, full release ratchet, private downstream inspection, publication,
+or remote mutation is in scope.
+
+**Autonomous architecture checkpoint:** proceed. The user's standing authorization and explicit simplicity/reuse
+mandate cover this break-and-rebuild; current code proves the removed branches are false or ownerless rather than
+accepted V1 commitments.
+
+### Web Admin focused completion evidence
+
+- `Sylin.Koan.Web.Admin` has terminal `keep` disposition as one explicit Development diagnostic projection. A package
+  reference plus the application's existing `AddKoan()` automatically mounts the authenticated UI, status, and health
+  endpoints; there is no Admin registration method, endpoint builder, contributor registry, or separate control plane.
+- The implementation deletes the fictitious LaunchKit/Compose/Aspire/OpenAPI topology generator, raw manifest and
+  dynamic style endpoints, stale service-mesh call, route/feature service layers, custom CIDR/production bypass,
+  destructive/log/transcript/console switches, and ownerless public service interfaces. The replacement source is
+  over 7,000 lines smaller after deleting more than 7,700 legacy lines, and it projects Core's canonical provenance,
+  pillar catalog, environment, and health directly.
+- Every request uses one standard ASP.NET Core authorization policy after the Development/enabled 404 boundary. The
+  default Development policy requires an authenticated user only when the application has not registered the named
+  policy. Routing is startup-owned; invalid configuration fails with the correction rather than advertising hot reload.
+- Secrets are always represented as `********`. Process user, command line, executable/working paths, machine name,
+  and domain are never projected and have no weakening option. The embedded UI is read-only, uses safe DOM text
+  rendering, requests only the status endpoint, and serves exact resources with `no-store`.
+- The new real-host `Koan.Web.Admin.Tests` suite passes 12/12. It proves automatic `AddKoan()` activation, HTML/status
+  delivery, challenge/forbid/success policy behavior, permanent redaction, Development/disabled 404 behavior, route
+  relocation, invalid-prefix/policy startup failure, and absence of the retired manifest/LaunchKit/service-mesh/style routes.
+- Admin and both GardenCoop consumers build Release warning-clean without application-code changes. Release pack emits
+  nupkg/snupkg under untracked `tmp/r11-web-admin`; archive inspection confirms DLL/XML, owned README, icon,
+  build-transitive props, exact identity/current description, and the single expected `Sylin.Koan.Web` dependency.
+- Generated truth remains 93 active packages and 26 claims. Admin moves from repair-required to structurally ready,
+  improving quality from 2 repair / 7 review / 84 ready to 1 repair / 7 review / 85 ready.
+- Strict API/full-site DocFX succeeds. The public documentation truth gate passes 226 current files and 42 navigation
+  targets; broad docs lint reports zero errors with 1,620 existing non-gating front-matter/TOC warnings.
+- Validation remains bounded to Admin, its real-host suite, two public sample consumers, exact package artifact, and
+  current docs/generated truth. No unrelated Web/Auth/family suite, live infrastructure, full release ratchet, private
+  downstream inspection, push, publication, tag, release, deployment, or remote mutation ran; `tmp/` remains untracked.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

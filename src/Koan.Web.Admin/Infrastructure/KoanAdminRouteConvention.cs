@@ -1,25 +1,25 @@
 using System;
 using Koan.Web.Admin.Contracts;
-using Koan.Web.Admin.Services;
+using Koan.Web.Admin.Options;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Web.Admin.Infrastructure;
 
 internal sealed class KoanAdminRouteConvention : IApplicationModelConvention
 {
     public const string RootPlaceholder = "[koan-admin-root]";
-    public const string ApiPlaceholder = "[koan-admin-api]";
 
-    private readonly IKoanAdminRouteProvider _routes;
+    private readonly KoanAdminRouteMap _routes;
 
-    public KoanAdminRouteConvention(IKoanAdminRouteProvider routes)
+    public KoanAdminRouteConvention(IOptions<KoanAdminOptions> options)
     {
-        _routes = routes;
+        _routes = KoanAdminPathUtility.BuildMap(options.Value.PathPrefix);
     }
 
     public void Apply(ApplicationModel application)
     {
-        var map = _routes.Current;
+        var map = _routes;
         foreach (var controller in application.Controllers)
         {
             foreach (var selector in controller.Selectors)
@@ -57,10 +57,6 @@ internal sealed class KoanAdminRouteConvention : IApplicationModelConvention
         if (updated.Contains(RootPlaceholder, StringComparison.Ordinal))
         {
             updated = updated.Replace(RootPlaceholder, map.RootTemplate, StringComparison.Ordinal);
-        }
-        if (updated.Contains(ApiPlaceholder, StringComparison.Ordinal))
-        {
-            updated = updated.Replace(ApiPlaceholder, map.ApiTemplate, StringComparison.Ordinal);
         }
         return updated;
     }

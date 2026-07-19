@@ -139,7 +139,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Testing.Containers` | `capability` | `keep` (implemented) |
 | `Sylin.Koan.Testing.Hosting` | `capability` | `keep` (implemented) |
 | `Sylin.Koan.Web` | `capability` | `keep` |
-| `Sylin.Koan.Web.Admin` | `projection` | `assess` |
+| `Sylin.Koan.Web.Admin` | `projection` | `keep` (implemented) |
 | `Sylin.Koan.Web.Auth` | `projection` | `keep` |
 | `Sylin.Koan.Web.Auth.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Web.Auth.Connector.Discord` | `provider` | `keep` |
@@ -330,6 +330,16 @@ neither earns a separate contracts or Web bridge package.
 
 Each reference adds a distinct application-facing projection and all three pass focused behavior, consumer, exact
 artifact, documentation, and current vulnerability evidence. Base `Sylin.Koan.Web` remains unchanged.
+
+## Web Admin disposition
+
+| Package | Disposition | Distinct reference intent and implemented boundary work |
+|---|---|---|
+| `Sylin.Koan.Web.Admin` | `keep` (implemented) | One reference adds an authenticated, Development-only, read-only projection of canonical Koan provenance, health, environment, and bounded runtime facts through the application's existing `AddKoan()` composition. The false LaunchKit/Compose/Aspire generator, raw manifest, service-mesh ghost, dynamic route/feature services, custom network bypass, destructive/log/console promises, style parser, public manual registration methods, and ownerless service interfaces are removed. Standard ASP.NET Core policy authorization gates one startup-owned UI/status/health surface; secrets and host identity are permanently sanitized. |
+
+Admin remains separate from base Web because an embedded privileged diagnostic UI is an explicit application reference
+decision. It does not earn Contracts, Runtime, or UI subpackages: its public records are the actual JSON wire contract,
+while Core's provenance, health, environment, and pillar catalog remain the independent authorities.
 
 ## Web edge projection dispositions
 

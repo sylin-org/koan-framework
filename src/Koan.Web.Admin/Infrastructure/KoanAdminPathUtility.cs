@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Koan.Web.Admin.Contracts;
 
 namespace Koan.Web.Admin.Infrastructure;
 
@@ -41,5 +42,12 @@ internal static class KoanAdminPathUtility
                 span[pref.Length] = '/';
                 suf.AsSpan().CopyTo(span[(pref.Length + 1)..]);
             });
+    }
+
+    public static KoanAdminRouteMap BuildMap(string? prefix)
+    {
+        var normalized = NormalizePrefix(prefix);
+        var root = BuildTemplate(normalized, "admin");
+        return new KoanAdminRouteMap(normalized, root);
     }
 }
