@@ -114,7 +114,7 @@ graduation claim. Architectural and prose review plus the applicable executable 
 | [R11-04](r11/R11-04-golden-package-journey.md) | golden package journey behind AddKoan + Entity + EntityController | passed |
 | [R11-05](r11/R11-05-package-family-graduation.md) | dependency-ordered family graduation with coalescence before polish | passed |
 | [R11-06](r11/R11-06-package-rendering-and-consumer-proof.md) | NuGet rendering, clean-consumer, operator, reviewer, and agent proof | passed |
-| R11-07 | complete active-package disposition and one final release-certification boundary | pending |
+| [R11-07](r11/R11-07-release-certification-boundary.md) | complete active-package disposition and one final release-certification boundary | in-progress |
 
 Open later child cards only when the preceding slice establishes the facts needed to size them. This keeps R11 a
 sequence of meaningful decisions rather than 108 parallel documentation chores.

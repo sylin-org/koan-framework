@@ -156,6 +156,6 @@ Entity code, controllers, and verbs are untouched — that's provider transparen
 - [Reference card: data.md](../../../docs/reference/cards/data.md) — one-screen Data pillar map
 - [Getting started: quickstart](../../../docs/getting-started/quickstart.md) — the long-form walkthrough
 - [Getting started: overview](../../../docs/getting-started/overview.md) — framework mental model
-- Sample: [`samples/S0.ConsoleJsonRepo/`](../../../samples/S0.ConsoleJsonRepo) — minimal console + JSON store
-- Sample: [`samples/S1.Web/`](../../../samples/S1.Web) — web app with `EntityController<T>` + `[Parent]` relationships
+- Sample: [LocalChecklist](../../../samples/fundamentals/LocalChecklist) — minimal local data application
+- Sample: [TaskGraph](../../../samples/fundamentals/TaskGraph) — web app with `EntityController<T>` + `[Parent]` relationships
 - [DATA-0072 — explicit-type parent relationship attribute](../../../docs/decisions/DATA-0072-parent-relationship-attribute-explicit-type.md)

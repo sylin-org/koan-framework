@@ -39,6 +39,10 @@
       "version": "0.17"
     },
     {
+      "id": "Koan.Data.Relational.Abstractions",
+      "version": "0.18"
+    },
+    {
       "id": "Koan.Web",
       "version": "0.17"
     },

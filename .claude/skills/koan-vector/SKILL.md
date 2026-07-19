@@ -130,6 +130,6 @@ public sealed class SemanticSearch
 
 - [Reference card: vector.md](../../../docs/reference/cards/vector.md) — one-screen pillar map
 - [AI & vector how-to](../../../docs/guides/ai-vector-howto.md) — embeddings, search, migration walkthrough
-- [`samples/S5.Recs`](../../../samples/S5.Recs/README.md) — `[Embedding]` on `Media` + hybrid `Vector<Media>.Search` over Weaviate with Ollama embeddings
+- [GardenCoop Local Discovery](../../../samples/journeys/GardenCoop/02-LocalDiscovery/README.md) — `[Embedding]` plus `Vector<Produce>.Search` for local semantic discovery
 - [DATA-0078 — vector export capabilities](../../../docs/decisions/DATA-0078-vector-export-capabilities.md)
 - [DATA-0103 — search-engine shared core (ES/OS vector)](../../../docs/decisions/DATA-0103-search-engine-shared-core.md) · [ARCH-0089 — AI pillar dissolution](../../../docs/decisions/ARCH-0089-ai-pillar-dissolution.md)

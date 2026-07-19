@@ -26,7 +26,7 @@ public sealed class VectorInMemoryPillarBootstrapSpec
     [Fact]
     public async Task AddKoan_discovers_inmemory_vector_adapter_and_ranks_by_cosine()
     {
-        await using var host = await KoanIntegrationHost.Configure()
+        await using var host = await PillarHost.Configure()
             .WithSetting("Koan:Data:Sources:Default:Adapter", "inmemory")
             .WithSetting("Koan:Environment", "Test")
             .ConfigureServices(services => services.AddKoan())

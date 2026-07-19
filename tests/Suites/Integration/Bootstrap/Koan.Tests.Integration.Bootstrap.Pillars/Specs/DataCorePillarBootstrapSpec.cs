@@ -25,7 +25,7 @@ public sealed class DataCorePillarBootstrapSpec
     [Fact]
     public async Task AddKoan_resolves_IDataService_through_real_bootstrap()
     {
-        await using var host = await KoanIntegrationHost.Configure()
+        await using var host = await PillarHost.Configure()
             .WithSetting("Koan:Data:Sources:Default:Adapter", "inmemory")
             .WithSetting("Koan:Environment", "Test")
             .ConfigureServices(services => services.AddKoan())

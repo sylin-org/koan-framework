@@ -122,5 +122,5 @@ Scopes nest and replace inner-most-wins; dispose restores the outer value. `Part
 - [Entity capabilities how-to](../../../docs/guides/entity-capabilities-howto.md) — capability tokens, query pushdown, counts
 - [DATA-0077 — context routing (partition / source / adapter)](../../../docs/decisions/DATA-0077-entity-context-source-adapter-partition-routing.md)
 - [ARCH-0084 — unified capability model (`CapabilitySet` / `DataCaps`)](../../../docs/decisions/ARCH-0084-unified-capability-model.md)
-- [`samples/S1.Web`](../../../samples/S1.Web/README.md) — `Entity<Todo>` over a single provider
-- [`samples/S10.DevPortal`](../../../samples/S10.DevPortal/README.md) — multi-provider showcase
+- [TaskGraph](../../../samples/fundamentals/TaskGraph/README.md) — `Entity<Todo>` over a single provider
+- [DevPortal](../../../samples/applications/DevPortal/README.md) — multi-provider showcase

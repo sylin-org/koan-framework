@@ -17,7 +17,7 @@ public sealed class AuthTrustFabricSpec
     [Fact]
     public async Task AddKoan_registers_the_trust_issuer_through_real_bootstrap()
     {
-        await using var host = await KoanIntegrationHost.Configure()
+        await using var host = await PillarHost.Configure()
             .WithSetting("Koan:Storage:DefaultProfile", "local")
             .WithSetting("Koan:Storage:Profiles:local:Provider", "local")
             .WithSetting("Koan:Storage:Profiles:local:Container", "trust-bootstrap")

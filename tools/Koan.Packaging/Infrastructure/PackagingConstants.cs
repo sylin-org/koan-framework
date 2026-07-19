@@ -236,9 +236,7 @@ internal static class PackagingConstants
         public const string JobsLedgerSubject = "jobs:ledger";
         public const string JobsWakeSubject = "jobs:wake";
         public const string DefaultDataSubject = "data:default";
-        public const string AdapterRejectedCode = "koan.data.adapter.rejected";
         public const string AdapterSelectedCode = "koan.data.adapter.selected";
-        public const string AdapterUnavailableReason = "adapter-unavailable";
         public const string UnavailableAdapter = "not-referenced";
         public const string SqliteAdapter = "sqlite";
         public const string DurableLedger = "durable-data";

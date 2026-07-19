@@ -26,7 +26,7 @@ public sealed class WebPillarBootstrapSpec
     [Fact]
     public async Task AddKoan_resolves_IEntityEndpointDescriptorProvider_through_real_bootstrap()
     {
-        await using var host = await KoanIntegrationHost.Configure()
+        await using var host = await PillarHost.Configure()
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 

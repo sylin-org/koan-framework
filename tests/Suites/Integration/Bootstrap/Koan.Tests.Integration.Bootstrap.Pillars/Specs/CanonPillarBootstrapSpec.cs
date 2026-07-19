@@ -24,7 +24,7 @@ public sealed class CanonPillarBootstrapSpec
     [Fact]
     public async Task AddKoan_resolves_ICanonRuntime_through_real_bootstrap()
     {
-        await using var host = await KoanIntegrationHost.Configure()
+        await using var host = await PillarHost.Configure()
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 

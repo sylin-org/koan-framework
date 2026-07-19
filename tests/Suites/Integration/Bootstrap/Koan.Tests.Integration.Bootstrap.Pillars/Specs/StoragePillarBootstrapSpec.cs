@@ -43,7 +43,7 @@ public sealed class StoragePillarBootstrapSpec : IDisposable
     [Fact]
     public async Task AddKoan_resolves_IStorageService_through_real_bootstrap()
     {
-        await using var host = await KoanIntegrationHost.Configure()
+        await using var host = await PillarHost.Configure()
             .WithSetting("Koan:Storage:DefaultProfile", "local")
             .WithSetting("Koan:Storage:Profiles:local:Provider", "local")
             .WithSetting("Koan:Storage:Profiles:local:Container", "files")

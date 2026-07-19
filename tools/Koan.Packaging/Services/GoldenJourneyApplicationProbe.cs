@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Koan.Packaging.Infrastructure;
@@ -247,34 +246,29 @@ internal sealed class GoldenJourneyApplicationProbe
         {
             await StepAsync("adapter-rejection-explained", steps, async () =>
             {
-                var facts = await ReadFactsWhenAvailableAsync(rejected, cancellationToken);
-                var rejection = facts.GetProperty("facts").EnumerateArray().FirstOrDefault(fact =>
-                    fact.GetProperty("code").GetString() == PackagingConstants.GoldenJourney.AdapterRejectedCode
-                    && fact.GetProperty("subject").GetString() == PackagingConstants.GoldenJourney.DefaultDataSubject);
-                adapterRejectionExplained = rejection.ValueKind != JsonValueKind.Undefined
-                    && rejection.GetProperty("state").GetString() == "rejected"
-                    && rejection.GetProperty("reasonCode").GetString() == PackagingConstants.GoldenJourney.AdapterUnavailableReason
-                    && rejection.GetProperty("correction").GetString()?.Contains("reference", StringComparison.OrdinalIgnoreCase) == true;
-                if (!adapterRejectionExplained)
-                    throw new InvalidOperationException("The unavailable adapter was not explained with a stable reason and correction.");
-
-                using var readiness = await rejected.Http.GetAsync(
-                    PackagingConstants.ApplicationProbe.HealthPath,
+                var failure = await rejected.WaitForExitAsync(
+                    TimeSpan.FromMilliseconds(PackagingConstants.ApplicationProbe.RejectedObservationMilliseconds * 4),
                     cancellationToken);
-                using var readinessDocument = JsonDocument.Parse(
-                    await readiness.Content.ReadAsStringAsync(cancellationToken));
-                adapterRejectionAffectedReadiness = readiness.StatusCode == HttpStatusCode.ServiceUnavailable
-                    && readinessDocument.RootElement.GetProperty("status").GetString() == "unhealthy";
+                var output = failure.StandardOutput + failure.StandardError;
+                adapterRejectionExplained = failure.ExitCode != 0
+                    && output.Contains(PackagingConstants.GoldenJourney.UnavailableAdapter, StringComparison.OrdinalIgnoreCase)
+                    && output.Contains("Koan:Data:Sources:Default:Adapter", StringComparison.Ordinal)
+                    && output.Contains("reference the connector package", StringComparison.OrdinalIgnoreCase)
+                    && !output.Contains("ConnectionString", StringComparison.Ordinal);
+                if (!adapterRejectionExplained)
+                    throw new InvalidOperationException(
+                        "The unavailable adapter did not fail startup with a safe, actionable correction.");
+
+                adapterRejectionAffectedReadiness = failure.ExitCode != 0;
                 if (!adapterRejectionAffectedReadiness)
-                    throw new InvalidOperationException("The unavailable elected adapter did not make canonical readiness unhealthy.");
+                    throw new InvalidOperationException("The unavailable elected adapter did not prevent readiness.");
+
+                rejectedWorkerLogsCalm = CountOccurrences(
+                    output,
+                    "Job worker iteration failed") <= PackagingConstants.ApplicationProbe.MaximumWorkerIterationErrors;
+                if (!rejectedWorkerLogsCalm)
+                    throw new InvalidOperationException("The rejected adapter caused the Jobs worker to flood repeated iteration errors.");
             });
-            await Task.Delay(PackagingConstants.ApplicationProbe.RejectedObservationMilliseconds, cancellationToken);
-            var rejectedLogs = await rejected.StopAsync();
-            rejectedWorkerLogsCalm = CountOccurrences(
-                rejectedLogs.StandardOutput + rejectedLogs.StandardError,
-                "Job worker iteration failed") <= PackagingConstants.ApplicationProbe.MaximumWorkerIterationErrors;
-            if (!rejectedWorkerLogsCalm)
-                throw new InvalidOperationException("The rejected adapter caused the Jobs worker to flood repeated iteration errors.");
         }
 
         await using (var recovered = ApplicationProbeHost.Start(
@@ -290,7 +284,10 @@ internal sealed class GoldenJourneyApplicationProbe
                     fact.GetProperty("code").GetString() == PackagingConstants.GoldenJourney.AdapterSelectedCode
                     && fact.GetProperty("subject").GetString() == PackagingConstants.GoldenJourney.DefaultDataSubject);
                 adapterRecoveryObserved = election.ValueKind != JsonValueKind.Undefined
-                    && election.GetProperty("state").GetString() == "selected"
+                    && string.Equals(
+                        election.GetProperty("state").GetString(),
+                        "selected",
+                        StringComparison.OrdinalIgnoreCase)
                     && election.GetProperty("summary").GetString()?.Contains(
                         PackagingConstants.GoldenJourney.SqliteAdapter,
                         StringComparison.OrdinalIgnoreCase) == true;
@@ -348,27 +345,6 @@ internal sealed class GoldenJourneyApplicationProbe
         return document.RootElement.Clone();
     }
 
-    private static async Task<JsonElement> ReadFactsWhenAvailableAsync(
-        ApplicationProbeHost host,
-        CancellationToken cancellationToken)
-    {
-        for (var attempt = 0; attempt < PackagingConstants.ApplicationProbe.StartupAttempts; attempt++)
-        {
-            try
-            {
-                return await ReadFactsAsync(host.Http, cancellationToken);
-            }
-            catch (HttpRequestException)
-            {
-            }
-            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-            }
-            await Task.Delay(PackagingConstants.ApplicationProbe.StartupPollMilliseconds, cancellationToken);
-        }
-        throw new InvalidOperationException("Runtime facts did not become reachable within the bounded startup window.");
-    }
-
     private static async Task<JsonElement> ReadFactsAsync(HttpClient http, CancellationToken cancellationToken)
     {
         using var response = await http.GetAsync(PackagingConstants.ApplicationProbe.FactsPath, cancellationToken);
@@ -381,7 +357,7 @@ internal sealed class GoldenJourneyApplicationProbe
     {
         var fact = facts.FirstOrDefault(candidate => candidate.GetProperty("subject").GetString() == subject);
         if (fact.ValueKind == JsonValueKind.Undefined
-            || !string.Equals(fact.GetProperty("state").GetString(), "selected", StringComparison.Ordinal)
+            || !string.Equals(fact.GetProperty("state").GetString(), "selected", StringComparison.OrdinalIgnoreCase)
             || !(fact.GetProperty("summary").GetString() ?? "").Contains(selection, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException($"Runtime facts did not select '{selection}' for '{subject}'.");
     }

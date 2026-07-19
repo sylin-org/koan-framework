@@ -28,7 +28,7 @@ public sealed class AuthPillarBootstrapSpec
     [Fact]
     public async Task AddKoan_registers_the_host_owned_provider_catalog()
     {
-        await using var host = KoanIntegrationHost.Configure()
+        await using var host = PillarHost.Configure()
             .ConfigureServices(services => services.AddKoan())
             .Build();
 

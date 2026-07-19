@@ -146,5 +146,5 @@ public static class WebRegistration
 - [Reference card: web.md](../../../docs/reference/cards/web.md) — one-screen pillar map
 - [Web pillar reference](../../../docs/reference/web/index.md) — full controller / negotiation detail
 - [Building APIs guide](../../../docs/guides/building-apis.md) · [HTTP API conventions](../../../docs/api/web-http-api.md)
-- [`samples/S1.Web`](../../../samples/S1.Web/README.md) — `EntityController<Todo>` CRUD + custom seed/relationship routes (controllers are flat under `samples/S1.Web/`)
+- [TaskGraph](../../../samples/fundamentals/TaskGraph/README.md) — `EntityController<Todo>` CRUD + custom relationship routes
 - [WEB-0068 — read-path visibility predicates](../../../docs/decisions/WEB-0068-query-options-predicates.md)

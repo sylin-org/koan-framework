@@ -24,7 +24,7 @@ public sealed class AuthDiscoverableContributorSpec
     [Fact]
     public async Task Bootstrap_routes_auth_flow_handler_discovery_through_the_registry()
     {
-        await using var host = await KoanIntegrationHost.Configure()
+        await using var host = await PillarHost.Configure()
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 
@@ -44,7 +44,7 @@ public sealed class AuthDiscoverableContributorSpec
     [Fact]
     public async Task Discovered_flow_handlers_register_builtins_including_the_migrated_contributor()
     {
-        await using var host = await KoanIntegrationHost.Configure()
+        await using var host = await PillarHost.Configure()
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 

@@ -1,6 +1,6 @@
 ---
 name: koan-bootstrap
-description: Project setup and boot — minimal Program.cs (AddKoan), Reference = Intent auto-registration, KoanModule (ARCH-0086) and IKoanAutoRegistrar, ProvenanceModuleWriter boot reports, KoanEnv/Configuration helpers
+description: Project setup and boot — minimal Program.cs (AddKoan), Reference = Intent activation, KoanModule lifecycle, ProvenanceModuleWriter boot reports, KoanEnv/Configuration helpers
 pillar: core
 status: current
 last_validated: 2026-06-18
@@ -11,7 +11,7 @@ last_validated: 2026-06-18
 ## Trigger this skill when you see
 
 - A `Program.cs` / `Startup` / project-setup question, or `builder.Services.AddKoan()`
-- `KoanModule`, `IKoanAutoRegistrar`, `IKoanInitializer`, `[KoanDiscoverable]`, `KoanRegistry`
+- `KoanModule`, `[KoanDiscoverable]`, `KoanRegistry`
 - `Describe(...)` / `Report(...)` boot reports, `ProvenanceModuleWriter`, `BootReport` (removed type)
 - `KoanEnv.IsDevelopment` / `IsProduction` / `InContainer` / `DumpSnapshot`
 - `Configuration.Read(...)` / `Configuration.ReadFirst(...)`
@@ -21,7 +21,7 @@ last_validated: 2026-06-18
 
 ## Core principle
 
-**`services.AddKoan()` is the only wiring line.** Framework modules self-register by being referenced (Reference = Intent). For *your* services, author one **`KoanModule`** (ARCH-0086) — a single self-describing unit (id + DI + ordered startup + provenance) that is auto-discovered and ordered, never hand-registered. It implements `IKoanAutoRegistrar`, so existing discovery applies unchanged.
+**`services.AddKoan()` is the only wiring line.** Framework modules activate by being referenced (Reference = Intent). For *your* services, author one **`KoanModule`** (ARCH-0086) — a single self-describing unit (DI + ordered startup + provenance) that is auto-discovered and ordered, never hand-registered. Its identity comes from the declaring package or assembly.
 
 <!-- validate -->
 ```csharp
@@ -38,8 +38,6 @@ namespace MyApp.Initialization;
 // ordered by [Before]/[After]. No registration call anywhere — referencing the assembly is the intent.
 public sealed class MyAppModule : KoanModule
 {
-    public override string Id => "MyApp";
-
     public override void Register(IServiceCollection services)          // DI wiring (was Initialize)
     {
         services.AddScoped<ITodoService, TodoService>();
@@ -91,12 +89,11 @@ Adding a package reference *is* the registration — there is no matching `Add*(
 | `+ Koan.Data.Connector.Mongo` (or Postgres/Sqlite/Redis…) | Data adapter discovered, configured, elected by capability |
 | `+ Koan.Web` | Controllers + middleware auto-wired |
 | `+ Koan.AI` / `Koan.Jobs` / `Koan.Cache` | Pillar self-registers; no `AddKoanAI()` / `AddKoanJobs()` needed to *enable* it |
-| Your assembly with a `KoanModule` / `IKoanAutoRegistrar` | Discovered + ordered automatically |
+| Your assembly with a `KoanModule` | Discovered + ordered automatically |
 
 ## Authoring choices
 
-- **`KoanModule` (preferred, ARCH-0086)** — `Id`, `Register(services)`, `Start(sp, ct)` (one-time ordered startup, DI available), `Report(module, cfg, env)`. `Start` folds the "register a bootstrap `IHostedService` inside `Initialize`" idiom into one verb. Recurring/pokable work stays on the `IKoanBackgroundService` family.
-- **Raw `IKoanAutoRegistrar`** — `ModuleName`, `ModuleVersion`, `Initialize(services)`, `Describe(ProvenanceModuleWriter, IConfiguration, IHostEnvironment)`. Still works (the module bridges to it); migrate opportunistically.
+- **`KoanModule` (ARCH-0086)** — `Register(services)`, `Start(sp, ct)` (one-time ordered startup, DI available), `Report(module, cfg, env)`. `Id` is host-bound from the package/assembly and is not application-authored. Recurring/pokable work stays on the `IKoanBackgroundService` family.
 - **Many implementers of one contract** — mark the *interface* `[KoanDiscoverable]` and read `KoanRegistry.GetDiscoveredImplementors(typeof(IMyPlugin))`. Never hand-roll an `AppDomain.GetAssemblies()` scan (it misses lazily-loaded assemblies).
 
 ## Boot report: ProvenanceModuleWriter
@@ -150,6 +147,6 @@ Use `KoanEnv.EnvironmentName` (not a fictional `CurrentEnvironment`). For multi-
 - [Reference card: data.md](../../../docs/reference/cards/data.md) — pillar map (Entity facade the bootstrap exposes)
 - [Bootstrap lifecycle deep-dive](../../../docs/guides/deep-dive/bootstrap-lifecycle.md) — discovery, ordering, provenance
 - [Framework utilities guide](../../../docs/guides/framework-utilities.md) — `Configuration`, `KoanEnv`, options helpers
-- [Sample: S0.ConsoleJsonRepo/Program.cs](../../../samples/S0.ConsoleJsonRepo/Program.cs) — minimal bootstrap
-- [Sample: S8.Canon registrar](../../../samples/S8.Canon/Initialization/KoanAutoRegistrar.cs) — canonical `Describe` with `ProvenanceModuleWriter`
+- [FirstUse Program.cs](../../../samples/FirstUse/Program.cs) — minimal bootstrap
+- [OrderIntake module](../../../samples/applications/OrderIntake/Initialization/OrderIntakeModule.cs) — application `KoanModule` with a provenance report
 - [ARCH-0086 — KoanModule](../../../docs/decisions/ARCH-0086-koan-module.md) — the module primitive

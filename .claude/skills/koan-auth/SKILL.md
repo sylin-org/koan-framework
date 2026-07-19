@@ -135,4 +135,4 @@ The cookie scheme stays the **default**; bearer is additive and opted into per e
 - [SEC-0004 — capability authorization (gate · constrain · project)](../../../docs/decisions/SEC-0004-capability-authorization-gate-constrain-project.md) — the entity authorization model
 - [Reference card: auth.md](../../../docs/reference/cards/auth.md) — one-screen pillar map
 - [WEB-0071 — auth engine swap to dynamic schemes](../../../docs/decisions/WEB-0071-auth-engine-swap-dynamic-schemes.md)
-- [`samples/S5.Recs`](../../../samples/S5.Recs/README.md) — provider discovery, cookie-session login, `[Authorize]`-gated claim-scoped controllers
+- [SnapVault](../../../samples/applications/SnapVault/README.md) — optional test-auth composition with access-scoped photo workflows

@@ -34,7 +34,7 @@ public sealed class McpPillarBootstrapSpec
     [Fact]
     public async Task AddKoan_resolves_McpServer_through_real_bootstrap()
     {
-        await using var host = await KoanIntegrationHost.Configure()
+        await using var host = await PillarHost.Configure()
             // Explicit-off defends future StdioTransport behavioural changes.
             .WithSetting("Koan:Mcp:EnableStdioTransport", "false")
             .ConfigureServices(services => services.AddKoan())

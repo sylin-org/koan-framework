@@ -29,7 +29,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Storage.Abstractions;
-using Koan.Storage.Infrastructure;
+using Koan.Storage;
 using Koan.Storage.Model;
 
 [StorageBinding(Profile = "cold", Container = "photos")]
@@ -124,4 +124,4 @@ Profiles live under the `Koan:Storage` config section (`StorageConstants.Constan
 - [Storage pillar reference](../../../docs/reference/storage/index.md) — full detail (profiles, providers, routing)
 - [STOR-0001 — storage module and contracts](../../../docs/decisions/STOR-0001-storage-module-and-contracts.md)
 - [STOR-0010 — replicated storage with local cache](../../../docs/decisions/STOR-0010-replicated-storage-with-local-cache.md)
-- [`samples/S6.SnapVault`](../../../samples/S6.SnapVault/README.md) — photo app whose `PhotoAsset` carries `[StorageBinding(Profile = "cold", Container = "photos")]` and onboards/reads image blobs through the seam
+- [SnapVault](../../../samples/applications/SnapVault/README.md) — photo app whose `PhotoAsset` carries `[StorageBinding(Profile = "cold", Container = "photos")]` and onboards/reads image blobs through the seam

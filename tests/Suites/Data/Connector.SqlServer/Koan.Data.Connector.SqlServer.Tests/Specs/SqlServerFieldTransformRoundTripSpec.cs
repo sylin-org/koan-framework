@@ -15,7 +15,8 @@ public sealed class SqlServerFieldTransformRoundTripSpec(SqlServerFixture fixtur
     public async Task Field_transform_round_trips()
     {
         RequireBackingStore();
-        await using var host = await BootAsync();
-        await FieldTransformRoundTrip.AssertRoundTripAsync();
+        var contributor = new FieldTransformRoundTrip.Contributor();
+        await using var host = await BootAsync(services => FieldTransformRoundTrip.Register(services, contributor));
+        await FieldTransformRoundTrip.AssertRoundTripAsync(contributor);
     }
 }

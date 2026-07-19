@@ -109,6 +109,15 @@ internal sealed class ApplicationProbeHost : IAsyncDisposable
         return (await stdout, await stderr);
     }
 
+    public async Task<(int ExitCode, string StandardOutput, string StandardError)> WaitForExitAsync(
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        await process.WaitForExitAsync(cancellationToken).WaitAsync(timeout, cancellationToken);
+        var logs = await StopAsync();
+        return (process.ExitCode, logs.StandardOutput, logs.StandardError);
+    }
+
     public async Task<InvalidOperationException> FailureAsync(string context, Exception exception)
     {
         var logs = await StopAsync();

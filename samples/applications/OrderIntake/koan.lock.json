@@ -47,8 +47,24 @@
       "version": "0.17"
     },
     {
+      "id": "Koan.Data.Relational.Abstractions",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Data.Relational.Npgsql",
+      "version": "0.1"
+    },
+    {
       "id": "Koan.Jobs",
       "version": "0.19"
+    },
+    {
+      "id": "Koan.Redis",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Redis.Abstractions",
+      "version": "0.18"
     },
     {
       "id": "Koan.Web",

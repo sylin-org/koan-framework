@@ -26,7 +26,7 @@ public sealed class JobsPillarBootstrapSpec
     [Fact]
     public async Task AddKoan_wires_the_jobs_pillar_through_real_bootstrap()
     {
-        await using var host = await KoanIntegrationHost.Configure()
+        await using var host = await PillarHost.Configure()
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 

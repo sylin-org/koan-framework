@@ -7,6 +7,7 @@ using Xunit;
 
 namespace Koan.Packaging.Tests;
 
+[Collection(ExecutableApplicationProbeCollection.Name)]
 public sealed class SemanticActivationManifestBuildTests
 {
     private const string RootBundlePackageId = "Sylin.Koan.Test.Activation.RootBundle";
@@ -203,25 +204,22 @@ public sealed class SemanticActivationManifestBuildTests
         try
         {
             var runner = new ProcessRunner();
-            foreach (var project in new[] { OrchestrationAbstractionsProject(), CoreProject() })
-            {
-                await runner.RequireAsync(
-                    "dotnet",
-                    [
-                        "pack",
-                        project,
-                        "-c",
-                        BuildConfiguration,
-                        "--no-build",
-                        "--no-restore",
-                        "--nologo",
-                        "--output",
-                        feed,
-                        "-p:IncludeSymbols=false"
-                    ],
-                    RepositoryRoot(),
-                    TestContext.Current.CancellationToken);
-            }
+            await runner.RequireAsync(
+                "dotnet",
+                [
+                    "pack",
+                    CoreProject(),
+                    "-c",
+                    BuildConfiguration,
+                    "--no-build",
+                    "--no-restore",
+                    "--nologo",
+                    "--output",
+                    feed,
+                    "-p:IncludeSymbols=false"
+                ],
+                RepositoryRoot(),
+                TestContext.Current.CancellationToken);
 
             var corePackage = Assert.Single(
                 Directory.EnumerateFiles(feed, $"{PackagingConstants.CorePackageId}.*.nupkg"),
@@ -808,13 +806,6 @@ public sealed class SemanticActivationManifestBuildTests
     private static string CoreProject() =>
         Path.Combine(RepositoryRoot(), "src", "Koan.Core", "Koan.Core.csproj");
 
-    private static string OrchestrationAbstractionsProject() =>
-        Path.Combine(
-            RepositoryRoot(),
-            "src",
-            "Koan.Orchestration.Abstractions",
-            "Koan.Orchestration.Abstractions.csproj");
-
     private static string WeaviateProject() =>
         Path.Combine(
             RepositoryRoot(),
@@ -855,7 +846,6 @@ public sealed class SemanticActivationManifestBuildTests
         "src/Koan.Cache.Adapter.Redis/Koan.Cache.Adapter.Redis.csproj",
         "src/Koan.Cache.Adapter.Sqlite/Koan.Cache.Adapter.Sqlite.csproj",
         "src/Koan.Mcp.Operations/Koan.Mcp.Operations.csproj",
-        "src/Koan.Tenancy.Web/Koan.Tenancy.Web.csproj",
     ];
 
     private static bool Reaches(

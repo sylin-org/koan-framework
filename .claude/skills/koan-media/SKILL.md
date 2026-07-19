@@ -30,10 +30,10 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.AI.Attributes;
-using Koan.Media.Abstractions.Model;
+using Koan.Media;
 using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Core.Extensions;          // .Url (extension on IMediaObject)
-using Koan.Storage.Infrastructure;          // [StorageBinding]
+using Koan.Storage;                         // [StorageBinding]
 
 [StorageBinding(Profile = "cold", Container = "photos")]            // inherited from Storage — pins where bytes land
 [MediaAnalysis(Analysis = MediaAnalysis.Describe | MediaAnalysis.Ocr, Async = true)]  // vision/OCR on upload
@@ -123,6 +123,6 @@ public sealed class PhotoService
 
 - [Reference card: media.md](../../../docs/reference/cards/media.md) — one-screen pillar map
 - [Media recipes how-to](../../../docs/guides/media-recipes-howto.md) — the authoritative walkthrough (recipes, mutators, serving, AI)
-- [`samples/S6.SnapVault`](../../../samples/S6.SnapVault/README.md) — `PhotoAsset : MediaEntity<PhotoAsset>` with `[StorageBinding]` + `[Embedding]`, derivative thumbnails linked through the media graph, AI-populated description/tags feeding semantic photo search
+- [SnapVault](../../../samples/applications/SnapVault/README.md) — `PhotoAsset : MediaEntity<PhotoAsset>` with `[StorageBinding]` + `[Embedding]`, recipes, and optional AI/vector enrichment
 - [MEDIA-0001 — media pillar baseline + storage integration](../../../docs/decisions/MEDIA-0001-media-pillar-baseline-and-storage-integration.md)
 - [MEDIA-0004 — recipe pipeline](../../../docs/decisions/MEDIA-0004-recipe-pipeline.md) · [DX-0047 — fluent media transform API](../../../docs/decisions/DX-0047-fluent-media-transform-api.md) · [AI-0027 — media analysis attribute](../../../docs/decisions/AI-0027-media-analysis-attribute.md)

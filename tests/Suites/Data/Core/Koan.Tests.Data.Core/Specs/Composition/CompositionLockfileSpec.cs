@@ -78,31 +78,21 @@ public class CompositionLockfileSpec
     }
 
     [Fact]
-    public async Task Unavailable_configured_default_is_rejected_with_a_safe_correction()
+    public async Task Unavailable_configured_default_fails_startup_with_a_safe_correction()
     {
-        await using var host = await KoanIntegrationHost.Configure()
-            .WithSetting("Koan:Environment", "Test")
-            .WithSetting("Koan:Data:Sources:Default:Adapter", "not-referenced")
-            .ConfigureServices(services => services.AddKoan())
-            .StartAsync();
-
-        AppHost.Current = host.Services;
+        AppHost.Current = null;
         try
         {
-            host.Services.GetRequiredService<IAppRuntime>().Discover();
+            var start = async () => await KoanIntegrationHost.Configure()
+                .WithSetting("Koan:Environment", "Test")
+                .WithSetting("Koan:Data:Sources:Default:Adapter", "not-referenced")
+                .ConfigureServices(services => services.AddKoan())
+                .StartAsync();
 
-            var fact = host.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts
-                .Single(item => item.Code == Constants.Diagnostics.Codes.AdapterRejected
-                    && item.Subject == "data:default");
-
-            fact.State.Should().Be(KoanFactState.Rejected);
-            fact.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.AdapterUnavailable);
-            fact.Correction.Should().Contain("Koan:Data:Sources:Default:Adapter")
-                .And.Contain("reference the connector package")
-                .And.NotContain("ConnectionString");
-
-            var action = () => KoanCompositionSnapshot.BuildFromServices(host.Services);
-            action.Should().NotThrow("fact collection must describe the rejection without breaking inspection");
+            await start.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("*not-referenced*Koan:Data:Sources:Default:Adapter*reference the connector package*")
+                .Where(exception => !exception.Message.Contains("ConnectionString", StringComparison.Ordinal));
+            AppHost.Current.Should().BeNull("a failed start must not leave an ambient application host");
         }
         finally
         {

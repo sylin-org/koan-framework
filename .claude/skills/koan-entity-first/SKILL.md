@@ -112,6 +112,6 @@ streaming as universal provider parity.
 - [Reference card: data.md](../../../docs/reference/cards/data.md) — one-screen pillar map
 - [Entity capabilities how-to](../../../docs/guides/entity-capabilities-howto.md) — the authoritative walkthrough (queries, batch, streaming, counts)
 - [Data modeling guide](../../../docs/guides/data-modeling.md) — aggregates, keys, relationships
-- [`samples/S1.Web`](../../../samples/S1.Web/README.md) — `Entity<Todo>` CRUD + relationship navigation over a web UI
+- [TaskGraph](../../../samples/fundamentals/TaskGraph/README.md) — `Entity<Todo>` CRUD + relationship navigation over a web UI
 - [DATA-0059 — entity-first facade & save semantics](../../../docs/decisions/DATA-0059-entity-first-facade-and-save-semantics.md)
 - [DATA-0096 — unified filter pipeline (`QueryDefinition`)](../../../docs/decisions/DATA-0096-unified-filter-pipeline.md) · [ARCH-0084 — unified capability model](../../../docs/decisions/ARCH-0084-unified-capability-model.md)

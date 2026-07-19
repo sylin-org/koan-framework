@@ -1,6 +1,6 @@
 ---
 name: koan-data-modeling
-description: Aggregate boundaries, [Parent] relationships + GetRelatives/Relatives navigation, persistence Lifecycle hooks (BeforeUpsert/BeforeRemove/AfterLoad), value objects, timestamps, context routing
+description: Aggregate boundaries, [Parent] relationships + Relatives navigation, persistence Lifecycle hooks (BeforeUpsert/BeforeRemove/AfterLoad), value objects, timestamps, context routing
 pillar: data
 card: docs/reference/cards/data.md
 status: current
@@ -12,7 +12,7 @@ last_validated: 2026-06-18
 ## Trigger this skill when you see
 
 - Aggregate design — business invariants, value objects (records), domain methods on an `Entity<T>`
-- `[Parent(typeof(...))]` on an FK property, `entity.GetRelatives(ct)`, `collection.Relatives<T,K>(ct)`, N+1 enrichment
+- `[Parent(typeof(...))]` on an FK property, `entity.Relatives(ct)`, `collection.Relatives<T,K>(ct)`, N+1 enrichment
 - Lifecycle wiring — host-owned `Entity<T>.Lifecycle.BeforeUpsert(...)` / `.BeforeRemove(...)` / `.AfterLoad(...)`, `ctx.Current`, `ctx.Proceed()` / `ctx.Cancel(...)`
 - `[Timestamp]` / `[Timestamp(OnSave = true)]`, `[Index]`, `[DataAdapter("...")]` routing
 - `EntityContext.Partition(...)` / `.Source(...)` / `.Adapter(...)` scoping
@@ -20,7 +20,7 @@ last_validated: 2026-06-18
 
 ## Core principle
 
-**An entity is the aggregate.** Encapsulate invariants on the type, model cohesive data as `record` value objects, declare relationships with `[Parent(typeof(...))]` (the FK string property carries the edge), and enforce persistence rules through host-owned `Entity<T>.Lifecycle` declarations — not scattered call sites. Navigation is first-class: `GetRelatives` / `Relatives<T,K>` batch-load the graph instead of hand-rolled FK helpers ([DATA-0072](../../../docs/decisions/DATA-0072-parent-relationship-attribute-explicit-type.md)). Timestamps are opt-in via `[Timestamp]`.
+**An entity is the aggregate.** Encapsulate invariants on the type, model cohesive data as `record` value objects, declare relationships with `[Parent(typeof(...))]` (the FK string property carries the edge), and enforce persistence rules through host-owned `Entity<T>.Lifecycle` declarations — not scattered call sites. Navigation is first-class: `Relatives` loads the direct graph for scalar, finite, or streaming entity cardinality instead of hand-rolled FK helpers ([DATA-0072](../../../docs/decisions/DATA-0072-parent-relationship-attribute-explicit-type.md)). Timestamps are opt-in via `[Timestamp]`.
 
 <!-- validate -->
 ```csharp
@@ -33,7 +33,6 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Core;
-using Koan.Data.Core.Extensions;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Relationships;
 
@@ -46,7 +45,7 @@ public sealed class Customer : Entity<Customer>
 
 public sealed class Order : Entity<Order>
 {
-    [Parent(typeof(Customer))]                          // FK edge → enables GetRelatives / Relatives
+    [Parent(typeof(Customer))]                          // FK edge → enables Relatives
     public string CustomerId { get; set; } = "";
 
     public Money Total { get; set; } = new(0m, "USD");
@@ -74,7 +73,7 @@ public sealed class OrderService
 {
     public async Task<Customer?> OwnerOf(Order order, CancellationToken ct = default)
     {
-        var graph = await order.GetRelatives(ct);        // RelationshipGraph<Order>
+        var graph = (await new[] { order }.Relatives<Order, string>(ct)).Single();
         return graph.Parents.TryGetValue(nameof(Order.CustomerId), out var p) ? p as Customer : null;
     }
 
@@ -94,7 +93,7 @@ public sealed class OrderService
 
 | Declare this | Effect |
 |---|---|
-| `[Parent(typeof(Customer))]` on a `string` FK property | Declares a relationship edge; powers `GetRelatives` / `Relatives<T,K>` + batch loading ([DATA-0072](../../../docs/decisions/DATA-0072-parent-relationship-attribute-explicit-type.md)). |
+| `[Parent(typeof(Customer))]` on a `string` FK property | Declares a relationship edge; powers scalar/finite/streaming `Relatives` graph loading ([DATA-0072](../../../docs/decisions/DATA-0072-parent-relationship-attribute-explicit-type.md)). |
 | `Entity<T>.Lifecycle.BeforeUpsert / BeforeRemove / AfterLoad` | Host-owned persistence hooks; `ctx.Current` is the entity, return `ctx.Proceed()` / `ctx.Cancel(reason, code)` from before-hooks. |
 | `[Timestamp]` · `[Timestamp(OnSave = true)]` (`Koan.Data.Abstractions.Annotations`) | Opt-in set-once / every-save `DateTimeOffset` stamps — **not** inherited. |
 | `[Index]` · `[Index(Group="ix", Order=N)]` · `[Index(Ttl=true)]` | Secondary, composite, and TTL indexes. |
@@ -105,8 +104,8 @@ public sealed class OrderService
 
 The FK is a plain `string` property tagged `[Parent(typeof(Parent))]`. From there:
 
-- `await entity.GetRelatives(ct)` → `RelationshipGraph<T>` for a single entity (`.Parents[fkPropertyName]`, `.Children[childTypeName][refProperty]`).
-- `await collection.Relatives<T, K>(ct)` → batches the whole set through `BatchRelationshipLoader` (100-item batches) — the N+1 cure. The same extension exists for `IAsyncEnumerable<T>` to enrich a stream.
+- `await entity.Relatives(ct)` → `RelationshipGraph<T>` for a scalar entity (`.Parents[fkPropertyName]`, `.Children[childTypeName][refProperty]`).
+- `await collection.Relatives<T, K>(ct)` → resolves the finite set as one bounded cardinality-aware operation — the N+1 cure. The same extension exists for `IAsyncEnumerable<T>` to enrich a stream lazily.
 
 Do **not** hand-roll `GetUser()` / `GetTodos()` FK helpers or loop `await Get(id)` per row — that is the N+1 anti-pattern the relationship system replaces.
 
@@ -127,7 +126,7 @@ is owned by that host. Handlers receive `EntityEventContext<T>`:
 | `EntityLifecycleBuilder<T>` / `Configure(pipeline)` / `.Allow(...)` / `(ctx, next) => await next()` | None of these exist — use `Entity<T>.Lifecycle.BeforeUpsert/BeforeRemove/AfterLoad`. |
 | `ctx.Entity` inside a hook | `ctx.Current` — that's the property name. |
 | `throw new InvalidOperationException(...)` to veto a save | `return ctx.Cancel(reason, code)` — the framework raises the cancellation; vetoes stay declarative. |
-| Hand-rolled `GetUser()` / `GetItems()` FK navigation helpers | `[Parent(typeof(...))]` + `entity.GetRelatives(ct)` (DATA-0072 is the first-class nav). |
+| Hand-rolled `GetUser()` / `GetItems()` FK navigation helpers | `[Parent(typeof(...))]` + `entity.Relatives(ct)` (DATA-0072 is the first-class nav). |
 | `foreach (var o in orders) await o.GetCustomer()` (N+1) | `await orders.Relatives<Order, string>(ct)` — one batched load. |
 | `Task<List<Order>>` as a facade return type | `IReadOnlyList<Order>` — facade and relationship loads return read-only lists. |
 | `Query().Where(o => ...)` (parameterless then filter) | `Order.Query(o => ..., ct)` — the predicate is the argument. |
@@ -146,7 +145,7 @@ is owned by that host. Handlers receive `EntityEventContext<T>`:
 
 - [Reference card: data.md](../../../docs/reference/cards/data.md) — one-screen pillar map
 - [Data modeling guide](../../../docs/guides/data-modeling.md) — aggregates, keys, value objects
-- [`samples/S1.Web`](../../../samples/S1.Web/README.md) — `Entity<Todo>` CRUD + `[Parent]` relationship navigation
+- [TaskGraph](../../../samples/fundamentals/TaskGraph/README.md) — `Entity<Todo>` CRUD + `[Parent]` relationship navigation across scalar, set, and stream cardinalities
 - [DATA-0072 — `[Parent]` relationship attribute](../../../docs/decisions/DATA-0072-parent-relationship-attribute-explicit-type.md)
 - [DATA-0077 — Source/Adapter/Partition routing](../../../docs/decisions/DATA-0077-entity-context-source-adapter-partition-routing.md)
 - [DATA-0096 — unified filter pipeline (`QueryDefinition`)](../../../docs/decisions/DATA-0096-unified-filter-pipeline.md) · [ARCH-0084 — unified capability model](../../../docs/decisions/ARCH-0084-unified-capability-model.md)

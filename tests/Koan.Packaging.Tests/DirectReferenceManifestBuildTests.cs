@@ -7,6 +7,7 @@ using Xunit;
 
 namespace Koan.Packaging.Tests;
 
+[Collection(ExecutableApplicationProbeCollection.Name)]
 public sealed class DirectReferenceManifestBuildTests
 {
     [Fact]
@@ -39,7 +40,7 @@ public sealed class DirectReferenceManifestBuildTests
                   </PropertyGroup>
                   <ItemGroup>
                     <ProjectReference Include="{{coreProject}}" />
-                    <PackageReference Include="Sylin.Koan.Communication" Version="1.0.0" ExcludeAssets="all" />
+                    <PackageReference Include="Sylin.Koan.Communication" Version="1.0.0" />
                   </ItemGroup>
                   <Import Project="{{compositionTarget}}" />
                 </Project>
@@ -48,9 +49,13 @@ public sealed class DirectReferenceManifestBuildTests
             await File.WriteAllTextAsync(config, $$"""
                 <?xml version="1.0" encoding="utf-8"?>
                 <configuration>
+                  <config>
+                    <add key="globalPackagesFolder" value="{{Path.Combine(root, "packages")}}" />
+                  </config>
                   <packageSources>
                     <clear />
                     <add key="local" value="{{feed}}" />
+                    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
                   </packageSources>
                 </configuration>
                 """);
@@ -89,17 +94,29 @@ public sealed class DirectReferenceManifestBuildTests
         var path = Path.Combine(feed, "Sylin.Koan.Communication.1.0.0.nupkg");
         using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
         var entry = archive.CreateEntry("Sylin.Koan.Communication.nuspec");
-        using var writer = new StreamWriter(entry.Open());
-        writer.Write("""
-            <?xml version="1.0"?>
-            <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
-              <metadata>
-                <id>Sylin.Koan.Communication</id>
-                <version>1.0.0</version>
-                <authors>Koan</authors>
-                <description>Direct-reference manifest build fixture.</description>
-              </metadata>
-            </package>
+        using (var writer = new StreamWriter(entry.Open()))
+        {
+            writer.Write("""
+                <?xml version="1.0"?>
+                <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+                  <metadata>
+                    <id>Sylin.Koan.Communication</id>
+                    <version>1.0.0</version>
+                    <authors>Koan</authors>
+                    <description>Direct-reference manifest build fixture.</description>
+                  </metadata>
+                </package>
+                """);
+        }
+
+        var activation = archive.CreateEntry("buildTransitive/Sylin.Koan.Communication.props");
+        using var activationWriter = new StreamWriter(activation.Open());
+        activationWriter.Write("""
+            <Project>
+              <ItemGroup>
+                <KoanActivationNode Include="Sylin.Koan.Communication" />
+              </ItemGroup>
+            </Project>
             """);
     }
 
