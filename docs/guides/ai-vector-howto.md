@@ -4,7 +4,7 @@ domain: ai
 title: "AI & Vector Search How-To"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-18
+last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
   status: not-yet-tested
@@ -19,9 +19,10 @@ related_guides:
 # Koan AI & Vector Search – End-to-End How-To
 
 This guide walks through Koan's AI-powered semantic-search surfaces, from a first embedding to hybrid
-and personalization patterns. The executable companion is [GardenCoop Chapter 2](../../samples/journeys/GardenCoop/02-LocalDiscovery/),
-which saves Produce entities, embeds them with local ONNX, and searches them with sqlite-vec. Advanced
-hybrid and personalization recipes are compositional patterns, not a certified production workload.
+and personalization patterns. [GardenCoop Chapter 2](../../samples/journeys/GardenCoop/02-LocalDiscovery/)
+proves the smallest local embed-save-search path. [AnimeRecommendations](../../samples/applications/AnimeRecommendations/)
+grows that path into a bounded, explainable personalization workflow. Neither sample claims production-scale
+recommendation quality; advanced hybrid and tuning recipes remain compositional patterns.
 
 **Related Guides:**
 - [Entity Capabilities](entity-capabilities-howto.md) – Core entity patterns for data access
@@ -99,6 +100,7 @@ Console.WriteLine($"Generated {embedding.Length}-dimensional vector");
 **Usage scenarios & benefits**
 
 - *GardenCoop Chapter 2* generates embeddings from produce names and descriptions for local semantic search
+- *AnimeRecommendations* embeds a present-tense mood plus a bounded set of strongly rated anime
 - Developers can swap embedding models (all-minilm → nomic-embed → OpenAI) by changing config
 - Same embedding can be used across multiple vector databases
 
@@ -872,9 +874,10 @@ await foreach (var batch in vectorRepo.ExportAll(batchSize: 100, ct))
 4. Use Entity lifecycle for ordinary indexing and explicit migrators for backfills (section 7)
 5. Add personalization for returning users (section 5)
 
-Run [GardenCoop Chapter 2](../../samples/journeys/GardenCoop/02-LocalDiscovery/) for the current local
-embed-save-search path. Treat hybrid matching, personalization, and production tuning as separate claims
-that need their own provider and workload evidence.
+Run [GardenCoop Chapter 2](../../samples/journeys/GardenCoop/02-LocalDiscovery/) for the smallest current local
+embed-save-search path. Run [AnimeRecommendations](../../samples/applications/AnimeRecommendations/) for the
+bounded ratings → intent → vector candidates → explanation workflow. Treat hybrid matching, internet-scale
+recommendation quality, and production tuning as separate claims that need their own provider and workload evidence.
 
 **Related Guides:**
 - [Entity Capabilities](entity-capabilities-howto.md) – Learn core entity patterns for data access and CRUD operations

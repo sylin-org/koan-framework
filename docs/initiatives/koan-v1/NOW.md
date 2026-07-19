@@ -54,8 +54,8 @@ maintained allowlist or stamping layer. Focused graph/version tests pass 41/41, 
 pass 39/39, and the packaging tool builds warning-clean.
 
 [R12-04](work-items/r12/R12-04-coherent-public-narrative.md) is active. Compile the exact public-content
-graph now covers 667 current assets, 656 current text surfaces, 107 historical boundaries, 42 navigation
-targets, and 11 graduated sample roots. Root, site, package, template, sample, tool, contributor, and
+graph now covers 688 current assets, 676 current text surfaces, 107 historical boundaries, 42 navigation
+targets, and 12 graduated sample roots. Root, site, package, template, sample, tool, contributor, and
 agent-skill surfaces now tell one present-tense path: package install, four-line host, first Entity result,
 progressive capability references, runtime facts and correction, application responsibilities, and the
 generated maturity boundary. Obsolete duplicate Web/OpenAPI/AI/transaction/CLI/Aspire/Flow/Messaging
@@ -63,25 +63,36 @@ instruction was removed or classified as history; the competing docs inventory a
 matrix were retired. Historical ADRs and initiatives remain evidence outside the ordinary learning graph.
 
 Focused R12-04 evidence passes: public-doc truth, 17/17 product/quality compiler tests, warning-clean
-packaging build, byte-identical generated reports, all ten graduated sample Release builds and their exact
+packaging build, byte-identical generated reports, all eleven graduated sample Release builds and their exact
 selective-0.20 lock audit, 20 strict skills, 20/20 instructional examples, whitespace checks, and broad
 documentation structure with zero errors / 1,375 non-gating warnings. No full ratchet or remote mutation
 ran. The maintainer is the sole validation authority. The first independent coding-agent read supplied useful
 cold-read evidence and its accepted corrections are committed; no second agent or human review is a completion
 gate. Direct sample-command validation is the remaining maintainer handoff before R12-04 closes.
 
-All ten graduated sample commands have now been executed from the repository root. LocalChecklist and both
+All eleven graduated sample commands have now been executed from the repository root. LocalChecklist and both
 GardenCoop chapters needed one standard MSBuild `RunWorkingDirectory` declaration so relative data, settings,
 assets, and lockfiles resolve under the owning sample. After correction, LocalChecklist exits with its expected
-result and `lockfile ok`; all nine Web hosts start on their documented ports, return liveness/runtime facts, and
+result and `lockfile ok`; all ten Web hosts start on their documented ports, return liveness/runtime facts, and
 reach their named entry surface. The three affected focused sample suites pass 1/1 each. No sample-owned wrapper
-script exists or is needed. The maintainer's direct validation is next.
+script exists or is needed. AnimeRecommendations subsequently starts on its documented port, curates and indexes
+24 titles locally, returns explained recommendations from Mika's three starter ratings plus a mood, and changes the
+next result after a new rating; its focused host suite passes 1/1. The maintainer's direct validation is next.
 
 A separate focused check found that GardenCoop Chapter 1's previously measured NativeAOT publication currently
 fails inside the .NET 10.0.10 ILC analyzer with an `IndexOutOfRangeException`. It fails with the original plain SDK
 as well as the rejected Web-SDK experiment, so the start-command repair did not introduce it. R12-05 must either
 re-prove or narrow that public deployment claim before freezing the candidate; do not expand the present sample-run
 slice into a framework-wide trim/AOT repair without a checkpoint.
+
+The maintainer has superseded R10-09's deletion of `S5.Recs`: restore the product as
+`samples/applications/AnimeRecommendations`, but do not restore its 96-file architecture. The recorded R12-04
+checkpoint makes it a local-first golden application: three Entities, automatic embedding-on-save, direct vector
+search, one irreducible multi-Entity recommendation workflow, thin controllers, module-owned starter state, and a
+compact UI. The result is a 21-file application plus four focused-test files; its Release build is warning-clean,
+the exact documented command and product journey work, the focused suite passes 1/1, and the public graph accepts
+it as the eleventh executable graduated sample. Manual provider discovery, worker pipelines, duplicate profiles,
+custom caches, admin/control-plane surface, and compatibility paths remain retired.
 
 [R12-05](work-items/r12/R12-05-public-consumer-journey.md) now owns only the frozen local candidate: final
 release-ready copy, one exact source SHA, the complete local ratchet, selective package graph, clean-room
@@ -245,7 +256,7 @@ bounded process-exit observation so GoldenJourney can prove fail-fast startup tr
 ## Resume here
 
 1. Verify `git status`, HEAD, and the R12-04 implementation/evidence record before work.
-2. Have the maintainer validate the corrected start commands for all ten graduated sample executables. No second
+2. Have the maintainer validate the corrected start commands for all eleven graduated sample executables. No second
    agent or human review is required.
 3. Re-run only the focused checks affected by those corrections; do not substitute the full release ratchet.
 4. Before the exact candidate freeze, re-prove or narrow GardenCoop Chapter 1's NativeAOT claim; the current

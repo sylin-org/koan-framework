@@ -170,8 +170,8 @@ companions, template payloads, product truth, feedback surfaces, `.claude/skills
 guidance, and requires every nonhistorical Markdown file under `docs/` to declare either `current` or an evidence
 status. Current orphan pages can no longer evade narrative checks merely by lacking an inbound link.
 
-The current projection contains 667 current assets, 656 current text surfaces, 107 historical boundaries,
-42 navigation targets, and 11 graduated sample roots. Current assets are derived into reader-purpose classes;
+The current projection contains 688 current assets, 676 current text surfaces, 107 historical boundaries,
+42 navigation targets, and 12 graduated sample roots. Current assets are derived into reader-purpose classes;
 there is no generated inventory file or maintained content ledger.
 
 The first coalescence pass:
@@ -190,17 +190,17 @@ The first coalescence pass:
   without rewriting their conclusions as product truth;
 - replaced removed Flow/Messaging teaching with the actual Entity lifecycle, Jobs, Communication, and contributor
   chokepoints, and changed Jobs tuning examples to standard `Configure<JobsOptions>`;
-- regenerated all ten graduated sample locks from successful builds so promoted modules report 0.20 while
+- regenerated all eleven graduated sample locks from successful builds so promoted modules report 0.20 while
   intentionally unpromoted modules retain their real package lines.
 
 ## Focused evidence
 
-- public documentation truth: 667 current assets / 656 current text surfaces / 107 historical boundaries /
-  42 navigation targets / 11 graduated sample roots;
+- public documentation truth: 688 current assets / 676 current text surfaces / 107 historical boundaries /
+  42 navigation targets / 12 graduated sample roots;
 - packaging compiler tests: 17/17 for product-surface and package-quality generation;
 - packaging tool: Release build, zero warnings and errors;
 - generated truth: 29 claims / 93 packages and 93 structurally ready packages, byte-identical after regeneration;
-- graduated samples: ten Release builds with zero warnings/errors; lock audit rejects both a promoted module below
+- graduated samples: eleven Release builds with zero warnings/errors; lock audit rejects both a promoted module below
   0.20 and an unpromoted module at 0.20;
 - strict skills: 20 skills, zero errors/warnings;
 - instructional examples: 20/20 compiled;
@@ -350,13 +350,100 @@ sample rather than the caller's directory. Add no launcher, path calculation, en
 **Ergonomics:** One copyable command works from the repository root, local state stays under the sample directory,
 and the printed URL remains authoritative. The maintainer is the only acceptance authority.
 
-**Focused evidence:** All ten graduated commands were executed from the repository root. LocalChecklist reaches its
-deterministic console result and reports `lockfile ok`. The nine Web hosts start on their documented ports, return
+**Focused evidence:** All eleven graduated commands were executed from the repository root. LocalChecklist reaches its
+deterministic console result and reports `lockfile ok`. The ten Web hosts start on their documented ports, return
 HTTP 200 from liveness and runtime facts, and reach their named root/API surface. Chapter 2 additionally activates
-the bundled ONNX provider and returns semantic search successfully. The LocalChecklist, GardenCoop C01, and
-GardenCoop C02 focused suites each pass 1/1. All processes started by the audit were stopped.
+the bundled ONNX provider and returns semantic search successfully. AnimeRecommendations starts on port 5094,
+returns its product UI and a local mood-and-ratings recommendation, and excludes a newly rated pick from the next
+feed. The LocalChecklist, GardenCoop C01, GardenCoop C02, and AnimeRecommendations focused suites each pass 1/1.
+All processes started by the audit were stopped.
 
 **Transferred concern:** A focused win-x64 NativeAOT publish currently fails inside the .NET 10.0.10 ILC analyzer
 with `IndexOutOfRangeException`. The same failure occurs with GardenCoop C01's original plain SDK, so it is not a
 regression from the start-command correction. Its public deployment claim must be re-proved or narrowed before the
 R12-05 candidate freeze; it does not invalidate the now-working ordinary start command.
+
+## AnimeRecommendations restoration checkpoint — 2026-07-19
+
+**Task:** Restore the recommendation product that R10-09 deleted, under the semantic identity
+`samples/applications/AnimeRecommendations`, and rebuild it against the current Koan application language instead of
+reviving the retired `S5.Recs` architecture. This maintainer mandate supersedes only R10-09's terminal deletion
+disposition; the dated R10 evidence remains unchanged as the reason the old implementation must not return.
+
+**Application intent:** A viewer rates anime they know and immediately discovers unfamiliar anime that match both
+their stated mood and the taste expressed by those ratings. The app should be delightful on first run, remain useful
+without a network or container, and teach a reader how little application machinery a current Koan recommendation
+product needs.
+
+**Public expression:** A four-line `AddKoan()` host; `Anime`, `Viewer`, and `LibraryEntry` Entities; `[Embedding]` on
+the anime meaning; ordinary Entity controllers for conventional state; one business-named recommendation workflow;
+thin rating/recommendation controllers; one application module for starter state and explanation; and a compact
+static UI. Direct references to SQLite, ONNX, sqlite-vec, Data.AI, Web, and OpenAPI make the complete local capability
+set active without application provider registration.
+
+**Guarantee/correction:** A clean local start creates the starter viewer and catalog, indexes each anime through its
+normal `Save()`, serves the product UI, accepts a bounded 1–5 rating, and returns an ordered bounded recommendation
+set with human-readable reasons. Unknown viewers/anime, invalid ratings, missing query intent, unavailable AI/vector
+capability, and provider failures remain explicit; the application never labels popularity fallback as semantic or
+personalized output. Runtime facts and health explain the elected providers.
+
+**Complete intent surface:** Browse the starter catalog; record or replace one viewer/anime rating; request a bounded
+recommendation from an optional mood plus positively rated anime; exclude already rated titles; inspect health,
+facts, and OpenAPI; reset local state by removing the sample-owned SQLite files. Remote catalog import, authentication,
+social features, model training, collaborative filtering, distributed jobs, external vector servers, and production
+authorization are deliberate nonclaims rather than half-built controls.
+
+**Public concepts:** Reuse `Entity<T>`, `EntityController<T>`, `[Embedding]`, `Client.Embed`, `Vector<T>.Search`,
+`KoanModule`, standard MVC controllers, ordinary DI/configuration, static files, SQLite, and HTTP. Add no application
+repository, provider abstraction, worker vocabulary, cache layer, custom pipeline, or Koan-specific recommendation
+framework.
+
+**Docs read:** engineering rules, architecture principles, product constitution, Entity semantics contract, current
+AI/Data-AI/Vector/Jobs/Web references, sample curriculum, R10-09's accepted deletion evidence, this R12-04 narrative
+contract, and the current handoff.
+
+**Code read:** the deleted 96-file `S5.Recs` tree and its host/model/controller/service topology at parent commit
+`5310fda55`; GardenCoop Chapter 2's local embedding/search/module/test path; GoldenJourney and OrderIntake's current
+job expression; current sample solution/test conventions; and the shared Entity/Web/AI/Vector contracts located by
+focused constants/options/request-response searches.
+
+**Reusing:** Preserve Recs' actual product promise—catalog discovery, ratings, personalized semantic ranking,
+explanations, and a usable browser experience. Reuse GardenCoop's proven local ONNX + SQLite + sqlite-vec composition,
+automatic embedding-on-save, four-line host, module-owned starter data, and focused executable-host proof.
+
+**Creating new:** One semantic application project, three business Entities, one recommendation result contract, one
+multi-Entity recommendation workflow, two thin business-action controllers plus conventional Entity controllers, one
+starter catalog/module, a small static UI, one README/request file, and one focused golden-path test project. Exact
+routes and limits live in one application constants owner.
+
+**Coalescence:** Delete by omission the old manual provider/parser registry, import orchestrator, three hosted workers,
+embedding monitor, raw/band/sliding caches, recommendation-settings persistence, duplicate rating/profile documents,
+15-controller admin taxonomy, auth/backup/service-demo surface, compatibility paths, and service-interface pairs.
+Viewer taste is derived from the bounded rating ledger at request time rather than persisted twice and synchronized.
+`Save()` owns indexing; `Vector<Anime>.Search` owns candidate retrieval; one application workflow owns the irreducible
+cross-Entity ranking and explanation.
+
+**Ergonomics:** Clone, run one command, and receive a polished catalog immediately. Rate a few titles and ask in plain
+language for a mood; the next result visibly changes and explains why. A reader can understand the complete backend
+by reading the three Entities, one workflow, and controllers without learning an internal sample framework.
+
+**Constraints satisfied:** Business intent leads; standard .NET and current Koan contracts precede new ceremony;
+application HTTP stays controller-owned; all data operations use Entity APIs; provider references express intent;
+the default is local and deterministic; focused tests replace the full ratchet; no private dogfood, `tmp/`, shelved
+projects, remote configuration, publication, release, or push enters the slice.
+
+**Risks:** A very small starter catalog proves product flow, not recommendation quality at internet scale. Bounded
+in-memory reranking is honest only because the candidate and rating sets are explicitly capped. Local ONNX startup
+and first indexing cost must remain acceptable. Sample polish must not expand into a second frontend framework or
+restore an operations console. Adding optional external import before the core journey is proven would recreate the
+architecture that caused Recs to be removed.
+
+**Implementation result:** The retired 96-file app is replaced by a 21-file application plus a four-file focused
+test project. The app contains three persisted business concepts, one derived recommendation workflow, conventional
+Entity controllers, two business-action controllers, one starter module/catalog, a four-line host, and a compact
+dependency-free UI. Its exact documented command starts from the repository root, serves the product on port 5094,
+curates and indexes 24 titles, uses Mika's three ratings as initial taste, returns explained local recommendations,
+and removes a newly rated title from the next feed. The Release build is warning-clean; the focused executable host
+suite passes 1/1; the selective lock records the real promoted/unpromoted package lines; public documentation truth
+passes at 688 current assets / 676 text surfaces / 107 historical boundaries / 42 navigation targets / 12 graduated
+sample roots. No sample process remains.

@@ -4,7 +4,7 @@ domain: data
 title: "Vector — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-07-18
+last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-16
@@ -72,6 +72,9 @@ Referencing a connector makes it available for election; it does not by itself m
 receive an explicit positive value unchanged; they never substitute a preferred page size or silently cap application
 intent. A provider may still reject a value outside its native deployment limits.
 
-## The sample that shows it
+## Samples that show it
 
 [`GardenCoop Chapter 2`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/) — `[Embedding]` on `Produce` plus local ONNX and sqlite-vec ranks a natural-language query without an external service.
+
+[`AnimeRecommendations`](../../../samples/applications/AnimeRecommendations/) — ratings and a present-tense mood
+become one query vector; `Vector<Anime>.Search` supplies bounded candidates for an explainable business workflow.

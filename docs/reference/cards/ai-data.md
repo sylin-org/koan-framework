@@ -4,7 +4,7 @@ domain: ai
 title: "AI (entity-aware) — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-07-16
+last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-16
@@ -67,6 +67,10 @@ var vector = await Client.Embed("free-form text, no entity");
 
 Same adapter resolution and source routing as `EntityAi`; you just give up the convention-based content extraction. For multi-step composition see the orchestration surface in [ai/index.md](../ai/index.md).
 
-## The sample that shows it
+## Samples that show it
 
 [`GardenCoop Chapter 2`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/) — `[Embedding]` on `Produce` turns ordinary saves into a local ONNX + sqlite-vec semantic-search result.
+
+[`AnimeRecommendations`](../../../samples/applications/AnimeRecommendations/) — a complete local application derives
+viewer taste from ratings, embeds that intent, searches `Vector<Anime>`, and explains the resulting recommendations
+without a repository, worker pipeline, or external AI/vector service.

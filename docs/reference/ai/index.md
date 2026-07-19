@@ -4,7 +4,7 @@ domain: ai
 title: "AI"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-18
+last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-18
@@ -158,6 +158,7 @@ those through their owning Koan/ASP.NET Core concerns before exposing AI routes 
 
 - [Entity data](../data/index.md)
 - [Vector providers](../cards/vector.md)
+- [AnimeRecommendations complete local sample](../../../samples/applications/AnimeRecommendations/)
 - [MCP and agent-facing surfaces](../cards/mcp.md)
 - [Ollama package](../../../src/Connectors/AI/Ollama/README.md)
 - [LM Studio package](../../../src/Connectors/AI/LMStudio/README.md)
