@@ -82,8 +82,8 @@ Communication, MCP, security, and optional AI/vector capability.
 | Child | Meaningful outcome | Status |
 |---|---|---|
 | [R12-01](r12/R12-01-preview-contract-and-version-band.md) | one exact 0.20 version, channel, guaranteed-package set, compatibility, support, and feedback contract before selective version edits | passed |
-| [R12-02](r12/R12-02-preview-blocking-seams.md) | every current PMC is re-evaluated against the proposed guarantee set; promise-level activation, configuration, lifetime, naming, wire, safety, and tooling concerns receive fix/remove/exclude decisions | in-progress |
-| R12-03 — compile the preview product boundary | a small recommended spine, advanced extensions, experiments, and non-claims are generated from current evidence without equating package availability with support | pending |
+| [R12-02](r12/R12-02-preview-blocking-seams.md) | every current PMC is re-evaluated against the proposed guarantee set; promise-level activation, configuration, lifetime, naming, wire, safety, and tooling concerns receive fix/remove/exclude decisions | passed |
+| [R12-03](r12/R12-03-preview-product-boundary.md) | a small recommended spine, advanced extensions, experiments, and non-claims are generated from current evidence without equating package availability with support | in-progress |
 | [R12-04](r12/R12-04-coherent-public-narrative.md) | every public-facing surface tells one greenfield, present-tense product story and an anti-drift gate preserves it | pending |
 | R12-05 — prove the public consumer journey | clean external-context users and agents install the preview candidate, reach meaningful results, swap infrastructure, diagnose rejection, and explain composition using public guidance only | pending |
 | R12-06 — publish and observe the first 0.20 wave | the exact prepared candidate becomes one coherent NuGet/GitHub preview with immutable custody and recorded terminal evidence | pending |

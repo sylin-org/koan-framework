@@ -8,14 +8,14 @@ last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-19
-  status: in-progress
-  scope: current-state PMC triage and dependency-ordered public-contract corrections
+  status: passed
+  scope: completed current-state PMC triage and dependency-ordered public-contract corrections
 ---
 
 # R12-02 — Close preview-blocking seams
 
 - Tranche: `T7C — 0.20 public-preview maturity`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: passed R12-01 selective preview/version contract
 - Unlocks: an evidence-derived preview product boundary in R12-03
 - Owner: fix, removal, or explicit exclusion of concerns that would make a proposed 0.20 guarantee false
@@ -37,7 +37,7 @@ the concern does not enter the stated 0.20 guarantee; it does not mean the packa
 |---|---|---|
 | 001 | repaired and closed | The framework-owned row is internal with unchanged persistence identity; one public `JobMetrics.Summary(...)` operation replaces the accidental Entity surface. |
 | 002, 004 | repaired and closed | Host-level explicit transports replace transitional/per-Entity selection; one camelCase application-payload contract spans Entity, custom tools, and Code Mode. |
-| 003, 028, 032 | close by current evidence | R11-07 built the complete Release solution with zero warnings and ran the SQLite/connector projects; the historical warning and missing-reference premises no longer hold. |
+| 003, 028, 032 | closed by current evidence | R11-07's complete Release build is warning-free; SQLite now passes 36/36 with the current discovery contract; all test-project references resolve. |
 | 005 | exclude from supported workflow | Linked-worktree release execution is convenience, not the supported clean-checkout release path. |
 | 006, 020 | phase to R12-06 | Live bounded progress and retained aggregate certification evidence belong to the actual publication operator path. |
 | 007, 015 | repaired and closed | The current filter AST/coordinator already provides execute-or-reject semantics; shared Web proofs and current docs now state it. Data's first-use shape guard rejects case-colliding Entity properties before adapter creation. |
@@ -443,6 +443,66 @@ build serialization, production code, or new fixture framework was added.
 The next audit is the combined current-evidence closure of PMC-003, PMC-028, and PMC-032: reconcile
 their old warning/missing-reference statements against the exact R11-07 zero-warning Release build and
 current connector test graphs before changing any files.
+
+## Sixth chokepoint exploration — warning and connector-graph truth
+
+**Task:** Determine whether PMC-003, PMC-028, and PMC-032 describe any current defect after the exact
+R11-07 public-release certification repairs.
+
+**Application intent:** Maintainers see a warning-clean build and executable connector evidence; stale
+test references or fakes cannot silently make that statement false.
+
+**Public expression:** None. Existing solution build and focused connector test commands remain the
+only operator surface.
+
+**Guarantee/correction:** The authoritative Release build has zero warnings/errors, every test-project
+`ProjectReference` resolves, and SQLite's current configuration/provenance suite compiles and executes.
+If any premise remains, repair its exact test owner; otherwise close the historical PMC without churn.
+
+**Complete intent surface:** R11-07 Release evidence; every test `.csproj`; retired adapter project
+paths; SQLite discovery fake and interface; configuration/provenance specs; connector Release build;
+and `MSB9008` output.
+
+**Public concepts:** Standard MSBuild project references, compiler warnings, and focused `dotnet test`.
+
+**Docs read:** PMC-003/028/032, R11-07 certification, NOW, PROGRESS, and R12-01/R12-02.
+
+**Code read:** every test project reference via XML inventory, the current SQLite configuration-truth
+spec/fake, `IServiceDiscoveryCoordinator`, and repository history for the R11 certification repair.
+
+**Reusing:** Treat the exact R11-07 zero-warning build as authoritative broad evidence; use the current
+SQLite connector project as the executable owner and a fresh graph inventory for missing references.
+
+**Creating new:** Nothing. Do not add warning suppressions, replacement dependencies, shared fakes, or
+a duplicate graph tool when the current release gate and compiler already reject recurrence.
+
+**Coalescence:** Close stale records in the PMC history. Warning policy stays with the release build;
+interface conformance stays with the compiler; project-reference validity stays with MSBuild plus the
+release graph.
+
+**Ergonomics:** Maintainers run the existing commands and receive ordinary compiler/MSBuild failures.
+There is no baseline file, special SQLite fake framework, or historical adapter shim to understand.
+
+**Constraints satisfied:** current repository evidence over historical hypotheses; no production
+change; no full ratchet rerun; focused connector execution only; no remote/private action.
+
+**Risks:** A one-off text search could miss conditional XML references, or a prior broad build could be
+misquoted. Parse all test projects as XML, run the full focused SQLite project, and cite the exact
+R11-07 terminal build record rather than reconstructing it.
+
+## Sixth slice outcome
+
+PMC-003, PMC-028, and PMC-032 close without changes. The exact R11-07 public-release build is the
+authoritative broad proof and reports zero warnings/errors, so the old 19-warning baseline is not
+current. SQLite's `CapturingDiscoveryCoordinator` already implements `ResolveServiceIntent`; its full
+Release project passes 36/36 with no `MSB9008`. A fresh XML inventory resolves every
+`ProjectReference` in every test `.csproj`: zero missing targets and zero retired
+`Koan.Core.Adapters.csproj` edges.
+
+R12-02 is complete. Every PMC now has a terminal disposition against the selective preview guarantee:
+repaired, closed by current evidence, transferred to its real later phase, or explicitly excluded as a
+nonclaim. R12-03 can now compile the exact supported package/claim boundary and apply 0.20 intent only
+to the owners whose guarantees are admitted.
 
 ## Stop conditions
 

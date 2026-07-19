@@ -43,13 +43,13 @@ language, references express capability intent, `AddKoan()` compiles host-owned 
 runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive only
 when genuinely inert and independently consumed.
 
-## Active slice: R12-02 preview-blocking seams
+## Active slice: R12-03 preview product boundary
 
 R12-01 passed with the maintainer-accepted checkpoint: ordinary stable-format `0.20.x`, project-local
 `0.20` intent, NBGV-owned patches, claim-owned selective admission, and no automatic promotion by
 dependency or repository membership. Its 35 packages remain an assessment slate, not admitted truth.
 
-[R12-02](work-items/r12/R12-02-preview-blocking-seams.md) now re-evaluates the complete PMC register
+[R12-02](work-items/r12/R12-02-preview-blocking-seams.md) re-evaluated the complete PMC register
 against that slate. Each concern receives one current disposition: repair, close by current evidence,
 transfer to the preview phase that owns its terminal proof, or explicit exclusion/nonclaim. The first
 exploration checks Storage's remaining layered-activation invariant through Media. GardenCoop C2 now
@@ -94,9 +94,16 @@ root while importing the real production targets read-only. It asserts that no `
 escapes that root, preserves package/project manifest truth, and proves a missing package fails only
 inside the fixture. The exact packaging cell passes 1/1.
 
-Resume R12-02 with the combined PMC-003/028/032 current-state audit. Reconcile their historical
-warning and missing-reference claims against the exact R11-07 zero-warning Release result and current
-connector project graph before making any repair. Do not run the full ratchet.
+PMC-003, PMC-028, and PMC-032 are closed by current evidence. R11-07's exact Release build is
+zero-warning; SQLite's current discovery fake compiles and its connector suite passes 36/36; a fresh
+XML inventory finds zero missing references across every test project. R12-02 therefore passes with
+every PMC repaired, closed, transferred, or explicitly excluded against the preview guarantee.
+
+[R12-03](work-items/r12/R12-03-preview-product-boundary.md) is active. Reconcile the 35-package
+assessment slate with the terminal PMC decisions, define the smallest supported foundation and
+independently useful extension claims, compute their complete public Koan dependency closure, and
+record the exact package/version checkpoint before changing any `version.json`. Guaranteed owners must
+be promoted to project-local `0.20`; no other owner inherits that signal. Do not run the full ratchet.
 
 ## Most recent completed slice: R08-05 local exact candidate
 
