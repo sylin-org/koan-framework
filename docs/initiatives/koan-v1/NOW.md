@@ -69,6 +69,11 @@ documentation structure with zero errors / 1,377 non-gating warnings. No full ra
 ran. R12-04 remains open only for the two required independent public-context-only cold reads and any
 corrections they uncover; package-only external-consumer proof remains downstream.
 
+[R12-05](work-items/r12/R12-05-public-consumer-journey.md) is now sized and checkpointed without beginning
+execution. It will reuse the release compiler's existing isolated template, FirstUse, GoldenJourney, facts,
+lock, and corrective-rejection chokepoints; it adds no second consumer harness or CLI. Exact candidate work
+waits for R12-04's real independent readers.
+
 ## Recently completed preview foundation
 
 R12-01 passed with the maintainer-accepted checkpoint: ordinary stable-format `0.20.x`, project-local

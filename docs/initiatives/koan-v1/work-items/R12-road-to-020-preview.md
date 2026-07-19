@@ -85,7 +85,7 @@ Communication, MCP, security, and optional AI/vector capability.
 | [R12-02](r12/R12-02-preview-blocking-seams.md) | every current PMC is re-evaluated against the proposed guarantee set; promise-level activation, configuration, lifetime, naming, wire, safety, and tooling concerns receive fix/remove/exclude decisions | passed |
 | [R12-03](r12/R12-03-preview-product-boundary.md) | a small recommended spine, advanced extensions, experiments, and non-claims are generated from current evidence without equating package availability with support | passed |
 | [R12-04](r12/R12-04-coherent-public-narrative.md) | every public-facing surface tells one greenfield, present-tense product story and an anti-drift gate preserves it | in-progress |
-| R12-05 — prove the public consumer journey | clean external-context users and agents install the preview candidate, reach meaningful results, swap infrastructure, diagnose rejection, and explain composition using public guidance only | pending |
+| [R12-05](r12/R12-05-public-consumer-journey.md) | clean external-context users and agents install the preview candidate, reach meaningful results, swap infrastructure, diagnose rejection, and explain composition using public guidance only | pending |
 | R12-06 — publish and observe the first 0.20 wave | the exact prepared candidate becomes one coherent NuGet/GitHub preview with immutable custody and recorded terminal evidence | pending |
 | R12-07 — prove preview evolution | a later independent package wave upgrades a public-created application, recovers injected interruption, and converts feedback into a bounded maturity queue | pending |
 
