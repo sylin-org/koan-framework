@@ -93,6 +93,76 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
     }
 
     [Fact]
+    public void RejectsSupportPromotionWithout020VersionIntent()
+    {
+        SeedPath("docs/capability.md");
+        SeedPath("tests/evidence.txt");
+        var package = Project("Sylin.Koan.Core", versionIntent: "0.19");
+        var claim = Claim(package.PackageId) with { Maturity = "supported-foundation" };
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            Compiler().Compile([package], Claims(claim)));
+
+        Assert.Contains("version intent '0.19'", error.Message, StringComparison.Ordinal);
+        Assert.Contains("0.20", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Rejects020VersionIntentWithoutASupportedClaim()
+    {
+        SeedPath("docs/capability.md");
+        SeedPath("tests/evidence.txt");
+        var package = Project("Sylin.Koan.Core", versionIntent: "0.20");
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            Compiler().Compile([package], Claims(Claim(package.PackageId))));
+
+        Assert.Contains("0.20 version intent", error.Message, StringComparison.Ordinal);
+        Assert.Contains("no supported claim", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RejectsSupportedPackageWithAnUnsupportedPublicDependency()
+    {
+        SeedPath("docs/capability.md");
+        SeedPath("tests/evidence.txt");
+        var dependency = Project("Sylin.Koan.Core", versionIntent: "0.17");
+        var application = Project(
+            "Sylin.Koan.App",
+            references: [Reference(dependency)],
+            versionIntent: "0.20");
+        var claim = Claim(application.PackageId) with { Maturity = "supported-foundation" };
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            Compiler().Compile([application, dependency], Claims(claim)));
+
+        Assert.Contains(application.PackageId, error.Message, StringComparison.Ordinal);
+        Assert.Contains(dependency.PackageId, error.Message, StringComparison.Ordinal);
+        Assert.Contains("not owned by a supported claim", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AcceptsCompleteSupported020DependencyClosure()
+    {
+        SeedPath("docs/capability.md");
+        SeedPath("tests/evidence.txt");
+        var dependency = Project("Sylin.Koan.Core", versionIntent: "0.20");
+        var application = Project(
+            "Sylin.Koan.App",
+            references: [Reference(dependency)],
+            versionIntent: "0.20");
+        var claim = Claim(application.PackageId) with
+        {
+            Maturity = "supported-foundation",
+            Packages = [application.PackageId, dependency.PackageId]
+        };
+
+        var surface = Compiler().Compile([application, dependency], Claims(claim));
+
+        Assert.All(surface.Packages, package => Assert.Equal("0.20", package.VersionIntent));
+    }
+
+    [Fact]
     public void ProducesDeterministicStandardPackageShapes()
     {
         SeedPath("docs/capability.md");
@@ -147,7 +217,8 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
         bool isRoslynComponent = false,
         bool includeBuildOutput = true,
         bool ownsReadme = true,
-        string[]? references = null)
+        string[]? references = null,
+        string versionIntent = "0.17")
     {
         var name = id.Replace('.', '-');
         var directory = Path.Combine(root, "src", name);
@@ -169,7 +240,8 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
             "Description",
             "koan;test",
             references ?? [],
-            []);
+            [],
+            VersionIntent: versionIntent);
     }
 
     private static string Reference(PackageProject project) =>

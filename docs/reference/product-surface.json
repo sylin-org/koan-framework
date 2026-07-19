@@ -45,13 +45,14 @@
       "id": "authentication-authorization",
       "title": "Authentication, authorization, and client token issuance",
       "summary": "Durable Identity, web sign-in, authenticated identity management, active-membership tenant scoping, and one ES256 workload-token verifier compose through referenced modules; the embedded OAuth server adds audience-bound public-client issuance and durable key continuity, while external provider behavior remains connector-specific.",
-      "maturity": "verified",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Identity",
         "Sylin.Koan.Identity.Tenancy",
         "Sylin.Koan.Identity.Web",
         "Sylin.Koan.Security.Trust",
         "Sylin.Koan.Web.Auth",
+        "Sylin.Koan.Web.Auth.Abstractions",
         "Sylin.Koan.Web.Auth.Server"
       ],
       "documentation": [
@@ -97,15 +98,17 @@
       "id": "bootstrap-startup-reporting",
       "title": "Bootstrap, discovery, and startup reporting",
       "summary": "AddKoan composes referenced capabilities and reports the resulting runtime decisions.",
-      "maturity": "demonstrated",
+      "maturity": "supported-foundation",
       "packages": [
-        "Sylin.Koan.App"
+        "Sylin.Koan.Core"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md"
+        "docs/initiatives/koan-v1/CAPABILITIES.md",
+        "src/Koan.Core/README.md"
       ],
       "evidence": [
         "docs/initiatives/koan-v1/R02-EVIDENCE.md",
+        "docs/initiatives/koan-v1/work-items/r11/R11-07-release-certification-boundary.md",
         "samples/FirstUse"
       ]
     },
@@ -113,7 +116,7 @@
       "id": "cache-distributed-state",
       "title": "Cache and distributed state",
       "summary": "Typed cache semantics work across local and external engines within their stated topology limits.",
-      "maturity": "verified",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Cache"
       ],
@@ -129,7 +132,7 @@
       "id": "canonical-entities",
       "title": "Canonical Entity pipelines",
       "summary": "Canon discovers every canonical Entity, compiles one deterministic host-owned pipeline plan, commits canonical state, indexes, and audit in an explicit non-atomic order, and optionally projects the same plan through inspectable HTTP surfaces.",
-      "maturity": "verified",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Canon",
         "Sylin.Koan.Canon.Web"
@@ -167,20 +170,17 @@
     {
       "id": "entity-communication",
       "title": "Entity Events and Transport",
-      "summary": "Entities and entity sequences express local-first events and transport intent with pluggable routing.",
-      "maturity": "verified",
+      "summary": "Entities and entity sequences express local-first Events and Transport intent through the automatic in-process provider with bounded, inspectable delivery semantics.",
+      "maturity": "supported-foundation",
       "packages": [
-        "Sylin.Koan.Communication",
-        "Sylin.Koan.Communication.Connector.RabbitMq"
+        "Sylin.Koan.Communication"
       ],
       "documentation": [
         "docs/reference/communication/index.md",
-        "src/Connectors/Communication/RabbitMq/README.md",
         "src/Koan.Communication/README.md"
       ],
       "evidence": [
         "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
-        "tests/Suites/Communication/Koan.Communication.Connector.RabbitMq.Tests",
         "tests/Suites/Communication/Koan.Communication.Tests"
       ]
     },
@@ -188,8 +188,9 @@
       "id": "entity-data-semantics",
       "title": "Entity\u003CT\u003E data semantics and context",
       "summary": "Entities expose provider-bounded persistence, query, paging, streaming, and ambient context semantics.",
-      "maturity": "verified",
+      "maturity": "supported-foundation",
       "packages": [
+        "Sylin.Koan.Cache.Abstractions",
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core"
       ],
@@ -205,7 +206,7 @@
       "id": "entity-field-at-rest-classification",
       "title": "Entity field-at-rest classification",
       "summary": "Writable classified string Entity properties are authenticated-encrypted through Data-owned transforms; active segmentation scopes key custody automatically, Development is zero-config, and non-Development hosts require an application key provider.",
-      "maturity": "verified",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Classification",
         "Sylin.Koan.Classification.Contracts"
@@ -224,7 +225,7 @@
       "id": "entity-social-card-projection",
       "title": "Entity social-card projection",
       "summary": "A host-owned Entity declaration projects encoded OpenGraph, Twitter, title, and canonical metadata into SPA navigations without manual middleware or SSR.",
-      "maturity": "verified",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Web.OpenGraph"
       ],
@@ -265,7 +266,7 @@
       "id": "jobs-scheduling",
       "title": "Jobs and scheduling",
       "summary": "Entities own inspectable background work with retries, cancellation, schedules, context restoration, and capability-graded durability.",
-      "maturity": "verified",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Jobs"
       ],
@@ -303,7 +304,7 @@
       "id": "local-data-providers",
       "title": "Local JSON and InMemory Entity persistence",
       "summary": "JSON supplies Koan\u0027s inspectable automatic local floor while InMemory supplies an explicitly ephemeral host-scoped provider and conformance oracle.",
-      "maturity": "verified",
+      "maturity": "supported-foundation",
       "packages": [
         "Sylin.Koan.Data.Connector.InMemory",
         "Sylin.Koan.Data.Connector.Json"
@@ -341,7 +342,7 @@
       "id": "mcp-agent-surface",
       "title": "MCP and agent-facing surfaces",
       "summary": "Koan exposes application tools and self-description to coding and runtime agents through MCP.",
-      "maturity": "verified",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Mcp",
         "Sylin.Koan.Mcp.Explorer",
@@ -382,7 +383,7 @@
       "id": "operations-diagnostics",
       "title": "Operations, health, and diagnostics",
       "summary": "Runtime facts and health expose bounded host decisions; the optional Observability reference composes one inspectable OpenTelemetry pipeline across every Koan trace source and meter.",
-      "maturity": "verified",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Observability"
       ],
@@ -397,20 +398,59 @@
       ]
     },
     {
-      "id": "packaging-installation-upgrades",
-      "title": "Packaging, installation, and upgrades",
-      "summary": "Independent package versioning and templates are specified, but public installation coherence is not yet certified.",
+      "id": "package-first-installation",
+      "title": "Package-first installation",
+      "summary": "The foundation bundle, web application bundle, and templates install through ordinary NuGet and dotnet new flows, preserve independent package identity, and reach the documented first business result outside the repository.",
+      "maturity": "supported-foundation",
+      "packages": [
+        "Sylin.Koan",
+        "Sylin.Koan.App",
+        "Sylin.Koan.Templates"
+      ],
+      "documentation": [
+        "docs/initiatives/koan-v1/work-items/r12/R12-01-preview-contract-and-version-band.md",
+        "samples/FirstUse/README.md",
+        "samples/GoldenJourney/README.md",
+        "tools/Koan.Packaging/README.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r08/R08-05-initial-public-observation.md",
+        "docs/initiatives/koan-v1/work-items/r11/R11-07-release-certification-boundary.md",
+        "tests/Koan.Packaging.Tests"
+      ]
+    },
+    {
+      "id": "preview-evolution",
+      "title": "Preview upgrade and interrupted-release recovery",
+      "summary": "A later 0.20 package wave must prove that a public-created application upgrades cleanly and that interrupted publication recovers from immutable evidence.",
       "maturity": "specified",
       "packages": [
         "Sylin.Koan.Templates"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md",
+        "docs/initiatives/koan-v1/work-items/R12-road-to-020-preview.md",
         "tools/Koan.Packaging/README.md"
       ],
       "evidence": [
-        "docs/initiatives/koan-v1/R02-EVIDENCE.md",
+        "docs/initiatives/koan-v1/work-items/r08/R08-05-initial-public-observation.md",
         "tests/Koan.Packaging.Tests"
+      ]
+    },
+    {
+      "id": "rabbitmq-communication",
+      "title": "RabbitMQ Communication carriage",
+      "summary": "A direct RabbitMQ connector reference elects authenticated cross-process Transport and framework carriage without silent local fallback; heterogeneous schema evolution remains outside the guarantee.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Communication.Connector.RabbitMq"
+      ],
+      "documentation": [
+        "docs/reference/communication/index.md",
+        "src/Connectors/Communication/RabbitMq/README.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "tests/Suites/Communication/Koan.Communication.Connector.RabbitMq.Tests"
       ]
     },
     {
@@ -435,10 +475,33 @@
       ]
     },
     {
+      "id": "sqlite-data-foundation",
+      "title": "Durable local SQLite Entity persistence",
+      "summary": "SQLite supplies the durable local application path over the shared relational contract, including provider-correct filtering, paging, schema ownership, readiness, and package-first template use.",
+      "maturity": "supported-foundation",
+      "packages": [
+        "Sylin.Koan.Data.Connector.Sqlite",
+        "Sylin.Koan.Data.Relational",
+        "Sylin.Koan.Data.Relational.Abstractions"
+      ],
+      "documentation": [
+        "docs/reference/data/index.md",
+        "src/Connectors/Data/Sqlite/README.md",
+        "src/Koan.Data.Relational.Abstractions/README.md",
+        "src/Koan.Data.Relational/README.md"
+      ],
+      "evidence": [
+        "samples/FirstUse",
+        "samples/GoldenJourney",
+        "tests/Suites/Data/Connector.Sqlite",
+        "tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Sqlite.Tests"
+      ]
+    },
+    {
       "id": "tenant-isolation-administration",
       "title": "Local-first tenant isolation and administration",
       "summary": "Referencing Tenancy contributes one hard ambient segmentation guarantee across active pillars; the optional Web projection mounts host-authorized tenant-registry, deterministic membership, and administration-audit surfaces without lifecycle-shaped placeholders.",
-      "maturity": "verified",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Tenancy",
         "Sylin.Koan.Tenancy.Web"
@@ -477,7 +540,7 @@
       "id": "web-api-conventions",
       "title": "Web/API conventions",
       "summary": "Entity controllers expose business-readable HTTP APIs through framework conventions.",
-      "maturity": "verified",
+      "maturity": "supported-foundation",
       "packages": [
         "Sylin.Koan.Web"
       ],
@@ -493,7 +556,7 @@
       "id": "web-projection-addons",
       "title": "Optional Entity HTTP, OpenAPI, and SSE projections",
       "summary": "Referenced Web add-ons compose through AddKoan(): richer Entity controllers remain host-owned, OpenAPI resolves one document/UI policy, and one SSE result model serves controllers and framework transports.",
-      "maturity": "verified",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Web.Extensions",
         "Sylin.Koan.Web.OpenApi",
@@ -516,6 +579,7 @@
   "packages": [
     {
       "packageId": "Sylin.Koan",
+      "versionIntent": "0.20",
       "shape": "bundle",
       "description": "Tested Koan foundation bundle: core runtime, Entity data, local Communication, and the JSON connector.",
       "targetFrameworks": [
@@ -531,10 +595,13 @@
       "readme": "packaging/Sylin.Koan/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "packaging/Sylin.Koan/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "package-first-installation"
+      ]
     },
     {
       "packageId": "Sylin.Koan.AI",
+      "versionIntent": "0.18",
       "shape": "library",
       "description": "Koan AI semantic client, capability-aware routing, provider composition, source health, and startup inspection.",
       "targetFrameworks": [
@@ -553,6 +620,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Agents",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Entity-aware autonomous agents for Koan AI: auto-generated tools from Entity\u003CT\u003E with ReAct reasoning.",
       "targetFrameworks": [
@@ -574,6 +642,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.HuggingFace",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "HuggingFace Hub connector for Koan AI: search, metadata, and download via adapter capabilities.",
       "targetFrameworks": [
@@ -593,6 +662,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.LMStudio",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "LM Studio provider for Koan AI (chat, streaming, embeddings) with auto-discovery.",
       "targetFrameworks": [
@@ -612,6 +682,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.Ollama",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Ollama provider for Koan AI (chat, streaming, embeddings) with Dev auto-discovery.",
       "targetFrameworks": [
@@ -632,6 +703,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.Onnx",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "In-process embedding generation for Koan via ONNX Runtime. Runs a local sentence-embedding model (e.g. all-MiniLM-L6-v2) with a WordPiece tokenizer entirely in-process \u2014 no model server, no network. The embeddings rung of the single-binary tier.",
       "targetFrameworks": [
@@ -651,6 +723,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Contracts",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Inert Koan AI contracts for provider adapters, routing, model selection, prompts, and multimodal request and result shapes.",
       "targetFrameworks": [
@@ -666,6 +739,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Contracts.Shared",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Dependency-free identities and result vocabulary shared across Koan-compatible model, dataset, compute, job, evaluation, and lineage workflows.",
       "targetFrameworks": [
@@ -679,6 +753,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Eval",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Model evaluation, quality gates, regression detection, and drift monitoring for Koan AI.",
       "targetFrameworks": [
@@ -698,6 +773,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Models",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Centralized model lifecycle for Koan AI: pull, convert, deploy, version, and manage models across runtimes.",
       "targetFrameworks": [
@@ -717,6 +793,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Orchestration",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Typed, immutable chain composition for Koan AI: RAG, branching, structured output, and streaming.",
       "targetFrameworks": [
@@ -738,6 +815,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Prompt",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Optional Entity-backed catalog for storing and resolving versioned Koan AI prompts.",
       "targetFrameworks": [
@@ -757,6 +835,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Review",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Human-in-the-loop review queues for Koan AI: approve, reject, edit, and label AI outputs to close the feedback loop.",
       "targetFrameworks": [
@@ -773,6 +852,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Web",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Provider-neutral HTTP projection for Koan AI chat, embeddings, model inventory, and capability inspection.",
       "targetFrameworks": [
@@ -793,6 +873,7 @@
     },
     {
       "packageId": "Sylin.Koan.App",
+      "versionIntent": "0.20",
       "shape": "bundle",
       "description": "Tested Koan application bundle: the Koan foundation plus controller-based ASP.NET Core integration.",
       "targetFrameworks": [
@@ -806,11 +887,12 @@
       "ownsReadme": true,
       "technicalDocumentation": "packaging/Sylin.Koan.App/TECHNICAL.md",
       "claims": [
-        "bootstrap-startup-reporting"
+        "package-first-installation"
       ]
     },
     {
       "packageId": "Sylin.Koan.Cache",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Koan Cache: transparent Entity caching, policy and topology negotiation, bounded explicit eviction, coherence, health, and inspection.",
       "targetFrameworks": [
@@ -832,6 +914,7 @@
     },
     {
       "packageId": "Sylin.Koan.Cache.Abstractions",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Shared cache contracts for the Koan framework: policies, builders, serializers, and capability descriptors.",
       "targetFrameworks": [
@@ -843,10 +926,13 @@
       "readme": "src/Koan.Cache.Abstractions/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Cache.Abstractions/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "entity-data-semantics"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Cache.Adapter.Redis",
+      "versionIntent": "0.18",
       "shape": "library",
       "description": "Redis-backed Remote Cache and layered every-node invalidation, using Koan\u0027s shared Redis backend without activating Data.",
       "targetFrameworks": [
@@ -866,6 +952,7 @@
     },
     {
       "packageId": "Sylin.Koan.Cache.Adapter.Sqlite",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "SQLite-backed persistent L1 cache store for Koan.Cache. Provides on-disk cache persistence with tag indexing and TTL eviction. Preempts the default Memory store by ProviderPriority.",
       "targetFrameworks": [
@@ -883,6 +970,7 @@
     },
     {
       "packageId": "Sylin.Koan.Canon",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Functional Koan Canon runtime with automatic model and pipeline composition.",
       "targetFrameworks": [
@@ -901,6 +989,7 @@
     },
     {
       "packageId": "Sylin.Koan.Canon.Web",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Generated ASP.NET Core and inspection surfaces for discovered Koan Canon models.",
       "targetFrameworks": [
@@ -921,6 +1010,7 @@
     },
     {
       "packageId": "Sylin.Koan.Classification",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Local-first AES-GCM field-at-rest protection for writable string Entity properties declared with Koan classification attributes.",
       "targetFrameworks": [
@@ -941,6 +1031,7 @@
     },
     {
       "packageId": "Sylin.Koan.Classification.Contracts",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Inert key-custody contracts for Koan field-at-rest classification.",
       "targetFrameworks": [
@@ -956,6 +1047,7 @@
     },
     {
       "packageId": "Sylin.Koan.Communication",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Koan Communication: Entity-first local Events and Transport with typed handlers, isolated snapshots, context carriage, and bounded acceptance.",
       "targetFrameworks": [
@@ -975,6 +1067,7 @@
     },
     {
       "packageId": "Sylin.Koan.Communication.Connector.RabbitMq",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "RabbitMQ Transport provider for Koan Communication with typed receiver groups and confirmed publication.",
       "targetFrameworks": [
@@ -988,11 +1081,12 @@
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Communication/RabbitMq/TECHNICAL.md",
       "claims": [
-        "entity-communication"
+        "rabbitmq-communication"
       ]
     },
     {
       "packageId": "Sylin.Koan.Core",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Composition and runtime substrate for Koan modules: lifecycle, context, provider catalogs, readiness, discovery, facts, and build provenance.",
       "targetFrameworks": [
@@ -1002,10 +1096,13 @@
       "readme": "src/Koan.Core/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Core/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "bootstrap-startup-reporting"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Abstractions",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Provider-neutral Koan data contracts for Entity identity, repositories, structured queries, capabilities, and canonical operations.",
       "targetFrameworks": [
@@ -1023,6 +1120,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.AI",
+      "versionIntent": "0.19",
       "shape": "library",
       "description": "Entity-aware AI operations for Koan: EntityAi.Embed/Chat/Ocr, [Embedding] convention defaults, [MediaAnalysis] auto-processing pipeline, and cross-modal search via the MediaAnalysisEmbeddingBridge.",
       "targetFrameworks": [
@@ -1043,6 +1141,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Backup",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Integrity-checked, provider-bounded Entity archive creation and recovery through Koan Storage.",
       "targetFrameworks": [
@@ -1062,6 +1161,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Cockroach",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "CockroachDB provider for Koan relational data: a thin pg-wire delta over the Postgres connector (Npgsql \u002B Dapper) with guardrails and governance.",
       "targetFrameworks": [
@@ -1081,6 +1181,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Couchbase",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Couchbase data provider for Koan: options binding and repository integration for document databases.",
       "targetFrameworks": [
@@ -1100,6 +1201,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.ElasticSearch",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Elasticsearch vector adapter for Koan: index provisioning, kNN search, metadata filtering and health checks via the Elasticsearch REST API.",
       "targetFrameworks": [
@@ -1118,6 +1220,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.InMemory",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "In-memory data provider for Koan: thread-safe repository for testing, development, and ephemeral storage scenarios.",
       "targetFrameworks": [
@@ -1137,6 +1240,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Json",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Zero-configuration JSON persistence for small Koan applications, tests, and local development.",
       "targetFrameworks": [
@@ -1156,6 +1260,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Mongo",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "MongoDB data provider for Koan: options binding and repository integration for document databases.",
       "targetFrameworks": [
@@ -1176,6 +1281,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.OpenSearch",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "OpenSearch vector adapter for Koan: index provisioning, kNN search, metadata filtering and health checks via the OpenSearch REST API.",
       "targetFrameworks": [
@@ -1194,6 +1300,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Postgres",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "PostgreSQL provider for Koan relational data: Dapper-based SQL integration with guardrails and governance.",
       "targetFrameworks": [
@@ -1213,6 +1320,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Redis",
+      "versionIntent": "0.18",
       "shape": "library",
       "description": "Redis-backed key/value Entity persistence for Koan with explicit caller paging, source routing, shared connection pooling, and participation-aware health.",
       "targetFrameworks": [
@@ -1232,6 +1340,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Sqlite",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Durable embedded SQLite provider for Koan Entity data with zero-config local storage, schema management, queries, and bounded paging.",
       "targetFrameworks": [
@@ -1245,10 +1354,13 @@
       "readme": "src/Connectors/Data/Sqlite/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Data/Sqlite/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "sqlite-data-foundation"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.SqlServer",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "SQL Server provider for Koan relational data with JSON-projection pushdowns, guardrails, and governance.",
       "targetFrameworks": [
@@ -1266,6 +1378,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Core",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Entity data runtime for Koan: provider election, routing, lifecycle, queries, paging, relationships, and canonical operations.",
       "targetFrameworks": [
@@ -1286,6 +1399,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Relational",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Shared schema governance, SQL translation, and command mechanics for Koan relational Data providers.",
       "targetFrameworks": [
@@ -1299,10 +1413,13 @@
       "readme": "src/Koan.Data.Relational/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Data.Relational/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "sqlite-data-foundation"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Relational.Abstractions",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Inert relational schema, dialect, and DDL contracts for Koan Data providers.",
       "targetFrameworks": [
@@ -1314,10 +1431,13 @@
       "readme": "src/Koan.Data.Relational.Abstractions/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Data.Relational.Abstractions/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "sqlite-data-foundation"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Relational.Npgsql",
+      "versionIntent": "0.1",
       "shape": "library",
       "description": "Shared Npgsql repository mechanics for PostgreSQL-wire Koan Data providers.",
       "targetFrameworks": [
@@ -1336,6 +1456,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.SearchEngine",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Shared core for Koan search-engine vector connectors (Elasticsearch / OpenSearch, both built on Apache Lucene): the shared SearchEngineVectorRepository behind a 3-member ISearchEngineDialect seam, plus the single source of truth for translating the unified Filter AST into the search-engine query DSL.",
       "targetFrameworks": [
@@ -1357,6 +1478,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.SoftDelete",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Opt-in recoverable Entity deletion: ordinary reads hide soft-removed rows while type-targeted recycle-bin, restore, and purge verbs remain explicit.",
       "targetFrameworks": [
@@ -1374,6 +1496,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector",
+      "versionIntent": "0.18",
       "shape": "library",
       "description": "Entity-first Koan vector runtime: provider election, memoized repository resolution, isolation-aware naming, querying, health participation, and facades.",
       "targetFrameworks": [
@@ -1392,6 +1515,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Abstractions",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Provider-neutral Koan vector contracts for search repositories, adapter factories, schemas, queries, matches, capabilities, and export shapes.",
       "targetFrameworks": [
@@ -1407,6 +1531,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.InMemory",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "In-process, in-memory vector adapter for Koan: brute-force cosine k-NN over System.Numerics.Tensors (SIMD). The zero-infrastructure vector floor for single-binary deployments and the cross-adapter convergence oracle. Pure managed, no native dependencies, NativeAOT-friendly.",
       "targetFrameworks": [
@@ -1428,6 +1553,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Milvus",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Milvus vector provider for Koan: entity-first KNN search, metadata-filter pushdown, bulk operations, and collection management over REST.",
       "targetFrameworks": [
@@ -1449,6 +1575,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Qdrant",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Qdrant vector provider for Koan: entity-first KNN search, payload filtering, bulk operations, export, and visibility-aware writes over REST.",
       "targetFrameworks": [
@@ -1470,6 +1597,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.SqliteVec",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Durable in-process vector adapter for Koan over sqlite-vec (asg017 vec0 v0.1.9) as a loadable SQLite extension. It can share SQLite\u0027s local database while k-NN runs in-process with no server. Native vec0 binaries for win-x64/linux-x64/linux-arm64 ship embedded and extract on first use.",
       "targetFrameworks": [
@@ -1491,6 +1619,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Weaviate",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Weaviate vector provider for Koan: entity-first KNN and hybrid search, GraphQL filter pushdown, continuation, export, and schema management.",
       "targetFrameworks": [
@@ -1513,6 +1642,7 @@
     },
     {
       "packageId": "Sylin.Koan.Identity",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "SEC-0007 \u2014 the durable person (Identity) and the sign-in \u2192 identity reconciliation seam. Implements Koan.Web.Auth\u0027s IUserStore / IExternalIdentityStore with Entity\u003C\u003E-backed durable stores, upserts an Identity from claims on every sign-in, and gives Membership.IdentityId a real backing entity. Reference = Intent.",
       "targetFrameworks": [
@@ -1533,6 +1663,7 @@
     },
     {
       "packageId": "Sylin.Koan.Identity.Tenancy",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Compose durable Identity with Tenancy: active-membership request scoping, tenant-role projection, effective-access facts, and integrity-checked lifecycle receipts by reference plus AddKoan().",
       "targetFrameworks": [
@@ -1552,6 +1683,7 @@
     },
     {
       "packageId": "Sylin.Koan.Identity.Web",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Reference-activated authenticated HTTP management for Koan.Identity: subject-scoped self-service, role-gated operator lifecycle and access APIs, and dual-control impersonation.",
       "targetFrameworks": [
@@ -1570,6 +1702,7 @@
     },
     {
       "packageId": "Sylin.Koan.Jobs",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Run Entity-owned background work with inspectable progress, retries, cancellation, schedules, and capability-graded durability through AddKoan().",
       "targetFrameworks": [
@@ -1590,6 +1723,7 @@
     },
     {
       "packageId": "Sylin.Koan.Mcp",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Model Context Protocol integration for Koan entity endpoints: discovery, schema, execution, and transports.",
       "targetFrameworks": [
@@ -1611,6 +1745,7 @@
     },
     {
       "packageId": "Sylin.Koan.Mcp.Explorer",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Human inspection console for Koan MCP: caller-visible tools, governed try-it, and fail-closed access-map diagnostics.",
       "targetFrameworks": [
@@ -1628,6 +1763,7 @@
     },
     {
       "packageId": "Sylin.Koan.Mcp.Operations",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Governed MCP operations for Koan Jobs and Cache, with explicit enablement, exact grants, destructive confirmation, and mutation audit.",
       "targetFrameworks": [
@@ -1647,6 +1783,7 @@
     },
     {
       "packageId": "Sylin.Koan.Media.Abstractions",
+      "versionIntent": "0.18",
       "shape": "library",
       "description": "Inert Koan media contracts for immutable recipes, pipeline intent, media metadata, output shapes, and registries.",
       "targetFrameworks": [
@@ -1663,6 +1800,7 @@
     },
     {
       "packageId": "Sylin.Koan.Media.Core",
+      "versionIntent": "0.18",
       "shape": "library",
       "description": "Koan media runtime for Entity-backed originals, recipe discovery, validated image pipelines, rendering, and runtime facts.",
       "targetFrameworks": [
@@ -1683,6 +1821,7 @@
     },
     {
       "packageId": "Sylin.Koan.Media.Web",
+      "versionIntent": "0.18",
       "shape": "library",
       "description": "Recipe-driven HTTP rendering and Entity-backed media serving for Koan.",
       "targetFrameworks": [
@@ -1705,6 +1844,7 @@
     },
     {
       "packageId": "Sylin.Koan.Observability",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Reference-activated OpenTelemetry traces and metrics for Koan, with optional OTLP export and standard OpenTelemetry customization.",
       "targetFrameworks": [
@@ -1722,6 +1862,7 @@
     },
     {
       "packageId": "Sylin.Koan.Redis",
+      "versionIntent": "0.18",
       "shape": "library",
       "description": "Shared Redis backend lifecycle, discovery, and connection pooling for Koan adapters.",
       "targetFrameworks": [
@@ -1738,6 +1879,7 @@
     },
     {
       "packageId": "Sylin.Koan.Redis.Abstractions",
+      "versionIntent": "0.18",
       "shape": "library",
       "description": "Inert connection-lifecycle contracts for Koan modules that share a Redis backend.",
       "targetFrameworks": [
@@ -1751,6 +1893,7 @@
     },
     {
       "packageId": "Sylin.Koan.Security.Trust",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "ES256 workload-token issuance and bearer verification with ambient request identity, automatic AddKoan activation, and a replaceable signing-key lifecycle.",
       "targetFrameworks": [
@@ -1768,6 +1911,7 @@
     },
     {
       "packageId": "Sylin.Koan.Storage",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Koan storage runtime for Entity-backed objects, provider routing, segmentation, replication, validation, transfer, and lifecycle helpers.",
       "targetFrameworks": [
@@ -1786,6 +1930,7 @@
     },
     {
       "packageId": "Sylin.Koan.Storage.Abstractions",
+      "versionIntent": "0.18",
       "shape": "library",
       "description": "Inert Koan storage contracts for providers, services, objects, capabilities, listing, stat, copy, presign, and model binding.",
       "targetFrameworks": [
@@ -1801,6 +1946,7 @@
     },
     {
       "packageId": "Sylin.Koan.Storage.Connector.Local",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Safe local-filesystem provider for Koan Storage with seek, range, stat, listing, and same-provider copy.",
       "targetFrameworks": [
@@ -1817,6 +1963,7 @@
     },
     {
       "packageId": "Sylin.Koan.Storage.Connector.S3",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "S3-compatible Remote provider for Koan Storage with explicit or optional Zen Garden endpoint discovery.",
       "targetFrameworks": [
@@ -1834,6 +1981,7 @@
     },
     {
       "packageId": "Sylin.Koan.Templates",
+      "versionIntent": "0.20",
       "shape": "template",
       "description": "\u0060dotnet new\u0060 templates for the Koan Framework: koan-web (minimal Entity \u002B EntityController web API) and koan-console (Entity CRUD console app), both over Sqlite and ready to run.",
       "targetFrameworks": [
@@ -1844,11 +1992,13 @@
       "ownsReadme": true,
       "technicalDocumentation": "templates/TECHNICAL.md",
       "claims": [
-        "packaging-installation-upgrades"
+        "package-first-installation",
+        "preview-evolution"
       ]
     },
     {
       "packageId": "Sylin.Koan.Tenancy",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Local-first multi-tenancy for Koan: ambient Tenant.Use/None scope, [HostScoped] exceptions, durable context carriage, and one hard segmentation contribution compiled independently by active framework pillars.",
       "targetFrameworks": [
@@ -1868,6 +2018,7 @@
     },
     {
       "packageId": "Sylin.Koan.Tenancy.Web",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Reference-mounted tenant registry and membership administration for Koan: a bundled operator UI and API with separated exposure/authority controls, idempotent seat grants, and mutation audit.",
       "targetFrameworks": [
@@ -1886,6 +2037,7 @@
     },
     {
       "packageId": "Sylin.Koan.Testing",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Koan conformance kit \u2014 your app inherits a test suite. Subclass EntityConformanceSpecs\u003CT\u003E (one method per entity); trait-gated batteries run round-trip, pushdown-vs-reference-oracle, paging, partition isolation, caching and embedding conformance automatically.",
       "targetFrameworks": [
@@ -1906,6 +2058,7 @@
     },
     {
       "packageId": "Sylin.Koan.Testing.Containers",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Koan test harness \u2014 xUnit v3 Testcontainers fixtures (KoanContainerFixture / KoanDataSpec) for engine-backed integration tests.",
       "targetFrameworks": [
@@ -1925,6 +2078,7 @@
     },
     {
       "packageId": "Sylin.Koan.Testing.Hosting",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Koan test harness \u2014 the AddKoan() integration host (KoanIntegrationHost), xUnit-agnostic. Boot a real compiled Koan composition in your app\u0027s tests.",
       "targetFrameworks": [
@@ -1940,6 +2094,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Controller-first ASP.NET Core projection for Koan Entities with health, startup composition, and redacted runtime facts.",
       "targetFrameworks": [
@@ -1959,6 +2114,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.Admin",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Development-only, read-only dashboard for sanitized Koan runtime, health, and provenance insight.",
       "targetFrameworks": [
@@ -1974,6 +2130,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.Auth",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Authentication core for Koan Web: IDP configuration, controller wiring, and claims transformation pipelines.",
       "targetFrameworks": [
@@ -1994,6 +2151,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Abstractions",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Inert Koan Web authentication contracts for provider composition, cookie lifecycle extensions, identity stores, and current-user projection.",
       "targetFrameworks": [
@@ -2005,10 +2163,13 @@
       "readme": "src/Koan.Web.Auth.Abstractions/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Web.Auth.Abstractions/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "authentication-authorization"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Discord",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Discord OAuth2 auth provider adapter for Koan.Web.Auth (self-registering defaults).",
       "targetFrameworks": [
@@ -2026,6 +2187,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Google",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Google auth provider adapter for Koan.Web.Auth (self-registering defaults).",
       "targetFrameworks": [
@@ -2043,6 +2205,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Microsoft",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Microsoft (Entra ID) auth provider adapter for Koan.Web.Auth (self-registering defaults).",
       "targetFrameworks": [
@@ -2060,6 +2223,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Test",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Test identity provider for Koan Web Auth: local login UI, token issuance for demos, and development-only wiring.",
       "targetFrameworks": [
@@ -2077,6 +2241,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Server",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "SEC-0006 embedded OAuth 2.1 Authorization Server for Koan: the MCP auth on-ramp. Mints asymmetric (ES256) access tokens for OAuth clients via Authorization Code \u002B PKCE and the Device Authorization Grant, advertises itself per the MCP authorization spec, and reuses the trust fabric for issuance. Opt-in leaf (Reference = Intent).",
       "targetFrameworks": [
@@ -2099,6 +2264,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.Extensions",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Entity-first REST exposure plus optional moderation, audit, and capability-policy controllers for Koan web applications.",
       "targetFrameworks": [
@@ -2119,6 +2285,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.OpenApi",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "OpenAPI 3.1 document and governed interactive UI projection for Koan web applications.",
       "targetFrameworks": [
@@ -2137,6 +2304,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.OpenGraph",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Host-owned Entity social-card projection and automatic OpenGraph/Twitter metadata injection for Koan SPA shells.",
       "targetFrameworks": [
@@ -2157,6 +2325,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.Sse",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Controller-first Server-Sent Events projection with one typed result model for Koan web applications and framework transports.",
       "targetFrameworks": [
@@ -2175,6 +2344,7 @@
     },
     {
       "packageId": "Sylin.Koan.ZenGarden",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Automatic Zen Garden offering, storage, and capability discovery for Koan applications",
       "targetFrameworks": [
@@ -2192,6 +2362,7 @@
     },
     {
       "packageId": "Sylin.Koan.ZenGarden.Contracts",
+      "versionIntent": "0.17",
       "shape": "library",
       "description": "Inert client, discovery, connection-intent, and capability contracts for Koan Zen Garden integrations.",
       "targetFrameworks": [

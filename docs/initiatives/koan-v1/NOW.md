@@ -29,7 +29,8 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - [R12-04](work-items/r12/R12-04-coherent-public-narrative.md) owns the maintainer-mandated realignment
   of every public-facing surface into one greenfield, present-tense narrative.
 - All 93 active packages have terminal topology dispositions, meaningful reference intent, package-owned presentation,
-  and objective package-quality finding count zero. Evaluated product truth is 93 packages and 26 claims.
+  and objective package-quality finding count zero. Evaluated product truth is 93 packages and 29 claims; exactly
+  38 owners belong to supported claims and declare 0.20 intent.
 - The exact R11-07 local public-release ratchet is green from repair commit `736b82cc3`.
 - The exact R08-05 local candidate from source `844449dd8c` compiled version `378f43beb54f`, packed all 93 active
   packages, proved both templates plus package-only FirstUse/GoldenJourney, and produced deterministic local escrow.
@@ -43,7 +44,25 @@ language, references express capability intent, `AddKoan()` compiles host-owned 
 runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive only
 when genuinely inert and independently consumed.
 
-## Active slice: R12-03 preview product boundary
+## Active slice: R12-04 coherent public narrative
+
+R12-01 through R12-03 pass. The generated boundary is a 14-owner supported foundation plus 24
+supported-extension owners. Exactly those 38 owners declare project-local 0.20 intent, every public
+Koan dependency stays inside the supported closure, and no other package carries 0.20. The existing
+product-surface compiler enforces claim/version/dependency agreement in both directions; there is no
+maintained allowlist or stamping layer. Focused graph/version tests pass 41/41, lineage/planner tests
+pass 39/39, the packaging tool builds warning-clean, public docs pass 233/42, and structural docs lint
+has zero errors. No full ratchet or remote mutation ran.
+
+[R12-04](work-items/r12/R12-04-coherent-public-narrative.md) is active. Compile the exact public-content
+graph, classify each reader outcome, then align root, site, package, template, sample, tool, and agent
+surfaces around one present-tense path: purpose, install, four-line host, first Entity result,
+progressive capability references, common runtime explanation/correction, application responsibilities,
+and the generated maturity boundary. Historical ADRs and initiatives remain evidence outside the
+ordinary learning graph. Extend the existing public-doc truth owner rather than creating a narrative
+ledger, and do not publish or run the full release ratchet.
+
+## Recently completed preview foundation
 
 R12-01 passed with the maintainer-accepted checkpoint: ordinary stable-format `0.20.x`, project-local
 `0.20` intent, NBGV-owned patches, claim-owned selective admission, and no automatic promotion by
@@ -99,11 +118,9 @@ zero-warning; SQLite's current discovery fake compiles and its connector suite p
 XML inventory finds zero missing references across every test project. R12-02 therefore passes with
 every PMC repaired, closed, transferred, or explicitly excluded against the preview guarantee.
 
-[R12-03](work-items/r12/R12-03-preview-product-boundary.md) is active. Reconcile the 35-package
-assessment slate with the terminal PMC decisions, define the smallest supported foundation and
-independently useful extension claims, compute their complete public Koan dependency closure, and
-record the exact package/version checkpoint before changing any `version.json`. Guaranteed owners must
-be promoted to project-local `0.20`; no other owner inherits that signal. Do not run the full ratchet.
+[R12-03](work-items/r12/R12-03-preview-product-boundary.md) passes. It replaced the 35-package
+assessment slate with the exact 38-owner supported closure, promoted only those owners to 0.20, and
+made the generated product-surface compiler reject missing, leaked, or stray promotion.
 
 ## Most recent completed slice: R08-05 local exact candidate
 

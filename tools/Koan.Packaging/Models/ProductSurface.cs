@@ -41,6 +41,7 @@ internal sealed record ProductClaim(
 
 internal sealed record ProductPackage(
     string PackageId,
+    string? VersionIntent,
     string Shape,
     string Description,
     IReadOnlyList<string> TargetFrameworks,

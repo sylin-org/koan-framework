@@ -8,14 +8,14 @@ last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-19
-  status: pending
+  status: in-progress
   scope: complete public-content inventory, greenfield narrative, executable guidance, and anti-drift gate
 ---
 
 # R12-04 — Establish one coherent public narrative
 
 - Tranche: `T7B — public product maturity`
-- Status: `pending R12-01 through R12-03`
+- Status: `in-progress`
 - Depends on: settled preview/version contract, preview-blocker dispositions, and generated maturity boundary
 - Unlocks: public-only consumer proof and the first 0.20 preview wave
 - Owner: every surface from which an external developer or coding agent learns what Koan is and how to use it

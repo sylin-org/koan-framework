@@ -52,6 +52,8 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
             }
         }
 
+        ValidateSupportedBoundary(graph, claimsById.Values);
+
         var claimIdsByPackage = claimsById.Values
             .SelectMany(claim => claim.Packages.Select(packageId => (packageId, claim.Id)))
             .GroupBy(pair => pair.packageId, StringComparer.OrdinalIgnoreCase)
@@ -66,6 +68,7 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
             .OrderBy(project => project.PackageId, StringComparer.OrdinalIgnoreCase)
             .Select(project => new ProductPackage(
                 project.PackageId,
+                project.VersionIntent,
                 PackageClassifier.ShapeOf(project, graph),
                 project.Description,
                 project.TargetFrameworks,
@@ -112,7 +115,7 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
         markdown.AppendLine();
         markdown.AppendLine("## Assessed capabilities");
         markdown.AppendLine();
-        markdown.AppendLine("| Capability | Maturity | Install packages | Documentation / evidence |");
+        markdown.AppendLine("| Capability | Maturity | Package owners | Documentation / evidence |");
         markdown.AppendLine("|---|---|---|---|");
         foreach (var claim in surface.Claims)
         {
@@ -129,8 +132,8 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
         markdown.AppendLine();
         markdown.AppendLine("## Installable packages");
         markdown.AppendLine();
-        markdown.AppendLine("| Package | Shape / target | Product claim | Package docs |");
-        markdown.AppendLine("|---|---|---|---|");
+        markdown.AppendLine("| Package | Version line | Shape / target | Product claim | Package docs |");
+        markdown.AppendLine("|---|---|---|---|---|");
         foreach (var package in surface.Packages)
         {
             var targets = package.TargetFrameworks.Count == 0
@@ -146,7 +149,9 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
                       ? string.Empty
                       : $"<br>[TECHNICAL](../../{package.TechnicalDocumentation})");
             markdown.Append("| `").Append(Escape(package.PackageId)).Append("` — ")
-                .Append(Escape(package.Description)).Append(" | ").Append(targets).Append(" | ")
+                .Append(Escape(package.Description)).Append(" | `")
+                .Append(Escape(package.VersionIntent ?? "unknown")).Append("` | ")
+                .Append(targets).Append(" | ")
                 .Append(claims).Append(" | ").Append(docs).AppendLine(" |");
         }
 
@@ -180,6 +185,46 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
         var documentation = RequirePaths(input.Documentation, $"documentation for claim '{id}'");
         var evidence = RequirePaths(input.Evidence, $"evidence for claim '{id}'");
         return new ProductClaim(id, title, summary, maturity, packages, documentation, evidence);
+    }
+
+    private static void ValidateSupportedBoundary(PackageGraph graph, IEnumerable<ProductClaim> claims)
+    {
+        var supportedPackages = claims
+            .Where(claim => PackagingConstants.ProductSurface.PromotedMaturities.Contains(claim.Maturity))
+            .SelectMany(claim => claim.Packages)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var packageId in supportedPackages.Order(StringComparer.OrdinalIgnoreCase))
+        {
+            var project = graph.Project(packageId);
+            if (!string.Equals(project.VersionIntent, "0.20", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Supported package '{packageId}' declares version intent '{project.VersionIntent ?? "<missing>"}'. " +
+                    "Set its project-local version.json intent to '0.20'; supported claims and the 0.20 signal must agree.");
+            }
+
+            foreach (var dependency in graph.PackageDependenciesOf(packageId))
+            {
+                if (!supportedPackages.Contains(dependency))
+                {
+                    throw new InvalidOperationException(
+                        $"Supported package '{packageId}' publicly depends on '{dependency}', but that dependency is not " +
+                        "owned by a supported claim. Admit the dependency's real guarantee or withhold the dependent package.");
+                }
+            }
+        }
+
+        foreach (var project in graph.Projects.OrderBy(project => project.PackageId, StringComparer.OrdinalIgnoreCase))
+        {
+            if (string.Equals(project.VersionIntent, "0.20", StringComparison.Ordinal) &&
+                !supportedPackages.Contains(project.PackageId))
+            {
+                throw new InvalidOperationException(
+                    $"Package '{project.PackageId}' declares 0.20 version intent but belongs to no supported claim. " +
+                    "Add an accepted guarantee or keep the package on its current lower maturity line.");
+            }
+        }
     }
 
     private IReadOnlyList<string> RequirePaths(IEnumerable<string> paths, string field)

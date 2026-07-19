@@ -174,7 +174,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
         }
 
         var projectDirectory = Path.GetDirectoryName(project)!;
-        ValidateVersionIntent(project, projectDirectory, packageId);
+        var versionIntent = ValidateVersionIntent(project, projectDirectory, packageId);
 
         var references = new List<string>();
         var sharedInputs = SharedBuildInputs(projectDirectory).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -303,7 +303,8 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             ReadString(properties, "PackageProjectUrl"),
             ReadString(properties, "RepositoryUrl"),
             ReadString(properties, "PackageLicenseExpression"),
-            ReadString(properties, "PackageReleaseNotes"));
+            ReadString(properties, "PackageReleaseNotes"),
+            versionIntent);
     }
 
     private static IReadOnlyList<string> ReadFrameworks(JsonElement properties)
@@ -323,7 +324,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
 
     private string? RelativeIfExists(string path) => File.Exists(path) ? Relative(path) : null;
 
-    private void ValidateVersionIntent(string project, string projectDirectory, string packageId)
+    private string ValidateVersionIntent(string project, string projectDirectory, string packageId)
     {
         var versionPath = Path.Combine(projectDirectory, VersionIntent.FileName);
         var relativeVersionPath = Relative(versionPath);
@@ -338,7 +339,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
 
         try
         {
-            _ = VersionIntent.ParseJson(File.ReadAllText(versionPath));
+            return VersionIntent.ParseJson(File.ReadAllText(versionPath)).ToString();
         }
         catch (Exception error) when (error is JsonException or InvalidOperationException)
         {

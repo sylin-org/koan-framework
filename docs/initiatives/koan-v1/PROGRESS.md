@@ -22,11 +22,11 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T7C — 0.20 public-preview maturity`
 - Active work item: [R12 — Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md)
-- Active child: [R12-03 — Compile the preview product boundary](work-items/r12/R12-03-preview-product-boundary.md)
-- Most recently passed child: [R12-02 — Close preview-blocking seams](work-items/r12/R12-02-preview-blocking-seams.md)
-- Pending release boundary: decide which guarantees earn 0.20, repair their exact public boundaries,
-  realign all public-facing content, and compile a fresh selective candidate before remote observation
-- Preview readiness: `not ready`; version semantics, guarantee admission, coherent narrative, public
+- Active child: [R12-04 — Establish one coherent public narrative](work-items/r12/R12-04-coherent-public-narrative.md)
+- Most recently passed child: [R12-03 — Compile the preview product boundary](work-items/r12/R12-03-preview-product-boundary.md)
+- Pending release boundary: realign all public-facing content and compile a fresh selective candidate
+  before remote observation
+- Preview readiness: `not ready`; coherent narrative, public
   observation, later upgrade/recovery proof, and an explicit maturity decision remain
 
 ## Work items
@@ -45,7 +45,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R09 | [Compile the Semantic Composition Kernel](work-items/R09-semantic-composition-kernel.md) | T7A | passed | R07; protects R08-01 | Codex · 2026-07-17 | R09-01 through R09-09 passed. One retained module lifecycle, compiled semantic constitution, typed contribution/election mechanics, hard capability overlays, canonical evidence, contract isolation, and legacy-kernel deletion are proved. ARCH-0115 and ARCH-0116 record the result. |
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
 | R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | passed | R09; R10; guards R08-05 | Architect + Codex · 2026-07-19 | R11-01 through R11-07 pass. All 93 active packages have terminal topology, package-owned presentation, and zero objective findings; the complete public-release ratchet passed 4,648 tests with 30 intentional skips and no failures. |
-| R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-19 | R12-01 fixed the selective 0.20 contract; R12-02 passed with every PMC repaired, closed, transferred, or excluded. R12-03 is compiling claims, exact package/dependency admission, and project-local 0.20 intent. |
+| R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-19 | R12-01 through R12-03 pass. Generated truth admits exactly 38 package owners to 0.20 with a closed supported dependency graph; R12-04 now realigns every public-facing surface around that promise. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -66,12 +66,13 @@ item should normally be `in-progress`.
 | R09 | passed | All nine children pass. Functional assemblies use one module lifecycle, contracts are isolated without activation metadata, the duplicate bootstrap kernel is deleted, and focused source/package journeys remain meaningful. |
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
 | R11 | passed | R11-01 through R11-07 pass. The 93-package graph, 26 claims, package-owned prose, objective zero-finding quality report, clean packs, focused family evidence, and complete public-release ratchet agree. |
-| R12 | in-progress | R12-01 and R12-02 passed the selective guarantee/version contract and promise-level seams. R12-03 now compiles the exact package boundary; coherent narrative, package-only readers, publication, and preview evolution follow. |
+| R12 | in-progress | R12-01 through R12-03 pass: the version contract, promise-level seams, and exact 38-owner 0.20 boundary agree. R12-04 owns the coherent narrative; package-only readers, publication, and preview evolution follow. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-19 | R12-03 selective 0.20 boundary | The provisional 35-package assessment omitted SQLite even though the admitted template depends on it through the relational layer; package availability and old `verified` labels also did not distinguish a preview support promise. | Admit guarantees first, yielding a closed 14-owner foundation plus 24 supported-extension owners. Promote exactly those 38 owners to project-local 0.20 and enforce bidirectional claim/version/dependency agreement in the existing generated product-surface compiler. Focused graph/version tests pass 41/41, lineage/planner tests pass 39/39, the tool builds warning-clean, and public docs pass 233/42. R12-03 passes; R12-04 opens on one coherent greenfield narrative. |
 | 2026-07-19 | R12-02 MCP transport/JSON boundary | MCP split the HTTP decision across a legacy master and nullable Streamable override, repeated transport selection on every Entity despite one shared handler, and serialized custom results differently from Entity/Web data. | Make transports one host decision: explicit STDIO, Streamable HTTP, deprecated legacy SSE, one HTTP route, one session vocabulary. Remove per-Entity transport metadata and compatibility aliases before 0.20. Reuse one camelCase, `[McpIgnore]`-aware application serializer across Entity/custom/Code Mode while preserving protocol DTO names. MCP conformance 80/80, HTTP 19/19, field exclusion 5/5, Code Mode 27/27, source consumers 3/3, warning-clean build, and public docs 233/42 pass. |
 | 2026-07-19 | R12-02 Data/Web filter and Entity-name boundary | PMC-007's old drop-filter concern no longer matched the unified AST/coordinator, but its public reference still implied SQLite-only semantics. PMC-015 remained real: inherited `Id` plus `id` has no portable JSON/provider identity. | Keep one filter pipeline and state its result guarantee without promising equal pushdown/cost. Strengthen the shared HTTP oracle, then reject case-colliding public Entity properties once at Data's cached first-use guard before adapter creation. InMemory 74/74, JSON 52/52, SQLite 52/52, exact guard/activation 9/9, and warning-clean affected builds pass. |
 | 2026-07-19 | R12-02 direct-reference fixture isolation | A packaging fixture restored the real Core project under a throwaway NuGet graph, allowing a failed test to poison repository `obj` assets. | Remove the hazardous graph edge: stage a canonical synthetic Core project, feed, package cache, intermediates, and outputs under the temporary root; import production targets read-only; structurally reject escaping project references; and prove both manifest success and local missing-package failure. Focused packaging passes 1/1 offline. |
