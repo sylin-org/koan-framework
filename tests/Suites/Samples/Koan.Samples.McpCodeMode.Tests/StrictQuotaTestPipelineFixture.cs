@@ -36,7 +36,7 @@ public class StrictQuotaTestPipelineFixture : TestHostFixtureBase
         services.Configure<McpServerOptions>(o =>
         {
             o.Exposure = McpExposureMode.Full;
-            o.EnableHttpSseTransport = false; // keep deterministic
+            o.EnableStreamableHttpTransport = false; // keep deterministic
         });
         services.Configure<CodeModeOptions>(o =>
         {

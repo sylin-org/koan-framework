@@ -25,9 +25,9 @@ internal static class McpEndpointMapping
 
         // AI-0037 D-C — route ownership. The CORE owns the bare GET {baseRoute}: an MCP client (text/event-stream)
         // gets the Streamable server-push stream; a browser (text/html) is delegated to the IMcpConsoleRenderer
-        // seam (the WEB-0072 human console). Streamable HTTP is the modern default (StreamableHttpEnabled); the
+        // seam (the WEB-0072 human console). Streamable HTTP is the primary HTTP transport; the
         // deprecated legacy /sse+/rpc pair is a separate opt-in (EnableLegacySseTransport).
-        var streamableOn = options.StreamableHttpEnabled;
+        var streamableOn = options.EnableStreamableHttpTransport;
         var legacyOn = options.EnableLegacySseTransport;
         var rendererPresent = services.GetService<IMcpConsoleRenderer>() is not null;
 
@@ -36,7 +36,7 @@ internal static class McpEndpointMapping
             return endpoints;
         }
 
-        var baseRoute = string.IsNullOrWhiteSpace(options.HttpSseRoute) ? "/mcp" : options.HttpSseRoute.TrimEnd('/');
+        var baseRoute = string.IsNullOrWhiteSpace(options.HttpRoute) ? "/mcp" : options.HttpRoute.TrimEnd('/');
         if (string.IsNullOrEmpty(baseRoute))
         {
             baseRoute = "/mcp";

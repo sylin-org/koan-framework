@@ -62,7 +62,7 @@ public sealed class EntityToolsetSpec : IClassFixture<ToolsetFixture>
         var result = await _fx.CallToolAsync(collection, new JObject());
 
         var items = JArray.Parse(McpHarnessFixtureBase.ContentText(result) ?? "[]");
-        items.OfType<JObject>().Select(i => i["Id"]?.Value<string>())
+        items.OfType<JObject>().Select(i => i["id"]?.Value<string>())
             .Should().Contain("spr-1", "a toolset-registered entity runs the same governed endpoint service as a [McpEntity] one");
     }
 }

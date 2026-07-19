@@ -10,13 +10,6 @@ namespace Koan.Mcp.Execution;
 
 public sealed class ResponseTranslator
 {
-    private static readonly JsonSerializerSettings SerializerSettings = new()
-    {
-        NullValueHandling = NullValueHandling.Ignore,
-        // Honor [McpIgnore] on results so internal/PII fields never leak (Tools + Code Mode share this path).
-        ContractResolver = McpContractResolver.Instance
-    };
-
     public McpToolExecutionResult Translate(McpEntityRegistration registration, McpToolDefinition tool, EntityEndpointResult result)
     {
         if (registration is null) throw new ArgumentNullException(nameof(registration));
@@ -166,7 +159,7 @@ public sealed class ResponseTranslator
     {
         if (value is null) return null;
         if (value is JToken token) return token;
-        try { return JToken.FromObject(value, JsonSerializer.Create(SerializerSettings)); }
+        try { return McpJson.FromApplicationObject(value); }
         catch (Exception ex)
         {
             // F2 burn-down: a tool result that cannot be serialised is an ERROR, not a null result. Mirror

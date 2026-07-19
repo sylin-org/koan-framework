@@ -4,13 +4,13 @@ domain: mcp
 title: "Agent-native MCP — from one attribute to governed access"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-06-20
+last_updated: 2026-07-19
 framework_version: source-first
 validation:
-  date_last_tested: 2026-06-20
+  date_last_tested: 2026-07-19
   status: verified
   scope: patterns-exercised
-  notes: "Every layer below is exercised end-to-end by tests/Suites/Mcp/Koan.Mcp.Conformance.Tests and tests/Suites/Web/Koan.Web.Extensions.Tests (gate/constrain/project/origin/grant/audit/door). The transport half is mcp-http-sse-howto.md."
+  notes: "Every layer below is exercised end-to-end by tests/Suites/Mcp/Koan.Mcp.Conformance.Tests and tests/Suites/Web/Koan.Web.Extensions.Tests (gate/constrain/project/origin/grant/audit/door). The transport half is mcp-http-sse-howto.md; the current MCP conformance suite passes 80/80."
 related_guides:
   - mcp-http-sse-howto.md
   - authorization-howto.md
@@ -298,7 +298,7 @@ Everything above is transport-neutral. STDIO (rung 1's bootstrap) is local-trust
 // The transport is config-gated.
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
-// appsettings: "Koan:Mcp:EnableHttpSseTransport": true, "Koan:Mcp:RequireAuthentication": true
+// appsettings: "Koan:Mcp:EnableStreamableHttpTransport": true, "Koan:Mcp:RequireAuthentication": true
 var app = builder.Build();
 await app.RunAsync();
 ```

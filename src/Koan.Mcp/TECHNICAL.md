@@ -58,14 +58,17 @@ not an operational warning.
 
 ## Transports
 
-STDIO is enabled by default. When `EnableHttpSseTransport` is true, Koan hosts modern Streamable
-HTTP on the single `HttpSseRoute` (`/mcp` by default): client JSON-RPC, including `initialize`, uses
+STDIO is enabled by default. When `EnableStreamableHttpTransport` is true, Koan hosts modern Streamable
+HTTP on the single `HttpRoute` (`/mcp` by default): client JSON-RPC, including `initialize`, uses
 `POST`; an established session may use `GET` for resumable server push and `DELETE` for termination.
 The initialize response mints `Mcp-Session-Id`, which the client echoes with the negotiated
 `MCP-Protocol-Version` on subsequent requests.
 
 `EnableLegacySseTransport` separately opts into the deprecated `/mcp/sse` plus `/mcp/rpc` shape.
 Both HTTP shapes delegate to the same dispatcher, session, authorization, and projection core.
+Transport choices are host-level options; every enabled edge projects the same governed capability
+surface. Application-owned inputs, Entity results, custom-tool results, and Code Mode objects share
+one camelCase JSON contract while protocol envelopes retain their specification-defined names.
 
 ## References
 

@@ -50,7 +50,6 @@ public sealed class StreamableHttpFixture : IAsyncLifetime
                     s.Configure<McpServerOptions>(o =>
                     {
                         o.EnableStreamableHttpTransport = true;
-                        o.EnableHttpSseTransport = false;
                         o.RequireAuthentication = false; // anonymous: this suite is about the transport, not auth
                     });
                 });

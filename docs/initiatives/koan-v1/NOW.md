@@ -70,8 +70,16 @@ host logging ownership.
 PMC-001 is now repaired without renaming stored data or adding an analyzer. The framework-owned
 `JobMetric` row is internal; its existing CLR/storage/`Count` identity remains unchanged. Applications
 see one business-facing `JobMetrics.Summary(...)` operation. Jobs passes 84/84, Tenancy 16/16, and the
-Jobs Release build is warning-clean. Resume R12-02 at MCP configuration/wire shape (PMC-002/004), then
-Data/Web correctness seams. Do not run the full ratchet.
+Jobs Release build is warning-clean.
+
+PMC-002 and PMC-004 are now repaired together. MCP transport choices live once at the host through
+explicit STDIO, Streamable HTTP, and deprecated legacy SSE switches; one `HttpRoute` and unified
+session vocabulary replace the transitional master/override and SSE-derived names. Per-Entity
+transport metadata is removed because every edge projects the same governed surface. One camelCase,
+`[McpIgnore]`-aware application JSON policy now covers Entity and custom tools plus Code Mode while
+protocol DTOs remain spec-owned. Conformance passes 80/80, Streamable/legacy HTTP 19/19, field
+exclusion 5/5, Code Mode 27/27, source FirstUse/GoldenJourney 3/3, bootstrap pillars 13/13, and the MCP build is warning-clean.
+Resume R12-02 at PMC-007/015's current Data/Web convergence audit. Do not run the full ratchet.
 
 ## Most recent completed slice: R08-05 local exact candidate
 

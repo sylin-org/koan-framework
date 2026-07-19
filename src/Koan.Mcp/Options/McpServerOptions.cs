@@ -16,23 +16,9 @@ public sealed class McpServerOptions
     public bool EnableStdioTransport { get; set; } = true;
 
     /// <summary>
-    /// The master "HTTP MCP transport on/off" switch. When true, the modern Streamable HTTP transport
-    /// (AI-0037) is hosted by default (see <see cref="StreamableHttpEnabled"/>); the deprecated legacy
-    /// <c>/sse</c>+<c>/rpc</c> pair is a separate opt-in (<see cref="EnableLegacySseTransport"/>).
+    /// Controls whether the MCP Streamable HTTP transport is hosted. The transport is secure opt-in.
     /// </summary>
-    public bool EnableHttpSseTransport { get; set; } = false;
-
-    /// <summary>
-    /// AI-0037 — explicit override for the MCP Streamable HTTP transport (spec 2025-06-18): a single endpoint at
-    /// <see cref="HttpSseRoute"/> serving POST (client→server JSON-RPC), GET (the resumable server-push stream), and
-    /// DELETE (session termination). <c>null</c> (the default) means "follow the master switch"
-    /// (<see cref="EnableHttpSseTransport"/>) — i.e. Streamable is the modern default whenever HTTP is enabled. Set
-    /// it explicitly to force-enable or force-disable independent of the master. Resolved by <see cref="StreamableHttpEnabled"/>.
-    /// </summary>
-    public bool? EnableStreamableHttpTransport { get; set; }
-
-    /// <summary>The resolved Streamable HTTP on/off state: the explicit override, else the master HTTP switch.</summary>
-    public bool StreamableHttpEnabled => EnableStreamableHttpTransport ?? EnableHttpSseTransport;
+    public bool EnableStreamableHttpTransport { get; set; } = false;
 
     /// <summary>
     /// AI-0037 — opt-in for the DEPRECATED legacy HTTP+SSE transport (the 2-endpoint <c>{baseRoute}/sse</c> +
@@ -45,7 +31,7 @@ public sealed class McpServerOptions
     /// Base route for Streamable HTTP (for example, <c>/mcp</c>). The deprecated legacy transport,
     /// when explicitly enabled, derives its <c>/sse</c> and <c>/rpc</c> routes from this value.
     /// </summary>
-    public string HttpSseRoute { get; set; } = "/mcp";
+    public string HttpRoute { get; set; } = "/mcp";
 
     /// <summary>
     /// SEC-0006 D2 — the canonical OAuth resource identifier (RFC 8707 <c>aud</c>) for this MCP edge, e.g.
@@ -59,7 +45,7 @@ public sealed class McpServerOptions
     private bool? _requireAuthentication;
 
     /// <summary>
-    /// Indicates whether HTTP + SSE endpoints require authentication. Defaults to true in production or container environments.
+    /// Indicates whether MCP HTTP endpoints require authentication. Defaults to true in production or container environments.
     /// </summary>
     public bool RequireAuthentication
     {
@@ -68,17 +54,17 @@ public sealed class McpServerOptions
     }
 
     /// <summary>
-    /// Maximum concurrent HTTP + SSE sessions allowed.
+    /// Maximum concurrent HTTP sessions allowed.
     /// </summary>
-    public int MaxConcurrentConnections { get; set; } = 100;
+    public int MaxConcurrentSessions { get; set; } = 100;
 
     /// <summary>
     /// Maximum idle duration before a session is reclaimed.
     /// </summary>
-    public TimeSpan SseConnectionTimeout { get; set; } = TimeSpan.FromMinutes(30);
+    public TimeSpan SessionIdleTimeout { get; set; } = TimeSpan.FromMinutes(30);
 
     /// <summary>
-    /// Enables CORS for the HTTP + SSE transport.
+    /// Enables CORS for MCP over HTTP.
     /// </summary>
     public bool EnableCors { get; set; } = false;
 
@@ -151,8 +137,5 @@ public sealed class McpEntityOverride
     public string? Name { get; set; }
     public string? Description { get; set; }
     public bool? AllowMutations { get; set; }
-    public bool? EnableStdio { get; set; }
-    public bool? EnableHttpSse { get; set; }
-    public McpTransportMode? EnabledTransports { get; set; }
     public string? SchemaOverride { get; set; }
 }

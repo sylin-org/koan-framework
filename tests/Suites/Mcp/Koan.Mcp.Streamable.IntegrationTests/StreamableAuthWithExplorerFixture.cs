@@ -48,7 +48,7 @@ public sealed class StreamableAuthWithExplorerFixture : IAsyncLifetime
                     s.AddKoanWeb();
                     s.Configure<McpServerOptions>(o =>
                     {
-                        o.EnableHttpSseTransport = true;
+                        o.EnableStreamableHttpTransport = true;
                         o.RequireAuthentication = true; // the deployment posture the review flagged
                     });
                     s.Configure<McpExplorerOptions>(o => o.Enabled = true);

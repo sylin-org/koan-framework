@@ -81,7 +81,7 @@ public abstract class McpHarnessFixtureBase : IAsyncLifetime
                     services.Configure<McpServerOptions>(o =>
                     {
                         o.Exposure = Exposure;
-                        o.EnableHttpSseTransport = true;
+                        o.EnableStreamableHttpTransport = true;
                         ConfigureMcp(o);
                     });
 

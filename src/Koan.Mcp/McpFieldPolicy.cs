@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace Koan.Mcp;
 
@@ -12,6 +13,8 @@ namespace Koan.Mcp;
 /// </summary>
 internal static class McpFieldPolicy
 {
+    private static readonly CamelCaseNamingStrategy CamelCase = new();
+
     /// <summary>True when the member must not be serialized into MCP results.</summary>
     public static bool IsExcludedFromOutput(MemberInfo member)
     {
@@ -28,8 +31,8 @@ internal static class McpFieldPolicy
 
     /// <summary>
     /// Resolves the JSON wire name for a member, honoring a Newtonsoft <c>[JsonProperty("name")]</c> rename.
-    /// The MCP result/input serializers use the default (PascalCase) contract resolver, so the wire name is
-    /// the rename when present, otherwise the CLR member name. Keeping the schema in sync with this prevents
+    /// The wire name is the explicit rename when present, otherwise the canonical camelCase member name.
+    /// Keeping the schema in sync with this prevents
     /// the input schema from advertising a property name the entity never round-trips.
     /// </summary>
     public static string ResolveWireName(MemberInfo member)
@@ -40,6 +43,6 @@ internal static class McpFieldPolicy
             return jsonProperty.PropertyName!;
         }
 
-        return member.Name;
+        return CamelCase.GetPropertyName(member.Name, hasSpecifiedName: false);
     }
 }

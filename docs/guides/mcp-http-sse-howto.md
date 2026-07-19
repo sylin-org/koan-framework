@@ -4,10 +4,10 @@ domain: mcp
 title: "MCP over HTTP"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-15
+last_updated: 2026-07-19
 framework_version: source-first
 validation:
-  date_last_tested: 2026-07-15
+  date_last_tested: 2026-07-19
   status: verified
   scope: Streamable HTTP source contract, security posture, and focused integration evidence
 related_guides:
@@ -23,15 +23,13 @@ related_guides:
 - **Use this surface when** an MCP client reaches the application over a network. Use STDIO when a
   local client owns the server process and does not need an HTTP security boundary.
 - **Inputs**: a Koan Web application, a reference to `Koan.Mcp`, at least one `[McpEntity]` or
-  `[McpTool]` surface, and `Koan:Mcp:EnableHttpSseTransport=true`.
+  `[McpTool]` surface, and `Koan:Mcp:EnableStreamableHttpTransport=true`.
 - **Outputs**: caller-specific tools and resources over one Streamable HTTP endpoint (`/mcp` by
   default).
 - **Failure modes**: invalid protocol negotiation, missing/expired sessions, unsupported content
   negotiation, unavailable tools, or denied caller authority.
 - **Success criteria**: the client initializes, receives a session id, discovers only usable tools,
   invokes them through `POST /mcp`, and can inspect the same runtime facts as an operator.
-
-The current master option retains `Sse` in its name, but enabling it selects Streamable HTTP.
 
 ## Shortest supported path
 
@@ -73,7 +71,7 @@ Enable the network transport:
 {
   "Koan": {
     "Mcp": {
-      "EnableHttpSseTransport": true,
+      "EnableStreamableHttpTransport": true,
       "Exposure": "Tools"
     }
   }
@@ -192,21 +190,18 @@ See [OAuth server](oauth-server-howto.md) for token acquisition and
 | Option | Default | Meaning |
 |---|---:|---|
 | `EnableStdioTransport` | `true` | Host the local process-owned transport |
-| `EnableHttpSseTransport` | `false` | Master HTTP opt-in; selects Streamable HTTP by default |
-| `EnableStreamableHttpTransport` | unset | Explicit override; otherwise follows the HTTP master switch |
-| `HttpSseRoute` | `/mcp` | Base route for Streamable HTTP |
+| `EnableStreamableHttpTransport` | `false` | Host the primary Streamable HTTP edge |
+| `EnableLegacySseTransport` | `false` | Host the deprecated `/sse` + `/rpc` compatibility edge |
+| `HttpRoute` | `/mcp` | Shared base route for MCP over HTTP |
 | `RequireAuthentication` | environment-derived | Require a remote authenticated principal |
 | `ResourceUri` | unset | Fixed OAuth resource/audience identifier |
-| `MaxConcurrentConnections` | `100` | Bound active HTTP sessions |
-| `SseConnectionTimeout` | `30 minutes` | Reclaim idle sessions after this interval |
+| `MaxConcurrentSessions` | `100` | Bound active HTTP sessions |
+| `SessionIdleTimeout` | `30 minutes` | Reclaim idle sessions after this interval |
 | `EnableCors` | `false` | Enable the MCP CORS policy |
 | `AllowedOrigins` | empty | Origins admitted when CORS is enabled |
 | `Transport.StreamableJsonResponse` | `false` | Return JSON instead of per-request SSE for request POSTs |
 | `Transport.StreamReplayBufferSize` | `256` | Recent events retained per stream for resume |
 | `Transport.MaxRetainedStreamsPerSession` | `64` | Bound completed request streams retained per session |
-
-The `EnableHttpSseTransport`, `HttpSseRoute`, and `SseConnectionTimeout` property names retain `Sse`;
-their current HTTP behavior is the single Streamable HTTP route described above.
 
 ## Failure interpretation
 

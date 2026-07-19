@@ -14,12 +14,12 @@ public interface IMcpCapabilityReporter
     Task<McpCapabilityDocument> GetCapabilities(CancellationToken cancellationToken);
 }
 
-public sealed class HttpSseCapabilityReporter : IMcpCapabilityReporter
+public sealed class McpCapabilityReporter : IMcpCapabilityReporter
 {
     private readonly McpEntityRegistry _registry;
     private readonly IOptionsMonitor<McpServerOptions> _options;
 
-    public HttpSseCapabilityReporter(McpEntityRegistry registry, IOptionsMonitor<McpServerOptions> options)
+    public McpCapabilityReporter(McpEntityRegistry registry, IOptionsMonitor<McpServerOptions> options)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -29,17 +29,29 @@ public sealed class HttpSseCapabilityReporter : IMcpCapabilityReporter
     {
         var options = _options.CurrentValue;
 
-        var transports = new[]
+        var route = Normalize(options.HttpRoute);
+        var transports = new List<McpTransportDescription>();
+        if (options.EnableStreamableHttpTransport)
         {
-            new McpTransportDescription
+            transports.Add(new McpTransportDescription
             {
-                Kind = "http+sse",
-                StreamEndpoint = Combine(options.HttpSseRoute, "sse"),
-                SubmitEndpoint = Combine(options.HttpSseRoute, "rpc"),
-                CapabilityEndpoint = options.PublishCapabilityEndpoint ? Combine(options.HttpSseRoute, "capabilities") : null,
+                Kind = "streamable-http",
+                Endpoint = route,
+                CapabilityEndpoint = options.PublishCapabilityEndpoint ? Combine(route, "capabilities") : null,
                 RequireAuthentication = options.RequireAuthentication
-            }
-        };
+            });
+        }
+        if (options.EnableLegacySseTransport)
+        {
+            transports.Add(new McpTransportDescription
+            {
+                Kind = "legacy-sse",
+                StreamEndpoint = Combine(route, "sse"),
+                SubmitEndpoint = Combine(route, "rpc"),
+                CapabilityEndpoint = options.PublishCapabilityEndpoint ? Combine(route, "capabilities") : null,
+                RequireAuthentication = options.RequireAuthentication
+            });
+        }
 
         var tools = _registry.Registrations
             .SelectMany(registration => registration.Tools.Select(tool => new McpCapabilityTool
@@ -48,8 +60,7 @@ public sealed class HttpSseCapabilityReporter : IMcpCapabilityReporter
                 Description = tool.Description,
                 // SEC-0004 Phase 3.3b: entity tools no longer carry a per-entity auth flag; this reports the
                 // server-wide transport authentication requirement. Per-entity access is the [Access] gate.
-                RequireAuthentication = options.RequireAuthentication,
-                EnabledTransports = registration.EnabledTransports
+                RequireAuthentication = options.RequireAuthentication
             }))
             .ToArray();
 
@@ -63,11 +74,13 @@ public sealed class HttpSseCapabilityReporter : IMcpCapabilityReporter
         return Task.FromResult(document);
     }
 
-    private static string Combine(string? route, string segment)
+    private static string Normalize(string? route)
     {
-        var prefix = string.IsNullOrWhiteSpace(route) ? "/mcp" : route.TrimEnd('/');
-        return $"{prefix}/{segment}";
+        var normalized = string.IsNullOrWhiteSpace(route) ? "/mcp" : route.TrimEnd('/');
+        return string.IsNullOrEmpty(normalized) ? "/mcp" : normalized;
     }
+
+    private static string Combine(string route, string segment) => $"{route}/{segment}";
 }
 
 public sealed record McpCapabilityDocument
@@ -80,8 +93,9 @@ public sealed record McpCapabilityDocument
 public sealed record McpTransportDescription
 {
     public required string Kind { get; init; }
-    public required string StreamEndpoint { get; init; }
-    public required string SubmitEndpoint { get; init; }
+    public string? Endpoint { get; init; }
+    public string? StreamEndpoint { get; init; }
+    public string? SubmitEndpoint { get; init; }
     public string? CapabilityEndpoint { get; init; }
     public bool RequireAuthentication { get; init; }
 }
@@ -91,5 +105,4 @@ public sealed record McpCapabilityTool
     public required string Name { get; init; }
     public string? Description { get; init; }
     public bool RequireAuthentication { get; init; }
-    public McpTransportMode EnabledTransports { get; init; } = McpTransportMode.All;
 }

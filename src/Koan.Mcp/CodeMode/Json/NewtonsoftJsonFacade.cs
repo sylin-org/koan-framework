@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Koan.Mcp.Execution;
 
 namespace Koan.Mcp.CodeMode.Json;
 
@@ -9,6 +10,7 @@ internal sealed class NewtonsoftJsonFacade : IJsonFacade
 {
     private static readonly JsonSerializer Serializer = JsonSerializer.Create(new JsonSerializerSettings
     {
+        ContractResolver = McpContractResolver.Instance,
         NullValueHandling = NullValueHandling.Ignore,
         DateParseHandling = DateParseHandling.DateTimeOffset,
         FloatParseHandling = FloatParseHandling.Decimal

@@ -83,18 +83,6 @@ public sealed class McpEntityRegistry
         return false;
     }
 
-    /// <summary>
-    /// Returns registrations that have STDIO enabled.
-    /// </summary>
-    public IReadOnlyList<McpEntityRegistration> RegistrationsForStdio()
-        => Snapshot.Items.Where(r => r.EnableStdio).ToList();
-
-    /// <summary>
-    /// Returns registrations that have HTTP + SSE enabled.
-    /// </summary>
-    public IReadOnlyList<McpEntityRegistration> RegistrationsForHttpSse()
-        => Snapshot.Items.Where(r => r.EnableHttpSse).ToList();
-
     private RegistrySnapshot Snapshot
     {
         get
@@ -160,8 +148,7 @@ public sealed class McpEntityRegistry
                 effectiveAttribute,
                 descriptor,
                 tools,
-                displayName,
-                effectiveAttribute.EnabledTransports);
+                displayName);
 
             registrations.Add(registration);
             AddIndex(registrationIndex, type.FullName, registration);
@@ -333,14 +320,6 @@ public sealed class McpEntityRegistry
             SchemaOverride = entityOverride.SchemaOverride ?? attribute.SchemaOverride,
             ToolPrefix = attribute.ToolPrefix
         };
-
-        merged.EnableStdio = entityOverride.EnableStdio ?? attribute.EnableStdio;
-        merged.EnableHttpSse = entityOverride.EnableHttpSse ?? attribute.EnableHttpSse;
-
-        if (entityOverride.EnabledTransports is McpTransportMode transports)
-        {
-            merged.EnabledTransports = transports;
-        }
 
         // Carry the attribute's exposure mode forward — the fresh merged attribute would otherwise drop it,
         // silently downgrading a configured [McpEntity(Exposure = ...)] to the default when any override exists.

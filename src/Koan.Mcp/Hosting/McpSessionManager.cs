@@ -58,7 +58,7 @@ public sealed class McpSessionManager : IHostedService, IDisposable
         if (context is null) throw new ArgumentNullException(nameof(context));
 
         var options = _options.CurrentValue;
-        var limit = options.MaxConcurrentConnections;
+        var limit = options.MaxConcurrentSessions;
         if (limit > 0 && _sessions.Count >= limit)
         {
             return null;
@@ -146,7 +146,7 @@ public sealed class McpSessionManager : IHostedService, IDisposable
 
     private void Sweep()
     {
-        var timeout = _options.CurrentValue.SseConnectionTimeout;
+        var timeout = _options.CurrentValue.SessionIdleTimeout;
         if (timeout <= TimeSpan.Zero) return;
 
         var now = _timeProvider.GetUtcNow();

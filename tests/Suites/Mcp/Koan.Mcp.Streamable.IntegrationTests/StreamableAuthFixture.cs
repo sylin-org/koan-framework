@@ -51,7 +51,6 @@ public sealed class StreamableAuthFixture : IAsyncLifetime
                     s.Configure<McpServerOptions>(o =>
                     {
                         o.EnableStreamableHttpTransport = true;
-                        o.EnableHttpSseTransport = false;
                         o.RequireAuthentication = true; // engage the SEC-0006 bearer gate + the same-principal check
                     });
                 });

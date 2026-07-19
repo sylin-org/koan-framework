@@ -41,11 +41,11 @@ public sealed class EdgeNavigabilitySpec : IClassFixture<EdgeFixture>
 
         // Navigate the author→article (via AuthorId) edge using the target's own governed Collection tool.
         var collection = _fx.ResolveToolName("article", EntityEndpointOperationKind.Collection);
-        var filter = new JObject { ["AuthorId"] = "an7-nav-author" }.ToString(Formatting.None);
+        var filter = new JObject { ["authorId"] = "an7-nav-author" }.ToString(Formatting.None);
         var result = await _fx.CallToolAsAsync(collection, new JObject { ["filter"] = filter }, reader);
 
         var items = JArray.Parse(McpHarnessFixtureBase.ContentText(result) ?? "[]");
-        var ids = items.OfType<JObject>().Select(a => a["Id"]?.Value<string>()).ToList();
+        var ids = items.OfType<JObject>().Select(a => a["id"]?.Value<string>()).ToList();
 
         ids.Should().Contain("an7-nav-a", "the edge resolves to the rows whose via-field matches the source id");
         ids.Should().NotContain("an7-nav-b", "rows of the other author are not on this edge");

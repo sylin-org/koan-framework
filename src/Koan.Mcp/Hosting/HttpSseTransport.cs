@@ -85,18 +85,11 @@ public sealed class HttpSseTransport
             return;
         }
 
-        if (_server.GetRegistrationsForHttpSse().Count == 0)
-        {
-            context.Response.StatusCode = StatusCodes.Status404NotFound;
-            await context.Response.WriteAsJsonAsync(new { error = "no_entities" }, cancellationToken: context.RequestAborted);
-            return;
-        }
-
         var session = _sessions.Create(context);
         if (session is null)
         {
             context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            await context.Response.WriteAsJsonAsync(new { error = "max_connections_exceeded" }, cancellationToken: context.RequestAborted);
+            await context.Response.WriteAsJsonAsync(new { error = "max_sessions_exceeded" }, cancellationToken: context.RequestAborted);
             return;
         }
 
@@ -232,7 +225,7 @@ public sealed class HttpSseTransport
 
     private static string ResolveBaseRoute(McpServerOptions options)
     {
-        var route = string.IsNullOrWhiteSpace(options.HttpSseRoute) ? "/mcp" : options.HttpSseRoute.TrimEnd('/');
+        var route = string.IsNullOrWhiteSpace(options.HttpRoute) ? "/mcp" : options.HttpRoute.TrimEnd('/');
         return string.IsNullOrEmpty(route) ? "/mcp" : route;
     }
 }

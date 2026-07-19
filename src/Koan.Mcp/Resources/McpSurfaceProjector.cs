@@ -102,8 +102,10 @@ public sealed class McpSurfaceProjector
             ["instructions"] = instructions,
             ["transport"] = new JObject
             {
-                ["httpSse"] = options.EnableHttpSseTransport,
-                ["route"] = string.IsNullOrWhiteSpace(options.HttpSseRoute) ? "/mcp" : options.HttpSseRoute.TrimEnd('/'),
+                ["stdio"] = options.EnableStdioTransport,
+                ["streamableHttp"] = options.EnableStreamableHttpTransport,
+                ["legacySse"] = options.EnableLegacySseTransport,
+                ["httpRoute"] = string.IsNullOrWhiteSpace(options.HttpRoute) ? "/mcp" : options.HttpRoute.TrimEnd('/'),
             },
             ["entities"] = entities,
             ["customTools"] = customTools,

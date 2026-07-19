@@ -36,7 +36,7 @@ Explorer projects four related views from MCP's existing registries and executor
 | `POST /mcp/explorer/call` | Invoke a tool in-process as the authenticated caller. |
 | `GET /mcp/access-map.json` | Privileged full requirement map, including walls. |
 
-Static assets live below `/mcp/explorer/`. The base follows `Koan:Mcp:HttpSseRoute`.
+Static assets live below `/mcp/explorer/`. The base follows `Koan:Mcp:HttpRoute`.
 
 ## Production posture
 

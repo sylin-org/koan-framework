@@ -55,15 +55,14 @@ Koan Web, declare the intent in configuration:
 {
   "Koan": {
     "Mcp": {
-      "EnableHttpSseTransport": true,
+      "EnableStreamableHttpTransport": true,
       "Exposure": "Tools"
     }
   }
 }
 ```
 
-The historical option name is retained for compatibility; enabling it selects modern Streamable
-HTTP by default. The deprecated two-endpoint SSE transport remains off unless
+The deprecated two-endpoint SSE transport remains off unless
 `EnableLegacySseTransport` is explicitly enabled.
 
 ## Streamable HTTP

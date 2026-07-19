@@ -12,7 +12,7 @@ builder.Services.AddKoanWeb();
 builder.Services.Configure<McpServerOptions>(o =>
 {
     o.Exposure = McpExposureMode.Full;
-    o.EnableHttpSseTransport = true; // required for /mcp/rpc
+    o.EnableLegacySseTransport = true; // required for /mcp/rpc
 });
 
 var app = builder.Build();

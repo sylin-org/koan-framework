@@ -38,7 +38,7 @@ internal sealed class McpExplorerEndpointContributor : IKoanEndpointContributor
         if (!explorer.Enabled) return;
 
         var mcp = services.GetRequiredService<IOptionsMonitor<McpServerOptions>>().CurrentValue;
-        var baseRoute = string.IsNullOrWhiteSpace(mcp.HttpSseRoute) ? "/mcp" : mcp.HttpSseRoute.TrimEnd('/');
+        var baseRoute = string.IsNullOrWhiteSpace(mcp.HttpRoute) ? "/mcp" : mcp.HttpRoute.TrimEnd('/');
         if (string.IsNullOrEmpty(baseRoute)) baseRoute = "/mcp";
 
         // AI-0037 D-C — the bare GET {baseRoute} (the console) is now owned by the CORE, which content-negotiates and

@@ -107,7 +107,7 @@ public sealed class StreamableHttpTransport
             var created = _sessions.Create(context);
             if (created is null)
             {
-                await WriteStatus(context, StatusCodes.Status429TooManyRequests, "max_connections_exceeded",
+                await WriteStatus(context, StatusCodes.Status429TooManyRequests, "max_sessions_exceeded",
                     "The maximum number of concurrent MCP sessions has been reached.");
                 return;
             }
@@ -196,7 +196,7 @@ public sealed class StreamableHttpTransport
         // STREAM branch — an MCP client explicitly requesting the SSE stream.
         if (explicitEventStream)
         {
-            if (!options.StreamableHttpEnabled)
+            if (!options.EnableStreamableHttpTransport)
             {
                 context.Response.Headers.Allow = "GET, POST, DELETE";
                 await WriteStatus(context, StatusCodes.Status405MethodNotAllowed, "stream_not_offered",
@@ -333,7 +333,7 @@ public sealed class StreamableHttpTransport
     /// response and returns false when a check fails.</summary>
     private async Task<bool> PreflightAsync(HttpContext context, McpServerOptions options)
     {
-        if (!options.StreamableHttpEnabled)
+        if (!options.EnableStreamableHttpTransport)
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return false;
@@ -456,7 +456,7 @@ public sealed class StreamableHttpTransport
 
     private static string ResolveBaseRoute(McpServerOptions options)
     {
-        var route = string.IsNullOrWhiteSpace(options.HttpSseRoute) ? "/mcp" : options.HttpSseRoute.TrimEnd('/');
+        var route = string.IsNullOrWhiteSpace(options.HttpRoute) ? "/mcp" : options.HttpRoute.TrimEnd('/');
         return string.IsNullOrEmpty(route) ? "/mcp" : route;
     }
 

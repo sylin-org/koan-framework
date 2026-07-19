@@ -122,7 +122,7 @@ public sealed class StreamableSessionSpec
     [Fact]
     public void Concurrent_session_cap_is_enforced()
     {
-        var manager = NewManager(o => o.MaxConcurrentConnections = 1);
+        var manager = NewManager(o => o.MaxConcurrentSessions = 1);
         _ = NewSession(manager);
 
         var context = new DefaultHttpContext { RequestServices = new ServiceCollection().BuildServiceProvider() };

@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Koan.Mcp.Execution;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -64,7 +65,7 @@ public sealed class McpCustomToolInvoker
                 break;
         }
 
-        return result is null ? JValue.CreateNull() : JToken.FromObject(result);
+        return McpJson.FromApplicationObject(result);
     }
 
     private static object? BindArgument(McpCustomToolParameter parameter, JObject? arguments)
@@ -75,7 +76,7 @@ public sealed class McpCustomToolInvoker
         {
             try
             {
-                return node.ToObject(parameter.Type);
+                return node.ToObject(parameter.Type, McpJson.CreateApplicationSerializer());
             }
             catch (Exception ex) when (ex is JsonException or FormatException or InvalidCastException or ArgumentException or OverflowException)
             {

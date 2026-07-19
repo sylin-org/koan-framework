@@ -39,4 +39,14 @@ public static class ConformanceTools
         Description = "Performs a scope-protected gadget operation.",
         RequiredScopes = ["gadget:admin"])]
     public static string GadgetAdmin() => "admin";
+
+    [McpTool(Name = "gadget_shape", Description = "Returns a structured gadget result.")]
+    public static GadgetShape GadgetShape(GadgetShape request)
+        => request with { InternalNote = "must-not-cross-the-wire" };
+}
+
+public sealed record GadgetShape(string DisplayName, int ItemCount)
+{
+    [McpIgnore(McpFieldDirection.Output)]
+    public string InternalNote { get; init; } = "";
 }

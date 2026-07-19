@@ -54,6 +54,39 @@ public sealed class WireShapeConformanceSpec : IClassFixture<ConformanceFixture>
         }
     }
 
+    [Fact]
+    public async Task Entity_results_use_the_application_camelCase_contract()
+    {
+        var toolName = _fx.ResolveToolName("gadget", EntityEndpointOperationKind.GetNew);
+        var call = await _fx.CallToolAsync(toolName, null);
+        var payload = JObject.Parse(McpHarnessFixtureBase.ContentText(call) ?? "{}");
+
+        payload.ContainsKey("name").Should().BeTrue();
+        payload.ContainsKey("quantity").Should().BeTrue();
+        payload.ContainsKey("Name").Should().BeFalse();
+        payload.ContainsKey("Quantity").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Custom_tool_inputs_and_results_share_the_application_contract()
+    {
+        var call = await _fx.CallToolAsync("gadget_shape", new JObject
+        {
+            ["request"] = new JObject
+            {
+                ["displayName"] = "Desk lamp",
+                ["itemCount"] = 3
+            }
+        });
+        var payload = JObject.Parse(McpHarnessFixtureBase.ContentText(call) ?? "{}");
+
+        payload["displayName"]?.Value<string>().Should().Be("Desk lamp");
+        payload["itemCount"]?.Value<int>().Should().Be(3);
+        payload.ContainsKey("DisplayName").Should().BeFalse();
+        payload.ContainsKey("InternalNote").Should().BeFalse();
+        payload.ContainsKey("internalNote").Should().BeFalse("[McpIgnore(Output)] applies to custom results too");
+    }
+
     private static void AssertSpecShape(JObject tool)
     {
         tool.ContainsKey("inputSchema").Should().BeTrue("the MCP spec names it inputSchema (camelCase)");

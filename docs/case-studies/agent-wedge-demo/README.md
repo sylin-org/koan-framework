@@ -187,7 +187,7 @@ info| Generated embeddings via adapter ollama (Embed) for model all-minilm
 public sealed class Anime : Entity<Anime> { ... }
 ```
 ```json
-{ "Koan": { "Mcp": { "EnableHttpSseTransport": true } } }
+{ "Koan": { "Mcp": { "EnableStreamableHttpTransport": true } } }
 ```
 
 Now an **agent** (here, a raw MCP client over the Streamable HTTP transport — AI-0037) initializes a

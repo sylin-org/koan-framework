@@ -4,10 +4,10 @@ domain: mcp
 title: "MCP — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-06-20
+last_updated: 2026-07-19
 framework_version: source-first
 validation:
-  date_last_tested: 2026-06-20
+  date_last_tested: 2026-07-19
   status: verified
   scope: docs/reference/cards/mcp.md
 ---
@@ -36,8 +36,8 @@ public sealed class Todo : Entity<Todo>
     public bool IsCompleted { get; set; }
 }
 
-// Program.cs — that's all. (Referencing Koan.Mcp hosts STDIO; referencing Koan.Web + Koan:Mcp:EnableHttpSseTransport
-// adds the HTTP transport — Streamable HTTP by default. No AddKoanMcp() / AddKoanWeb() / MapKoanMcpEndpoints() to call.)
+// Program.cs — that's all. (Referencing Koan.Mcp hosts STDIO; Koan:Mcp:EnableStreamableHttpTransport
+// adds the HTTP edge. No AddKoanMcp() / AddKoanWeb() / MapKoanMcpEndpoints() to call.)
 builder.Services.AddKoan();
 ```
 
@@ -47,7 +47,7 @@ builder.Services.AddKoan();
 
 | Attribute | What it does |
 |---|---|
-| `[McpEntity]` | Mark an entity for MCP exposure; `Name`, `Description`, `AllowMutations`, `Exposure` (`"auto"`/`"code"`/`"tools"`/`"full"`), `EnabledTransports`. Pure exposure — access is the entity's `[Access]` gate (SEC-0004), enforced identically on REST + MCP. |
+| `[McpEntity]` | Mark an entity for MCP exposure; `Name`, `Description`, `AllowMutations`, and `Exposure` (`"auto"`/`"code"`/`"tools"`/`"full"`). Pure exposure — host options choose transports and the entity's `[Access]` gate governs authority identically on REST + MCP. |
 | `[Access]` | The per-action access gate (SEC-0004) — `[Access(read: "anyone", write: "has:scope:posts:write")]`. The MCP edge gates entity tools through THIS (the same gate REST enforces); a walled verb is absent from `tools/list` and denied on call. Custom `[McpTool]` verbs keep `RequiredScopes`. |
 | `[McpTool]` | Expose a public static method as a custom verb (not an entity CRUD op) over the same `tools/list` + `tools/call` surface; `RequiredScopes` gates it. |
 | `[McpDescription("…")]` | Per-property description text surfaced into the generated JSON schema; optional `Operation` scope. |

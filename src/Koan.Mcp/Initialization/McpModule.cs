@@ -19,7 +19,7 @@ public sealed class McpModule : KoanModule
     {
         services.AddMcpServices();
         // WEB-0069: map MCP endpoints via the typed endpoint-contributor seam (replaces KoanWebStartupFilter's
-        // reflection into this assembly). Self-gates on EnableHttpSseTransport.
+        // reflection into this assembly). Self-gates on the explicit HTTP transport switches.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Web.Hosting.IKoanEndpointContributor, McpEndpointContributor>());
     }
 
@@ -38,13 +38,21 @@ public sealed class McpModule : KoanModule
             sourceKey: enableStdio.ResolvedKey,
             usedDefault: enableStdio.UsedDefault);
 
-        var enableHttpSse = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.EnableHttpSseTransport), false);
+        var enableStreamable = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.EnableStreamableHttpTransport), false);
         module.AddSetting(
-            McpProvenanceItems.EnableHttpSseTransport,
-            FromConfigurationValue(enableHttpSse),
-            enableHttpSse.Value,
-            sourceKey: enableHttpSse.ResolvedKey,
-            usedDefault: enableHttpSse.UsedDefault);
+            McpProvenanceItems.EnableStreamableHttpTransport,
+            FromConfigurationValue(enableStreamable),
+            enableStreamable.Value,
+            sourceKey: enableStreamable.ResolvedKey,
+            usedDefault: enableStreamable.UsedDefault);
+
+        var enableLegacy = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.EnableLegacySseTransport), false);
+        module.AddSetting(
+            McpProvenanceItems.EnableLegacySseTransport,
+            FromConfigurationValue(enableLegacy),
+            enableLegacy.Value,
+            sourceKey: enableLegacy.ResolvedKey,
+            usedDefault: enableLegacy.UsedDefault);
 
         var requireAuth = Configuration.ReadWithSource<bool?>(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.RequireAuthentication), null);
         if (!requireAuth.UsedDefault)
@@ -57,11 +65,11 @@ public sealed class McpModule : KoanModule
                 usedDefault: requireAuth.UsedDefault);
         }
 
-        var route = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.HttpSseRoute), "");
+        var route = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.HttpRoute), "");
         if (!string.IsNullOrWhiteSpace(route.Value))
         {
             module.AddSetting(
-                McpProvenanceItems.HttpSseRoute,
+                McpProvenanceItems.HttpRoute,
                 FromConfigurationValue(route),
                 route.Value,
                 sourceKey: route.ResolvedKey,

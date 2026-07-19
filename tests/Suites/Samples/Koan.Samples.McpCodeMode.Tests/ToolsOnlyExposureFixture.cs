@@ -32,7 +32,7 @@ public class ToolsOnlyExposureFixture : TestHostFixtureBase
         services.Configure<McpServerOptions>(o =>
         {
             o.Exposure = McpExposureMode.Tools; // entity tools only
-            o.EnableHttpSseTransport = false;
+            o.EnableStreamableHttpTransport = false;
         });
         services.Configure<CodeModeOptions>(o =>
         {

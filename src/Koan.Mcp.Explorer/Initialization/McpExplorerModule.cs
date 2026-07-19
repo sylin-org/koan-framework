@@ -36,7 +36,7 @@ public sealed class McpExplorerModule : KoanModule
             return;
         }
 
-        var route = configuration["Koan:Mcp:HttpSseRoute"];
+        var route = configuration["Koan:Mcp:HttpRoute"];
         route = string.IsNullOrWhiteSpace(route) ? "/mcp" : route.TrimEnd('/');
         var role = configuration["Koan:Mcp:Explorer:AdminRole"];
         var scope = configuration["Koan:Mcp:Explorer:AdminScope"];

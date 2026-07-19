@@ -21,15 +21,6 @@ namespace Koan.Mcp.Execution;
 
 public sealed class RequestTranslator
 {
-    private static readonly JsonSerializerSettings SerializerSettings = new()
-    {
-        NullValueHandling = NullValueHandling.Ignore,
-        // Honor [McpIgnore] (input-excluded) so caller payloads cannot set hidden fields (mass-assignment guard).
-        ContractResolver = McpContractResolver.Instance
-    };
-
-    private static readonly JsonSerializer EntitySerializer = JsonSerializer.Create(SerializerSettings);
-
     public RequestTranslation Translate(
         IServiceProvider services,
         McpEntityRegistration registration,
@@ -373,14 +364,14 @@ public sealed class RequestTranslator
 
     private static object ConvertEntity(JToken node, Type entityType)
     {
-        try { return node.ToObject(entityType, EntitySerializer) ?? throw new JsonException($"Unable to deserialize payload as {entityType.Name}."); }
+        try { return node.ToObject(entityType, McpJson.CreateApplicationSerializer()) ?? throw new JsonException($"Unable to deserialize payload as {entityType.Name}."); }
         catch (Exception ex) { throw new JsonException($"Unable to deserialize payload as {entityType.Name}: {ex.Message}"); }
     }
 
     private static object ConvertEntityCollection(JToken node, Type entityType)
     {
         var listType = typeof(List<>).MakeGenericType(entityType);
-        try { return node.ToObject(listType, EntitySerializer) ?? throw new JsonException($"Unable to deserialize collection payload as {entityType.Name} list."); }
+        try { return node.ToObject(listType, McpJson.CreateApplicationSerializer()) ?? throw new JsonException($"Unable to deserialize collection payload as {entityType.Name} list."); }
         catch (Exception ex) { throw new JsonException($"Unable to deserialize collection payload as {entityType.Name} list: {ex.Message}"); }
     }
 

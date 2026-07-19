@@ -36,11 +36,7 @@ public sealed class McpServer
         _serverOptions = serverOptions ?? throw new ArgumentNullException(nameof(serverOptions));
     }
 
-    public IReadOnlyList<McpEntityRegistration> GetRegistrationsForStdio()
-        => _registry.RegistrationsForStdio();
-
-    public IReadOnlyList<McpEntityRegistration> GetRegistrationsForHttpSse()
-        => _registry.RegistrationsForHttpSse();
+    internal IReadOnlyList<McpEntityRegistration> Registrations => _registry.Registrations;
 
     public McpRpcHandler CreateHandler()
     {

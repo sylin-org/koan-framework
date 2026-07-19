@@ -52,10 +52,10 @@ public sealed class StdioTransport : BackgroundService
         var options = _optionsMonitor.CurrentValue;
         var transportLogger = _loggerFactory.CreateLogger(options.Transport.LoggerCategory ?? "Koan.Transport.Mcp");
 
-        var registrations = _server.GetRegistrationsForStdio();
+        var registrations = _server.Registrations;
         var globallyEnabled = options.EnableStdioTransport;
 
-        if (!globallyEnabled && registrations.Count == 0)
+        if (!globallyEnabled)
         {
             _logger.LogInformation("MCP STDIO transport disabled via configuration.");
             transportLogger.LogInformation("STDIO transport disabled by configuration.");
@@ -64,19 +64,15 @@ public sealed class StdioTransport : BackgroundService
             return;
         }
 
-        if (registrations.Count == 0)
+        var handler = _server.CreateHandler();
+        var toolCount = (await handler.ListTools(stoppingToken)).Tools.Count;
+        if (toolCount == 0)
         {
-            _logger.LogInformation("No MCP entities opted into STDIO transport. Transport will remain idle.");
-            transportLogger.LogInformation("STDIO transport idle: no registered entities.");
+            _logger.LogInformation("MCP STDIO transport has no exposed tools and will remain idle.");
+            transportLogger.LogInformation("STDIO transport idle: no exposed tools.");
             ResetMetrics();
-            PublishTransportHealth(HealthStatus.Healthy, "STDIO transport idle (no registered entities).", options, 0, 0);
+            PublishTransportHealth(HealthStatus.Healthy, "STDIO transport idle (no exposed tools).", options, registrations.Count, 0);
             return;
-        }
-
-        if (!globallyEnabled)
-        {
-            _logger.LogInformation("STDIO transport globally disabled but {EntityCount} entity/entities opted in; starting limited session.", registrations.Count);
-            transportLogger.LogInformation("STDIO transport limited mode with {EntityCount} entities.", registrations.Count);
         }
 
         Console.SetOut(Console.Error);
@@ -91,7 +87,7 @@ public sealed class StdioTransport : BackgroundService
 
         _sessionCts = linkedCts;
         _entityCount = registrations.Count;
-        _toolCount = registrations.Sum(r => r.Tools.Count);
+        _toolCount = toolCount;
         _startedAtUtc = DateTimeOffset.UtcNow;
         _lastHeartbeatUtc = _startedAtUtc;
 
@@ -104,9 +100,8 @@ public sealed class StdioTransport : BackgroundService
         // AN3 local-trust invariant: STDIO binds the RAW handler with no McpToolAccessPolicy filter, by
         // design. stdin/stdout is the same-machine process owner, so the local caller has full access —
         // there is no remote principal to gate. Enforcement (auth ∩ scopes) is a remote-transport-edge
-        // concern (see HttpSseRpcBridge). Any FUTURE remote transport that reuses this handler MUST wrap it
+        // concern (see McpRpcDispatcher). Any FUTURE remote transport that reuses this handler MUST wrap it
         // with McpToolAccessPolicy; the local-trust assumption is pinned by EnforcementConsolidationSpec.
-        var handler = _server.CreateHandler();
         var runTask = _server.Run(handler, input, output, linkedCts.Token);
         _sessionTask = runTask;
 

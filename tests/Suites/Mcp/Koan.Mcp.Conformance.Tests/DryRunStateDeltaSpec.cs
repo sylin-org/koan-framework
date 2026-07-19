@@ -30,10 +30,9 @@ public sealed class DryRunStateDeltaSpec : IClassFixture<DryRunFixture>
     private static JObject? Diagnostics(JToken call) => call["meta"]?["diagnostics"] as JObject;
     private static JObject? Delta(JToken call) => Diagnostics(call)?["delta"] as JObject;
 
-    // Field names follow the MCP wire convention (PascalCase, DefaultContractResolver) — lower-case them so
-    // the assertions read by data field, not by casing.
+    // Field names follow the shared application camelCase contract.
     private static string[] ChangedFields(JObject delta) =>
-        (delta["changes"] as JArray)?.Select(c => c["field"]!.Value<string>()!.ToLowerInvariant()).ToArray() ?? [];
+        (delta["changes"] as JArray)?.Select(c => c["field"]!.Value<string>()!).ToArray() ?? [];
 
     [Fact]
     public async Task Dry_run_upsert_writes_nothing_but_returns_a_prospective_delta()

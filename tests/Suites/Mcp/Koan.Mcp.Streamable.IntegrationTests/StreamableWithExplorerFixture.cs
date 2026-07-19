@@ -46,10 +46,10 @@ public sealed class StreamableWithExplorerFixture : IAsyncLifetime
                 {
                     s.AddKoan();
                     s.AddKoanWeb();
-                    // EnableHttpSseTransport is the master switch → Streamable mounts by default.
+                    // Streamable HTTP is an explicit host edge.
                     s.Configure<McpServerOptions>(o =>
                     {
-                        o.EnableHttpSseTransport = true;
+                        o.EnableStreamableHttpTransport = true;
                         o.RequireAuthentication = false;
                     });
                     s.Configure<McpExplorerOptions>(o => o.Enabled = true); // the console, co-enabled

@@ -38,7 +38,7 @@ public class TestPipelineFixture : TestHostFixtureBase
         services.Configure<McpServerOptions>(o =>
         {
             o.Exposure = McpExposureMode.Full;
-            o.EnableHttpSseTransport = true;
+            o.EnableStreamableHttpTransport = true;
         });
         // Controllers from test host assembly
         services.AddKoanControllersFrom<TodosController>();

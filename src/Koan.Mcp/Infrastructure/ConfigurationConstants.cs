@@ -7,9 +7,10 @@ internal static class ConfigurationConstants
     public static class Keys
     {
         public const string EnableStdioTransport = nameof(EnableStdioTransport);
-        public const string EnableHttpSseTransport = nameof(EnableHttpSseTransport);
+        public const string EnableStreamableHttpTransport = nameof(EnableStreamableHttpTransport);
+        public const string EnableLegacySseTransport = nameof(EnableLegacySseTransport);
         public const string RequireAuthentication = nameof(RequireAuthentication);
-        public const string HttpSseRoute = nameof(HttpSseRoute);
+        public const string HttpRoute = nameof(HttpRoute);
         public const string PublishCapabilityEndpoint = nameof(PublishCapabilityEndpoint);
         public const string AllowedEntities = nameof(AllowedEntities);
         public const string DeniedEntities = nameof(DeniedEntities);

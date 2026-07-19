@@ -65,4 +65,19 @@ public sealed class StreamableWithExplorerSpec : IClassFixture<StreamableWithExp
         using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(Quick));
         doc.RootElement.GetProperty("error").GetProperty("code").GetInt32().Should().Be(-32000);
     }
+
+    [Fact]
+    public async Task Explorer_map_reports_the_canonical_host_transport_contract()
+    {
+        using var client = _fx.NewClient();
+        var res = await client.GetAsync("/mcp/map.json", Quick);
+
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(Quick));
+        var transport = doc.RootElement.GetProperty("transport");
+        transport.GetProperty("streamableHttp").GetBoolean().Should().BeTrue();
+        transport.GetProperty("legacySse").GetBoolean().Should().BeFalse();
+        transport.GetProperty("httpRoute").GetString().Should().Be("/mcp");
+        transport.TryGetProperty("httpSse", out _).Should().BeFalse();
+    }
 }

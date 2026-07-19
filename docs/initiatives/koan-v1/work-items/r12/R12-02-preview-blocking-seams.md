@@ -36,7 +36,7 @@ the concern does not enter the stated 0.20 guarantee; it does not mean the packa
 | PMCs | Current disposition | 0.20 consequence |
 |---|---|---|
 | 001 | repaired and closed | The framework-owned row is internal with unchanged persistence identity; one public `JobMetrics.Summary(...)` operation replaces the accidental Entity surface. |
-| 002, 004 | repair in R12-02 | MCP needs one canonical transport vocabulary and JSON wire contract, with a deliberate pre-0.20 compatibility decision. |
+| 002, 004 | repaired and closed | Host-level explicit transports replace transitional/per-Entity selection; one camelCase application-payload contract spans Entity, custom tools, and Code Mode. |
 | 003, 028, 032 | close by current evidence | R11-07 built the complete Release solution with zero warnings and ran the SQLite/connector projects; the historical warning and missing-reference premises no longer hold. |
 | 005 | exclude from supported workflow | Linked-worktree release execution is convenience, not the supported clean-checkout release path. |
 | 006, 020 | phase to R12-06 | Live bounded progress and retained aggregate certification evidence belong to the actual publication operator path. |
@@ -198,6 +198,95 @@ one exported operation. Package guidance now teaches that API and explicitly des
 derived and lossy-tolerant. Jobs passes 84/84, Tenancy passes 16/16, and the Jobs Release build has zero
 warnings/errors. No general analyzer was added because the current defect was framework storage leakage,
 not evidence for another public toolchain.
+
+## Third chokepoint exploration — MCP transport and application JSON contract
+
+**Task:** Replace MCP's transitional HTTP/SSE option vocabulary and split application serializers
+with one pre-0.20 host transport contract and one application-payload JSON contract.
+
+**Application intent:** An application chooses which MCP edges the host exposes, chooses one HTTP base
+route and session lifetime, and receives the same camel-case business payload whether a tool is
+entity-derived, hand-written, reached through STDIO, or reached through HTTP.
+
+**Public expression:** Configure `EnableStdioTransport`, `EnableStreamableHttpTransport`, optional
+deprecated `EnableLegacySseTransport`, `HttpRoute`, and `SessionIdleTimeout` under `Koan:Mcp`. Mark a
+business type once with `[McpEntity]` or expose a verb with `[McpTool]`; do not repeat host transport
+choices on every entity.
+
+**Guarantee/correction:** Streamable HTTP remains secure opt-in and legacy SSE remains explicit
+deprecated opt-in. Both share the configured HTTP route and unified sessions. All enabled transports
+project one capability surface and application payloads use camelCase while honoring `[JsonProperty]`
+and directional `[McpIgnore]`. Protocol envelopes retain their protocol-owned names.
+
+**Complete intent surface:** options binding; startup provenance; endpoint contribution; Explorer map
+and route discovery; Streamable and legacy endpoints; session reclamation; capability reporting;
+entity registry; custom-tool binding/results; Entity result/input translation; mutation deltas; Code
+Mode object conversion; package/sample/guide configuration; and exported CLR surface.
+
+**Public concepts:** Standard .NET options and JSON naming only. The host owns three explicit transport
+switches and one HTTP route. `McpTransportMode` and per-entity `EnableStdio`/`EnableHttpSse` controls are
+removed because transport availability is a host decision, not business-model metadata.
+
+**Docs read:** PMC-002/004, R12/R12-01/R12-02, MCP package README/TECHNICAL, the current MCP-over-HTTP,
+OAuth, agent-native, reference-card, sample, and case-study surfaces, plus accepted AI-0037 history.
+Dated decisions, assessment logs, and archives remain history rather than current instructions.
+
+**Code read:** `McpServerOptions`, configuration constants/provenance, endpoint contributor/mapping,
+both HTTP transports, unified session manager, Explorer route owner, capability reporter, surface
+projector, `McpEntityAttribute`/override/registration/registry/server, RPC handler/dispatcher,
+`McpContractResolver`, `McpFieldPolicy`, request/response translators, mutation delta projector,
+custom-tool invoker, Code Mode JSON facade, and focused conformance/Streamable fixtures.
+
+**Reusing:** Keep the existing three transport implementations, one dispatcher, one session manager,
+one entity registry, one access gate, Newtonsoft attributes, and the existing focused real-host suites.
+Make `McpContractResolver` the shared application naming/exclusion policy rather than creating another
+serializer framework.
+
+**Creating new:** No public abstraction or compatibility layer. Add only golden wire assertions and
+binding/provenance assertions at existing focused test owners; an internal serializer helper is allowed
+only if it removes duplicated settings from the real payload paths.
+
+**Coalescence:** Remove the transitional master-plus-nullable-override pair and old SSE-derived route
+and timeout names. Remove per-model transport selection rather than renaming it: the host edge is the
+single transport chokepoint, while the shared registry/gate owns tool visibility. Keep legacy SSE as a
+thin opt-in transport, not a second capability model. Keep protocol-envelope serialization separate
+from application-payload serialization because the MCP specification owns the former.
+
+**Ergonomics:** A remote host says `EnableStreamableHttpTransport: true`; changing `/mcp` is
+`HttpRoute`; session cleanup is `SessionIdleTimeout`. A tool author writes ordinary PascalCase C# and
+clients see idiomatic camelCase JSON everywhere without annotations or transport-specific decoration.
+
+**Constraints satisfied:** current defect and consumer evidence justify the break before 0.20; fewer
+public moving parts; standard options/JSON concepts; one host transport owner and one payload policy;
+no cross-module contract; focused tests only; no remote or private application access.
+
+**Risks:** This deliberately breaks old pre-preview option/property names and removes public
+per-entity transport flags. Configuration examples, Explorer discovery, provenance, and fixtures must
+move atomically. Camel-casing can drift schemas, deltas, nested custom results, or Code Mode unless the
+same resolver owns them. Legacy wire framing and MCP protocol DTO casing must remain byte/spec stable.
+
+## Third slice outcome
+
+PMC-002 and PMC-004 are closed as one boundary correction. A host now makes three explicit transport
+decisions: STDIO, Streamable HTTP, and deprecated legacy SSE. `HttpRoute`, `MaxConcurrentSessions`,
+and `SessionIdleTimeout` describe the shared HTTP/session core without lying about the primary
+transport. The transitional master switch, nullable override, derived state, `McpTransportMode`, and
+per-Entity transport flags are gone; custom-tool-only hosts are no longer rejected merely because
+their registry contains no Entity. Startup provenance, Explorer projection, capability reporting,
+samples, and current guidance use the same vocabulary.
+
+`McpContractResolver` now owns camelCase plus directional `[McpIgnore]` for application data.
+Entity schemas/inputs/results, custom-tool inputs/results, mutation deltas, and Code Mode reuse it;
+JSON-RPC/MCP protocol DTOs retain their explicitly named protocol shape. Golden fixtures prove both
+Entity and nested custom-tool payloads, canonical option binding, removed aliases, provenance,
+capability reporting, Explorer projection, and field exclusion. Focused Release evidence passes MCP
+conformance 80/80, Streamable plus legacy HTTP 19/19, field exclusion 5/5, Code Mode 27/27, and the
+source FirstUse/GoldenJourney consumer boundary 3/3, and bootstrap pillars 13/13. The MCP Release build
+has zero warnings/errors; public docs pass 233/42 and docs lint has zero errors.
+
+The next dependency-ordered exploration is the current Data/Web filter and portable model-identity
+boundary (PMC-007/015). Current provider convergence must be audited before choosing repair or
+narrowing; no historical drop-filter premise is assumed current.
 
 ## Stop conditions
 

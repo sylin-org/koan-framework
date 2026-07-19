@@ -23,25 +23,32 @@ internal static class McpProvenanceItems
         DefaultValue: BoolString(Defaults.EnableStdioTransport),
         DefaultConsumers: TransportConsumers);
 
-    internal static readonly ProvenanceItem EnableHttpSseTransport = new(
-        ConfigurationConstants.FullKey(ConfigurationConstants.Keys.EnableHttpSseTransport),
-        "Enable HTTP + SSE Transport",
-        "Hosts the HTTP + Server-Sent Events MCP transport.",
-        DefaultValue: BoolString(Defaults.EnableHttpSseTransport),
+    internal static readonly ProvenanceItem EnableStreamableHttpTransport = new(
+        ConfigurationConstants.FullKey(ConfigurationConstants.Keys.EnableStreamableHttpTransport),
+        "Enable Streamable HTTP Transport",
+        "Hosts the MCP Streamable HTTP transport.",
+        DefaultValue: BoolString(Defaults.EnableStreamableHttpTransport),
+        DefaultConsumers: TransportConsumers);
+
+    internal static readonly ProvenanceItem EnableLegacySseTransport = new(
+        ConfigurationConstants.FullKey(ConfigurationConstants.Keys.EnableLegacySseTransport),
+        "Enable Legacy SSE Transport",
+        "Hosts the deprecated MCP HTTP/SSE compatibility transport.",
+        DefaultValue: BoolString(Defaults.EnableLegacySseTransport),
         DefaultConsumers: TransportConsumers);
 
     internal static readonly ProvenanceItem RequireAuthentication = new(
         ConfigurationConstants.FullKey(ConfigurationConstants.Keys.RequireAuthentication),
         "Require Authentication",
-        "Gates HTTP + SSE transport endpoints behind authentication.",
+        "Gates MCP HTTP endpoints behind authentication.",
         DefaultValue: BoolString(Defaults.RequireAuthentication),
         DefaultConsumers: TransportConsumers);
 
-    internal static readonly ProvenanceItem HttpSseRoute = new(
-        ConfigurationConstants.FullKey(ConfigurationConstants.Keys.HttpSseRoute),
-        "HTTP + SSE Route",
-        "Base route for MCP HTTP + SSE endpoints.",
-        DefaultValue: Defaults.HttpSseRoute,
+    internal static readonly ProvenanceItem HttpRoute = new(
+        ConfigurationConstants.FullKey(ConfigurationConstants.Keys.HttpRoute),
+        "HTTP Route",
+        "Base route for MCP HTTP endpoints.",
+        DefaultValue: Defaults.HttpRoute,
         DefaultConsumers: RoutingConsumers);
 
     internal static readonly ProvenanceItem PublishCapabilityEndpoint = new(

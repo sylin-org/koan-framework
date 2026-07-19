@@ -54,7 +54,7 @@ internal static class McpServiceRegistration
         services.AddHostedService(sp => sp.GetRequiredService<McpSessionManager>());
         services.TryAddSingleton<StreamableHttpTransport>();
         services.TryAddSingleton<HttpSseTransport>();
-        services.TryAddSingleton<IMcpCapabilityReporter, HttpSseCapabilityReporter>();
+        services.TryAddSingleton<IMcpCapabilityReporter, McpCapabilityReporter>();
 
         services.AddCors();
 

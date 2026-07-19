@@ -32,7 +32,7 @@ public class CodeModeDisabledFixture : TestHostFixtureBase
         services.Configure<McpServerOptions>(o =>
         {
             o.Exposure = McpExposureMode.Full;
-            o.EnableHttpSseTransport = false;
+            o.EnableStreamableHttpTransport = false;
         });
         services.Configure<CodeModeOptions>(o =>
         {

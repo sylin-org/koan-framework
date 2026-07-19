@@ -23,11 +23,11 @@ public class McpFieldExclusionSpec : IClassFixture<FieldExclusionFixture>
         var modelProps = (JObject?)schema["properties"]?["model"]?["properties"];
         modelProps.Should().NotBeNull("the upsert schema describes the entity model");
 
-        modelProps!.ContainsKey("Name").Should().BeTrue();
-        modelProps.ContainsKey("WriteOnlyToken").Should().BeTrue("output-only exclusion still allows input");
+        modelProps!.ContainsKey("name").Should().BeTrue();
+        modelProps.ContainsKey("writeOnlyToken").Should().BeTrue("output-only exclusion still allows input");
 
-        modelProps.ContainsKey("InternalSecret").Should().BeFalse("[McpIgnore] hides it from input");
-        modelProps.ContainsKey("ServerOwned").Should().BeFalse("[McpIgnore(Input)] hides it from input");
+        modelProps.ContainsKey("internalSecret").Should().BeFalse("[McpIgnore] hides it from input");
+        modelProps.ContainsKey("serverOwned").Should().BeFalse("[McpIgnore(Input)] hides it from input");
     }
 
     [Fact(DisplayName = "Tool results omit output-excluded fields, keep the rest")]
@@ -64,10 +64,10 @@ public class McpFieldExclusionSpec : IClassFixture<FieldExclusionFixture>
     {
         var model = new JObject
         {
-            ["Name"] = "upsert-public",
-            ["InternalSecret"] = "UPSERT-INTERNAL",
-            ["ServerOwned"] = "UPSERT-SERVER",
-            ["WriteOnlyToken"] = "UPSERT-WRITEONLY"
+            ["name"] = "upsert-public",
+            ["internalSecret"] = "UPSERT-INTERNAL",
+            ["serverOwned"] = "UPSERT-SERVER",
+            ["writeOnlyToken"] = "UPSERT-WRITEONLY"
         };
 
         var upsert = await _fx.CallToolAsync("catalog-item.upsert", new JObject { ["model"] = model });
@@ -106,10 +106,10 @@ public class McpFieldExclusionSpec : IClassFixture<FieldExclusionFixture>
         var http = _fx.CreateClient();
         var body = new JObject
         {
-            ["Name"] = name,
-            ["InternalSecret"] = internalSecret,
-            ["ServerOwned"] = serverOwned,
-            ["WriteOnlyToken"] = writeOnlyToken
+            ["name"] = name,
+            ["internalSecret"] = internalSecret,
+            ["serverOwned"] = serverOwned,
+            ["writeOnlyToken"] = writeOnlyToken
         }.ToString();
 
         using var content = new StringContent(body, Encoding.UTF8, "application/json");
@@ -126,5 +126,5 @@ public class McpFieldExclusionSpec : IClassFixture<FieldExclusionFixture>
         => callResult["content"]?[0]?["text"]?.Value<string>();
 
     private static string? FindId(JToken entity)
-        => entity["id"]?.Value<string>() ?? entity["Id"]?.Value<string>();
+        => entity["id"]?.Value<string>();
 }

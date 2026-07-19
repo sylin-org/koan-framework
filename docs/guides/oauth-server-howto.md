@@ -141,7 +141,7 @@ With `Koan:Mcp:RequireAuthentication=true`, the MCP HTTP edge (Streamable HTTP b
 
 ```jsonc
 "Koan": { "Mcp": {
-  "EnableHttpSseTransport": true,
+  "EnableStreamableHttpTransport": true,
   "RequireAuthentication": true,
   "ResourceUri": "https://app.example.com/mcp"   // canonical aud — see below
 } }
