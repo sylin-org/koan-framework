@@ -124,17 +124,17 @@ The workflow has six explicit jobs:
 1. `prepare_prior` has read-only contents permission and inspects or reconstructs proof for the prior
    exact version wave.
 2. `stage_prior` has contents write permission and stages only prior escrow.
-3. `promote_prior` has OIDC permission but exchanges identity only after prepared escrow is rechecked,
-   then converges the prior wave.
+3. `promote_prior` receives the repository API key only after prepared escrow is rechecked, then
+   converges the prior wave.
 4. `prove_current` has read-only contents permission and compiles, tests, packs, and bundles current
    exact inputs.
 5. `stage_current` has contents write permission to persist the exact lineage candidate and stage the
    current draft escrow.
-6. `promote_current` has OIDC permission but exchanges identity only after prepared current escrow is
-   rechecked, then promotes the current wave.
+6. `promote_current` receives the repository API key only after prepared current escrow is rechecked,
+   then promotes the current wave.
 
-Build, test, pack, and clean-room proof never receive `contents:write` or `id-token:write`. Staging
-never receives an OIDC credential. Promotion jobs consume the previously built coordinator and exact
+Build, test, pack, and clean-room proof never receive `contents:write` or `NUGET_API_KEY`. Staging
+never receives the credential. Promotion jobs consume the previously built coordinator and exact
 handoff; they do not restore, compile, test, or rebuild source.
 
 ## Clean room
@@ -166,8 +166,8 @@ historical custody evidence and is not reopened because the registry is later un
 
 The local implementation, adversarial simulations, and least-privilege workflow contracts are
 complete. No real NuGet publication or immutable GitHub Release was observed in this implementation
-cycle. Immutable Releases and NuGet trusted publishing are one-time repository prerequisites for the
-separately authorized first public wave.
+cycle. Immutable Releases and the existing publish-scoped `NUGET_API_KEY` repository secret are
+one-time prerequisites for the separately authorized first public wave.
 
 Completion schema 1 is a durable byte contract. Before adding or reordering receipt fields, introduce
 schema-dispatched readers and a frozen golden schema-1 fixture so an older immutable Release remains

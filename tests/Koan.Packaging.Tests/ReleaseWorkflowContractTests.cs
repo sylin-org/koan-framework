@@ -75,8 +75,8 @@ public sealed class ReleaseWorkflowContractTests
         AssertReadOnly(proveCurrent);
         AssertContentsWriterWithoutOidc(stagePrior);
         AssertContentsWriterWithoutOidc(stageCurrent);
-        AssertPublisher(promotePrior);
-        AssertPublisher(promoteCurrent);
+        AssertApiKeyPublisher(promotePrior);
+        AssertApiKeyPublisher(promoteCurrent);
 
         Assert.Contains("needs: prepare_prior", stagePrior, StringComparison.Ordinal);
         Assert.Contains("- prepare_prior\n      - stage_prior", promotePrior, StringComparison.Ordinal);
@@ -123,15 +123,18 @@ public sealed class ReleaseWorkflowContractTests
         Assert.Contains("uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9", workflow, StringComparison.Ordinal);
         Assert.Contains("uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02", workflow, StringComparison.Ordinal);
         Assert.Contains("uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093", workflow, StringComparison.Ordinal);
-        Assert.Contains("uses: NuGet/login@ebc737b6fc418a6ca0073cf116ec8dc156d8b81e", workflow, StringComparison.Ordinal);
         Assert.Contains("global-json-file: global.json", workflow, StringComparison.Ordinal);
         Assert.Contains("git status --porcelain --untracked-files=no", workflow, StringComparison.Ordinal);
-        Assert.Equal(2, Regex.Matches(workflow, "uses: NuGet/login@", RegexOptions.CultureInvariant).Count);
+        Assert.Equal(2, Regex.Matches(
+            workflow,
+            @"NUGET_API_KEY: \$\{\{ secrets\.NUGET_API_KEY \}\}",
+            RegexOptions.CultureInvariant).Count);
+        Assert.DoesNotContain("uses: NuGet/login@", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("NUGET_USER", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("uses: actions/checkout@v", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("uses: actions/setup-dotnet@v", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("uses: actions/upload-artifact@v", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("uses: actions/download-artifact@v", workflow, StringComparison.Ordinal);
-        Assert.DoesNotContain("uses: NuGet/login@v", workflow, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -223,7 +226,7 @@ public sealed class ReleaseWorkflowContractTests
     }
 
     [Fact]
-    public void PromotionProvesPreparedEscrowBeforeCredentialExchange()
+    public void PromotionProvesPreparedEscrowBeforeApiKeyUse()
     {
         var workflow = ReadWorkflow();
         var promotePrior = JobBlock(workflow, ExpectedReleaseJobs, "promote_prior");
@@ -231,19 +234,17 @@ public sealed class ReleaseWorkflowContractTests
 
         AssertPromotionGate(
             promotePrior,
-            "- name: Require prepared prior escrow before credential exchange",
-            "- name: Exchange GitHub identity for prior-wave NuGet credential",
+            "- name: Require prepared prior escrow before promotion",
             "- name: Promote exact prior release wave");
         AssertPromotionGate(
             promoteCurrent,
-            "- name: Require prepared current escrow before credential exchange",
-            "- name: Exchange GitHub identity for current-wave NuGet credential",
+            "- name: Require prepared current escrow before promotion",
             "- name: Promote exact current release wave");
 
-        Assert.Equal(3, Regex.Matches(
+        Assert.Single(Regex.Matches(
             promoteCurrent,
             "if: steps.gate.outputs.needs-promotion == 'true'",
-            RegexOptions.CultureInvariant).Count);
+            RegexOptions.CultureInvariant).Cast<Match>());
         Assert.Equal(3, Regex.Matches(
             promotePrior,
             "if: needs.prepare_prior.outputs.prior-needs-promote == 'true'",
@@ -288,13 +289,17 @@ public sealed class ReleaseWorkflowContractTests
         AssertPrivilegedJobDoesNotBuildOrTest(job);
     }
 
-    private static void AssertPublisher(string job)
+    private static void AssertApiKeyPublisher(string job)
     {
         Assert.Contains(
-            "permissions:\n      actions: read\n      contents: write\n      id-token: write",
+            "permissions:\n      actions: read\n      contents: write",
             job,
             StringComparison.Ordinal);
-        Assert.Contains("NuGet/login@ebc737b6fc418a6ca0073cf116ec8dc156d8b81e", job, StringComparison.Ordinal);
+        Assert.DoesNotContain("id-token: write", job, StringComparison.Ordinal);
+        Assert.Contains("NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}", job, StringComparison.Ordinal);
+        Assert.Contains("Repository secret NUGET_API_KEY is required for NuGet promotion.", job, StringComparison.Ordinal);
+        Assert.DoesNotContain("NUGET_USER", job, StringComparison.Ordinal);
+        Assert.DoesNotContain("NuGet/login@", job, StringComparison.Ordinal);
         AssertPrivilegedJobDoesNotBuildOrTest(job);
     }
 
@@ -312,7 +317,6 @@ public sealed class ReleaseWorkflowContractTests
     private static void AssertPromotionGate(
         string job,
         string gateStep,
-        string credentialStep,
         string promotionStep)
     {
         AssertOrdered(job,
@@ -320,10 +324,11 @@ public sealed class ReleaseWorkflowContractTests
             "& dotnet $tool wave-inspect",
             "if ($inspection.state -eq 'prepared')",
             "elseif ($inspection.state -eq 'published')",
-            credentialStep,
-            "uses: NuGet/login@ebc737b6fc418a6ca0073cf116ec8dc156d8b81e",
-            promotionStep);
-        Assert.Contains("must be prepared before credential exchange", job, StringComparison.Ordinal);
+            promotionStep,
+            "NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}",
+            "if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY))",
+            "& dotnet $tool wave-promote");
+        Assert.Contains("must be prepared before promotion", job, StringComparison.Ordinal);
     }
 
     private static string ReadWorkflow() => File.ReadAllText(Path.Combine(

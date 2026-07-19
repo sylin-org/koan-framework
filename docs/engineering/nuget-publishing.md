@@ -9,20 +9,19 @@ them without routine operator input.
 
 Before the first authorized public wave:
 
-1. Configure [nuget.org trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing)
-   for this repository and `release-on-dev.yml`.
-2. Set the repository Actions variable `NUGET_USER` to the nuget.org package owner. GitHub OIDC then
-   produces a short-lived API key; no committed or long-lived publishing secret is used.
-3. Enable immutable Releases for the GitHub repository. The workflow token cannot read the
+1. Verify that the repository Actions secret `NUGET_API_KEY` contains the established nuget.org
+   publish credential. Scope it to package publication, rotate it through the normal maintainer
+   process, and never print or copy its value into workflow inputs or logs.
+2. Enable immutable Releases for the GitHub repository. The workflow token cannot read the
    administration-level repository setting, so this is an explicit one-time prerequisite. Promotion
    accepts terminal success only when GitHub reports the published Release as immutable.
-4. Protect `dev`, the release workflow, and `automation/package-lineage-dev` according to the
+3. Protect `dev`, the release workflow, and `automation/package-lineage-dev` according to the
    repository's release trust policy. Workflow code and immutable Release custody are the attestation
    boundary.
 
-If trusted publishing is absent, `NUGET_USER` is empty, the exact draft is not prepared, or the final
-Release is mutable, the workflow fails red. Do not introduce a long-lived API key or mutable evidence
-as a workaround.
+If `NUGET_API_KEY` is absent, the exact draft is not prepared, or the final Release is mutable, the
+workflow fails red. Do not expose the key to proof/staging jobs or introduce mutable evidence as a
+workaround.
 
 This implementation cycle completed local failure simulations and workflow contract tests, but did
 not perform a real NuGet publication or observe a real immutable Release. The first public run remains
@@ -36,14 +35,15 @@ The workflow separates proof, GitHub mutation, and credential use into six jobs:
 | --- | --- | --- |
 | `prepare_prior` | contents read | Serialize the event; inspect, materialize, and prove any incomplete prior version wave. |
 | `stage_prior` | contents write | Stage only the exact prior bundle and marker on its draft Release. |
-| `promote_prior` | contents write + OIDC | Recheck prepared prior escrow, request a short-lived credential, and converge the prior wave. |
+| `promote_prior` | contents write + step-scoped API key | Recheck prepared prior escrow, then converge the prior wave from exact custody. |
 | `prove_current` | contents read | Compile lineage, run the release ratchet, pack, clean-room test, and build current escrow. |
 | `stage_current` | contents write | Persist the exact lineage candidate and stage the exact current draft escrow. |
-| `promote_current` | contents write + OIDC | Recheck prepared current escrow, request a short-lived credential, and converge the current wave. |
+| `promote_current` | contents write + step-scoped API key | Recheck prepared current escrow, then converge the current wave from exact custody. |
 
-Build/test/pack work has neither `contents:write` nor `id-token:write`. Staging has no OIDC
-credential. Promotion consumes the previously built coordinator and handoff; it does not restore,
-compile, test, or rebuild source.
+Build/test/pack work has neither `contents:write` nor `NUGET_API_KEY`. Staging has no NuGet
+credential. Only the promotion step receives the secret, after the prepared-state gate. Promotion
+consumes the previously built coordinator and handoff; it does not restore, compile, test, or rebuild
+source.
 
 ## What happens
 
@@ -64,8 +64,8 @@ compile, test, or rebuild source.
    package count, version commit, and `release/dev/<full-VersionCommit>`.
 6. `stage_current` persists the exact lineage commit, creates one draft GitHub Release, uploads the
    ZIP first, and uploads the marker last. The uploaded marker becomes authority and is never replaced.
-7. After a second prepared-state check, OIDC supplies the NuGet credential. Promotion follows manifest
-   dependency order, pushes a missing nupkg, always replays each required exact snupkg with
+7. After a second prepared-state check, the promotion step receives `NUGET_API_KEY`. Promotion follows
+   manifest dependency order, pushes a missing nupkg, always replays each required exact snupkg with
    duplicate-safe semantics, and waits until every nupkg is visible.
 8. One deterministic `release-completion.json` binds the prepared marker, bundle, lineage, manifest,
    and package/symbol hashes. Promotion re-reads the complete draft, creates or verifies the
@@ -129,10 +129,11 @@ package unlisting does not reinterpret that completed wave.
 Retry after the registry recovers. If the push succeeded before the timeout, the next attempt observes
 the nupkg, skips repushing it, replays exact symbols, and waits again.
 
-### Trusted-publishing exchange fails
+### NuGet API key is absent or rejected
 
-Verify that the nuget.org policy names this repository/workflow and `NUGET_USER` names its owner. Do
-not add a long-lived key.
+Verify the `NUGET_API_KEY` repository Actions secret and its nuget.org publish scope without printing
+the value. Rotate the secret through the established maintainer process if nuget.org has revoked or
+expired it; do not weaken escrow checks or pass the key to another job.
 
 ### Published Release is not immutable
 

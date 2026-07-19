@@ -124,9 +124,9 @@ promote. The standalone command can still encode an empty manifest for local ins
 
 `wave-inspect`, `wave-stage`, and `wave-promote` are protected-workflow boundaries, not routine local
 release instructions. `wave-stage` mutates GitHub escrow. After prepared escrow is rechecked, the
-promotion job exchanges trusted identity for a short-lived NuGet credential and supplies it to
-`wave-promote`. Use them only in the protected workflow or an explicitly authorized disposable
-rehearsal.
+promotion step receives the existing repository `NUGET_API_KEY` and supplies it to `wave-promote`.
+Proof and staging never receive that key. Use these commands only in the protected workflow or an
+explicitly authorized disposable rehearsal.
 
 Every packed package must contain its declared package-owned README and the canonical `icon.png` bytes;
 the verifier rejects presentation metadata that points at absent or divergent payloads.
@@ -139,5 +139,5 @@ dependencies equal the evaluated project graph and that every selected dependenc
 selected identity.
 
 The implementation and failure simulations are complete locally, but this cycle has not observed a
-real NuGet publication or immutable GitHub Release. Enable immutable Releases and trusted publishing
-before the separately authorized first public wave.
+real NuGet publication or immutable GitHub Release. Verify immutable Releases and the existing
+publish-scoped `NUGET_API_KEY` repository secret before the separately authorized first public wave.

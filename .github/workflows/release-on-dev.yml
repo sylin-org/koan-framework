@@ -253,7 +253,6 @@ jobs:
     permissions:
       actions: read
       contents: write
-      id-token: write
     steps:
       - name: Setup exact promotion runtime
         if: needs.prepare_prior.outputs.prior-needs-promote == 'true'
@@ -268,7 +267,7 @@ jobs:
           name: koan-prior-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/prior
 
-      - name: Require prepared prior escrow before credential exchange
+      - name: Require prepared prior escrow before promotion
         if: needs.prepare_prior.outputs.prior-needs-promote == 'true'
         id: gate
         shell: pwsh
@@ -300,25 +299,8 @@ jobs:
             'needs-promotion=false' | Out-File $env:GITHUB_OUTPUT -Append
           }
           else {
-            throw "Prior release wave must be prepared before credential exchange; found '$($inspection.state)'."
+            throw "Prior release wave must be prepared before promotion; found '$($inspection.state)'."
           }
-
-      - name: Require trusted-publishing identity for prior wave
-        if: steps.gate.outputs.needs-promotion == 'true'
-        shell: pwsh
-        env:
-          NUGET_USER: ${{ vars.NUGET_USER }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:NUGET_USER)) {
-            throw 'Repository variable NUGET_USER must name the nuget.org trusted-publishing owner.'
-          }
-
-      - name: Exchange GitHub identity for prior-wave NuGet credential
-        if: steps.gate.outputs.needs-promotion == 'true'
-        id: nuget-login
-        uses: NuGet/login@ebc737b6fc418a6ca0073cf116ec8dc156d8b81e # v1
-        with:
-          user: ${{ vars.NUGET_USER }}
 
       - name: Promote exact prior release wave
         if: steps.gate.outputs.needs-promotion == 'true'
@@ -326,9 +308,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
           VERSION_COMMIT: ${{ needs.prepare_prior.outputs.previous-lineage }}
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
+            throw 'Repository secret NUGET_API_KEY is required for NuGet promotion.'
+          }
           $tool = (Resolve-Path 'artifacts/prior/tool/Koan.Packaging.dll').Path
           $scratch = Join-Path $env:RUNNER_TEMP "koan-promote-prior-$($env:GITHUB_RUN_ID)-$($env:GITHUB_RUN_ATTEMPT)"
           git init $scratch
@@ -704,7 +689,6 @@ jobs:
     permissions:
       actions: read
       contents: write
-      id-token: write
     steps:
       - name: Setup exact promotion runtime
         if: needs.prove_current.outputs.needs-promote == 'true'
@@ -719,7 +703,7 @@ jobs:
           name: koan-current-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/current
 
-      - name: Require prepared current escrow before credential exchange
+      - name: Require prepared current escrow before promotion
         if: needs.prove_current.outputs.needs-promote == 'true'
         id: gate
         shell: pwsh
@@ -751,25 +735,8 @@ jobs:
             'needs-promotion=false' | Out-File $env:GITHUB_OUTPUT -Append
           }
           else {
-            throw "Current release wave must be prepared before credential exchange; found '$($inspection.state)'."
+            throw "Current release wave must be prepared before promotion; found '$($inspection.state)'."
           }
-
-      - name: Require trusted-publishing identity for current wave
-        if: steps.gate.outputs.needs-promotion == 'true'
-        shell: pwsh
-        env:
-          NUGET_USER: ${{ vars.NUGET_USER }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:NUGET_USER)) {
-            throw 'Repository variable NUGET_USER must name the nuget.org trusted-publishing owner.'
-          }
-
-      - name: Exchange GitHub identity for current-wave NuGet credential
-        if: steps.gate.outputs.needs-promotion == 'true'
-        id: nuget-login
-        uses: NuGet/login@ebc737b6fc418a6ca0073cf116ec8dc156d8b81e # v1
-        with:
-          user: ${{ vars.NUGET_USER }}
 
       - name: Promote exact current release wave
         if: steps.gate.outputs.needs-promotion == 'true'
@@ -777,9 +744,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
           VERSION_COMMIT: ${{ needs.prove_current.outputs.version-commit }}
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
+            throw 'Repository secret NUGET_API_KEY is required for NuGet promotion.'
+          }
           $tool = (Resolve-Path 'artifacts/current/tool/Koan.Packaging.dll').Path
           $scratch = Join-Path $env:RUNNER_TEMP "koan-promote-current-$($env:GITHUB_RUN_ID)-$($env:GITHUB_RUN_ATTEMPT)"
           git init $scratch

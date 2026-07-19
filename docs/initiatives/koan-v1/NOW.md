@@ -118,10 +118,11 @@ bounded process-exit observation so GoldenJourney can prove fail-fast startup tr
 ## Current repository state
 
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
-- Branch: `dev`; R11 completion is `3f7ca5186`, followed by R08-05 repairs `5aeabb2a6` and `844449dd8`, then this
-  evidence-only closeout. Verify exact HEAD and ahead/behind counts before continuing.
+- Branch: `dev`; R11 completion is `3f7ca5186`, followed by R08-05 repairs `5aeabb2a6` and `844449dd8`,
+  local-candidate closeout `e40cd4525`, API-key architecture amendment `5c346082c`, and the current
+  focused workflow wiring. Verify exact HEAD and ahead/behind counts before continuing.
 - `tmp/` is untracked certification/evaluator/artifact material and must never be staged.
-- The tracked worktree is expected clean after this R08-05 local-evidence closeout commit.
+- The tracked worktree is expected clean after this R08-05 API-key workflow commit.
 
 ## Resume here
 
@@ -129,8 +130,8 @@ bounded process-exit observation so GoldenJourney can prove fail-fast startup tr
    [R08-05](work-items/r08/R08-05-initial-public-observation.md).
 2. R08-05 remains `pending explicit remote-operation authorization`; local evidence is not authorization.
 3. Immediately before any separately authorized public operation, refresh source/privacy/docs status and the exact
-   candidate because this evidence-only closeout follows the proved source commit.
-4. Stop before trusted-publishing setup, repository/branch/environment settings, push/merge, tag, GitHub Release,
+   candidate because workflow/documentation commits follow the proved package source.
+4. Stop before repository-secret or repository/branch/environment settings, push/merge, tag, GitHub Release,
    NuGet publication, deployment, or any remote mutation unless the user explicitly authorizes that named operation.
 
 ## Do not redo

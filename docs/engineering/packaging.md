@@ -4,7 +4,7 @@ domain: engineering
 title: "NuGet packaging policy"
 audience: [developers, maintainers, ai-agents]
 status: current
-last_updated: 2026-07-16
+last_updated: 2026-07-19
 framework_version: v0.17.0
 validation:
   status: tested
@@ -27,9 +27,10 @@ validation:
   deterministic release-wave escrow.
 - **Proof**: the canonical public-release green ratchet, advisory enforcement, package inspection, internal dependency
   closure, and package-only FirstUse and GoldenJourney execution outside the checkout.
-- **Publication**: draft GitHub Release escrow first; trusted GitHub OIDC identity only after prepared
-  proof; ordered nupkg push and exact symbol replay; registry visibility waits; one completion receipt;
-  then the immutable Release at `release/dev/<full-VersionCommit>`.
+- **Publication**: draft GitHub Release escrow first; the existing repository `NUGET_API_KEY` only in
+  the promotion step after prepared proof; ordered nupkg push and exact symbol replay; registry
+  visibility waits; one completion receipt; then the immutable Release at
+  `release/dev/<full-VersionCommit>`.
 
 The implementation is [Koan.Packaging](../../tools/Koan.Packaging/README.md); the governing decision
 is [ARCH-0110](../decisions/ARCH-0110-dev-release-compiler.md).
@@ -150,10 +151,11 @@ Every event reconciles the prior version wave before compiling the current one. 
 without exact prepared escrow is a hard block, not permission to rebuild. An empty manifest creates no
 bundle, draft, tag, or completion receipt.
 
-The six workflow permission boundaries are `prepare_prior` (read), `stage_prior` (contents write),
-`promote_prior` (contents write plus OIDC), `prove_current` (read), `stage_current` (contents write),
-and `promote_current` (contents write plus OIDC). Proof jobs never receive publish permissions;
-staging jobs never receive credentials; promotion jobs never rebuild source.
+The six workflow authority boundaries are `prepare_prior` (read), `stage_prior` (contents write),
+`promote_prior` (contents write plus step-scoped API key), `prove_current` (read), `stage_current`
+(contents write), and `promote_current` (contents write plus step-scoped API key). Proof jobs never
+receive publish permissions or the key; staging jobs never receive credentials; promotion jobs never
+rebuild source.
 
 ## Adding a package
 
@@ -192,8 +194,8 @@ project and do not run a stamping script.
 
 The mechanism and failure simulations are implemented and focused tests are green. This cycle has not
 observed a real NuGet publication or immutable GitHub Release. Before the separately authorized first
-public wave, enable immutable Releases and configure trusted publishing plus `NUGET_USER` as described
-in [NuGet publishing](nuget-publishing.md).
+public wave, verify immutable Releases and the existing publish-scoped `NUGET_API_KEY` repository
+secret as described in [NuGet publishing](nuget-publishing.md).
 
 ## Related
 

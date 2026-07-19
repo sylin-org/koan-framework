@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-19
   status: pending
-  scope: exact 93-package local candidate and readiness contract; no remote configuration or publication performed
+  scope: exact 93-package local candidate and API-key promotion contract; no remote configuration or publication performed
 ---
 
 # R08-05 — Observe the initial coherent public wave
@@ -53,8 +53,8 @@ intent from logs.
 
 Before explicit authorization, all work is read-only or local. Stop before any of the following:
 
-- creating or changing the nuget.org trusted-publishing policy;
-- setting `NUGET_USER` or changing GitHub repository/branch/environment settings;
+- creating, replacing, or deleting the `NUGET_API_KEY` repository Actions secret;
+- changing GitHub repository/branch/environment settings;
 - enabling immutable Releases;
 - pushing or merging to `dev` or `automation/package-lineage-dev`;
 - creating, editing, publishing, or deleting a GitHub Release or tag;
@@ -163,31 +163,88 @@ decision and the compiler retains one evaluated package grammar.
 ARCH-0110, the packaging policy, and the tool README must describe the current-owner bootstrap. No
 runtime API, constant, option, DTO, module, HTTP route, data access, or application concept is added.
 
+### 2026-07-19 API-key promotion checkpoint
+
+**Task:** Retain the established NuGet API-key process while connecting it correctly to the current
+independent per-project versioning, prepared-escrow, and promotion workflow.
+
+**Application intent:** A maintainer advances `dev`; the release compiler derives every selected
+project and version, while the existing repository secret authorizes only promotion of the exact
+prepared artifacts.
+
+**Public expression:** The operator surface is one reviewed `dev` advancement plus the pre-existing
+repository Actions secret `NUGET_API_KEY`. The operator supplies no package list, version, ordering, or
+recovery input.
+
+**Guarantee/correction:** Missing credentials fail the promotion step before `wave-promote` and before
+any package push. The prepared-escrow inspection remains an earlier step. Source selection, per-owner
+lineage, manifest identity, hashes, publication order, retry, and recovery remain unchanged.
+
+**Complete intent surface:** Maintainers provision and rotate the existing publish credential through
+the standard GitHub Actions secret surface. `NUGET_USER`, a trusted-publishing policy, and an OIDC token
+exchange are not part of this process.
+
+**Public concepts:** No application concept is added. The only operator-facing credential concept is
+the conventional repository Actions secret `NUGET_API_KEY`.
+
+**Docs read:** `docs/engineering/index.md` keeps controlled release proof local until explicit remote
+authorization; `docs/architecture/principles.md` favors standard platform concepts and one current
+path; `docs/engineering/packaging.md`, `docs/engineering/nuget-publishing.md`, ARCH-0110, and this card
+own the release and trust contract.
+
+**Code read:** `.github/workflows/release-on-dev.yml` currently exchanges OIDC only in the two
+promotion jobs; `Program.cs` already defaults `wave-promote` to `NUGET_API_KEY`;
+`NuGetPackagePromotionTarget` already performs exact hash verification, ordered NuGet push, retry,
+visibility checks, and credential redaction; workflow and promotion-target tests own the focused
+contract.
+
+**Reusing:** The six existing workflow boundaries, prepared-escrow gates, `wave-promote`,
+`NuGetPackagePromotionTarget`, `NUGET_API_KEY`, and the existing release workflow contract tests.
+
+**Creating new:** None. The workflow, focused contract tests, and current release documentation are
+edited in place; no service, option, DTO, command, publishing mechanism, or secret name is introduced.
+
+**Coalescence:** `NuGetPackagePromotionTarget` remains the sole publication mechanism and the two
+promotion steps remain the sole credential boundary. Remove the parallel OIDC login ceremony and pass
+the established secret directly to those steps only.
+
+**Ergonomics:** Maintainers keep the credential process they already operate. Package selection and
+per-project versions stay automatic, proof/staging jobs never receive the key, and a missing secret
+produces one direct correction without exposing its value.
+
+**Constraints satisfied:** The change uses standard GitHub Actions secrets and the existing .NET/NuGet
+publisher. It neither changes package identity nor reruns the release ratchet, and it performs no remote
+configuration, push, tag, Release, or publication.
+
+**Risks:** An API key is long-lived, so maintainers must scope it to publishing, protect and rotate it,
+and never print or copy it. Local proof can verify the credential boundary and redaction but cannot
+verify that the remote secret exists. Immutable GitHub Releases remain a separate prerequisite.
+
 | Gate | Required evidence | Stop condition |
 |---|---|---|
 | source boundary | intended changes reviewed; privacy gate and changed-doc lint green; no scratch/evaluator material | source contains private downstream identity, unintended files, or unexplained generated drift |
 | release mechanics | focused workflow-contract, lineage, planner, package, template, escrow, and recovery tests green | any test requires weakening fail-closed behavior or choosing packages manually |
 | exact candidate | canonical clean-room pack proves the selected closure, both templates, FirstUse, and GoldenJourney | source/version commit mismatch, package incoherence, audit failure, or application proof failure |
 | startup truth | package-only probes reject the PMC-029 Communication-composition and health-registry collection failures while retaining truthful elections/guarantees | successful business work reports either false collection failure |
-| trust settings plan | exact repository, owner, workflow filename, lineage branch, and protection changes are written down before mutation | setup identity is ambiguous or asks for a long-lived API key |
+| trust settings plan | exact repository, secret name, lineage branch, and protection changes are written down before mutation | setup is ambiguous, exposes the key, or grants broader than package-publish scope |
 | recovery posture | maintainer has the failure map in `nuget-publishing.md`; no per-package recovery procedure is introduced | proposed recovery rebuilds published identity, replaces prepared evidence, or moves a tag |
 
 The complete public-release ratchet runs once at this boundary. It is not repeated after every focused repair.
 
-## One-time trust prerequisites — authorized remote setup
+## One-time publishing prerequisites — authorized remote setup
 
 After explicit authorization and before advancing `dev`:
 
-1. Configure nuget.org trusted publishing for the exact GitHub repository and
-   `.github/workflows/release-on-dev.yml`.
-2. Set the repository Actions variable `NUGET_USER` to the matching nuget.org owner.
-3. Enable immutable GitHub Releases.
-4. Protect `dev`, `automation/package-lineage-dev`, and the release workflow according to the recorded
-   release trust policy; ordinary proof jobs must retain no write or OIDC permission.
-5. Re-read the effective remote settings. If any prerequisite cannot be positively observed, stop before
+1. Verify that the existing repository Actions secret `NUGET_API_KEY` holds a publish-scoped nuget.org
+   credential without exposing its value. Create or rotate it only under separate explicit authorization.
+2. Enable immutable GitHub Releases.
+3. Protect `dev`, `automation/package-lineage-dev`, and the release workflow according to the recorded
+   release trust policy; proof and staging jobs must not receive the NuGet key.
+4. Re-read the effective remote settings. If any prerequisite cannot be positively observed, stop before
    advancing `dev`; do not test trust by publishing a sacrificial package.
 
-No long-lived NuGet key is created or stored.
+The API key is stored only as the repository Actions secret and is supplied only to a promotion step
+after prepared escrow has been rechecked.
 
 ## One trigger
 
@@ -211,8 +268,8 @@ Observe the six permission boundaries as one state machine:
 3. `prove_current` compiles exact lineage, runs the release ratchet once, packs the selected closure, and
    produces package-only template/FirstUse/GoldenJourney evidence.
 4. `stage_current` persists the exact lineage candidate and uploads bundle before marker.
-5. `promote_current` exchanges OIDC only after prepared escrow, converges packages/symbols, creates the
-   full-commit tag, publishes the same draft, and requires immutable terminal state.
+5. `promote_current` receives `NUGET_API_KEY` only after prepared escrow, converges packages/symbols,
+   creates the full-commit tag, publishes the same draft, and requires immutable terminal state.
 
 Do not cancel a slow valid run merely because long package output is buffered. Investigate only after the
 bounded job timeout, an explicit failure, or contradictory external state.
@@ -244,7 +301,7 @@ maintained ledger.
 | prepared marker exists | never replace marker or bundle; resume from exact escrow |
 | package push/visibility/response is uncertain | rerun or let the next event reconcile; skip visible nupkgs and replay exact symbols |
 | public package exists without prepared escrow | stop all later waves and review; never rebuild beneath that identity |
-| trusted-publishing exchange fails | correct the exact policy/owner mapping; never add a long-lived key |
+| NuGet API key is missing or rejected | verify or rotate the repository secret without printing it; preserve the prepared escrow and do not broaden credential access |
 | published Release is mutable | treat the wave as failed, stop later publication, and review repository settings; do not move tag or create a substitute Release |
 | package-only startup repeats PMC-029 | do not call the public baseline coherent; preserve evidence and repair through ARCH-0119's owner |
 
@@ -261,6 +318,10 @@ maintained ledger.
 
 - R08-01 proves release-wave failure/recovery mechanics locally, including exact binary custody and six
   least-privilege workflow boundaries.
+- The established API-key process is now wired directly into the current release compiler: only the
+  two exact promotion steps receive `secrets.NUGET_API_KEY`, after the prepared-escrow gate. OIDC login,
+  `NUGET_USER`, and `id-token:write` are absent. Focused workflow/promotion-target evidence passes 14/14,
+  including exact hash guards, retry, symbol replay, and credential redaction.
 - R08-04's historical 108-package candidate proved the package-first gate before R11 graduation. The
   current graph is now 93 active packages; the historical count is not current release evidence.
 - ARCH-0119 repairs the console lifecycle root behind PMC-029; focused source-equivalent evidence is green.
