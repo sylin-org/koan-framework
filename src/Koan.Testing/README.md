@@ -1,13 +1,15 @@
-# Koan.Testing
+# Sylin.Koan.Testing
 
 **Your application inherits a test suite.** Reference this package from an xUnit v3 test project,
 subclass `EntityConformanceSpecs<TEntity>` once per Entity, and implement one business-valid factory
 method. Koan supplies the common persistence and capability batteries through the real application
 composition path.
 
-Reference it as part of one coherent Koan package version set. Repository development uses the
-project at `src/Koan.Testing`; public package-set readiness is tracked separately from this module's
-runtime contract.
+## Install
+
+```powershell
+dotnet add package Sylin.Koan.Testing
+```
 
 ## Choose it when
 
@@ -19,7 +21,7 @@ runtime contract.
 Use `Koan.Testing.Hosting` when you need a custom compiled-composition host without inherited batteries. Use
 `Koan.Testing.Containers` for adapter development against reusable real backing-store fixtures.
 
-## Add one class per Entity
+## Meaningful result: add one class per Entity
 
 ```csharp
 using Koan.Testing;
@@ -44,8 +46,8 @@ That class inherits six batteries:
 Cache and embedding batteries skip when the Entity does not declare those traits. Query pushdown
 skips when the selected adapter does not declare the required capability.
 
-Override `Mutate(TEntity)` only when a conformance extension needs a valid changed Entity. Override
-`Configure(IDictionary<string, string?>)` to select an adapter or supply test configuration.
+Override `Configure(IDictionary<string, string?>)` only to select an adapter or supply test
+configuration. `NewValid()` is the complete Entity extension surface.
 
 ## Host isolation is automatic
 
@@ -58,15 +60,14 @@ This contract isolates Koan host/provider selection, Entity partitions, and temp
 suite that deliberately points multiple classes at the same external database, queue, container, or
 other shared resource still owns that resource's scheduling policy.
 
-## Backing stores and skips
+## Backing stores and failures
 
-Each battery uses an isolated temporary root and a unique Entity partition. The default configuration
-supports Docker-free file adapters; override `Configure` to select `inmemory` or provide a reachable
-external adapter.
+Each battery uses an isolated temporary root and a unique Entity partition. Override `Configure` to
+select `inmemory` for a Docker-free run or to provide a real external adapter.
 
-The initial reachability probe converts an unreachable backing store into a native xUnit skip for the
-battery. Once the store is reachable, conformance failures remain loud. A skip is absence of evidence,
-not evidence that the provider conforms.
+Only missing capabilities and absent model traits skip their inapplicable batteries. Host startup,
+composition, provider access, and Entity-operation failures retain their original exception and fail
+the test. A missing database is not evidence that its provider conforms.
 
 ## Limits
 

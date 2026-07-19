@@ -4,11 +4,11 @@
   "summary": {
     "packages": 93,
     "repairRequired": 2,
-    "reviewRequired": 10,
-    "structurallyReady": 81,
+    "reviewRequired": 7,
+    "structurallyReady": 84,
     "ownedReadmes": 91,
     "technicalCompanions": 86,
-    "findings": 40
+    "findings": 31
   },
   "findingDefinitions": [
     {
@@ -1598,7 +1598,7 @@
       "projectPath": "src/Koan.Testing/Koan.Testing.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Koan conformance kit \u2014 your app inherits a test suite. Subclass EntityConformanceSpecs\u003CT\u003E (one method per entity); trait-gated batteries run round-trip, pushdown-vs-reference-oracle, paging, partition isolation, caching and embedding conformance automatically.",
       "targetFrameworks": [
         "net10.0"
@@ -1612,18 +1612,14 @@
       "readme": "src/Koan.Testing/README.md",
       "technicalDocumentation": "src/Koan.Testing/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Testing.Containers",
       "projectPath": "src/Koan.Testing.Containers/Koan.Testing.Containers.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Koan test harness \u2014 xUnit v3 Testcontainers fixtures (KoanContainerFixture / KoanDataSpec) for engine-backed integration tests.",
       "targetFrameworks": [
         "net10.0"
@@ -1636,18 +1632,14 @@
       "readme": "src/Koan.Testing.Containers/README.md",
       "technicalDocumentation": "src/Koan.Testing.Containers/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.install.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Testing.Hosting",
       "projectPath": "src/Koan.Testing.Hosting/Koan.Testing.Hosting.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Koan test harness \u2014 the AddKoan() integration host (KoanIntegrationHost), xUnit-agnostic. Boot a real compiled Koan composition in your app\u0027s tests.",
       "targetFrameworks": [
         "net10.0"
@@ -1656,11 +1648,7 @@
       "readme": "src/Koan.Testing.Hosting/README.md",
       "technicalDocumentation": "src/Koan.Testing.Hosting/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Web",

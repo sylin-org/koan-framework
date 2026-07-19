@@ -110,7 +110,8 @@ For data-adapter suites, derive from `KoanDataSpec<TFixture>` instead of hand-wi
 1. Create `Suites/<Domain>/<Scope>/<ProjectName>/` (mirror the `src/` path of the module under test).
 2. Reference `src/Koan.Testing.Hosting` (for `KoanIntegrationHost`) and, when you need a real
    backing store, `src/Koan.Testing.Containers` (for the fixtures + `KoanDataSpec`). Do **not**
-   reference the retired `Koan.Testing` shim.
+   reference `Koan.Testing` merely as a transitive harness; that package is the separate
+   application-facing `EntityConformanceSpecs<TEntity>` product.
 3. Adopt the xUnit-v3 csproj shape above and add the `DisableTestParallelization` assembly attribute.
 4. Keep specs under `Specs/<Feature>/`.
 

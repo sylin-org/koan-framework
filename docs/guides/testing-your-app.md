@@ -4,10 +4,10 @@ domain: engineering
 title: "Testing Your App — Conformance Kits"
 audience: [developers, architects]
 status: current
-last_updated: 2026-07-15
+last_updated: 2026-07-19
 framework_version: source-first
 validation:
-  date_last_tested: 2026-07-15
+  date_last_tested: 2026-07-19
   status: verified
   scope: EntityConformanceSpecs batteries + KoanDataSpec host ownership guidance
 ---
@@ -42,8 +42,6 @@ public sealed class AnimeConformance : EntityConformanceSpecs<Anime>
 | `Cacheable_invalidates_on_delete` | a delete is never served from a stale cache | `[Cacheable]` |
 | `Embedding_does_not_break_the_save_path` | declaring `[Embedding]` never blocks the write | `[Embedding]` |
 
-There is a second, optional hook — `protected override TEntity Mutate(TEntity e)` — and nothing else.
-
 ## Two rules
 
 1. **Let Koan own host isolation.** Each battery binds static `Entity<T>` operations to its own real
@@ -51,10 +49,10 @@ There is a second, optional hook — `protected override TEntity Mutate(TEntity 
    scheduling; no assembly-level parallelization switch is required. If tests deliberately share one
    external database, queue, or container, coordinate that resource explicitly.
 
-2. **Provide a backing store (or let it skip).** Each battery boots its own isolated host with temp
-   storage for the file adapters (json, sqlite). If your entity's adapter needs a container that isn't
-   running, the batteries **skip cleanly** rather than fail. Force a no-container adapter for a
-   Docker-free run:
+2. **Provide the backing store you intend to prove.** Each battery boots its own isolated host with
+   temp storage settings for the file adapters (json, sqlite). Host composition, provider access, and
+   Entity-operation failures remain test failures; only an inapplicable capability or model trait
+   skips its battery. Force a no-container adapter for a Docker-free run:
 
    ```csharp
    protected override void Configure(IDictionary<string, string?> settings)
@@ -87,6 +85,8 @@ contract and the framework's contract can never drift.
   on every entity without needing to know your schema; richer per-property cases are yours to add.
 - `Cacheable`/`Embedding` batteries gate on the class attribute and skip when absent; the embedding
   battery is a save-path smoke check (full vector-sync assertion needs a running vector store).
+- A configured external provider must be reachable. Use `Koan.Testing.Containers` when the test should
+  own that infrastructure and expose an explicit availability skip.
 - Conformance runs are correctness-first (one host boot per battery), not a performance benchmark.
 
 ## See also

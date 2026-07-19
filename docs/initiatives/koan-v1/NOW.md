@@ -9,7 +9,7 @@ framework_version: source-first
 validation:
   date_last_tested: 2026-07-19
   status: tested
-  scope: R11-05 Security Trust graduation and focused issuer/bearer/consumer/package proof
+  scope: R11-05 Testing family graduation and focused conformance/host/provider/package proof
 ---
 
 # Koan V1 reorganization current handoff
@@ -23,17 +23,34 @@ Replace this file at every handoff. It is a restart point, not a diary.
   R11-07 release-certification boundary.
 - Foundation, package identity, templates, Storage, Cache, Redis, relational/Data providers, Vector, AI, MCP, Web,
   Media, OpenGraph, Identity, Tenancy, Classification, Canon, RabbitMQ, Web request context/Data Access, Data
-  Backup/SoftDelete, Jobs, Observability, and Security Trust have completed their current R11 family work. The bespoke
-  Orchestration CLI and Aspire families are now shelved beyond V1 without package retirement.
-- The evaluated V1 graph is 93 packages and 26 claims. Generated package quality is 2 repair-required, 10
-  review-required, and 81 structurally ready.
+  Backup/SoftDelete, Jobs, Observability, Security Trust, and Testing have completed their current R11 family work. The
+  bespoke Orchestration CLI and Aspire families are now shelved beyond V1 without package retirement.
+- The evaluated V1 graph is 93 packages and 26 claims. Generated package quality is 2 repair-required, 7
+  review-required, and 84 structurally ready.
 
 The accepted architecture remains business intent first: fewer meaningful moving parts, Entity-first application
 language, references express capability intent, `AddKoan()` compiles host-owned decisions, pillars own meaning and
 runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive only
 when genuinely inert and independently consumed.
 
-## Most recent completed slice: Security Trust
+## Most recent completed slice: Testing, Containers, and Hosting
+
+The testing product remains three deliberately meaningful packages. `Sylin.Koan.Testing.Hosting` is the xUnit-free
+real generic-host seam used across framework generations. `Sylin.Koan.Testing` is the lightweight application-facing
+Entity conformance kit. `Sylin.Koan.Testing.Containers` is the optional provider-fixture layer and keeps its five
+heavy Testcontainers engines out of every conformance project. The broad consumer graph proves all three boundaries;
+merging would reduce package count while increasing accidental dependencies.
+
+The conformance surface is now exactly one `NewValid()` method plus an optional configuration override. Its unused
+`Mutate` hook is gone. More importantly, a catch-all reachability probe no longer turns broken composition, provider
+configuration, or Entity behavior into a green skip. Only an absent capability or model trait skips its inapplicable
+battery; application conformance failures stay loud. Explicit provider fixtures retain their own concrete
+infrastructure-availability skip and diagnostic reason.
+
+All three packages now own exact-ID, install-first README/TECHNICAL companions and are structurally ready. Generated
+quality is 2 repair / 7 review / 84 ready without changing the 93-package / 26-claim graph.
+
+## Previous completed slice: Security Trust
 
 `Sylin.Koan.Security.Trust` remains the one lower-level workload-token and ambient request-identity pillar. Its
 package reference plus `AddKoan()` now activates the non-default `Koan.bearer` scheme directly; Web Auth no longer
@@ -90,26 +107,25 @@ Invalid booleans, sample rates, and endpoints reject boot with the exact correct
 disabled, or Production without a package-owned endpoint creates no providers. Startup/provenance/composition facts
 explain active state, signals, wildcard boundary, and exporter kind without exposing endpoint or headers.
 
-## Focused proof for Security Trust
+## Focused proof for Testing
 
-- Trust unit evidence: 22/22; real-host Trust/Web Auth pipeline: 12/12; Auth Server: 50/50; focused MCP auth: 2/2;
-  real `AddKoan()` bootstrap: 1/1.
-- Trust, Web Auth, Auth Server, and MCP Release builds: zero warnings/errors.
-- Trust Release pack: nupkg/snupkg produced; the nupkg contains DLL/XML, owned README, icon, and build-transitive
-  props with the expected Core/JWT dependencies and ES256 description.
-- Evaluated inventory: 93 active package projects. Generated product truth remains 26 claims and now includes Trust
-  under verified authentication/authorization.
-- Generated package quality: 2 repair / 10 review / 81 structurally ready; Trust has no finding.
+- Conformance: 13 passed / 3 intentional trait skips; Docker-free in-memory provider: 56/56; failed-start async host
+  disposal: 1/1.
+- Testing, Containers, and Hosting Release builds: zero warnings/errors.
+- All three Release packs produced nupkg/snupkg artifacts. Archive inspection confirms DLL/XML, owned README, icon,
+  build-transitive props, exact identities, and expected dependency boundaries.
+- Evaluated inventory: 93 active package projects and 26 claims. Generated quality is 2 repair / 7 review / 84 ready;
+  all three testing packages have no finding.
 - Strict API/full-site DocFX succeeds, the public documentation truth gate passes 224 current files and 42 navigation
-  targets, and the broad linter reports no errors (pre-existing front-matter warnings remain non-gating).
+  targets, and the broad linter reports no errors (1,621 pre-existing front-matter/TOC warnings remain non-gating).
 - No full release ratchet, unrelated family suite, private downstream inspection, push, publication, tag, release,
   deployment, or remote mutation ran.
 
 ## Current repository state
 
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
-- Branch: `dev`; the Security Trust graduation commit is expected to be the current local HEAD. The branch is expected
-  to be 154 commits ahead of `origin/dev` and 0 behind; verify exact HEAD.
+- Branch: `dev`; the Testing family graduation commit is expected to be the current local HEAD. The branch is expected
+  to be 155 commits ahead of `origin/dev` and 0 behind; verify exact HEAD.
 - `tmp/` remains untracked scratch/evaluator/artifact material and must never be staged.
 - No push, publication, tag, release, deployment, remote mutation, private downstream inspection, or full release
   certification occurred.
@@ -118,15 +134,14 @@ explain active state, signals, wildcard boundary, and exporter kind without expo
 
 1. Verify `git status`, HEAD, and the focused evidence recorded in
    [R11-05](work-items/r11/R11-05-package-family-graduation.md).
-2. Continue R11-05 with fresh exploration of the Testing, Containers, and Hosting family, the next unresolved package
-   group. Both Orchestration shelves are outside V1; do not graduate, retire, polish, or re-inject them without a new
-   explicit scope decision.
+2. Continue R11-05 with fresh exploration of `Sylin.Koan.Web.Admin`, the next unresolved package. Both Orchestration
+   shelves are outside V1; do not graduate, retire, polish, or re-inject them without a new explicit scope decision.
 3. Preserve the contributor mandate for context-aware Web behavior, but do not force persistent Entity semantics or
    operational work into Web contributors merely because contributors are the correct request-context chokepoint.
 
 ## Remaining temporary dispositions
 
-Testing, Containers, and Hosting; Web Admin; and ZenGarden still require terminal R11-02 decisions.
+Web Admin and ZenGarden still require terminal R11-02 decisions.
 
 ## Do not redo
 
@@ -140,6 +155,8 @@ Testing, Containers, and Hosting; Web Admin; and ZenGarden still require termina
 - Do not restore Trust's shared-secret issuer, parallel asymmetric interface/base class, trust modes, insecure escape
   flag, Web Auth-owned bearer registration, or claim fleet enrollment/federation/revocation without implemented
   consumer evidence.
+- Do not merge the three Testing packages without new consumer/dependency evidence, restore the unused conformance
+  mutation hook, or classify arbitrary host/provider/Entity failures as infrastructure skips.
 - Do not move the shelved Orchestration CLI family back into `src/`/`Koan.sln`, restore manifest-generator injection,
   or treat its preserved source as a V1 package promise without a new explicit scope decision.
 - Do not move the shelved Aspire family back into `src/`/`Koan.sln`, restore contributor discovery or provider

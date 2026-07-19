@@ -1,12 +1,14 @@
-# Koan.Testing.Containers
+# Sylin.Koan.Testing.Containers
 
 Use this package for xUnit v3 integration specs that must exercise a Koan data adapter against its
 real backing store. It supplies shared Testcontainers fixtures, Docker-free fixtures for the
 in-memory/file adapters, and `KoanDataSpec<TFixture>` for the common compiled-host workflow.
 
-Reference it as part of one coherent Koan package version set. Repository development uses the
-project at `src/Koan.Testing.Containers`; public package-set readiness is tracked separately from
-this module's runtime contract.
+## Install
+
+```powershell
+dotnet add package Sylin.Koan.Testing.Containers
+```
 
 ## Choose it when
 
@@ -33,7 +35,7 @@ using Xunit;
 [assembly: AssemblyFixture(typeof(PostgresFixture))]
 ```
 
-## Write a data spec
+## Meaningful result: write a data spec
 
 ```csharp
 public sealed class TodoSpec(PostgresFixture fixture, ITestOutputHelper output)

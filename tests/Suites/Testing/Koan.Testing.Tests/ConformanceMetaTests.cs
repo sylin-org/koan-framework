@@ -36,6 +36,14 @@ public class ConformanceBatteriesHaveTeeth
         protected override BrokenWidget NewValid() => new() { Id = "duplicate-id", Name = "x" };
     }
 
+    private sealed class MissingProviderConformance : Koan.Testing.EntityConformanceSpecs<FakeWidget>
+    {
+        protected override FakeWidget NewValid() => new() { Name = "missing-provider" };
+
+        protected override void Configure(IDictionary<string, string?> settings)
+            => settings["Koan:Data:Sources:Default:Adapter"] = "provider-that-does-not-exist";
+    }
+
     [Fact]
     public async Task Paging_battery_fails_when_rows_are_lost()
     {
@@ -48,6 +56,25 @@ public class ConformanceBatteriesHaveTeeth
             Func<Task> battery = spec.Paging_returns_every_row_exactly_once;
             await battery.Should().ThrowAsync<Exception>(
                 "the Paging battery must catch a row-count violation, proving it has teeth");
+        }
+        finally
+        {
+            await ((IAsyncLifetime)spec).DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Provider_failure_is_not_reclassified_as_an_infrastructure_skip()
+    {
+        var spec = new MissingProviderConformance();
+        await ((IAsyncLifetime)spec).InitializeAsync();
+        try
+        {
+            var exception = await Record.ExceptionAsync(spec.RoundTrip_persists_and_reads_back_by_id);
+
+            exception.Should().NotBeNull("an unknown configured provider is a conformance failure");
+            exception!.GetType().FullName.Should().NotContain("Skip",
+                "composition and provider defects must remain visible instead of producing a green suite");
         }
         finally
         {

@@ -135,9 +135,9 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Templates` | `template` | `keep` |
 | `Sylin.Koan.Tenancy` | `capability` | `keep` |
 | `Sylin.Koan.Tenancy.Web` | `projection` | `keep` |
-| `Sylin.Koan.Testing` | `capability` | `assess` |
-| `Sylin.Koan.Testing.Containers` | `capability` | `assess` |
-| `Sylin.Koan.Testing.Hosting` | `capability` | `assess` |
+| `Sylin.Koan.Testing` | `capability` | `keep` (implemented) |
+| `Sylin.Koan.Testing.Containers` | `capability` | `keep` (implemented) |
+| `Sylin.Koan.Testing.Hosting` | `capability` | `keep` (implemented) |
 | `Sylin.Koan.Web` | `capability` | `keep` |
 | `Sylin.Koan.Web.Admin` | `projection` | `assess` |
 | `Sylin.Koan.Web.Auth` | `projection` | `keep` |
@@ -386,6 +386,18 @@ Observability is a functional leaf rather than a framework-wide default: package
 out of the application graph, while package presence states the telemetry intent. Production without a Koan OTLP
 endpoint remains deliberately inactive; collector delivery, backend retention/query, log export, and application
 instrumentation remain outside the package guarantee.
+
+## Testing family disposition
+
+| Package | Disposition | Distinct reference intent and implemented boundary work |
+|---|---|---|
+| `Sylin.Koan.Testing.Hosting` | `keep` (implemented) | Framework-neutral real generic-host construction and async ownership. It has no xUnit dependency and is independently consumed by fenced xUnit v2 and current xUnit v3 suites; absorbing it would recreate the assembly-version collision the boundary prevents. |
+| `Sylin.Koan.Testing` | `keep` (implemented) | Lightweight application Entity conformance through one subclass and `NewValid()` factory. The unused `Mutate` hook and catch-all provider-unavailability skip are removed; only absent capabilities or traits skip, while composition/provider defects retain their original failure. |
+| `Sylin.Koan.Testing.Containers` | `keep` (implemented) | Optional xUnit v3 provider-test fixtures, real `AddKoan()` host boot, and partition isolation across five Testcontainers modules plus equivalent daemon-free engines. Its heavy provider dependencies stay out of ordinary conformance projects; the unified fixture grammar is exercised by 65 derived provider specs. |
+
+The three identities are user-intent and dependency boundaries, not a layered contracts taxonomy: inherit common
+behavior, boot a host, or own provider infrastructure. Merging the family would reduce the package count while
+increasing accidental dependencies and erasing the xUnit-neutral seam.
 
 ## Acceptance
 

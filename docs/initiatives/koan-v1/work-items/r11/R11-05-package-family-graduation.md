@@ -4949,6 +4949,109 @@ chokepoint before materially changing Trust's public promise.
   private downstream inspection, push, publication, tag, release, deployment, or remote mutation occurred. Pack
   artifacts remain under untracked `tmp/` and must not be staged.
 
+## Testing family architecture checkpoint
+
+**Task:** Graduate the three testing packages as a deliberately layered test product, preserving the one standard
+generic-host chokepoint while removing conformance behavior that can turn a real application defect into a false
+skip.
+
+**Application intent:** An application author can inherit Koan's common Entity contract in one class; a framework or
+adapter author can boot the same compiled `AddKoan()` composition as an application; and a provider suite can opt into
+one reusable real-infrastructure fixture without inventing host, availability, or partition mechanics.
+
+**Public expression:** An application conformance project references `Sylin.Koan.Testing` and writes one xUnit class:
+
+```csharp
+public sealed class OrderConformance : EntityConformanceSpecs<Order>
+{
+    protected override Order NewValid() => new() { Number = "A-100" };
+}
+```
+
+Code that only needs a real host references `Sylin.Koan.Testing.Hosting` and uses the standard host lifecycle through
+`KoanIntegrationHost.Configure()`. Provider suites reference `Sylin.Koan.Testing.Containers`, take the applicable
+xUnit fixture, derive from `KoanDataSpec<TFixture>`, and dispose each returned host with `await using`.
+
+**Guarantee and correction:** Every host path uses a real `IHost`, in-memory configuration, the caller's explicit
+service registrations, and async lifecycle disposal. Conformance batteries bind Entity operations to the host they
+created. A missing capability or absent model trait skips only the battery that is inapplicable. Host startup,
+composition, provider access, and Entity-operation failures are test failures with their original exception; they are
+not reclassified by a catch-all as "backing store unavailable." An application that deliberately wants a Docker-free
+conformance run selects the in-memory adapter explicitly. Provider fixtures retain their separate, concrete
+infrastructure-availability skip and reason.
+
+**Complete intent surface and public concepts:** `KoanIntegrationHost`/`IntegrationHost` express generic-host setup
+and ownership; `EntityConformanceSpecs<TEntity>` plus `NewValid()` express the application contract;
+`KoanContainerFixture`, the nine concrete engine fixtures, and `KoanDataSpec<TFixture>` express provider-test
+lifecycle, host boot, and partition isolation. The unused `Mutate(TEntity)` hook expresses no current battery or user
+decision and leaves the public surface. There is no test pipeline DSL, fixture registry, seed context, custom runner,
+automatic local-service guessing, or Koan-owned container runtime.
+
+**Docs read:** `CLAUDE.md` and the current architecture principles require standard .NET concepts and meaningful
+package boundaries; `docs/engineering/test-authoring.md` and `tests/README.md` define the three validation rings and
+real-host/provider-fixture canon; ARCH-0079 establishes integration composition as the proof of Reference = Intent;
+ARCH-0091 replaces the bespoke test DSL with xUnit v3 and Testcontainers modules. TEST-0001's proposed pipeline,
+fixture registry, diagnostics DSL, and parallel guarantee are dated history superseded by current source,
+ARCH-0091, and the current engineering guide. TEST-0002 is migration history, not a current package contract.
+
+**Code and consumer graph read:** `KoanIntegrationHost` is one xUnit-free source file and has 38 direct test-project
+references and 62 source-file consumers. `Koan.Testing.Containers` has 17 direct test-project references and 65
+derived `KoanDataSpec` specs across real and daemon-free providers. `Koan.Testing` has the application conformance
+type, its focused meta/ownership suite, and a real sample consumer. The complete source of all nine fixtures,
+`KoanDataSpec`, conformance batteries, host wrapper, current package companions, focused tests, and solution entries
+was read. Baseline evidence is 12 passed / 3 applicable skips for conformance, 56/56 for the in-memory provider lane,
+and 1/1 for failed-start async disposal. The known PMC-032 stale test reference warning remains unrelated.
+
+**Reusing:** standard `HostBuilder`, `IHost`, `IAsyncDisposable`, `IAsyncLifetime`, xUnit v3 fixtures/skips/output,
+Testcontainers module builders, `AppHost.PushScope`, and `EntityContext.Partition` already own the required mechanics.
+No new runtime contract, contributor, registry, runner, options object, DTO, or constants class is required.
+
+**Coalescence and topology:** keep all three packages. `Sylin.Koan.Testing.Hosting` is a genuine framework-neutral
+boundary shared by xUnit v2-fenced and xUnit v3 consumers. `Sylin.Koan.Testing` is the lightweight application-facing
+xUnit conformance product. `Sylin.Koan.Testing.Containers` is the optional provider-test layer and isolates five
+heavy Testcontainers engine dependencies from every conformance consumer; its daemon-free fixtures intentionally
+provide the same provider-spec shape for the local engines. Absorbing Hosting would create an xUnit assembly conflict;
+absorbing Containers would make Docker engine clients an accidental dependency of the four-line conformance journey.
+The package count therefore reflects three real user intents and costs, not borrowed vocabulary. Disposition: `keep`
+all three; delete only the unused conformance hook and fail-open catch path.
+
+**Ergonomics:** a human or coding model chooses by test intent: inherit a contract, boot a host, or exercise a
+provider. Infrastructure absence is explicit only at the provider-fixture boundary. A broken `AddKoan()` composition,
+wrong provider configuration, or faulty query can no longer produce a green suite by masquerading as missing Docker.
+
+**Constraints and risks:** no production runtime, Entity semantics, Web pipeline, package dependency direction,
+container lifecycle, or test scheduling model changes. The deliberate behavior correction can turn previously skipped
+application conformance tests red when their configured provider is unavailable; the correction is to provide that
+provider or select the in-memory adapter, not to hide the failure. Validation is limited to the three package builds,
+focused conformance/host/in-memory provider cells, package artifacts, and current documentation/generated truth. The
+full provider matrix and release ratchet remain R11-07 work.
+
+**Autonomous architecture checkpoint:** proceed. The user's standing authorization covers the active R11 family
+graduation; the checkpoint retains genuinely isolated cross-module contracts and declines a superficially smaller
+package graph that would create a materially larger dependency surface.
+
+### Testing family focused completion evidence
+
+- `Sylin.Koan.Testing.Hosting`, `Sylin.Koan.Testing`, and `Sylin.Koan.Testing.Containers` have terminal `keep`
+  dispositions. Hosting remains xUnit-free; conformance remains lightweight; provider fixtures continue to isolate
+  the five Testcontainers engine dependencies from ordinary application conformance.
+- The unused public `Mutate(TEntity)` hook and the catch-all reachability classification are removed. Conformance now
+  skips only absent capabilities/traits; host, composition, provider, and Entity-operation defects fail with their
+  original exception. The package guide and companions state the explicit in-memory correction for Docker-free runs.
+- Focused evidence passes: conformance 13 passed / 3 intentional trait skips, Docker-free in-memory provider 56/56,
+  and failed-start async host disposal 1/1. Restoring the bounded bootstrap project removed its stale local assets
+  reference to the already shelved orchestration package; the final focused run is warning-clean.
+- All three Release package builds succeed with zero warnings/errors. All three produce nupkg/snupkg artifacts under
+  untracked `tmp/r11-testing`; archive inspection confirms DLL/XML, package-owned README, icon, build-transitive
+  props, exact package identity, and the expected Hosting/xUnit/Data/Testcontainers dependency boundaries.
+- Generated truth remains 93 active packages and 26 product claims. All three testing packages are structurally
+  ready; generated package quality improves from 2 repair / 10 review / 81 ready to 2 repair / 7 review / 84 ready.
+- Strict API/full-site DocFX succeeds, the public documentation truth gate passes 224 current files and 42 navigation
+  targets, and the broad docs linter reports zero errors with 1,621 existing non-gating front-matter/TOC warnings.
+- No live provider container, full provider matrix, unrelated family suite, full release ratchet, private downstream
+  inspection, push, publication, tag, release, deployment, or remote mutation ran. Scratch package artifacts remain
+  untracked and must not be staged.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

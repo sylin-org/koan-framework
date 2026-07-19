@@ -30,8 +30,8 @@ namespace Koan.Testing;
 /// <item><b>EmbeddingDoesNotBreakSave</b> — gated on <c>[Embedding]</c>; the embedding pipeline never
 ///   blocks the write path.</item>
 /// </list>
-/// Each battery boots its own isolated host and self-skips when the entity's backing store is
-/// unreachable (no Docker), so the suite is green out of the box and meaningful when infra is present.
+/// Each battery boots its own isolated host. Missing capabilities and absent traits skip only the
+/// inapplicable battery; composition, configuration, provider, and Entity-operation failures fail loudly.
 /// </summary>
 /// <remarks>
 /// Every battery enters a flow-scoped <see cref="AppHost"/> binding for the host it created. Independent
@@ -46,14 +46,10 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
     // (which cannot satisfy new()) are supported. (Delta from the card's illustrative signature.)
     private IntegrationHost? _host;
     private string? _root;
-    private string? _unavailable;
     private readonly string _partition = $"conf-{Guid.CreateVersion7():n}";
 
     /// <summary>Produce a fresh, valid entity (no id). REQUIRED — the only method you must write.</summary>
     protected abstract TEntity NewValid();
-
-    /// <summary>Optionally return a changed copy of <paramref name="entity"/> (default: unchanged).</summary>
-    protected virtual TEntity Mutate(TEntity entity) => entity;
 
     /// <summary>Override to add/replace host configuration (e.g. force an adapter or supply a connection
     /// string). Defaults provide isolated temp storage for the file adapters (json, sqlite).</summary>
@@ -77,21 +73,13 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
             _host = await KoanIntegrationHost.Configure()
                 .WithSettings(settings)
                 .ConfigureServices(s => s.AddKoan())
-                .StartAsync()
+                .StartAsync(TestContext.Current.CancellationToken)
                 .ConfigureAwait(false);
-
-            // Reachability probe: a read against the entity's resolved adapter. If the store is absent
-            // (e.g. a container that isn't running) this throws and every battery skips — distinguishing
-            // "infra missing" (skip) from a real conformance defect (fail loud) once we know it's reachable.
-            await RunInHost(async () =>
-            {
-                using (EntityContext.Partition(_partition))
-                    _ = await Entity<TEntity, string>.All().ConfigureAwait(false);
-            }).ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch
         {
-            _unavailable = $"backing store for {typeof(TEntity).Name} is unavailable: {ex.GetType().Name}: {Firstline(ex.Message)}";
+            TryDeleteRoot();
+            throw;
         }
     }
 
@@ -107,7 +95,6 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
     [Fact]
     public Task RoundTrip_persists_and_reads_back_by_id() => RunInHost(async () =>
     {
-        RequireStore();
         using var _ = EntityContext.Partition(_partition);
 
         var saved = await NewValid().Save();
@@ -120,7 +107,6 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
     [Fact]
     public Task Paging_returns_every_row_exactly_once() => RunInHost(async () =>
     {
-        RequireStore();
         using var _ = EntityContext.Partition(_partition);
 
         const int total = 23, size = 10;
@@ -140,7 +126,6 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
     [Fact]
     public Task QueryPushdown_agrees_with_reference_evaluator() => RunInHost(async () =>
     {
-        RequireStore();
         if (!Data<TEntity, string>.Capabilities.Has(DataCaps.Query.Filter))
         {
             Assert.Skip($"{typeof(TEntity).Name}'s adapter declares no query.filter pushdown.");
@@ -190,7 +175,6 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
     [Fact]
     public Task Partition_isolates_writes() => RunInHost(async () =>
     {
-        RequireStore();
         var a = _partition + "-a";
         var b = _partition + "-b";
 
@@ -205,7 +189,6 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
     [Fact]
     public Task Cacheable_invalidates_on_delete() => RunInHost(async () =>
     {
-        RequireStore();
         if (!IsCacheable)
         {
             Assert.Skip($"{typeof(TEntity).Name} is not [Cacheable].");
@@ -224,7 +207,6 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
     [Fact]
     public Task Embedding_does_not_break_the_save_path() => RunInHost(async () =>
     {
-        RequireStore();
         if (!IsEmbedding)
         {
             Assert.Skip($"{typeof(TEntity).Name} is not [Embedding].");
@@ -244,18 +226,12 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
     {
         if (_host is null)
         {
-            RequireStore();
             throw new InvalidOperationException(
                 $"{GetType().Name} has no active conformance host. Ensure xUnit initialization completed before invoking a battery.");
         }
 
         using var scope = AppHost.PushScope(_host.Services);
         await operation().ConfigureAwait(false);
-    }
-
-    private void RequireStore()
-    {
-        if (_unavailable is not null) Assert.Skip(_unavailable);
     }
 
     private static bool IsCacheable => HasClassAttribute("Koan.Cache.Abstractions.Policies.CacheableAttribute");

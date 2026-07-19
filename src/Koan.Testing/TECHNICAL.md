@@ -24,12 +24,11 @@ xUnit creates one conformance instance for each inherited battery. `InitializeAs
 1. creates a unique temporary root and Entity partition;
 2. seeds Test-environment JSON and SQLite settings;
 3. applies the consumer's `Configure` overrides;
-4. starts a real `KoanIntegrationHost` with `AddKoan()`;
-5. probes the selected Entity adapter for reachability.
+4. starts a real `KoanIntegrationHost` with `AddKoan()`.
 
 The generic host's `AppHostBinderHostedService` owns the process-default provider with a
-compare-and-release lease. Initialization's reachability probe and every inherited battery additionally
-enter `AppHost.PushScope(host.Services)`, so static Entity operations resolve the correct provider in
+compare-and-release lease. Every inherited battery additionally enters `AppHost.PushScope(host.Services)`,
+so static Entity operations resolve the correct provider in
 their own async flow even while another conformance host is active. `DisposeAsync` delegates to
 integration-host disposal, then removes the temporary root best-effort. Stopping an older overlapping
 host cannot clear a newer owner.
@@ -61,7 +60,6 @@ later test-method invocation. Consumers therefore need no assembly-wide parallel
 
 - `NewValid()` is required and must return a fresh business-valid Entity without relying on a
   parameterless-constructor constraint.
-- `Mutate(TEntity)` defaults to no change and is reserved for batteries that need an updated value.
 - `Configure(IDictionary<string, string?>)` may replace defaults or add adapter settings before host
   construction.
 
@@ -71,19 +69,14 @@ scaffolding generator on the public surface. Tests needing custom DI composition
 
 ## Failure and skip behavior
 
-- An exception during the initial adapter reachability probe records one redacted first-line reason;
-  inherited batteries then skip through native xUnit behavior.
-- After reachability succeeds, assertion and operation failures propagate normally.
+- Host startup, composition, provider access, assertion, and Entity-operation failures propagate with
+  their original exception.
 - Trait and capability absence produce explicit skips naming the missing declaration.
 - Temporary-root deletion is best-effort and cannot replace a test result with a cleanup failure.
 
-The reachability catch currently treats every setup/probe exception as backing-store unavailability.
-It is not a general failure-classification model; finer composition-versus-infrastructure facts belong
-to the framework's later unified error/explanation work.
-
 ## Evidence boundary
 
-The meta-suite proves positive batteries, trait gating, a deliberately failing paging oracle,
-host-owner preservation, and concurrent same-Entity specifications resolving distinct hosts through
-generated module composition. S1 and S5 provide application-level consumer proofs using the unchanged
-one-method inheritance grammar.
+The meta-suite proves positive batteries, trait gating, a deliberately failing paging oracle, fail-loud
+provider selection, host-owner preservation, and concurrent same-Entity specifications resolving
+distinct hosts through generated module composition. TaskGraph provides an application-level consumer
+proof using the one-method inheritance grammar.
