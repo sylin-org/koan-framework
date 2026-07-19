@@ -1,8 +1,8 @@
 namespace Koan.Security.Trust.Dev;
 
 /// <summary>
-/// SEC-0001 §4 (Rung 0) — the zero-config dev identity. Active only when the middleware is inserted,
-/// which the auth pipeline does in Development only (structurally absent in production).
+/// SEC-0001 §4 (Rung 0) — the zero-config dev identity. Evaluated only by Web Auth's Development context
+/// contributor; production requests never receive this identity.
 /// </summary>
 public sealed class DevIdentityOptions
 {

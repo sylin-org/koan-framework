@@ -24,8 +24,7 @@
     <ProjectReference Include="..\..\..\..\src\Koan.Media.Web\Koan.Media.Web.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
-    <!-- SEC-0008 access axis (the moat MediaEntitySource inherits) + real AddKoan hosting (ARCH-0079). -->
-    <ProjectReference Include="..\..\..\..\src\Koan.Data.Access\Koan.Data.Access.csproj" />
+    <!-- Real AddKoan hosting; Koan.Media.Web transitively supplies the Web-context/Data projection. -->
     <ProjectReference Include="..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
     <!-- In-memory record store + real Local blob storage so the positive/cache legs round-trip, no Docker. -->
     <ProjectReference Include="..\..\..\..\src\Connectors\Data\InMemory\Koan.Data.Connector.InMemory.csproj" />

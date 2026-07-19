@@ -25,7 +25,7 @@ namespace SnapVault.Initialization;
 /// Each leg is wrapped so a cleanup failure never fails the user's delete — the photo row is already gone.
 ///
 /// <para>INVARIANT: the hook runs in the ambient tenant of the triggering delete, so the (tenant-scoped, not
-/// access-scoped) <c>Collection.All</c> / <c>MediaDerivation.Query</c> only ever touch that tenant's rows. Every
+/// gallery-request-scoped) <c>Collection.All</c> / <c>MediaDerivation.Query</c> only ever touch that tenant's rows. Every
 /// SnapVault delete path establishes a tenant (the operator's request, or a deprovisioning job's rehydrated
 /// tenant) — a future caller that removes a photo OUTSIDE a tenant scope would fan the collection scan across all
 /// tenants, so keep <c>PhotoAsset.Remove</c> inside an established tenant ambient.</para>

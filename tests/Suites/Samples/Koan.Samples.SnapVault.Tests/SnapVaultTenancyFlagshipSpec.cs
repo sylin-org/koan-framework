@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Hosting.App;
-using Koan.Data.Access;
 using Koan.Data.Core;
 using Koan.Data.Core.Axes;
 using Koan.Data.Core.Model;
@@ -163,7 +162,6 @@ public sealed class SnapVaultTenancyFlagshipSpec
 
         // Reads see only own rows; cross-studio get-by-id is a fail-closed null (IDOR rejected).
         using (Tenant.Use(StudioA))
-        using (Subject.System())   // the studio/platform reads with full access; the access axis narrows for GUESTS
         {
             (await PhotoAsset.All()).Select(p => p.Id).Should().BeEquivalentTo(new[] { pA.Id });
             (await Event.All()).Select(e => e.Id).Should().BeEquivalentTo(new[] { evA.Id });
@@ -174,7 +172,6 @@ public sealed class SnapVaultTenancyFlagshipSpec
             (await Collection.Get(colB.Id)).Should().BeNull();
         }
         using (Tenant.Use(StudioB))
-        using (Subject.System())
         {
             (await PhotoAsset.All()).Select(p => p.Id).Should().BeEquivalentTo(new[] { pB.Id });
             (await PhotoAsset.Get(pA.Id, CancellationToken.None)).Should().BeNull();
@@ -219,16 +216,13 @@ public sealed class SnapVaultTenancyFlagshipSpec
 
         // Studio A searches with GLOBEX's exact vector. Without isolation a KNN returns globex-1 (the nearest);
         // the __koan_tenant filter excludes it, so only acme-1 comes back — proving the filter, not distance, isolates.
-        // (The SEC-0008 access axis also reaches the vector search chokepoint via ReadScopeFold, so a studio/operator
-        // search runs under Subject.System(); a GUEST's semantic search would be event-scoped for free.)
+        // A Web-contributed gallery predicate reaches the same Vector read fold during a guest request.
         using (Tenant.Use(StudioA))
-        using (Subject.System())
         {
             var r = await Vector<PhotoAsset>.Search(new VectorQueryOptions(Query: globexPoint, TopK: 10));
             r.Matches.Select(m => m.Id).Should().Equal("acme-1");
         }
         using (Tenant.Use(StudioB))
-        using (Subject.System())
         {
             var r = await Vector<PhotoAsset>.Search(new VectorQueryOptions(Query: acmePoint, TopK: 10));
             r.Matches.Select(m => m.Id).Should().Equal("globex-1");

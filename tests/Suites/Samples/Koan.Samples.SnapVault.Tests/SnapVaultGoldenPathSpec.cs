@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using AwesomeAssertions;
 using Koan.Core.Diagnostics;
-using Koan.Data.Access;
 using Koan.Jobs;
 using Koan.Tenancy;
 using Microsoft.Extensions.DependencyInjection;
@@ -55,7 +54,6 @@ public sealed class SnapVaultGoldenPathSpec(SnapVaultHostFixture fixture)
 
         PhotoAsset photo;
         using (Tenant.Use(LocalDevelopmentTenant))
-        using (Subject.System())
         {
             var matches = await PhotoAsset.Query(candidate => candidate.OriginalFileName == fileName, ct);
             photo = matches.Should().ContainSingle().Subject;

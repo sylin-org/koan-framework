@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Koan.Web.Context;
 
 namespace Koan.Web.Auth.Initialization;
 
@@ -25,7 +26,7 @@ public sealed class AuthModule : KoanModule
         SecurityPillarManifest.EnsureRegistered();
         services.AddKoanWebAuth();
         services.AddHttpContextAccessor();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Web.Hosting.IKoanWebPipelineContributor, DevIdentityContributor>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IWebContextContributor, DevIdentityContributor>());
         services.AddKoanControllersFrom<Controllers.DiscoveryController>();
     }
 

@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Hosting.App;
-using Koan.Data.Access;
 using Koan.Data.Core;
 using Koan.Media;
 using Koan.Media.Abstractions.Recipes;
@@ -14,16 +14,17 @@ using Koan.Media.Web.Routing;
 using Koan.Storage;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Http;
+using Koan.Web.Context;
 using Xunit;
 
 namespace Koan.Media.Web.Tests;
 
 /// <summary>
 /// ARCH-0079 framework-home spec for <see cref="MediaEntitySource{TEntity}"/> — the generic that makes media
-/// serving inherit the SEC-0008 access axis. A real <c>AddKoan()</c> boot (in-memory record store + real Local
-/// blob storage, no Docker) over an <c>[AccessScoped]</c> <see cref="MediaEntity{TEntity}"/> proves the moat
-/// framework-side, independent of any sample: (1) serving resolves through the entity layer so it is
-/// access-scoped and fail-closed on an absent/ungranted subject; (2) a granted subject serves the stored bytes;
+/// serving inherit Web-contributed Data read context. A real <c>AddKoan()</c> boot (in-memory record store + real Local
+/// blob storage, no Docker) proves the moat framework-side, independent of any sample: (1) serving resolves through
+/// the Entity layer so a current request predicate hides cross-scope ids; (2) a matching scope serves stored bytes;
 /// (3) the <see cref="MediaDerivation"/> render cache round-trips.
 /// </summary>
 [Collection("media-web")]
@@ -44,7 +45,15 @@ public sealed class MediaEntitySourceSpec
         }
     }
 
-    [Fact(DisplayName = "serving is access-scoped + fail-closed: OpenAsync resolves through the entity gate, not raw storage")]
+    private static IDisposable ReadScope<TEntity>(Expression<Func<TEntity, bool>> predicate)
+        where TEntity : class
+    {
+        var context = new WebContext(new DefaultHttpContext());
+        context.Where(predicate);
+        return context.EnterPending()!;
+    }
+
+    [Fact(DisplayName = "serving inherits request read context: OpenAsync resolves through the entity gate, not raw storage")]
     public async Task Serving_is_access_scoped_and_fail_closed()
     {
         var source = new MediaEntitySource<ScopedMedia>();
@@ -54,23 +63,20 @@ public sealed class MediaEntitySourceSpec
 
         // Seed two owners' media with real stored bytes (writes aren't access-gated — that stays at the surface).
         ScopedMedia mine, theirs;
-        using (Subject.System())
-        {
-            mine = await ScopedMedia.Upload(new MemoryStream(new byte[] { 1, 2, 3 }), $"{alice}.bin", "image/jpeg");
-            mine.OwnerId = alice; await mine.Save();
-            theirs = await ScopedMedia.Upload(new MemoryStream(new byte[] { 4, 5, 6 }), $"{bob}.bin", "image/jpeg");
-            theirs.OwnerId = bob; await theirs.Save();
-        }
+        mine = await ScopedMedia.Upload(new MemoryStream(new byte[] { 1, 2, 3 }), $"{alice}.bin", "image/jpeg");
+        mine.OwnerId = alice; await mine.Save();
+        theirs = await ScopedMedia.Upload(new MemoryStream(new byte[] { 4, 5, 6 }), $"{bob}.bin", "image/jpeg");
+        theirs.OwnerId = bob; await theirs.Save();
 
-        // No subject → fail-closed null, and (the moat) it never reaches storage: the Get gate denies first.
-        (await source.OpenAsync(mine.Id)).Should().BeNull();
+        // Outside a Web request there is no invented access policy; the source remains an ordinary Entity projection.
+        (await source.OpenAsync(mine.Id)).Should().NotBeNull();
 
-        // Wrong-scope subject → null (can't serve another owner's bytes by id — the IDOR is closed).
-        using (Subject.Use(bob, new[] { "owner:" + bob }))
+        // Wrong request scope → null (can't serve another owner's bytes by id — the IDOR is closed).
+        using (ReadScope<ScopedMedia>(media => media.OwnerId == bob))
             (await source.OpenAsync(mine.Id)).Should().BeNull();
 
-        // Matching-scope subject → serves the stored bytes.
-        using (Subject.Use(alice, new[] { "owner:" + alice }))
+        // Matching request scope → serves the stored bytes.
+        using (ReadScope<ScopedMedia>(media => media.OwnerId == alice))
         {
             var handle = await source.OpenAsync(mine.Id);
             handle.Should().NotBeNull();
@@ -78,12 +84,8 @@ public sealed class MediaEntitySourceSpec
             (await ReadAll(handle.Bytes)).Should().Equal(new byte[] { 1, 2, 3 });
         }
 
-        // System (platform) → full access; an unknown id → null (not an error).
-        using (Subject.System())
-        {
-            (await source.OpenAsync(theirs.Id)).Should().NotBeNull();
-            (await source.OpenAsync("no-such-id-" + stamp)).Should().BeNull();
-        }
+        (await source.OpenAsync(theirs.Id)).Should().NotBeNull();
+        (await source.OpenAsync("no-such-id-" + stamp)).Should().BeNull();
     }
 
     [Fact(DisplayName = "derivation cache round-trips: TryStore then OpenDerivation serves the render; miss before store; idempotent")]
@@ -96,28 +98,24 @@ public sealed class MediaEntitySourceSpec
         var rendered = new byte[] { 7, 7, 9, 9, 7 };
         var output = new MediaOutput(rendered, "image/jpeg", "jpeg", "jpeg", 1, 1, 1, "out-" + stamp);
 
-        using (Subject.System())
-        {
-            (await source.OpenDerivationAsync(sourceId, fingerprint)).Should().BeNull();          // miss before store
+        (await source.OpenDerivationAsync(sourceId, fingerprint)).Should().BeNull();          // miss before store
 
-            await source.TryStoreDerivationAsync(sourceId, fingerprint, output, "gallery", "1");
-            var hit = await source.OpenDerivationAsync(sourceId, fingerprint);
-            hit.Should().NotBeNull();
-            hit!.ContentType.Should().Be("image/jpeg");
-            (await ReadAll(hit.Bytes)).Should().Equal(rendered);
+        await source.TryStoreDerivationAsync(sourceId, fingerprint, output, "gallery", "1");
+        var hit = await source.OpenDerivationAsync(sourceId, fingerprint);
+        hit.Should().NotBeNull();
+        hit!.ContentType.Should().Be("image/jpeg");
+        (await ReadAll(hit.Bytes)).Should().Equal(rendered);
 
-            // A distinct fingerprint is a distinct cache entry.
-            (await source.OpenDerivationAsync(sourceId, "other-" + stamp)).Should().BeNull();
+        // A distinct fingerprint is a distinct cache entry.
+        (await source.OpenDerivationAsync(sourceId, "other-" + stamp)).Should().BeNull();
 
-            // Idempotent: a second store for the same (source, fingerprint) is a no-op, still serves one render.
-            await source.TryStoreDerivationAsync(sourceId, fingerprint, output, "gallery", "1");
-            (await source.OpenDerivationAsync(sourceId, fingerprint)).Should().NotBeNull();
-        }
+        // Idempotent: a second store for the same (source, fingerprint) is a no-op, still serves one render.
+        await source.TryStoreDerivationAsync(sourceId, fingerprint, output, "gallery", "1");
+        (await source.OpenDerivationAsync(sourceId, fingerprint)).Should().NotBeNull();
     }
 }
 
-/// <summary>An access-scoped media entity: an owner's media is served only to a subject holding its scope token.</summary>
-[AccessScoped("OwnerId", "owner:")]
+/// <summary>A media entity whose owner predicate is contributed once by the Web request edge.</summary>
 [StorageBinding(Profile = "test", Container = "media")]
 public sealed class ScopedMedia : MediaEntity<ScopedMedia>
 {
@@ -126,7 +124,7 @@ public sealed class ScopedMedia : MediaEntity<ScopedMedia>
 
 /// <summary>
 /// One real <c>AddKoan()</c> boot shared across the collection — in-memory record store + Local blob storage
-/// (temp dir), fail-closed access posture (the default). A single boot is deliberate (the framework caches
+/// (temp dir). A single boot is deliberate (the framework caches
 /// per-process static state against the booted provider); AppHost.Current is saved/restored around it.
 /// </summary>
 public sealed class MediaWebHostFixture : IAsyncLifetime

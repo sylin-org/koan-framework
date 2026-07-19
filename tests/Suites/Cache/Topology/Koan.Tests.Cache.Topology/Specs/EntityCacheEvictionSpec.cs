@@ -7,6 +7,7 @@ using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Entity;
 using Koan.Cache.Identity;
 using Koan.Core.Context;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
@@ -196,6 +197,24 @@ public sealed class EntityCacheEvictionSpec
         }
     }
 
+    [Fact]
+    public void Dynamic_read_scope_is_observed_after_the_cache_plan_is_compiled()
+    {
+        var contributor = new DynamicReadScope();
+        var plan = new EntityCachePlan(
+            new StubPolicyRegistry([Policy("{TypeName}:{Id}", typeof(Note))]),
+            new NoFieldTransforms(),
+            [contributor]);
+        var resolution = plan.TryResolve(typeof(Note));
+
+        resolution.Should().NotBeNull();
+        resolution!.IsReadScopedNow().Should().BeFalse();
+
+        contributor.Filter = Filter.Eq(nameof(Note.Id), "visible");
+        resolution.IsReadScopedNow().Should().BeTrue(
+            "a request-derived predicate appears after boot and must bypass an already-compiled global cache plan");
+    }
+
     private static EntityCacheEvictionCoordinator Coordinator(
         ICacheWriter writer,
         params CachePolicyDescriptor[] policies)
@@ -214,6 +233,15 @@ public sealed class EntityCacheEvictionSpec
     {
         public bool HasTransformsFor(Type entityType) => false;
         public IReadOnlyList<string> ContributorIdsFor(Type entityType) => [];
+    }
+
+    private sealed class DynamicReadScope : IReadFilterContributor
+    {
+        public Filter? Filter { get; set; }
+
+        public Filter? ReadFilter(Type entityType) => entityType == typeof(Note) ? Filter : null;
+
+        public Koan.Core.Capabilities.Capability? RequiredCapability => null;
     }
 
     private sealed class IdentityWriter(ICacheWriter inner) : ICacheSubjectClient

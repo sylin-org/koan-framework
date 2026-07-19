@@ -12,7 +12,7 @@
     <ProjectReference Include="..\Koan.Media.Core\Koan.Media.Core.csproj" />
     <ProjectReference Include="..\Koan.Storage\Koan.Storage.csproj" />
     <ProjectReference Include="..\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
-    <!-- Explicit: MediaEntitySource<T> resolves via Data<T>.Get so the SEC-0008 access axis + tenancy apply
+    <!-- Explicit: MediaEntitySource<T> resolves via Data<T>.Get so contributed request predicates + tenancy apply
          to media serving. Declaring the dependency the moat rests on rather than inheriting it transitively. -->
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <!-- AddKoanControllersFrom + Koan.Web.Extensions live here (was reached

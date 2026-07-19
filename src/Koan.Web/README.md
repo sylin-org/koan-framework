@@ -13,6 +13,7 @@ Turn Koan entities into controller-first ASP.NET Core APIs, with shared policy, 
 - static-file middleware only when the host supplies a real web-root provider
 - redacted runtime facts at `GET /.well-known/Koan/facts`
 - response transformers for deliberate representation shaping
+- one ordered request-context contributor lifecycle for validated principal, tenant, and Entity read context
 
 ## Install
 
@@ -42,6 +43,13 @@ actions only for business operations that are not entity CRUD.
 
 Use transformers when a representation must differ from the stored model; see WEB-0035 below.
 
+For request-derived business context, implement `IWebContextContributor` with ordinary scoped DI. Koan invokes it
+after authentication and before endpoints. The contributor validates standard `HttpContext` evidence once, then may
+contribute a principal, a capability scope, typed Entity predicates, or an existence-hiding rejection. For example, a
+share-link contributor can prove `?event=` against a durable grant and call
+`context.Where<Photo>(photo => photo.EventId == eventId)`; all downstream Entity, Vector, and Entity-backed Media
+reads inherit that predicate automatically. Query values are evidence, never authorization by themselves.
+
 ## Inspection and configuration
 
 Runtime facts use the same schema as startup, health, and `koan://facts`. Outside Development, enable
@@ -59,6 +67,8 @@ surface. Static-file wiring stays dormant in API-only hosts that have no real we
 - Runtime facts are redacted, not anonymous. Non-Development exposure remains an operator-owned security decision.
 - Authentication and richer authorization projections live in optional Web/Auth packages; referencing Web alone does
   not make an API secure.
+- Contributed predicates are request-lifetime read visibility. They do not authorize writes, secure raw storage/SQL,
+  or travel into durable jobs; those boundaries must establish or re-resolve their own application authority.
 
 ## Technical reference
 

@@ -15,7 +15,7 @@ public sealed record PhotoSetDefinition
     public string? SearchQuery { get; init; }
     public double? SearchAlpha { get; init; }
     public string? CollectionId { get; init; }
-    /// <summary>The event id for an access-scoped event browse.</summary>
+    /// <summary>The event id for a request-context-scoped event browse.</summary>
     public string? EventId { get; init; }
     public string SortBy { get; init; } = "capturedAt";     // capturedAt · createdAt · rating · fileName
     public string SortOrder { get; init; } = "desc";        // asc · desc

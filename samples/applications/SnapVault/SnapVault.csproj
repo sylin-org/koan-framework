@@ -50,8 +50,6 @@
     <!-- Cookie authentication and a zero-configuration Development sign-in provider. -->
     <ProjectReference Include="..\..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
     <ProjectReference Include="..\..\..\src\Connectors\Web\Auth\Test\Koan.Web.Auth.Connector.Test.csproj" />
-    <!-- Guest reads are narrowed to granted events at the Data layer. -->
-    <ProjectReference Include="..\..\..\src\Koan.Data.Access\Koan.Data.Access.csproj" />
   </ItemGroup>
 
   <ItemGroup>

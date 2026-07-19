@@ -4,7 +4,7 @@ namespace SnapVault.Media;
 
 /// <summary>
 /// On-demand image recipes rendered from each photo's single stored original. Koan.Media.Web serves them at
-/// <c>GET /media/{photoId}/{name}</c> through access-scoped <c>PhotoAsset</c> resolution; the seedless route
+/// <c>GET /media/{photoId}/{name}</c> through context-aware <c>PhotoAsset</c> resolution; the seedless route
 /// returns the original.
 ///
 /// <para>Recipes are discovered automatically. Their names are global slugs and avoid the reserved

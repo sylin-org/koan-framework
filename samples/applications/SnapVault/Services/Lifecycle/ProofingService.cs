@@ -10,7 +10,7 @@ namespace SnapVault.Services;
 /// The proofing gallery: a granted guest marks photos (favorite / rating / "I select this" / comment), attributed to
 /// the GUEST via <see cref="ProofSelection"/> — deliberately separate from the studio's own
 /// <c>PhotoAsset.IsFavorite</c>/<c>Rating</c> — and the studio reads the client's selections back. Whether the guest
-/// can see the photo at all is enforced upstream by the access axis; this service only records the marks.
+/// can see the photo at all is enforced by the upstream request contributor; this service only records the marks.
 /// </summary>
 public sealed class ProofingService
 {

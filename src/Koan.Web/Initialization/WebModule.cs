@@ -12,6 +12,7 @@ using Koan.Web.Hooks;
 using Koan.Web.Infrastructure;
 using Koan.Web.Pillars;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Data.Core.Pipeline;
 
 namespace Koan.Web.Initialization;
 
@@ -22,6 +23,8 @@ public sealed class WebModule : KoanModule
         WebPillarManifest.EnsureRegistered();
         services.AddKoanWeb();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.KoanWebStartupFilter>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Hosting.IKoanWebPipelineContributor, Context.WebContextPipelineContributor>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IReadFilterContributor, Context.WebContextReadFilterContributor>());
 
         // ARCH-0092 (§D): register the unified IAuthorize seam + the built-in entity-floor rung BY DEFAULT so
         // base CRUD (and the MCP edge) can authorize through one engine. With no provider granting/denying, the

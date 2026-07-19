@@ -52,7 +52,7 @@ Use [`requests.http`](requests.http), or inspect these directly:
 - `GET /health/ready` — whether the selected runtime composition can serve work.
 - `GET /.well-known/Koan/facts` — elected providers, capabilities, guarantees, and corrections.
 - `GET /api/photos/stats` — the current studio totals.
-- `GET /media/{photoId}` and `GET /media/{photoId}/gallery` — the access-scoped original and gallery recipe.
+- `GET /media/{photoId}` and `GET /media/{photoId}/gallery` — the original and recipe under the current validated request context.
 
 Startup reporting tells the same story: SQLite and local storage are the default local mechanisms, Jobs owns
 durable processing, and optional providers appear only when they actually participate.

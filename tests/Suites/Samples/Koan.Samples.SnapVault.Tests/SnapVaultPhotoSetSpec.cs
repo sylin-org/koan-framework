@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using AwesomeAssertions;
-using Koan.Data.Access;
 using Koan.Data.Core;
 using Koan.Tenancy;
 using Microsoft.Extensions.DependencyInjection;
@@ -38,7 +37,6 @@ public sealed class SnapVaultPhotoSetSpec
         PhotoAsset p0, p1, p2, p3, p4;
         Collection col;
         using (Tenant.Use(studio))
-        using (Subject.System())
         {
             var ev = new Event { Name = "Shoot" }; await ev.Save();
             // Five photos with strictly increasing capture dates; favorite the middle two.
@@ -52,7 +50,6 @@ public sealed class SnapVaultPhotoSetSpec
         }
 
         using (Tenant.Use(studio))
-        using (Subject.System())
         {
             // all-photos: count once, window on demand, newest-first (capturedAt desc default).
             var all = await svc.CreateSession(new PhotoSetDefinition { Context = "all-photos", SortBy = "capturedAt", SortOrder = "desc" });
@@ -80,7 +77,7 @@ public sealed class SnapVaultPhotoSetSpec
         }
     }
 
-    [Fact(DisplayName = "windowing: the 'event' context windows ONE event's photos (the #6 by-event unify — access-scoped, infinite-scroll)")]
+    [Fact(DisplayName = "windowing: the 'event' context windows ONE event's photos (request-scoped, infinite-scroll)")]
     public async Task Event_context_windows_one_event()
     {
         var studio = "studio-" + Stamp();
@@ -89,7 +86,6 @@ public sealed class SnapVaultPhotoSetSpec
 
         Event evA, evB;
         using (Tenant.Use(studio))
-        using (Subject.System())
         {
             evA = new Event { Name = "A" }; await evA.Save();
             evB = new Event { Name = "B" }; await evB.Save();
@@ -99,7 +95,6 @@ public sealed class SnapVaultPhotoSetSpec
         }
 
         using (Tenant.Use(studio))
-        using (Subject.System())
         {
             var session = await svc.CreateSession(new PhotoSetDefinition { Context = "event", EventId = evA.Id, SortBy = "capturedAt", SortOrder = "desc" });
             session.TotalCount.Should().Be(3);                 // only event A's photos, not B's

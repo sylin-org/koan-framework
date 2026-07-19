@@ -41,7 +41,7 @@ scan or source election. Startup reporting states the candidate/default posture.
 
 Derivative identity is source id plus recipe fingerprint. Writes are idempotent and best-effort. No generic
 orphan sweep is shipped: a context-free background probe cannot safely decide source existence for every
-tenant/access-scoped source. Applications that own deletion currently perform targeted cleanup. A future
+tenant/request-context-scoped source. Applications that own deletion currently perform targeted cleanup. A future
 framework lifecycle service must centralize source identity and context before replacing that explicit path.
 
 ## Unsupported

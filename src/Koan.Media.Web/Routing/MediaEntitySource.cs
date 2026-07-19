@@ -13,14 +13,14 @@ namespace Koan.Media.Web.Routing;
 /// The default <see cref="IMediaSource"/> for a <see cref="MediaEntity{TEntity}"/>-derived
 /// content type. This is the one meaningful part an app needs to serve its media recipes: it
 /// resolves a media id <b>through the entity layer</b> (<c>Data&lt;TEntity, string&gt;.Get</c>),
-/// not through raw storage — so <b>every active data axis applies to media serving structurally,
+/// not through raw storage — so <b>every active read predicate applies to media serving structurally,
 /// not per-endpoint</b>:
 /// <list type="bullet">
 ///   <item>tenant isolation (the request's ambient tenant scopes the lookup), and</item>
-///   <item>SEC-0008 access scoping (an <c>[AccessScoped]</c> entity is narrowed to the ambient
-///   <c>Subject</c>'s grants — a guest sees only their events, fail-closed on an absent subject).</item>
+///   <item>request context contributed through <c>IWebContextContributor</c> (for example, a validated
+///   share link can contribute the gallery predicate once for every downstream entity read).</item>
 /// </list>
-/// A request whose subject/tenant can't see the entity gets a <c>null</c> handle, and the
+/// A request whose contributed context/tenant can't see the entity gets a <c>null</c> handle, and the
 /// <see cref="Controllers.MediaController"/> returns 404. Because the controller calls
 /// <see cref="OpenAsync"/> <i>before</i> any derivation-cache lookup, even a cached recipe render
 /// is gated by this resolve — the access check can't be bypassed by a warm cache.
@@ -41,8 +41,8 @@ public class MediaEntitySource<TEntity> : IMediaSource
     {
         if (string.IsNullOrWhiteSpace(id)) return null;
 
-        // Entity-layer resolve. RepositoryFacade folds in every active read axis (tenant +
-        // SEC-0008 access): a gated-out or subject-less request yields null here → 404 upstream.
+        // Entity-layer resolve. RepositoryFacade folds in every active read predicate (tenant +
+        // Web-contributed context): a gated-out request yields null here → 404 upstream.
         var entity = await Entity<TEntity, string>.Get(id, ct).ConfigureAwait(false);
         if (entity is null) return null;
 
@@ -114,7 +114,7 @@ public static class MediaSourceServiceCollectionExtensions
 {
     /// <summary>
     /// Register the app's <see cref="MediaEntity{TEntity}"/>-derived content type as the source the recipe
-    /// controller serves — the one line that makes <c>GET /media/{id}[/{recipe}]</c> resolve, access-scoped,
+    /// controller serves — the one line that makes <c>GET /media/{id}[/{recipe}]</c> resolve through current Entity read context,
     /// from that type's stored originals. Named + generic-constrained so the intent is greppable and the
     /// wrong type can't be registered. The framework does not auto-pick a type (a bare <c>/media/{id}</c>
     /// carries no discriminator); an app with several media types registers one per type behind its own routing.

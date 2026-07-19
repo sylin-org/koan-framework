@@ -96,7 +96,7 @@ public sealed class PhotoSetService
     {
         switch (context)
         {
-            // Fetch the tenant- and access-scoped set, sort globally, then window. Sample-scale fetch-then-sort is
+            // Fetch the tenant- and request-context-scoped set, sort globally, then window. Sample-scale fetch-then-sort is
             // correct and simple; a production version would push the sort into the query (the
             // default capturedAt??createdAt coalesce is what makes that non-trivial).
             case "all-photos":

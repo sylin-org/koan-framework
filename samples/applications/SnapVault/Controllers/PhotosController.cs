@@ -393,7 +393,7 @@ public sealed class PhotosController : EntityController<PhotoAsset>
 
     public override Task<IActionResult> Upsert(PhotoAsset model, CancellationToken ct) => Task.FromResult(SealedWrite());
     public override Task<IActionResult> UpsertMany(IEnumerable<PhotoAsset> models, CancellationToken ct) => Task.FromResult(SealedWrite());
-    public override Task<IActionResult> Patch(string id, CancellationToken ct) => Task.FromResult(SealedWrite());   // partial update would let EventId (the access axis) be rewritten
+    public override Task<IActionResult> Patch(string id, CancellationToken ct) => Task.FromResult(SealedWrite());   // partial update would let request-scoped EventId be rewritten
     public override Task<IActionResult> Delete(string id, CancellationToken ct) => Task.FromResult(SealedWrite());
     public override Task<IActionResult> DeleteMany(IEnumerable<string> ids, CancellationToken ct) => Task.FromResult(SealedWrite());
     public override Task<IActionResult> DeleteByQuery(string? q, CancellationToken ct) => Task.FromResult(SealedWrite());

@@ -6,12 +6,11 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Hosting.App;
-using Koan.Data.Access;
 using Koan.Data.Core;
 using Koan.Identity;
-using Koan.Jobs;
 using Koan.Media.Web.Routing;
 using Koan.Tenancy;
+using Koan.Web.Context;
 using Koan.Testing.Integration;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -29,7 +28,7 @@ namespace Koan.Samples.SnapVault.Tests;
 /// (ARCH-0079, in-memory, no Docker) under the FAIL-CLOSED access posture proves the whole arc the framework now
 /// backs: a studio grants a known durable client access to ONE event's gallery → the client sees ONLY that event's
 /// photos, cross-event get-by-id is a
-/// fail-closed null (the SEC-0008 data-layer access axis, enforced on a raw <c>Entity.Query()</c>, not a controller
+/// fail-closed null (the Web contributor's predicate reaches raw <c>Entity.Query()</c>, not only a controller
 /// hook) → the client proofs (favorite/rate/select, attributed to the guest, never overwriting the studio's marks) →
 /// the studio reads the selections → closing this client's access removes the grant and seat and emits an
 /// integrity-checked operation record, after which the client's reads fail closed.
@@ -42,6 +41,33 @@ public sealed class SnapVaultGuestLifecycleSpec
 
     private T Svc<T>() where T : notnull => _fx.Host.Services.GetRequiredService<T>();
     private static string Stamp() => Guid.NewGuid().ToString("n").Substring(0, 8);
+
+    private async Task<(bool Rejected, T? Value)> RunGalleryContext<T>(
+        string guestId,
+        string eventId,
+        Func<Task<T>> action)
+    {
+        await using var requestScope = _fx.Host.Services.CreateAsyncScope();
+        var services = requestScope.ServiceProvider;
+        var http = new DefaultHttpContext { RequestServices = services };
+        http.Request.QueryString = new QueryString($"?_as={guestId}&event={eventId}");
+        var context = new WebContext(http);
+        var entered = new List<IDisposable>();
+        try
+        {
+            foreach (var contributor in services.GetServices<IWebContextContributor>().OrderBy(static item => item.Order))
+            {
+                await contributor.ContributeAsync(context);
+                if (context.IsRejected) return (true, default);
+                if (context.EnterPending() is { } scope) entered.Add(scope);
+            }
+            return (false, await action());
+        }
+        finally
+        {
+            for (var index = entered.Count - 1; index >= 0; index--) entered[index].Dispose();
+        }
+    }
 
     // Seed a guest as a durable person with a VERIFIED email factor (what a real verified sign-in would create).
     private static async Task SeedGuestAsync(string guestId, string normalizedEmail)
@@ -61,7 +87,6 @@ public sealed class SnapVaultGuestLifecycleSpec
     public async Task Full_studio_client_lifecycle()
     {
         var grants = Svc<GalleryGrantService>();
-        var scopes = Svc<GuestScopeService>();
         var proofing = Svc<ProofingService>();
         var deprov = Svc<SnapVaultDeprovisioningService>();
 
@@ -89,23 +114,20 @@ public sealed class SnapVaultGuestLifecycleSpec
         granted.Grant!.EventId.Should().Be(eventA.Id);
         (await GalleryGrant.Get(GalleryGrant.KeyFor(guestId, eventA.Id))).Should().NotBeNull();
 
-        // 2. In the studio tenant + their CONSTRAINED subject, the guest sees only eventA's photo; eventB is a 404.
-        // Resolve the guest's grant scopes first, then enter the ambient Subject SYNCHRONOUSLY (see WithGuestScopeAsync).
-        var guestScopes = await scopes.ScopesForAsync(guestId);
-        guestScopes.Should().Equal("event:" + eventA.Id);
-        using (Tenant.Use(studio))
-        using (Subject.Use(guestId, guestScopes))
+        // 2. The validated event link contributes both tenant and PhotoAsset scope once for downstream Entity reads.
+        var scopedRead = await RunGalleryContext(guestId, eventA.Id, async () =>
         {
             (await PhotoAsset.All()).Select(p => p.Id).Should().Equal(photoA.Id);
             (await PhotoAsset.Get(photoB.Id, CancellationToken.None)).Should().BeNull();     // cross-event IDOR → fail-closed null
             (await PhotoAsset.Get(photoA.Id, CancellationToken.None)).Should().NotBeNull();
-        }
+            return true;
+        });
+        scopedRead.Rejected.Should().BeFalse();
 
         // 3. Proofing: the guest selects + rates photoA 5; the studio's own PhotoAsset.Rating (3) is untouched.
         await proofing.SetSelectionAsync(guestId, eventA.Id, photoA.Id, studio, selected: true, rating: 5, comment: "love this");
         (await ProofSelection.Get(ProofSelection.KeyFor(guestId, photoA.Id)))!.Rating.Should().Be(5);
         using (Tenant.Use(studio))
-        using (Subject.System())   // the studio/platform reads with full access
             (await PhotoAsset.Get(photoA.Id, CancellationToken.None))!.Rating.Should().Be(3);
 
         // 4. The studio reads the client's selections.
@@ -119,25 +141,21 @@ public sealed class SnapVaultGuestLifecycleSpec
         (await GalleryGrant.Get(GalleryGrant.KeyFor(guestId, eventA.Id))).Should().BeNull();   // grant gone
         (await Membership.Get(Membership.KeyFor(studio, guestId))).Should().BeNull();           // seat gone
 
-        // 6. Post-erasure the client's read fails closed (no grants → constrained-empty subject → deny-all).
-        var afterScopes = await scopes.ScopesForAsync(guestId);
-        afterScopes.Should().BeEmpty();
-        using (Tenant.Use(studio))
-        using (Subject.Use(guestId, afterScopes))
-            (await PhotoAsset.All()).Should().BeEmpty();
+        // 6. Post-erasure the same link rejects before downstream Entity work.
+        var afterClosure = await RunGalleryContext(guestId, eventA.Id, () => PhotoAsset.All());
+        afterClosure.Rejected.Should().BeTrue();
     }
 
-    [Fact(DisplayName = "media serving is access-scoped: MediaEntitySource resolves a photo only for a subject that can see it")]
+    [Fact(DisplayName = "media serving inherits gallery context: MediaEntitySource resolves only a visible photo")]
     public async Task Media_serving_inherits_the_access_axis()
     {
         // The framework generic SnapVault registers as its IMediaSource. Serving resolves the media id THROUGH
-        // PhotoAsset.Get, so the SEC-0008 access axis gates the media bytes exactly like a raw Entity read —
+        // PhotoAsset.Get, so the contributed request predicate gates media bytes exactly like a raw Entity read —
         // the moat: a guest can't fetch another event's photo bytes by id (an IDOR the legacy anonymous
         // MediaController allowed), and a subject-less request fails closed. All three assertions short-circuit
         // at the Get gate (null) before any storage read, so they hold even while the blob leg is parked.
         var source = new MediaEntitySource<PhotoAsset>();
         var grants = Svc<GalleryGrantService>();
-        var scopes = Svc<GuestScopeService>();
 
         var stamp = Stamp();
         var studio = "studio-" + stamp;
@@ -157,23 +175,17 @@ public sealed class SnapVaultGuestLifecycleSpec
 
         // The guest is granted eventA only.
         (await grants.GrantAsync(studio, eventA.Id, guestId)).Outcome.Should().Be(GalleryGrantOutcome.Granted);
-        var guestScopes = await scopes.ScopesForAsync(guestId);
 
-        using (Tenant.Use(studio))
-        using (Subject.Use(guestId, guestScopes))
+        var scopedMedia = await RunGalleryContext(guestId, eventA.Id, async () =>
         {
             // Cross-event: the guest cannot resolve eventB's photo bytes → fail-closed null → 404 upstream.
             (await source.OpenAsync(photoB.Id, CancellationToken.None)).Should().BeNull();
-        }
-
-        // No established subject at all → the media source refuses to resolve (the step-5 tripwire's safety net:
-        // an unauthenticated /media request can't serve until a subject is set on the request path).
-        using (Tenant.Use(studio))
-            (await source.OpenAsync(photoA.Id, CancellationToken.None)).Should().BeNull();
+            return true;
+        });
+        scopedMedia.Rejected.Should().BeFalse();
 
         // Unknown id under full access → null (not an error).
         using (Tenant.Use(studio))
-        using (Subject.System())
             (await source.OpenAsync("no-such-photo-" + stamp, CancellationToken.None)).Should().BeNull();
     }
 

@@ -48,7 +48,8 @@ internal sealed class EntityCachePlan(
             entityType,
             policy,
             CacheKeyTemplate.For(policy.KeyTemplate),
-            ResolveExclusion(entityType));
+            ResolveExclusion(entityType),
+            () => IsReadScopedNow(entityType));
     }
 
     public Resolution Require(Type entityType)
@@ -102,11 +103,20 @@ internal sealed class EntityCachePlan(
         return null;
     }
 
+    private bool IsReadScopedNow(Type entityType)
+    {
+        foreach (var contributor in _readContributors)
+            if (contributor.ReadFilter(entityType) is not null)
+                return true;
+        return false;
+    }
+
     internal sealed class Resolution(
         Type entityType,
         CachePolicyDescriptor policy,
         CacheKeyTemplate template,
-        string? exclusionReason)
+        string? exclusionReason,
+        Func<bool> readScopedNow)
     {
         public Type EntityType { get; } = entityType;
 
@@ -115,6 +125,12 @@ internal sealed class EntityCachePlan(
         public CachePolicyDescriptor Policy { get; } = policy;
 
         public string? ExclusionReason { get; } = exclusionReason;
+
+        /// <summary>
+        /// True when an ambient read contributor currently narrows this Entity. A scoped operation must bypass the
+        /// global id cache even when the contributor's applicability is dynamic rather than type-declared at boot.
+        /// </summary>
+        public bool IsReadScopedNow() => readScopedNow();
 
         public bool TryBuildKey(object? entity, object? id, out CacheKey key)
         {

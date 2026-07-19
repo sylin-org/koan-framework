@@ -1,4 +1,3 @@
-using Koan.Data.Access;
 using Koan.Data.Core;
 using Koan.Tenancy;
 using Microsoft.AspNetCore.Http;
@@ -11,9 +10,9 @@ namespace SnapVault.Controllers;
 
 /// <summary>
 /// Invited-client proofing and the studio's client-selection read. A mark is authorized against the client's own <see cref="GalleryGrant"/>,
-/// and every scope id (event, studio) is derived SERVER-SIDE from the ambient subject + the photo — never from the
-/// caller. The photo is loaded under the guest's constrained subject, so a cross-set photo id resolves to null (the
-/// access axis) and is refused before any write. Grant permissions and read scope both gate the write.
+/// and every scope id (event, studio) is derived SERVER-SIDE from the validated request context + the photo — never from the
+/// caller. The photo is loaded under the validated gallery request filter, so a cross-set photo id resolves to null
+/// and is refused before any write. Grant permissions and read scope both gate the write.
 /// </summary>
 [ApiController]
 [Route("api/proofing")]
@@ -27,22 +26,19 @@ public sealed class ProofingController : ControllerBase
     [HttpPost("{photoId}")]
     public async Task<IActionResult> SetMark(string photoId, [FromBody] ProofMarkRequest request, CancellationToken ct = default)
     {
-        // Must be a CONSTRAINED guest subject (an operator is unconstrained; a job is system) — proofing is guest-only.
-        var subject = Subject.Current;
-        if (subject is null || subject.IsSystem || !subject.IsConstrained || string.IsNullOrEmpty(subject.Id))
+        var grant = SnapVaultContextContributor.CurrentGrant(HttpContext);
+        if (grant is null)
             return StatusCode(StatusCodes.Status403Forbidden, new { error = "Proofing requires an invited-guest session." });
-        var guestId = subject.Id!;
+        var guestId = grant.IdentityId;
 
         if (request is null || (request.Favorite is null && request.Rating is null && request.Selected is null && request.Comment is null))
             return BadRequest(new { error = "No mark provided." });
 
-        // Load the photo UNDER the guest's subject: a cross-set (or cross-studio) photo id resolves to null → refuse.
+        // The request contributor already scoped PhotoAsset reads: a cross-set (or cross-studio) id resolves to null.
         var photo = await PhotoAsset.Get(photoId, ct);
         if (photo is null) return NotFound();
 
-        // Derive the grant from (guest, photo.EventId) — never a caller-supplied event/studio id.
-        var grant = await GalleryGrant.Get(GalleryGrant.KeyFor(guestId, photo.EventId));
-        if (grant is null || !grant.IsActive) return StatusCode(StatusCodes.Status403Forbidden, new { error = "No active grant for this photo." });
+        if (!string.Equals(grant.EventId, photo.EventId, StringComparison.Ordinal)) return NotFound();
 
         // Permission floor: a favorite/rating/select mark needs "select"; a comment needs "comment".
         var wantsMark = request.Favorite is not null || request.Rating is not null || request.Selected is not null;

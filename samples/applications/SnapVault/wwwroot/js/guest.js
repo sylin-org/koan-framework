@@ -2,14 +2,15 @@
  * SnapVault — granted-client proofing gallery.
  *
  * The flow: a client opens their event link while signed in as the durable identity the studio granted. Their
- * event's photos load through the access-scoped subject derived from that grant; selection/rating writes pass through
- * the same guest floor. The query parameter chooses a view, never authority—the stored grant remains the constraint.
+ * every API/media request carries that selector; the server-side Web context contributor validates the durable grant
+ * before contributing the request's tenant and photo filter. The selector is evidence, never authority.
  */
 import { API } from './api.js';
 
 const api = new API();
 const statusEl = document.getElementById('status');
 const galleryEl = document.getElementById('gallery');
+let activeEventId = '';
 
 async function main() {
   const eventId = new URLSearchParams(location.search).get('event');
@@ -18,13 +19,14 @@ async function main() {
     return;
   }
 
+  activeEventId = eventId;
   await loadGallery(eventId);
 }
 
 async function loadGallery(eventId) {
   let photos;
   try {
-    const res = await api.post('/api/photosets/query', {
+    const res = await api.post(scoped('/api/photosets/query'), {
       startIndex: 0,
       count: 500,
       definition: { context: 'event', eventId }
@@ -51,7 +53,7 @@ function renderCard(photo) {
   const id = escapeAttr(photo.id);
   return `
     <figure class="guest-card" data-photo="${id}">
-      <img loading="lazy" src="/media/${id}/gallery" alt="${escapeAttr(photo.fileName)}">
+      <img loading="lazy" src="${scoped(`/media/${id}/gallery`)}" alt="${escapeAttr(photo.fileName)}">
       <figcaption>
         <button class="pick" type="button" aria-pressed="false" data-photo="${id}">☆ Select</button>
         <span class="stars" role="group" aria-label="Rate this photo">
@@ -65,7 +67,7 @@ async function toggleSelect(btn) {
   const photoId = btn.dataset.photo;
   const next = btn.getAttribute('aria-pressed') !== 'true';
   try {
-    await api.post(`/api/proofing/${photoId}`, { selected: next });
+    await api.post(scoped(`/api/proofing/${photoId}`), { selected: next });
     btn.setAttribute('aria-pressed', String(next));
     btn.textContent = next ? '★ Selected' : '☆ Select';
     btn.closest('.guest-card')?.classList.toggle('selected', next);
@@ -78,7 +80,7 @@ async function rate(btn) {
   const photoId = btn.dataset.photo;
   const value = parseInt(btn.dataset.value, 10);
   try {
-    await api.post(`/api/proofing/${photoId}`, { rating: value });
+    await api.post(scoped(`/api/proofing/${photoId}`), { rating: value });
     const stars = [...btn.parentElement.querySelectorAll('button')];
     stars.forEach((star, index) => star.classList.toggle('on', index < value));
   } catch (error) {
@@ -90,6 +92,11 @@ function escapeAttr(value) {
   const div = document.createElement('div');
   div.textContent = value ?? '';
   return div.innerHTML.replace(/"/g, '&quot;');
+}
+
+function scoped(path) {
+  const separator = path.includes('?') ? '&' : '?';
+  return `${path}${separator}event=${encodeURIComponent(activeEventId)}`;
 }
 
 main();

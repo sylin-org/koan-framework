@@ -221,10 +221,10 @@ public class EmbeddingWorker(
 
         try
         {
-            // Restore the Koan context (tenant + access subject) captured at enqueue so this global worker
-            // reads/writes the scoped entity, vector, and state in the scope it belongs to. Without it, a
-            // [AccessScoped]/tenant-scoped entity reads back null (fail-closed) → "not found". Fail-closed itself: an
-            // unrestorable carrier throws here and the job is retried/dead-lettered, never silently mis-scoped.
+            // Restore durable service context (tenant + registered carrier axes) captured at enqueue so this global
+            // worker reads/writes the entity, vector, and state in the scope they belong to. Request-only Web filters
+            // are intentionally not carried into jobs. An unrestorable carrier throws here and the job is
+            // retried/dead-lettered, never silently mis-scoped.
             using var _ambient = contextCarriers.Restore(job.AmbientCarrier, ContextIngressTrust.HostTrusted);
 
             // Load the entity to get fresh data

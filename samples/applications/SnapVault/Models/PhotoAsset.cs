@@ -3,7 +3,6 @@ using Koan.Storage;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.AI.Attributes;
 using Koan.Data.Core.Relationships;
-using Koan.Data.Access;
 
 namespace SnapVault.Models;
 
@@ -19,8 +18,6 @@ namespace SnapVault.Models;
     Version = 2,
     Model = "nomic-embed-text",
     Exclude = ["EventId", "InferredStyleId"])]
-// A constrained client sees only photos whose globally unique EventId appears in an "event:<id>" grant.
-[AccessScoped("EventId", "event:")]
 public class PhotoAsset : MediaEntity<PhotoAsset>
 {
     // Event relationship

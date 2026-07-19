@@ -8,20 +8,20 @@ Identity's effective-access explanation, and explicit identity/seat lifecycle cl
 protocol, bearer-token issuer, tenant CRUD API, or invitation ceremony.
 
 `IdentityTenancyModule` binds and validates carrier options, registers four `ITenantResolver` implementations, adds one
-`AfterAuthentication` web-pipeline contributor, and registers `DeprovisioningService`. Identity's existing discovered
+ordered `IWebContextContributor`, and registers `DeprovisioningService`. Identity's existing discovered
 contributor registry finds `MembershipAccessContributor`; the bridge does not create another registry or activation
 ordering mechanism.
 
 ## Request isolation chokepoint
 
-`TenantResolutionMiddleware` executes after authentication:
+`TenantResolutionContributor` executes automatically in Web's ordered context lifecycle after authentication:
 
 1. reject anonymous subjects before carrier/control-plane lookup;
 2. ask claim, header, subdomain, and path resolvers in that order for the first tenant candidate;
 3. query one matching `Membership`, which both authorizes the candidate and supplies tenant roles;
 4. load the durable `Identity` and require `IsActive`;
-5. strip reserved Identity/Tenancy host roles, project the remaining standard role claims, and run the rest of the
-   request inside `Tenant.Use(candidate)`;
+5. strip reserved Identity/Tenancy host roles, project the remaining standard role claims, and contribute
+   `Tenant.Use(candidate)` for the rest of the request;
 6. restore the original principal and ambient context on exit.
 
 Unresolved or unauthorized requests continue unscoped rather than returning a tenant-existence oracle. Downstream

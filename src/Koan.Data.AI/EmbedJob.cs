@@ -21,10 +21,11 @@ public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>, IAmbientExempt
     public required string EntityId { get; set; }
 
     /// <summary>
-    /// The Koan context (tenant, access subject, …) captured at enqueue, keyed by axis. The embedding worker is a
-    /// global background service with no context of its own, so it restores this before loading the
-    /// entity + writing the vector/state — without it, a <c>[AccessScoped]</c> / tenant-scoped entity reads back as
-    /// "not found" (fail-closed) and its embedding never lands. Null when no cross-cutting axis was in scope.
+    /// The durable Koan service context (tenant and other registered carrier axes) captured at enqueue, keyed by axis. The embedding worker is a
+/// global background service with no context of its own, so it restores this before loading the
+    /// entity + writing the vector/state — without it, a tenant-scoped entity reads back as "not found" and its
+    /// embedding never lands. Request-only Web filters are intentionally not durable job context; a job that needs
+    /// authorization must re-resolve its own application capability. Null when no carrier axis was in scope.
     /// Carried opaquely (this record names no axis), mirroring <c>JobRecord.AmbientCarrier</c>.
     /// The property name is retained for persisted-wire compatibility.
     /// </summary>

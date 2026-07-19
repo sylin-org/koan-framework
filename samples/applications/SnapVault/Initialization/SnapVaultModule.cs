@@ -7,6 +7,7 @@ using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
 using Koan.Web.Hosting;
+using Koan.Web.Context;
 using SnapVault.Configuration;
 using SnapVault.Services;
 
@@ -23,7 +24,6 @@ public sealed class SnapVaultModule : KoanModule
 
         // Studio-to-client lifecycle: explicit grant, proof, and integrity-checked deprovisioning.
         services.AddSingleton<GalleryGrantService>();
-        services.AddSingleton<GuestScopeService>();
         services.AddSingleton<ProofingService>();
         services.AddSingleton<SnapVaultDeprovisioningService>();
 
@@ -34,8 +34,8 @@ public sealed class SnapVaultModule : KoanModule
         // Session-windowed gallery queries.
         services.AddSingleton<PhotoSetService>();
 
-        // Every request receives an explicit guest/operator subject; missing subjects remain fail-closed.
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanWebPipelineContributor, SnapVaultSubjectContributor>());
+        // One request contributor validates gallery links and contributes their tenant/read context.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IWebContextContributor, SnapVaultContextContributor>());
 
         // Structural blob cleanup belongs to host composition, not mutable process state.
         PhotoAssetCleanup.Register();

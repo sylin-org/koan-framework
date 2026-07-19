@@ -10,9 +10,9 @@ namespace Koan.Media.Web.Routing;
 /// controller computes — with the rendered bytes held as this <see cref="StorageEntity{TEntity}"/>'s
 /// blob. Kept a distinct entity type (not a derived row of the app's <c>MediaEntity&lt;T&gt;</c>) so
 /// cached renders never pollute the app's own queries, and tenant-scoped like any entity so a studio's
-/// renders stay isolated. It is deliberately NOT <c>[AccessScoped]</c>: the source access gate already
-/// fired in <see cref="MediaEntitySource{TEntity}.OpenAsync"/> (which the controller calls before any
-/// derivation lookup), so the cache carries no access axis of its own.
+/// renders stay isolated. It deliberately carries no separate request-context policy: the source entity resolve
+/// already ran in <see cref="MediaEntitySource{TEntity}.OpenAsync"/> (which the controller calls before any
+/// derivation lookup), so the cache does not duplicate the application's authorization rule.
 ///
 /// <para>The bytes are keyed by (source, recipe fingerprint), not by source <i>content</i> — matching the
 /// framework's MEDIA-0007 contract — so it assumes originals are immutable per id (true for

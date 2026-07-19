@@ -9,11 +9,11 @@ using Koan.Tenancy;
 namespace SnapVault.Models;
 
 /// <summary>
-/// The fail-closed source of a guest's scoped access to one shareable SET (an <see cref="Event"/>). Minted by an
-/// explicit studio grant; consumed by the guest read path to narrow every PhotoAsset read to the granted events.
-/// The grant itself is the filter.
+/// The fail-closed source of a guest's scoped access to one shareable set (an <see cref="Event"/>). Minted by an
+/// explicit studio grant; the Web context contributor validates the link selector against this row once per request
+/// and contributes the corresponding PhotoAsset predicate.
 /// <para>
-/// [HostScoped] (like <c>Membership</c>) so it is resolvable from the read-path hook without an ambient
+/// [HostScoped] (like <c>Membership</c>) so it is resolvable from the request contributor without an ambient
 /// studio tenant; <see cref="StudioTenantId"/> carries the scope explicitly. Revocation is immediate — the hook
 /// re-reads grants per request, so removing this row fail-closes the next read.
 /// </para>
@@ -66,8 +66,7 @@ public sealed class GalleryGrant : Entity<GalleryGrant>
            && (ExpiresAt is null || DateTimeOffset.UtcNow < ExpiresAt);
 
     /// <summary>Deterministic id — one grant per (guest, event) so command retries converge instead of duplicating.
-    /// INVARIANT: <paramref name="eventId"/> MUST be a globally-unique, delimiter-free id (a GUID) — it becomes the
-    /// <c>"event:&lt;id&gt;"</c> access-scope token, so a slug/email would break both the (guest,event) uniqueness and
-    /// access-scope token contract (U+001F carrier join plus the <c>"event:"</c> prefix; a GUID contains neither).</summary>
+    /// INVARIANT: <paramref name="eventId"/> is globally unique; the pair is both the durable grant identity and the
+    /// server-side lookup used to validate a gallery link.</summary>
     public static string KeyFor(string identityId, string eventId) => DeterministicId.From(identityId, eventId);
 }

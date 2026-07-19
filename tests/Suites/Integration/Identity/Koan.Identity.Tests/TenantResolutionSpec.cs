@@ -9,13 +9,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Koan.Web.Context;
 using Xunit;
 
 namespace Koan.Identity.Tests;
 
 /// <summary>
 /// SEC-0007 P4 / Layer-4 acceptance (ARCH-0079 — real <c>AddKoan()</c>, offline): the tenant-resolution carriers and
-/// the <c>AfterAuthentication</c> middleware that scopes a request to a <b>membership-authorized</b> tenant. The
+/// the ordered Web context contributor that scopes a request to a <b>membership-authorized</b> tenant. The
 /// scoping is enforced on the REQUEST PATH (re-evaluated every request) — a forged carrier or a non-member is never
 /// scoped in, which is the whole point of the SnapVault D1 gap this closes.
 /// </summary>
@@ -43,16 +44,29 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
     public void Path_carrier_extracts_the_segment_after_the_prefix(string path, string prefix, string? expected)
         => PathTenantResolver.ExtractCode(path, prefix).Should().Be(expected);
 
-    // ── The middleware, end-to-end against the real resolvers + store ────────────────────────────────────────────
+    // ── The contributor, end-to-end against the real resolvers + store ──────────────────────────────────────────
 
-    private async Task<string?> RunMiddlewareAsync(Action<DefaultHttpContext> configure)
+    private async Task RunContributorAsync(DefaultHttpContext context, Func<DefaultHttpContext, Task> inside)
+    {
+        var contributor = new TenantResolutionContributor(
+            _fx.Services.GetServices<ITenantResolver>(),
+            _fx.Services.GetRequiredService<IOptions<TenancyResolutionOptions>>());
+        var webContext = new WebContext(context);
+        await contributor.ContributeAsync(webContext);
+        using var entered = webContext.EnterPending();
+        await inside(context);
+    }
+
+    private async Task<string?> RunContextAsync(Action<DefaultHttpContext> configure)
     {
         var ctx = new DefaultHttpContext { RequestServices = _fx.Services };
         configure(ctx);
         string? scoped = null;
-        var mw = new TenantResolutionMiddleware(_ => { scoped = Tenant.Current?.Id; return Task.CompletedTask; });
-        await mw.InvokeAsync(ctx, _fx.Services.GetServices<ITenantResolver>(),
-            _fx.Services.GetRequiredService<IOptions<TenancyResolutionOptions>>());
+        await RunContributorAsync(ctx, _ =>
+        {
+            scoped = Tenant.Current?.Id;
+            return Task.CompletedTask;
+        });
         return scoped;
     }
 
@@ -87,7 +101,7 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
         await new TenantRecord { Id = "tr-acme", Name = "Acme", Code = "acme" }.Save();
         await new Membership { TenantId = "tr-acme", IdentityId = "carrier-alice", Roles = { "koan:member" } }.Save();
 
-        var scoped = await RunMiddlewareAsync(ctx =>
+        var scoped = await RunContextAsync(ctx =>
         {
             SignedIn(ctx, "carrier-alice");
             ctx.Request.Headers["X-Koan-Tenant"] = "acme"; // the Code, not the id
@@ -103,7 +117,7 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
         await new TenantRecord { Id = "tr-globex", Name = "Globex", Code = "globex" }.Save();
         await new Membership { TenantId = "tr-globex", IdentityId = "carrier-bob", Roles = { "koan:member" } }.Save();
 
-        var scoped = await RunMiddlewareAsync(ctx =>
+        var scoped = await RunContextAsync(ctx =>
         {
             SignedIn(ctx, "carrier-bob");
             ctx.Request.Path = "/t/globex/orders";
@@ -119,7 +133,7 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
         await new TenantRecord { Id = "tr-initech", Name = "Initech" }.Save();
         await new Membership { TenantId = "tr-initech", IdentityId = "carrier-claire", Roles = { "koan:member" } }.Save();
 
-        var scoped = await RunMiddlewareAsync(ctx =>
+        var scoped = await RunContextAsync(ctx =>
         {
             ctx.User = new ClaimsPrincipal(new ClaimsIdentity(new[]
             {
@@ -137,7 +151,7 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
         await new TenantRecord { Id = "tr-secret", Name = "Secret", Code = "secret" }.Save();
         // mallory is signed in but holds NO membership in tr-secret.
 
-        var scoped = await RunMiddlewareAsync(ctx =>
+        var scoped = await RunContextAsync(ctx =>
         {
             SignedIn(ctx, "mallory");
             ctx.Request.Headers["X-Koan-Tenant"] = "secret";
@@ -151,7 +165,7 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
     {
         await new TenantRecord { Id = "tr-anon", Name = "Anon", Code = "anon" }.Save();
 
-        var scoped = await RunMiddlewareAsync(ctx => ctx.Request.Headers["X-Koan-Tenant"] = "anon");
+        var scoped = await RunContextAsync(ctx => ctx.Request.Headers["X-Koan-Tenant"] = "anon");
 
         scoped.Should().BeNull("an anonymous principal can never be a member, so it is never scoped");
     }
@@ -159,7 +173,7 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
     [Fact]
     public async Task An_unknown_routing_code_resolves_to_nothing()
     {
-        var scoped = await RunMiddlewareAsync(ctx =>
+        var scoped = await RunContextAsync(ctx =>
         {
             SignedIn(ctx, "carrier-alice");
             ctx.Request.Headers["X-Koan-Tenant"] = "no-such-tenant-code";
@@ -179,9 +193,11 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
         var ctx = new DefaultHttpContext { RequestServices = _fx.Services };
         SignedIn(ctx, "roleproj-user");
         ctx.Request.Headers["X-Koan-Tenant"] = "roleproj";
-        var mw = new TenantResolutionMiddleware(c => { inRoleInside = c.User.IsInRole("koan:manager"); return Task.CompletedTask; });
-        await mw.InvokeAsync(ctx, _fx.Services.GetServices<ITenantResolver>(),
-            _fx.Services.GetRequiredService<IOptions<TenancyResolutionOptions>>());
+        await RunContributorAsync(ctx, c =>
+        {
+            inRoleInside = c.User.IsInRole("koan:manager");
+            return Task.CompletedTask;
+        });
 
         inRoleInside.Should().BeTrue("Membership.Roles must be HONORED on the request path (projected as role claims the authorize floor reads), not write-only");
         ctx.User.IsInRole("koan:manager").Should().BeFalse("the projection is scoped to the request — the principal is restored after the scope");
@@ -205,15 +221,13 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
         var ctx = new DefaultHttpContext { RequestServices = _fx.Services };
         SignedIn(ctx, "backdoor-user");
         ctx.Request.Headers["X-Koan-Tenant"] = "backdoor";
-        var mw = new TenantResolutionMiddleware(c =>
+        await RunContributorAsync(ctx, c =>
         {
             tenancyOperatorInside = c.User.IsInRole(TenancyRoles.Operator);
             identityOperatorInside = c.User.IsInRole(IdentityRoles.Operator);
             memberInside = c.User.IsInRole("koan:member");
             return Task.CompletedTask;
         });
-        await mw.InvokeAsync(ctx, _fx.Services.GetServices<ITenantResolver>(),
-            _fx.Services.GetRequiredService<IOptions<TenancyResolutionOptions>>());
 
         tenancyOperatorInside.Should().BeFalse("a tenant membership must never project fleet operator authority");
         identityOperatorInside.Should().BeFalse("a tenant membership must never project global identity authority");
@@ -230,9 +244,12 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
         var ctx = new DefaultHttpContext { RequestServices = _fx.Services };
         SignedIn(ctx, "outsider");
         ctx.Request.Headers["X-Koan-Tenant"] = "noproj";
-        var mw = new TenantResolutionMiddleware(c => { scoped = Tenant.Current is not null; inRole = c.User.IsInRole("koan:manager"); return Task.CompletedTask; });
-        await mw.InvokeAsync(ctx, _fx.Services.GetServices<ITenantResolver>(),
-            _fx.Services.GetRequiredService<IOptions<TenancyResolutionOptions>>());
+        await RunContributorAsync(ctx, c =>
+        {
+            scoped = Tenant.Current is not null;
+            inRole = c.User.IsInRole("koan:manager");
+            return Task.CompletedTask;
+        });
 
         scoped.Should().Be(false, "a non-member is not scoped in");
         inRole.Should().BeFalse("and never inherits another member's tenant role");
@@ -246,13 +263,13 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
         var membership = await new Membership { TenantId = "tr-churn", IdentityId = "churn-user", Roles = { "koan:member" } }.Save();
 
         // Request 1 — scoped while a member.
-        (await RunMiddlewareAsync(ctx => { SignedIn(ctx, "churn-user"); ctx.Request.Headers["X-Koan-Tenant"] = "churn"; }))
+        (await RunContextAsync(ctx => { SignedIn(ctx, "churn-user"); ctx.Request.Headers["X-Koan-Tenant"] = "churn"; }))
             .Should().Be("tr-churn");
 
         await membership.Remove();
 
         // Request 2 — the SAME carrier no longer scopes, because authorization is re-evaluated on the request path.
-        (await RunMiddlewareAsync(ctx => { SignedIn(ctx, "churn-user"); ctx.Request.Headers["X-Koan-Tenant"] = "churn"; }))
+        (await RunContextAsync(ctx => { SignedIn(ctx, "churn-user"); ctx.Request.Headers["X-Koan-Tenant"] = "churn"; }))
             .Should().BeNull("enforcement is on the request path, not a write-only flag");
     }
 
@@ -263,7 +280,7 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
         await new TenantRecord { Id = "tr-inactive", Name = "Inactive", Code = "inactive" }.Save();
         await new Membership { TenantId = "tr-inactive", IdentityId = "inactive-user", Roles = { "koan:member" } }.Save();
 
-        var scoped = await RunMiddlewareAsync(ctx =>
+        var scoped = await RunContextAsync(ctx =>
         {
             SignedIn(ctx, "inactive-user");
             ctx.Request.Headers["X-Koan-Tenant"] = "inactive";

@@ -35,10 +35,6 @@
       "version": "0.18"
     },
     {
-      "id": "Koan.Data.Access",
-      "version": "0.17"
-    },
-    {
       "id": "Koan.Data.Connector.Sqlite",
       "version": "0.17"
     },
@@ -143,10 +139,6 @@
     {
       "kind": "project",
       "id": "Koan.Data.AI"
-    },
-    {
-      "kind": "project",
-      "id": "Koan.Data.Access"
     },
     {
       "kind": "project",

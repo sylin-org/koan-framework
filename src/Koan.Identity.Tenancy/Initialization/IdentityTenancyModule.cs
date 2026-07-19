@@ -10,7 +10,7 @@ using Koan.Core.Provenance;
 using Koan.Identity.Tenancy.Deprovisioning;
 using Koan.Identity.Tenancy.Resolvers;
 using Koan.Tenancy;
-using Koan.Web.Hosting;
+using Koan.Web.Context;
 
 namespace Koan.Identity.Tenancy.Initialization;
 
@@ -47,8 +47,8 @@ public sealed class IdentityTenancyModule : KoanModule
         services.AddSingleton<ITenantResolver, SubdomainTenantResolver>();
         services.AddSingleton<ITenantResolver, PathTenantResolver>();
 
-        // P4 — the middleware that scopes the request to the resolved, membership-authorized tenant (AfterAuthentication).
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanWebPipelineContributor, TenantResolutionContributor>());
+        // P4 — one ordered Web-context contribution resolves and membership-authorizes the inbound tenant.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IWebContextContributor, TenantResolutionContributor>());
 
         // P4 — one explicit lifecycle workflow for closing seats and durable persons.
         services.TryAddSingleton<DeprovisioningService>();

@@ -564,7 +564,7 @@ class SnapVaultApp {
     try {
       this.setLoading(true);
 
-      // Unified onto the #5 windowed grid via the "event" context (access-scoped, so a guest's event browse is
+      // Unified onto the #5 windowed grid via the "event" context (request-scoped, so a guest's event browse is
       // confined to their granted event for free) — no longer capped at the old 50-row by-event page. A generous
       // window covers a realistic event; a full infinite-scroll routes through PhotoSetManager (follow-on).
       const response = await this.api.post('/api/photosets/query', {

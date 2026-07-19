@@ -26,14 +26,13 @@ namespace Koan.Media.Web.Controllers;
 /// routing on the subclass. They are not auto-registered; the host
 /// app registers each one explicitly.</para>
 ///
-/// <para><b>SECURITY — not access-axis-aware.</b> This controller streams bytes addressed by their storage
+/// <para><b>SECURITY — raw storage has no entity read context.</b> This controller streams bytes addressed by their storage
 /// <i>key</i> via <c>StorageEntity&lt;TEntity&gt;.OpenRead(key)</c>. That path applies STORAGE-layer isolation
-/// (the tenant particle, STOR-0011) but NOT the SEC-0008 data-layer access axis — the row-visibility predicate
-/// only folds in on an entity read (<c>Data&lt;T&gt;.Get</c>/<c>Query</c>), which this bypasses. Do <b>not</b>
-/// subclass this for an <c>[AccessScoped]</c> media type expecting per-subject scoping: a caller with a key
-/// would fetch bytes across the access axis (an IDOR). For access-scoped serving use the recipe pipeline
+/// (the tenant particle, STOR-0011) but not request-contributed entity predicates, which fold in only on an entity
+/// read (<c>Data&lt;T&gt;.Get</c>/<c>Query</c>). Do <b>not</b> subclass this for media whose authorization is expressed
+/// as an entity predicate: a caller with a key would bypass that predicate (an IDOR). For context-aware serving use the recipe pipeline
 /// (<see cref="MediaController"/> + <see cref="Routing.MediaEntitySource{TEntity}"/>), which resolves through
-/// the entity layer. This controller is for raw-bytes access to media that is NOT access-scoped.</para>
+/// the entity layer. This controller is for raw-bytes access governed by storage and tenant boundaries alone.</para>
 /// </summary>
 [ApiController]
 [Route("api/media")]

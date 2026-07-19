@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core;
-using Koan.Data.Access;
 using Koan.Data.Core;
 using Koan.Jobs;
 using Koan.Tenancy;
@@ -80,7 +79,6 @@ public sealed class SnapVaultIngestSpec
 
         // The pipeline created the photo under the studio, with dimensions read from the JPEG and a daily event.
         using (Tenant.Use(studio))
-        using (Subject.System())
         {
             var photos = await PhotoAsset.All();
             var photo = photos.Single(p => p.OriginalFileName == "sunset.jpg");

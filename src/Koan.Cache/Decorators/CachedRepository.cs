@@ -63,6 +63,13 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
+        // The cache decorates outside Data's canonical read fold. A dynamic request predicate therefore has to bypass
+        // the global id entry here, before a cache hit can short-circuit the scoped store read.
+        if (_plan.IsReadScopedNow())
+        {
+            return await _inner.Get(id, ct);
+        }
+
         var effectiveStrategy = ResolveEffectiveStrategy();
 
         if (effectiveStrategy is CacheStrategy.NoCache or CacheStrategy.SetOnly or CacheStrategy.Invalidate)
@@ -269,6 +276,13 @@ internal sealed class CachedRepository<TEntity, TKey> :
     {
         if (_entityPolicy.Strategy is CacheStrategy.NoCache)
         {
+            return;
+        }
+
+        // Never seed a globally keyed cache from a request-scoped write. Remove a possible older entry instead.
+        if (_plan.IsReadScopedNow())
+        {
+            if (!IsDefaultKey(entity.Id)) await Remove(entity.Id, ct);
             return;
         }
 

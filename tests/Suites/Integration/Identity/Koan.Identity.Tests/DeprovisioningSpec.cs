@@ -97,7 +97,7 @@ public sealed class DeprovisioningSpec : IdentityHostScopedSpec
         (await Membership.Query(m => m.IdentityId == "dp-seat" && m.TenantId == "dp-tenant")).Should().BeEmpty();
 
         // The request-path proof: the middleware's membership-authorization now fails, so the tenant can't be scoped in.
-        (await TenantResolutionMiddleware.IsMemberAsync("dp-seat", "dp-tenant", default))
+        (await TenantResolutionContributor.IsMemberAsync("dp-seat", "dp-tenant", default))
             .Should().BeFalse("seat removal seals the tenant on the request path (the fail-closed axis does the rest)");
     }
 

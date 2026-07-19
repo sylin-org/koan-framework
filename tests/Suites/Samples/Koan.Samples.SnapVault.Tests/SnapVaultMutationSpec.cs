@@ -3,7 +3,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
-using Koan.Data.Access;
 using Koan.Data.Core;
 using Koan.Media.Web.Routing;
 using Koan.Tenancy;
@@ -43,7 +42,6 @@ public sealed class SnapVaultMutationSpec
     {
         var studio = "studio-" + Stamp();
         using (Tenant.Use(studio))
-        using (Subject.System())
         {
             var ev = new Event { Name = "Shoot" }; await ev.Save();
             var p0 = new PhotoAsset { EventId = ev.Id, OriginalFileName = "0.jpg" }; await p0.Save();
@@ -80,7 +78,6 @@ public sealed class SnapVaultMutationSpec
     {
         var studio = "studio-" + Stamp();
         using (Tenant.Use(studio))
-        using (Subject.System())
         {
             var ev = new Event { Name = "Shoot" }; await ev.Save();
             var photo = new PhotoAsset { EventId = ev.Id, OriginalFileName = "r.jpg" }; await photo.Save();
@@ -99,7 +96,6 @@ public sealed class SnapVaultMutationSpec
     {
         var studio = "studio-" + Stamp();
         using (Tenant.Use(studio))
-        using (Subject.System())
         {
             var ev = new Event { Name = "Shoot" }; await ev.Save();
             var photo = new PhotoAsset
@@ -123,7 +119,6 @@ public sealed class SnapVaultMutationSpec
     {
         var studio = "studio-" + Stamp();
         using (Tenant.Use(studio))
-        using (Subject.System())
         {
             var ev = new Event { Name = "Shoot" }; await ev.Save();
             var p0 = new PhotoAsset { EventId = ev.Id, OriginalFileName = "0.jpg" }; await p0.Save();

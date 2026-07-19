@@ -5,7 +5,7 @@ description: Contracts, configuration, and architecture for Koan’s ASP.NET Cor
 since: 0.2.x
 packages: [Sylin.Koan.Web]
 source: src/Koan.Web/
-last_updated: 2026-07-17
+last_updated: 2026-07-18
 framework_version: source-first
 ---
 
@@ -25,6 +25,7 @@ framework_version: source-first
 ## Key types and surfaces
 
 - `EntityController<TEntity, TKey>`
+- `IWebContextContributor` and `WebContext` for ordered, scoped request-context decisions
 - Transformers for payload shaping (see WEB-0035)
 - `GET /.well-known/Koan/facts` projects `IKoanRuntimeFacts.Current` through `KoanFactJson`.
 
@@ -43,10 +44,28 @@ framework_version: source-first
 - For data access inside controllers, prefer first-class model statics:
   - `Item.FirstPage(...)`, `Item.Page(...)`, `Item.QueryStream(...)`
 
+### Request context
+
+- Register scoped `IWebContextContributor` implementations with standard DI. The Web module mounts one internal
+  runner after authentication; applications do not add contributor middleware manually.
+- Contributors run by `Order`. After each asynchronous contribution returns, the runner synchronously enters its
+  pending principal/capability/filter scopes before invoking the next contributor. Later contributors can therefore
+  depend on earlier validated identity or tenant context. All entered scopes wrap downstream execution and unwind in
+  reverse order.
+- `WebContext.Where<TEntity>(expression)` lowers through Data's normalized filter compiler and AND-composes with
+  other predicates for that Entity type. One Web-owned `IReadFilterContributor` supplies the immutable current map
+  to Data's canonical read fold; Data remains unaware of HTTP vocabulary.
+- `Reject()` stops the request before endpoints with an existence-hiding response. A contributor must distinguish an
+  inapplicable request from applicable-but-invalid evidence explicitly.
+- Global Entity cache reads/writes are bypassed while a dynamic read predicate is active. Static model decoration is
+  not required for cache safety.
+
 ## Edge cases and limits
 
 - Large responses: prefer paging/streaming; set appropriate cache/timeout policies
 - Auth/permissions: integrate with Koan.Web.Auth modules where needed
+- Context predicates authorize reads only. Controller policies still own write decisions; raw storage and raw SQL do
+  not pass through Entity read filters, and request predicates are not durable job context.
 
 ## Observability and security
 

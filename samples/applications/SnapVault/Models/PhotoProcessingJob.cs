@@ -1,4 +1,3 @@
-using Koan.Data.Access;
 using Koan.Data.Core.Model;
 using Koan.Jobs;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,9 +39,6 @@ public sealed class PhotoProcessingJob : Entity<PhotoProcessingJob>, IKoanJob<Ph
 
     public static async Task Execute(PhotoProcessingJob job, JobContext ctx, CancellationToken ct)
     {
-        // Processing is system work inside the studio context restored by Jobs.
-        using var _system = Subject.System();
-
         var service = ctx.Services.GetRequiredService<PhotoProcessingService>();
 
         switch (ctx.Action)

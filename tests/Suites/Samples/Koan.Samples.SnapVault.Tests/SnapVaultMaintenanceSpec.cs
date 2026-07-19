@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AwesomeAssertions;
-using Koan.Data.Access;
 using Koan.Data.Core;
 using Koan.Media.Web.Routing;
 using Koan.Tenancy;
@@ -56,7 +55,6 @@ public sealed class SnapVaultMaintenanceSpec
     {
         var studio = "studio-" + Stamp();
         using (Tenant.Use(studio))
-        using (Subject.System())
         {
             var ev = new Event { Name = "Shoot" }; await ev.Save();
             // 3 originals of 2 GB each + 2 render-cache rows of 512 MB each (Size is the stored byte count; the
@@ -84,7 +82,6 @@ public sealed class SnapVaultMaintenanceSpec
     {
         var studio = "studio-" + Stamp();
         using (Tenant.Use(studio))
-        using (Subject.System())
         {
             var ev = new Event { Name = "Shoot" }; await ev.Save();
             // A real uploaded photo (blob + record) so the wipe's blob-delete is actually exercised, not just the
