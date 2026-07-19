@@ -69,10 +69,15 @@ documentation structure with zero errors / 1,377 non-gating warnings. No full ra
 ran. R12-04 remains open only for the two required independent public-context-only cold reads and any
 corrections they uncover; package-only external-consumer proof remains downstream.
 
-[R12-05](work-items/r12/R12-05-public-consumer-journey.md) is now sized and checkpointed without beginning
-execution. It will reuse the release compiler's existing isolated template, FirstUse, GoldenJourney, facts,
-lock, and corrective-rejection chokepoints; it adds no second consumer harness or CLI. Exact candidate work
-waits for R12-04's real independent readers.
+[R12-05](work-items/r12/R12-05-public-consumer-journey.md) now owns only the frozen local candidate: final
+release-ready copy, one exact source SHA, the complete local ratchet, selective package graph, clean-room
+templates/FirstUse/GoldenJourney, and deterministic escrow. It adds no second harness or CLI and waits for
+R12-04's comprehension-only readers.
+
+[R12-06](work-items/r12/R12-06-publish-and-observe-first-wave.md) owns the separately authorized `dev`
+advancement, existing API-key promotion, immutable Release/NuGet observation, and the first genuine public-feed
+human/agent journey. Local-feed automation is not external-consumer evidence. R12-07 stays unopened until that
+wave supplies a real public upgrade baseline.
 
 ## Recently completed preview foundation
 
@@ -226,12 +231,14 @@ bounded process-exit observation so GoldenJourney can prove fail-fast startup tr
 ## Resume here
 
 1. Verify `git status`, HEAD, and the R12-04 implementation/evidence record before work.
-2. Obtain two independent public-context-only cold reads against the compiled public learning path;
-   record anonymous findings and make repository-owned corrections without exposing initiative history.
+2. Obtain two independent comprehension-only reads against the public learning path; record anonymous findings
+   and correct contradictions. Readers must distinguish candidate readiness from public availability, but they
+   do not execute an unpublished NuGet install.
 3. Re-run the focused R12-04 public-doc, structural-doc, skill, example, packaging-generation, sample-lock,
    and whitespace checks affected by those corrections; do not substitute the full release ratchet.
-4. Close R12-04 only when both readers reproduce the intended story with no unresolved contradiction,
-   then advance to the next R12 maturity slice.
+4. Close R12-04 only when both readers reproduce the intended story with no unresolved contradiction. Then begin
+   R12-05, finalize release-ready public copy, freeze one exact source commit, and run the single complete local
+   candidate boundary without further tracked changes.
 5. Preserve the R08 release compiler and API-key promotion path unless current evidence identifies a
    defect required by the selective preview.
 6. Stop before repository-secret or repository/branch/environment settings, push/merge, tag, GitHub

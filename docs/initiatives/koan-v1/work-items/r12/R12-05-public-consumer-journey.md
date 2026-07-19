@@ -1,138 +1,131 @@
 ---
 type: SPEC
 domain: framework
-title: "R12-05 - Prove the Public Consumer Journey"
-audience: [architects, maintainers, developers, ai-agents]
+title: "R12-05 - Freeze and Certify the First 0.20 Candidate"
+audience: [architects, maintainers, release-engineers, ai-agents]
 status: current
 last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-19
   status: in-progress
-  scope: public-consumer architecture checkpoint; execution waits on R12-04 independent-reader acceptance
+  scope: corrected local-candidate architecture checkpoint; execution waits on R12-04
 ---
 
-# R12-05 — Prove the public consumer journey
+# R12-05 — Freeze and certify the first 0.20 candidate
 
 - Tranche: `T7B — public product maturity`
-- Status: `pending — checkpoint recorded; execution waits on R12-04`
-- Depends on: passed R12-01 through R12-03 and completed R12-04 independent-reader acceptance
-- Unlocks: R12-06 exact initial 0.20 publication and observation
-- Owner: the existing release compiler owns exact package/template execution; independent readers own
-  public comprehension evidence
+- Status: `pending — checkpoint accepted; execution waits on R12-04`
+- Depends on: passed R12-01 through R12-04
+- Unlocks: R12-06 publication and genuine public-feed consumer observation
+- Owner: the existing release compiler owns exact selection, versions, proof, artifacts, and local escrow
 
 ## Meaningful outcome
 
-A developer or coding agent with no repository context follows only Koan's public entry path, installs the
-exact 0.20 candidate, creates an application, reaches a useful Entity result, changes the persistence choice
-without changing business code, diagnoses one rejected intent, and correctly explains the resulting composition.
+Koan has one frozen source commit that is ready to become the first public 0.20 preview wave. Its exact
+selective guarantee boundary, independently versioned package graph, release-ready public narrative,
+templates, FirstUse, GoldenJourney, and recovery evidence pass locally before any remote mutation.
 
-This slice proves the public product before publication. It does not create an alternate quickstart, consumer
-harness, package catalogue, application abstraction, or remote release operation.
+This is release-candidate engineering evidence, not public-consumer evidence. An isolated local feed can
+prove exact package behavior; only packages visible on NuGet can prove the public experience.
 
-## Architecture checkpoint — one package-only consumer path
+## Architecture checkpoint — one frozen local candidate
 
-**Task:** Prove that the coherent R12-04 narrative and selective R12-03 package boundary produce the intended
-application experience from an isolated package feed and CLI home.
+**Task:** Converge all accepted 0.20 source, package, and narrative changes, freeze one source commit, and
+run the repository's existing complete local candidate boundary without publishing it.
 
-**Application intent:** “Start from public Koan guidance, build something useful, change one infrastructure
-decision without redesigning the application, and understand both success and correction.”
+**Application intent:** “Before Koan asks anyone else to try 0.20, prove that the exact package family can
+create and run the documented applications without repository help.”
 
-**Public expression:** Use standard `dotnet new install`, `dotnet new koan-web`, `dotnet restore/build/run`,
-ordinary `PackageReference`, configuration, HTTP, health, and runtime facts. The shortest host and Entity model
-remain unchanged while capability references express deliberate growth.
+**Public expression:** No new application API exists. The candidate must preserve ordinary
+`dotnet new install Sylin.Koan.Templates`, the four-line `AddKoan()` host, `Entity<T>`, and
+`EntityController<T>` path. During local proof the exact nupkg replaces NuGet as the package source;
+that substitution is maintainer evidence and is never taught as the public install path.
 
-**Guarantee/correction:** The exact locally compiled candidate must restore without repository sources or ambient
-Koan packages, reach the documented business result, expose composition facts matching its lock/package graph,
-elect the deliberately referenced local provider, and reject a named unavailable provider with the documented
-correction. Any hidden source edge, stale package range, undisclosed configuration, silent fallback, or mismatch
-between prose and runtime evidence fails before publication and names the owning public surface.
+**Guarantee/correction:** The frozen commit deterministically compiles a coherent manifest, exact package
+identities, bounded internal dependencies, clean artifacts, both templates, FirstUse, GoldenJourney, and
+one escrow marker/bundle. Any drift, audit failure, hidden source edge, package mismatch, stale template
+range, runtime contradiction, or false success stops before staging or publication and names the existing owner.
 
-**Complete intent surface:** install the exact template package; create both public template shapes; restore,
-build, and run in an isolated CLI/package home; exercise Entity persistence and HTTP; replace SQLite with one
-supported zero-administration provider using only its public package/configuration contract; inspect startup,
-health, facts, and `koan.lock.json`; request one unavailable adapter and recover; add the documented Jobs/MCP
-progression through GoldenJourney; remove the added capability/provider and return to the prior result.
+**Complete intent surface:** Finish R12-04 reader corrections; make public copy release-ready; commit every
+tracked change; freeze one source SHA; perform read-only remote-lineage/prerequisite discovery; compile lineage
+and manifest in a disposable checkout; run the one complete local public-release ratchet; pack and inspect the
+exact selected set with clean-room templates, FirstUse, and GoldenJourney; create deterministic local escrow;
+record a go/no-go without making another tracked change. Any correction invalidates the freeze and starts a
+new exact candidate.
 
-**Public concepts:** standard .NET templates, NuGet packages and ranges, `PackageReference`, configuration,
-hosting, HTTP, and health; Koan's existing Entity language, Reference = Intent, startup report, runtime facts,
-composition lock, and generated maturity labels. No R12-specific application concept is introduced.
+**Public concepts:** None. Standard Git commit identity, MSBuild/NBGV package identity, NuGet ranges,
+`dotnet new`, and the already documented Koan application grammar remain the only concepts.
 
-**Docs read:** the R12 charter and R12-01 through R12-04 contracts; root/template/quickstart front doors;
-FirstUse and GoldenJourney; generated product-surface truth; package-first template work in R08-04; retained local
-candidate/API-key evidence in R08-05; and R11-06 package rendering/consumer proof.
+**Docs read:** the R12 charter and R12-01 through R12-04; R08-04 package-first templates; R08-05 retained
+candidate/API-key boundary; `nuget-publishing.md`; `packaging.md`; ARCH-0110; root/template/FirstUse/
+GoldenJourney public entry points.
 
-**Code read:** `PackagePipeline.VerifyCleanRoomAsync`, `TemplatePackageProbe`,
-`CleanRoomApplicationCompiler`, `FirstUseApplicationProbe`, `GoldenJourneyApplicationProbe`, application probe
-constants/hosting, release evidence/bundle validation, and the focused Packaging test owners.
+**Code read:** `release-on-dev.yml`; `PackagingProgram`; `ReleaseLineageCompiler`; `ReleasePlanner`;
+`PackagePipeline`; `TemplatePackageProbe`; FirstUse/GoldenJourney probes; `ReleaseWaveBundle` and its
+coordinator/model/constants; workflow, lineage, planner, package, template, escrow, and recovery tests.
 
-**Reusing:** The release compiler remains the sole exact-candidate and isolated-feed owner.
-`TemplatePackageProbe` remains the template consumer chokepoint; FirstUse and GoldenJourney remain the cumulative
-application probes; runtime facts and `koan.lock.json` remain composition truth. Independent readers follow the
-same public steps and report confusion as anonymous findings in this card rather than through a new ledger.
+**Reusing:** The release compiler remains the sole selection/version owner. The canonical green ratchet remains
+the aggregate source proof. `PackagePipeline --clean-room` remains the package-only execution chokepoint.
+`ReleaseWaveBundle` remains the only local escrow compiler. Existing facts, health, and lockfile assertions remain
+composition truth.
 
-**Creating new:** Add only missing assertions or scenario steps to the existing template/application probes when
-an executable public promise is not already covered. Prefer extending their existing evidence records and bundle
-validation. Add no new runner, scenario DSL, package allowlist, CLI, sample, or maintained support matrix.
+**Creating new:** No production type, release command, manifest, runner, CLI, sample, or evidence ledger is
+planned. Add assertions only inside the existing probe or compiler owner if the exact candidate exposes an
+unproved accepted promise.
 
-**Coalescence:** R08-04 already proves exact template materialization; R08-05 retains exact candidate custody;
-R11-06 proves package-page signatures; R12-04 owns narrative coherence. R12-05 composes these at their existing
-release boundary and deletes or fixes any duplicated proof it exposes. It does not restate package maturity or
-release selection.
+**Coalescence:** Rebuild the former pre-public “consumer journey” card into this local certification boundary.
+Keep R12-04's narrative comprehension review. Transfer all genuine independent installation and provider-swap
+evidence to R12-06 after NuGet visibility. Keep the release compiler, API-key workflow, and immutable escrow as
+the single release path; delete no recovery guard and add no manual publication lane.
 
-**Ergonomics:** Measure time and concepts to first result, edits required to change infrastructure, ability to
-predict what a reference activates, correction usefulness, and whether a fresh reader can explain application
-versus framework responsibility. The ideal provider swap changes package/configuration intent while leaving
-Entity/controller business code untouched.
+**Ergonomics:** The maintainer makes one decision—this source commit is ready—and supplies no package list,
+version, dependency order, or recovery choice. A developer still sees only the normal template/Entity path.
+Local-feed mechanics remain invisible outside release evidence.
 
-**Constraints satisfied:** business intent and user delight lead; fewer meaningful moving parts win; standard
-.NET concepts precede Koan vocabulary; package and context behavior stay at existing compiler/runtime
-chokepoints; only guaranteed owners carry 0.20; `tmp/`, private dogfood, remotes, publication, tags, Releases,
-and repository configuration remain outside scope.
+**Constraints satisfied:** business intent leads; fewer meaningful moving parts win; standard Git/.NET/MSBuild/
+NuGet concepts come first; only supported claims carry 0.20; the one complete ratchet runs only at the frozen
+candidate boundary; private dogfood, `tmp/`, staging, publication, tags, Releases, secrets, and remote mutation
+remain outside scope.
 
-**Risks:** A local feed can conceal ambient NuGet caches or source references; automated probes can prove behavior
-without proving comprehension; infrastructure replacement can accidentally test an unpromoted provider; a broad
-ratchet can obscure a consumer-specific failure. Use an isolated CLI/global-package home, exact candidate feed,
-supported zero-administration package, public-context-only readers, and focused evidence. Stop if R12-04 readers
-still find an unresolved narrative contradiction or if the candidate package boundary changes.
+**Risks:** The local branch currently contains many unpublished events and the authoritative remote lineage may
+still require an all-owner bootstrap. Therefore neither package count nor exact version commit is assumed before
+read-only preflight. A local proof followed by a tracked commit is no longer exact. Remote settings and secret
+existence cannot be inferred from local tests.
 
 ## Work
 
-1. After R12-04 passes, compile one exact selective-0.20 local candidate through the existing release path.
-2. Verify that its template package contains the exact compatible package ranges and no unresolved source/token edge.
-3. Run both templates in an isolated CLI and NuGet home using only the exact candidate feed.
-4. Extend the web-template proof through create/read, facts, health, lock explanation, supported local-provider
-   replacement, removal/recovery, and unavailable-provider correction without changing its business model.
-5. Run package-only FirstUse and GoldenJourney as the progressive capability path; retain their existing
-   application-owned rule, Jobs, MCP, inspectability, and correction evidence.
-6. Give the public entry path and exact candidate to independent human and agent consumers without repository or
-   initiative context. Record anonymous observations, corrections, elapsed time, and whether each could explain
-   composition and responsibility.
-7. Re-run only affected packaging, template, application, docs, skills, lock, and artifact-integrity gates.
-8. Produce one go/no-go record for R12-06. Do not publish.
+1. Close R12-04 with two independent comprehension-only reads and all resulting tracked corrections.
+2. Replace temporary publication-pending language with the final public install posture and rerun affected docs,
+   examples, skills, generated-truth, sample-lock, and focused package checks.
+3. Commit all intended tracked changes, confirm only `tmp/` remains untracked, and record the frozen source SHA.
+4. Read-only inspect current remote `dev`, durable lineage, workflow, immutable-Release posture where observable,
+   and the named API-key prerequisite without exposing or changing credentials.
+5. In a disposable checkout, compile exact lineage and manifest from the authoritative predecessor and frozen source.
+6. Run the one complete local public-release ratchet, then exact clean-room pack and local escrow preparation.
+7. Verify generated package identities against the 38-owner 0.20 guarantee boundary while allowing lower-line
+   available packages selected by bootstrap or real change.
+8. Record source/version commits, derived package count, hashes, durations, application evidence, and a concise
+   R12-06 go/no-go. Make no tracked change after the freeze; if evidence must enter Git, refreeze and rerun.
 
 ## Acceptance
 
-1. Both public templates install, restore, build, and reach their documented business result from the exact
-   candidate with no repository source, external Koan feed fallback, or pre-existing Koan package cache.
-2. The web path changes from SQLite to one supported zero-administration provider and back without changing Entity,
-   controller, or business-rule code; facts and lock truth match each deliberate reference/configuration state.
-3. An unavailable adapter intent fails correctively and recovery requires only removing or correcting that intent;
-   there is no silent fallback.
-4. Package-only FirstUse and GoldenJourney reproduce their cumulative public results from the same exact candidate.
-5. At least one independent human and one independent coding agent complete the path from public guidance only,
-   explain what reference plus `AddKoan()` selected, and leave no unresolved contradiction or hidden prerequisite.
-6. Evidence records exact source/version commits, package identities/hashes/ranges, isolated environment, commands,
-   results, corrections, elapsed time, and anonymous reader findings without creating a second release ledger.
-7. Focused affected gates and exact artifact/bundle validation pass; no full release ratchet is repeated without an
-   affected dependency.
-8. No push, tag, publication, GitHub Release, deployment, secret/configuration change, private dogfood inspection,
+1. R12-04 passes and final public copy contains no contradictory “published”/“pending” states.
+2. One frozen source commit contains every intended tracked release change and no private or scratch material.
+3. The exact local lineage/manifest is derived without a hand-maintained package list or version input.
+4. Exactly the supported-claim owners carry 0.20; other selected packages retain their truthful version/maturity.
+5. The complete local ratchet, advisory enforcement, exact pack, artifact inspection, both templates,
+   package-only FirstUse, package-only GoldenJourney, and escrow validation pass from that frozen source.
+6. No tracked file changes after the proof. A correction creates and fully reproves a new candidate.
+7. The R12-06 checkpoint names the exact source, derived version commit, manifest, remote target, credential name,
+   immutable custody requirement, stop map, and authorization still required.
+8. No push, tag, publication, GitHub Release, deployment, secret/configuration mutation, private dogfood inspection,
    or `tmp/` staging occurs.
 
 ## Stop conditions
 
-- Stop execution until R12-04's two independent public-context-only reads pass.
-- Stop if the proposed provider is outside the supported 0.20 boundary.
-- Stop if proof requires a repository ProjectReference, hidden local feed, manual package alignment, or a new CLI.
-- Stop if automation is presented as independent comprehension evidence.
-- Stop before any remote mutation; R12-06 owns publication and public observation.
+- Stop until R12-04's comprehension-only readers leave no unresolved contradiction.
+- Stop on tracked drift after freeze or any source/version/manifest/artifact mismatch.
+- Stop if release selection requires an operator package list or if a lower-maturity package is relabeled 0.20.
+- Stop if local-feed success is presented as public availability or independent consumer evidence.
+- Stop before any remote mutation; R12-06 owns authorization, publication, and public observation.

@@ -85,13 +85,14 @@ Communication, MCP, security, and optional AI/vector capability.
 | [R12-02](r12/R12-02-preview-blocking-seams.md) | every current PMC is re-evaluated against the proposed guarantee set; promise-level activation, configuration, lifetime, naming, wire, safety, and tooling concerns receive fix/remove/exclude decisions | passed |
 | [R12-03](r12/R12-03-preview-product-boundary.md) | a small recommended spine, advanced extensions, experiments, and non-claims are generated from current evidence without equating package availability with support | passed |
 | [R12-04](r12/R12-04-coherent-public-narrative.md) | every public-facing surface tells one greenfield, present-tense product story and an anti-drift gate preserves it | in-progress |
-| [R12-05](r12/R12-05-public-consumer-journey.md) | clean external-context users and agents install the preview candidate, reach meaningful results, swap infrastructure, diagnose rejection, and explain composition using public guidance only | pending |
-| R12-06 — publish and observe the first 0.20 wave | the exact prepared candidate becomes one coherent NuGet/GitHub preview with immutable custody and recorded terminal evidence | pending |
+| [R12-05](r12/R12-05-public-consumer-journey.md) | one frozen source commit passes the exact local release ratchet, selective package graph, clean-room templates/applications, and deterministic escrow before remote mutation | pending |
+| [R12-06](r12/R12-06-publish-and-observe-first-wave.md) | the frozen candidate becomes one immutable NuGet/GitHub wave, then clean human and agent environments prove the genuine public-feed journey | pending |
 | R12-07 — prove preview evolution | a later independent package wave upgrades a public-created application, recovers injected interruption, and converts feedback into a bounded maturity queue | pending |
 
-Later child cards open only when the preceding evidence sizes their real work. R12-04 is opened now
-because the maintainer explicitly requires coherent narrative across all public-facing content; its
-rewrite begins only after R12-01 through R12-03 settle the promise it must teach.
+Later child cards open only when preceding evidence sizes their real work. R12-05 and R12-06 are now
+checkpointed because R12-04 exposed the crucial boundary: local packages can certify candidate behavior,
+but only published NuGet packages can prove the public consumer experience. R12-07 remains unopened until
+the first observed wave supplies a real upgrade and feedback baseline.
 
 ## Scope
 
@@ -120,7 +121,8 @@ rewrite begins only after R12-01 through R12-03 settle the promise it must teach
 - Do not rerun the complete release ratchet after documentation-only or family-local changes.
 - Run one complete local candidate boundary after code, product truth, package versions, and narrative
   converge.
-- Use package-only and public-source-only readers for the external product proof.
+- Use isolated local packages for pre-publication candidate proof. Use public NuGet only for the external
+  product proof after the complete first wave is visible.
 - Perform no remote mutation during planning, assessment, or local implementation. The terminal
   publication child must revalidate the exact target, credential boundary, and irreversible actions
   immediately before use.

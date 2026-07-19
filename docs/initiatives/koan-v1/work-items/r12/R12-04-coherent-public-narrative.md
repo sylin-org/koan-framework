@@ -17,7 +17,7 @@ validation:
 - Tranche: `T7B — public product maturity`
 - Status: `in-progress`
 - Depends on: settled preview/version contract, preview-blocker dispositions, and generated maturity boundary
-- Unlocks: public-only consumer proof and the first 0.20 preview wave
+- Unlocks: R12-05 exact local candidate freeze and certification
 - Owner: every surface from which an external developer or coding agent learns what Koan is and how to use it
 
 ## Meaningful outcome
@@ -208,8 +208,10 @@ The first coalescence pass:
   baseline after removing the obsolete lockstep-root-version assumption;
 - whitespace validation: tracked and staged diffs clean.
 
-R12-04 remains in progress. Two independent public-context-only cold reads and their anonymous evidence are still
-required before closure; package-only external-consumer proof remains downstream of this narrative slice.
+R12-04 remains in progress. Two independent public-context-only comprehension reads and their anonymous evidence
+are still required before closure. They must reproduce the intended story and identify contradictions, but they do
+not claim that unpublished install commands execute. Exact local package behavior belongs to R12-05; genuine
+public-feed installation and independent execution belong to R12-06.
 
 ## Work
 
@@ -225,8 +227,8 @@ required before closure; package-only external-consumer proof remains downstream
 6. Reconcile every package and sample surface with the same story at proportional depth.
 7. Extend the existing public-doc truth gate so the complete inventory and critical narrative invariants
    fail automatically when they drift.
-8. Run public-context-only cold reads with both people and coding agents; turn confusion into repository-owned
-   anonymous corrections.
+8. Run comprehension-only public-context cold reads with both people and coding agents; turn confusion into
+   repository-owned anonymous corrections without presenting unpublished installation as executable public proof.
 
 ## Acceptance
 
@@ -238,10 +240,11 @@ required before closure; package-only external-consumer proof remains downstream
 5. Package pages explain why to reference the package, what becomes automatic, what remains the
    application's responsibility, how to inspect it, and how failure corrects the user.
 6. Historical evidence remains accessible but is never required to understand or operate current Koan.
-7. Templates, active samples, package-only consumer proofs, snippets, links, generated pages, and strict
-   public-doc checks pass from one exact candidate.
-8. At least two independent public-context-only readers reproduce the intended story and identify no
-   unresolved contradiction; their anonymous evidence and resulting corrections are recorded.
+7. Templates, active samples, snippets, links, generated pages, and strict public-doc checks pass from source;
+   R12-05 owns their exact package-only candidate proof.
+8. At least two independent public-context-only readers reproduce the intended story, accurately distinguish
+   candidate readiness from public availability, and identify no unresolved contradiction; their anonymous
+   evidence and resulting corrections are recorded.
 9. A newly added public-facing file cannot silently escape the inventory or introduce a competing current path.
 
 ## Stop conditions
