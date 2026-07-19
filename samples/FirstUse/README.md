@@ -48,3 +48,9 @@ The release compiler copies this same directory outside the repository and rebui
 from locally staged `Sylin.Koan.*` packages. `FirstUseContractTests` proves the source lane, including
 the lockfile; the release clean room writes `first-use-package-evidence.json` with the same package-
 transitive assertion. Public package availability is a separate release fact.
+
+This is an executable first-use contract, not a production security template. Koan can supply the
+supported identity, authorization, token, trust, and tenancy primitives selected by package
+reference. The application still owns its policy declarations, exposed operations, credentials,
+HTTPS and network boundary, input validation, backups, and deployment controls. HTTP MCP is enabled
+here only for local Development.

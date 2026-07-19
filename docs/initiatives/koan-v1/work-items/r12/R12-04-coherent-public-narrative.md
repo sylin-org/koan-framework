@@ -197,21 +197,95 @@ The first coalescence pass:
 
 - public documentation truth: 667 current assets / 656 current text surfaces / 107 historical boundaries /
   42 navigation targets / 11 graduated sample roots;
-- packaging compiler tests: 16/16 for product-surface and package-quality generation;
+- packaging compiler tests: 17/17 for product-surface and package-quality generation;
 - packaging tool: Release build, zero warnings and errors;
 - generated truth: 29 claims / 93 packages and 93 structurally ready packages, byte-identical after regeneration;
 - graduated samples: ten Release builds with zero warnings/errors; lock audit rejects both a promoted module below
   0.20 and an unpromoted module at 0.20;
 - strict skills: 20 skills, zero errors/warnings;
 - instructional examples: 20/20 compiled;
-- broad documentation structure: zero errors / 1,377 non-gating warnings, improved from the 1,633-warning opening
+- broad documentation structure: zero errors / 1,375 non-gating warnings, improved from the 1,633-warning opening
   baseline after removing the obsolete lockstep-root-version assumption;
 - whitespace validation: tracked and staged diffs clean.
 
-R12-04 remains in progress. Two independent public-context-only comprehension reads and their anonymous evidence
-are still required before closure. They must reproduce the intended story and identify contradictions, but they do
-not claim that unpublished install commands execute. Exact local package behavior belongs to R12-05; genuine
-public-feed installation and independent execution belong to R12-06.
+R12-04 remains in progress. The maintainer is the sole human validation authority for this cycle; no second human
+reader is required. At least one independent public-context-only coding-agent read supplies adversarial cold-read
+evidence, and the maintainer accepts or rejects every finding. Readers reproduce the story and identify
+contradictions but do not claim that unpublished install commands execute. Exact local package behavior belongs to
+R12-05; genuine public-feed installation and independent coding-agent execution belong to R12-06.
+
+## Cold-read correction checkpoint — 2026-07-19
+
+**Task:** Reconcile the first independent coding-agent read with current source and remove every confirmed public
+contradiction before R12-04 closes.
+
+**Application intent:** A new reader should know what can be run today, what becomes the package-first path after
+publication, what each maturity label guarantees, and where to inspect or correct a host without guessing across
+generations.
+
+**Public expression:** While NuGet publication is pending, the source-built FirstUse command is the executable first
+action and the template command is explicitly the post-publication canonical entry. The four-line host, Entity
+grammar, and capability references do not change.
+
+**Guarantee/correction:** Current commands must be executable in their stated availability state; generated product
+truth must define every accepted maturity; troubleshooting must name only current APIs, routes, and configuration;
+security text must separate framework primitives from application policy/deployment; inspection routes must be exact.
+Any future drift fails at the public-doc or generated-product owner with the conflicting path and correction.
+
+**Complete intent surface:** Reorder pre-public first-use instructions; define maturity dispositions in generated
+truth; rebuild the troubleshooting hub around startup/facts/health and current pillar references; clarify security
+responsibility, aggregate capability inspection, Jobs discovery, Communication reach, and the LLM front door; fix
+the README template/sample mismatch; rerun one independent coding-agent read and maintainer review. No package
+installation or external human recruitment is part of R12-04.
+
+**Public concepts:** Reuse standard source checkout, NuGet availability, package reference, configuration, health,
+and HTTP vocabulary plus existing Entity, Reference = Intent, facts, lockfile, and generated maturity labels. Add no
+new Koan concept.
+
+**Docs read:** the reader packet, product constitution, Entity semantics contract, root/index/quickstart/template
+front doors, product surface, troubleshooting, Jobs, Communication, composition lockfile, FirstUse, and
+GoldenJourney.
+
+**Code read:** product-surface compiler/constants/tests; current Web facts/aggregate/auth controllers and route
+constants; Data default-provider plan and corrective strings; Jobs discovery marker/registry; Core environment and
+health contracts.
+
+**Reusing:** The product-surface generator owns maturity vocabulary; current pillar references own detailed
+troubleshooting; Web route constants/controllers own inspection truth; public-doc lint owns narrative invariants.
+
+**Creating new:** Add only a generated maturity-definition table and its focused assertion. No runtime type,
+endpoint, option, service, sample, or documentation ledger is required.
+
+**Coalescence:** Rebuild stale troubleshooting prose instead of preserving removed Scheduling examples. Keep the
+real auth-discovery, KoanEnv, and health seams. Correct the aggregate path to its actual distinct capability endpoint
+rather than falsely collapsing it into facts. Fold reader findings into this work card; create no second review log.
+
+**Ergonomics:** One runnable command leads today, one package command leads after publication, maturity labels answer
+“what may I rely on?”, and diagnosis begins with startup → health → facts → owning pillar. Security language maps
+framework mechanism to application policy without suggesting that applications rebuild supported capabilities.
+
+**Constraints satisfied:** standard .NET/Git/NuGet/HTTP concepts first; one generated maturity owner; no runtime API,
+inline endpoint, data path, magic configuration, private dogfood, remote mutation, or full ratchet; maintainer-only
+human acceptance is explicit.
+
+**Risks:** The first reader overclassified several live APIs as stale; every removal must remain source-verified.
+Maturity is a set of evidence/support dispositions, not a total ranking. Port examples retain the printed-URL rule;
+changing all ports to placeholders would add ceremony without correcting current behavior.
+
+### First coding-agent finding disposition
+
+| Finding | Disposition |
+|---|---|
+| headline install is unavailable; README mixes Todo template with Approval calls | accepted; lead with source today and keep template as explicit post-public path |
+| maturity terms undefined and `verified` omitted from the preview summary | accepted; generate definitions for the complete canonical vocabulary |
+| troubleshooting is wholly stale | narrowed; remove retired Scheduling/default-key prose, retain source-confirmed auth, environment, and health seams |
+| security responsibility appears contradictory | accepted; distinguish framework primitives from application policy and deployment responsibility |
+| aggregate capability endpoint conflicts with facts | accepted as an exact-route defect; use `/.well-known/Koan/aggregates` and explain its distinct purpose |
+| Jobs discovery attribute appears application-authored | accepted as clarity; `[KoanDiscoverable]` belongs to `IKoanJob`, not each job type |
+| Communication “mesh” overstates RabbitMQ | accepted; connectors extend Transport reach, not local Events |
+| `llms.txt` is undiscoverable | accepted; link the agent front door from the root README |
+| product constitution/entity semantics were absent from the reader packet | protocol defect, not document defect; include both in subsequent reads |
+| fixed port examples are contradictory | rejected; the public text already makes the printed URL authoritative and the ordinary no-profile host uses the shown default |
 
 ## Work
 
@@ -227,8 +301,9 @@ public-feed installation and independent execution belong to R12-06.
 6. Reconcile every package and sample surface with the same story at proportional depth.
 7. Extend the existing public-doc truth gate so the complete inventory and critical narrative invariants
    fail automatically when they drift.
-8. Run comprehension-only public-context cold reads with both people and coding agents; turn confusion into
-   repository-owned anonymous corrections without presenting unpublished installation as executable public proof.
+8. Run at least one comprehension-only public-context coding-agent read; the maintainer is the sole human
+   validation authority and turns accepted confusion into repository-owned corrections without presenting
+   unpublished installation as executable public proof.
 
 ## Acceptance
 
@@ -242,9 +317,9 @@ public-feed installation and independent execution belong to R12-06.
 6. Historical evidence remains accessible but is never required to understand or operate current Koan.
 7. Templates, active samples, snippets, links, generated pages, and strict public-doc checks pass from source;
    R12-05 owns their exact package-only candidate proof.
-8. At least two independent public-context-only readers reproduce the intended story, accurately distinguish
-   candidate readiness from public availability, and identify no unresolved contradiction; their anonymous
-   evidence and resulting corrections are recorded.
+8. At least one independent public-context-only coding agent reproduces the intended story, accurately distinguishes
+   candidate readiness from public availability, and identifies no unresolved contradiction after correction; the
+   maintainer reviews the anonymous evidence and is the sole human acceptance authority.
 9. A newly added public-facing file cannot silently escape the inventory or introduce a competing current path.
 
 ## Stop conditions

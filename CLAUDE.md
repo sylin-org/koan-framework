@@ -78,8 +78,9 @@ finite Entity collections and lazy streams.
 
 Koan 0.20 is the current preview line. The generated
 `docs/reference/product-surface.md` is the authority: only packages owned by supported-foundation or
-supported-extension claims carry 0.20. Demonstrated, experimental, specified, and unassessed
-packages remain available only at their stated maturity; dependency proximity does not promote them.
+supported-extension claims carry 0.20. Verified, demonstrated, experimental, specified, unassessed,
+deprecated, and retired are separate dispositions defined in that document; dependency proximity
+does not promote a package or turn evidence into a support promise.
 
 ## Module authoring
 

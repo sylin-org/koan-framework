@@ -20,17 +20,13 @@ lifecycle, and explanation.
 
 ## Start with a result
 
-Koan 0.20 starts through an ordinary .NET template:
+While public-feed publication is pending, start with the executable source contract:
 
 ```powershell
-dotnet new install Sylin.Koan.Templates
-dotnet new koan-web -o ApprovalApi
-cd ApprovalApi
-dotnet run
+git clone https://github.com/sylin-org/koan-framework
+cd koan-framework
+dotnet run --project samples/FirstUse
 ```
-
-Public-feed publication follows the final package-only proof. Until then, run the same validated
-journey from this checkout with `dotnet run --project samples/FirstUse`.
 
 Then create and inspect one approval:
 
@@ -43,6 +39,18 @@ Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
 
 Use the URL printed by the application if it differs. The [quickstart](getting-started/quickstart.md)
 explains the result; [FirstUse](../samples/FirstUse/README.md) is the executable contract.
+
+After the first 0.20 wave is visible on NuGet, the canonical entry becomes:
+
+```powershell
+dotnet new install Sylin.Koan.Templates
+dotnet new koan-web -o TodoApi
+cd TodoApi
+dotnet run
+```
+
+The template's business result uses `Todo` and `/api/todos`; local candidate proof does not imply public
+package availability.
 
 ## Read business, not plumbing
 

@@ -153,7 +153,9 @@ fact prose, timestamps, sessions, correlation IDs, configuration values, or busi
 ## Limits (by design, honest)
 
 - **Capabilities** are negotiated per-repository (connection-bound), so the twin omits them in this
-  version; query them live at `/.well-known/aggregates`.
+  version. `/.well-known/Koan/facts` explains the composed application; query
+  `/.well-known/Koan/aggregates` when you need the distinct, live per-Entity aggregate capability
+  view.
 - **Entities** reflect what was resolved by boot (entity configs populate lazily on first
   `Entity<T>` access), so the list is typically what the app touched during startup.
 - The resolved twin and the boot-line comparison need a content root, so they apply to host-based apps

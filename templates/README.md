@@ -3,14 +3,15 @@
 Two `dotnet new` paths to a persisted Koan Entity application. The templates choose a proved package family; the
 generated application contains business code and ordinary .NET structure, not framework scaffolding.
 
-## Install
+## Install after publication
 
 ```powershell
 dotnet new install Sylin.Koan.Templates
 ```
 
-This is the canonical Koan 0.20 preview entry. Public-feed publication follows the final package-only proof; the
-same command already runs against the exact locally compiled candidate used by release validation.
+This becomes the canonical Koan 0.20 preview entry after the first wave is visible on NuGet. Until then, run
+`dotnet run --project samples/FirstUse` from the repository checkout. Release validation already runs this template
+command against the exact locally compiled candidate, but local candidate evidence is not public availability.
 
 ## First result
 
@@ -64,8 +65,9 @@ deployment guarantees.
 
 - The templates target .NET 10 and require a feed containing their compiled Koan dependency ranges.
 - They are minimal learning and first-application shapes, not production security or deployment templates.
-- Authentication, authorization, tenancy, validation, backup, public API design, and external infrastructure remain
-  explicit application decisions.
+- Koan can supply supported identity, authorization gates, token issuance, trust, and tenancy primitives when their
+  capability packages are referenced. The application still owns its policy declarations, exposed operations,
+  credentials, HTTPS/network boundary, validation, backup, and deployment decisions.
 - SQLite provides durable embedded storage, not multi-node availability or a remote database service.
 - Direct `dotnet pack` of this template source is unsupported because it cannot prove dependency floors; the Koan
   release compiler prepares and verifies the content-only package.

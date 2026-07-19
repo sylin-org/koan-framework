@@ -95,7 +95,8 @@ existence cannot be inferred from local tests.
 
 ## Work
 
-1. Close R12-04 with two independent comprehension-only reads and all resulting tracked corrections.
+1. Close R12-04 with the pre-correction and post-correction comprehension-only coding-agent reads,
+   maintainer disposition, and all resulting tracked corrections; no additional human validator is required.
 2. Replace temporary publication-pending language with the final public install posture and rerun affected docs,
    examples, skills, generated-truth, sample-lock, and focused package checks.
 3. Commit all intended tracked changes, confirm only `tmp/` remains untracked, and record the frozen source SHA.
@@ -124,7 +125,7 @@ existence cannot be inferred from local tests.
 
 ## Stop conditions
 
-- Stop until R12-04's comprehension-only readers leave no unresolved contradiction.
+- Stop until R12-04's coding-agent evidence and maintainer disposition leave no unresolved contradiction.
 - Stop on tracked drift after freeze or any source/version/manifest/artifact mismatch.
 - Stop if release selection requires an operator package list or if a lower-maturity package is relabeled 0.20.
 - Stop if local-feed success is presented as public availability or independent consumer evidence.

@@ -23,8 +23,8 @@ validation:
 
 ## Meaningful outcome
 
-The exact R12-05 candidate becomes one recoverable public 0.20 wave. A clean human and coding-agent
-environment can install Koan from public NuGet, reach a useful Entity result, replace local persistence
+The exact R12-05 candidate becomes one recoverable public 0.20 wave. Clean maintainer and independent coding-agent
+environments can install Koan from public NuGet, reach a useful Entity result, replace local persistence
 without changing business code, diagnose rejected intent, and explain composition using public guidance only.
 
 ## Architecture checkpoint — publish once, then test the public product
@@ -51,8 +51,9 @@ advance `dev` once; observe prior reconciliation, proof, staging, promotion, vis
 immutability; wait for the complete manifest on public NuGet; use isolated CLI/global-package homes and public
 sources only; install both templates; run first results; replace SQLite with the supported JSON provider and back
 without changing Entity/controller/business-rule code; inspect startup, health, facts, and lock truth; provoke and
-recover one unavailable-adapter intent; run public package-only FirstUse and GoldenJourney; conduct independent
-human and coding-agent journeys; record immutable identities, links, findings, and go/no-go for R12-07.
+recover one unavailable-adapter intent; run public package-only FirstUse and GoldenJourney; conduct maintainer and
+independent coding-agent journeys; record immutable identities, links, findings, and go/no-go for R12-07. The
+maintainer remains the sole human validation authority.
 
 **Public concepts:** Standard NuGet package visibility, SemVer `0.20.x`, `dotnet new`, PackageReference,
 configuration, GitHub Release, and Git commit/tag identity; existing Koan Entity, Reference = Intent, runtime facts,
@@ -103,8 +104,9 @@ Remote trust settings are unstable facts and must be re-read immediately before 
 7. From clean isolated environments using public NuGet only, execute exact and unqualified template installs,
    both first results, JSON provider replacement/removal, rejection/recovery, facts/health/lock inspection, and
    public package-only FirstUse/GoldenJourney.
-8. Have at least one independent human and one independent coding agent follow public guidance only. Record
-   anonymous confusion, elapsed time, corrections, and their explanation of reference/application responsibility.
+8. Have the maintainer and at least one independent coding agent follow public guidance only. Record anonymous agent
+   confusion, elapsed time, corrections, and their explanation of reference/application responsibility; require no
+   additional human validator.
 9. Record immutable evidence and bounded follow-ups. Do not call the wave successful while any public contradiction,
    unavailable manifest package, mutable Release, or unexplained consumer failure remains.
 
@@ -121,8 +123,8 @@ Remote trust settings are unstable facts and must be re-read immediately before 
    assistance.
 6. SQLite → JSON → SQLite changes only package/configuration intent; business code remains unchanged and facts/lock
    explain each result. Invalid adapter intent rejects correctively and recovers by correcting/removing that intent.
-7. One independent human and one independent coding agent complete the journey and leave no unresolved contradiction
-   or hidden prerequisite.
+7. The maintainer and at least one independent coding agent complete the journey and leave no unresolved
+   contradiction or hidden prerequisite; the maintainer is the sole human acceptance authority.
 8. Failures use exact coordinator recovery; no artifact rebuild, manual package choice, tag movement, evidence
    replacement, unlisting, or parallel publication path occurs.
 9. Immutable links/identities and bounded feedback are recorded without copying package state into a new ledger.

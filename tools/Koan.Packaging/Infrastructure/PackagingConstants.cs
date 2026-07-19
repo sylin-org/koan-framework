@@ -42,17 +42,40 @@ internal static class PackagingConstants
         public const int Schema = 1;
         public const string ClaimsPath = "product/claims.json";
         public const string UnassessedMaturity = "unassessed";
-        public static readonly IReadOnlySet<string> Maturities = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "specified",
-            "demonstrated",
-            "experimental",
-            "verified",
-            "supported-extension",
-            "supported-foundation",
-            "deprecated",
-            "retired"
-        };
+        public static readonly IReadOnlyList<(string Name, string Meaning, string Contract)> MaturityDefinitions =
+        [
+            ("supported-foundation",
+                "An admitted part of Koan's recommended application base with documented limits and terminal evidence.",
+                "Its owner and public Koan dependencies carry the 0.20 patch-compatibility promise."),
+            ("supported-extension",
+                "An admitted optional capability with documented prerequisites, limits, and terminal evidence.",
+                "Its owner and public Koan dependencies carry the 0.20 patch-compatibility promise."),
+            ("verified",
+                "Focused executable evidence covers the claim's stated boundary.",
+                "Evidence is current, but the claim has not been admitted to the 0.20 support promise."),
+            ("demonstrated",
+                "At least one executable path shows the capability working within stated limits.",
+                "The path is useful evidence, not a support or patch-compatibility promise."),
+            ("experimental",
+                "An implemented capability is available for evaluation while its public shape or guarantees may change.",
+                "Expect revision; do not rely on 0.20 compatibility unless a separate supported claim says otherwise."),
+            ("specified",
+                "The intended public outcome is documented, but terminal implementation or external proof remains pending.",
+                "Treat it as planned contract evidence, not an available support promise."),
+            ("unassessed",
+                "A package is present but has no accepted product claim evaluating its public contract.",
+                "Package availability alone creates no maturity, support, or compatibility promise."),
+            ("deprecated",
+                "A transition surface remains available but is no longer the recommended current path.",
+                "Move to the documented replacement; continued availability is not guaranteed beyond its stated window."),
+            ("retired",
+                "The capability is outside the current product surface.",
+                "Do not begin or continue new use through this path."),
+        ];
+
+        public static readonly IReadOnlySet<string> Maturities = MaturityDefinitions
+            .Select(definition => definition.Name)
+            .ToHashSet(StringComparer.Ordinal);
         public static readonly IReadOnlySet<string> PromotedMaturities = new HashSet<string>(StringComparer.Ordinal)
         {
             "supported-extension",

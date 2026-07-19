@@ -6,23 +6,19 @@ code states business intent while the framework owns composition, backend negoti
 and explanation.
 
 > **Status:** Koan 0.20 is the preview line. Its supported foundation and extensions are explicit;
-> other available packages remain demonstrated, experimental, specified, or unassessed. Public-feed
+> other available packages remain verified, demonstrated, experimental, specified, or unassessed. Public-feed
 > publication follows the final package-only proof. Until then, run the checkout directly and use the
 > [generated product surface](docs/reference/product-surface.md) as the maturity authority.
 
 ## Reach a meaningful result
 
-The package-first entry is a normal .NET template:
+Today, run the executable first-use contract from source:
 
 ```powershell
-dotnet new install Sylin.Koan.Templates
-dotnet new koan-web -o TodoApi
-cd TodoApi
-dotnet run
+git clone https://github.com/sylin-org/koan-framework
+cd koan-framework
+dotnet run --project samples/FirstUse
 ```
-
-While the 0.20 packages are awaiting public-feed observation, run the same proved path from this
-checkout with `dotnet run --project samples/FirstUse`.
 
 In another shell, create a business request and inspect what composed it:
 
@@ -35,6 +31,18 @@ Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
 
 Use the URL printed by the application if it differs. The complete walkthrough is in
 [`samples/FirstUse`](samples/FirstUse/README.md).
+
+After the first 0.20 wave is visible on NuGet, the canonical entry becomes the ordinary template path:
+
+```powershell
+dotnet new install Sylin.Koan.Templates
+dotnet new koan-web -o TodoApi
+cd TodoApi
+dotnet run
+```
+
+That template creates a `Todo` application and exposes `/api/todos`; its complete result is in
+[the template guide](templates/README.md). Candidate package evidence is not public-feed availability.
 
 ## The application grammar
 
@@ -84,7 +92,7 @@ Examples:
 - `[Embedding]` adds semantic indexing and search when AI/vector providers are present.
 - `[McpEntity]` projects a governed Entity surface to agents.
 - Entity Events and Transport are local-first; adding an eligible connector can transparently extend
-  the communication mesh without changing the application terminal.
+  Transport reach without changing the application terminal. Events remain local to the process.
 
 ```csharp
 await order.Events.Raise<OrderApproved>(ct); // something happened to this order
@@ -128,6 +136,7 @@ claim.
 - [Current capability and package surface](docs/reference/product-surface.md)
 - [Current package-quality assessment](docs/reference/package-quality.md)
 - [Troubleshooting](docs/support/troubleshooting.md)
+- [Agent-readable product map](llms.txt)
 
 Architecture decision records are retained as dated decisions. For current product behavior, prefer
 the pages above, executable samples, generated product surface, and source/tests.

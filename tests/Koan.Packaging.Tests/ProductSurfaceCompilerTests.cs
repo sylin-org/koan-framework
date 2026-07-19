@@ -1,3 +1,4 @@
+using Koan.Packaging.Infrastructure;
 using Koan.Packaging.Models;
 using Koan.Packaging.Services;
 using Xunit;
@@ -185,6 +186,24 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
         Assert.Equal("bundle", first.Packages.Single(package => package.PackageId == bundle.PackageId).Shape);
         Assert.Equal("template", first.Packages.Single(package => package.PackageId == template.PackageId).Shape);
         Assert.Equal("analyzer", first.Packages.Single(package => package.PackageId == analyzer.PackageId).Shape);
+    }
+
+    [Fact]
+    public void EmitsTheCompleteCanonicalMaturityVocabulary()
+    {
+        SeedPath("docs/capability.md");
+        SeedPath("tests/evidence.txt");
+        var package = Project("Sylin.Koan.Library");
+
+        var markdown = ProductSurfaceCompiler.ToMarkdown(
+            Compiler().Compile([package], Claims(Claim(package.PackageId))));
+
+        Assert.Contains("## Maturity vocabulary", markdown, StringComparison.Ordinal);
+        Assert.Contains("not one linear ranking", markdown, StringComparison.Ordinal);
+        foreach (var definition in PackagingConstants.ProductSurface.MaturityDefinitions)
+        {
+            Assert.Contains($"| `{definition.Name}` |", markdown, StringComparison.Ordinal);
+        }
     }
 
     public void Dispose()

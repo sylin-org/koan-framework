@@ -1,339 +1,146 @@
-﻿---
+---
 type: SUPPORT
 domain: troubleshooting
-title: "Koan Troubleshooting Hub"
+title: "Koan troubleshooting"
 audience: [developers, support-engineers, ai-agents]
 status: current
-last_updated: 2025-09-28
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation:
+  date_last_tested: 2026-07-19
+  status: reviewed
+  scope: public diagnostics and current extension seams
 ---
 
-# Koan Troubleshooting Hub
+# Koan troubleshooting
 
-## Contract
+Start with the decision Koan made. Most failures are a missing package reference, rejected explicit
+intent, or unavailable infrastructure—not a registration problem to solve with more application
+code.
 
-- **Inputs**: Running (or attempting to run) a Koan service, access to application logs, and optional container/host tooling.
-- **Outputs**: Diagnosed root cause and next action plan covering boot, adapters, AI, and web layers.
-- **Error Modes**: Skipped auto-registration, adapters remaining unhealthy, AI providers refusing connections, or health checks reporting failures.
-- **Success Criteria**: Service boots with expected modules, adapters report healthy, pipelines process data, AI features respond, and health endpoints return `200`.
+## Start here
 
-### Edge Cases
+1. Read the startup report. It names activated modules, elections, rejected intent, and corrections.
+2. Call `/health/live` to confirm the process is running and `/health/ready` to check selected
+   dependencies. Use the exact base URL printed by ASP.NET Core.
+3. In a Web host, read `/.well-known/Koan/facts` for the same redacted runtime decisions. MCP hosts
+   expose that envelope as `koan://facts`.
+4. Compare `koan.lock.json` with the references you intended to ship. The runtime boot line reports
+   lockfile drift when the loaded composition differs.
+5. Turn on `Debug` logging only for the affected `Koan.*` namespace, then reproduce once.
 
-- **Delayed infrastructure** – some adapters (Couchbase, Postgres) take >30s to warm up; configure health checks and waits accordingly.
-- **Rate-limited AI providers** – throttle embedding/chat calls with batch options to avoid 429 responses.
-- **Vector mismatch** – embeddings with incorrect dimensions silently fail searches; verify provider + model alignment.
-- **Production overrides** – disabling defaults (HTTPS, auth, telemetry) without replacements leads to compliance gaps; ensure compensating controls exist.
-
----
-
-## Quick Triage Checklist
-
-1. **Confirm boot completed** – run `curl http://localhost:5000/health/ready`; if unhealthy, inspect logs for `Koan:modules` output and DI errors.
-2. **Inspect adapter state** – for containerized stacks `docker compose ps` and `docker logs <service> --tail 50`; look for `StartupProbe` / `Healthy` markers.
-3. **Verify configuration** – dump active configuration for suspect sections using `Configuration.Read` logging or `dotnet user-secrets list` (development).
-4. **Run smoke call** – `curl http://localhost:5000/api/todos` (or domain equivalent) and `curl http://localhost:5000/.well-known/auth/providers` to validate HTTP + auth surfaces.
-
-When an item fails, jump to the matching section below.
-
----
+The facts endpoint is gated by the host's access policy. Do not weaken a production boundary merely
+to make diagnostics public.
 
 ## Boot and module activation
 
-### Ensure Koan Loaded
+A Koan application needs the host bootstrap and the package that owns the capability:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan(); // Required for module discovery
+builder.Services.AddKoan();
 ```
 
-Missing `AddKoan()` prevents Koan from activating referenced controllers, capabilities, and adapters. Verify the
-capability package is referenced and its assembly contributes one concrete `KoanModule`.
+Do not manually register Koan controllers, adapters, jobs, or contributors. Confirm the relevant
+`Sylin.Koan.*` package is a direct or transitive reference, then inspect startup facts for whether it
+was activated, inactive by design, or rejected. Package proximity alone does not promise that a
+surface exists.
 
-### Review Boot Reports
-
-Enable verbose logs during development:
-
-```csharp
-builder.Logging.SetMinimumLevel(LogLevel.Debug);
-if (KoanEnv.IsDevelopment)
-{
-    KoanEnv.DumpSnapshot(logger);
-}
-```
-
-Expected output includes module elections, adapter readiness, and recipe hints:
-
-```
-[INFO] Koan:modules data→postgres web→controllers ai→ollama
-```
-
-Absence of a module line suggests missing package references.
-
-### Bootstrap Tasks Not Running
-
-Tasks implementing `IScheduledTask` + `IOnStartup` execute during boot. Confirm discovery and readiness:
-
-```bash
-docker logs api --follow | grep -E "(SchedulingOrchestrator|bootstrap)"
-```
-
-Author bootstrap tasks with idempotency and dependency checks:
-
-```csharp
-public sealed class ReferenceDataBootstrap : IScheduledTask, IOnStartup
-{
-    public string Id => "app:reference-data";
-
-    public async Task RunAsync(CancellationToken ct)
-    {
-        if (await Category.Any(ct))
-        {
-            _logger.LogInformation("Reference data already seeded");
-            return;
-        }
-
-        await new[]
-        {
-            new Category { Name = "Electronics" },
-            new Category { Name = "Books" }
-        }.Save(ct);
-    }
-}
-```
-
-If boot tasks depend on external services, wait for readiness:
-
-```csharp
-var health = await _healthChecks.CheckHealthAsync(ct);
-if (health.Status != HealthStatus.Healthy)
-{
-    _logger.LogWarning("Skipping bootstrap until dependencies are healthy");
-    return;
-}
-```
-
----
+For HTTP 404s, also verify the route on the application controller and use the URL printed by the
+host. Entity controllers normally derive from `EntityController<T>` and declare their application
+route. `/.well-known/auth/providers` exists only when the Auth Web capability is referenced and
+active; it is not a general Web-health probe.
 
 ## Adapter & Data Connectivity
 
-### Diagnose Connection Failures
+Read the data decision in `/.well-known/Koan/facts` first. A referenced adapter may be available but
+unelected, which is normal and must not make readiness fail. An explicitly selected adapter that is
+missing or unavailable is different: Koan rejects the intent instead of silently changing storage.
 
-Typical symptoms: `SocketNotAvailableException`, `Service n1ql is either not configured or cannot be reached`, empty query results.
-
-1. **Verify container state**
-
-   ```powershell
-   docker compose ps
-   docker logs couchbase --tail 50
-   ```
-
-   Look for ✅ `Cluster initialized successfully` or ❌ `Connection refused`.
-
-2. **Check adapter readiness logs**
-
-   ```powershell
-   docker logs api | Select-String "StartupProbe: data"
-   ```
-
-3. **Probe provider health**
-   ```powershell
-   curl -s http://localhost:8091/pools/default               # Couchbase example
-   curl -u user:pass -X POST http://localhost:8093/query/service -d "statement=SELECT 1"
-   ```
-
-### Wait for SDK Warm-Up
-
-Insert waits inside adapter bootstrapping when necessary:
-
-```csharp
-_cluster = await Cluster.ConnectAsync(cs, options);
-await _cluster.WaitUntilReadyAsync(TimeSpan.FromSeconds(30));
-
-_bucket = await _cluster.BucketAsync(bucketName);
-await _bucket.WaitUntilReadyAsync(TimeSpan.FromSeconds(10));
-```
-
-### Entity Pattern & Provider Selection
-
-- Always use `Entity<T>` or `Entity<T, TKey>` statics; repository abstractions cause missing DI registrations.
-- Inspect provider election and capabilities:
-  ```csharp
-  var caps = Data<Todo, string>.Capabilities;
-  _logger.LogInformation("Provider {Provider} capabilities {Tokens}",
-      caps.Owner, string.Join(", ", caps.All.Select(c => c.Id)));
-  ```
-- Explicitly set defaults when multiple adapters exist:
-  ```json
-  {
-    "Koan": {
-      "Data": {
-        "DefaultProvider": "Postgres"
-      }
-    }
-  }
-  ```
-
-### Schema & Provisioning Delays
-
-After auto-provisioning collections, allow the backend to settle before issuing queries:
-
-```csharp
-await manager.CreateCollectionAsync(spec);
-await Task.Delay(TimeSpan.FromSeconds(2), ct); // Wait for query readiness
-```
-
----
-
-## Web & Authentication
-
-### Missing Controllers / 404s
-
-Ensure controllers inherit from `EntityController<T>` (or a custom controller) and are decorated with attribute routing:
-
-```csharp
-[Route("api/[controller]")]
-public sealed class TodosController : EntityController<Todo> { }
-```
-
-### Auth Provider Diagnostics
-
-- List configured providers: `curl http://localhost:5000/.well-known/auth/providers`.
-- Confirm secrets exist via configuration hierarchy; never hardcode client IDs/secrets.
-- For social providers, verify redirect URIs match portal configuration.
-
-### Health Endpoint Failures
-
-Use the canonical probes to distinguish a running process from dependency readiness:
-
-```powershell
-curl http://localhost:5000/health/live
-curl http://localhost:5000/health/ready
-```
-
-Implement targeted checks for critical dependencies:
-
-```csharp
-public sealed class DatabaseHealthCheck : IHealthContributor
-{
-    public string Name => "database";
-    public bool IsCritical => true;
-
-    public async Task<HealthReport> Check(CancellationToken ct = default)
-    {
-        try
-        {
-            await Todo.FirstPage(1, ct);
-            return new HealthReport(Name, HealthState.Healthy, "Database ready", null, null);
-        }
-        catch (Exception ex)
-        {
-            return new HealthReport(Name, HealthState.Unhealthy, ex.Message, null, null);
-        }
-    }
-}
-```
-
----
-
-## AI & Vector Troubleshooting
-
-### Provider Connectivity
-
-- Start with the startup report: it distinguishes a referenced provider, an inactive automatic candidate, and rejected
-  explicit configuration.
-- For Ollama, `curl http://localhost:11434/api/tags` should return available models.
-- When the runtime is not at its conventional endpoint, configure one exact placement:
+The application-wide default setting is:
 
 ```json
 {
   "Koan": {
-    "Ai": {
-      "Ollama": {
-        "Endpoints": ["http://ollama.internal:11434"],
-        "DefaultModel": "llama3.2"
+    "Data": {
+      "Sources": {
+        "Default": {
+          "Adapter": "postgres"
+        }
       }
     }
   }
 }
 ```
 
-`ConnectionStrings:Ollama` is the single-endpoint alternative. Do not configure both forms. Invalid explicit
-placement fails startup; an absent automatically discovered local runtime remains normal inactivity.
+Reference the package that owns the named adapter, verify its external service independently, and
+restart. Entity-level `[SourceAdapter]` or `[DataAdapter]` declarations take precedence where the
+domain deliberately requires stable placement. Do not add arbitrary startup delays or raw SDK
+warm-up code to the application; adapter readiness belongs to the adapter.
 
-Koan AI does not currently provide a universal budget, retry, rate-limit, or provider-fallback configuration. Apply
-those policies through the selected provider or the application's owning resilience boundary. See the
-[AI reference](../reference/ai/index.md) and provider package page for exact supported options.
+For capability and placement details, use the
+[data reference](../reference/data/index.md) and
+[adapter diagnostics](../reference/data/adapter-diagnostics.md).
 
----
+## Health does not match the runtime
 
-## AI Indexing Health
+- `/health/live` answers whether the process can serve.
+- `/health/ready` answers whether the capabilities Koan actually selected are ready.
+- Runtime facts explain why a provider was selected, left inactive, or rejected.
 
-### Embedding lifecycle and migration failures
+An installed but unelected provider should remain visible evidence, not a readiness failure. Add an
+application `IHealthContributor` only for a real business-critical dependency that Koan cannot own;
+do not duplicate adapter checks already supplied by a capability package.
 
-For ordinary indexing, declare the intent on the Entity and save normally:
+## A job is not running
 
-```csharp
-[Embedding(Async = true)]
-public sealed class Document : Entity<Document>
-{
-    public string Content { get; set; } = "";
-}
+Application code implements `IKoanJob<T>` and its static `Execute` handler. The interface carries
+Koan's discovery marker, so the concrete job does not need a discovery attribute, worker
+registration, repository, or startup task. Submit through the Entity's `.Job` or `.Jobs` accessor,
+then inspect the job status and Jobs health contribution.
 
-await document.Save(ct);
-```
+If a durable ledger or cross-node wake-up was intended, verify that the elected data adapter and
+Communication connector support that tier. The same handler remains valid when those packages are
+added. See the [Jobs pillar map](../reference/cards/jobs.md) and
+[Jobs how-to](../guides/jobs-howto.md).
 
-With `Async = true`, persistence completion and embedding completion are separate facts. Inspect the
-embedding ledger and `Koan.Data.AI` logs before treating the vector as available.
+## Authentication is unavailable
 
-For an explicit backfill, inspect the returned outcome:
+`GET /.well-known/auth/providers` lists eligible providers when the Auth Web capability is active.
+An absent provider usually means its required configuration is incomplete; inspect startup facts and
+the provider's documented keys. Keep client secrets outside source control and verify configured
+redirect URIs against the external provider.
 
-```csharp
-var result = await EmbeddingMigrator.ReEmbed(documents, logger: logger, ct: ct);
-if (!result.Success)
-{
-    logger.LogWarning(
-        "Embedding backfill failed for {Failed}/{Total} documents: {Error}",
-        result.FailedEntities,
-        result.TotalEntities,
-        result.ErrorMessage);
-}
-```
+Koan can supply supported identity, authorization, token, trust, and tenancy primitives. The
+application owns policy declarations, exposed operations, credentials, HTTPS and network boundary,
+input validation, backups, and deployment controls. See
+[authentication setup](../guides/authentication-setup.md).
 
-The migrator reports partial failure but does not retry or roll back successful vector writes. Check
-AI provider routing, model compatibility, vector availability, and the per-entity error logs.
+## AI or vector work is unavailable
 
----
+The startup report distinguishes a referenced provider, an inactive automatic candidate, and
+rejected explicit configuration. Verify the selected provider at its own health endpoint. Configure
+one supported placement form; do not set both an endpoint list and its connection-string
+alternative. Koan AI does not claim a universal application budget, retry, rate-limit, or
+provider-fallback policy—those belong to the selected provider or the application's resilience
+boundary.
 
-## Observability & Diagnostics
+For Entity indexing, declare `[Embedding]` and save normally. With asynchronous embedding,
+persistence completion and vector completion are separate facts. Inspect the embedding ledger and
+`Koan.Data.AI` logs before treating a vector as available. For a backfill, inspect the
+`EmbeddingMigrator.ReEmbed` result; partial failure does not roll back successful vector writes.
+See the [AI reference](../reference/ai/index.md).
 
-- Increase logging verbosity for specific namespaces:
-  ```json
-  {
-    "Logging": {
-      "LogLevel": {
-        "Koan.Data": "Debug",
-        "Koan.Canon": "Debug",
-        "Koan.AI": "Debug"
-      }
-    }
-  }
-  ```
-- Capture metrics for adapter connection times and pipeline throughput; send to Prometheus/OpenTelemetry exporters as needed.
-- Use `docker logs <service> --follow | Select-String` (PowerShell) or `grep` (bash) to filter health, provisioning, and bootstrap lines in real time.
+## Escalate with evidence
 
----
+Include:
 
-## Escalate with Context
+- the Koan version and direct `Sylin.Koan.*` package references;
+- startup logs from process start through the failure;
+- `/health/live`, `/health/ready`, and redacted runtime facts;
+- the relevant `koan.lock.json` drift line;
+- configuration with secrets removed; and
+- a minimal reproduction or failing request.
 
-When opening a support ticket or escalating internally, include:
-
-- Koan version and list of referenced packages.
-- Full boot logs (from process start to failure) highlighting `Koan:` lines.
-- Health endpoint outputs, runtime facts, and relevant Job or embedding status.
-- Adapter configuration snippets (mask secrets) and provider health results.
-- Reproduction steps or minimal failing pipeline/controller code.
-
-Providing this context shortens triage cycles and avoids duplicate debugging.
-
----
-
-Use this hub as your first stop—each pillar reference links back here, reducing duplicated guides and keeping troubleshooting knowledge in one place.
+That evidence describes composition, intent, and observed behavior without requiring private
+application access.

@@ -62,12 +62,13 @@ generated maturity boundary. Obsolete duplicate Web/OpenAPI/AI/transaction/CLI/A
 instruction was removed or classified as history; the competing docs inventory and hand-maintained adapter
 matrix were retired. Historical ADRs and initiatives remain evidence outside the ordinary learning graph.
 
-Focused R12-04 evidence passes: public-doc truth, 16/16 product/quality compiler tests, warning-clean
+Focused R12-04 evidence passes: public-doc truth, 17/17 product/quality compiler tests, warning-clean
 packaging build, byte-identical generated reports, all ten graduated sample Release builds and their exact
 selective-0.20 lock audit, 20 strict skills, 20/20 instructional examples, whitespace checks, and broad
-documentation structure with zero errors / 1,377 non-gating warnings. No full ratchet or remote mutation
-ran. R12-04 remains open only for the two required independent public-context-only cold reads and any
-corrections they uncover; package-only external-consumer proof remains downstream.
+documentation structure with zero errors / 1,375 non-gating warnings. No full ratchet or remote mutation
+ran. The maintainer is the sole human validation authority; no second human reader is required. R12-04 remains
+open for correction of the first independent coding-agent read and one post-correction coding-agent confirmation;
+package-only external-consumer proof remains downstream.
 
 [R12-05](work-items/r12/R12-05-public-consumer-journey.md) now owns only the frozen local candidate: final
 release-ready copy, one exact source SHA, the complete local ratchet, selective package graph, clean-room
@@ -76,8 +77,8 @@ R12-04's comprehension-only readers.
 
 [R12-06](work-items/r12/R12-06-publish-and-observe-first-wave.md) owns the separately authorized `dev`
 advancement, existing API-key promotion, immutable Release/NuGet observation, and the first genuine public-feed
-human/agent journey. Local-feed automation is not external-consumer evidence. R12-07 stays unopened until that
-wave supplies a real public upgrade baseline.
+maintainer/agent journey. Local-feed automation is not external-consumer evidence. R12-07 stays unopened until
+that wave supplies a real public upgrade baseline.
 
 ## Recently completed preview foundation
 
@@ -231,12 +232,13 @@ bounded process-exit observation so GoldenJourney can prove fail-fast startup tr
 ## Resume here
 
 1. Verify `git status`, HEAD, and the R12-04 implementation/evidence record before work.
-2. Obtain two independent comprehension-only reads against the public learning path; record anonymous findings
-   and correct contradictions. Readers must distinguish candidate readiness from public availability, but they
-   do not execute an unpublished NuGet install.
+2. Give the corrected public-context packet to one coding agent for post-correction confirmation. The maintainer is
+   the sole human validator; do not wait for or imply another human gate. The agent must distinguish candidate
+   readiness from public availability but does not execute an unpublished NuGet install.
 3. Re-run the focused R12-04 public-doc, structural-doc, skill, example, packaging-generation, sample-lock,
    and whitespace checks affected by those corrections; do not substitute the full release ratchet.
-4. Close R12-04 only when both readers reproduce the intended story with no unresolved contradiction. Then begin
+4. Close R12-04 only when the pre-correction and post-correction coding-agent reads leave no unresolved
+   contradiction after maintainer disposition. Then begin
    R12-05, finalize release-ready public copy, freeze one exact source commit, and run the single complete local
    candidate boundary without further tracked changes.
 5. Preserve the R08 release compiler and API-key promotion path unless current evidence identifies a

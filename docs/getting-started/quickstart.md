@@ -14,19 +14,7 @@ validation:
 
 # Koan quickstart
 
-The 0.20 preview begins with an ordinary .NET template package:
-
-```powershell
-dotnet new install Sylin.Koan.Templates
-dotnet new koan-web -o TodoApi
-cd TodoApi
-dotnet run
-```
-
-Public-feed publication follows the final package-only proof. Until that exact preview is visible on the feed,
-exercise the same application grammar from the repository checkout.
-
-## Run the source-built preview today
+Public-feed publication is still pending, so run the source-built FirstUse contract today:
 
 ```powershell
 git clone https://github.com/sylin-org/koan-framework
@@ -48,6 +36,21 @@ Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
 The URL printed by ASP.NET Core is authoritative if it differs. The POST persists an approval; the
 two reads prove ordinary and filtered Entity access; the facts response explains the modules and
 SQLite election that produced the result.
+
+## Package-first entry after publication
+
+After the first 0.20 wave is visible on NuGet, use the canonical template path:
+
+```powershell
+dotnet new install Sylin.Koan.Templates
+dotnet new koan-web -o TodoApi
+cd TodoApi
+dotnet run
+```
+
+That generated application uses `Todo` and `/api/todos`. The [template guide](../../templates/README.md)
+contains its exact result. Until publication, these commands describe the proved candidate rather than an
+installable public package.
 
 ## Read the whole application
 

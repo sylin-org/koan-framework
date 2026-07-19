@@ -18,9 +18,9 @@ Koan's golden path is V0 to V1 in meaningful small steps. Each new line should e
 decision or a deliberate capability; framework and adapter mechanics stay behind stable semantic
 chokepoints.
 
-> **0.20 preview:** the canonical entry is `dotnet new install Sylin.Koan.Templates`. The exact candidate has
-> local package evidence; public-feed publication and observation still belong to the release phase. Use the source
-> checkout until that external step completes.
+> **0.20 preview:** run `dotnet run --project samples/FirstUse` from the source checkout today. After the first
+> public wave is visible on NuGet, `dotnet new install Sylin.Koan.Templates` becomes the canonical entry. The exact
+> candidate has local package evidence, but local evidence is not public availability.
 
 ## Step 1 — make one Entity useful
 

@@ -95,6 +95,8 @@ observed through REST, unavailable-adapter explanation followed by a clean resta
 composition lockfile. Package-only clean-room proof repeats the lockfile assertion after the Core
 target flows transitively through `Sylin.Koan.App`.
 
-This is not a production security template. HTTP MCP is enabled for local Development, the agent
-recommendation is deliberately non-final, and authentication/authorization must be designed for the
-application's deployment boundary.
+This is not a production security template. Koan can supply the supported identity, authorization,
+token, trust, and tenancy primitives selected by package reference. The application still owns its
+policy declarations, exposed operations, credentials, HTTPS and network boundary, input validation,
+backups, and deployment controls. HTTP MCP is enabled here only for local Development, and the agent
+recommendation is deliberately non-final.

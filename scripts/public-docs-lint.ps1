@@ -334,6 +334,7 @@ $frontDoorRequirements = [ordered]@{
     '.github/copilot-instructions.md' = @('0.20', 'AddKoan()', 'Entity<', 'product-surface.md')
     'templates/README.md' = @('0.20', 'dotnet new install Sylin.Koan.Templates', 'AddKoan()', 'Entity<')
     'samples/README.md' = @('0.20', 'FirstUse', 'GoldenJourney', 'product surface')
+    'docs/reference/product-surface.md' = @('Maturity vocabulary', 'supported-foundation', 'supported-extension', 'verified', 'demonstrated', 'experimental', 'specified', 'unassessed', 'deprecated', 'retired')
 }
 foreach ($path in $frontDoorRequirements.Keys) {
     $content = Get-Content -Raw -LiteralPath (Join-Path $root $path)
