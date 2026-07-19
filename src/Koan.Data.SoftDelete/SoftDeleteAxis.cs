@@ -24,6 +24,6 @@ public sealed class SoftDeleteAxis : IDataAxis
         .Named("soft-delete")
         .AppliesTo(static t => SoftDeleteMetadata.IsSoftDelete(t))
         .Field("__deleted", static () => null, typeof(bool))
-        .Reads(static _ => SoftDeleteAmbient.ShowDeleted ? null : HideDeleted)   // AppliesTo=IsSoftDelete is added by the framework
+        .Reads(static entityType => SoftDeleteAmbient.Includes(entityType) ? null : HideDeleted)   // AppliesTo=IsSoftDelete is added by the framework
         .OnDelete(Logical.SetTrue("__deleted"));
 }

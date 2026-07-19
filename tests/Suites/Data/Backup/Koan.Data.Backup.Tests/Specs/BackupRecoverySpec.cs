@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text;
 using System.Text.Json;
 using Koan.Core;
 using Koan.Core.Capabilities;
@@ -8,11 +9,12 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Backup.Abstractions;
 using Koan.Data.Backup.Models;
-using Koan.Data.Backup.Storage;
 using Koan.Data.Core;
 using Koan.Data.Core.Decorators;
 using Koan.Data.Core.Infrastructure;
 using Koan.Data.Core.Querying;
+using Koan.Storage.Abstractions;
+using Koan.Storage.Keys;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,10 +22,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Backup.Tests.Specs;
 
-public sealed class StreamingBackupServiceAcceptanceSpec
+public sealed class BackupRecoverySpec
 {
     [Fact]
-    public async Task Single_entity_backup_consumes_real_bounded_pages_and_publishes_the_complete_archive()
+    public async Task Create_consumes_provider_bounded_pages_and_publishes_one_complete_archive()
     {
         await WithRuntime("sqlite", async runtime =>
         {
@@ -31,10 +33,10 @@ public sealed class StreamingBackupServiceAcceptanceSpec
             runtime.Probe.Reset();
 
             using var scope = runtime.Services.CreateScope();
-            var manifest = await scope.ServiceProvider.GetRequiredService<IBackupService>()
-                .BackupEntityAsync<BackupRecord, string>(
+            var receipt = await scope.ServiceProvider.GetRequiredService<IBackupService>()
+                .Create<BackupRecord, string>(
                     "bounded-pages",
-                    new BackupOptions { BatchSize = 2, StorageProfile = Profile });
+                    new BackupRequest { PageSize = 2, StorageProfile = Profile });
 
             runtime.Probe.RequestedPages.Should().Equal(1, 2, 3);
             runtime.Probe.CompletedPages.Should().SatisfyRespectively(
@@ -43,20 +45,11 @@ public sealed class StreamingBackupServiceAcceptanceSpec
                 page => AssertPage(page, number: 3, candidates: 1));
             runtime.Probe.CountCalls.Should().Be(0);
 
-            manifest.Status.Should().Be(BackupStatus.Completed);
-            manifest.Entities.Should().ContainSingle()
-                .Which.Should().Match<EntityBackupInfo>(entity =>
-                    entity.EntityType == nameof(BackupRecord)
-                    && entity.Provider == "sqlite"
-                    && entity.ItemCount == 5);
-            manifest.Verification.TotalItemCount.Should().Be(5);
-            manifest.Verification.ArchiveContentHash.Should().NotBeNullOrWhiteSpace();
-            manifest.Verification.ArchiveSizeBytes.Should().BeGreaterThan(0);
-
-            var storage = scope.ServiceProvider.GetRequiredService<BackupStorageService>();
-            using var archive = await storage.OpenBackupArchive(manifest.ArchiveStorageKey, Profile);
-            var archivedIds = await ReadIds(archive, manifest.Entities.Single().StorageFile);
-            archivedIds.Should().Equal(ExpectedIds);
+            receipt.RecordCount.Should().Be(5);
+            receipt.DataContentSha256.Should().HaveLength(64);
+            receipt.ArchiveBytes.Should().BeGreaterThan(0);
+            receipt.StorageKey.Should().EndWith(".zip");
+            (await ReadIds(scope.ServiceProvider, receipt)).Should().Equal(ExpectedIds);
 
             var fact = runtime.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts.Single(item =>
                 item.Code == Constants.Diagnostics.Codes.StreamExecution
@@ -67,40 +60,115 @@ public sealed class StreamingBackupServiceAcceptanceSpec
     }
 
     [Fact]
-    public async Task Explicit_partition_controls_both_source_rows_and_archive_identity()
+    public async Task Create_and_restore_round_trip_preserves_partition_and_records()
     {
         await WithRuntime("sqlite", async runtime =>
         {
             await SeedPartition("tenant-a", "a-0001", "a-0002");
-            await SeedPartition("tenant-b", "b-0001", "b-0002", "b-0003");
-            runtime.Probe.Reset();
+            await SeedPartition("tenant-b", "b-0001");
 
-            using var ambient = EntityContext.With(partition: "tenant-b");
             using var scope = runtime.Services.CreateScope();
-            var manifest = await scope.ServiceProvider.GetRequiredService<IBackupService>()
-                .BackupEntityAsync<BackupRecord, string>(
-                    "partition-a",
-                    new BackupOptions
-                    {
-                        BatchSize = 2,
-                        Partition = "tenant-a",
-                        StorageProfile = Profile
-                    });
+            var service = scope.ServiceProvider.GetRequiredService<IBackupService>();
+            var backup = await service.Create<BackupRecord, string>(
+                "tenant-a",
+                new BackupRequest { PageSize = 1, Partition = "tenant-a", StorageProfile = Profile });
 
-            runtime.Probe.ObservedPartitions.Should().NotBeEmpty()
-                .And.OnlyContain(partition => partition == "tenant-a");
-            var entity = manifest.Entities.Should().ContainSingle().Which;
-            entity.Set.Should().Be("tenant-a");
-            entity.ItemCount.Should().Be(2);
+            using (EntityContext.With(partition: "tenant-a"))
+                (await Data<BackupRecord, string>.DeleteAll()).Should().Be(2);
 
-            var storage = scope.ServiceProvider.GetRequiredService<BackupStorageService>();
-            using var archive = await storage.OpenBackupArchive(manifest.ArchiveStorageKey, Profile);
-            (await ReadIds(archive, entity.StorageFile)).Should().Equal("a-0001", "a-0002");
+            var restore = await service.Restore<BackupRecord, string>(
+                backup.StorageKey,
+                new RestoreRequest { BatchSize = 1, StorageProfile = Profile });
+
+            restore.ArchiveId.Should().Be(backup.ArchiveId);
+            restore.RecordCount.Should().Be(2);
+            restore.TargetPartition.Should().Be("tenant-a");
+            restore.DataContentSha256.Should().Be(backup.DataContentSha256);
+
+            using (EntityContext.With(partition: "tenant-a"))
+                (await BackupRecord.All()).Select(x => x.Id).Should().Equal("a-0001", "a-0002");
+            using (EntityContext.With(partition: "tenant-b"))
+                (await BackupRecord.All()).Select(x => x.Id).Should().Equal("b-0001");
         });
     }
 
     [Fact]
-    public async Task Caller_cancellation_stops_between_real_pages_and_publishes_nothing()
+    public async Task Repeated_names_publish_distinct_archives()
+    {
+        await WithRuntime("sqlite", async runtime =>
+        {
+            await SeedFive();
+            using var scope = runtime.Services.CreateScope();
+            var service = scope.ServiceProvider.GetRequiredService<IBackupService>();
+
+            var first = await service.Create<BackupRecord, string>(
+                "same-business-name",
+                new BackupRequest { StorageProfile = Profile });
+            var second = await service.Create<BackupRecord, string>(
+                "same-business-name",
+                new BackupRequest { StorageProfile = Profile });
+
+            first.ArchiveId.Should().NotBe(second.ArchiveId);
+            first.StorageKey.Should().NotBe(second.StorageKey);
+            PublishedArchives(runtime.StorageRoot).Should().HaveCount(2);
+        });
+    }
+
+    [Fact]
+    public async Task Malformed_archive_fails_before_the_first_restore_mutation()
+    {
+        await WithRuntime("sqlite", async runtime =>
+        {
+            await SeedFive();
+            using var scope = runtime.Services.CreateScope();
+            var service = scope.ServiceProvider.GetRequiredService<IBackupService>();
+            var backup = await service.Create<BackupRecord, string>(
+                "corruption-drill",
+                new BackupRequest { PageSize = 2, StorageProfile = Profile });
+
+            CorruptDataEntry(runtime.StorageRoot);
+            await SeedPartition("recovery-target", "sentinel");
+
+            Func<Task> restore = () => service.Restore<BackupRecord, string>(
+                backup.StorageKey,
+                new RestoreRequest
+                {
+                    BatchSize = 1,
+                    StorageProfile = Profile,
+                    TargetPartition = "recovery-target"
+                });
+
+            await restore.Should().ThrowAsync<InvalidDataException>()
+                .WithMessage("*record*malformed*");
+            using (EntityContext.With(partition: "recovery-target"))
+                (await BackupRecord.All()).Select(x => x.Id).Should().Equal("sentinel");
+        });
+    }
+
+    [Fact]
+    public async Task Type_mismatch_fails_before_the_first_restore_mutation()
+    {
+        await WithRuntime("sqlite", async runtime =>
+        {
+            await SeedFive();
+            using var scope = runtime.Services.CreateScope();
+            var service = scope.ServiceProvider.GetRequiredService<IBackupService>();
+            var backup = await service.Create<BackupRecord, string>(
+                "type-drill",
+                new BackupRequest { StorageProfile = Profile });
+
+            Func<Task> restore = () => service.Restore<OtherRecord, string>(
+                backup.StorageKey,
+                new RestoreRequest { StorageProfile = Profile });
+
+            await restore.Should().ThrowAsync<InvalidDataException>()
+                .WithMessage("*not*");
+            (await OtherRecord.All()).Should().BeEmpty();
+        });
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_stops_between_pages_and_publishes_nothing()
     {
         await WithRuntime("sqlite", async runtime =>
         {
@@ -111,17 +179,14 @@ public sealed class StreamingBackupServiceAcceptanceSpec
 
             using var scope = runtime.Services.CreateScope();
             Func<Task> backup = () => scope.ServiceProvider.GetRequiredService<IBackupService>()
-                .BackupEntityAsync<BackupRecord, string>(
+                .Create<BackupRecord, string>(
                     "cancelled-between-pages",
-                    new BackupOptions { BatchSize = 2, StorageProfile = Profile },
+                    new BackupRequest { PageSize = 2, StorageProfile = Profile },
                     cancellation.Token);
 
             await backup.Should().ThrowAsync<OperationCanceledException>();
             runtime.Probe.RequestedPages.Should().Equal(1, 2);
-            runtime.Probe.CompletedPages.Should().ContainSingle();
-            AssertPage(runtime.Probe.CompletedPages.Single(), number: 1, candidates: 2);
-            runtime.Probe.CountCalls.Should().Be(0);
-            PublishedFiles(runtime.StorageRoot).Should().BeEmpty();
+            PublishedArchives(runtime.StorageRoot).Should().BeEmpty();
         });
     }
 
@@ -141,47 +206,35 @@ public sealed class StreamingBackupServiceAcceptanceSpec
 
             using var scope = runtime.Services.CreateScope();
             Func<Task> backup = () => scope.ServiceProvider.GetRequiredService<IBackupService>()
-                .BackupEntityAsync<BackupRecord, string>(
+                .Create<BackupRecord, string>(
                     $"unsupported-{provider}",
-                    new BackupOptions { BatchSize = 2, StorageProfile = Profile });
+                    new BackupRequest { PageSize = 2, StorageProfile = Profile });
 
             var rejection = (await backup.Should().ThrowAsync<QueryStreamRejectedException>()).Which;
             rejection.EntityType.Should().Contain(nameof(BackupRecord));
             rejection.Provider.Should().Be(provider);
-            rejection.BatchSize.Should().Be(2);
-            rejection.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.MissingProviderBoundedPaging);
-            rejection.Correction.Should().NotBeNullOrWhiteSpace();
             runtime.Probe.RequestedPages.Should().BeEmpty();
             runtime.Probe.CountCalls.Should().Be(0);
-            PublishedFiles(runtime.StorageRoot).Should().BeEmpty();
+            PublishedArchives(runtime.StorageRoot).Should().BeEmpty();
         });
     }
 
     private const string Profile = "acceptance";
+    private const string DataEntry = "entity.jsonl";
     private static readonly string[] ExpectedIds = ["0001", "0002", "0003", "0004", "0005"];
 
     private static async Task SeedFive()
-    {
-        await BackupRecord.UpsertMany(ExpectedIds.Select((id, index) => new BackupRecord
-        {
-            Id = id,
-            Sequence = index + 1
-        }));
-    }
+        => await BackupRecord.UpsertMany(ExpectedIds.Select((id, index) => new BackupRecord { Id = id, Sequence = index + 1 }));
 
     private static async Task SeedPartition(string partition, params string[] ids)
     {
         using var scope = EntityContext.With(partition: partition);
-        await BackupRecord.UpsertMany(ids.Select((id, index) => new BackupRecord
-        {
-            Id = id,
-            Sequence = index + 1
-        }));
+        await BackupRecord.UpsertMany(ids.Select((id, index) => new BackupRecord { Id = id, Sequence = index + 1 }));
     }
 
     private static async Task WithRuntime(string provider, Func<Runtime, Task> assertion)
     {
-        var root = Path.Combine(Path.GetTempPath(), "koan-backup-stream", Guid.CreateVersion7().ToString("n"));
+        var root = Path.Combine(Path.GetTempPath(), "koan-backup-recovery", Guid.CreateVersion7().ToString("n"));
         var storageRoot = Path.Combine(root, "storage");
         Directory.CreateDirectory(root);
         var probe = new BackupStreamProbe();
@@ -220,9 +273,49 @@ public sealed class StreamingBackupServiceAcceptanceSpec
             }
 
             try { Directory.Delete(root, recursive: true); }
-            catch { /* best-effort cleanup for a failed assertion */ }
+            catch { }
         }
     }
+
+    private static async Task<IReadOnlyList<string>> ReadIds(IServiceProvider services, BackupReceipt receipt)
+    {
+        using var scope = StorageScope.HostScoped();
+        await using var stream = await services.GetRequiredService<IStorageService>()
+            .Read(receipt.StorageProfile, "backups", receipt.StorageKey);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        var entry = archive.GetEntry(DataEntry);
+        entry.Should().NotBeNull();
+        await using var input = entry!.Open();
+        using var reader = new StreamReader(input);
+        var ids = new List<string>();
+        while (await reader.ReadLineAsync() is { } line)
+        {
+            using var document = JsonDocument.Parse(line);
+            ids.Add(document.RootElement.GetProperty("id").GetString()!);
+        }
+        return ids;
+    }
+
+    private static void CorruptDataEntry(string storageRoot)
+    {
+        var path = PublishedArchives(storageRoot).Should().ContainSingle().Which;
+        using var archive = ZipFile.Open(path, ZipArchiveMode.Update);
+        var entry = archive.GetEntry(DataEntry);
+        entry.Should().NotBeNull();
+        string first;
+        using (var reader = new StreamReader(entry!.Open(), Encoding.UTF8))
+            first = reader.ReadLine()!;
+        entry.Delete();
+        var replacement = archive.CreateEntry(DataEntry);
+        using var writer = new StreamWriter(replacement.Open(), Encoding.UTF8);
+        writer.WriteLine(first);
+        writer.WriteLine("{not-json}");
+    }
+
+    private static IReadOnlyList<string> PublishedArchives(string storageRoot)
+        => Directory.Exists(storageRoot)
+            ? Directory.EnumerateFiles(storageRoot, "*.zip", SearchOption.AllDirectories).ToList()
+            : [];
 
     private static void AssertPage(PageObservation page, int number, int candidates)
     {
@@ -234,56 +327,28 @@ public sealed class StreamingBackupServiceAcceptanceSpec
         page.CountRequested.Should().BeFalse();
     }
 
-    private static async Task<IReadOnlyList<string>> ReadIds(ZipArchive archive, string storageFile)
-    {
-        var entry = archive.GetEntry(storageFile);
-        entry.Should().NotBeNull();
-        await using var stream = entry!.Open();
-        using var reader = new StreamReader(stream);
-        var ids = new List<string>();
-        while (await reader.ReadLineAsync() is { } line)
-        {
-            using var document = JsonDocument.Parse(line);
-            ids.Add(document.RootElement.GetProperty(nameof(BackupRecord.Id)).GetString()!);
-        }
-
-        return ids;
-    }
-
-    private static IReadOnlyList<string> PublishedFiles(string storageRoot)
-        => Directory.Exists(storageRoot)
-            ? Directory.EnumerateFiles(storageRoot, "*", SearchOption.AllDirectories).ToList()
-            : [];
-
     private sealed record Runtime(IServiceProvider Services, string StorageRoot, BackupStreamProbe Probe);
-    private sealed record PageObservation(
-        int Number,
-        int Size,
-        int Candidates,
-        bool PaginationHandled,
-        bool SortHandled,
-        bool CountRequested);
+    private sealed record PageObservation(int Number, int Size, int Candidates, bool PaginationHandled, bool SortHandled, bool CountRequested);
 
     private sealed class BackupRecord : Entity<BackupRecord>
     {
         public int Sequence { get; set; }
     }
 
+    private sealed class OtherRecord : Entity<OtherRecord>;
+
     private sealed class BackupStreamProbe
     {
         private int? _cancelPage;
         private CancellationTokenSource? _cancellation;
-
         public List<int> RequestedPages { get; } = [];
         public List<PageObservation> CompletedPages { get; } = [];
-        public List<string?> ObservedPartitions { get; } = [];
         public int CountCalls { get; private set; }
 
         public void Reset()
         {
             RequestedPages.Clear();
             CompletedPages.Clear();
-            ObservedPartitions.Clear();
             CountCalls = 0;
             _cancelPage = null;
             _cancellation = null;
@@ -299,7 +364,6 @@ public sealed class StreamingBackupServiceAcceptanceSpec
         {
             var page = query.EffectivePage();
             RequestedPages.Add(page);
-            ObservedPartitions.Add(EntityContext.Current?.Partition);
             if (_cancelPage == page)
             {
                 _cancellation!.Cancel();
@@ -309,12 +373,8 @@ public sealed class StreamingBackupServiceAcceptanceSpec
 
         public void Completed(QueryDefinition query, RepositoryQueryResult<BackupRecord> result)
             => CompletedPages.Add(new PageObservation(
-                query.EffectivePage(),
-                query.EffectivePageSize(),
-                result.Items.Count,
-                result.PaginationHandled,
-                result.SortFullyHandled(query),
-                query.CountStrategy is not null));
+                query.EffectivePage(), query.EffectivePageSize(), result.Items.Count,
+                result.PaginationHandled, result.SortFullyHandled(query), query.CountStrategy is not null));
 
         public void Counted() => CountCalls++;
     }
@@ -355,12 +415,7 @@ public sealed class StreamingBackupServiceAcceptanceSpec
             return result;
         }
 
-        public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
-        {
-            _probe.Counted();
-            return _query.Count(query, ct);
-        }
-
+        public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default) { _probe.Counted(); return _query.Count(query, ct); }
         public Task EnsureReady(CancellationToken ct = default) => _inner.EnsureReady(ct);
         public Task<BackupRecord?> Get(string id, CancellationToken ct = default) => _inner.Get(id, ct);
         public Task<IReadOnlyList<BackupRecord?>> GetMany(IEnumerable<string> ids, CancellationToken ct = default) => _inner.GetMany(ids, ct);

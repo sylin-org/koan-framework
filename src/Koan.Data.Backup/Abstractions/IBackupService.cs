@@ -3,51 +3,22 @@ using Koan.Data.Backup.Models;
 
 namespace Koan.Data.Backup.Abstractions;
 
+/// <summary>
+/// Creates and restores integrity-checked archives for one Entity type.
+/// </summary>
 public interface IBackupService
 {
-    /// <summary>
-    /// Backs up a specific entity type
-    /// </summary>
-    Task<BackupManifest> BackupEntityAsync<TEntity, TKey>(string backupName, BackupOptions? options = null, CancellationToken ct = default)
+    Task<BackupReceipt> Create<TEntity, TKey>(
+        string name,
+        BackupRequest? request = null,
+        CancellationToken ct = default)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull;
 
-    /// <summary>
-    /// Backs up all discovered entity types
-    /// </summary>
-    Task<BackupManifest> BackupAllEntities(string backupName, GlobalBackupOptions? options = null, CancellationToken ct = default);
-
-    /// <summary>
-    /// Backs up selected entities based on filter
-    /// </summary>
-    Task<BackupManifest> BackupSelected(string backupName, Func<EntityTypeInfo, bool> filter, GlobalBackupOptions? options = null, CancellationToken ct = default);
-
-    /// <summary>
-    /// Backs up entities from specific providers
-    /// </summary>
-    Task<BackupManifest> BackupByProvider(string backupName, string[] providers, GlobalBackupOptions? options = null, CancellationToken ct = default);
-
-    /// <summary>
-    /// Gets backup progress for monitoring
-    /// </summary>
-    Task<BackupProgress> GetBackupProgress(string backupId, CancellationToken ct = default);
-
-    /// <summary>
-    /// Cancels an ongoing backup operation
-    /// </summary>
-    Task CancelBackup(string backupId, CancellationToken ct = default);
-}
-
-public class BackupProgress
-{
-    public string BackupId { get; set; } = default!;
-    public BackupStatus Status { get; set; }
-    public int EntitiesCompleted { get; set; }
-    public int TotalEntities { get; set; }
-    public long BytesProcessed { get; set; }
-    public long TotalEstimatedBytes { get; set; }
-    public TimeSpan ElapsedTime { get; set; }
-    public TimeSpan? EstimatedTimeRemaining { get; set; }
-    public string? CurrentEntityType { get; set; }
-    public double PercentComplete => TotalEntities > 0 ? (double)EntitiesCompleted / TotalEntities * 100 : 0;
+    Task<RestoreReceipt> Restore<TEntity, TKey>(
+        string storageKey,
+        RestoreRequest? request = null,
+        CancellationToken ct = default)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull;
 }

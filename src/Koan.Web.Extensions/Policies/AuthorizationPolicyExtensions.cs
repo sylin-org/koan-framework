@@ -12,7 +12,6 @@ public static class AuthorizationPolicyExtensions
         public string? ModerationAuthorRole { get; set; }
         public string? ModerationReviewerRole { get; set; }
         public string? ModerationPublisherRole { get; set; }
-        public string? SoftDeleteRole { get; set; }
         public string? AuditRole { get; set; }
     }
 
@@ -35,8 +34,6 @@ public static class AuthorizationPolicyExtensions
                 options.AddPolicy(KoanWebPolicyNames.ModerationReviewer, p => p.RequireRole(opts.ModerationReviewerRole!));
             if (!string.IsNullOrWhiteSpace(opts.ModerationPublisherRole))
                 options.AddPolicy(KoanWebPolicyNames.ModerationPublisher, p => p.RequireRole(opts.ModerationPublisherRole!));
-            if (!string.IsNullOrWhiteSpace(opts.SoftDeleteRole))
-                options.AddPolicy(KoanWebPolicyNames.SoftDeleteActor, p => p.RequireRole(opts.SoftDeleteRole!));
             if (!string.IsNullOrWhiteSpace(opts.AuditRole))
                 options.AddPolicy(KoanWebPolicyNames.AuditActor, p => p.RequireRole(opts.AuditRole!));
         });

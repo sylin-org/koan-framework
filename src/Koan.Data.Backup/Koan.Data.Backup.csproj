@@ -3,8 +3,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Comprehensive backup and restore system for Koan Framework applications with streaming, compression, and multi-provider support.</Description>
-    <PackageTags>$(CommonPackageTags);backup;restore;data;streaming;compression</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>Integrity-checked, provider-bounded Entity archive creation and recovery through Koan Storage.</Description>
+    <PackageTags>$(CommonPackageTags);backup;restore;data;recovery;integrity</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
@@ -14,12 +15,8 @@
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-  </ItemGroup>
-  <ItemGroup>
-    <!-- This project maps real ASP.NET Core endpoints (IEndpointRouteBuilder / Builder/Http/Routing) and
-         HealthChecks. It previously free-rode on Microsoft.AspNetCore.App leaked transitively through
-         Koan.Core's OTel packages; declared explicitly now that OTel moved out (ARCH-0088). -->
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
   </ItemGroup>
 </Project>

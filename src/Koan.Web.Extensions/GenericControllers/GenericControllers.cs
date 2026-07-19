@@ -19,15 +19,6 @@ public static class GenericControllers
         return services;
     }
 
-    public static IServiceCollection AddEntitySoftDeleteController<TEntity, TKey>(this IServiceCollection services, string routePrefix)
-        where TEntity : class
-        where TKey : notnull
-    {
-        var genericDef = typeof(Controllers.EntitySoftDeleteController<,>);
-        GenericControllerRegistry.GetOrAdd(services).Register(genericDef, typeof(TEntity), typeof(TKey), routePrefix);
-        return services;
-    }
-
     public static IServiceCollection AddEntityModerationController<TEntity, TKey>(this IServiceCollection services, string routePrefix)
         where TEntity : class
         where TKey : notnull

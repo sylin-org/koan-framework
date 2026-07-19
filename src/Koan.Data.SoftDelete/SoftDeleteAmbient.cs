@@ -2,32 +2,48 @@ namespace Koan.Data.SoftDelete;
 
 /// <summary>
 /// The ambient "show soft-deleted rows" slice. Inside a <c>using (T.WithDeleted())</c> scope the soft-delete read
-/// filter is suppressed, so a query (or a load-before-<c>.Restore()</c>) sees the deleted rows. Off by default — the
-/// recycle bin is opt-in per scope, never globally on.
+/// filter is suppressed for <c>T</c>, so a query (or a load-before-<c>.Restore()</c>) sees that type's deleted rows.
+/// Off by default and type-targeted — opening one recycle bin never reveals another entity type.
 /// </summary>
 internal static class SoftDeleteAmbient
 {
-    private static readonly AsyncLocal<bool> _showDeleted = new();
+    private static readonly AsyncLocal<ScopeFrame?> Current = new();
 
-    /// <summary>Whether deleted rows are visible in the current ambient.</summary>
-    public static bool ShowDeleted => _showDeleted.Value;
-
-    /// <summary>Enter a scope where reads include soft-deleted rows; dispose restores the previous state.</summary>
-    public static IDisposable Enter()
+    /// <summary>Whether deleted rows for <paramref name="entityType"/> are visible in the current ambient.</summary>
+    public static bool Includes(Type entityType)
     {
-        var prev = _showDeleted.Value;
-        _showDeleted.Value = true;
-        return new Scope(prev);
+        for (var frame = Current.Value; frame is not null; frame = frame.Parent)
+        {
+            if (frame.EntityType == entityType)
+                return true;
+        }
+
+        return false;
     }
 
-    private sealed class Scope(bool previous) : IDisposable
+    /// <summary>Enter a scope where reads of one entity type include soft-deleted rows.</summary>
+    public static IDisposable Enter(Type entityType)
+    {
+        ArgumentNullException.ThrowIfNull(entityType);
+
+        var frame = new ScopeFrame(entityType, Current.Value);
+        Current.Value = frame;
+        return new Scope(frame);
+    }
+
+    private sealed record ScopeFrame(Type EntityType, ScopeFrame? Parent);
+
+    private sealed class Scope(ScopeFrame frame) : IDisposable
     {
         private bool _disposed;
+
         public void Dispose()
         {
             if (_disposed) return;
             _disposed = true;
-            _showDeleted.Value = previous;
+
+            if (ReferenceEquals(Current.Value, frame))
+                Current.Value = frame.Parent;
         }
     }
 }

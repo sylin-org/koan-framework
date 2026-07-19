@@ -26,6 +26,9 @@ public sealed class SoftDeleteSpec(SqliteFixture fixture, ITestOutputHelper outp
     [SoftDelete]
     public sealed class Doc : Entity<Doc> { public string Title { get; set; } = ""; }
 
+    [SoftDelete]
+    public sealed class Note : Entity<Note> { public string Title { get; set; } = ""; }
+
     [Fact(DisplayName = "Delete soft-removes: hidden from all reads, but physically present (visible under WithDeleted)")]
     public async Task Delete_soft_removes_and_reads_hide_it()
     {
@@ -67,6 +70,37 @@ public sealed class SoftDeleteSpec(SqliteFixture fixture, ITestOutputHelper outp
         await loaded.Restore();
 
         (await Doc.All()).Select(d => d.Title).Should().Equal("a");   // visible again
+    }
+
+    [Fact(DisplayName = "WithDeleted is type-targeted and nested recycle-bin scopes unwind independently")]
+    public async Task WithDeleted_is_type_targeted_and_nested()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        using var _ = Lease(NewPartition());
+
+        var doc = await new Doc { Title = "doc" }.Save();
+        var note = await new Note { Title = "note" }.Save();
+        await Doc.Remove(doc.Id);
+        await Note.Remove(note.Id);
+
+        using (Doc.WithDeleted())
+        {
+            (await Doc.Get(doc.Id)).Should().NotBeNull();
+            (await Note.Get(note.Id)).Should().BeNull("opening Doc's recycle bin must not reveal Note rows");
+
+            using (Note.WithDeleted())
+            {
+                (await Doc.Get(doc.Id)).Should().NotBeNull();
+                (await Note.Get(note.Id)).Should().NotBeNull();
+            }
+
+            (await Doc.Get(doc.Id)).Should().NotBeNull();
+            (await Note.Get(note.Id)).Should().BeNull("disposing the nested scope must hide Note again");
+        }
+
+        (await Doc.Get(doc.Id)).Should().BeNull();
+        (await Note.Get(note.Id)).Should().BeNull();
     }
 
     [Fact(DisplayName = ".HardDelete() physically removes the row (gone even under WithDeleted)")]

@@ -22,7 +22,7 @@ public static class SoftDeleteExtensions
         public async Task<bool> HardDelete(CancellationToken ct = default)
         {
             using (OperationOverrideBypass.Enter(typeof(T), model.Id))
-            using (SoftDeleteAmbient.Enter())
+            using (SoftDeleteAmbient.Enter(typeof(T)))
                 return await model.Remove(ct);
         }
 
@@ -39,6 +39,6 @@ public static class SoftDeleteExtensions
         /// A scope where reads of <typeparamref name="T"/> include soft-deleted rows (the recycle bin):
         /// <c>using (T.WithDeleted()) { ... }</c>. Off by default — never globally on.
         /// </summary>
-        public static IDisposable WithDeleted() => SoftDeleteAmbient.Enter();
+        public static IDisposable WithDeleted() => SoftDeleteAmbient.Enter(typeof(T));
     }
 }

@@ -18,15 +18,6 @@ public static class CapabilityActions
         public const string Return = "Moderation.Return";
     }
 
-    public static class SoftDelete
-    {
-        public const string ListDeleted = "SoftDelete.ListDeleted";
-        public const string Delete = "SoftDelete.Delete";
-        public const string DeleteMany = "SoftDelete.DeleteMany";
-        public const string Restore = "SoftDelete.Restore";
-        public const string RestoreMany = "SoftDelete.RestoreMany";
-    }
-
     public static class Audit
     {
         public const string Snapshot = "Audit.Snapshot";
