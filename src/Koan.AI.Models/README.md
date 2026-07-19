@@ -1,79 +1,39 @@
-# Koan.AI.Models
+# Sylin.Koan.AI.Models
 
-Centralized model lifecycle management for Koan: search, pull, inspect, convert, quantize, deploy, version, and audit AI models across providers.
+Discover, acquire, catalog, transform, deploy, and inspect models through the capabilities of referenced AI adapters.
 
-- Target framework: net10.0
-- License: Apache-2.0
-- Version: 0.6.3
-
-## Install
-
-```powershell
+```bash
 dotnet add package Sylin.Koan.AI.Models
 ```
 
-## Quick Start
+## Meaningful use
+
+Reference the package, keep `AddKoan()`, and call the facade from a running host:
 
 ```csharp
-// Search for a model
-var entries = await Model.Search(new ModelQuery
-{
-    Keywords    = ["llama", "instruct"],
-    Quantization = Quantization.Q4_K_M,
-    Format       = ModelFormat.Gguf,
-});
+var matches = await Model.Search(
+    new ModelQuery { Keywords = "bge embedding", Format = ModelFormat.ONNX },
+    cancellationToken);
 
-// Pull a model (download with progress)
-await foreach (var progress in Model.Pull("llama3:8b-instruct-q4_K_M"))
-    Console.WriteLine($"{progress.Stage} {progress.Percent:P0}");
-
-// Deploy and list viable routes
-var routes = await Model.Routes("llama3:8b-instruct-q4_K_M");
-foreach (var route in routes)
-    Console.WriteLine($"{route.Runtime} via {route.Compute?.DeviceName}");
+var model = await Model.Pull(
+    "BAAI/bge-small-en-v1.5",
+    format: ModelFormat.ONNX,
+    progress: new Progress<ModelPullProgress>(p => Console.WriteLine($"{p.Phase}: {p.Percent:P0}")),
+    ct: cancellationToken);
 ```
 
-## Core API
+`Inspect`, `List`, `Routes`, `Health`, `History`, and `Audit` inspect current catalog/runtime facts. `Convert`,
+`Quantize`, `Merge`, `Deploy`, `Rollback`, `Remove`, and `Prune` are explicit mutations routed to capable adapters.
 
-```csharp
-Model.Search(ModelQuery query)              // → IReadOnlyList<ModelEntry>
-Model.Pull(string modelId)                  // → IAsyncEnumerable<ModelPullProgress>
-Model.Inspect(string modelId)               // → ModelEntry
-Model.Convert(string modelId, ModelFormat)  // → ConversionJob
-Model.Quantize(string modelId, Quantization)// → QuantizationJob
-Model.Merge(string[] modelIds, MergeOptions)// → MergeJob
-Model.Deploy(string modelId)                // → DeployResult
-Model.Routes(string modelId)                // → IReadOnlyList<ModelRoute>
-Model.History(string modelId)               // → IReadOnlyList<ModelHistoryEntry>
-Model.Rollback(string modelId, string version) // → void
-Model.Audit(string modelId)                 // → AuditReport
-Model.Register(ModelEntry entry)            // → void  — add to catalog
-Model.List()                                // → IReadOnlyList<ModelEntry>
-Model.Remove(string modelId)                // → void
-Model.Prune()                               // → PruneReport  — remove unused/old
-Model.Health(string modelId)                // → ModelHealthReport
-```
+## Guarantees and limitations
 
-## `ModelStatus` Lifecycle
+- Reference plus `AddKoan()` automatically registers `IModelService`; adapters remain separate reference decisions.
+- Each operation selects adapters by declared capability. Absence, ambiguity, unsupported format/runtime, invalid model
+  identity, or missing local file fails with a correction; the service does not pretend every adapter can transform or
+  deploy every model.
+- Catalog entries are Koan Data Entities. Durable history/catalog behavior therefore requires an application-selected
+  Data provider. Downloads and runtime deployment remain adapter-owned external effects.
+- Conversion/quantization return `JobRef`; this package does not itself guarantee a worker/toolchain, transactional
+  rollback across adapters, license suitability, malware scanning, model quality, or deterministic runtime output.
 
-```
-Cached → Loaded → Deployed → Standby
-```
-
-## Supported Formats
-
-| `ModelFormat` | Description |
-|--------------|-------------|
-| `Gguf` | llama.cpp format (recommended for local) |
-| `Safetensors` | HuggingFace format |
-| `Onnx` | ONNX Runtime format |
-| `Mlx` | Apple MLX format |
-
-## Quantizations
-
-`Q4_K_M`, `Q5_K_M`, `Q8_0`, `F16`, `F32` — standard GGUF quantization levels.
-
-## Reference
-
-- **ADR**: `docs/decisions/AI-0023-model-catalog-and-lifecycle.md`
-- **Related**: `Koan.AI.Eval` (quality gates)
+See [TECHNICAL.md](TECHNICAL.md) for capability routing, persistence, and lifecycle boundaries.

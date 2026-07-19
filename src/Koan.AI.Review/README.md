@@ -1,81 +1,41 @@
-# Koan.AI.Review
+# Sylin.Koan.AI.Review
 
-Human-in-the-loop review queues for Koan. Define review queues over any entity, surface approve/reject/edit/label/flag actions, and close the feedback loop back to training data.
+Define typed human-review queues and apply approve, reject, edit, label, or flag decisions to reviewable Entities.
 
-- Target framework: net10.0
-- License: Apache-2.0
-- Version: 0.6.3
-
-## Install
-
-```powershell
+```bash
 dotnet add package Sylin.Koan.AI.Review
 ```
 
-## Quick Start
+## Meaningful use
+
+The package automatically registers review infrastructure through `AddKoan()`. The application defines its business
+queue explicitly with standard DI:
 
 ```csharp
-// Define a review queue for AI-generated summaries
-var queue = Review.Create<ArticleSummary>()
-    .Named("summary-review")
-    .Filter(x => x.Status == SummaryStatus.PendingReview)
-    .Display(x => new { x.Title, x.GeneratedSummary, x.Source })
-    .Approve(x => x.Status = SummaryStatus.Approved)
-    .Reject(x => x.Status = SummaryStatus.Rejected)
-    .Edit(x => new { x.GeneratedSummary });
-
-// Process a review action (e.g., from API handler)
-await Review.Approve<ArticleSummary>(summaryId, ct);
-await Review.Reject<ArticleSummary>(summaryId, reason: "Inaccurate", ct);
-await Review.Edit<ArticleSummary>(summaryId, patch: new { GeneratedSummary = "corrected text" }, ct);
-await Review.Label<ArticleSummary>(summaryId, labels: ["high-quality", "technical"], ct);
-await Review.Flag<ArticleSummary>(summaryId, reason: "Potential hallucination", ct);
+builder.Services.AddKoan();
+builder.Services.AddKoanReview(review => review.Queue<ArticleSummary>(
+    "summary-review",
+    queue => queue
+        .Where(item => item.ReviewStatus == ReviewStatus.Pending)
+        .Display(item => new { item.Title, item.GeneratedSummary })
+        .Approve()
+        .Reject(requireReason: true)
+        .Edit(item => item.GeneratedSummary)
+        .Flag("hallucination")));
 ```
 
-## Entity Opt-In
+`ArticleSummary` implements `IReviewable`. A controller, worker, or other authorized application boundary loads the
+Entity and calls `IReviewActionHandler`; for example `ApproveAsync(entity, reviewerId, ct)`.
 
-Implement `IReviewable` to mark an entity as reviewable:
+## Guarantees and limitations
 
-```csharp
-public class ArticleSummary : Entity<ArticleSummary>, IReviewable
-{
-    public string Title            { get; set; } = "";
-    public string GeneratedSummary { get; set; } = "";
-    public SummaryStatus Status    { get; set; } = SummaryStatus.PendingReview;
-}
-```
+- Queue definitions are typed, process-local configuration and require both `Where` and `Display`. Duplicate names for
+  the same Entity type are rejected.
+- The default handler mutates review fields in memory and validates requested edit/label properties. The caller owns
+  authorization, reviewer identity, Entity load/save, concurrency, and any audit/event publication.
+- Reference plus `AddKoan()` registers the registry and handler, but does not invent application queues or HTTP/UI
+  endpoints. `AddKoanReview` is the deliberate business-queue declaration, not module activation.
+- The package does not provide durable work assignment, locks, notifications, SLA/escalation, anonymous reviewer
+  trust, or atomic persistence. Missing fields and invalid queue definitions fail with corrections.
 
-## Queue Builder
-
-```csharp
-Review.Create<TEntity>()
-    .Named(string queueName)
-    .Filter(Expression<Func<TEntity, bool>> predicate)   // Which records to show
-    .Display(Func<TEntity, object> fields)               // Fields shown to reviewer
-    .Approve(Action<TEntity> mutation)                   // What approve does to entity
-    .Reject(Action<TEntity> mutation)                    // What reject does
-    .Edit(Func<TEntity, object> editableFields)          // Which fields are editable
-```
-
-## Actions
-
-| Method | Purpose |
-|--------|---------|
-| `Review.Approve<T>(id, ct)` | Mark as approved, apply configured mutation |
-| `Review.Reject<T>(id, reason, ct)` | Mark as rejected with reason |
-| `Review.Edit<T>(id, patch, ct)` | Apply a correction patch |
-| `Review.Label<T>(id, labels, ct)` | Attach classification labels |
-| `Review.Flag<T>(id, reason, ct)` | Flag for follow-up (not a final action) |
-
-## Feedback Loop
-
-Review events are emitted after each action, enabling downstream consumers (e.g., training dataset pipelines) to capture reviewer decisions:
-
-```csharp
-// In AiReviewModule or a background service
-services.AddReviewEventHandler<ArticleSummary, SummaryFeedbackHandler>();
-```
-
-## Reference
-
-- **Related**: `Koan.AI.Eval` (automated quality gates), `Koan.Data.Core` (entity persistence)
+See [TECHNICAL.md](TECHNICAL.md) for registration, action, and persistence ownership.

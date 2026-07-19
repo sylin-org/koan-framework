@@ -3,45 +3,14 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 93,
-    "repairRequired": 1,
-    "reviewRequired": 6,
-    "structurallyReady": 86,
-    "ownedReadmes": 92,
-    "technicalCompanions": 87,
-    "findings": 25
+    "repairRequired": 0,
+    "reviewRequired": 0,
+    "structurallyReady": 93,
+    "ownedReadmes": 93,
+    "technicalCompanions": 93,
+    "findings": 0
   },
-  "findingDefinitions": [
-    {
-      "code": "docs.readme.boundaries.missing",
-      "severity": "warning",
-      "summary": "The README has no recognizable guarantees, requirements, failure, or limitation section.",
-      "correction": "State defaults, prerequisites, corrective failures, and unsupported guarantees proportionate to the package role."
-    },
-    {
-      "code": "docs.readme.meaningful-use.missing",
-      "severity": "warning",
-      "summary": "The README has no recognizable meaningful-use or behavior section.",
-      "correction": "Show the smallest honest result and explain what referencing the package makes available."
-    },
-    {
-      "code": "docs.readme.owned.missing",
-      "severity": "error",
-      "summary": "The package falls back to the framework root README.",
-      "correction": "Add a package-owned README that explains this reference intent and its smallest meaningful result."
-    },
-    {
-      "code": "docs.readme.package-title.missing",
-      "severity": "warning",
-      "summary": "The README does not use the exact package ID as its primary title.",
-      "correction": "Use the exact package ID as the primary title so the NuGet page and source companion identify the same product."
-    },
-    {
-      "code": "docs.technical.missing",
-      "severity": "warning",
-      "summary": "No package-owned technical companion describes runtime or build ownership.",
-      "correction": "Add TECHNICAL.md when this package owns non-trivial activation, lifecycle, provider, projection, or build behavior; otherwise confirm during R11 review that the README contains the complete contract."
-    }
-  ],
+  "findingDefinitions": [],
   "packages": [
     {
       "packageId": "Sylin.Koan",
@@ -89,7 +58,7 @@
       "projectPath": "src/Koan.AI.Agents/Koan.AI.Agents.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Entity-aware autonomous agents for Koan AI: auto-generated tools from Entity\u003CT\u003E with ReAct reasoning.",
       "targetFrameworks": [
         "net10.0"
@@ -104,21 +73,16 @@
         "Sylin.Koan.Data.Vector"
       ],
       "readme": "src/Koan.AI.Agents/README.md",
-      "technicalDocumentation": null,
+      "technicalDocumentation": "src/Koan.AI.Agents/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.HuggingFace",
       "projectPath": "src/Connectors/AI/HuggingFace/Koan.AI.Connector.HuggingFace.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "repair-required",
+      "status": "structurally-ready",
       "description": "HuggingFace Hub connector for Koan AI: search, metadata, and download via adapter capabilities.",
       "targetFrameworks": [
         "net10.0"
@@ -130,13 +94,10 @@
         "Sylin.Koan.AI.Models",
         "Sylin.Koan.Core"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Connectors/AI/HuggingFace/README.md",
+      "technicalDocumentation": "src/Connectors/AI/HuggingFace/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.LMStudio",
@@ -236,7 +197,7 @@
       "projectPath": "src/Koan.AI.Eval/Koan.AI.Eval.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Model evaluation, quality gates, regression detection, and drift monitoring for Koan AI.",
       "targetFrameworks": [
         "net10.0"
@@ -249,21 +210,16 @@
         "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Koan.AI.Eval/README.md",
-      "technicalDocumentation": null,
+      "technicalDocumentation": "src/Koan.AI.Eval/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI.Models",
       "projectPath": "src/Koan.AI.Models/Koan.AI.Models.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Centralized model lifecycle for Koan AI: pull, convert, deploy, version, and manage models across runtimes.",
       "targetFrameworks": [
         "net10.0"
@@ -276,21 +232,16 @@
         "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Koan.AI.Models/README.md",
-      "technicalDocumentation": null,
+      "technicalDocumentation": "src/Koan.AI.Models/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI.Orchestration",
       "projectPath": "src/Koan.AI.Orchestration/Koan.AI.Orchestration.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Typed, immutable chain composition for Koan AI: RAG, branching, structured output, and streaming.",
       "targetFrameworks": [
         "net10.0"
@@ -305,14 +256,9 @@
         "Sylin.Koan.Data.Vector"
       ],
       "readme": "src/Koan.AI.Orchestration/README.md",
-      "technicalDocumentation": null,
+      "technicalDocumentation": "src/Koan.AI.Orchestration/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI.Prompt",
@@ -339,7 +285,7 @@
       "projectPath": "src/Koan.AI.Review/Koan.AI.Review.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Human-in-the-loop review queues for Koan AI: approve, reject, edit, and label AI outputs to close the feedback loop.",
       "targetFrameworks": [
         "net10.0"
@@ -349,14 +295,9 @@
         "Sylin.Koan.Data.Core"
       ],
       "readme": "src/Koan.AI.Review/README.md",
-      "technicalDocumentation": null,
+      "technicalDocumentation": "src/Koan.AI.Review/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.AI.Web",
@@ -635,7 +576,7 @@
       "projectPath": "src/Koan.Data.AI/Koan.Data.AI.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
+      "status": "structurally-ready",
       "description": "Entity-aware AI operations for Koan: EntityAi.Embed/Chat/Ocr, [Embedding] convention defaults, [MediaAnalysis] auto-processing pipeline, and cross-modal search via the MediaAnalysisEmbeddingBridge.",
       "targetFrameworks": [
         "net10.0"
@@ -651,11 +592,7 @@
       "readme": "src/Koan.Data.AI/README.md",
       "technicalDocumentation": "src/Koan.Data.AI/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.meaningful-use.missing",
-        "docs.readme.package-title.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Backup",

@@ -1,4 +1,4 @@
-# Koan.Data.AI
+# Sylin.Koan.Data.AI
 
 Data-layer AI integration for Koan: embeddings lifecycle, media analysis, and semantic search — all driven by convention, with attribute opt-in for automatic processing.
 
@@ -12,7 +12,7 @@ Data-layer AI integration for Koan: embeddings lifecycle, media analysis, and se
 dotnet add package Sylin.Koan.Data.AI
 ```
 
-## Core Principle
+## Meaningful use
 
 **Convention over configuration.** On-demand operations (embed a string, search semantically) work with zero attributes. Attributes are only needed to opt into **automatic** processing on entity save.
 
@@ -126,7 +126,17 @@ if (meta is not null)
 }
 ```
 
----
+## Guarantees and limitations
+
+- Reference plus the host's existing `AddKoan()` activates embedding/media-analysis lifecycle discovery; there is no
+  Data.AI registration method.
+- On-demand `EntityAi` and semantic-search operations require a running host plus compatible AI and Vector providers.
+  `[Embedding]` and `[MediaAnalysis]` opt an Entity into automatic lifecycle work; undecorated Entities are unchanged.
+- Deferred embedding uses durable Koan Jobs/Data state, restores the captured logical context, reloads the current
+  Entity, and writes only the vector/state records. Provider, mixed-model, persistence, and retry-exhaustion failures
+  remain inspectable.
+- Vector writes and Data state confirmation are not cross-store atomic. The package does not provide training,
+  provider inference, media storage, model deployment, automatic schema migration, or a Web/operator surface.
 
 ## Reference
 

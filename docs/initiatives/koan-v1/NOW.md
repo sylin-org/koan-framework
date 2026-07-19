@@ -19,23 +19,38 @@ Replace this file at every handoff. It is a restart point, not a diary.
 ## Outcome so far
 
 - R00 through R07, R09, and R10 pass. R08 is locally prepared but publication remains deliberately gated.
-- R11-01 through R11-05 pass. Every one of the 93 active packages now has a terminal topology disposition; R11-06 is
-  next. The single complete release-certification boundary remains R11-07.
+- R11-01 through R11-06 pass. Every one of the 93 active packages has a terminal topology disposition and objective
+  package-quality finding count is zero. The single complete release-certification boundary is now R11-07.
 - Foundation, package identity, templates, Storage, Cache, Redis, relational/Data providers, Vector, AI, MCP, Web,
   Media, OpenGraph, Identity, Tenancy, Classification, Canon, RabbitMQ, Web request context/Data Access, Data
   Backup/SoftDelete, Jobs, Observability, Security Trust, Testing, Web Admin, and ZenGarden completed their current
   R11 family work.
 - The bespoke Orchestration CLI and Aspire families are shelved beyond V1 under `shelved/`, outside `Koan.sln`, active
   package discovery, and the release graph. Their retained source is not a V1 package promise.
-- Evaluated truth is 93 packages and 26 claims. Generated package quality is 1 repair-required, 6 review-required,
-  and 86 structurally ready.
+- Evaluated truth is 93 packages and 26 claims. Generated package quality is 0 repair-required, 0 review-required,
+  93 structurally ready, and zero findings.
 
 The accepted architecture remains business intent first: fewer meaningful moving parts, Entity-first application
 language, references express capability intent, `AddKoan()` compiles host-owned decisions, pillars own meaning and
 runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive only
 when genuinely inert and independently consumed.
 
-## Most recent completed slice: ZenGarden
+## Most recent completed slice: package rendering and clean-consumer proof
+
+The last 25 generated findings were concentrated in seven already-terminal AI packages: Agents, Eval, Models,
+Orchestration, Review, Data.AI, and HuggingFace. Their package pages now use exact IDs/install expressions, compile
+against current public signatures, state automatic activation and deliberate application registration separately,
+name provider/Data/Vector requirements, and identify corrective failures and non-guarantees. HuggingFace is accurately
+presented as Hub model discovery/download rather than inference; Review accurately leaves Entity persistence,
+authorization, concurrency, and audit to the application.
+
+A single clean net10.0 temporary consumer compiles every advertised surface warning-as-error. All seven build and pack
+in Release; exact artifacts contain owned rendering/assets and expected dependencies, and current vulnerability audits
+are clean. Generated quality is now 93/93 structurally ready with zero findings. Strict API/full-site docs and the
+233-file public truth gate pass; broad lint has zero errors and 1,624 pre-existing non-gating warnings. No production
+code or broad AI behavior suite changed or ran.
+
+## Previous completed slice: ZenGarden
 
 `Sylin.Koan.ZenGarden` remains one functional runtime package. Reference plus the application's existing `AddKoan()`
 activates the DI-owned client, layered Moss/Koi/UDP discovery, tools catalog/events, capability wishes,
@@ -108,11 +123,11 @@ now structurally ready; Contracts remains structurally ready.
 
 1. Verify `git status`, HEAD, and the completion evidence in
    [R11-05](work-items/r11/R11-05-package-family-graduation.md).
-2. Open R11-06 from the parent contract: prove NuGet rendering, clean-consumer experience, operator review, and agent
-   comprehension across the now-terminal product surface. Size the child from current generated findings and current
-   package evidence; do not create another maintained package list or repeat family architecture work.
-3. Preserve R11-07 as the one complete active-package/release-certification boundary. R11-06 remains focused and may
-   reuse already-current package artifacts and structural truth where the dependency has not changed.
+2. Open R11-07 from the parent acceptance and validation-economy contract. It is the one complete active-package,
+   template, FirstUse, GoldenJourney, public-docs, and release-certification boundary; do not split it into repeated
+   family work or mutate public/remote state.
+3. Reuse R11-05/R11-06 focused evidence for diagnosis, but run the complete ratchet required by R11-07 and record every
+   failure/correction. Publication remains separately authorized and out of scope.
 
 ## Remaining temporary dispositions
 
@@ -129,8 +144,7 @@ None. Every active package has a terminal R11-02 disposition.
   events, or expose Koi/concrete client mechanics without new independent-consumer evidence.
 - Do not move the shelved CLI or Aspire families into `src/`/`Koan.sln` or treat retained source as V1 scope.
 - Do not rerun Classification, standalone Tenancy, Jobs, Data transform, or earlier family suites without an affected
-  dependency.
-- Do not run the full release ratchet before R11-07.
+  dependency outside the R11-07 complete certification command set.
 - Do not stage `tmp/`, inspect private dogfood applications, or use private identities in public docs.
 - Do not push, tag, publish, release, deploy, or mutate remote configuration without separate authorization.
 

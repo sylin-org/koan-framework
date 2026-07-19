@@ -569,7 +569,7 @@
       ],
       "readme": "src/Koan.AI.Agents/README.md",
       "ownsReadme": true,
-      "technicalDocumentation": null,
+      "technicalDocumentation": "src/Koan.AI.Agents/TECHNICAL.md",
       "claims": []
     },
     {
@@ -586,9 +586,9 @@
         "Sylin.Koan.AI.Models",
         "Sylin.Koan.Core"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
+      "readme": "src/Connectors/AI/HuggingFace/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Connectors/AI/HuggingFace/TECHNICAL.md",
       "claims": []
     },
     {
@@ -693,7 +693,7 @@
       ],
       "readme": "src/Koan.AI.Eval/README.md",
       "ownsReadme": true,
-      "technicalDocumentation": null,
+      "technicalDocumentation": "src/Koan.AI.Eval/TECHNICAL.md",
       "claims": []
     },
     {
@@ -712,7 +712,7 @@
       ],
       "readme": "src/Koan.AI.Models/README.md",
       "ownsReadme": true,
-      "technicalDocumentation": null,
+      "technicalDocumentation": "src/Koan.AI.Models/TECHNICAL.md",
       "claims": []
     },
     {
@@ -733,7 +733,7 @@
       ],
       "readme": "src/Koan.AI.Orchestration/README.md",
       "ownsReadme": true,
-      "technicalDocumentation": null,
+      "technicalDocumentation": "src/Koan.AI.Orchestration/TECHNICAL.md",
       "claims": []
     },
     {
@@ -768,7 +768,7 @@
       ],
       "readme": "src/Koan.AI.Review/README.md",
       "ownsReadme": true,
-      "technicalDocumentation": null,
+      "technicalDocumentation": "src/Koan.AI.Review/TECHNICAL.md",
       "claims": []
     },
     {

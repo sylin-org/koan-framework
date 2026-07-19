@@ -1,86 +1,40 @@
-# Koan.AI.Agents
+# Sylin.Koan.AI.Agents
 
-Autonomous, entity-aware agents for Koan. Automatically generates tools from `Entity<T>` static methods, supports vector search, and uses ReAct reasoning to complete multi-step tasks.
+Run bounded, entity-aware AI agents with immutable configuration and read-only Entity tools by default.
 
-- Target framework: net10.0
-- License: Apache-2.0
-- Version: 0.6.3
-
-## Install
-
-```powershell
+```bash
 dotnet add package Sylin.Koan.AI.Agents
 ```
 
-## Quick Start
+## Meaningful use
+
+Reference the package, keep the host's existing `AddKoan()`, then run from an active host:
 
 ```csharp
 var result = await Agent.Create()
-    .System("You are a helpful assistant managing a product catalog.")
-    .WithEntities<Product>()     // Auto-generates CRUD tools from Entity<T>
-    .WithSearch<Product>()       // Adds semantic search tool
-    .WithPlanning()              // Enables multi-step ReAct reasoning
-    .Run("Find all products under $50 and summarise them", ct);
+    .System("Answer from the product catalog.")
+    .WithEntities<Product>()
+    .WithSearch<Product>()
+    .WithMaxIterations(6)
+    .Run("Which products are suitable for a small studio?", ct: cancellationToken);
 
 Console.WriteLine(result.Text);
 ```
 
-## Entity Tools (auto-generated)
+`WithEntities<T>()` exposes read tools. Pass `write: true` only when the application deliberately permits model-driven
+create/update/delete operations. `WithSearch<T>()` adds semantic retrieval. `WithTools(...)`, `WithMemory(...)`,
+`Scope(...)`, token limits, and streamed `AgentStep` output are explicit choices.
 
-`WithEntities<T>()` reflects on `Entity<T>` static methods and generates callable tools automatically:
+## Guarantees and limitations
 
-| Entity Method | Generated Tool |
-|--------------|----------------|
-| `T.Get(id)` | `get_{entity}` |
-| `T.All()` | `list_{entity}` |
-| `T.Query(expr)` | `query_{entity}` |
-| `new T().Save()` | `create_{entity}` |
-| `entity.Delete()` | `delete_{entity}` |
+- Reference plus `AddKoan()` automatically registers the DI-owned executor; there is no Agents registration call.
+- Execution requires a running Koan host, a chat-capable AI provider, and the Data providers used by selected Entity
+  tools. Semantic search also requires the Entity's Vector/embedding path.
+- Iteration and token limits bound planning, not external tool latency or provider cost. Tool handlers must remain
+  authorized, idempotent where replay matters, and safe for untrusted model arguments.
+- An absent host/executor or provider fails with a correction. Tool, AI, and Entity errors remain failures; the agent
+  does not invent fallback data or transactions.
+- This package does not provide durable workflow orchestration, human approval, sandboxing, scheduling, or cross-tool
+  atomicity. Use Jobs, Review, and application authorization at their own boundaries.
 
-No manual tool definition required for standard CRUD operations.
-
-## Fluent Builder API
-
-```csharp
-Agent.Create()
-    .System(string systemPrompt)         // Persona / instructions
-    .WithEntities<T>()                   // Auto CRUD tools for entity T
-    .WithSearch<T>()                     // Semantic search tool for entity T
-    .WithPlanning()                      // Enable multi-step planning (ReAct)
-    .WithMemory()                        // Conversational history across turns
-    .WithMaxIterations(int n)            // Default: 10
-    .WithMaxTokens(int n)                // Token budget cap
-    .Scope(IAiPipeline pipeline)         // Target a specific AI pipeline
-    .Run(string message, CancellationToken ct)      // → AgentResult
-    .Stream(string message, CancellationToken ct)   // → IAsyncEnumerable<AgentChunk>
-```
-
-## AgentResult
-
-```csharp
-public sealed class AgentResult
-{
-    string Text            { get; }  // Final response text
-    AgentStatus Status     { get; }  // Completed | IterationLimitReached | BudgetExhausted
-    IReadOnlyList<AgentStep> Steps { get; }  // Reasoning trace
-    int    Iterations      { get; }
-    int    TotalTokens     { get; }
-    TimeSpan Duration      { get; }
-}
-```
-
-## Streaming
-
-```csharp
-await foreach (var chunk in Agent.Create()
-    .WithEntities<Product>()
-    .Stream("List expensive products", ct))
-{
-    Console.Write(chunk.Content);
-}
-```
-
-## Reference
-
-- **ADR**: `docs/decisions/AI-0021-category-driven-ai-with-convention-defaults.md`
-- **Related**: `Koan.AI` (pipeline facade), `Koan.AI.Orchestration` (chain composition)
+See [TECHNICAL.md](TECHNICAL.md) for activation, execution, tool generation, and failure ownership.
