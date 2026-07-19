@@ -2,6 +2,7 @@
 
 **Status**: Accepted
 **Date**: 2026-07-14
+**Amended**: 2026-07-19 — retain the established step-scoped `NUGET_API_KEY` promotion credential
 **Deciders**: Framework maintainer
 **Scope**: Package selection, verification, publication, recovery, and release evidence
 **Related / supersedes**: completes the release-pipeline portion of **ARCH-0085** and supersedes
@@ -127,20 +128,19 @@ Before compiling the current source wave, automation inspects and converges the 
 therefore completed from the original prior escrow even after a later `dev` event arrives. It is never
 rebuilt under an already-public identity.
 
-nuget.org trusted publishing exchanges GitHub OIDC identity for a short-lived credential only after
-prepared escrow is rechecked. A missing trusted-publishing owner is fatal. No long-lived API key is
-stored. An empty manifest advances lineage as required but creates no bundle, draft Release, tag, or
-receipt.
+The established repository Actions secret `NUGET_API_KEY` is supplied only to the promotion step,
+after prepared escrow is rechecked. A missing key is fatal before `wave-promote`. An empty manifest
+advances lineage as required but creates no bundle, draft Release, tag, or receipt.
 
 ### 7. Proof, staging, and promotion have separate authority
 
-The workflow has six permission boundaries: read-only `prepare_prior`, write-only `stage_prior`,
-write-plus-OIDC `promote_prior`, read-only `prove_current`, write-only `stage_current`, and
-write-plus-OIDC `promote_current`.
+The workflow has six authority boundaries: read-only `prepare_prior`, write-only `stage_prior`,
+write-plus-step-scoped-key `promote_prior`, read-only `prove_current`, write-only `stage_current`, and
+write-plus-step-scoped-key `promote_current`.
 
-Build, test, pack, and clean-room proof never receive contents-write or OIDC permission. Staging never
-receives a NuGet credential. Promotion consumes the already-built coordinator and exact handoff; it
-does not restore, compile, test, or rebuild source.
+Build, test, pack, and clean-room proof never receive contents-write permission or the NuGet key.
+Staging never receives a NuGet credential. Promotion consumes the already-built coordinator and exact
+handoff; it does not restore, compile, test, or rebuild source.
 
 ## Consequences
 
@@ -182,10 +182,9 @@ does not restore, compile, test, or rebuild source.
 
 ## Operational contract
 
-The one-time setup is a nuget.org trusted-publishing policy for this repository/workflow, the
-`NUGET_USER` repository variable, immutable GitHub Releases, and the repository's protected release
-trust boundary. After the separately authorized first public observation, the normal release
-instruction is simply:
+The one-time setup is the existing publish-scoped `NUGET_API_KEY` repository Actions secret,
+immutable GitHub Releases, and the repository's protected release trust boundary. After the
+separately authorized first public observation, the normal release instruction is simply:
 
 ```text
 push or merge a package-affecting commit into dev
