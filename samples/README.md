@@ -7,6 +7,10 @@ These applications teach the Koan 0.20 preview. A sample proves behavior, not pa
 the [generated product surface](../docs/reference/product-surface.md) before treating a capability as
 supported.
 
+On Windows, every listed sample also starts through the `start.bat` in its own root. The launcher uses
+the same standard `dotnet run` path, works from any caller directory, and forwards optional application
+arguments. The tables retain the portable cross-platform command as the execution contract.
+
 ## Start here
 
 | Sample | Meaningful result | Start |

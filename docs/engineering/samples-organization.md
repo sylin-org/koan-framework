@@ -51,7 +51,9 @@ A sample joins `samples/README.md` only when all of these agree:
 2. business-first application code using the canonical `AddKoan()` and Entity grammar;
 3. an executable cumulative contract proving result, host surface, and composition facts;
 4. honest prerequisites, provider behavior, errors, and deployment claims;
-5. current paths and names across source, solution, requests, dashboard, and documentation.
+5. current paths and names across source, solution, requests, dashboard, and documentation;
+6. one root-level `start.bat` that invokes the exact project through standard `dotnet run`, forwards application
+   arguments, and preserves failures without adding prerequisite discovery or orchestration.
 
 Project presence is not a support claim. Work that has not graduated remains outside the public curriculum;
 dead, duplicate, or speculative samples are deleted instead of archived in the active tree.

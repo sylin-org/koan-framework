@@ -207,6 +207,40 @@ foreach ($link in Get-MarkdownLinks -Path 'samples/README.md') {
         [void]$sampleDirectories.Add(($link.Substring(0, $link.Length - '/README.md'.Length)).TrimEnd('/') + '/')
     }
 }
+foreach ($directory in $sampleDirectories) {
+    $directProjects = @($trackedPaths | Where-Object {
+        $_.StartsWith($directory, [StringComparison]::OrdinalIgnoreCase) -and
+        $_.Substring($directory.Length) -notmatch '/' -and
+        $_.EndsWith('.csproj', [StringComparison]::OrdinalIgnoreCase)
+    })
+    if ($directProjects.Count -eq 0) { continue }
+
+    $launcher = $directory.TrimEnd('/') + '/start.bat'
+    if (-not $tracked.Contains($launcher)) {
+        $issues.Add("Graduated sample root '$($directory.TrimEnd('/'))' is missing start.bat; add the standard root-local dotnet launcher.")
+        continue
+    }
+
+    $launcherContent = Get-Content -Raw -LiteralPath (Join-Path $root $launcher)
+    foreach ($required in @('pushd "%~dp0"', 'set "koan_exit=%errorlevel%"', 'popd', 'exit /b %koan_exit%')) {
+        if (-not $launcherContent.Contains($required, [StringComparison]::OrdinalIgnoreCase)) {
+            $issues.Add("$launcher is missing '$required'; keep the standard working-directory and exit-code contract.")
+        }
+    }
+
+    $runMatch = [regex]::Match(
+        $launcherContent,
+        '(?im)^\s*dotnet\s+run\s+--project\s+"(?<project>[^"]+\.csproj)"\s+--\s+%\*\s*$')
+    if (-not $runMatch.Success) {
+        $issues.Add($launcher + ' must invoke one explicit project with dotnet run --project "<project>.csproj" -- %*.')
+        continue
+    }
+
+    $projectPath = ($directory + $runMatch.Groups['project'].Value).Replace('\', '/')
+    if (-not $tracked.Contains($projectPath)) {
+        $issues.Add("$launcher targets missing or untracked project '$projectPath'.")
+    }
+}
 foreach ($path in $trackedPaths) {
     foreach ($directory in $sampleDirectories) {
         if ($path.StartsWith($directory, [StringComparison]::OrdinalIgnoreCase)) {

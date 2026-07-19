@@ -54,7 +54,7 @@ maintained allowlist or stamping layer. Focused graph/version tests pass 41/41, 
 pass 39/39, and the packaging tool builds warning-clean.
 
 [R12-04](work-items/r12/R12-04-coherent-public-narrative.md) is active. Compile the exact public-content
-graph now covers 688 current assets, 676 current text surfaces, 107 historical boundaries, 42 navigation
+graph now covers 699 current assets, 676 current text surfaces, 107 historical boundaries, 42 navigation
 targets, and 12 graduated sample roots. Root, site, package, template, sample, tool, contributor, and
 agent-skill surfaces now tell one present-tense path: package install, four-line host, first Entity result,
 progressive capability references, runtime facts and correction, application responsibilities, and the
@@ -93,6 +93,13 @@ compact UI. The result is a 21-file application plus four focused-test files; it
 the exact documented command and product journey work, the focused suite passes 1/1, and the public graph accepts
 it as the eleventh executable graduated sample. Manual provider discovery, worker pipelines, duplicate profiles,
 custom caches, admin/control-plane surface, and compatibility paths remain retired.
+
+Every graduated sample executable now has the required root-level `start.bat`. Eleven tiny root-local launchers keep
+standard `dotnet run` as execution owner, normalize the working directory, name the exact project, forward application
+arguments, and preserve the exit code. LocalChecklist exits successfully with its meaningful result; all ten Web
+launchers accept isolated `--urls` arguments and return HTTP 200 from liveness. The existing public sample graph now
+rejects a missing/malformed launcher or untracked target project and passes at 699 current assets. No shared runner,
+generator, Docker bootstrap, second sample registry, new Koan command, or retained sample process was introduced.
 
 [R12-05](work-items/r12/R12-05-public-consumer-journey.md) now owns only the frozen local candidate: final
 release-ready copy, one exact source SHA, the complete local ratchet, selective package graph, clean-room

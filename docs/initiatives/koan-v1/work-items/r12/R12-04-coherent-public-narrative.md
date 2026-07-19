@@ -170,7 +170,7 @@ companions, template payloads, product truth, feedback surfaces, `.claude/skills
 guidance, and requires every nonhistorical Markdown file under `docs/` to declare either `current` or an evidence
 status. Current orphan pages can no longer evade narrative checks merely by lacking an inbound link.
 
-The current projection contains 688 current assets, 676 current text surfaces, 107 historical boundaries,
+The current projection contains 699 current assets, 676 current text surfaces, 107 historical boundaries,
 42 navigation targets, and 12 graduated sample roots. Current assets are derived into reader-purpose classes;
 there is no generated inventory file or maintained content ledger.
 
@@ -195,7 +195,7 @@ The first coalescence pass:
 
 ## Focused evidence
 
-- public documentation truth: 688 current assets / 676 current text surfaces / 107 historical boundaries /
+- public documentation truth: 699 current assets / 676 current text surfaces / 107 historical boundaries /
   42 navigation targets / 12 graduated sample roots;
 - packaging compiler tests: 17/17 for product-surface and package-quality generation;
 - packaging tool: Release build, zero warnings and errors;
@@ -445,5 +445,69 @@ dependency-free UI. Its exact documented command starts from the repository root
 curates and indexes 24 titles, uses Mika's three ratings as initial taste, returns explained local recommendations,
 and removes a newly rated title from the next feed. The Release build is warning-clean; the focused executable host
 suite passes 1/1; the selective lock records the real promoted/unpromoted package lines; public documentation truth
-passes at 688 current assets / 676 text surfaces / 107 historical boundaries / 42 navigation targets / 12 graduated
+passes at 699 current assets / 676 text surfaces / 107 historical boundaries / 42 navigation targets / 12 graduated
 sample roots. No sample process remains.
+
+## Uniform sample launcher checkpoint — 2026-07-19
+
+**Task:** Give every graduated sample executable a root-level `start.bat` without recreating a Koan runner or the
+retired Docker/orchestration launcher generation.
+
+**Application intent:** On Windows, a reader should enter any sample root and start it through the same obvious file,
+regardless of the shell's original working directory.
+
+**Public expression:** `start.bat [application arguments]`. Each launcher changes to its own directory, invokes that
+root's exact project with standard `dotnet run`, forwards arguments after `--`, restores the caller's directory, and
+returns the application/SDK exit code. Portable `dotnet run --project ...` commands remain the cross-platform owner.
+
+**Guarantee/correction:** Every root admitted once through `samples/README.md` contains one tracked `start.bat` and
+can resolve project-local settings, assets, models, and state. A missing launcher fails `public-docs-lint.ps1` with
+the exact graduated root and correction. SDK, restore, build, application, and prerequisite failures remain visible
+through their original output and nonzero exit code.
+
+**Complete intent surface:** Run or double-click `start.bat`; optionally append the same application arguments accepted
+by `dotnet run -- ...`. No launcher configuration, generated manifest, environment probing, browser automation,
+container startup, process supervision, or Koan-specific command is introduced. Each sample retains its already
+documented runtime prerequisites and launch-profile/default URL.
+
+**Public concepts:** One ordinary Windows batch convenience and the existing .NET project/launch-profile vocabulary.
+No framework API, option, service, executable, or package is added.
+
+**Docs read:** engineering guardrails, architecture principles, the graduated sample index, and the sample portfolio
+standard establish standard-.NET startup, one current path, project-root ownership, and graduation evidence.
+
+**Code read:** the FirstUse, LocalChecklist, TaskGraph, AnimeRecommendations, and GardenCoop Chapter 1 hosts/projects;
+all eleven graduated project roots; the current public-document graph; the retired S5 and attic batch launchers as
+negative Docker/orchestration evidence.
+
+**Reusing:** Each root's exact `.csproj`, existing launch profiles/defaults, project-relative content behavior, and
+`public-docs-lint.ps1`'s derived `$sampleDirectories` set.
+
+**Creating new:** Eleven root-local seven-line `start.bat` files, one public sample-index instruction, one portfolio
+graduation rule, and one invariant in the existing public-document truth gate. No shared launcher file or generator.
+
+**Coalescence:** Keep standard `dotnet run` as execution owner; absorb only working-directory normalization, argument
+forwarding, and exit-code preservation into each required Windows entry file. Delete nothing because no current
+launcher competes. Historical Docker-compose launchers remain historical and do not become a template. The graduated
+sample graph is the single enforcement owner; a second sample registry or launcher validator is rejected.
+
+**Ergonomics:** The same filename works in every sample, from Explorer or any shell. The seven readable lines expose
+the exact project rather than hiding it behind discovery. Humans and coding agents retain one execution model and can
+still copy the portable command from the sample index.
+
+**Constraints satisfied:** No production runtime, HTTP, Entity, provider, configuration, package, or remote state
+changes; no inline endpoints, constants/options, data access, shared wrapper, private dogfood, shelved content, or
+`tmp/`; focused launcher and public-document evidence only.
+
+**Risks:** Batch quoting, an empty `%*`, project paths containing spaces, console exit, and long-running Web process
+termination require focused direct checks. Launcher tests must stop only the exact processes they start.
+
+**Implementation result:** All eleven executable roots admitted through the public sample index contain the same
+seven-line launcher shape and an explicit tracked target project. LocalChecklist's launcher runs from the repository
+root, resolves its project-local content, prints the expected checklist result, and exits zero. Each of the ten Web
+launchers runs from that same external directory, forwards an isolated `--urls` argument, starts its exact host, and
+returns HTTP 200 from `/health/live`. The audit stops the exact listening process after each proof; ports 5221–5230
+have no listeners and no sample process remains. `public-docs-lint.ps1` derives executable roots from the existing
+sample graph, validates launcher mechanics/targets, and passes at 699 current assets / 676 current text surfaces /
+107 historical boundaries / 42 navigation targets / 12 graduated sample roots. No full sample suites or release
+ratchet ran.
