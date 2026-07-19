@@ -213,10 +213,10 @@ bounded process-exit observation so GoldenJourney can prove fail-fast startup tr
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
 - Branch: `dev`; R11 completion is `3f7ca5186`, followed by R08-05 repairs `5aeabb2a6` and `844449dd8`,
   local-candidate closeout `e40cd4525`, API-key architecture amendment `5c346082c`, workflow wiring
-  `f1a816b02`, and R12 selective-boundary commit `679ae4f97`. Verify exact HEAD and ahead/behind counts
-  before continuing.
+  `f1a816b02`, R12 selective-boundary commit `679ae4f97`, and coherent-public-narrative tranche
+  `8e62dee51`. Verify exact HEAD and ahead/behind counts before continuing.
 - `tmp/` is untracked certification/evaluator/artifact material and must never be staged.
-- The tracked worktree contains the coherent R12-04 public-narrative tranche until it is committed.
+- The tracked worktree is expected clean after the R12-04 narrative and handoff commits.
 
 ## Resume here
 
