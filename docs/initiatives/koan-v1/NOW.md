@@ -60,8 +60,12 @@ PMC-033 is now repaired at the generalized Storage chokepoint. Availability is i
 default configuration or actual service use declares routing intent; configured routes still compile
 at startup, unconfigured use still fails correctively, and facts distinguish inactive availability.
 Focused Release evidence passes Media Web 8/8, Storage 20/20, bootstrap pillars 13/13, Data.AI 87/87,
-and GardenCoop C2 1/1. Resume R12-02 at PMC-025's first-use Windows logging boundary, then Jobs/MCP
-public shapes and Data/Web correctness seams. Do not run the full ratchet.
+and GardenCoop C2 1/1. No full ratchet ran.
+
+PMC-025 is closed as stale current-state evidence, not repaired code. Current source and package-only
+FirstUse run on Windows without any EventLog override; the fresh focused source proof passes 1/1, and
+.NET 10.0.8 already disables only the EventLog sink on `SecurityException`. Koan retains standard
+host logging ownership. Resume at PMC-001's Jobs Entity-language collision, then MCP and Data/Web.
 
 ## Most recent completed slice: R08-05 local exact candidate
 

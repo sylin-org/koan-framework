@@ -48,7 +48,7 @@ the concern does not enter the stated 0.20 guarantee; it does not mean the packa
 | 022, 027 | withhold Media/Storage group pending R12-03 | Derivative lifecycle and connector-owned evidence are not silently inherited from Media's verified pipeline tests. |
 | 023 | explicit Communication nonclaim | One-application RabbitMQ carriage is eligible; heterogeneous schema/rename evolution is not promised. |
 | 024 | re-audit in R12-02 | Release/build fixture isolation is safety-relevant and may have been superseded by R08/R11 repairs. |
-| 025 | repair in R12-02 | First use cannot require an undocumented Windows logging override. |
+| 025 | closed by current evidence | Current source/package FirstUse uses no EventLog override and passes on Windows; .NET 10.0.8 degrades EventLog `SecurityException` without taking down console logging. Koan does not replace standard host provider ownership. |
 | 026 | exclude from guarantee | Conservative analyzer impact is release-safe; output-sensitive optimization is not a preview contract. |
 | 029 | phase to R12-05 | The lifecycle fix is already implemented; the next exact package-only consumer must close its remaining observation gate. |
 | 030 | exclude with AI | Mixed adapter disposal ownership remains outside the initial supported package slate. |
@@ -129,9 +129,14 @@ inactive availability without resolving a route. Focused Release evidence passes
 Storage Core 20/20, bootstrap pillars 13/13, Data.AI 87/87, and GardenCoop C2 1/1. Configured Media/Storage
 paths remain covered by the same suites. No full ratchet or remote action ran.
 
-The next dependency-ordered exploration is PMC-025 at the first-use host boundary. Jobs and MCP public
-shape corrections follow foundation evidence; Data/Web parity and model identity follow their current
-convergence audit.
+PMC-025 is also closed without production change. The current application probe contains no EventLog
+override; the exact R08-05 candidate, R11-07 public contract, and a fresh source FirstUse proof pass on
+Windows. Inspection of the exact Microsoft.Extensions.Logging.EventLog 10.0.8 binary confirms that a
+`SecurityException` disables only that sink. Koan therefore retains standard host logging ownership
+instead of removing user providers or adding a Koan-specific toggle for a stale premise.
+
+The next dependency-ordered exploration is PMC-001's Jobs Entity-language collision. MCP public shape
+corrections follow; Data/Web parity and model identity follow their current convergence audit.
 
 ## Stop conditions
 
