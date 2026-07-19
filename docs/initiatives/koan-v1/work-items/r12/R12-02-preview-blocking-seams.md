@@ -47,7 +47,7 @@ the concern does not enter the stated 0.20 guarantee; it does not mean the packa
 | 021 | exclude from Communication guarantee | Runtime rejection for missing required event details is supported; a compile-time analyzer is not promised. |
 | 022, 027 | withhold Media/Storage group pending R12-03 | Derivative lifecycle and connector-owned evidence are not silently inherited from Media's verified pipeline tests. |
 | 023 | explicit Communication nonclaim | One-application RabbitMQ carriage is eligible; heterogeneous schema/rename evolution is not promised. |
-| 024 | re-audit in R12-02 | Release/build fixture isolation is safety-relevant and may have been superseded by R08/R11 repairs. |
+| 024 | repaired and closed | The direct-reference fixture now evaluates only a synthetic temporary project graph against its staged local feed/cache; the real production targets are read-only imports. |
 | 025 | closed by current evidence | Current source/package FirstUse uses no EventLog override and passes on Windows; .NET 10.0.8 degrades EventLog `SecurityException` without taking down console logging. Koan does not replace standard host provider ownership. |
 | 026 | exclude from guarantee | Conservative analyzer impact is release-safe; output-sensitive optimization is not a preview contract. |
 | 029 | phase to R12-05 | The lifecycle fix is already implemented; the next exact package-only consumer must close its remaining observation gate. |
@@ -373,6 +373,76 @@ alias was introduced.
 The next dependency-ordered exploration is PMC-024's build-fixture isolation invariant, followed by
 current-evidence closure of PMC-003/028/032 where the R11 release record already suggests their
 historical warning/reference premises are stale.
+
+## Fifth chokepoint exploration — direct-reference build-fixture isolation
+
+**Task:** Prevent the legacy direct-reference manifest fixture from evaluating a repository project
+under a throwaway NuGet configuration while preserving its exact package-vs-project manifest proof.
+
+**Application intent:** Maintainers can run packaging tests offline or through a failed restore without
+corrupting the repository's already-restored project assets. The fixture still proves that direct
+application intent stays distinct from the recursively resolved graph.
+
+**Public expression:** None. This is repository-owned test infrastructure behind the existing
+`dotnet test tests/Koan.Packaging.Tests` workflow.
+
+**Guarantee/correction:** Every project evaluated by the fixture's custom NuGet configuration lives
+under its temporary root, as do its feed, global package cache, intermediates, and outputs. A missing
+package fails only that temporary restore. The production composition target is imported read-only and
+still emits the expected package/project direct references.
+
+**Complete intent surface:** temporary project graph; staged package feed; NuGet sources and global
+package cache; restore failure; build output/intermediates; production composition target import;
+`koan.lock.json`; executable-probe serialization; and cleanup.
+
+**Public concepts:** Standard MSBuild `ProjectReference`, NuGet local feeds/configuration, temporary
+directories, and process exit codes only.
+
+**Docs read:** PMC-024, R12-01/R12-02, current packaging test conventions, and R09-02's semantic
+activation fixture evidence.
+
+**Code read:** `DirectReferenceManifestBuildTests`, `SemanticActivationManifestBuildTests`,
+`ExecutableApplicationProbeCollection`, `ProcessRunner`, the packaging test project, and
+`Sylin.Koan.Core.targets` direct-reference emission.
+
+**Reusing:** Keep the existing `ProcessRunner`, temporary-root lifecycle, local nupkg writer,
+executable-probe collection, and real production target. Follow the semantic-activation fixture's
+synthetic-project pattern.
+
+**Creating new:** One tiny synthetic `Koan.Core` project and marker inside the existing temporary
+fixture; one missing-package failure cell. No shared fixture framework or production helper.
+
+**Coalescence:** Replace the repository `ProjectReference`; do not work around its side effects with
+asset backup/restore, a repository-wide build lock, or cleanup code. Remove nuget.org from this
+self-contained test instead of adding offline retry behavior.
+
+**Ergonomics:** The focused test is deterministic, offline, and self-cleaning. A failure reports the
+temporary consumer and cannot require maintainers to repair repository assets afterward.
+
+**Constraints satisfied:** standard .NET/NuGet mechanics; fewer dependencies; no production/public
+contract change; no remote source required; focused test only; no release ratchet or remote mutation.
+
+**Risks:** A synthetic project could stop representing a project reference accurately, or an overly
+isolated test could bypass the real target. Keep the canonical `Koan.Core` assembly/project identity,
+import the production target, assert every evaluated project path is under the fixture root, and prove
+both successful manifest emission and an isolated missing-package failure.
+
+## Fifth slice outcome
+
+PMC-024 closes by removing the hazardous edge rather than compensating for it. The direct-reference
+fixture no longer places `src/Koan.Core` in a restore graph governed by a throwaway NuGet config. It
+creates a canonical synthetic `Koan.Core` node under its temporary root, imports the real semantic and
+composition targets read-only, and keeps its feed, package cache, `obj`, and `bin` outputs under that
+same root. A recursive assertion rejects any future `ProjectReference` escaping the fixture.
+
+The focused packaging cell passes 1/1 with no network source: it still emits direct package
+`Sylin.Koan.Communication` and direct project `Koan.Core`, while a planted missing package produces the
+expected failed restore inside the temporary consumer. No repository asset backup/restore, global
+build serialization, production code, or new fixture framework was added.
+
+The next audit is the combined current-evidence closure of PMC-003, PMC-028, and PMC-032: reconcile
+their old warning/missing-reference statements against the exact R11-07 zero-warning Release build and
+current connector test graphs before changing any files.
 
 ## Stop conditions
 

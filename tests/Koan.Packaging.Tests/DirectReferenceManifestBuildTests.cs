@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Xml.Linq;
 using Koan.Packaging.Infrastructure;
 using Koan.Packaging.Services;
 using Xunit;
@@ -11,19 +12,30 @@ namespace Koan.Packaging.Tests;
 public sealed class DirectReferenceManifestBuildTests
 {
     [Fact]
-    public async Task Package_and_project_references_remain_direct_while_the_resolved_graph_stays_separate()
+    public async Task Package_and_project_references_remain_direct_in_a_fully_isolated_restore_graph()
     {
         var root = Path.Combine(Path.GetTempPath(), $"koan-reference-manifest-{Guid.NewGuid():N}");
         var feed = Path.Combine(root, "feed");
         var app = Path.Combine(root, "app");
+        var missingApp = Path.Combine(root, "missing-app");
         Directory.CreateDirectory(feed);
         Directory.CreateDirectory(app);
+        Directory.CreateDirectory(missingApp);
 
         try
         {
             WritePackage(feed);
             var repository = RepositoryRoot();
-            var coreProject = Path.Combine(repository, "src", "Koan.Core", "Koan.Core.csproj");
+            var activationTarget = Path.Combine(
+                repository,
+                "src",
+                "Koan.Core",
+                "build",
+                "tools",
+                "Sylin.Koan.SemanticActivation.targets");
+            var coreProject = await WriteProjectAsync(
+                Path.Combine(root, "projects", "core"),
+                activationTarget);
             var compositionTarget = Path.Combine(
                 repository,
                 "src",
@@ -45,6 +57,8 @@ public sealed class DirectReferenceManifestBuildTests
                   <Import Project="{{compositionTarget}}" />
                 </Project>
                 """);
+            AssertProjectGraphIsContained(root, Path.Combine(app, "Probe.csproj"));
+
             var config = Path.Combine(root, "NuGet.Config");
             await File.WriteAllTextAsync(config, $$"""
                 <?xml version="1.0" encoding="utf-8"?>
@@ -55,7 +69,6 @@ public sealed class DirectReferenceManifestBuildTests
                   <packageSources>
                     <clear />
                     <add key="local" value="{{feed}}" />
-                    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
                   </packageSources>
                 </configuration>
                 """);
@@ -82,10 +95,71 @@ public sealed class DirectReferenceManifestBuildTests
             Assert.Equal(
                 ["package|Sylin.Koan.Communication", "project|Koan.Core"],
                 direct);
+
+            await File.WriteAllTextAsync(Path.Combine(missingApp, "Probe.csproj"), """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="Sylin.Koan.DeliberatelyMissing" Version="1.0.0" />
+                  </ItemGroup>
+                </Project>
+                """);
+            AssertProjectGraphIsContained(root, Path.Combine(missingApp, "Probe.csproj"));
+
+            var missing = await runner.RunAsync(
+                "dotnet",
+                ["restore", "Probe.csproj", "--configfile", config, "--no-cache", "--nologo"],
+                missingApp,
+                TestContext.Current.CancellationToken);
+
+            Assert.NotEqual(0, missing.ExitCode);
+            Assert.Contains("Sylin.Koan.DeliberatelyMissing", missing.StandardError + missing.StandardOutput, StringComparison.Ordinal);
         }
         finally
         {
             try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    private static async Task<string> WriteProjectAsync(string directory, string activationTarget)
+    {
+        Directory.CreateDirectory(directory);
+        var project = Path.Combine(directory, "Koan.Core.csproj");
+        await File.WriteAllTextAsync(project, $$"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <AssemblyName>Koan.Core</AssemblyName>
+                <PackageId>Sylin.Koan.Core</PackageId>
+              </PropertyGroup>
+              <Import Project="{{activationTarget}}" />
+            </Project>
+            """);
+        await File.WriteAllTextAsync(
+            Path.Combine(directory, "Marker.cs"),
+            "namespace Koan.Core; public sealed class DirectReferenceFixtureMarker { }");
+        return project;
+    }
+
+    private static void AssertProjectGraphIsContained(string root, string entryProject)
+    {
+        var rootPath = Path.GetFullPath(root) + Path.DirectorySeparatorChar;
+        var pending = new Stack<string>();
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        pending.Push(Path.GetFullPath(entryProject));
+
+        while (pending.TryPop(out var project))
+        {
+            Assert.StartsWith(rootPath, project, StringComparison.OrdinalIgnoreCase);
+            if (!visited.Add(project)) continue;
+
+            foreach (var reference in XDocument.Load(project).Descendants("ProjectReference"))
+            {
+                var include = Assert.IsType<XAttribute>(reference.Attribute("Include"));
+                pending.Push(Path.GetFullPath(Path.Combine(Path.GetDirectoryName(project)!, include.Value)));
+            }
         }
     }
 

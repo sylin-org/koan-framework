@@ -88,8 +88,15 @@ now rejects public properties that differ only by case before adapter creation, 
 correction; exact owner tests pass 9/9 and affected builds are warning-clean. No provider flag,
 mapping attribute, or new filter layer was added.
 
-Resume R12-02 at PMC-024's build-fixture isolation audit, then close PMC-003/028/032 by current evidence
-if their historical warning and missing-reference premises remain stale. Do not run the full ratchet.
+PMC-024 is repaired without production code. The direct-reference manifest fixture now stages a
+synthetic `Koan.Core` project, its local-only feed/cache, intermediates, and outputs under one temporary
+root while importing the real production targets read-only. It asserts that no `ProjectReference`
+escapes that root, preserves package/project manifest truth, and proves a missing package fails only
+inside the fixture. The exact packaging cell passes 1/1.
+
+Resume R12-02 with the combined PMC-003/028/032 current-state audit. Reconcile their historical
+warning and missing-reference claims against the exact R11-07 zero-warning Release result and current
+connector project graph before making any repair. Do not run the full ratchet.
 
 ## Most recent completed slice: R08-05 local exact candidate
 
