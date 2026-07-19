@@ -40,23 +40,119 @@ future release, or interpret “pre-release” differently across NuGet, documen
   content.
 - The objective is a version worthy of external testing, not another internal architecture campaign.
 
+## 2026-07-19 read-only inventory
+
+No version, claim, package, production source, or remote state changed during this inventory.
+
+### Current facts
+
+- The active graph contains 93 package owners. Their current major/minor intents are: three at `0.1`,
+  68 at `0.17`, 16 at `0.18`, four at `0.19`, and two at `0.20`.
+- Product truth contains 26 claims: 15 `verified`, nine `demonstrated`, one `experimental`, and one
+  `specified`. No claim is yet `supported-foundation` or `supported-extension`, so no existing maturity
+  label alone is the accepted 0.20 guarantee set.
+- The 15 verified claims name 31 packages directly. Their transitive public package closure adds six
+  currently unassessed dependencies: `Sylin.Koan.Core`, `Sylin.Koan.Cache.Abstractions`,
+  `Sylin.Koan.Media.Abstractions`, `Sylin.Koan.Storage`, `Sylin.Koan.Storage.Abstractions`, and
+  `Sylin.Koan.Web.Auth.Abstractions`.
+- Adding the entry bundle, application bundle, and templates creates a maximum 40-package candidate
+  boundary. This is a discovery ceiling, not an accepted promotion list.
+- Package version intent is exactly `major.minor`; the repository rejects a literal `0.20.0` value in
+  `version.json`. NBGV owns the patch. A new owner entering the line normally declares `"version":
+  "0.20"`; its lineage commit determines the exact `0.20.x` identity.
+- Communication already declares `0.20` intent. At the current source its direct NBGV previews are
+  `Sylin.Koan.Communication` `0.20.3` and RabbitMQ `0.20.6`; resetting either to `.0` would fight
+  deterministic history and is not proposed.
+- Current compatibility bands and release-wave parsing intentionally accept stable three-part package
+  versions. GitHub release escrow explicitly rejects a Release marked prerelease. Introducing
+  `-preview.N` would therefore require a second compatibility and custody mechanism.
+
+### Provisional guarantee slate
+
+The evidence supports assessing this 35-package slate for 0.20 admission. None is promoted merely by
+appearing here; R12-02/R12-03 must either admit its exact guarantee or remove it from the slate.
+
+| Responsibility | Exact package owners | Count |
+|---|---|---:|
+| entry and foundation | `Sylin.Koan`, `Sylin.Koan.App`, `Sylin.Koan.Templates`, `Sylin.Koan.Core`, `Sylin.Koan.Data.Abstractions`, `Sylin.Koan.Data.Core`, `Sylin.Koan.Data.Connector.Json`, `Sylin.Koan.Communication`, `Sylin.Koan.Web` | 9 |
+| local test data | `Sylin.Koan.Data.Connector.InMemory` | 1 |
+| cache | `Sylin.Koan.Cache`, `Sylin.Koan.Cache.Abstractions` | 2 |
+| Canon | `Sylin.Koan.Canon`, `Sylin.Koan.Canon.Web` | 2 |
+| Classification | `Sylin.Koan.Classification`, `Sylin.Koan.Classification.Contracts` | 2 |
+| distributed Communication | `Sylin.Koan.Communication.Connector.RabbitMq` | 1 |
+| Jobs | `Sylin.Koan.Jobs` | 1 |
+| Web projections | `Sylin.Koan.Web.Extensions`, `Sylin.Koan.Web.OpenApi`, `Sylin.Koan.Web.OpenGraph`, `Sylin.Koan.Web.Sse` | 4 |
+| authentication, identity, trust, and tenancy | `Sylin.Koan.Web.Auth.Abstractions`, `Sylin.Koan.Web.Auth`, `Sylin.Koan.Web.Auth.Server`, `Sylin.Koan.Identity`, `Sylin.Koan.Identity.Web`, `Sylin.Koan.Identity.Tenancy`, `Sylin.Koan.Security.Trust`, `Sylin.Koan.Tenancy`, `Sylin.Koan.Tenancy.Web` | 9 |
+| MCP | `Sylin.Koan.Mcp`, `Sylin.Koan.Mcp.Explorer`, `Sylin.Koan.Mcp.Operations` | 3 |
+| observability | `Sylin.Koan.Observability` | 1 |
+
+Media is deliberately conditional rather than silently included. Its verified claim adds
+`Sylin.Koan.Media.Core` and `Sylin.Koan.Media.Web`, but their public closure also requires
+`Sylin.Koan.Media.Abstractions`, `Sylin.Koan.Storage`, and `Sylin.Koan.Storage.Abstractions`. Storage
+has no assessed product claim and retains PMC-033's unused-activation defect; the five-package group
+may join 0.20 only if Storage earns its own guarantee and the layered boundary is corrected. Otherwise
+Media stays below 0.20 without losing its current verified evidence.
+
+### Concerns attached to the slate
+
+R12-02 must re-evaluate the complete current register, with these direct admission questions:
+
+- foundation/first use: Windows EventLog behavior (PMC-025), exact public installation, and template
+  upgrade/recovery;
+- Data/Web: provider-correct public filtering (PMC-007) and case-colliding Entity models (PMC-015);
+- Jobs: the `JobMetric.Count` Entity-language collision (PMC-001);
+- MCP: legacy transport option names and JSON casing contract (PMC-002/004);
+- Communication: details-required authoring feedback and explicit single-application/wire-evolution
+  limits (PMC-021/023);
+- Media/Storage: derivative lifecycle, connector-owned evidence, and unused layered activation
+  (PMC-022/027/033);
+- Auth/Tenancy: passwords/MFA and distributed-safe invitations remain explicit non-claims unless their
+  full ceremonies are separately earned (PMC-034/035);
+- release and repository evidence: warning/doc policy, buffered progress, aggregate certification,
+  build-fixture isolation, SQLite test drift, and stale connector references
+  (PMC-003/006/009/020/024/028/032).
+
+AI/vector, remote Data providers, Backup, and other demonstrated/experimental/unassessed packages stay
+outside the initial slate. Their PMCs remain real, but they do not block 0.20 unless a supported package
+depends on their guarantee.
+
+## Proposed architecture checkpoint
+
+1. **Channel:** publish ordinary stable-format `0.20.x` NuGet identities. “Preview” describes Koan's
+   pre-1.0 maturity cycle, not a NuGet `-preview.N` suffix. Installation therefore needs no
+   `--prerelease`, and the existing compatibility/escrow machinery remains single-path.
+2. **Admission:** a package reaches 0.20 only when it is named by an accepted
+   `supported-foundation` or `supported-extension` claim. `verified` is necessary evidence but is not
+   automatic admission.
+3. **Dependency closure:** every public Koan dependency of a promoted package must be inside an accepted
+   support claim. Add a true dependency contract to the relevant claim, create an earned foundation
+   claim, or withhold the dependent package; never promote dependencies mechanically.
+4. **Version expression:** admitted owners declare `"version": "0.20"`; NBGV owns exact patches.
+   Existing valid 0.20 history is preserved. No stamping script, package list, or exact `.0` override is added.
+5. **Compatibility:** within an admitted package's 0.20 patch line, Koan makes no intentional breaking
+   public-contract change. The next deliberate pre-1.0 breaking tier is a later minor line and triggers
+   the existing reverse-dependent closure and bounded dependency ranges.
+6. **Mixed maturity:** the first coherent public bootstrap may publish missing lower-line packages as
+   dependencies or experiments. Their lower version and maturity remain visible; only 0.20 carries the
+   guarantee signal.
+7. **Entry timing:** bundle, App, and Templates are provisional 0.20 candidates. Their version edits
+   occur only after their support contract is accepted and the exact package-only candidate is green;
+   public observation completes, rather than substitutes for, that evidence.
+
 ## Questions this card must settle
 
-1. Does the NuGet identity use a true SemVer prerelease suffix such as `-preview.N`, or does “preview”
-   describe the pre-1.0 `0.20.*` quality band while NuGet receives ordinary `0.20.x` versions?
-2. Which current capability contracts are strong enough to become `supported-foundation` or
+1. Which current capability contracts are strong enough to become `supported-foundation` or
    `supported-extension`, and which exact package owners carry each guarantee?
-3. Does each guaranteed package's public dependency closure also carry supportable contracts? If not,
+2. Does each guaranteed package's public dependency closure also carry supportable contracts? If not,
    the parent is not promoted until the boundary is corrected; transitive membership alone never grants 0.20.
-4. How does NBGV derive exact output from `0.20.0` owner intent without erasing independent per-project
+3. How does NBGV derive exact output from `0.20` owner intent without erasing independent per-project
    patch lineage afterward?
-5. Which dependency bands allow promoted and non-promoted owners to coexist without implying that a
+4. Which dependency bands allow promoted and non-promoted owners to coexist without implying that a
    lower-maturity dependency is guaranteed?
-6. What source/binary/configuration compatibility should testers expect within the preview line?
-7. Which platforms, SDK, package sources, security posture, and operational prerequisites are supported?
-8. What is the recommended capability spine, and how are demonstrated, experimental, and unassessed
+5. Which platforms, SDK, package sources, security posture, and operational prerequisites are supported?
+6. What is the recommended capability spine, and how are demonstrated, experimental, and unassessed
    extensions presented without implying equal support?
-9. What feedback belongs in a defect, a documentation correction, a provider limitation, or a future
+7. What feedback belongs in a defect, a documentation correction, a provider limitation, or a future
    proposal?
 
 ## Evidence to read first

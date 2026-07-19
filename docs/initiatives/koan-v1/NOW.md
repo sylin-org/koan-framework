@@ -57,8 +57,12 @@ Before any version file changes, R12-01 must:
 - present the resulting architecture checkpoint before selective `version.json` edits.
 
 The product currently has 26 assessed capability claims: 15 verified, 9 demonstrated, one
-experimental, and one specified. `verified` is evidence strength, not yet a compatibility guarantee;
-R12-01 decides which verified contracts earn supported status and 0.20 identity.
+experimental, and one specified. `verified` is evidence strength, not yet a compatibility guarantee.
+The first read-only R12-01 inventory found 31 packages named by verified claims, six additional public
+dependencies, and three entry/template packages: a 40-package ceiling. The proposed initial slate is
+35 packages; Media/Storage's five-package closure is conditional on an earned Storage guarantee and
+PMC-033 correction. The proposed version grammar is ordinary `0.20.x` with project intent `0.20`, not
+a NuGet prerelease suffix and never a hand-authored patch.
 
 ## Most recent completed slice: R08-05 local exact candidate
 
