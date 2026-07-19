@@ -8,14 +8,14 @@ last_updated: 2026-07-19
 framework_version: source-first
 validation:
   date_last_tested: 2026-07-19
-  status: in-progress
-  scope: complete local public-release ratchet from the graduated 93-package source boundary
+  status: passed
+  scope: exact complete local public-release ratchet from commit 736b82cc3
 ---
 
 # R11-07 — Certify the graduated package boundary
 
 - Tranche: `T7B — package-product graduation`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: passed R11-01 through R11-06
 - Unlocks: passed R11 and preparation of the exact R08-05 candidate
 
@@ -94,3 +94,27 @@ Focused evidence before the corrected complete boundary:
 The refreshed tracked composition lockfiles record the current relational-abstractions split and OrderIntake's
 ordinary Npgsql/Redis dependency closure. They must be committed before the exact ratchet's drift leg can certify the
 same boundary.
+
+## Final certification evidence
+
+Commit `736b82cc3` passed the exact boundary without exclusions or mutation:
+
+```powershell
+pwsh scripts/green-ratchet.ps1 -Configuration Release -PublicRelease
+```
+
+- elapsed: 1,222.2 seconds (20 minutes 22 seconds);
+- public-release solution build: zero warnings/errors;
+- lockfile drift: passed against the committed composition;
+- solution tests: 103 projects, 4,648 passed, 30 intentional environment skips, 0 failed (4,678 total);
+- Packaging: 196/196, including source-checkout FirstUse and GoldenJourney;
+- broad docs: zero errors and 1,626 pre-existing non-gating warnings;
+- public docs: 233 current files and 42 navigation targets;
+- changed instructional examples: 20/20;
+- strict skills: 20 skills, zero errors/warnings;
+- strict blueprints: one blueprint, zero errors/warnings;
+- final ratchet result: every leg passed.
+
+The ratchet left no tracked drift. Its 19 retained MSBuild node-reuse workers were identified by their exact parent and
+command line and stopped after the successful result; no application/test process from certification remains. No
+private application was inspected and no push, publication, tag, Release, deployment, or remote setting changed.

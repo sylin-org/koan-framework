@@ -4,18 +4,18 @@ domain: framework
 title: "R11 - Graduate the NuGet Product Surface"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-19
 framework_version: source-first
 validation:
   date_last_tested: 2026-07-17
-  status: in-progress
-  scope: package-quality contract and deterministic assessment owner
+  status: passed
+  scope: 93-package product graduation plus exact complete local public-release ratchet
 ---
 
 # R11 — Graduate the NuGet product surface
 
 - Tranche: `T7B — V1 release readiness / package-product graduation`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: passed R09 and R10; prepared R08-05
 - Guards: exact R08-05 candidate and initial coherent public observation
 - Owner: public package identity, reference intent, package-specific documentation, consumer proof, and package presentation
@@ -114,7 +114,7 @@ graduation claim. Architectural and prose review plus the applicable executable 
 | [R11-04](r11/R11-04-golden-package-journey.md) | golden package journey behind AddKoan + Entity + EntityController | passed |
 | [R11-05](r11/R11-05-package-family-graduation.md) | dependency-ordered family graduation with coalescence before polish | passed |
 | [R11-06](r11/R11-06-package-rendering-and-consumer-proof.md) | NuGet rendering, clean-consumer, operator, reviewer, and agent proof | passed |
-| [R11-07](r11/R11-07-release-certification-boundary.md) | complete active-package disposition and one final release-certification boundary | in-progress |
+| [R11-07](r11/R11-07-release-certification-boundary.md) | complete active-package disposition and one final release-certification boundary | passed |
 
 Open later child cards only when the preceding slice establishes the facts needed to size them. This keeps R11 a
 sequence of meaningful decisions rather than 108 parallel documentation chores.
