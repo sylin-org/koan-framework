@@ -8,14 +8,14 @@ last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-19
-  status: in-progress
+  status: reviewed
   scope: preview intent, version grammar, compatibility boundary, support posture, and exact inventory plan
 ---
 
 # R12-01 — Define the 0.20 preview contract and version band
 
 - Tranche: `T7B — public product maturity`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: passed R11 and the exact local R08-05 candidate evidence
 - Unlocks: bounded preview repairs, coherent product classification, mass public narrative alignment,
   and the exact selective 0.20 promotion wave
@@ -230,3 +230,10 @@ depends on their guarantee.
 - Stop if exact package identity requires a maintained list or hand-authored release manifest.
 - Stop if NuGet prerelease behavior and the documentation meaning of “preview” disagree.
 - Stop before any version edit, full pack, or remote mutation until the checkpoint is accepted.
+
+## Outcome
+
+Accepted by the maintainer on 2026-07-19. Ordinary stable-format `0.20.x` identities, project-local
+`0.20` intent, NBGV-owned patches, no intentional breaking changes within a 0.20 patch line, and
+claim-owned selective admission are the version contract. The 35-package table is the assessment
+slate for R12-02/R12-03, not an automatic promotion list. No `version.json` changed in this child.

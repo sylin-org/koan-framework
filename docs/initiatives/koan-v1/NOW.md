@@ -43,26 +43,25 @@ language, references express capability intent, `AddKoan()` compiles host-owned 
 runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive only
 when genuinely inert and independently consumed.
 
-## Active slice: R12-01 preview contract and version band
+## Active slice: R12-02 preview-blocking seams
 
-Before any version file changes, R12-01 must:
+R12-01 passed with the maintainer-accepted checkpoint: ordinary stable-format `0.20.x`, project-local
+`0.20` intent, NBGV-owned patches, claim-owned selective admission, and no automatic promotion by
+dependency or repository membership. Its 35 packages remain an assessment slate, not admitted truth.
 
-- inventory every active owner's current version intent, exact projected package identity, maturity
-  evidence, claim ownership, and public dependency boundary;
-- decide the exact NuGet/SemVer meaning of “0.20 preview”;
-- select which capability contracts become `supported-foundation` or `supported-extension`;
-- map those guarantees to exact package owners without mechanically promoting their entire dependency graph;
-- prove that any promoted package has no lower-maturity dependency that invalidates its guarantee;
-- define compatibility, support, platform, security, and feedback expectations;
-- present the resulting architecture checkpoint before selective `version.json` edits.
+[R12-02](work-items/r12/R12-02-preview-blocking-seams.md) now re-evaluates the complete PMC register
+against that slate. Each concern receives one current disposition: repair, close by current evidence,
+transfer to the preview phase that owns its terminal proof, or explicit exclusion/nonclaim. The first
+exploration checks Storage's remaining layered-activation invariant through Media. GardenCoop C2 now
+passes 1/1 without Storage in its graph, so the historical sample failure is closed and must not be
+repeated as the current defect.
 
-The product currently has 26 assessed capability claims: 15 verified, 9 demonstrated, one
-experimental, and one specified. `verified` is evidence strength, not yet a compatibility guarantee.
-The first read-only R12-01 inventory found 31 packages named by verified claims, six additional public
-dependencies, and three entry/template packages: a 40-package ceiling. The proposed initial slate is
-35 packages; Media/Storage's five-package closure is conditional on an earned Storage guarantee and
-PMC-033 correction. The proposed version grammar is ordinary `0.20.x` with project intent `0.20`, not
-a NuGet prerelease suffix and never a hand-authored patch.
+PMC-033 is now repaired at the generalized Storage chokepoint. Availability is inert until profile/
+default configuration or actual service use declares routing intent; configured routes still compile
+at startup, unconfigured use still fails correctively, and facts distinguish inactive availability.
+Focused Release evidence passes Media Web 8/8, Storage 20/20, bootstrap pillars 13/13, Data.AI 87/87,
+and GardenCoop C2 1/1. Resume R12-02 at PMC-025's first-use Windows logging boundary, then Jobs/MCP
+public shapes and Data/Web correctness seams. Do not run the full ratchet.
 
 ## Most recent completed slice: R08-05 local exact candidate
 

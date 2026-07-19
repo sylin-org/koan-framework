@@ -4,6 +4,7 @@ using Koan.Core.Diagnostics;
 using Koan.Core.Hosting.App;
 using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Core.Recipes;
+using Koan.Storage.Abstractions;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -13,6 +14,37 @@ namespace Koan.Media.Web.Tests;
 [Collection("media-web")]
 public sealed class MediaStartupContractSpec(MediaWebHostFixture fixture)
 {
+    [Fact]
+    public async Task Pipeline_only_media_leaves_transitive_storage_available_but_inactive()
+    {
+        var current = AppHost.Current;
+        try
+        {
+            await using var host = await KoanIntegrationHost.Configure()
+                .WithSetting("Koan:Environment", "Test")
+                // This test project directly references the Local connector for other cells. Satisfy that
+                // connector's own required option while deliberately declaring no Storage routing profile.
+                .WithSetting("Koan:Storage:Providers:Local:BasePath", Path.GetTempPath())
+                .ConfigureServices(services => services.AddKoan())
+                .StartAsync();
+
+            var facts = host.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts;
+            facts.Should().ContainSingle(fact =>
+                fact.Code == "koan.storage.routing.available"
+                && fact.Subject == "storage:routing"
+                && fact.Summary.Contains("inactive", StringComparison.OrdinalIgnoreCase));
+            facts.Should().NotContain(fact => fact.Code == "koan.storage.profile.selected");
+
+            var resolveStorage = () => host.Services.GetRequiredService<IStorageService>();
+            resolveStorage.Should().Throw<InvalidOperationException>()
+                .WithMessage("*no profiles*Configure at least one*");
+        }
+        finally
+        {
+            AppHost.Current = current;
+        }
+    }
+
     [Fact]
     public void Startup_facts_report_materialized_recipe_decisions()
     {

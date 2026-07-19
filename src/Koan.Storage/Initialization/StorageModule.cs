@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Storage;
@@ -49,9 +50,11 @@ public sealed class StorageModule : KoanModule
 
     public override Task Start(IServiceProvider services, CancellationToken ct)
     {
-        // Resolve eagerly when Koan owns the standard pipeline. A deliberately supplied
-        // IStorageService remains authoritative and does not need provider/profile machinery.
-        _ = services.GetService<StorageRoutingPlan>();
+        // A Storage reference makes the capability available. Configuration makes routing active;
+        // an actual service resolution remains the fail-loud boundary for unconfigured runtime use.
+        // A deliberately supplied IStorageService remains authoritative and needs no routing plan.
+        if (services.GetRequiredService<IOptions<StorageOptions>>().Value.DeclaresRoutingIntent)
+            _ = services.GetService<StorageRoutingPlan>();
         return Task.CompletedTask;
     }
 

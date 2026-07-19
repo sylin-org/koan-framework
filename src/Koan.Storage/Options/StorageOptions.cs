@@ -8,6 +8,9 @@ public sealed class StorageOptions
 
     public string? DefaultProfile { get; set; }
 
+    internal bool DeclaresRoutingIntent
+        => (Profiles?.Count ?? 0) > 0 || !string.IsNullOrWhiteSpace(DefaultProfile);
+
     public sealed class StorageProfile
     {
         /// <summary>
