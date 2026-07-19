@@ -167,27 +167,37 @@ zero-config in Development; to expose it in a controlled non-production test env
 
 ---
 
-## 6. Service-to-service — bearer tokens (KSVID)
+## 6. Workload bearer tokens
 
 Browsers carry cookies; services carry **bearer tokens**. Koan validates inbound bearer tokens through a dedicated scheme, `Koan.bearer`. Opt an endpoint into it explicitly—so a service route requires a real token, regardless of any browser session:
 
 ```csharp
-[Authorize(AuthenticationSchemes = "Koan.bearer")]
+[Authorize(AuthenticationSchemes = KoanBearerDefaults.AuthenticationScheme)]
 [HttpGet("/internal/sync")]
 public IActionResult Sync() => Ok(/* ... */);
 ```
 
-A caller presents `Authorization: Bearer <token>`; a missing or invalid token is **401**. For the **service mesh**, Koan signs and validates these with a **shared secret** (HS256), `Koan:Security:Trust:Key`, which in a fresh app **defaults to a well-known development value**. Because every Koan service defaults to the *same* key, they all **self-mint valid tokens and trust each other with zero configuration** — local service-to-service auth just works. To mint one yourself — in a test, a dev tool, or a service calling another — use the issuer:
+A caller presents `Authorization: Bearer <token>`; a missing, malformed, tampered, expired, foreign-key, or
+wrong-algorithm token is **401**. Trust generates one random ES256 keypair per process, registers `Koan.bearer`
+automatically under `AddKoan()`, and needs no signing secret. To mint a token inside that trust boundary, inject the
+one issuer contract:
 
 ```csharp
 public sealed class SyncTrigger(IIssuer issuer)
 {
-    public string TokenForBilling() =>
-        issuer.Issue(new TrustClaims { Subject = "billing-svc", Roles = new[] { "service" } });
+    public string TokenForBilling() => issuer.Issue(
+        new TrustClaims { Subject = "billing-svc", Roles = ["service"] },
+        audience: "koan://billing");
 }
 ```
 
-> **Mentor note.** This is the seed of *fleet identity*: one verifiable token a service presents to any other, validated the same way everywhere. That default key is **loudly insecure by name** (`super-insecure-shared-secret-replace-asap`) and bootstrap warns you on every start — it's for local dev only, and Koan **refuses to boot** a Production/Staging app that still uses it (§8). For a private team or a shared environment, set `Koan:Security:Trust:Key` to a real secret; every service that shares it interoperates. (The per-node **asymmetric ES256** tier this anticipated has now shipped: `Koan.Security.Trust`'s `EcdsaIssuer` / `IAsymmetricIssuer` — persisted + rotating keys, published JWKS — is what the embedded OAuth Authorization Server signs with, and `Koan.bearer` validates **both** tiers (the HS256 mesh secret here *and* the ES256 AS tokens) without the `Identity.Current` / `[Authorize]` surface changing. To **issue** tokens to API/agent clients, reference `Koan.Web.Auth.Server` — see [oauth-server-howto.md](oauth-server-howto.md).)
+The default key is safe but ephemeral: tokens stop validating after a process restart. For public-client issuance,
+restart continuity, rotating keys, and JWKS publication, reference `Koan.Web.Auth.Server`; it replaces the key store
+with its persisted implementation outside Development. Trust does not currently discover remote JWKS or enroll a
+fleet, so do not treat the direct package as zero-configuration cross-service identity.
+
+The bearer scheme authenticates signature, issuer, algorithm, and lifetime. A resource-specific audience is an
+authorization decision at that resource; MCP compares `aud` with its own canonical resource URI automatically.
 
 ---
 
@@ -208,7 +218,10 @@ The one-line bridge: **identity** (this guide) establishes *who you are*; **auth
 Two things change the moment the environment isn't Development, and you don't have to remember to do either:
 
 1. **The dev conveniences are inactive.** No `?_as=` personas and no automatic TestProvider login. Real users authenticate through configured providers; services through `Koan.bearer`. Do not explicitly enable the Test connector in production.
-2. **The default insecure key is refused.** In dev, an app with no `Koan:Security:Trust:Key` runs on the public default secret — with a very loud warning banner on every boot. In **Production or Staging**, Koan **refuses to start** on that key: set a real secret first (or, for a throwaway box, `Koan:Security:Trust:AllowInsecureKeyInProduction=true`). No quiet fallback.
+2. **Token continuity is explicit.** Direct Trust uses a random per-process key and carries no forgeable default
+   secret. If the deployment promises OAuth tokens that survive restarts or work across replicas, use Auth Server's
+   durable Data/Data Protection-backed key store; Auth Server fails startup outside Development when it cannot provide
+   that continuity unless the operator explicitly acknowledges the ephemeral posture.
 
 > **Mentor note.** The design goal is a fail-closed default: dev conveniences are loud in Development and inactive
 > elsewhere. Explicitly overriding those gates remains an operator decision and should be reviewed as such.

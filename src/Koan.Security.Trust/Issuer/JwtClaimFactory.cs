@@ -5,8 +5,7 @@ namespace Koan.Security.Trust.Issuer;
 
 /// <summary>
 /// Builds the JWT claim list for a <see cref="TrustClaims"/> — the single, shared projection used by every
-/// <see cref="IIssuer"/> (HS256 <see cref="SharedKeyIssuer"/> and ES256 <see cref="EcdsaIssuer"/>), so the
-/// wire shape of a Koan credential is identical regardless of the signing tier. Keeping claim types exactly
+/// <see cref="IIssuer"/>, so every minting path shares one wire shape. Keeping claim types exactly
 /// as written here (no short-name remap) is what lets the inbound bearer scheme — which sets
 /// <c>MapInboundClaims=false</c> — preserve <see cref="ClaimTypes.Role"/> and <c>Koan.permission</c> for
 /// the SEC-0004/0005 authorization chain.

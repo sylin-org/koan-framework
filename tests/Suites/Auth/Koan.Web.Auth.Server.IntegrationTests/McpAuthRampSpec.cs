@@ -54,7 +54,7 @@ public sealed class McpAuthRampSpec : IClassFixture<McpAuthRampFixture>
     public async Task Mcp_rejects_a_token_bound_to_the_wrong_resource()
     {
         // Authentic (signed by the live ES256 issuer) but bound to a different resource → confused-deputy reject.
-        var issuer = _fx.Services.GetRequiredService<IAsymmetricIssuer>();
+        var issuer = _fx.Services.GetRequiredService<IIssuer>();
         var wrongAud = issuer.Issue(new TrustClaims { Subject = "alice", Roles = new[] { "admin" } },
             TimeSpan.FromMinutes(5), audience: "koan://some/other/resource");
 

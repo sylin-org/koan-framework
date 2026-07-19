@@ -68,7 +68,7 @@ internal static class DevTokenEndpoint
         var scopeOverride = ParseList(ctx.Request.Query["scope"].ToString());
         var rolesOverride = ParseList(ctx.Request.Query["roles"].ToString());
 
-        var issuer = ctx.RequestServices.GetRequiredService<IAsymmetricIssuer>();
+        var issuer = ctx.RequestServices.GetRequiredService<IIssuer>();
         var claims = SessionPrincipal.ToTrustClaims(ctx.User, clientId: "koan-dev-token", scopeOverride, rolesOverride);
         // Clamp to a sane ceiling so a misconfigured option can't mint a long-lived dev credential.
         var minutes = Math.Clamp(options.DevTokenLifetimeMinutes, 1, 1440);

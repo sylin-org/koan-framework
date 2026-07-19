@@ -44,31 +44,37 @@
     {
       "id": "authentication-authorization",
       "title": "Authentication, authorization, and client token issuance",
-      "summary": "Durable Identity, web sign-in, authenticated identity management, and active-membership tenant scoping compose through referenced modules; the embedded OAuth server issues audience-bound public-client tokens through its verified protocol boundary, while external provider behavior remains connector-specific.",
+      "summary": "Durable Identity, web sign-in, authenticated identity management, active-membership tenant scoping, and one ES256 workload-token verifier compose through referenced modules; the embedded OAuth server adds audience-bound public-client issuance and durable key continuity, while external provider behavior remains connector-specific.",
       "maturity": "verified",
       "packages": [
         "Sylin.Koan.Identity",
         "Sylin.Koan.Identity.Tenancy",
         "Sylin.Koan.Identity.Web",
+        "Sylin.Koan.Security.Trust",
         "Sylin.Koan.Web.Auth",
         "Sylin.Koan.Web.Auth.Server"
       ],
       "documentation": [
+        "docs/guides/auth-howto.md",
         "docs/guides/authentication-setup.md",
         "docs/guides/oauth-server-howto.md",
         "docs/guides/tenancy-howto.md",
         "docs/initiatives/koan-v1/CAPABILITIES.md",
-        "src/Koan.Identity.Tenancy/README.md"
+        "src/Koan.Identity.Tenancy/README.md",
+        "src/Koan.Security.Trust/README.md"
       ],
       "evidence": [
         "docs/initiatives/koan-v1/R02-EVIDENCE.md",
         "src/Koan.Identity",
         "src/Koan.Identity.Tenancy",
         "src/Koan.Identity.Web",
+        "src/Koan.Security.Trust",
         "src/Koan.Web.Auth",
         "tests/Suites/Auth/Koan.Web.Auth.Server.IntegrationTests",
         "tests/Suites/Integration/Identity/Koan.Identity.Tests",
-        "tests/Suites/Samples/Koan.Samples.SnapVault.Tests"
+        "tests/Suites/Samples/Koan.Samples.SnapVault.Tests",
+        "tests/Suites/Security/Koan.Security.Trust.IntegrationTests",
+        "tests/Suites/Security/Koan.Security.Trust.Tests"
       ]
     },
     {
@@ -1746,17 +1752,19 @@
     {
       "packageId": "Sylin.Koan.Security.Trust",
       "shape": "library",
-      "description": "SEC-0001 fleet identity and trust fabric: the asymmetric issuer, inbound token verifier, ambient Identity, IAuthorize seam, and fail-closed trust-mode boot guard. Lower-level pillar consumed by Koan.Web.Auth (one-way dependency).",
+      "description": "ES256 workload-token issuance and bearer verification with ambient request identity, automatic AddKoan activation, and a replaceable signing-key lifecycle.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core"
       ],
-      "readme": null,
-      "ownsReadme": false,
-      "technicalDocumentation": null,
-      "claims": []
+      "readme": "src/Koan.Security.Trust/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Security.Trust/TECHNICAL.md",
+      "claims": [
+        "authentication-authorization"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Storage",

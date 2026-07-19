@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -71,7 +72,7 @@ public sealed class EcdsaIssuerTests
         jwk.Crv.Should().Be("P-256");
         jwk.Alg.Should().Be("ES256");
         jwk.Use.Should().Be("sig");
-        jwk.Kid.Should().Be(issuer.KeyId);
+        jwk.Kid.Should().NotBeNullOrEmpty();
         jwk.X.Should().NotBeNullOrEmpty();
         jwk.Y.Should().NotBeNullOrEmpty();
         // The private component must never appear in a published JWK.
@@ -119,9 +120,13 @@ public sealed class EcdsaIssuerTests
     {
         // alg-pinning: an HS256 token must never validate against the ES256 issuer (HS↔ES confusion).
         var es = NewIssuer();
-        var hs = new SharedKeyIssuer(Options.Create(new TrustIssuerOptions()), NullLogger<SharedKeyIssuer>.Instance);
-
-        var hsToken = hs.Issue(new TrustClaims { Subject = "x" });
+        var key = new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(32));
+        var hsToken = new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
+            issuer: "koan-dev",
+            audience: "koan",
+            claims: [new Claim("sub", "x")],
+            expires: DateTime.UtcNow.AddMinutes(5),
+            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)));
 
         es.TryValidate(hsToken, out _).Should().BeFalse();
     }

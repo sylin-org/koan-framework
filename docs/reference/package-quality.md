@@ -22,7 +22,7 @@ This report separates objective package repairs from human review. `structurally
 
 | Packages | Repair required | Review required | Structurally ready | Owned READMEs | Technical companions | Findings |
 |---:|---:|---:|---:|---:|---:|---:|
-| 93 | 3 | 10 | 80 | 90 | 85 | 42 |
+| 93 | 2 | 10 | 81 | 91 | 86 | 40 |
 
 ## Packages
 
@@ -95,7 +95,7 @@ This report separates objective package repairs from human review. `structurally
 | `Sylin.Koan.Observability`<br>[`src/Koan.Observability/Koan.Observability.csproj`](../../src/Koan.Observability/Koan.Observability.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Observability/README.md)<br>[TECHNICAL](../../src/Koan.Observability/TECHNICAL.md) | none |
 | `Sylin.Koan.Redis`<br>[`src/Koan.Redis/Koan.Redis.csproj`](../../src/Koan.Redis/Koan.Redis.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Redis/README.md)<br>[TECHNICAL](../../src/Koan.Redis/TECHNICAL.md) | none |
 | `Sylin.Koan.Redis.Abstractions`<br>[`src/Koan.Redis.Abstractions/Koan.Redis.Abstractions.csproj`](../../src/Koan.Redis.Abstractions/Koan.Redis.Abstractions.csproj) | contracts / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Redis.Abstractions/README.md)<br>[TECHNICAL](../../src/Koan.Redis.Abstractions/TECHNICAL.md) | none |
-| `Sylin.Koan.Security.Trust`<br>[`src/Koan.Security.Trust/Koan.Security.Trust.csproj`](../../src/Koan.Security.Trust/Koan.Security.Trust.csproj) | capability / library<br>net10.0 | `repair-required` | root README fallback | `docs.readme.owned.missing` (error): The package falls back to the framework root README.<br>`docs.technical.missing` (warning): No package-owned technical companion describes runtime or build ownership. |
+| `Sylin.Koan.Security.Trust`<br>[`src/Koan.Security.Trust/Koan.Security.Trust.csproj`](../../src/Koan.Security.Trust/Koan.Security.Trust.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Security.Trust/README.md)<br>[TECHNICAL](../../src/Koan.Security.Trust/TECHNICAL.md) | none |
 | `Sylin.Koan.Storage`<br>[`src/Koan.Storage/Koan.Storage.csproj`](../../src/Koan.Storage/Koan.Storage.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Storage/README.md)<br>[TECHNICAL](../../src/Koan.Storage/TECHNICAL.md) | none |
 | `Sylin.Koan.Storage.Abstractions`<br>[`src/Koan.Storage.Abstractions/Koan.Storage.Abstractions.csproj`](../../src/Koan.Storage.Abstractions/Koan.Storage.Abstractions.csproj) | contracts / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Storage.Abstractions/README.md)<br>[TECHNICAL](../../src/Koan.Storage.Abstractions/TECHNICAL.md) | none |
 | `Sylin.Koan.Storage.Connector.Local`<br>[`src/Connectors/Storage/Local/Koan.Storage.Connector.Local.csproj`](../../src/Connectors/Storage/Local/Koan.Storage.Connector.Local.csproj) | provider / library<br>net10.0 | `structurally-ready` | [README](../../src/Connectors/Storage/Local/README.md)<br>[TECHNICAL](../../src/Connectors/Storage/Local/TECHNICAL.md) | none |

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core;
@@ -9,10 +10,7 @@ using Xunit;
 namespace Koan.Tests.Integration.Bootstrap.Pillars.Specs;
 
 /// <summary>
-/// SEC-0001 Phase 2 (2g), per ARCH-0079: the trust fabric composes through real <c>AddKoan()</c> reflective
-/// discovery — the asymmetric issuer is registered and resolvable. The fail-closed boot guard itself is
-/// unit-tested in <c>Koan.Security.Trust.Tests</c> (a full-AddKoan Production boot would also trip unrelated
-/// production guards, so it is not exercised here).
+/// Per ARCH-0079: Trust composes through real <c>AddKoan()</c> discovery with one ES256 issuer.
 /// </summary>
 public sealed class AuthTrustFabricSpec
 {
@@ -20,11 +18,15 @@ public sealed class AuthTrustFabricSpec
     public async Task AddKoan_registers_the_trust_issuer_through_real_bootstrap()
     {
         await using var host = await KoanIntegrationHost.Configure()
+            .WithSetting("Koan:Storage:DefaultProfile", "local")
+            .WithSetting("Koan:Storage:Profiles:local:Provider", "local")
+            .WithSetting("Koan:Storage:Profiles:local:Container", "trust-bootstrap")
+            .WithSetting("Koan:Storage:Providers:Local:BasePath", Path.GetTempPath())
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 
         var issuer = host.Services.GetService<IIssuer>();
         issuer.Should().NotBeNull();
-        issuer!.KeyId.Should().NotBeNullOrEmpty();
+        issuer!.PublishedKeys.Should().ContainSingle();
     }
 }

@@ -409,7 +409,7 @@ internal static class OAuthProtocolEndpoints
     private static async Task IssueTokens(HttpContext ctx, AuthServerOptions options, GrantedIdentity id,
         string clientId, string resource, string familyId, string grantId, DateTimeOffset now)
     {
-        var issuer = ctx.RequestServices.GetRequiredService<IAsymmetricIssuer>();
+        var issuer = ctx.RequestServices.GetRequiredService<IIssuer>();
         var access = issuer.Issue(new TrustClaims
         {
             Subject = id.Subject,

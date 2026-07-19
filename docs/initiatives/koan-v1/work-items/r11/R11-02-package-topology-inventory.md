@@ -127,7 +127,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Observability` | `capability` | `keep` (implemented) |
 | `Sylin.Koan.Redis` | `provider` | `keep` |
 | `Sylin.Koan.Redis.Abstractions` | `contracts` | `keep` |
-| `Sylin.Koan.Security.Trust` | `capability` | `assess` |
+| `Sylin.Koan.Security.Trust` | `capability` | `keep` |
 | `Sylin.Koan.Storage` | `capability` | `keep` |
 | `Sylin.Koan.Storage.Abstractions` | `contracts` | `keep` |
 | `Sylin.Koan.Storage.Connector.Local` | `provider` | `keep` |

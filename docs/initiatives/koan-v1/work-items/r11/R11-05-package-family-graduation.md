@@ -4794,6 +4794,161 @@ pretending the two experiments were one implementation family.
 - no behavior suite, pack, live container, private downstream inspection, full release ratchet, publication, push,
   tag, release, or remote mutation ran.
 
+## Security Trust family architecture checkpoint
+
+**Task:** Graduate `Sylin.Koan.Security.Trust` as the single lower-level workload-token and ambient-identity pillar,
+remove its unsafe symmetric/future-mode branches, and make the package that owns bearer verification activate that
+verification itself.
+
+**Application intent:** A Koan application can mint a short-lived token, present it to a bearer-protected endpoint in
+the same trust boundary, and receive one authenticated principal without configuring a signing secret or assembling
+authentication internals.
+
+**Public expression:** The complete direct-package expression is a reference to `Sylin.Koan.Security.Trust`, the
+application's existing `AddKoan()`, and the standard ASP.NET Core declaration:
+
+```csharp
+[Authorize(AuthenticationSchemes = KoanBearerDefaults.AuthenticationScheme)]
+```
+
+When the application itself needs to mint a workload credential, it injects the one issuer contract and supplies the
+business claims and, when relevant, the resource audience:
+
+```csharp
+var token = issuer.Issue(new TrustClaims { Subject = "worker-1" }, audience: "koan://orders");
+```
+
+`Sylin.Koan.Web.Auth`, `.Web.Auth.Server`, and `.Mcp` already reference Trust and therefore receive the same bearer
+scheme transitively. Web Auth continues to own cookie sign-in, Auth Server continues to own public-client protocol and
+durable key lifecycle, and MCP continues to enforce its exact resource audience at its own edge.
+
+**Guarantee/correction:** Trust generates one random P-256 keypair per process by default, signs only ES256, pins
+issuer/algorithm/lifetime during validation, preserves rotating-key overlap, and rejects malformed, tampered, foreign,
+or wrong-algorithm tokens through the normal bearer 401 path. Empty issuer/audience values and non-positive token
+lifetimes fail options validation with the configuration correction. The default ephemeral key is cryptographically
+safe but intentionally loses token continuity on restart; an embedded production authorization server replaces it
+with its existing persisted encrypted-at-rest key store and retains its own fail-closed continuity guard. An audience
+is an authenticity assertion here, not a global authorization policy: a resource such as MCP must compare `aud` with
+its own canonical resource identifier and reject a mismatch.
+
+**Complete intent surface:** There is no issuer constructor, secret, trust-mode selection, bearer registration call,
+middleware call, or Web Auth prerequisite. Direct callers optionally configure `Koan:Security:Trust:Issuer`,
+`Audience`, and `DefaultLifetimeMinutes`; Auth Server deployments additionally follow that package's existing durable
+Data/Data Protection and canonical-public-origin requirements. Cross-process fleet enrollment, remote JWKS trust,
+federation, revocation, and a cross-channel security envelope do not exist in V1 and are not implied by this
+expression.
+
+**Public concepts:** `KoanBearerDefaults.AuthenticationScheme` maps to the deliberate ASP.NET Core endpoint scheme;
+`IIssuer` maps to the one mint/verify/public-key contract; `TrustClaims` maps caller identity data into the token;
+`Identity.Current`/`KoanIdentity` project the request principal for ordinary application reads; `IIssuerKeyStore` and
+`EcdsaKeyRing` remain cross-module lifecycle contracts because Auth Server genuinely supplies persisted/rotating
+material. `DevIdentityOptions` remains the configuration owned by Trust's parser but the Development-only Web context
+contributor remains the request-pipeline owner. `IAsymmetricIssuer`, `SharedKeyIssuer`, `TrustMode`, `TrustPosture`, a
+public default secret, and `AddKoanBearer` are not independent business decisions and leave the public model.
+
+**Docs read:** `CLAUDE.md` establishes current source/guides/tests over dated ADR prose and permits this task-owned
+decision update; `docs/engineering/index.md` requires standard options/DI, companion docs, and structural decision
+documentation; `docs/architecture/principles.md` requires one readable application decision and one lifecycle owner;
+`docs/architecture/capability-map.md` places Trust below Web Auth/Auth Server/MCP without establishing fleet behavior;
+`docs/toc.yml` establishes the current public curriculum; `SEC-0001`, `SEC-0003`, and `SEC-0006` establish the dated
+asymmetric invariant, the historical shared-secret rung, and Auth Server's real ES256/persisted-key consumer. The
+current source and focused evidence supersede those ADRs' unimplemented fleet/federation wording; this R11 checkpoint
+states the V1 supersession while the dated ADR files remain unchanged historical records.
+
+**Code read:** `TrustModule` currently registers both a public-default HS256 issuer and an ES256 issuer, delegates
+bearer activation upward, and reports a mode that does not correspond to implemented federation; `TrustPosture`
+contains the production bypass whereby setting only `Issuer` suppresses the insecure-key guard while the forgeable
+default secret remains active; `IIssuer` claims asymmetric behavior while its default implementation is symmetric;
+`IAsymmetricIssuer` adds only `PublishedKeys`; `JwtIssuerBase` has no reason to remain once the second strategy is
+removed; `EcdsaIssuer` already owns the complete safe issue/validate/key-rotation behavior; `KoanBearerExtensions`
+duplicates issuer branches and snapshots ownership outside the module; Web Auth calls that extension despite not
+owning bearer tokens; Auth Server consumes issuance/JWKS/key-store behavior; MCP consumes the scheme then correctly
+owns the resource-audience comparison. The complete Trust unit and real-host integration suites establish a clean
+30/30 and 12/12 baseline.
+
+**Reusing:** Already exists: `TrustClaims`, `JwtClaimFactory`, `EcdsaKeyRing`, `IIssuerKeyStore`,
+`EphemeralIssuerKeyStore`, the ES256 issue/validate implementation, `KoanBearerDefaults`, typed
+`TrustIssuerOptions`/`DevIdentityOptions`, centralized dev-identity constants, `Identity.Current`, Auth Server's
+persisted store/rotation/boot guard, MCP's audience enforcement, and standard ASP.NET Core authentication/options.
+Needs to be created: owned Trust README/TECHNICAL companions and options validation annotations. No new runtime
+contract, DTO, contributor, registry, mode, or constants class is required.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| package orientation | `src/Koan.Security.Trust/README.md` | make the smallest honest reference/attribute/issuer expression and limits visible at the package boundary |
+| technical contract | `src/Koan.Security.Trust/TECHNICAL.md` | state registration, key lifecycle, audience ownership, consumers, and explicit non-capabilities |
+
+**Coalescence:** Closest pattern: `src/Koan.Security.Trust/Issuer/EcdsaIssuer.cs`, already the real Auth Server and MCP
+token path. The Trust pillar owns issuer meaning, per-process key lifetime, bearer registration, and principal
+projection; Auth Server owns durable signing-key storage and public OAuth protocol; resource edges own audience
+authorization. Current hot-path work is one key-ring read and standard JWT validation. Repeated mechanics are the
+parallel HS256/ES256 implementations, the second issuer interface, the base class supporting those two branches, and
+Web Auth's borrowed bearer activation. Specificity is pillar-level. Disposition: `keep` Trust; `absorb`
+`IAsymmetricIssuer` and `JwtIssuerBase` into the one `IIssuer`/ES256 implementation; `delete` SharedKey/mode/guard
+branches; move automatic bearer registration to `TrustModule`; keep Auth Server's key-store override and MCP's exact
+audience gate. Core is too wide because JWT/security meaning is not framework law; Web Auth and MCP are too narrow
+because neither owns the shared token contract. No `Trust.Contracts` package is justified: every production consumer
+wants functional Trust behavior, while the key-store seam is already genuinely isolated at the type boundary.
+Superseded source and tests for `SharedKeyIssuer`, `IAsymmetricIssuer`, `JwtIssuerBase`, `TrustPosture`, `TrustGuard`,
+and shared-secret behavior must be deleted rather than deprecated.
+
+**Ergonomics:** Humans and coding models see one package, one scheme constant, one issuer contract, one algorithm, and
+one correction path. IntelliSense no longer offers a choice between `IIssuer` and `IAsymmetricIssuer`, a public secret,
+a future-only mode, or a manual bearer extension. The package reference truthfully activates its owned behavior.
+Advanced key persistence remains discoverable only where that deployment decision is real: Auth Server.
+
+**Constraints satisfied:**
+
+- no inline HTTP endpoints, new routes, model decorations, Entity/data access, large-data path, or repository pattern;
+- stable scheme/dev-identity identifiers remain centralized, while issuer/audience/lifetime remain typed options;
+- standard ASP.NET Core authentication, JWT primitives, DI replacement, DataAnnotations, and options validation are
+  reused before any Koan-specific ceremony;
+- reusable-module README and TECHNICAL companions, current guides, this explicit R11 supersession record, package
+  inventory, and generated product truth move with the behavior while dated ADR files remain unchanged;
+- only affected Trust/Web Auth/Auth Server/MCP/bootstrap/package/docs cells will run; the full release ratchet remains
+  R11-07 work.
+
+**Risks:** Removing HS256 intentionally removes zero-config cross-process self-mint between services sharing a secret;
+no current product claim or exercised consumer establishes that as a V1 guarantee. The zero-config replacement is
+same-process ES256, while deliberate multi-process/public-client continuity belongs to Auth Server's persisted-key
+boundary. Trust does not yet consume remote JWKS, enroll nodes, revoke credentials, or federate issuers, so docs must
+say so plainly. Moving bearer registration down changes module composition ordering, but `AddAuthentication()` is
+additive and does not replace Web Auth's cookie defaults; focused real-host tests must prove both direct Trust and
+transitive Web Auth composition.
+
+**Autonomous architecture checkpoint:** proceed. The user's standing authorization covers the active R11 graduation,
+and this checkpoint applies the explicit mandate to centralize reusable Web/context behavior at its true pillar
+chokepoint before materially changing Trust's public promise.
+
+### Security Trust focused completion evidence
+
+- `Sylin.Koan.Security.Trust` has terminal `keep` disposition. Package reference plus `AddKoan()` now registers one
+  ES256 `IIssuer`, its replaceable key store, `Koan.bearer`, and ambient identity without a Web Auth prerequisite.
+- The public default secret, HS256 issuer, `IAsymmetricIssuer`, two-strategy base class, trust-posture modes, bypassable
+  production guard, and public/manual bearer extension are deleted. The source slice removes more code than it adds
+  and leaves one issuer/key/verifier path.
+- Direct Trust is explicitly ephemeral and same-host. Auth Server continues to replace the key store with its
+  persisted/rotating implementation and owns its production continuity guard; MCP continues to enforce exact
+  resource audience after bearer authentication.
+- `TrustIssuerOptions` uses standard DataAnnotations/ValidateOnStart for non-empty issuer/audience and positive
+  lifetime. The package owns instruction-first README/TECHNICAL companions and no longer claims `IAuthorize`, fleet
+  enrollment, remote JWKS trust, federation, revocation, or cross-channel envelope behavior it does not implement.
+- Focused evidence passes: Trust unit 22/22, Trust/Web Auth real-host 12/12, Auth Server 50/50, MCP auth 2/2, and real
+  `AddKoan()` bootstrap 1/1. The bootstrap cell received only the Storage settings its broad project already requires.
+- Trust, Web Auth, Auth Server, and MCP Release builds succeed with zero warnings/errors. Trust Release pack produces
+  nupkg/snupkg; the nupkg contains DLL/XML, owned README, icon, build-transitive props, expected dependencies, and the
+  current ES256 description.
+- Evaluated truth remains 93 active packages and 26 claims. Trust joins the verified authentication/authorization
+  claim; generated quality improves to 2 repair / 10 review / 81 structurally ready with no Trust finding.
+- Strict API/full-site DocFX succeeds. The public documentation truth gate passes 224 current files and 42 navigation
+  targets; the broad linter has zero errors and retains its existing non-gating front-matter warnings. Dated ADR files
+  remain unchanged; this checkpoint, current source/tests/guides, and generated product surface own the V1 correction.
+- No Classification, standalone Tenancy, Jobs, or other completed-family suite and no full release ratchet ran. No
+  private downstream inspection, push, publication, tag, release, deployment, or remote mutation occurred. Pack
+  artifacts remain under untracked `tmp/` and must not be staged.
+
 ## Acceptance
 
 1. every active package receives a terminal R11-02 disposition before prose graduation;

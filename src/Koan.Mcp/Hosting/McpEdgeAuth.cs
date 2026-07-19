@@ -25,14 +25,14 @@ internal static class McpEdgeAuth
     {
         if (!requireAuth) return true;
 
-        // Fail loudly (not with a confusing raw exception) when the edge requires auth but the bearer scheme
-        // was never registered — i.e. Koan.Mcp is used without Koan.Web.Auth, which installs AddKoanBearer().
+        // Fail loudly (not with a confusing raw exception) if host composition is incomplete. Koan.Mcp references
+        // Trust directly, so ordinary AddKoan discovery registers this scheme without a Web Auth prerequisite.
         var schemes = context.RequestServices.GetService<IAuthenticationSchemeProvider>();
         if (schemes is null || await schemes.GetSchemeAsync(KoanBearerDefaults.AuthenticationScheme) is null)
         {
             context.RequestServices.GetService<ILoggerFactory>()?.CreateLogger("Koan.Mcp")
                 .LogError("MCP edge requires authentication but the '{Scheme}' bearer scheme is not registered. " +
-                          "Reference Koan.Web.Auth (or Koan.Web.Auth.Server) so AddKoanBearer() runs.",
+                          "Ensure AddKoan() module discovery completed before mapping MCP.",
                     KoanBearerDefaults.AuthenticationScheme);
             context.Response.StatusCode = StatusCodes.Status500InternalServerError;
             await context.Response.WriteAsJsonAsync(new { error = "bearer_scheme_unavailable" }, cancellationToken: context.RequestAborted);

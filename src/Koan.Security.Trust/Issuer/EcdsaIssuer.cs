@@ -1,3 +1,5 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -5,50 +7,54 @@ using Microsoft.IdentityModel.Tokens;
 namespace Koan.Security.Trust.Issuer;
 
 /// <summary>
-/// SEC-0001 / SEC-0006 D1 — the asymmetric (ES256) issuer: the user-facing / Authorization-Server tier where
-/// "whoever can verify must not be able to forge" is non-negotiable. Signs with the active P-256 key from
-/// the injected <see cref="IIssuerKeyStore"/>; publishes only public JWKs. Token <c>iss</c> and the default
-/// <c>aud</c> come from <see cref="TrustIssuerOptions"/> (shared with the HS256 tier so the wire shape is
-/// uniform), but every call may bind a specific resource audience (SEC-0006 D2 / RFC 8707).
+/// Trust's ES256 issuer. It signs with the active P-256 key from <see cref="IIssuerKeyStore"/>, publishes
+/// only public JWKs, and accepts retiring verification keys during rotation overlap.
 /// <para>
 /// Validation is <b>audience-agnostic</b> here by design: this issuer asserts authenticity (signature, issuer,
 /// algorithm, lifetime); the per-resource <c>aud</c> check belongs to the resource server (the MCP edge),
-/// which is the SEC-0006 D2 confused-deputy fix. A symmetric issuer's fixed-audience check is exactly the
-/// bug being removed.
+/// which prevents a valid token for one resource from being replayed against another.
 /// </para>
 /// </summary>
-public sealed class EcdsaIssuer : JwtIssuerBase, IAsymmetricIssuer
+internal sealed class EcdsaIssuer : IIssuer
 {
     private readonly IIssuerKeyStore _keyStore;
     private readonly TrustIssuerOptions _options;
+    private readonly ILogger<EcdsaIssuer> _logger;
 
     public EcdsaIssuer(IIssuerKeyStore keyStore, IOptions<TrustIssuerOptions> options, ILogger<EcdsaIssuer> logger)
-        : base(logger)
     {
         _keyStore = keyStore ?? throw new ArgumentNullException(nameof(keyStore));
         _options = options.Value;
+        _logger = logger;
     }
 
     private EcdsaKeyRing Ring => _keyStore.GetKeyRing();
 
-    public override string KeyId => Ring.Active.KeyId!;
-    public override string Algorithm => EcdsaKeyRing.Algorithm; // "ES256"
-    public override string Issuer => _options.Issuer;
-    public override string Audience => _options.Audience;
-    public override SecurityKey SignatureKey => Ring.Active;
-
-    protected override SigningCredentials SigningCredentials => new(Ring.Active, Algorithm);
-    protected override TimeSpan DefaultLifetime => TimeSpan.FromMinutes(_options.DefaultLifetimeMinutes);
-
     public IReadOnlyList<JsonWebKey> PublishedKeys => Ring.ToPublicJwks();
 
-    public override TokenValidationParameters CreateValidationParameters() => new()
+    public string Issue(TrustClaims claims, TimeSpan? lifetime = null, string? audience = null)
+    {
+        ArgumentNullException.ThrowIfNull(claims);
+
+        var handler = new JwtSecurityTokenHandler();
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(JwtClaimFactory.From(claims)),
+            Expires = DateTime.UtcNow.Add(lifetime ?? TimeSpan.FromMinutes(_options.DefaultLifetimeMinutes)),
+            Issuer = _options.Issuer,
+            Audience = string.IsNullOrWhiteSpace(audience) ? _options.Audience : audience,
+            SigningCredentials = new SigningCredentials(Ring.Active, EcdsaKeyRing.Algorithm),
+        };
+        return handler.WriteToken(handler.CreateToken(descriptor));
+    }
+
+    public TokenValidationParameters CreateValidationParameters() => new()
     {
         ValidateIssuerSigningKey = true,
         // Accept every key in the ring (active + retiring) so a rotated key keeps validating until its last
         // token expires (JWKS overlap).
         IssuerSigningKeys = Ring.All,
-        ValidAlgorithms = new[] { Algorithm }, // SEC-0001 §6.1: pin ES256 — alg=none / HS↔ES confusion unrepresentable
+        ValidAlgorithms = [EcdsaKeyRing.Algorithm],
         ValidateIssuer = true,
         ValidIssuer = _options.Issuer,
         // SEC-0006 D2 — audience is enforced per-resource at the resource server, not here.
@@ -56,4 +62,32 @@ public sealed class EcdsaIssuer : JwtIssuerBase, IAsymmetricIssuer
         ValidateLifetime = true,
         ClockSkew = TimeSpan.FromMinutes(1),
     };
+
+    public bool TryValidate(string token, out ClaimsPrincipal principal)
+    {
+        principal = default!;
+        try
+        {
+            var handler = new JwtSecurityTokenHandler();
+            principal = handler.ValidateToken(token, CreateValidationParameters(), out var validated);
+            if (validated is not JwtSecurityToken jwt ||
+                !string.Equals(jwt.Header.Alg, EcdsaKeyRing.Algorithm, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("Trust issuer rejected a token with an unexpected signing algorithm.");
+                return false;
+            }
+
+            return true;
+        }
+        catch (SecurityTokenException ex)
+        {
+            _logger.LogDebug("Trust issuer rejected a token: {Error}", ex.Message);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Trust issuer encountered an unexpected token-validation error.");
+            return false;
+        }
+    }
 }

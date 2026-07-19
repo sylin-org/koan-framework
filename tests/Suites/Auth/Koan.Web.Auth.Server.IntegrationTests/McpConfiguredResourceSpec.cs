@@ -35,7 +35,7 @@ public sealed class McpConfiguredResourceSpec : IClassFixture<McpConfiguredResou
     [Fact]
     public async Task A_token_bound_to_the_configured_resource_is_accepted()
     {
-        var issuer = _fx.Services.GetRequiredService<IAsymmetricIssuer>();
+        var issuer = _fx.Services.GetRequiredService<IIssuer>();
         var token = issuer.Issue(new TrustClaims { Subject = "alice", Roles = new[] { "admin" } },
             TimeSpan.FromMinutes(5), audience: McpConfiguredResourceFixture.CanonicalResource);
 
@@ -51,7 +51,7 @@ public sealed class McpConfiguredResourceSpec : IClassFixture<McpConfiguredResou
     public async Task A_token_bound_to_the_spoofable_host_derived_resource_is_rejected()
     {
         // The host-derived audience ({base}/mcp) must NOT be accepted when a canonical ResourceUri is configured.
-        var issuer = _fx.Services.GetRequiredService<IAsymmetricIssuer>();
+        var issuer = _fx.Services.GetRequiredService<IIssuer>();
         var token = issuer.Issue(new TrustClaims { Subject = "alice", Roles = new[] { "admin" } },
             TimeSpan.FromMinutes(5), audience: $"{_fx.BaseUrl}/mcp");
 

@@ -18,7 +18,6 @@ using Koan.Web.Auth.Hosting;
 using Koan.Web.Auth.Infrastructure;
 using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Providers;
-using Koan.Security.Trust.Inbound;
 
 namespace Koan.Web.Auth.Extensions;
 
@@ -179,10 +178,7 @@ internal static class ServiceCollectionExtensions
                         await dispatcher.DispatchSignOut(signOutCtx, ctx.HttpContext.RequestAborted);
                     }
                 };
-            })
-            // SEC-0001 §6.1/§11 (Phase 2, 2d): inbound bearer scheme alongside cookie. Additive and
-            // non-default — opt in per endpoint via [Authorize(AuthenticationSchemes="Koan.bearer")].
-            .AddKoanBearer();
+            });
         return services;
     }
 

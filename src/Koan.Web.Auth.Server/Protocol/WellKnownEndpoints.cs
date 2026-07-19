@@ -42,7 +42,7 @@ internal static class WellKnownEndpoints
 
     internal static Task Jwks(HttpContext ctx)
     {
-        var issuer = ctx.RequestServices.GetRequiredService<IAsymmetricIssuer>();
+        var issuer = ctx.RequestServices.GetRequiredService<IIssuer>();
         ctx.Response.Headers.CacheControl = "public, max-age=3600"; // cacheable; rotation keeps the retiring key published
         // Project to explicit lower-case JWK members (the AS signs ES256 / P-256; public coordinates only).
         var keys = issuer.PublishedKeys.Select(k => new

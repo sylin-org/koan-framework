@@ -44,7 +44,7 @@ replay revokes the token family. Remembered consent depends on a live revocable 
 ## Identity, issuer, and resource boundaries
 
 The authorization server consumes the existing `Koan.cookie` principal established by Web Auth. It uses the Trust
-pillar's `IAsymmetricIssuer` to mint ES256 access tokens; it does not own login-provider mechanics. Issued authority is
+pillar's `IIssuer` to mint ES256 access tokens; it does not own login-provider mechanics. Issued authority is
 derived from the authenticated session and approved scopes, not from caller-supplied roles.
 
 Tokens are bound to the requested resource. The MCP resource-server edge validates the signature, issuer, lifetime,

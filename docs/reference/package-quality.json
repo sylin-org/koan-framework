@@ -3,12 +3,12 @@
   "source": "evaluated-msbuild-package-graph",
   "summary": {
     "packages": 93,
-    "repairRequired": 3,
+    "repairRequired": 2,
     "reviewRequired": 10,
-    "structurallyReady": 80,
-    "ownedReadmes": 90,
-    "technicalCompanions": 85,
-    "findings": 42
+    "structurallyReady": 81,
+    "ownedReadmes": 91,
+    "technicalCompanions": 86,
+    "findings": 40
   },
   "findingDefinitions": [
     {
@@ -1447,21 +1447,18 @@
       "projectPath": "src/Koan.Security.Trust/Koan.Security.Trust.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "repair-required",
-      "description": "SEC-0001 fleet identity and trust fabric: the asymmetric issuer, inbound token verifier, ambient Identity, IAuthorize seam, and fail-closed trust-mode boot guard. Lower-level pillar consumed by Koan.Web.Auth (one-way dependency).",
+      "status": "structurally-ready",
+      "description": "ES256 workload-token issuance and bearer verification with ambient request identity, automatic AddKoan activation, and a replaceable signing-key lifecycle.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core"
       ],
-      "readme": null,
-      "technicalDocumentation": null,
+      "readme": "src/Koan.Security.Trust/README.md",
+      "technicalDocumentation": "src/Koan.Security.Trust/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.owned.missing",
-        "docs.technical.missing"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Storage",

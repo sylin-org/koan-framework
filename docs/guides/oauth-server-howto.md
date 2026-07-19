@@ -52,7 +52,9 @@ The AS is an opt-in leaf. Reference it; that is the whole wiring:
 builder.Services.AddKoan();
 ```
 
-Referencing `Koan.Web.Auth.Server` activates the AS at `/oauth/…`, the discovery documents under `/.well-known/…`, and — because it brings the trust fabric's asymmetric issuer — wires the `Koan.bearer` scheme that the `/mcp` edge validates against. You write declarations, not ceremony.
+Referencing `Koan.Web.Auth.Server` activates the AS at `/oauth/…`, the discovery documents under `/.well-known/…`,
+and Trust's persisted ES256 signing-key lifecycle. Trust itself wires the `Koan.bearer` scheme that the `/mcp` edge
+uses before applying its exact audience check. You write declarations, not ceremony.
 
 ## What you implement: exactly two pages
 

@@ -9,12 +9,10 @@ using Koan.Security.Trust.Issuer;
 namespace Koan.Security.Trust.Inbound;
 
 /// <summary>
-/// SEC-0001 §6.1/§11 — registers the inbound bearer scheme that validates KSVIDs against the trust fabric's
-/// issuers with the algorithm pinned. Additive and non-default: cookie remains the default scheme; bearer is
-/// opted into per endpoint. Called by <c>Koan.Web.Auth.AddKoanWebAuth()</c> alongside the cookie scheme —
-/// Trust never references Web.Auth back up.
+/// Registers Trust's inbound bearer scheme with an algorithm-pinned issuer contract. It is additive and
+/// non-default: cookie may remain the default scheme while endpoints deliberately opt into bearer.
 /// </summary>
-public static class KoanBearerExtensions
+internal static class KoanBearerExtensions
 {
     public static AuthenticationBuilder AddKoanBearer(this AuthenticationBuilder builder)
     {
@@ -30,13 +28,8 @@ public static class KoanBearerExtensions
 internal sealed class ConfigureKoanBearerOptions : IConfigureNamedOptions<JwtBearerOptions>
 {
     private readonly IIssuer _issuer;
-    private readonly IEnumerable<IAsymmetricIssuer> _asymmetricIssuers;
 
-    public ConfigureKoanBearerOptions(IIssuer issuer, IEnumerable<IAsymmetricIssuer> asymmetricIssuers)
-    {
-        _issuer = issuer;
-        _asymmetricIssuers = asymmetricIssuers;
-    }
+    public ConfigureKoanBearerOptions(IIssuer issuer) => _issuer = issuer;
 
     public void Configure(string? name, JwtBearerOptions options)
     {
@@ -45,45 +38,19 @@ internal sealed class ConfigureKoanBearerOptions : IConfigureNamedOptions<JwtBea
         // and Koan.permission survive intact for authorization.
         options.MapInboundClaims = false;
 
-        // Accept credentials from every trust-fabric issuer: the default (HS256 service-mesh) plus every
-        // asymmetric (ES256) tier — the embedded Authorization Server's user/agent tokens (SEC-0006 D1/D3).
-        // The scheme asserts AUTHENTICITY only (signature + issuer + algorithm + lifetime). The per-resource
-        // audience (RFC 8707 / SEC-0006 D2) is enforced by the resource server (e.g. the MCP edge), NOT here:
-        // a single fixed audience at the scheme is precisely the confused-deputy bug being removed.
-        var allIssuers = new List<IIssuer> { _issuer };
-        allIssuers.AddRange(_asymmetricIssuers);
-
-        var algorithms = allIssuers.Select(i => i.Algorithm).Distinct(StringComparer.Ordinal).ToArray();
-        var validIssuers = allIssuers.Select(i => i.Issuer).Distinct(StringComparer.Ordinal).ToArray();
+        // The scheme asserts authenticity only (signature + issuer + algorithm + lifetime). A resource-specific
+        // audience is enforced by the resource server because a single global audience would recreate the
+        // confused-deputy bug.
         var issuer = _issuer;
-        var asymmetricIssuers = _asymmetricIssuers;
-
-        options.TokenValidationParameters = new TokenValidationParameters
+        var parameters = issuer.CreateValidationParameters();
+        // Resolve the ring afresh per validation so persisted rotation is visible without restarting the host.
+        parameters.IssuerSigningKeyResolver = (_, _, _, _) =>
         {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = _issuer.SignatureKey, // singular retained for the default tier
-            // Resolve signing keys FRESH per validation (not a startup snapshot) so a rotated asymmetric key
-            // (IIssuerKeyStore rotation) is picked up without a restart, and we use each issuer's real key
-            // objects (the asymmetric issuer's active + retiring ECDsaSecurityKeys) rather than reconstructing
-            // them from published JWKs. The JWKS form (IAsymmetricIssuer.PublishedKeys) is for publication only.
-            IssuerSigningKeyResolver = (_, _, _, _) =>
-            {
-                var keys = new List<SecurityKey> { issuer.SignatureKey };
-                foreach (var asym in asymmetricIssuers)
-                {
-                    var p = asym.CreateValidationParameters();
-                    if (p.IssuerSigningKeys is not null) keys.AddRange(p.IssuerSigningKeys);
-                    if (p.IssuerSigningKey is not null) keys.Add(p.IssuerSigningKey);
-                }
-                return keys;
-            },
-            ValidAlgorithms = algorithms, // SEC-0001 §6.1: pin the suite — alg=none / HS↔ES confusion unrepresentable
-            ValidateIssuer = true,
-            ValidIssuers = validIssuers,
-            ValidateAudience = false, // SEC-0006 D2: per-resource audience enforced at the resource server
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromMinutes(1),
+            var current = issuer.CreateValidationParameters();
+            if (current.IssuerSigningKeys is not null) return current.IssuerSigningKeys;
+            return current.IssuerSigningKey is null ? [] : [current.IssuerSigningKey];
         };
+        options.TokenValidationParameters = parameters;
     }
 
     public void Configure(JwtBearerOptions options) => Configure(Options.DefaultName, options);

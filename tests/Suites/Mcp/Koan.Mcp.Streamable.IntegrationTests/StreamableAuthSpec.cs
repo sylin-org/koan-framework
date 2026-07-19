@@ -35,7 +35,7 @@ public sealed class StreamableAuthSpec : IClassFixture<StreamableAuthFixture>
     /// <summary>Mint an ES256 token for <paramref name="subject"/>, bound to this host's MCP resource (RFC 8707 aud).</summary>
     private string Token(string subject)
     {
-        var issuer = _fx.Services.GetRequiredService<IAsymmetricIssuer>();
+        var issuer = _fx.Services.GetRequiredService<IIssuer>();
         return issuer.Issue(new TrustClaims { Subject = subject }, TimeSpan.FromMinutes(5), audience: _fx.Resource);
     }
 

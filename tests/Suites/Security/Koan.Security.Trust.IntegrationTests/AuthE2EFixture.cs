@@ -23,7 +23,7 @@ namespace Koan.Security.Trust.IntegrationTests;
 
 /// <summary>
 /// Boots a real Koan web app over an in-memory TestServer (Development) with the full auth/authz fabric, and
-/// can mint bearer KSVIDs via the app's own <see cref="IIssuer"/> — so the inbound bearer scheme (which
+/// can mint bearer tokens via the app's own <see cref="IIssuer"/> — so the inbound bearer scheme (which
 /// validates against that same issuer) accepts them. This is the harness for HTTP-level end-to-end auth tests.
 /// </summary>
 /// <remarks>

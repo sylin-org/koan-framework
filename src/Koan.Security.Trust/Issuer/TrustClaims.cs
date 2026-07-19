@@ -1,7 +1,7 @@
 namespace Koan.Security.Trust.Issuer;
 
 /// <summary>
-/// SEC-0001 §6.2 — the coarse claim contract carried by a Koan credential (KSVID). Identity + broad
+/// The coarse claim contract carried by a Koan workload token. Identity + broad
 /// roles only; fine-grained / revocable authorization is resolved at the resource (§8), never embedded
 /// in a long-lived token. This is the issuer's input DTO, decoupled from any provider-specific shape.
 /// </summary>

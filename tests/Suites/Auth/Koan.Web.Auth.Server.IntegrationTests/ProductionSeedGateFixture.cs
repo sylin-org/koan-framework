@@ -41,7 +41,6 @@ public sealed class ProductionSeedGateFixture : IAsyncLifetime
                 ["Koan:BackgroundServices:Enabled"] = "false",
                 // Acknowledge the throwaway HS256 key so this Production test host clears the SEC-0003 boot guard
                 // (we are testing the seed env gate, not the key lifecycle).
-                ["Koan:Security:Trust:AllowInsecureKeyInProduction"] = "true",
                 // Knob intentionally left default (true) — only the env gate should suppress the seed.
             }))
             .ConfigureWebHostDefaults(web =>
