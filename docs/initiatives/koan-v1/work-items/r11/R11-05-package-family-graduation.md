@@ -8,14 +8,14 @@ last_updated: 2026-07-19
 framework_version: source-first
 validation:
   date_last_tested: 2026-07-19
-  status: in-progress
-  scope: dependency-ordered family graduation; bespoke Orchestration CLI family deferred outside V1
+  status: tested
+  scope: dependency-ordered family graduation with terminal active-package dispositions
 ---
 
 # R11-05 — Graduate package families
 
 - Tranche: `T7B — package-product graduation`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R11-04 golden package journey
 - Unlocks: final packed rendering and complete release boundary
 
@@ -40,9 +40,9 @@ and generated quality report. It does not run the complete release ratchet.
 |---|---|---|
 | foundation runtime | Core, Data contracts/runtime, JSON, SQLite, Web, Communication | passed |
 | contract isolation | ZenGarden, AI contracts, Vector/Media/Storage abstractions, former Orchestration CLI contracts | passed; CLI family later shelved |
-| provider families | Data, Vector, AI, Cache, Storage, Auth, Orchestration providers | bespoke CLI providers deferred; Aspire pending; other current families passed |
-| semantic capabilities | Jobs, MCP, AI, Cache, Tenancy, Identity, Canon, Media, Classification, Security | Security and ZenGarden pending; other current families passed |
-| projections and tools | Web add-ons, testing, analyzers, generators, CLI and operator surfaces | bespoke Orchestration CLI/generator deferred; remaining families pending |
+| provider families | Data, Vector, AI, Cache, Storage, Auth, Orchestration providers | passed; bespoke CLI and Aspire families shelved beyond V1 |
+| semantic capabilities | Jobs, MCP, AI, Cache, Tenancy, Identity, Canon, Media, Classification, Security, ZenGarden | passed |
+| projections and tools | Web add-ons, testing, analyzers, generators, CLI and operator surfaces | passed; bespoke CLI and Aspire families shelved beyond V1 |
 
 ## Foundation discovery
 
@@ -5170,6 +5170,111 @@ accepted V1 commitments.
 - Validation remains bounded to Admin, its real-host suite, two public sample consumers, exact package artifact, and
   current docs/generated truth. No unrelated Web/Auth/family suite, live infrastructure, full release ratchet, private
   downstream inspection, push, publication, tag, release, deployment, or remote mutation ran; `tmp/` remains untracked.
+
+## ZenGarden architecture checkpoint
+
+**Task:** Graduate `Sylin.Koan.ZenGarden` and its already isolated Contracts boundary without reopening the completed
+contract split or turning unrealized Zen Garden proposals into a V1 public promise.
+
+**Application intent:** An application can express an offering, storage, or capability need and let the active Zen
+Garden runtime discover Moss/Koi/UDP candidates, maintain the tools catalog, and report availability or wish progress.
+An adapter can parse and resolve the same intent without taking a dependency on the runtime engine.
+
+**Public expression:** application hosts reference `Sylin.Koan.ZenGarden`, retain their existing `AddKoan()`, and use
+the three intent surfaces (`ZenGarden.Offering`, `ZenGarden.Storage`, and `ZenGarden.Capability`) after the host is
+running. Long-lived subscriptions belong in a standard hosted service. Adapter packages reference only
+`Sylin.Koan.ZenGarden.Contracts` and consume `ZenGardenConnectionIntent` or `IZenGardenInitializationProvider`; no
+module-specific registration call, client factory, generic event dispatcher, or process-global configuration is
+required.
+
+**Guarantee and correction:** one generated module activates one DI-owned `IZenGardenClient`, layered discovery
+source, optional Koi handler, initialization provider, and AI model advisor. Explicit connection intent either
+resolves to a ready offering or fails correctively at the consuming adapter boundary; an absent automatic Garden is
+normal inactivity. Invalid numeric configuration fails standard options validation at startup. Live-environment test
+cells skip visibly when the Garden or requested offering is absent instead of silently returning green. Provenance
+reports whether the cache path is configured or automatic but never publishes a resolved host filesystem path.
+
+**Complete intent surface and public concepts:** the runtime keeps `ZenGardenOptions`, the three facade surfaces, and
+the Contracts types that describe subscriptions, snapshots, capability wishes/progress, connection intent,
+resolution, initialization, and the replaceable `IZenGardenClient`. Concrete client, Koi topology records/handler,
+constants, roster persistence, and discovery implementation are runtime mechanics. There is no V1 storage changelog
+client, generic runtime-checked `On<TEvent>`, manual static `Configure`, facade model-advice shortcut, public circuit
+breaker, or endpoint-manager abstraction.
+
+**Docs and history read:** current architecture rules require standard .NET lifecycle/options concepts and genuinely
+isolated cross-module contracts. The R10/R11 contract-isolation checkpoint already renamed the former Core package and
+proved 86/86; it is not repeated. Current STOR-0009 explicitly marks its endpoint-manager, resilient decorator, and
+CDC portions as unrealized target design, while the later storage assessment records that the competing resilience
+decorator was deleted in favor of Storage replication. Runtime and Contracts package companions, the current Koi and
+Moss protocols, package history, current product/quality truth, and all focused tests were read. Private downstreams
+remain out of scope.
+
+**Code and consumer graph read:** Contracts has no functional dependency and is consumed directly by the Mongo,
+Weaviate, Ollama, and S3 production connectors; runtime depends on it, never the reverse. The runtime suite passes
+86/86 at baseline. `GardenAwareEndpointManager<TConnection>`/`CircuitState`, storage CDC, manual `ZenGarden.Configure`,
+generic `ZenGarden.On<TEvent>`, and facade `RecommendedModel` have no current source/test consumer. Storage CDC creates
+an unmanaged second `HttpClient`, starts a fire-and-forget loop from a constructor, and duplicates the canonical
+client's stream/rebind chokepoint. Concrete client/Koi types and public constants are consumed only inside the runtime
+and its friend test assembly. Seven live tests currently convert missing infrastructure or offerings into silent
+passes.
+
+**Reusing:** generated module discovery, `AddKoanOptions` DataAnnotations/ValidateOnStart, DI ownership,
+`BackgroundService`, `AppHost.Current`, the inert Contracts assembly, the one canonical `ZenGardenClient`, Core's
+discovery contribution, and the AI Contracts advisor seam already own every earned behavior. No new contributor,
+registry, client factory, event pipeline, contracts package, runtime abstraction, or resilience layer is required.
+
+**Coalescence and topology:** keep both packages. Contracts is a genuine independently consumed boundary and merging
+it would force four connectors to acquire the discovery/runtime engine. The runtime remains one functional package;
+splitting Koi, persistence, discovery, AI advice, or facade mechanics would expose implementation choices rather than
+new application intent. Simplification happens inside that package by internalizing mechanics and deleting the two
+ownerless parallel paths. Disposition: terminal `keep` for both.
+
+**Ergonomics:** one reference activates the runtime; three named surfaces express the user's intent; standard hosted
+service lifetime owns durable reactions; adapters share one inert intent contract. Missing external infrastructure is
+visible in test output, invalid settings identify their correction at startup, and diagnostics do not leak local host
+paths.
+
+**Constraints and risks:** the slice intentionally breaks ownerless runtime concrete/Koi APIs and removes proposal-only
+storage CDC/circuit behavior. It does not change Contracts identities, adapter intent semantics, discovery ordering,
+Moss/Koi protocols, capability wishes, AI routing, or persistence behavior. Validation is bounded to the ZenGarden
+suite, affected connector builds/tests, semantic activation, both package artifacts, and current docs/generated truth;
+no live Garden is required and no unrelated family or full release ratchet is in scope.
+
+**Autonomous architecture checkpoint:** proceed. The user's standing authorization and explicit simplicity/reuse
+mandate cover this bounded public trim; the current consumer graph proves the Contracts split is meaningful and the
+removed runtime branches are ownerless or duplicate rather than accepted V1 behavior.
+
+### ZenGarden focused completion evidence
+
+- `Sylin.Koan.ZenGarden` and `.Contracts` have terminal `keep` dispositions. Contracts remains dependency-free and is
+  independently referenced by Mongo, Weaviate, Ollama, and S3; the runtime remains one automatic functional package.
+- The runtime deletes the 325-line ownerless endpoint manager/circuit path and 283-line unproved storage CDC branch.
+  Manual static configuration, generic runtime-checked event dispatch, and duplicate model advice are removed. The
+  concrete client, Koi handler/topology records, and constants are internal; the public application language is three
+  intent surfaces plus standard validated options.
+- One standard options path now rejects invalid ports/counts/timeouts/TTLs and non-positive Koi durations. Provenance
+  reports cache-path configuration state without publishing the configured or resolved filesystem path. Package docs
+  use the exact public package ID, install expression, running-host/hosted-service lifecycle, three surfaces, current
+  Koi routes, corrections, and explicit non-capabilities.
+- Focused runtime evidence passes 82 behavior cells with 7 visible external-environment skips (89 total), including
+  three new options-validation cells. The former 86/86 result contained those seven silent returns; the corrected
+  result makes absence observable without requiring a live Garden.
+- Mongo, Weaviate, Ollama, and S3 production connectors build Release with zero warnings/errors. The two semantic
+  activation cells pass, proving S3's Contracts dependency remains inert and explicit Weaviate intent cannot weaken
+  into autonomous fallback. The Mongo ZenGarden filter could not compile because its broad test host has an unrelated
+  pre-existing missing `FieldTransformRoundTrip` symbol; production Mongo and the ZenGarden-owned intent/connectivity
+  cells remain green, and the already-passed Data transform slice was not reopened.
+- Runtime and Contracts Release packs produce nupkg/snupkg artifacts under untracked `tmp/r11-zengarden`. Archive
+  inspection confirms exact identities, DLL/XML, owned README, icon, build-transitive props, repository provenance,
+  runtime's expected Core/AI.Contracts/ZenGarden.Contracts dependencies, and Contracts' empty dependency group. Both
+  projects report no known vulnerable direct or transitive packages from the current configured sources.
+- Evaluated truth remains 93 active packages and 26 claims. Runtime moves from review-required to structurally ready,
+  improving quality from 1 repair / 7 review / 85 ready to 1 repair / 6 review / 86 ready; Contracts remains clean.
+- Strict API/full-site DocFX succeeds. The public documentation truth gate passes 226 current files and 42 navigation
+  targets; broad docs lint reports zero errors with 1,621 existing non-gating front-matter/TOC warnings.
+- No unrelated completed-family suite, live Garden requirement, full release ratchet, private downstream inspection,
+  push, publication, tag, release, deployment, or remote mutation ran. Scratch artifacts remain untracked and must not
+  be staged.
 
 ## Acceptance
 

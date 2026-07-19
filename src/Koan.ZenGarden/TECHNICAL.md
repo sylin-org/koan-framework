@@ -1,15 +1,16 @@
-# Koan.ZenGarden Technical Reference
+# Sylin.Koan.ZenGarden technical reference
 
 ## Scope
 
-This project is a greenfield tools-domain runtime client for Zen Garden.
+This package is Koan's tools-domain runtime client for Zen Garden. The independently consumable wire and intent
+boundary lives in `Sylin.Koan.ZenGarden.Contracts`.
 
 ## Decision
 
-`Koan.ZenGarden` adopts a typed event model with a non-blocking wishful capability workflow:
+The runtime adopts a typed event model with a non-blocking wishful capability workflow:
 
-- canonical primitive: `ZenGarden.On<TEvent>(...)`
-- ergonomic wrappers remain: `ZenGarden.Offering.On(...)`, `ZenGarden.Storage.On(...)`, `ZenGarden.Capability.On(...)`
+- application primitives: `ZenGarden.Offering`, `ZenGarden.Storage`, and `ZenGarden.Capability`
+- durable subscriptions use the standard hosted-service lifecycle after the host has started
 - capability requests are scheduled wishfully and never block startup
 - capability orchestration is centralized in `IZenGardenInitializationProvider.Resolve(intent)`
 - capability fulfillment is reported incrementally (`PartiallyFulfilled`) and finally (`Fulfilled`) from tools SSE updates
@@ -58,8 +59,8 @@ Endpoints used by the Koi handler:
 
 - `GET /healthz` (liveness probe)
 - `GET /v1/status` (version + capability status)
-- `GET /v1/mdns/browse?type=_moss._tcp&idle_for=3` (initial snapshot)
-- `GET /v1/mdns/events?type=_moss._tcp&idle_for=0` (continuous stream)
+- `GET /v1/mdns/discover?type=_moss._tcp&idle_for=3` (initial snapshot)
+- `GET /v1/mdns/subscribe?type=_moss._tcp&idle_for=0` (continuous stream)
 
 Optional lantern discovery uses the same endpoints with `type=_lantern._tcp`.
 The SSE streams follow Koi's event format: `data: {"found": {...}}`,
@@ -305,10 +306,6 @@ using var storageSub = ZenGarden.Storage.On("default", async (evt, ct) => { });
 
 var wish = await ZenGarden.Capability.Wish("ollama", ["modelv1", "modelv2"]);
 using var wishSub = ZenGarden.Capability.On(wish, async (evt, ct) => { });
-
-using var typed = ZenGarden.On<ZenGardenAvailabilityEvent>(
-    ZenGardenSubscription.ForOffering("mongodb"),
-    async (evt, ct) => { });
 ```
 
 Catalog access:

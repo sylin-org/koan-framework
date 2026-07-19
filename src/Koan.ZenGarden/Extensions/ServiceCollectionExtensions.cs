@@ -36,6 +36,9 @@ internal static class ServiceCollectionExtensions
             }
         }
 
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IValidateOptions<ZenGardenOptions>, ZenGardenOptionsValidator>());
+
         services.TryAddSingleton<IKoiHandler>(sp =>
         {
             var options = sp.GetService<IOptions<ZenGardenOptions>>()?.Value ?? new ZenGardenOptions();

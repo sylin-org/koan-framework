@@ -9,7 +9,7 @@ framework_version: source-first
 validation:
   date_last_tested: 2026-07-19
   status: tested
-  scope: R11-05 Web Admin graduation and focused real-host/consumer/package proof
+  scope: R11-05 ZenGarden graduation and focused runtime/consumer/package proof
 ---
 
 # Koan V1 reorganization current handoff
@@ -19,189 +19,117 @@ Replace this file at every handoff. It is a restart point, not a diary.
 ## Outcome so far
 
 - R00 through R07, R09, and R10 pass. R08 is locally prepared but publication remains deliberately gated.
-- R11-01 through R11-04 pass. R11-05 is active and graduates package families in dependency order before the single
-  R11-07 release-certification boundary.
+- R11-01 through R11-05 pass. Every one of the 93 active packages now has a terminal topology disposition; R11-06 is
+  next. The single complete release-certification boundary remains R11-07.
 - Foundation, package identity, templates, Storage, Cache, Redis, relational/Data providers, Vector, AI, MCP, Web,
   Media, OpenGraph, Identity, Tenancy, Classification, Canon, RabbitMQ, Web request context/Data Access, Data
-  Backup/SoftDelete, Jobs, Observability, Security Trust, Testing, and Web Admin have completed their current R11
-  family work. The bespoke Orchestration CLI and Aspire families are now shelved beyond V1 without package retirement.
-- The evaluated V1 graph is 93 packages and 26 claims. Generated package quality is 1 repair-required, 7
-  review-required, and 85 structurally ready.
+  Backup/SoftDelete, Jobs, Observability, Security Trust, Testing, Web Admin, and ZenGarden completed their current
+  R11 family work.
+- The bespoke Orchestration CLI and Aspire families are shelved beyond V1 under `shelved/`, outside `Koan.sln`, active
+  package discovery, and the release graph. Their retained source is not a V1 package promise.
+- Evaluated truth is 93 packages and 26 claims. Generated package quality is 1 repair-required, 6 review-required,
+  and 86 structurally ready.
 
 The accepted architecture remains business intent first: fewer meaningful moving parts, Entity-first application
 language, references express capability intent, `AddKoan()` compiles host-owned decisions, pillars own meaning and
 runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive only
 when genuinely inert and independently consumed.
 
-## Most recent completed slice: Web Admin
+## Most recent completed slice: ZenGarden
 
-`Sylin.Koan.Web.Admin` remains one explicit Development diagnostic projection. Reference the package, keep the
-application's existing `AddKoan()`, and provide standard ASP.NET Core authentication: the package automatically mounts
-one authenticated, read-only dashboard at `/.koan/admin/`, plus status and health APIs. It stays separate from base Web
-because a privileged embedded UI is a deliberate reference decision, but no Contracts/Runtime/UI split is earned.
+`Sylin.Koan.ZenGarden` remains one functional runtime package. Reference plus the application's existing `AddKoan()`
+activates the DI-owned client, layered Moss/Koi/UDP discovery, tools catalog/events, capability wishes,
+connection-intent initialization, persisted roster, and optional AI model advice. The application language is three
+named surfaces after host start: `ZenGarden.Offering`, `.Storage`, and `.Capability`; durable reactions use a standard
+hosted service.
 
-The former implementation's false control plane is gone: no LaunchKit/Compose/Aspire generator, raw manifest,
-OpenAPI-client scaffolder, service-mesh ghost, dynamic route/feature layer, custom network/production bypass,
-destructive/log/transcript/console switches, style-note parser, manual registration method, or public service-interface
-stack remains. Admin now projects Core's canonical provenance, pillar catalog, environment, and health at the HTTP
-chokepoint. The replacement deletes more than 7,700 legacy lines and is over 7,000 lines smaller while retaining the
-useful UI.
+`Sylin.Koan.ZenGarden.Contracts` remains a genuine dependency-free boundary. Mongo, Weaviate, Ollama, and S3 reference
+its client/intent/resolution vocabulary without acquiring the runtime engine. R10/R11's earlier contract isolation was
+preserved rather than repeated or reversed.
 
-Every request crosses the Development/enabled 404 boundary and one standard named authorization policy. The default
-policy requires an authenticated user only when the application has not supplied the named policy. Routes snapshot one
-validated prefix at startup. Secrets are always masked, and user name, command line, executable/working paths, machine
-name, and domain can never be projected. The small embedded UI uses safe DOM text rendering and reads only status.
+The runtime is smaller and more truthful. The ownerless endpoint manager/circuit and unproved storage-CDC second
+client are deleted. Manual process-global client configuration, runtime-checked generic event dispatch, and duplicate
+facade model advice are gone. Concrete client, Koi handler/topology records, and constants are internal mechanics.
+Standard options validation rejects invalid numeric/duration settings. Provenance says only whether a cache path is
+configured or automatic and never publishes its value or resolved host path.
 
-Package-owned README/TECHNICAL companions now state the exact reference/auth/route expression and non-capabilities.
-Admin is structurally ready, moving generated quality to 1 repair / 7 review / 85 ready while the graph remains 93
-packages and 26 claims.
+The package README now has exact identity/install instructions, a real running-host lifecycle example, the three
+surfaces, corrections, and non-capabilities. Technical docs use the current Koi discover/subscribe routes. Runtime is
+now structurally ready; Contracts remains structurally ready.
 
-## Previous completed slice: Testing, Containers, and Hosting
+## Focused proof for ZenGarden
 
-The testing product remains three deliberately meaningful packages. `Sylin.Koan.Testing.Hosting` is the xUnit-free
-real generic-host seam used across framework generations. `Sylin.Koan.Testing` is the lightweight application-facing
-Entity conformance kit. `Sylin.Koan.Testing.Containers` is the optional provider-fixture layer and keeps its five
-heavy Testcontainers engines out of every conformance project. The broad consumer graph proves all three boundaries;
-merging would reduce package count while increasing accidental dependencies.
+- ZenGarden suite: 82 passed / 7 visible environment skips / 0 failed (89 total). Three options-validation tests are
+  new. The previous 86/86 baseline included seven silent returns; absence is now reported honestly.
+- Mongo, Weaviate, Ollama, and S3 production connector Release builds: zero warnings/errors.
+- Semantic activation: 2/2, proving S3's Contracts dependency is inert and explicit Weaviate intent cannot fall back
+  autonomously.
+- The focused Mongo ZenGarden filter is blocked at compilation by an unrelated pre-existing missing
+  `FieldTransformRoundTrip` symbol in its broad test host. Production Mongo builds and ZenGarden-owned intent/live
+  cells pass; the already-passed Data transform slice was not reopened.
+- Runtime and Contracts Release packs produce nupkg/snupkg under untracked `tmp/r11-zengarden`; archive inspection
+  confirms exact IDs, DLL/XML, README, icon, build-transitive props, symbols, provenance, and expected dependency
+  boundaries. Current direct/transitive vulnerability audits are clean for both projects.
+- Generated truth: 93 active packages / 26 claims; quality 1 repair / 6 review / 86 structurally ready.
+- Strict API/full-site DocFX passes; public documentation truth passes 226 current files / 42 navigation targets;
+  broad docs lint has zero errors and 1,621 existing non-gating warnings.
+- No live Garden requirement, unrelated completed-family suite, full release ratchet, private downstream inspection,
+  push, publication, tag, release, deployment, or remote mutation occurred. `tmp/` remains untracked.
 
-The conformance surface is now exactly one `NewValid()` method plus an optional configuration override. Its unused
-`Mutate` hook is gone. More importantly, a catch-all reachability probe no longer turns broken composition, provider
-configuration, or Entity behavior into a green skip. Only an absent capability or model trait skips its inapplicable
-battery; application conformance failures stay loud. Explicit provider fixtures retain their own concrete
-infrastructure-availability skip and diagnostic reason.
+## Previous completed slices that must not be reopened
 
-All three packages now own exact-ID, install-first README/TECHNICAL companions and are structurally ready. Generated
-quality is 2 repair / 7 review / 84 ready without changing the 93-package / 26-claim graph.
-
-## Previous completed slice: Security Trust
-
-`Sylin.Koan.Security.Trust` remains the one lower-level workload-token and ambient request-identity pillar. Its
-package reference plus `AddKoan()` now activates the non-default `Koan.bearer` scheme directly; Web Auth no longer
-borrows that activation, and MCP no longer has a hidden Web Auth prerequisite.
-
-Trust now has one `IIssuer`, one ES256 implementation, and one replaceable `IIssuerKeyStore` lifecycle. The public
-default HS256 secret, `SharedKeyIssuer`, `IAsymmetricIssuer`, two-strategy base class, future-only trust modes, bypassable
-production guard, and public bearer-registration extension are gone. Direct Trust uses a random per-process key and
-honestly promises same-host/ephemeral tokens. Auth Server remains the genuine persisted/rotating key-store consumer
-and owns its production continuity guard; MCP remains the resource-audience owner.
-
-The package now owns instruction-first README/TECHNICAL companions, validates issuer/audience/lifetime through standard
-.NET options, and participates in the verified authentication/authorization claim. Dated fleet/federation ADRs remain
-unchanged historical records; current source, guides, focused tests, generated product truth, and the R11 checkpoint
-state the smaller V1 contract.
-
-## Previous completed slice: Aspire shelving and one topology owner
-
-`Sylin.Koan.Orchestration.Aspire` and `.Aspire.Abstractions` now live under `shelved/orchestration-aspire/`, outside
-`Koan.sln`, active package discovery, and release scope. The retained source is the buildable automatic AppHost
-discovery experiment only; the unrelated in-application Docker lifecycle was removed.
-
-V1 applications author standard Aspire resources and `WithReference` in their AppHost. Koan connectors consume the
-injected connection strings and service endpoints through their existing discovery adapters. Redis/Postgres no longer
-pull Aspire hosting packages or implement a Koan contributor contract. Core's ownerless evaluator SPI, seven provider
-evaluators, and the false Development `SelfOrchestrating` mode are gone; external Aspire/Compose/Kubernetes detection,
-connector health, connection resolution, and runtime facts remain.
-
-## Earlier completed slice: Orchestration CLI shelving
-
-The six-project bespoke CLI stack now lives under `shelved/orchestration-cli/`, outside `Koan.sln` and outside the
-release compiler's active discovery roots. This is a physical V1 scope boundary, not a rewrite or deletion: the CLI,
-its provider/exporter SPI, legacy manifest generator, Docker/Podman providers, and Compose renderer remain directly
-buildable source for a future product reassessment.
-
-Active connector and sample builds no longer receive the legacy orchestration manifest generator. V1 publishes no
-Koan CLI/topology promise and uses standard Aspire, Compose, Docker, or Podman tooling instead. Core runtime service
-discovery, connector health, connection resolution, and `KoanApp` identity remained unchanged by that CLI-only
-decision. The independent Aspire family was subsequently assessed and shelved as recorded above.
-
-## Earlier completed slice: Observability
-
-`Sylin.Koan.Observability` remains one optional functional leaf: reference it and the application's existing
-`AddKoan()` call composes standard OpenTelemetry traces and metrics. Core retains only the inert
-`ObservabilityOptions` and health/diagnostic primitives because they are independently consumed by Core/Web; no new
-Contracts, Web, exporter, contributor, or source-registry package was created.
-
-The discovered module now compiles one immutable host plan without `BuildServiceProvider`. The public
-`AddKoanObservability` callback, sentinel, fixed source list, missing meter subscription, and trace-only OTLP headers
-are removed. `Koan.*` is the single trace/meter subscription boundary; ASP.NET Core, `HttpClient`, and runtime
-instrumentation join the same providers. Advanced applications use OpenTelemetry's own builder.
-
-Invalid booleans, sample rates, and endpoints reject boot with the exact correction. `Enabled=false`, both signals
-disabled, or Production without a package-owned endpoint creates no providers. Startup/provenance/composition facts
-explain active state, signals, wildcard boundary, and exporter kind without exposing endpoint or headers.
-
-## Focused proof for Web Admin
-
-- Real-host Admin suite: 12/12, covering automatic composition, policy results, redaction, environment/enablement,
-  route relocation/configuration failure, and retired-route absence.
-- Admin and both GardenCoop consumers build Release with zero warnings/errors and no application-code changes.
-- Release pack produces nupkg/snupkg; archive inspection confirms DLL/XML, owned README, icon, build-transitive props,
-  current metadata, and the single expected Web dependency.
-- Evaluated inventory remains 93 active packages / 26 claims; generated quality is 1 repair / 7 review / 85 ready.
-- Strict API/full-site DocFX succeeds; public documentation truth passes 226 current files / 42 navigation targets;
-  broad docs lint has zero errors and 1,620 existing non-gating warnings.
-- No full release ratchet, unrelated family suite, private downstream inspection, push, publication, tag, release,
-  deployment, or remote mutation ran. Scratch package artifacts remain untracked under `tmp/`.
-
-## Previous focused proof for Testing
-
-- Conformance: 13 passed / 3 intentional trait skips; Docker-free in-memory provider: 56/56; failed-start async host
-  disposal: 1/1.
-- Testing, Containers, and Hosting Release builds: zero warnings/errors.
-- All three Release packs produced nupkg/snupkg artifacts. Archive inspection confirms DLL/XML, owned README, icon,
-  build-transitive props, exact identities, and expected dependency boundaries.
-- Evaluated inventory: 93 active package projects and 26 claims. Generated quality is 2 repair / 7 review / 84 ready;
-  all three testing packages have no finding.
-- Strict API/full-site DocFX succeeds, the public documentation truth gate passes 224 current files and 42 navigation
-  targets, and the broad linter reports no errors (1,621 pre-existing front-matter/TOC warnings remain non-gating).
-- No full release ratchet, unrelated family suite, private downstream inspection, push, publication, tag, release,
-  deployment, or remote mutation ran.
+- Web Admin is one authenticated, Development-only, read-only projection over canonical provenance/health/runtime.
+  Its false LaunchKit/Compose/Aspire generator, raw manifest, service-mesh/style/control-plane promises, manual
+  registration, and weakening security options are gone. Real-host proof is 12/12.
+- Testing remains three meaningful packages: xUnit-free Hosting, lightweight conformance, and optional heavy provider
+  fixtures. Arbitrary application defects no longer become infrastructure skips.
+- Security Trust is one ES256 issuer/key/verifier path. Direct Trust is ephemeral/same-host; Auth Server owns persisted
+  rotation and MCP owns exact resource audience.
+- Observability is one optional standard OpenTelemetry leaf over the `Koan.*` trace/meter boundary, with no manual
+  callback, temporary provider, fixed source registry, or Koan exporter abstraction.
+- Jobs remains one functional capability with internal runtime implementations, automatic Data CAS claims, explicit
+  capability requirements, and neutral Communication wake signals.
+- Canon's R10-11 automatic contributor discovery, functional/Web split, four-line CustomerCanon host, and
+  failed/parked non-persistence remain intact.
+- Web context-aware behavior uses ordered `IWebContextContributor`s at the request chokepoint. Scoped link evidence,
+  tenant, principal, capability scopes, rejection, and read predicates are contributed centrally; arbitrary durable
+  filter carriage and model decoration are not restored.
+- CLI and Aspire remain shelved beyond V1. Standard AppHost/Compose/Docker/Podman/Kubernetes tooling owns topology.
 
 ## Current repository state
 
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
-- Branch: `dev`; the Web Admin graduation commit is expected to be the current local HEAD. Verify exact HEAD and
-  ahead/behind counts.
-- `tmp/` remains untracked scratch/evaluator/artifact material and must never be staged.
-- No push, publication, tag, release, deployment, remote mutation, private downstream inspection, or full release
-  certification occurred.
+- Branch: `dev`; the bounded ZenGarden graduation commit is expected to be current local HEAD. Verify exact HEAD and
+  ahead/behind counts before continuing.
+- `tmp/` is untracked scratch/evaluator/artifact material and must never be staged.
+- No process started by the focused slice is expected to remain running.
 
 ## Resume here
 
-1. Verify `git status`, HEAD, and the focused evidence recorded in
+1. Verify `git status`, HEAD, and the completion evidence in
    [R11-05](work-items/r11/R11-05-package-family-graduation.md).
-2. Continue R11-05 with fresh exploration of `Sylin.Koan.ZenGarden` and its genuinely isolated Contracts package, the
-   final unresolved active family. Do not infer a merge from the package names; prove independent consumers and the
-   smallest honest model/resource orchestration promise from current code.
-3. Preserve the contributor mandate for context-aware Web behavior, but do not force persistent Entity semantics or
-   operational work into Web contributors merely because contributors are the correct request-context chokepoint.
+2. Open R11-06 from the parent contract: prove NuGet rendering, clean-consumer experience, operator review, and agent
+   comprehension across the now-terminal product surface. Size the child from current generated findings and current
+   package evidence; do not create another maintained package list or repeat family architecture work.
+3. Preserve R11-07 as the one complete active-package/release-certification boundary. R11-06 remains focused and may
+   reuse already-current package artifacts and structural truth where the dependency has not changed.
 
 ## Remaining temporary dispositions
 
-ZenGarden is the only remaining temporary R11-02 disposition.
+None. Every active package has a terminal R11-02 disposition.
 
 ## Do not redo
 
 - Do not reopen R10-11 Canon or rebuild CustomerCanon.
-- Do not recreate Data Access, ambient subjects, `[AccessScoped]`, or durable arbitrary-filter carriage.
-- Do not recreate Backup discovery/attributes/dashboard/inline HTTP or Web Extensions' partition-backed soft delete.
-- Do not rebuild Jobs or reintroduce public runtime implementations, the claim-ticket branch, provider pin, Blocked
-  state, pool registrar alias, or a Contracts package without new independent-consumer evidence.
-- Do not rebuild Observability, restore `AddKoanObservability`, enumerate source names, introduce a Koan exporter or
-  contributor registry, or move the inert options/health contract out of Core.
-- Do not restore Trust's shared-secret issuer, parallel asymmetric interface/base class, trust modes, insecure escape
-  flag, Web Auth-owned bearer registration, or claim fleet enrollment/federation/revocation without implemented
-  consumer evidence.
-- Do not merge the three Testing packages without new consumer/dependency evidence, restore the unused conformance
-  mutation hook, or classify arbitrary host/provider/Entity failures as infrastructure skips.
-- Do not restore Web Admin's LaunchKit/Compose/Aspire generator, raw manifest, service-mesh/style endpoints, custom
-  CIDR/production bypass, destructive/log/console promises, dynamic route services, manual registration methods, or
-  parallel discovery model. Do not weaken its permanent secret/host-identity redaction boundary.
-- Do not move the shelved Orchestration CLI family back into `src/`/`Koan.sln`, restore manifest-generator injection,
-  or treat its preserved source as a V1 package promise without a new explicit scope decision.
-- Do not move the shelved Aspire family back into `src/`/`Koan.sln`, restore contributor discovery or provider
-  evaluators, or reintroduce Koan-owned container lifecycle without a new explicit scope decision.
-- Do not rerun Classification, standalone Tenancy, Jobs, or earlier family suites without an affected dependency.
+- Do not recreate Data Access, ambient subjects, `[AccessScoped]`, durable arbitrary-filter carriage, Backup HTTP
+  control planes, Web Extensions partition-backed soft delete, or Jobs' removed public runtime/claim branches.
+- Do not restore Observability's manual registration/fixed source list, Trust's shared secret/parallel issuer stack,
+  Testing's catch-all skips, or Web Admin's false control plane/security bypasses.
+- Do not merge ZenGarden Contracts into runtime, restore the endpoint manager/storage CDC/manual Configure/generic
+  events, or expose Koi/concrete client mechanics without new independent-consumer evidence.
+- Do not move the shelved CLI or Aspire families into `src/`/`Koan.sln` or treat retained source as V1 scope.
+- Do not rerun Classification, standalone Tenancy, Jobs, Data transform, or earlier family suites without an affected
+  dependency.
 - Do not run the full release ratchet before R11-07.
 - Do not stage `tmp/`, inspect private dogfood applications, or use private identities in public docs.
 - Do not push, tag, publish, release, deploy, or mutate remote configuration without separate authorization.
@@ -210,23 +138,13 @@ ZenGarden is the only remaining temporary R11-02 disposition.
 
 - Design from the application inward: business sentence, smallest honest C# expression, exact guarantee, corrective
   failure, then internal types.
-- Assess context-aware Web behavior first as ordered contributors. Evidence is not authority; validate once at the
-  edge and project the resulting context through the existing centralized enforcement seam.
+- Assess context-aware Web behavior first as ordered contributors. Validate evidence once at the edge and project the
+  resulting context through the centralized enforcement seam.
 - Persistent Entity semantics belong in Data axes when decoration truthfully selects durable model behavior; they are
   not request-context contributors.
 - `AddKoan()` / `Entity<T>` / `EntityController<T>` is the golden business-to-code comparison. Extra public concepts
   must express a real business decision, guarantee, or deliberate override.
 - Complexity is centralized at typed responsibility chokepoints. Core owns generic law; pillars own meaning and policy;
   adapters own mechanics; applications own business intent.
-- Standard .NET hosting, DI, options, assembly, MSBuild, NuGet, and OpenTelemetry concepts come before Koan-specific
-  parts.
-- Startup, facts, health, errors, HTTP/MCP, tests, and future tooling project canonical decisions; no projection
-  becomes a second authority.
-- Break-and-rebuild is preferred when compatibility preserves duplicate owners or crutches, but every rebuild is
-  justified against current code rather than remembered history.
-
-## Validation economy
-
-- Start each new R11 family slice with focused exploration and coalescence assessment.
-- Run only affected owner/consumer, package, documentation, and security cells during implementation.
-- Run the complete public-release ratchet only at the explicit R11-07 certification boundary.
+- Standard .NET concepts are preferred over Koan ceremony. Break-and-rebuild is justified only by current code and
+  consumer evidence.

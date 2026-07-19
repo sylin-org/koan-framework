@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>Koan.ZenGarden</RootNamespace>
-    <Description>Zen Garden tools-domain runtime for Koan Framework</Description>
+    <Description>Automatic Zen Garden offering, storage, and capability discovery for Koan applications</Description>
     <PackageTags>koan;zen-garden;tools;offering;seed-bank;events</PackageTags>
   </PropertyGroup>
 

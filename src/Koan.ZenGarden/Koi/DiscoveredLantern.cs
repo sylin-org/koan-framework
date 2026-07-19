@@ -4,7 +4,7 @@ namespace Koan.ZenGarden.Koi;
 /// A Lantern endpoint discovered via Koi's mDNS-to-HTTP bridge.
 /// Lanterns provide cross-subnet garden topology.
 /// </summary>
-public sealed record DiscoveredLantern
+internal sealed record DiscoveredLantern
 {
     /// <summary>mDNS instance name.</summary>
     public required string Name { get; init; }

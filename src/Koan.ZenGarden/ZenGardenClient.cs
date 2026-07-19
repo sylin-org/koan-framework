@@ -8,7 +8,7 @@ namespace Koan.ZenGarden;
 /// Greenfield tools-domain runtime for Zen Garden.
 /// Consumes snapshot + SSE stream and emits derived availability signals.
 /// </summary>
-public sealed class ZenGardenClient : IZenGardenClient
+internal sealed class ZenGardenClient : IZenGardenClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<ZenGardenClient> _logger;

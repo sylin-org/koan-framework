@@ -4,11 +4,11 @@
   "summary": {
     "packages": 93,
     "repairRequired": 1,
-    "reviewRequired": 7,
-    "structurallyReady": 85,
+    "reviewRequired": 6,
+    "structurallyReady": 86,
     "ownedReadmes": 92,
     "technicalCompanions": 87,
-    "findings": 29
+    "findings": 25
   },
   "findingDefinitions": [
     {
@@ -16,12 +16,6 @@
       "severity": "warning",
       "summary": "The README has no recognizable guarantees, requirements, failure, or limitation section.",
       "correction": "State defaults, prerequisites, corrective failures, and unsupported guarantees proportionate to the package role."
-    },
-    {
-      "code": "docs.readme.install.missing",
-      "severity": "warning",
-      "summary": "The README does not show the package-specific install or reference expression.",
-      "correction": "Add the shortest supported dotnet add/tool/template installation command and state any current publication boundary."
     },
     {
       "code": "docs.readme.meaningful-use.missing",
@@ -46,12 +40,6 @@
       "severity": "warning",
       "summary": "No package-owned technical companion describes runtime or build ownership.",
       "correction": "Add TECHNICAL.md when this package owns non-trivial activation, lifecycle, provider, projection, or build behavior; otherwise confirm during R11 review that the README contains the complete contract."
-    },
-    {
-      "code": "metadata.description.terse",
-      "severity": "warning",
-      "summary": "The package description may be too terse to explain its distinct reference intent.",
-      "correction": "Describe what capability appears, for whom, and the important boundary without repeating framework-wide marketing."
     }
   ],
   "packages": [
@@ -1915,8 +1903,8 @@
       "projectPath": "src/Koan.ZenGarden/Koan.ZenGarden.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "review-required",
-      "description": "Zen Garden tools-domain runtime for Koan Framework",
+      "status": "structurally-ready",
+      "description": "Automatic Zen Garden offering, storage, and capability discovery for Koan applications",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1928,12 +1916,7 @@
       "readme": "src/Koan.ZenGarden/README.md",
       "technicalDocumentation": "src/Koan.ZenGarden/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": [
-        "docs.readme.boundaries.missing",
-        "docs.readme.install.missing",
-        "docs.readme.package-title.missing",
-        "metadata.description.terse"
-      ]
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.ZenGarden.Contracts",

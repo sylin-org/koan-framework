@@ -8,14 +8,14 @@ last_updated: 2026-07-19
 framework_version: source-first
 validation:
   date_last_tested: 2026-07-19
-  status: pending
+  status: tested
   scope: exact evaluated package inventory and terminal architecture dispositions
 ---
 
 # R11-02 — Reconcile package topology
 
 - Tranche: `T7B — package-product graduation`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: R11-01 generated baseline
 - Unlocks: shared substrate and dependency-ordered package-family graduation
 
@@ -151,7 +151,7 @@ in the family disposition tables, not as phantom active-package rows.
 | `Sylin.Koan.Web.OpenApi` | `projection` | `keep` |
 | `Sylin.Koan.Web.OpenGraph` | `projection` | `keep` |
 | `Sylin.Koan.Web.Sse` | `projection` | `keep` |
-| `Sylin.Koan.ZenGarden` | `capability` | `assess` |
+| `Sylin.Koan.ZenGarden` | `capability` | `keep` (implemented) |
 | `Sylin.Koan.ZenGarden.Contracts` | `contracts` | `keep` |
 
 ### Shelved source outside the active package matrix
@@ -408,6 +408,17 @@ instrumentation remain outside the package guarantee.
 The three identities are user-intent and dependency boundaries, not a layered contracts taxonomy: inherit common
 behavior, boot a host, or own provider infrastructure. Merging the family would reduce the package count while
 increasing accidental dependencies and erasing the xUnit-neutral seam.
+
+## ZenGarden family disposition
+
+| Package | Disposition | Distinct reference intent and implemented boundary work |
+|---|---|---|
+| `Sylin.Koan.ZenGarden` | `keep` (implemented) | One reference activates the DI-owned Garden runtime: layered Moss/Koi/UDP discovery, tools catalog/events, capability wishes, connection-intent initialization, persistence, and optional AI advice. The three application surfaces are Offering, Storage, and Capability. Ownerless endpoint-manager/circuit and storage-CDC prototypes are deleted; manual static configuration, runtime-checked generic events, facade model advice, concrete client, Koi topology, and constants no longer form parallel public promises. Standard options validation rejects invalid numeric/duration settings, and provenance no longer publishes resolved cache paths. |
+| `Sylin.Koan.ZenGarden.Contracts` | `keep` | Dependency-free client, tool, subscription, capability, connection-intent, resolution, and initialization vocabulary. Mongo, Weaviate, Ollama, and S3 consume it independently without activating the Garden runtime; merging would force functional discovery and AI dependencies into four connectors. |
+
+Both identities therefore express genuine reference and dependency decisions. Runtime mechanics remain one cohesive
+functional package rather than becoming Koi, persistence, discovery, or AI-advice subpackages; Contracts remains the
+one inert cross-module seam. Every active row now has a terminal disposition.
 
 ## Acceptance
 

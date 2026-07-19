@@ -4,10 +4,8 @@ using Koan.Core.Orchestration.Composition;
 using Koan.Core.Provenance;
 using Koan.Core.Semantics;
 using Koan.Core.Semantics.Contributions;
-using static Koan.Core.Hosting.Bootstrap.BootSettingSource;
 using Koan.ZenGarden.Extensions;
 using Koan.ZenGarden.Infrastructure;
-using Koan.ZenGarden.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -66,7 +64,7 @@ internal sealed class ZenGardenModule : KoanModule, IContributeTo<DiscoveryContr
         module.AddSetting(ConfigurationConstants.Keys.ContainerHost, containerHost.Value, source: containerHost.Source, sourceKey: containerHost.ResolvedKey);
         module.AddSetting(ConfigurationConstants.Keys.ContainerHostPort, containerHostPort.Value.ToString(), source: containerHostPort.Source, sourceKey: containerHostPort.ResolvedKey);
         module.AddSetting(ConfigurationConstants.Keys.PersistDiscoveryCache, persistDiscoveryCache.Value.ToString(), source: persistDiscoveryCache.Source, sourceKey: persistDiscoveryCache.ResolvedKey);
-        module.AddSetting(ConfigurationConstants.Keys.DiscoveryCachePath, discoveryCachePath.Value ?? "(auto-resolved)", source: discoveryCachePath.Source, sourceKey: discoveryCachePath.ResolvedKey);
+        module.AddSetting(ConfigurationConstants.Keys.DiscoveryCachePath, discoveryCachePath.Value is null ? "(automatic)" : "(configured)", source: discoveryCachePath.Source, sourceKey: discoveryCachePath.ResolvedKey);
         module.AddSetting(ConfigurationConstants.Keys.PersistedCacheTtlHours, persistedCacheTtlHours.Value.ToString(), source: persistedCacheTtlHours.Source, sourceKey: persistedCacheTtlHours.ResolvedKey);
         module.AddSetting(ConfigurationConstants.Keys.PreferredStoneName, preferredStoneName.Value ?? "(none)", source: preferredStoneName.Source, sourceKey: preferredStoneName.ResolvedKey);
 
@@ -84,13 +82,6 @@ internal sealed class ZenGardenModule : KoanModule, IContributeTo<DiscoveryContr
         module.AddSetting(ConfigurationConstants.Keys.KoiContinuousDiscovery, koiContinuous.Value.ToString(), source: koiContinuous.Source, sourceKey: koiContinuous.ResolvedKey);
         module.AddSetting(ConfigurationConstants.Keys.KoiLanternDiscovery, koiLantern.Value.ToString(), source: koiLantern.Source, sourceKey: koiLantern.ResolvedKey);
         module.AddSetting(ConfigurationConstants.Keys.KoiRetryInterval, koiRetryInterval.Value.ToString(), source: koiRetryInterval.Source, sourceKey: koiRetryInterval.ResolvedKey);
-
-        if (persistDiscoveryCache.Value)
-        {
-            var resolvedPath = StoneRosterPathResolver.Resolve(
-                new ZenGardenOptions { DiscoveryCachePath = discoveryCachePath.Value });
-            module.AddSetting("DiscoveryCachePath (resolved)", resolvedPath, source: Custom);
-        }
 
         if (koiEnabled.Value)
         {

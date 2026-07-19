@@ -3,7 +3,7 @@ namespace Koan.ZenGarden.Koi;
 /// <summary>
 /// Lifecycle state of the background Koi topology handler.
 /// </summary>
-public enum KoiHandlerState
+internal enum KoiHandlerState
 {
     /// <summary>Handler has started but has not yet probed Koi.</summary>
     Initializing,

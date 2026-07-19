@@ -22,7 +22,7 @@ This report separates objective package repairs from human review. `structurally
 
 | Packages | Repair required | Review required | Structurally ready | Owned READMEs | Technical companions | Findings |
 |---:|---:|---:|---:|---:|---:|---:|
-| 93 | 1 | 7 | 85 | 92 | 87 | 29 |
+| 93 | 1 | 6 | 86 | 92 | 87 | 25 |
 
 ## Packages
 
@@ -119,5 +119,5 @@ This report separates objective package repairs from human review. `structurally
 | `Sylin.Koan.Web.OpenApi`<br>[`src/Koan.Web.OpenApi/Koan.Web.OpenApi.csproj`](../../src/Koan.Web.OpenApi/Koan.Web.OpenApi.csproj) | projection / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Web.OpenApi/README.md)<br>[TECHNICAL](../../src/Koan.Web.OpenApi/TECHNICAL.md) | none |
 | `Sylin.Koan.Web.OpenGraph`<br>[`src/Koan.Web.OpenGraph/Koan.Web.OpenGraph.csproj`](../../src/Koan.Web.OpenGraph/Koan.Web.OpenGraph.csproj) | projection / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Web.OpenGraph/README.md)<br>[TECHNICAL](../../src/Koan.Web.OpenGraph/TECHNICAL.md) | none |
 | `Sylin.Koan.Web.Sse`<br>[`src/Koan.Web.Sse/Koan.Web.Sse.csproj`](../../src/Koan.Web.Sse/Koan.Web.Sse.csproj) | projection / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Web.Sse/README.md)<br>[TECHNICAL](../../src/Koan.Web.Sse/TECHNICAL.md) | none |
-| `Sylin.Koan.ZenGarden`<br>[`src/Koan.ZenGarden/Koan.ZenGarden.csproj`](../../src/Koan.ZenGarden/Koan.ZenGarden.csproj) | capability / library<br>net10.0 | `review-required` | [README](../../src/Koan.ZenGarden/README.md)<br>[TECHNICAL](../../src/Koan.ZenGarden/TECHNICAL.md) | `docs.readme.boundaries.missing` (warning): The README has no recognizable guarantees, requirements, failure, or limitation section.<br>`docs.readme.install.missing` (warning): The README does not show the package-specific install or reference expression.<br>`docs.readme.package-title.missing` (warning): The README does not use the exact package ID as its primary title.<br>`metadata.description.terse` (warning): The package description may be too terse to explain its distinct reference intent. |
+| `Sylin.Koan.ZenGarden`<br>[`src/Koan.ZenGarden/Koan.ZenGarden.csproj`](../../src/Koan.ZenGarden/Koan.ZenGarden.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.ZenGarden/README.md)<br>[TECHNICAL](../../src/Koan.ZenGarden/TECHNICAL.md) | none |
 | `Sylin.Koan.ZenGarden.Contracts`<br>[`src/Koan.ZenGarden.Contracts/Koan.ZenGarden.Contracts.csproj`](../../src/Koan.ZenGarden.Contracts/Koan.ZenGarden.Contracts.csproj) | contracts / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.ZenGarden.Contracts/README.md)<br>[TECHNICAL](../../src/Koan.ZenGarden.Contracts/TECHNICAL.md) | none |

@@ -2176,7 +2176,7 @@
     {
       "packageId": "Sylin.Koan.ZenGarden",
       "shape": "library",
-      "description": "Zen Garden tools-domain runtime for Koan Framework",
+      "description": "Automatic Zen Garden offering, storage, and capability discovery for Koan applications",
       "targetFrameworks": [
         "net10.0"
       ],

@@ -3,7 +3,7 @@ namespace Koan.ZenGarden;
 /// <summary>
 /// Constants for Zen Garden tools-domain integration.
 /// </summary>
-public static class Constants
+internal static class Constants
 {
     internal static class Composition
     {
