@@ -51,9 +51,11 @@ curl --get \
   http://localhost:5000/api/products
 ```
 
-The FirstUse SQLite path executes this contract. Support and execution posture remain
-adapter-specific, so do not infer universal filter parity, pushdown, or cost from one connector;
-unsupported and historically uneven provider paths remain visible in the capability evidence.
+Koan parses this into one filter tree. Each adapter receives only the nodes it declares it can
+execute; Koan evaluates any remainder before sorting and pagination. This gives the HTTP contract the
+same result semantics across query-capable adapters without claiming that every provider pushes the
+same work down or has the same cost. Malformed filters, unknown fields, and unsupported input return
+`400 Bad Request`; they are never treated as an unfiltered request.
 
 ## Transformers (WEB-0035)
 

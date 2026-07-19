@@ -79,7 +79,17 @@ transport metadata is removed because every edge projects the same governed surf
 `[McpIgnore]`-aware application JSON policy now covers Entity and custom tools plus Code Mode while
 protocol DTOs remain spec-owned. Conformance passes 80/80, Streamable/legacy HTTP 19/19, field
 exclusion 5/5, Code Mode 27/27, source FirstUse/GoldenJourney 3/3, bootstrap pillars 13/13, and the MCP build is warning-clean.
-Resume R12-02 at PMC-007/015's current Data/Web convergence audit. Do not run the full ratchet.
+
+PMC-007 and PMC-015 are now closed together at the existing Data/Web boundary. The current filter
+AST/coordinator already gives query-capable adapters execute-or-reject result semantics; shared HTTP
+proofs now cover compound/mixed-case input and reject malformed or unknown filters without dropping
+them. InMemory passes 74/74, JSON 52/52, and SQLite 52/52. Data's cached first-use Entity shape guard
+now rejects public properties that differ only by case before adapter creation, with one rename
+correction; exact owner tests pass 9/9 and affected builds are warning-clean. No provider flag,
+mapping attribute, or new filter layer was added.
+
+Resume R12-02 at PMC-024's build-fixture isolation audit, then close PMC-003/028/032 by current evidence
+if their historical warning and missing-reference premises remain stale. Do not run the full ratchet.
 
 ## Most recent completed slice: R08-05 local exact candidate
 

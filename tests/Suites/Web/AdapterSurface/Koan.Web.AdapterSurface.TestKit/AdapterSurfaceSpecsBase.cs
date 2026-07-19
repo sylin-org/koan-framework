@@ -451,6 +451,52 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         NameOf(items[0]).Should().Be("Bravo");
     }
 
+    [Fact]
+    public async Task GetCollection_querystring_filter_composes_operators_and_mixed_case_fields()
+    {
+        Assert.SkipWhen(!Factory.SupportsQueryStringFilter, $"[{typeof(TFactory).Name}] does not support ?filter= query-string filter.");
+        SkipIfUnavailable();
+
+        await UpsertWidget("id1", name: "Alpha", priority: 1);
+        await UpsertWidget("id2", name: "Bravo", priority: 2);
+        await UpsertWidget("id3", name: "Charlie", priority: 3);
+        await UpsertWidget("id4", name: "Delta", priority: 4);
+
+        var filter = "{\"$or\":[{\"pRiOrItY\":{\"$gte\":3}},{\"name\":\"Alpha\"}]}";
+        var encoded = Uri.EscapeDataString(filter);
+        var response = await Client.GetAsync($"/api/widgets?filter={encoded}&sort=Priority");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var items = await ReadItems(response);
+        items.Select(NameOf).Should().Equal("Alpha", "Charlie", "Delta");
+    }
+
+    [Fact]
+    public async Task GetCollection_malformed_filter_returns_400_not_unfiltered_results()
+    {
+        Assert.SkipWhen(!Factory.SupportsQueryStringFilter, $"[{typeof(TFactory).Name}] does not support ?filter= query-string filter.");
+        SkipIfUnavailable();
+        await SeedAlphaBravoCharlie();
+
+        var encoded = Uri.EscapeDataString("{\"Name\":");
+        var response = await Client.GetAsync($"/api/widgets?filter={encoded}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task GetCollection_unknown_filter_field_returns_400_not_unfiltered_results()
+    {
+        Assert.SkipWhen(!Factory.SupportsQueryStringFilter, $"[{typeof(TFactory).Name}] does not support ?filter= query-string filter.");
+        SkipIfUnavailable();
+        await SeedAlphaBravoCharlie();
+
+        var encoded = Uri.EscapeDataString("{\"DoesNotExist\":\"Bravo\"}");
+        var response = await Client.GetAsync($"/api/widgets?filter={encoded}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ============================================================================================
     // DELETE /api/widgets/bulk — delete many by ids body
     // ============================================================================================

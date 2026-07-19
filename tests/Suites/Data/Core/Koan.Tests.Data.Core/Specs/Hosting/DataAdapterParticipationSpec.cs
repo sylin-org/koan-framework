@@ -38,6 +38,36 @@ public sealed class DataAdapterParticipationSpec
     }
 
     [Fact]
+    public void Invalid_entity_shape_rejects_before_adapter_creation()
+    {
+        var factory = new CountingAdapterFactory();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Koan:Data:Sources:Default:Adapter"] = factory.Provider
+            })
+            .Build();
+        var registrations = new ServiceCollection();
+        registrations.AddSingleton<IConfiguration>(configuration);
+        registrations.AddKoanDataCore();
+        registrations.AddSingleton<IDataAdapterFactory>(factory);
+
+        using var services = registrations.BuildServiceProvider();
+        var data = services.GetRequiredService<IDataService>();
+
+        var inspect = () => data.GetScopeDiagnostics<CaseCollidingEntity, string>();
+        var activate = () => data.GetRepository<CaseCollidingEntity, string>();
+
+        inspect.Should().Throw<InvalidOperationException>()
+            .WithMessage("*'Id'*")
+            .WithMessage("*'id'*");
+        activate.Should().Throw<InvalidOperationException>()
+            .WithMessage("*'Id'*")
+            .WithMessage("*'id'*");
+        factory.CreateCalls.Should().Be(0, "invalid models reject before an adapter can perform I/O");
+    }
+
+    [Fact]
     public async Task Health_reads_the_internal_runtime_ledger_when_public_diagnostics_are_replaced()
     {
         var configuration = new ConfigurationBuilder()
@@ -126,6 +156,32 @@ public sealed class DataAdapterParticipationSpec
     private sealed class AliasEntity : Entity<AliasEntity>;
 
     private sealed class ArchiveEntity : Entity<ArchiveEntity>;
+
+    private sealed class CaseCollidingEntity : Entity<CaseCollidingEntity>
+    {
+        public string? id { get; set; }
+    }
+
+    private sealed class CountingAdapterFactory : IDataAdapterFactory
+    {
+        private readonly NonIsolatingFakeAdapterFactory _inner = new();
+
+        public string Provider => "counting-provider";
+        public int CreateCalls { get; private set; }
+
+        public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
+            IServiceProvider sp,
+            string source = "Default")
+            where TEntity : class, IEntity<TKey>
+            where TKey : notnull
+        {
+            CreateCalls++;
+            return _inner.Create<TEntity, TKey>(sp, source);
+        }
+
+        public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+            => _inner.GetNamingCapability(services);
+    }
 
     private sealed class CanonicalAdapterFactory : IDataAdapterFactory
     {

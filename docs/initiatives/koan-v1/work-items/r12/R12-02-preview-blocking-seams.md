@@ -40,7 +40,7 @@ the concern does not enter the stated 0.20 guarantee; it does not mean the packa
 | 003, 028, 032 | close by current evidence | R11-07 built the complete Release solution with zero warnings and ran the SQLite/connector projects; the historical warning and missing-reference premises no longer hold. |
 | 005 | exclude from supported workflow | Linked-worktree release execution is convenience, not the supported clean-checkout release path. |
 | 006, 020 | phase to R12-06 | Live bounded progress and retained aggregate certification evidence belong to the actual publication operator path. |
-| 007, 015 | repair or narrow in R12-02 | Data/Web support needs provider-correct filtering and a portable model-identity rule. Existing convergence evidence must be audited before code changes. |
+| 007, 015 | repaired and closed | The current filter AST/coordinator already provides execute-or-reject semantics; shared Web proofs and current docs now state it. Data's first-use shape guard rejects case-colliding Entity properties before adapter creation. |
 | 008, 018 | exclude with non-promoted providers | Vector transaction reflection and remote provider provenance do not enter the initial local Data guarantee. |
 | 009 | phase to R12-04 | The coherent-public-narrative gate owns public XML-doc/link enforcement. |
 | 013, 014 | exclude with Backup | Backup remains outside the initial supported boundary; metadata-only encryption and incomplete Web operations remain explicit limits. |
@@ -287,6 +287,92 @@ has zero warnings/errors; public docs pass 233/42 and docs lint has zero errors.
 The next dependency-ordered exploration is the current Data/Web filter and portable model-identity
 boundary (PMC-007/015). Current provider convergence must be audited before choosing repair or
 narrowing; no historical drop-filter premise is assumed current.
+
+## Fourth chokepoint exploration — Data/Web query truth and portable Entity names
+
+**Task:** Reconcile PMC-007 against the current unified filter pipeline, and close PMC-015 at the
+earliest shared Entity-model boundary if case-colliding public properties still lack one portable
+identity.
+
+**Application intent:** A developer can submit one documented JSON filter through an Entity HTTP
+endpoint and trust that Koan either evaluates it correctly or returns a corrective client error. The
+same Entity model must have one stable public/property identity across Web JSON and every Data adapter.
+
+**Public expression:** Use `?filter=<url-encoded-json>` or the existing POST query body against an
+ordinary `Entity<T>`. Name each public Entity property uniquely without relying on case alone. No
+provider switch, model attribute, filter mode, or mapping profile is introduced.
+
+**Guarantee/correction:** Parsed filters are never silently dropped. The Data-owned coordinator pushes
+only supported nodes, evaluates residual nodes centrally, sorts before paging, and Web maps malformed,
+unknown, or unsupported input to 400. An Entity whose public instance properties collide under
+ordinal case-insensitive comparison rejects on first repository request, before adapter selection or
+provider I/O, with one rename correction.
+
+**Complete intent surface:** GET `filter`; POST query bodies; hook-contributed access predicates;
+filter parsing and field resolution; pushdown capability declarations; residual evaluation; sorting,
+counting, and pagination; InMemory/JSON scan execution; native provider translation; Entity first-use
+repository resolution; JSON/property naming; public Data/Web guidance; and provider convergence tests.
+
+**Public concepts:** Existing JSON filter syntax, HTTP 400 errors, ordinary CLR property names, adapter
+capabilities, and the existing Entity shape guard only.
+
+**Docs read:** PMC-007/015, R12-01/R12-02, DATA-0096/0031 history, current Web HTTP reference, Entity
+capabilities guide, and the shared adapter-surface/convergence test contracts.
+
+**Code read:** `EntityEndpointService`, query-body parse regression specs, `JsonFilterParser`,
+`FieldPathResolver`, `FilterSplitter`, `FilterPushdownCoordinator`, `IQueryRepository`, `Data<T>`,
+`KeyValueStore`, InMemory/JSON repositories and capability declarations, native provider capability
+derivations, `AggregateMetadata`, `ProjectionResolver`, `IdentityEncoding`, `DataService`, and
+`EntityShapeGuard`. Repository-wide searches covered model validation, property projection,
+serialization, and adapter-surface ownership.
+
+**Reusing:** Keep the filter AST/coordinator as the single execution owner and the shared Web adapter
+surface plus Data filter-convergence oracle as evidence. Extend the existing cached Entity shape guard,
+which already runs before adapter resolution, instead of adding provider validation.
+
+**Creating new:** No production abstraction. Add one model-rule branch and focused guard/first-use
+tests. Correct current Web/Entity guidance to state the actual execute-or-reject contract without
+claiming universal native pushdown or equal cost.
+
+**Coalescence:** PMC-007 needs evidence and a documentation correction, not another filter layer.
+PMC-015 belongs beside the existing concrete-inheritance shape rule because both are universal Entity
+validity constraints. Do not add case-sensitivity capabilities, persisted-name annotations, serializer
+exceptions, or per-adapter checks.
+
+**Ergonomics:** Normal PascalCase models and camelCase clients keep working, including unambiguous
+case-insensitive field input. A problematic `Id`/`id` model fails once with both property names and a
+plain rename instruction, before a database or file is touched.
+
+**Constraints satisfied:** business intent inward; fewer moving parts; standard CLR naming and HTTP
+errors; genuinely Data-owned cross-provider semantics; no model decoration; focused local tests only;
+no remote/private application access or release ratchet.
+
+**Risks:** A pre-preview application may intentionally expose properties distinguished only by case on
+a case-sensitive backend. That shape is deliberately rejected because it cannot survive the complete
+Web/Data adapter boundary. Reflection must not mistake a normal override for a collision, validation
+must precede factory creation, and the docs must distinguish semantic parity from native pushdown and
+performance parity.
+
+## Fourth slice outcome
+
+PMC-007 closes by current architecture plus strengthened evidence, not a second filtering subsystem.
+Web parses GET and POST input into the shared filter AST; Data's coordinator pushes only adapter-owned
+nodes, evaluates the residual centrally, and completes sort/pagination in semantic order. Malformed
+JSON, unknown fields, and unsupported input remain corrective 400 responses. Current guidance now
+promises result semantics without falsely promising equal native pushdown or provider cost. Shared
+HTTP proofs cover equality, compound operators, mixed-case fields, malformed JSON, and unknown fields
+across InMemory 74/74, JSON 52/52, and SQLite 52/52.
+
+PMC-015 closes at the existing Data first-use shape guard. A public `Id`/`id` collision now rejects
+with the Entity and both property names before adapter selection or creation; ordinary overrides and
+unique property names remain valid. The guard is internal framework machinery, not a new application
+concept. Exact guard/activation tests pass 9/9, and Data.Core plus the shared Web adapter test kit build
+with zero warnings/errors. No provider capability, naming annotation, mapping profile, or compatibility
+alias was introduced.
+
+The next dependency-ordered exploration is PMC-024's build-fixture isolation invariant, followed by
+current-evidence closure of PMC-003/028/032 where the R11 release record already suggests their
+historical warning/reference premises are stale.
 
 ## Stop conditions
 

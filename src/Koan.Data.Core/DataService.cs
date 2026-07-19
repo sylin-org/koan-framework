@@ -25,7 +25,7 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        EntityShapeGuard.EnsureOwnRoot(typeof(TEntity));
+        EntityShapeGuard.EnsureValid(typeof(TEntity));
 
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
         var decision = AdapterResolver.ResolveDecisionForEntity<TEntity>(sp, sourceRegistry);
@@ -81,6 +81,8 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
+        EntityShapeGuard.EnsureValid(typeof(TEntity));
+
         // Mirror GetRepository's raw-adapter resolution but return the UNDECORATED facade (the diagnostic authority that
         // holds the raw adapter for the IQueryRepository check). Cheap + connection-free: capability description is
         // static. Not cached — Explain / the boot pre-flight call it rarely, never on a hot path.

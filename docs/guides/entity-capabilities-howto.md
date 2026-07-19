@@ -188,6 +188,12 @@ var m = await Mirror.Get(id);    // bare .Get(id), returns Mirror, own collectio
 
 **Rule of thumb:** every concrete entity should read `class Foo : Entity<Foo>` or `class Foo : SomeBase<Foo>`. If you ever see `class Foo : SomeConcreteEntity` (inheriting a type that is itself a set), stop: that is the footgun.
 
+Entity property names must also be unique without relying on case. A model with inherited `Id` and a
+second property named `id`, for example, has no portable identity across JSON and providers with
+different case-sensitivity rules. Koan rejects that model on first use, before opening a repository,
+and names the properties to rename. Normal PascalCase properties still accept unambiguous camelCase or
+mixed-case filter input.
+
 **Usage Scenarios**
 
 - **Web APIs:** Entity<T> eliminates boilerplate. No manual repositories, no hand-written CRUD.
