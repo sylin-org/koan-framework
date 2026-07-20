@@ -60,6 +60,37 @@ public sealed class ReleaseWorkflowContractTests
     }
 
     [Fact]
+    public void SolutionIncludesEveryRunnableTestProject()
+    {
+        var root = FindKoanRoot();
+        var solution = File.ReadAllText(Path.Combine(root, "Koan.sln"))
+            .Replace('\\', '/');
+        var projects = Directory
+            .EnumerateFiles(Path.Combine(root, "tests"), "*.csproj", SearchOption.AllDirectories)
+            .Where(project =>
+            {
+                var document = XDocument.Load(project);
+                var usesTestSdk = document.Descendants("PackageReference").Any(reference =>
+                    string.Equals(
+                        reference.Attribute("Include")?.Value,
+                        "Microsoft.NET.Test.Sdk",
+                        StringComparison.Ordinal));
+                var explicitlyNonRunnable = document.Descendants("IsTestProject").Any(element =>
+                    string.Equals(element.Value.Trim(), "false", StringComparison.OrdinalIgnoreCase));
+                return usesTestSdk && !explicitlyNonRunnable;
+            })
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        Assert.NotEmpty(projects);
+        foreach (var project in projects)
+        {
+            var relative = Path.GetRelativePath(root, project).Replace('\\', '/');
+            Assert.Contains($"\"{relative}\"", solution, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
     public void ReleaseWorkflowUsesSixOrderedLeastPrivilegeBoundaries()
     {
         var workflow = ReadWorkflow();
