@@ -4,12 +4,12 @@ domain: orchestration
 title: "Publishing a Koan app with NativeAOT"
 audience: [developers, architects]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-20
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-17
-  status: verified
-  scope: GardenCoop Chapter 1 win-x64 native deployment, business API, lifecycle result, and facts
+  date_last_tested: 2026-07-20
+  status: blocked
+  scope: GardenCoop Chapter 1 win-x64 publish currently stops inside the .NET 10.0.10 ILC analyzer
 related_guides:
   - composition-lockfile.md
   - ai-vector-howto.md
@@ -17,16 +17,18 @@ related_guides:
 
 # Publishing a Koan app with NativeAOT
 
-A Koan app can publish as a self-contained **NativeAOT deployment**—no installed .NET runtime—when
+A Koan app is intended to publish as a self-contained **NativeAOT deployment**—no installed .NET runtime—when
 every capability it uses is AOT-compatible. The deployment is a directory: the native executable may
 travel with application assets and connector-native libraries. The framework wiring for AOT is decided in
 [ARCH-0093](../decisions/ARCH-0093-nativeaot-substrate.md); this guide is the operational recipe.
 
-> Current measured sample: [GardenCoop Chapter 1](../../samples/journeys/GardenCoop/01-GardenJournal/) —
-> a win-x64 native executable that serves its dashboard, SQLite-backed garden API, lifecycle automation,
-> and runtime facts with no external service.
+> **Current boundary:** NativeAOT is experimental and not part of Koan's 0.20 guarantee. With the pinned .NET
+> 10.0.302 SDK and 10.0.10 runtime packs, [GardenCoop Chapter 1](../../samples/journeys/GardenCoop/01-GardenJournal/)
+> stops inside the ILC analyzer with an `IndexOutOfRangeException` before emitting an executable. The configuration
+> below remains a reproducible diagnostic surface. Use self-contained or single-file JIT publication for the current
+> candidate.
 
-## TL;DR
+## Diagnostic commands
 
 ```bash
 # Linux (x64/arm64) — clang is the linker, found on PATH:
@@ -122,8 +124,9 @@ sudo apt-get install -y clang zlib1g-dev binutils libicu-dev   # Debian/Ubuntu
   The server relational adapters (Postgres, SQL Server) keep Dapper — they never ship in a single
   binary; if you somehow AOT one, route it through the same `Koan.Data.Relational.Ado` helpers.
 - **No `dynamic`.** The DLR can't bind under AOT. Koan's hot paths avoid it.
-- **Measured native dependency:** GardenCoop proves `e_sqlite3` in the current win-x64 deployment.
-  Treat every additional native connector as a separate publish-and-run claim until exercised.
+- **Native dependencies are unverified for the candidate.** GardenCoop retains `e_sqlite3` packaging intent, but the
+  current compiler failure occurs before the application can prove that deployment. Treat every native connector and
+  RID as a separate publish-and-run claim.
 - **Globalization.** Set `<InvariantGlobalization>true</InvariantGlobalization>` in the app project
   (the floor doesn't need culture data). Otherwise the AOT binary needs ICU present on the target.
   Note the **build/SDK** box still needs `libicu` regardless — `dotnet` itself fails fast without it.
@@ -154,9 +157,10 @@ Resolve such paths against `AppContext.BaseDirectory` (the exe's directory), nev
 (All four `[Embedding]` text strategies — `Template`, `Properties`/`AllStrings`, and `FullJson` —
 are AOT-clean: text is built by reflection over names + string ops, and `FullJson` uses Newtonsoft.)
 
-## 6. Verify it ran
+## 6. Reproduce and verify after the compiler blocker is removed
 
-The boot report's `Registry`/`Inventory` blocks list every discovered module—if the trim roots worked
+The current command is expected to reproduce the ILC analyzer failure. After the pinned toolchain can publish it,
+the boot report's `Registry`/`Inventory` blocks must list every discovered module—if the trim roots worked
 you'll see all of them. Then exercise a real business path end-to-end; for the current sample:
 
 ```powershell
@@ -172,6 +176,7 @@ Set-Location samples/journeys/GardenCoop/01-GardenJournal/bin/Release/net10.0/wi
 
 | Symptom | Cause / fix |
 |---|---|
+| ILC analyzer throws `IndexOutOfRangeException` | Current .NET 10.0.10 compiler/runtime-pack blocker reproduced by GardenCoop Chapter 1. Do not claim native deployment success; use self-contained or single-file JIT and re-run this proof after the toolchain changes. |
 | `NETSDK1207` on a `Koan.*.Generators` project | A **global** `-p:PublishAot=true`. Use the `-p:KoanAot=true` gate (§1) so `PublishAot` is set only on the app. |
 | Windows link error mentioning `vswhere` / `link.exe` | Publish inside `vcvars64` with `-p:IlcUseEnvironmentalTools=true` (§3), or install the **Desktop development with C++** workload (MSVC `link.exe`). |
 | Boot throws missing-controller/entity `InvalidOperationException` | A reflection-reached type was trimmed — add it to `NativeAotRoots.xml` or `[DynamicDependency]` (§2). Koan modules are auto-rooted; this is for **your** types. |
@@ -179,5 +184,5 @@ Set-Location samples/journeys/GardenCoop/01-GardenJournal/bin/Release/net10.0/wi
 | `Reflection-based serialization has been disabled` | Something serialized via `System.Text.Json`. The floor is Newtonsoft (§4); for an MVC app ensure Koan.Web's Newtonsoft pipeline is active. |
 | Need a stack trace from the native binary | Publish with `-p:StripSymbols=false` (or `-p:IlcGenerateCompleteDebugInfo=true`) to keep symbols. |
 
-Expect a wall of `IL2026`/`IL3050` trim/AOT **warnings** from ASP.NET Core MVC, Newtonsoft, and the
-reflection-based relationship/config paths — they're warnings, not errors; the floor runs correctly.
+Expect `IL2026`/`IL3050` trim/AOT warnings from ASP.NET Core MVC, Newtonsoft, and the reflection-based
+relationship/config paths. Those warnings remain separate from the current fatal ILC analyzer exception.

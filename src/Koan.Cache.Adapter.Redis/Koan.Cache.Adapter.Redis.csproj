@@ -16,9 +16,9 @@
                       />
     <ProjectReference Include="..\Koan.Redis.Abstractions\Koan.Redis.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Redis\Koan.Redis.csproj" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
-    <PackageReference Include="StackExchange.Redis" Version="2.9.32" />
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="StackExchange.Redis" />
   </ItemGroup>
 </Project>

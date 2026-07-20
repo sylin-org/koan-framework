@@ -96,10 +96,12 @@ public sealed class OpenApiUiPolicySpec : IClassFixture<OpenApiWebApplicationFac
 
         var document = await client.GetAsync("/contracts/v1.json", TestContext.Current.CancellationToken);
         var ui = await client.GetAsync("/docs/index.html", TestContext.Current.CancellationToken);
+        var bootstrap = await client.GetAsync("/docs/index.js", TestContext.Current.CancellationToken);
 
         document.StatusCode.Should().Be(HttpStatusCode.OK);
         ui.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await ui.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))
+        bootstrap.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await bootstrap.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))
             .Should().Contain("/contracts/v1.json");
     }
 }

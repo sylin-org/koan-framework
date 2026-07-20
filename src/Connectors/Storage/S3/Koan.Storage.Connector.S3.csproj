@@ -12,6 +12,6 @@
     <ProjectReference Include="..\..\..\Koan.ZenGarden.Contracts\Koan.ZenGarden.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Minio" Version="6.*" />
+    <PackageReference Include="Minio" />
   </ItemGroup>
 </Project>

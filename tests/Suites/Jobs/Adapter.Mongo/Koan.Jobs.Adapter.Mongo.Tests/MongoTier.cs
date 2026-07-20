@@ -12,9 +12,9 @@ public sealed class MongoJobsFixture : IAsyncLifetime
     private MongoDbContainer? _container;
     public IReadOnlyDictionary<string, string?> Settings { get; private set; } = new Dictionary<string, string?>();
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
-        _container = new MongoDbBuilder("mongo:7").Build();
+        _container = new MongoDbBuilder("mongo:8.3.4").Build();
         await _container.StartAsync();
         var cs = _container.GetConnectionString();
         Settings = new Dictionary<string, string?>(StringComparer.Ordinal)
@@ -33,7 +33,7 @@ public sealed class MongoJobsFixture : IAsyncLifetime
         };
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_container is not null) await _container.DisposeAsync();
     }

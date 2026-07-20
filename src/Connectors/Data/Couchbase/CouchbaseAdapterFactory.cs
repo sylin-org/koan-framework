@@ -16,10 +16,10 @@ namespace Koan.Data.Connector.Couchbase;
 [ProviderPriority(Infrastructure.Constants.Provider.Priority)]
 [KoanService(ServiceKind.Database, shortCode: "couchbase", name: "Couchbase",
     ContainerImage = "couchbase/server",
-    DefaultTag = "latest",
+    DefaultTag = "8.0.2",
     DefaultPorts = new[] { 8091, 8092, 8093, 8094, 11210 },
     Capabilities = new[] { "protocol=couchbase" },
-    Volumes = new[] { "./Data/couchbase:/opt/couchbase/var" },
+    Volumes = new[] { "./Data/couchbase-8.0:/opt/couchbase/var" },
     AppEnv = new[] { "Koan__Data__Couchbase__ConnectionString=couchbase://{host}", "Koan__Data__Couchbase__Bucket=Koan" },
     Scheme = "couchbase", Host = "couchbase", EndpointPort = 8091,
     UriPattern = "couchbase://{host}", LocalScheme = "couchbase", LocalHost = "localhost", LocalPort = 8091, LocalPattern = "couchbase://{host}")]

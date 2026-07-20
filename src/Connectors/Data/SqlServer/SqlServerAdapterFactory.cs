@@ -13,11 +13,11 @@ namespace Koan.Data.Connector.SqlServer;
 [ProviderPriority(15)]
 [KoanService(ServiceKind.Database, shortCode: "mssql", name: "SQL Server",
     ContainerImage = "mcr.microsoft.com/mssql/server",
-    DefaultTag = "2022-latest",
+    DefaultTag = "2025-CU6-GDR1-ubuntu-24.04",
     DefaultPorts = new[] { 1433 },
     Capabilities = new[] { "protocol=mssql" },
-    Env = new[] { "ACCEPT_EULA=Y", "SA_PASSWORD" },
-    Volumes = new[] { "./Data/mssql:/var/opt/mssql" },
+    Env = new[] { "ACCEPT_EULA=Y", "MSSQL_SA_PASSWORD" },
+    Volumes = new[] { "./Data/mssql-2025:/var/opt/mssql" },
     AppEnv = new[] { "Koan__Data__SqlServer__ConnectionString={scheme}://{host}:{port}" },
     Scheme = "mssql", Host = "mssql", EndpointPort = 1433, UriPattern = "mssql://{host}:{port}",
     LocalScheme = "mssql", LocalHost = "localhost", LocalPort = 1433, LocalPattern = "mssql://{host}:{port}")]

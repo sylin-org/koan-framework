@@ -56,12 +56,12 @@
   <CompilerVisibleProperty Include="IsTestProject" />
   <AssemblyMetadata Include="KoanModuleIdentity" Value="$(KoanModuleIdentity)" />
   <!-- SourceLink for better debugging experience on NuGet -->
-  <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
   <!-- ARCH-0085: Nerdbank.GitVersioning is the single version source — Version / AssemblyVersion /
        FileVersion are computed from each package's version.json (operator-owned major.minor) plus
        git commit height (automatic patch). Replaces build/versions.props + scripts/versioning.
        PrivateAssets=all so it never flows to consumers. -->
-  <PackageReference Include="Nerdbank.GitVersioning" Version="3.9.50" PrivateAssets="all" />
+  <PackageReference Include="Nerdbank.GitVersioning" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
   <!-- Canonical package presentation: one package-owned README and one repository-owned mascot. -->

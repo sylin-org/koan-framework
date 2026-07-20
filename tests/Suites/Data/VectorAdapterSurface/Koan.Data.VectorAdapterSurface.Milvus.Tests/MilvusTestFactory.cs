@@ -86,7 +86,7 @@ public sealed class MilvusTestFactory : IVectorAdapterTestFactory
             await _network.CreateAsync();
 
             _etcd = new ContainerBuilder()
-                .WithImage("quay.io/coreos/etcd:v3.5.5")
+                .WithImage("quay.io/coreos/etcd:v3.5.25")
                 .WithNetwork(_network)
                 .WithNetworkAliases("etcd")
                 .WithEnvironment("ETCD_AUTO_COMPACTION_MODE", "revision")
@@ -106,7 +106,7 @@ public sealed class MilvusTestFactory : IVectorAdapterTestFactory
             await _etcd.StartAsync();
 
             _minio = new ContainerBuilder()
-                .WithImage("minio/minio:RELEASE.2023-03-20T20-16-18Z")
+                .WithImage("minio/minio:RELEASE.2024-12-18T13-15-44Z")
                 .WithNetwork(_network)
                 .WithNetworkAliases("minio")
                 .WithEnvironment("MINIO_ACCESS_KEY", "minioadmin")
@@ -123,7 +123,7 @@ public sealed class MilvusTestFactory : IVectorAdapterTestFactory
                 // 2.4.13 is the latest 2.4.x stable; 2.4.0 has REST API quirks (notably
                 // single-id delete-by-filter being silently dropped on growing segments)
                 // that were fixed in later patch releases.
-                .WithImage("milvusdb/milvus:v2.4.13")
+                .WithImage("milvusdb/milvus:v2.6.20")
                 .WithNetwork(_network)
                 .WithNetworkAliases("milvus")
                 .WithEnvironment("ETCD_ENDPOINTS", "etcd:2379")

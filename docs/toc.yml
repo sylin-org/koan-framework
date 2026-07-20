@@ -38,7 +38,7 @@
       href: reference/cards/tenancy.md
     - name: Test an application
       href: guides/testing-your-app.md
-    - name: Publish with NativeAOT
+    - name: Evaluate experimental NativeAOT
       href: reference/cards/nativeaot.md
     - name: Understand the composition lockfile
       href: guides/composition-lockfile.md

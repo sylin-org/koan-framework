@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Couchbase;
+using Couchbase.Core.IO.Authentication.Authenticators;
 using Couchbase.KeyValue;
 using Couchbase.Management.Collections;
 using Koan.Core;
@@ -482,11 +483,11 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                     _logger?.LogDebug("Couchbase cluster initialization was not needed or failed gracefully");
                 }
 
-                var clusterOptions = new global::Couchbase.ClusterOptions
-                {
-                    UserName = username,
-                    Password = password
-                };
+                var clusterOptions = new global::Couchbase.ClusterOptions();
+                clusterOptions.WithAuthenticator(new PasswordAuthenticator(
+                    username,
+                    password,
+                    options.ConnectionString.StartsWith("couchbases://", StringComparison.OrdinalIgnoreCase)));
 
                 _logger?.LogDebug("Connecting to Couchbase cluster at {ConnectionString}", Redaction.DeIdentify(options.ConnectionString));
                 _cluster = await Cluster.ConnectAsync(options.ConnectionString, clusterOptions);

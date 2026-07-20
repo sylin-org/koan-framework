@@ -7,7 +7,7 @@ namespace Koan.Data.Connector.ElasticSearch;
 [ProviderPriority(Infrastructure.Constants.Provider.Priority)]
 [KoanService(ServiceKind.Vector, shortCode: Infrastructure.Constants.Provider.Id, name: "Elasticsearch",
     ContainerImage = "docker.elastic.co/elasticsearch/elasticsearch",
-    DefaultTag = "8.13.4",
+    DefaultTag = "9.4.3",
     DefaultPorts = new[] { 9200 },
     Capabilities = new[] { "protocol=http", "vector-search=true", "filters=true" },
     Env = new[]
@@ -16,7 +16,7 @@ namespace Koan.Data.Connector.ElasticSearch;
         "xpack.security.enabled=false",
         "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     },
-    Volumes = new[] { "./Data/elasticsearch:/usr/share/elasticsearch/data" },
+    Volumes = new[] { "./Data/elasticsearch-9.4:/usr/share/elasticsearch/data" },
     AppEnv = new[] { "Koan__Data__ElasticSearch__Endpoint=http://{serviceId}:{port}" },
     HealthEndpoint = "/_cluster/health",
     HealthIntervalSeconds = 5,

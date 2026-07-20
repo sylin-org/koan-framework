@@ -12,12 +12,12 @@
     <ProjectReference Include="..\..\..\Koan.Data.Relational\Koan.Data.Relational.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
     <!-- Transitive-override: Microsoft.Data.Sqlite pulls the vulnerable native lib 2.1.11 (NU1903,
          GHSA-2m69-gcr7-jv3q). Pin just the native binary to the patched 3.50.3 (SQLite 3.50.3); the
          managed SQLitePCLRaw.core stays 2.1.11, so Microsoft.Data.Sqlite is unaffected. -->
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
     <!-- SQLite uses the AOT-clean Koan.Data.Relational.Ado helpers; no runtime IL emission is required. -->
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 </Project>

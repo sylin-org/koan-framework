@@ -18,14 +18,14 @@
     <NoWarn>$(NoWarn);xUnit1051</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="xunit.v3.extensibility.core" Version="3.2.2" />
-    <PackageReference Include="xunit.v3.assert" Version="3.2.2" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
+    <PackageReference Include="xunit.v3.assert" />
     <!-- Engine modules are added here as each engine is rolled out (ARCH-0091 staged rollout). -->
-    <PackageReference Include="Testcontainers.PostgreSql" Version="4.11.0" />
-    <PackageReference Include="Testcontainers.MongoDb" Version="4.11.0" />
-    <PackageReference Include="Testcontainers.Redis" Version="4.11.0" />
-    <PackageReference Include="Testcontainers.MsSql" Version="4.11.0" />
-    <PackageReference Include="Testcontainers.Couchbase" Version="4.11.0" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.MongoDb" />
+    <PackageReference Include="Testcontainers.Redis" />
+    <PackageReference Include="Testcontainers.MsSql" />
+    <PackageReference Include="Testcontainers.Couchbase" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />

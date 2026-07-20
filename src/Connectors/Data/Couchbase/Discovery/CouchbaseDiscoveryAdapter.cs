@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Couchbase;
 using Couchbase.Core.Configuration.Server;
+using Couchbase.Core.IO.Authentication.Authenticators;
 using Couchbase.KeyValue;
 using Koan.Core;
 using Koan.Core.Orchestration;
@@ -35,21 +36,22 @@ internal sealed class CouchbaseDiscoveryAdapter : ServiceDiscoveryAdapterBase
             ConnectionString = connectionString
         };
 
+        var username = "Administrator";
+        var password = "password";
         if (context.Parameters != null)
         {
-            if (context.Parameters.TryGetValue("username", out var username) &&
-                context.Parameters.TryGetValue("password", out var password))
+            if (context.Parameters.TryGetValue("username", out var configuredUsername) &&
+                context.Parameters.TryGetValue("password", out var configuredPassword))
             {
-                options.UserName = username.ToString();
-                options.Password = password.ToString();
+                username = configuredUsername.ToString() ?? username;
+                password = configuredPassword.ToString() ?? password;
             }
         }
 
-        if (string.IsNullOrEmpty(options.UserName))
-        {
-            options.UserName = "Administrator";
-            options.Password = "password";
-        }
+        options.WithAuthenticator(new PasswordAuthenticator(
+            username,
+            password,
+            connectionString.StartsWith("couchbases://", StringComparison.OrdinalIgnoreCase)));
 
         using var cluster = await Cluster.ConnectAsync(options);
 

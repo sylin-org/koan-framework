@@ -4,18 +4,18 @@ domain: framework
 title: "R12-05 - Freeze and Certify the First 0.20 Candidate"
 audience: [architects, maintainers, release-engineers, ai-agents]
 status: current
-last_updated: 2026-07-19
+last_updated: 2026-07-20
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-19
+  date_last_tested: 2026-07-20
   status: in-progress
-  scope: corrected local-candidate architecture checkpoint; execution waits on R12-04
+  scope: pre-freeze convergence complete; exact candidate commit and certification pending
 ---
 
 # R12-05 — Freeze and certify the first 0.20 candidate
 
 - Tranche: `T7B — public product maturity`
-- Status: `pending — checkpoint accepted; execution waits on R12-04`
+- Status: `in-progress — pre-freeze convergence complete; exact candidate not yet frozen`
 - Depends on: passed R12-01 through R12-04
 - Unlocks: R12-06 publication and genuine public-feed consumer observation
 - Owner: the existing release compiler owns exact selection, versions, proof, artifacts, and local escrow
@@ -92,6 +92,29 @@ remain outside scope.
 still require an all-owner bootstrap. Therefore neither package count nor exact version commit is assumed before
 read-only preflight. A local proof followed by a tracked commit is no longer exact. Remote settings and secret
 existence cannot be inferred from local tests.
+
+## Pre-freeze convergence checkpoint — 2026-07-20
+
+The workstation now has the repository-pinned .NET SDK 10.0.302 installed, and `global.json` resolves it exactly with
+roll-forward disabled. Docker Desktop is healthy for container-backed suites. Read-only remote inspection finds
+`origin/dev` at `7249ce72ad836324fc02b289e21f39ddcd3b6290`, no
+`automation/package-lineage-dev` branch, and the existing Actions secret name `NUGET_API_KEY`; its value was not read
+or exposed. The repository API does not affirm immutable Releases, so that setting remains an explicit R12-06
+prerequisite rather than being guessed or changed here.
+
+The absent durable lineage makes this candidate an all-current-owner bootstrap through the existing compiler. No
+operator package list or predecessor reconstruction is permitted. The dirty source scope consists of the accepted
+dependency modernization and compatibility adaptations, the central `Directory.Packages.props` constitution and its
+governance test, AnimeRecommendations/Usagi Picks extraction, coherent public narrative, and the final NativeAOT
+truth correction. `tmp/` remains scratch-only and is excluded from staging.
+
+GardenCoop's prior win-x64 NativeAOT success is no longer presented as current evidence. The pinned SDK/runtime-pack
+combination stops inside the ILC analyzer with an `IndexOutOfRangeException` before producing an executable. Current
+public guidance now calls the path experimental, preserves the minimal configuration as a reproducible diagnostic,
+and directs candidate users to self-contained or single-file JIT publication. The ordinary GardenCoop journey
+remains verified. This narrows an unproved deployment claim; it does not change runtime code or add an exception
+mechanism. The exact pinned SDK passes the focused dependency-governance and release-workflow pre-freeze cells 12/12,
+and the complete tracked diff passes whitespace validation.
 
 ## Work
 

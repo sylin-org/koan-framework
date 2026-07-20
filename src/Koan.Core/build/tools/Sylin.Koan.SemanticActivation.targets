@@ -16,7 +16,7 @@
 
   <UsingTask TaskName="WriteKoanActivationProps"
              TaskFactory="RoslynCodeTaskFactory"
-             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
     <ParameterGroup>
       <Edges ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
       <PackageId ParameterType="System.String" Required="true" />

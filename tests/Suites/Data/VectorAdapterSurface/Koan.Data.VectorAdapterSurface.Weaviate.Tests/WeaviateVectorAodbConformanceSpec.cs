@@ -35,7 +35,7 @@ public sealed class WeaviateVectorAodbConformanceSpec : VectorAodbConformanceSpe
         IContainer weaviate;
         try
         {
-            weaviate = new ContainerBuilder("semitechnologies/weaviate:1.25.6")
+            weaviate = new ContainerBuilder("cr.weaviate.io/semitechnologies/weaviate:1.37.6")
                 .WithEnvironment("QUERY_DEFAULTS_LIMIT", "25")
                 .WithEnvironment("AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED", "true")
                 .WithEnvironment("AUTOSCHEMA_ENABLED", "true")

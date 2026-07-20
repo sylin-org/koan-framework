@@ -71,6 +71,6 @@ Same adapter resolution and source routing as `EntityAi`; you just give up the c
 
 [`GardenCoop Chapter 2`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/) — `[Embedding]` on `Produce` turns ordinary saves into a local ONNX + sqlite-vec semantic-search result.
 
-[`AnimeRecommendations`](../../../samples/applications/AnimeRecommendations/) — a complete local application derives
-viewer taste from ratings, embeds that intent, searches `Vector<Anime>`, and explains the resulting recommendations
-without a repository, worker pipeline, or external AI/vector service.
+Standalone [Usagi Picks](https://github.com/lbotinelly/usagipicks) — a complete local application derives viewer
+taste from ratings, embeds that intent, searches `Vector<Anime>`, and explains the resulting recommendations without
+a repository, worker pipeline, or external AI/vector service.

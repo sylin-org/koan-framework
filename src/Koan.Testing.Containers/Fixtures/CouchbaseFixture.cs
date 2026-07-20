@@ -44,7 +44,7 @@ public sealed class CouchbaseFixture : KoanContainerFixture
 
     protected override async Task<string> StartContainerAsync()
     {
-        _container = new CouchbaseBuilder("couchbase:community-7.6.1").Build();
+        _container = new CouchbaseBuilder("couchbase:community-8.0.2").Build();
         await _container.StartAsync().ConfigureAwait(false);
         _bucket = _container.Buckets.First().Name;
         _managementUrl = $"http://{_container.Hostname}:{_container.GetMappedPublicPort(ManagementPort)}";

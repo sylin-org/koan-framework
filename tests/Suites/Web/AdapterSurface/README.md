@@ -30,8 +30,8 @@ Each adapter declares what it supports via `IAdapterCapabilities` on its factory
 | **InMemory** | **42 / 6 / 0** | No container required. Partition routing + cross-partition transfer fully validated here. |
 | **Json** | **42 / 6 / 0** | File-based, temp directory. Partition + transfer fully validated. |
 | **Sqlite** | **25 / 23 / 0** | File-based. Partition + transfer opted out: `ensureCreated` under `EntityContext.With(partition: X)` doesn't produce the partition-suffixed table at the framework level. |
-| **Mongo** | **25 / 23 / 0** | Testcontainer `mongo:7`. Surface specs all green; partition/transfer opted out pending the framework partition-routing fix. The original `?sort=-Sightings.LastChangedAt` bug stays validated end-to-end here. |
-| **Postgres** | **25 / 23 / 0** | Testcontainer `postgres:16-alpine`. Same partition/transfer opt-out as Sqlite. |
+| **Mongo** | **25 / 23 / 0** | Testcontainer `mongo:8.3.4`. Surface specs all green; partition/transfer opted out pending the framework partition-routing fix. The original `?sort=-Sightings.LastChangedAt` bug stays validated end-to-end here. |
+| **Postgres** | **25 / 23 / 0** | Testcontainer `postgres:18.4-alpine`. Same partition/transfer opt-out as Sqlite. |
 | **Redis** | **25 / 23 / 0** | Testcontainer Redis. Most partition ops work but bulk-upsert and collection-read with `?set=` leak across to default; opted out to keep the matrix honest. |
 | **SqlServer** | **25 / 23 / 0** | Testcontainer MsSql. Same partition/transfer opt-out as Sqlite/Postgres. |
 | **Couchbase** | **0 / 48 / 0** | Whole suite cleanly skipped: `Testcontainers.Couchbase` exposes KV and management on separate random host ports, but Koan's `CouchbaseClusterProvider` derives the management URL from the single KV connection string. Set `Koan_TESTS_COUCHBASE=...` to run against an externally provisioned cluster. |

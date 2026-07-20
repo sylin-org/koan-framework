@@ -83,4 +83,18 @@ public sealed class FilterSplitterSpecs
         split.Residual.Should().NotBeNull();
         EvalSplit(split).Should().Equal(Eval(full));
     }
+
+    [Fact]
+    public void Provider_without_structural_negation_leaves_complete_not_node_residual()
+    {
+        var full = Filter.Negate(Filter.Eq("Score", 100));
+        var split = FilterSplitter.Split(
+            full,
+            ScalarOnly with { SupportsNegation = false },
+            typeof(Gamer));
+
+        split.Pushable.Should().BeNull();
+        split.Residual.Should().BeSameAs(full);
+        EvalSplit(split).Should().Equal(Eval(full));
+    }
 }

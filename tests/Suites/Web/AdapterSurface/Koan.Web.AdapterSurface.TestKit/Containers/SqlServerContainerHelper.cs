@@ -24,7 +24,7 @@ public sealed class SqlServerContainerHelper : IAsyncDisposable
 
         try
         {
-            _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
+            _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-CU6-GDR1-ubuntu-24.04")
                 .Build();
             await _container.StartAsync().ConfigureAwait(false);
             var connection = _container.GetConnectionString() + ";TrustServerCertificate=true";

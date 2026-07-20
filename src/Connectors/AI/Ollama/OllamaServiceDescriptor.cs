@@ -4,7 +4,7 @@ namespace Koan.AI.Connector.Ollama;
 
 [KoanService(ServiceKind.Ai, shortCode: "ollama", name: "Ollama",
     ContainerImage = "ollama/ollama",
-    DefaultTag = "latest",
+    DefaultTag = "0.32.0",
     DefaultPorts = [Infrastructure.Constants.Discovery.DefaultPort],
     Capabilities = ["protocol=http", "chat=true", "embeddings=true"],
     HealthEndpoint = Infrastructure.Constants.Discovery.ModelsPath,

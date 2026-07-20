@@ -65,7 +65,7 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
             // pattern (WithImage) still functions — suppress the deprecation (warnings-as-errors).
 #pragma warning disable CS0618
             _container = new ContainerBuilder()
-                .WithImage("semitechnologies/weaviate:1.25.6")
+                .WithImage("cr.weaviate.io/semitechnologies/weaviate:1.37.6")
                 .WithEnvironment("QUERY_DEFAULTS_LIMIT", "25")
                 .WithEnvironment("AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED", "true")
                 .WithEnvironment("AUTOSCHEMA_ENABLED", "true") // auto-create metadata properties on insert (filterable)

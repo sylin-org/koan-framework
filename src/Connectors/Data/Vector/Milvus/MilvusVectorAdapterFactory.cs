@@ -10,7 +10,7 @@ namespace Koan.Data.Vector.Connector.Milvus;
 [ProviderPriority(30)]
 [KoanService(ServiceKind.Vector, shortCode: "milvus", name: "Milvus",
     ContainerImage = "milvusdb/milvus",
-    DefaultTag = "2.4.0",
+    DefaultTag = "2.6.20",
     DefaultPorts = new[] { 19530 },
     Capabilities = new[] { "protocol=http", "vector-search=true", "filters=true" },
     Env = new[]
@@ -18,7 +18,7 @@ namespace Koan.Data.Vector.Connector.Milvus;
         "ETCD_USE_EMBED=true",
         "COMMON_MAXPROCS=2"
     },
-    Volumes = new[] { "./Data/milvus:/var/lib/milvus" },
+    Volumes = new[] { "./Data/milvus-2.6:/var/lib/milvus" },
     AppEnv = new[] { "Koan__Data__Milvus__Endpoint=http://{serviceId}:{port}" },
     HealthEndpoint = "/v2/health",
     HealthIntervalSeconds = 5,

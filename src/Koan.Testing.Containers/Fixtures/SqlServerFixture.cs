@@ -20,7 +20,7 @@ public sealed class SqlServerFixture : KoanContainerFixture
 
     protected override async Task<string> StartContainerAsync()
     {
-        _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-CU6-GDR1-ubuntu-24.04").Build();
         await _container.StartAsync().ConfigureAwait(false);
         return _container.GetConnectionString();
     }

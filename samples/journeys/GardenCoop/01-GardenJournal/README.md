@@ -31,9 +31,10 @@ Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
 binding and watering policy at the write boundary. `GardenCoopModule` composes that policy, seeds the first
 useful state, and explains it at startup.
 
-This chapter is also Koan's measured win-x64 NativeAOT sample. It publishes a self-contained native
-deployment directory—not a claimed physical single file. See the
-[NativeAOT guide](../../../../docs/guides/nativeaot-howto.md) for the current command and boundary.
+This chapter also retains Koan's experimental win-x64 NativeAOT configuration. With the pinned .NET 10.0.302 SDK
+and 10.0.10 runtime packs, native publication currently stops inside the ILC analyzer before producing an executable,
+so NativeAOT is not a 0.20 sample guarantee. The ordinary JIT journey above remains verified. See the
+[NativeAOT guide](../../../../docs/guides/nativeaot-howto.md) for the reproducible blocker and fallback.
 
 Continue to [Chapter 2 — Local Discovery](../02-LocalDiscovery/README.md) to add local semantic search without
 losing any of this application.

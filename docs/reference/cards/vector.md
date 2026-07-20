@@ -76,5 +76,5 @@ intent. A provider may still reject a value outside its native deployment limits
 
 [`GardenCoop Chapter 2`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/) — `[Embedding]` on `Produce` plus local ONNX and sqlite-vec ranks a natural-language query without an external service.
 
-[`AnimeRecommendations`](../../../samples/applications/AnimeRecommendations/) — ratings and a present-tense mood
-become one query vector; `Vector<Anime>.Search` supplies bounded candidates for an explainable business workflow.
+Standalone [Usagi Picks](https://github.com/lbotinelly/usagipicks) — ratings and a present-tense mood become one
+query vector; `Vector<Anime>.Search` supplies bounded candidates for an explainable business workflow.

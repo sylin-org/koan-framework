@@ -14,11 +14,11 @@ namespace Koan.Data.Connector.Postgres;
 [ProviderPriority(14)]
 [KoanService(ServiceKind.Database, shortCode: "postgres", name: "PostgreSQL",
     ContainerImage = "postgres",
-    DefaultTag = "16",
+    DefaultTag = "18.4",
     DefaultPorts = new[] { 5432 },
     Capabilities = new[] { "protocol=postgres" },
     Env = new[] { "POSTGRES_USER=postgres", "POSTGRES_PASSWORD", "POSTGRES_DB=Koan" },
-    Volumes = new[] { "./Data/postgres:/var/lib/postgresql/data" },
+    Volumes = new[] { "./Data/postgres-18:/var/lib/postgresql" },
     AppEnv = new[] { "Koan__Data__Postgres__ConnectionString={scheme}://{host}:{port}", "Koan__Data__Postgres__Database=Koan" },
     Scheme = "postgres", Host = "postgres", EndpointPort = 5432, UriPattern = "postgres://{host}:{port}",
     LocalScheme = "postgres", LocalHost = "localhost", LocalPort = 5432, LocalPattern = "postgres://{host}:{port}")]

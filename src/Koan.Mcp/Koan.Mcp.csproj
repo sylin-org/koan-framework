@@ -7,18 +7,18 @@
     <PackageTags>$(CommonPackageTags);mcp;jsonrpc;llm;entity;agent</PackageTags>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="StreamJsonRpc" Version="2.22.23" />
+    <PackageReference Include="StreamJsonRpc" />
     <!-- Transitive-vulnerability override: StreamJsonRpc 2.22.23 pulls MessagePack 2.5.192,
          affected by CVE-2026-48109 (GHSA-hv8m-jj95-wg3x, high/8.2 LZ4 out of bounds read DoS). Pin
          the patched 2.5.301 (API-compatible 2.5.x line). Koan.Mcp is the only direct StreamJsonRpc
          referencer, so this floor propagates to every MCP consumer. Remove once StreamJsonRpc's own
          MessagePack floor is 2.5.301 or higher. -->
-    <PackageReference Include="MessagePack" Version="2.5.301" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="Microsoft.AspNetCore.JsonPatch" Version="10.0.8" />
-  <PackageReference Include="Jint" Version="4.4.2" />
+    <PackageReference Include="MessagePack" />
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Microsoft.AspNetCore.JsonPatch" />
+  <PackageReference Include="Jint" />
   <!-- Explicitly include Acornima to satisfy deps manifest when running tests under net10 preview -->
-  <PackageReference Include="Acornima" Version="1.2.0" />
+  <PackageReference Include="Acornima" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />

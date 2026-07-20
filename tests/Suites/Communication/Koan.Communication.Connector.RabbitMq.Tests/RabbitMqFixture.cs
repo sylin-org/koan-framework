@@ -11,7 +11,7 @@ public sealed class RabbitMqFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        _container = new RabbitMqBuilder("rabbitmq:3.13-alpine").Build();
+        _container = new RabbitMqBuilder("rabbitmq:4.3.2-alpine").Build();
         await _container.StartAsync(TestContext.Current.CancellationToken).ConfigureAwait(false);
     }
 

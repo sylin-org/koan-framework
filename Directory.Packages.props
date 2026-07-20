@@ -1,0 +1,106 @@
+<Project>
+  <PropertyGroup>
+    <!-- One evaluated dependency constitution for every release-relevant project. -->
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Historical and explicitly shelved trees preserve their frozen manifests and are not release inputs. -->
+    <_KoanAtticRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)attic'))</_KoanAtticRoot>
+    <_KoanShelvedRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)shelved'))</_KoanShelvedRoot>
+    <_KoanArchivedSamplesRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)samples/archive'))</_KoanArchivedSamplesRoot>
+    <_KoanCaseStudiesRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)docs/case-studies'))</_KoanCaseStudiesRoot>
+    <ManagePackageVersionsCentrally Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanAtticRoot)'))">false</ManagePackageVersionsCentrally>
+    <ManagePackageVersionsCentrally Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanShelvedRoot)'))">false</ManagePackageVersionsCentrally>
+    <ManagePackageVersionsCentrally Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanArchivedSamplesRoot)'))">false</ManagePackageVersionsCentrally>
+    <ManagePackageVersionsCentrally Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanCaseStudiesRoot)'))">false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="Acornima" Version="1.6.2" />
+    <PackageVersion Include="AwesomeAssertions" Version="9.5.0" />
+    <PackageVersion Include="CouchbaseNetClient" Version="3.9.4" />
+    <!-- CouchbaseNetClient 3.9 still exposes transaction support through the deprecated companion package. -->
+    <PackageVersion Include="Couchbase.Transactions" Version="3.9.0" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <PackageVersion Include="Cronos" Version="0.13.0" />
+    <PackageVersion Include="Dapper" Version="2.1.79" />
+    <PackageVersion Include="FastBertTokenizer" Version="1.0.28" />
+    <PackageVersion Include="Jint" Version="4.13.0" />
+    <PackageVersion Include="MessagePack" Version="3.1.8" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.Http" Version="2.3.11" />
+    <PackageVersion Include="Microsoft.AspNetCore.JsonPatch" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.6.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.6.0" />
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.8.0" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyModel" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.8.0" />
+    <PackageVersion Include="Microsoft.IdentityModel.Tokens" Version="8.19.2" />
+    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.27.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <!-- ASP.NET Core 10.0.10's XML source generator targets the mutable Microsoft.OpenApi 2.x model. -->
+    <PackageVersion Include="Microsoft.OpenApi" Version="2.11.0" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.301" />
+    <PackageVersion Include="Minio" Version="7.0.0" />
+    <PackageVersion Include="MongoDB.Driver" Version="3.10.0" />
+    <PackageVersion Include="Nerdbank.GitVersioning" Version="3.10.91" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="NSubstitute" Version="6.0.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+    <PackageVersion Include="RabbitMQ.Client" Version="7.2.1" />
+    <PackageVersion Include="SharpCompress" Version="0.50.0" />
+    <!-- ImageSharp.Drawing 3 requires a private build license; use the newest distributable 2.x/3.x pair. -->
+    <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageVersion Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
+    <PackageVersion Include="SkiaSharp" Version="4.150.1" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux" Version="4.150.1" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.macOS" Version="4.150.1" />
+    <PackageVersion Include="Snappier" Version="1.3.1" />
+    <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+    <PackageVersion Include="StackExchange.Redis" Version="3.0.17" />
+    <PackageVersion Include="StreamJsonRpc" Version="2.25.29" />
+    <PackageVersion Include="Svg.Skia" Version="5.1.1" />
+    <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />
+    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.19.2" />
+    <PackageVersion Include="System.Numerics.Tensors" Version="10.0.10" />
+    <PackageVersion Include="Testcontainers" Version="4.13.0" />
+    <PackageVersion Include="Testcontainers.Couchbase" Version="4.13.0" />
+    <PackageVersion Include="Testcontainers.MongoDb" Version="4.13.0" />
+    <PackageVersion Include="Testcontainers.MsSql" Version="4.13.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
+    <PackageVersion Include="Testcontainers.RabbitMq" Version="4.13.0" />
+    <PackageVersion Include="Testcontainers.Redis" Version="4.13.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.v3.assert" Version="3.2.2" />
+    <PackageVersion Include="xunit.v3.extensibility.core" Version="3.2.2" />
+  </ItemGroup>
+</Project>

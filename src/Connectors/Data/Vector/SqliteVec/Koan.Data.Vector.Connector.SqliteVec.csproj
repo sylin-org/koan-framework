@@ -16,13 +16,13 @@
     <ProjectReference Include="..\..\..\..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
     <!-- Transitive-override for NU1903 (GHSA-2m69-gcr7-jv3q): pin the native SQLite binary to the patched
          3.50.3; Microsoft.Data.Sqlite's managed SQLitePCLRaw.core stays 2.1.11. -->
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
     <!-- Vector metadata + stored-vector JSON use Newtonsoft (framework canon) — System.Text.Json's
          reflection serializer is disabled under NativeAOT, so it threw in the single-binary floor. -->
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
   <ItemGroup>
     <!-- vec0 v0.1.9 native loadable extension, embedded per floor RID and self-extracted at load. -->

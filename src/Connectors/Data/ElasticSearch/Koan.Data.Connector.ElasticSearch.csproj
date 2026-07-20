@@ -12,6 +12,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\Koan.Data.SearchEngine\Koan.Data.SearchEngine.csproj" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 </Project>

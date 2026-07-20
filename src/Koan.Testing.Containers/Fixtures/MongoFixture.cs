@@ -23,7 +23,7 @@ public sealed class MongoFixture : KoanContainerFixture
 
     protected override async Task<string> StartContainerAsync()
     {
-        _container = new MongoDbBuilder("mongo:7").Build();
+        _container = new MongoDbBuilder("mongo:8.3.4").Build();
         await _container.StartAsync().ConfigureAwait(false);
         return _container.GetConnectionString();
     }

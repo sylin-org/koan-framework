@@ -41,7 +41,6 @@ then add one visible capability.
 
 | Sample | Meaningful result | Concepts | Start |
 |---|---|---|---|
-| [AnimeRecommendations](applications/AnimeRecommendations/README.md) | Rate familiar anime and receive local, explainable recommendations shaped by taste and mood | Entity ratings, embedding-on-save, local vector search, one multi-Entity workflow | `dotnet run --project samples/applications/AnimeRecommendations` |
 | [DevPortal](applications/DevPortal/README.md) | Approve local articles, publish them through named provider channels, and render entity-backed share cards | named sources, Entity transfer, OpenGraph | `dotnet run --project samples/applications/DevPortal` |
 | [OrderIntake](applications/OrderIntake/README.md) | Run bounded order intake through one named source and keep a verified durable receipt | named sources, Entity batch work, Jobs, readiness | `dotnet run --project samples/applications/OrderIntake` |
 | [SnapVault](applications/SnapVault/README.md) | Upload a photo into a local studio, durably organize and serve it, then share its event without exposing the vault | Entity media, Jobs, tenancy, access, optional AI/vector | `dotnet run --project samples/applications/SnapVault` |
@@ -49,6 +48,10 @@ then add one visible capability.
 
 Other application directories are active graduation work, not current curriculum. Presence in the tree
 is not a support claim.
+
+The recommendation experience graduated into the standalone
+[Usagi Picks](https://github.com/lbotinelly/usagipicks) product repository. It remains useful Koan application
+evidence, but is no longer bundled sample source or part of this solution.
 
 ## Graduation contract
 

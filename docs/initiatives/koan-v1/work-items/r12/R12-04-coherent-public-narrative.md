@@ -4,18 +4,18 @@ domain: framework
 title: "R12-04 - Establish One Coherent Public Narrative"
 audience: [architects, maintainers, developers, technical-writers, ai-agents]
 status: current
-last_updated: 2026-07-19
+last_updated: 2026-07-20
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-19
-  status: in-progress
-  scope: complete public-content inventory, greenfield narrative, executable guidance, and anti-drift gate
+  date_last_tested: 2026-07-20
+  status: passed
+  scope: coherent 0.20 public graph, post-extraction sample topology, executable guidance, and anti-drift gate
 ---
 
 # R12-04 — Establish one coherent public narrative
 
 - Tranche: `T7B — public product maturity`
-- Status: `in-progress`
+- Status: `passed`
 - Depends on: settled preview/version contract, preview-blocker dispositions, and generated maturity boundary
 - Unlocks: R12-05 exact local candidate freeze and certification
 - Owner: every surface from which an external developer or coding agent learns what Koan is and how to use it
@@ -511,3 +511,286 @@ have no listeners and no sample process remains. `public-docs-lint.ps1` derives 
 sample graph, validates launcher mechanics/targets, and passes at 699 current assets / 676 current text surfaces /
 107 historical boundaries / 42 navigation targets / 12 graduated sample roots. No full sample suites or release
 ratchet ran.
+
+## AnimeRecommendations portability and durability realignment — 2026-07-19
+
+This checkpoint supersedes the embedded-only boundary and the uniform-launcher assumption above for
+AnimeRecommendations. Those records remain as evidence of the decisions that produced the regression; they are not
+the accepted product promise after the maintainer clarified that “less but more meaningful moving parts” constrains
+Koan's application grammar, not an application's legitimate deployment topology or durable user value.
+
+**Task:** Restore the valuable S5.Recs durability and distributed-runtime experience in AnimeRecommendations without
+restoring its 96-file service architecture, while proving that one Koan business application keeps its quality across
+embedded and Compose-selected providers.
+
+**Application intent:** Acquire an anime catalog once, preserve its source evidence and viewer state across process or
+container replacement, and return the same kind of explained recommendations whether the application uses embedded
+or distributed persistence, vector, and embedding resources.
+
+**Public expression:** The application host remains `AddKoan()` plus `RunAsync()`. `Anime` remains automatically
+embedded on `Save()` without naming a provider model. `CatalogImport : Entity<CatalogImport>, IKoanJob<CatalogImport>`
+is the one durable acquisition/rebuild expression. `dotnet run --project samples/applications/AnimeRecommendations`
+selects SQLite + sqlite-vec + ONNX through ordinary configuration; root `start.bat` owns the standard Docker Compose
+topology and selects Mongo + Weaviate + Ollama through environment configuration. The same Entities, import job,
+recommendation workflow, controllers, UI, cache format, and acceptance contract serve both.
+
+**Guarantee/correction:** A successful source refresh writes every raw page before projection, records one completed
+manifest, resumes the same attempt from already cached pages after job redelivery, and projects stable source records
+through normal Entity `Save()` so the elected vector/AI providers index them. A completed manifest can rebuild an
+empty catalog without network access. Local SQLite state and Compose bind-mounted Mongo, Weaviate, Ollama model, and
+source-cache directories survive ordinary restarts and container replacement. Unsupported provider placement,
+missing models, source HTTP/rate-limit failure, malformed source data, missing cache manifests, and failed durable-job
+requirements remain explicit through startup, health, facts, HTTP problem responses, and the Jobs ledger; no fallback
+is mislabeled as equivalent quality. Reset and cache flush are explicit destructive actions and never occur during
+start.
+
+**Complete intent surface:** Run `start.bat` for the complete Compose topology or the documented `dotnet run` command
+for the embedded topology; browse and rate the starter catalog immediately; request explained recommendations; queue
+an incremental AniList refresh; inspect durable job progress and completed source manifests; rebuild from one cached
+manifest offline; explicitly flush source evidence when intended; inspect health and runtime facts; stop Compose with
+the documented standard command. No provider-specific application branch, manual service registration, repository,
+custom worker, hidden reset, generated launcher, Koan CLI, auth/control plane, or second recommendation algorithm is
+required.
+
+**Public concepts:** Existing `Entity<T>`, `EntityController<T>`, `[Embedding]`, `Client.Embed`, `Vector<T>.Search`,
+`IKoanJob<T>`, `JobContext`, `KoanModule`, MVC, options, `HttpClient`, filesystem APIs, and Docker Compose retain their
+current meaning. One `CatalogImport` business Entity exists because acquisition/rebuild is durable work with progress.
+One application-scoped source contributor exists because source protocol/parsing changes independently of cache and
+projection while multiple sources must share the same chokepoint. One typed catalog-options object exists because
+endpoint, paging, retry, and cache placement are deployment tunables. A cache manifest is durable source evidence,
+not a second application database.
+
+**Docs read:** `docs/engineering/index.md` establishes controller/entity/constants/options and focused-validation
+guardrails; `docs/architecture/principles.md` establishes business-first code, provider election, thin adapters, and
+standard-.NET ownership; `docs/toc.yml`, root `README.md`, and `samples/CATALOG.md` establish the current public front
+doors; the product constitution establishes honest topology commitments and golden-sample evidence; the current Jobs
+card establishes `IKoanJob<T>` as the durable restart-safe work expression; current Mongo, Weaviate, and Ollama package
+docs establish exact provider configuration and capability boundaries; NOW and this card establish the active R12
+handoff.
+
+**Code read:** Current AnimeRecommendations host, Entities, workflow, controllers, module, configuration, UI, and
+focused fixture; GoldenJourney and SnapVault durable-job expressions; Data default-provider, Vector default-provider,
+ONNX/Ollama source, Mongo, and Weaviate composition owners; the deleted S5.Recs `start.bat`, Dockerfile, Compose graph,
+AniList provider, raw-page cache/manifests, rebuild endpoints, and import jobs. Explicit repository searches found
+1,413 constant declarations, 935 constants-owner references, 528 options references, and 913 record/DTO/request/
+response candidates; no current general source-acquisition/cache contract owns this application-specific lifecycle.
+
+**Reusing:** Koan Jobs owns durable execution, retries, progress, ledger status, and restart recovery. Entity statics
+own all application data. Automatic embedding-on-save owns indexing. Data/Vector/AI composition owns provider choice
+and facts. Standard `HttpClient` owns source transport, the filesystem owns raw evidence, and Docker Compose owns the
+distributed topology. The current starter catalog remains the immediate first-use floor; the current recommendation
+workflow remains the one provider-independent quality owner.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| `CatalogOptions` | `samples/applications/AnimeRecommendations/Options/CatalogOptions.cs` | One typed owner for source endpoint, bounded paging/retry, and cache placement. |
+| `IAnimeCatalogSourceContributor` and source-page contract | `samples/applications/AnimeRecommendations/Catalog/` | Application-specific protocol/parsing contribution chokepoint; no framework law is implied. |
+| `AniListCatalogSourceContributor` | `samples/applications/AnimeRecommendations/Catalog/AniListCatalogSourceContributor.cs` | Thin AniList HTTP/JSON mechanics behind the source boundary. |
+| `CatalogSourceCache` and manifest | `samples/applications/AnimeRecommendations/Catalog/` | One crash-safe raw-page/manifests owner shared by refresh, resume, inspection, and rebuild. |
+| `CatalogImportWorkflow` | `samples/applications/AnimeRecommendations/Catalog/CatalogImportWorkflow.cs` | The irreducible acquire/cache/project workflow, separate from HTTP and the job ledger. |
+| `CatalogImport` | `samples/applications/AnimeRecommendations/Domain/CatalogImport.cs` | Durable Entity work and progress using the existing Jobs pillar. |
+| `CatalogOperationsController` | `samples/applications/AnimeRecommendations/Controllers/CatalogOperationsController.cs` | Thin controller for refresh, status, manifests, rebuild, and explicit flush actions. |
+| Compose assets | `samples/applications/AnimeRecommendations/docker/` and root `start.bat` | Standard topology owner for app + Mongo + Weaviate + Ollama and durable bind mounts. |
+| Focused cache/import/provider-parity evidence | `tests/Suites/Samples/Koan.Samples.AnimeRecommendations.Tests/` | Proves source evidence, offline rebuild, unchanged recommendation behavior, and embedded/Compose contract parity. |
+
+**Coalescence:** Closest historical pattern is S5.Recs' AniList provider plus raw cache; closest current execution
+pattern is SnapVault's Entity job. Rebuild the historical acquisition capability but delete its bespoke import
+orchestrator, three workers, provider/parser registries, settings Entity, band/sliding caches, duplicate profiles, and
+admin control plane. Application specificity is correct: source acquisition is AnimeRecommendations business
+behavior, while Jobs/Data/Vector/AI/Compose already own their wider laws. `CatalogImportWorkflow` is the single owner;
+putting source protocol in the Entity is narrower and unreadable, while adding a Koan source-ingestion pillar is wider
+than the demonstrated reuse. No separate application microservice is introduced merely to claim microservices; the
+Compose profile honestly demonstrates a containerized Koan workload composed with independently replaceable remote
+data, vector, and AI services. A future second business workload requires its own justified contract boundary.
+
+**Ergonomics:** A reader sees one four-line host, ordinary Entities, one named durable job, and one named workflow.
+IntelliSense discovers durable work on `CatalogImport.Job`; source contributors remain behind DI and do not contaminate
+the recommendation path. Human-readable configuration names the elected providers, runtime facts confirm them, and
+the UI presents refresh/rebuild status without exposing queues or adapter APIs. The only topology branch is the user's
+standard launch/configuration choice; business code has none.
+
+**Constraints satisfied:** No inline endpoints; all HTTP remains controller-owned. Entity statics replace repositories.
+Stable routes/source IDs/cache names belong to the application constants owner; deployment tunables belong to typed
+options. Catalog projection is explicitly page-bounded and never calls unbounded `All`/stream APIs. Cross-module Koan
+contracts remain untouched and isolated. Standard .NET and existing Koan capabilities precede new ceremony. Public
+docs and the launcher invariant change with the product promise. Validation remains focused; private dogfood, `tmp/`,
+shelved projects, remotes, publication, tagging, release, and the full ratchet remain out of scope.
+
+**Risks:** AniList availability and rate limits cannot be a startup dependency; the starter catalog preserves first
+use. Different embedding models will not produce byte-identical rankings, so parity evidence must assert bounded
+business relevance and exclusions rather than exact order. Compose image/model pulls are expensive on first use and
+must report progress rather than appear hung. Bind mounts require path and reset safety. Provider connectors are below
+the supported 0.20 boundary, so this sample demonstrates interchangeability without promoting their maturity.
+
+**Implementation result:** AnimeRecommendations now provides the same lean application over an embedded
+SQLite/sqlite-vec/ONNX profile and a root-launchable Mongo/Weaviate/Ollama Compose profile. The latter ran healthy on
+MongoDB 8.3.4, Weaviate 1.37.6, and Ollama 0.32.0; runtime facts selected Mongo and Weaviate, the packaged lockfile
+matched all 22 modules, the 24 starter records plus one cached AniList record remained available after application
+recreation, and a pre-existing raw-page manifest rebuilt one item offline as a completed durable job. Explainable
+recommendations returned five requested results after recreation. Compose was stopped without volume deletion and
+the versioned Mongo/Weaviate data, source cache, and Ollama model directories remain under the sample's `.koan`
+owner. Focused sample evidence passes 3/3; no full release ratchet ran.
+
+## Pre-release dependency modernization checkpoint — 2026-07-19
+
+**Task:** Promote Koan's exact .NET 10 toolchain pin to the latest stable SDK and evaluate every release-relevant
+external dependency against its latest stable release before the initial 0.20 publication.
+
+**Application intent:** A contributor or release runner should build the initial Koan preview from one current,
+reproducible dependency constitution rather than inherit unexplained old feature bands, floating versions, or
+project-by-project version drift.
+
+**Public expression:** `global.json` pins the current stable .NET 10 SDK exactly. Standard .NET Central Package
+Management owns one version for each external NuGet identity in `Directory.Packages.props`; ordinary project
+`PackageReference` items state only dependency intent. Internal `Sylin.Koan.*` compatibility placeholders and template
+substitution properties remain owned by their existing packaging contracts. Workflow actions and runnable sample
+container images use reviewed, reproducible versions rather than accidental stale or floating inputs.
+
+**Guarantee/correction:** The same commit restores, builds, tests, and packages with one explicit external dependency
+graph. A missing central version, incompatible major upgrade, advisory, stale release literal, or unexplained local
+override fails focused restore/build/package evidence and is corrected at the owning dependency or recorded as a
+time-bounded exception. Reproducibility never means silently retaining an old dependency; freshness never means
+floating a build input between commits.
+
+**Complete intent surface:** Install the SDK named by `global.json`, restore normally, and build. Maintainers update
+one central NuGet declaration per external identity and the exact pins for SDK, workflow, tool, and container inputs.
+No Koan dependency manager, version registry, generated application ceremony, or runtime configuration is added.
+
+**Public concepts:** `global.json`, `Directory.Packages.props`, `PackageReference`, NuGet restore/audit, GitHub Actions,
+and Docker image tags are standard platform concepts. The only policy concept is “latest stable by default”; an
+exception must name the compatibility blocker and its revisit condition.
+
+**Docs read:** The engineering front door requires evaluated packaging and clean metadata; architecture principles
+prefer standard .NET and one current path; the public TOC and root README establish 0.20 as the initial preview line;
+ARCH-0082/0085 establish independently versioned Koan packages; ARCH-0110 establishes exact-toolchain, clean-room,
+audited release proof.
+
+**Code read:** `global.json` and `release-on-dev.yml` currently split one SDK policy across five literals;
+`Directory.Build.props` repeats SourceLink/NBGV versions into every project; 216 solution projects contain 755
+release-relevant `PackageReference` sites for 91 identities; `.config/dotnet-tools.json` separately pins NBGV;
+`ReleaseWorkflowContractTests` protects exact release-action identities and trust boundaries. Explicit searches found
+1,422 constant declarations, 935 constants-owner references, 536 options references, and 926 record/DTO/request/
+response candidates; none is relevant because this slice changes build dependency ownership, not runtime behavior.
+
+**Reusing:** NuGet restore/audit, MSBuild evaluation, NBGV, the release compiler, package-graph tests, workflow contract
+tests, Docker Compose validation, and focused connector/sample suites remain the proof owners. The official .NET 10
+release metadata reports SDK 10.0.302/runtime 10.0.10 as the current stable line. The NuGet flat-container index was
+queried for all 86 external identities discovered in the release-relevant graph; no identity failed lookup.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| Central external package versions | `Directory.Packages.props` | Standard .NET single owner replacing repeated and divergent version literals. |
+| Freshness policy and exception contract | current engineering/packaging documentation | Makes “latest stable” enforceable and prevents unexplained holds from returning. |
+| Focused dependency audit evidence | existing packaging tests/scripts where a durable gate is justified | Reuses the release-quality chokepoint instead of adding another versioning subsystem. |
+
+**Coalescence:** The closest current owner is root `Directory.Build.props`, but it mixes universal build behavior with
+two package versions and cannot govern the other 753 sites. Absorb external NuGet versions into the SDK-native central
+package file; keep dependency intent at each consumer; keep internal Koan range tokens at their packaging owners;
+delete external `Version` duplication and floating ranges. The repository root is the one correct lifetime and scope:
+project-local ownership is too narrow and the release compiler is too late because restore has already resolved the
+graph. Human review gains one readable inventory, IntelliSense continues to discover ordinary PackageReferences,
+and the coding model loses version branches without gaining a Koan abstraction.
+
+**Ergonomics:** A dependency upgrade becomes one obvious diff plus any necessary source adaptation. Contributors no
+longer search hundreds of project files or wonder which duplicate is authoritative. Exact SDK/action/image pins keep
+failures attributable to a commit; automated or manual freshness checks can propose the next stable version without
+changing builds implicitly.
+
+**Constraints satisfied:** No application HTTP, Entity, data, options, or provider semantics change by architecture;
+standard .NET owns dependency management; internal cross-package compatibility remains isolated; no inline endpoints,
+runtime constants, repositories, private dogfood, shelved scope, `tmp/`, remote mutation, publication, tag, push, or
+full release ratchet enters the slice. Major dependency adaptations will stay at the existing package owner and receive
+focused tests.
+
+**Risks:** Latest stable major releases can contain intentional API or behavior breaks; each must be compiled and
+tested rather than mechanically declared successful. Some packages may lag current .NET support or constrain a peer
+dependency. Container service majors can change persisted formats, so runnable samples require explicit migration or
+fresh-state evidence. Updating the SDK changes compiler/MSBuild behavior and therefore requires packaging/generator
+proof in addition to application builds. The current machine lacks SDK 10.0.302, so validation must use an isolated
+exact SDK installation until the workstation installs the repository prerequisite.
+
+**Implementation result:** The repository now pins SDK 10.0.302, runtime images 10.0.10, NBGV 3.10.91, exact current
+GitHub Action SHAs, and one Central Package Management inventory for the 216-project solution. All listed stable NuGet
+updates were adopted except four explicit constraints: Microsoft.OpenApi remains on 2.11.0 because ASP.NET Core
+10.0.10's OpenAPI generator is incompatible with the 3.x read-only model; ImageSharp 3.1.12 and Drawing 2.1.7 remain
+the latest freely distributable compatible pair because Drawing 3 requires a private Six Labors build license;
+StreamJsonRpc 2.25.29 is the same NuGet identity displayed with `+RR` metadata; Couchbase.Transactions 3.9.0 remains
+deprecated-but-required because CouchbaseNetClient 3.9.4 does not expose the transactions namespaces. Milvus'
+official 2.6.20 etcd 3.5.25 and MinIO 2024-12-18 companions remain a tested stack rather than independently promoted
+incompatibly. All runnable production/sample containers use exact non-floating tags and versioned persisted-data
+paths where service majors changed.
+
+The complete solution restore resolves all 216 projects and the transitive vulnerability audit reports zero known
+vulnerable packages. Focused evidence passes dependency/workflow governance 12/12, filtering 94/94, RabbitMQ 8/8,
+OpenAPI 12/12, Milvus 25 passed with eight declared capability skips, and each promoted connector suite exercised
+against its exact current service image. The dependency constitution now fails duplicate/missing external NuGet
+ownership, inline external versions, non-exact SDK/action selection, and floating release-relevant container tags.
+
+## Usagi Picks product graduation checkpoint — 2026-07-20
+
+The maintainer promoted AnimeRecommendations from bundled framework sample to the standalone product repository
+`https://github.com/lbotinelly/usagipicks`. The application and focused tests moved rather than being rebuilt; the
+shared ONNX model was copied because other Koan samples still consume it. Existing ignored `.koan` state moved with
+the product, including raw-source manifests, SQLite, versioned MongoDB/Weaviate stores, and the Ollama model. Legacy
+database identifiers remain intentionally stable so the product rename does not orphan preserved data.
+
+The standalone repository owns a temporary explicit source-checkout bridge because the complete set of required
+preview packages is not yet public; ordinary package references remain the permanent boundary. It also records the
+accepted next product specification: Media as the common business primitive with honest Anime/Manga subtype meaning;
+artwork captured, stored, and locally served through Koan.Media; public and authenticated journeys; identity-owned
+libraries, feedback, and progress; several user-named explainable discovery modes; a protected task-oriented catalog
+administration experience; and restoration of the mature interaction depth under the Usagi Picks brand. Historical
+S5.Recs commit `5310fda55c4608540f476990e23f219823044388` is retained as capability/UI evidence, never as an architecture
+to transplant.
+
+Koan's solution, bundled sample catalog, and current AI/vector references no longer point at deleted local paths;
+they identify Usagi Picks as a standalone application where relevant. Historical initiative passages remain evidence
+of the decisions and tests that occurred before graduation. The current bundled graduated portfolio is ten
+executables; prior eleven-sample test counts are historical results, not a current inventory claim.
+
+## Post-extraction public-graph closure checkpoint — 2026-07-20
+
+**Application intent:** A reader entering Koan through any current front door sees one 0.20 preview product and
+understands that Usagi Picks is a separate Koan application, not a missing or partially removed bundled sample.
+
+**Complete expression:** The canonical install → four-line `AddKoan()` host → first `Entity<T>` result → progressive
+capability-reference path remains unchanged. `samples/README.md` admits eleven curriculum roots containing ten
+executables, and AI/vector guidance links directly to the standalone Usagi Picks repository where its complete
+product journey is relevant.
+
+**Guarantee/correction:** No current public surface may point at the removed local AnimeRecommendations application or
+tests, repeat its old bundled-sample totals as present fact, or require historical initiative prose to explain the
+move. The existing public-content compiler derives the current graph and reports the exact offending path; dated
+checkpoints retain the counts and evidence that were true when they ran.
+
+**Coalescence:** Keep `scripts/public-docs-lint.ps1` as the single inventory and narrative-invariant owner. Sample
+admission remains one ordinary README link, local launchability remains the existing root `start.bat` contract, and
+an ordinary external repository link expresses the product boundary. Add no sample manifest, redirect stub,
+Usagi-specific compiler rule, or second documentation ledger.
+
+**Ergonomics:** A developer can distinguish bundled learning applications from a standalone product at a glance;
+there is no dead local path, unexplained count mismatch, or duplicate launch model. Maintainers continue to run one
+discoverable truth command and reason about one derived graph.
+
+**Implementation boundary:** Reconcile current front doors, sample inventory, AI/vector references, solution
+membership, this work card, and `NOW.md`. Preserve historical evidence unchanged. Do not modify runtime APIs,
+generated maturity truth, ADR conclusions, sample behavior, remote state, or the R12-05 candidate-certification
+boundary.
+
+### Closure result
+
+The intended patch passes the public-document truth gate in an isolated worktree at 677 current assets, 656 current
+text surfaces, 107 historical boundaries, 42 navigation targets, and eleven graduated curriculum roots. All ten
+executable roots have the standard launcher contract; the GardenCoop overview is the one non-executable admitted
+root. The broad current documentation structure check reports zero errors and fourteen non-gating frontmatter
+warnings, the four changed instructional files contain no marked executable code block, scoped whitespace checks
+pass, and current-path plus solution searches find zero deleted AnimeRecommendations references.
+
+The same public gate run in the working checkout stops only because its deliberate isolation guard observes existing
+changes to `DATA-0103` and `SERV-0001`. Those ADR edits belong to the separate dependency/source work already present
+in the dirty tree; this slice neither changes them nor weakens the guard. No full ratchet, sample suite, remote
+mutation, publication, tag, push, or private dogfood inspection ran. R12-05 now owns the exact frozen-candidate proof.

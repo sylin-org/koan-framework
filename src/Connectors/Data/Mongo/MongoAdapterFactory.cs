@@ -17,10 +17,10 @@ namespace Koan.Data.Connector.Mongo;
 [ProviderPriority(Constants.Provider.Priority)]
 [KoanService(ServiceKind.Database, shortCode: "mongo", name: "MongoDB",
     ContainerImage = "mongo",
-    DefaultTag = "7",
+    DefaultTag = "8.3.4",
     DefaultPorts = new[] { 27017 },
     Capabilities = new[] { "protocol=mongodb" },
-    Volumes = new[] { "./Data/mongo:/data/db" },
+    Volumes = new[] { "./Data/mongo-8.3:/data/db" },
     AppEnv = new[] { "Koan__Data__Mongo__ConnectionString={scheme}://{host}:{port}", "Koan__Data__Mongo__Database=Koan" },
     Scheme = "mongodb", Host = "mongo", EndpointPort = 27017, UriPattern = "mongodb://{host}:{port}",
     LocalScheme = "mongodb", LocalHost = "localhost", LocalPort = 27017, LocalPattern = "mongodb://{host}:{port}")]

@@ -2,13 +2,13 @@ name: koan-devportal
 
 services:
   mongo:
-    image: mongo:7.0
+    image: mongo:8.3.4
     ports:
       - "5091:27017"
     environment:
       MONGO_INITDB_DATABASE: DevPortalDocuments
     volumes:
-      - ../.koan/mongo:/data/db
+      - ../.koan/mongo-8.3:/data/db
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/DevPortalDocuments --quiet
       interval: 2s
@@ -16,7 +16,7 @@ services:
       retries: 20
 
   postgres:
-    image: postgres:16
+    image: postgres:18.4
     ports:
       - "5092:5432"
     environment:
@@ -25,7 +25,7 @@ services:
       POSTGRES_PASSWORD: dev
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
     volumes:
-      - ../.koan/postgres:/var/lib/postgresql/data
+      - ../.koan/postgres-18:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d devportal"]
       interval: 2s

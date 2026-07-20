@@ -39,7 +39,7 @@ public sealed class MilvusVectorAodbConformanceSpec : VectorAodbConformanceSpecs
             _network = new NetworkBuilder().Build();
             await _network.CreateAsync().ConfigureAwait(false);
 
-            _etcd = new ContainerBuilder("quay.io/coreos/etcd:v3.5.5")
+            _etcd = new ContainerBuilder("quay.io/coreos/etcd:v3.5.25")
                 .WithNetwork(_network)
                 .WithNetworkAliases("etcd")
                 .WithEnvironment("ETCD_AUTO_COMPACTION_MODE", "revision")
@@ -54,7 +54,7 @@ public sealed class MilvusVectorAodbConformanceSpec : VectorAodbConformanceSpecs
                 .Build();
             await _etcd.StartAsync().ConfigureAwait(false);
 
-            _minio = new ContainerBuilder("minio/minio:RELEASE.2023-03-20T20-16-18Z")
+            _minio = new ContainerBuilder("minio/minio:RELEASE.2024-12-18T13-15-44Z")
                 .WithNetwork(_network)
                 .WithNetworkAliases("minio")
                 .WithEnvironment("MINIO_ACCESS_KEY", "minioadmin")
@@ -64,7 +64,7 @@ public sealed class MilvusVectorAodbConformanceSpec : VectorAodbConformanceSpecs
                 .Build();
             await _minio.StartAsync().ConfigureAwait(false);
 
-            _milvus = new ContainerBuilder("milvusdb/milvus:v2.4.13")
+            _milvus = new ContainerBuilder("milvusdb/milvus:v2.6.20")
                 .WithNetwork(_network)
                 .WithNetworkAliases("milvus")
                 .WithEnvironment("ETCD_ENDPOINTS", "etcd:2379")

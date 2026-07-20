@@ -56,7 +56,7 @@ These live in the base. OpenSearch supports the identical scroll (`_search?scrol
 
 ### 4. Keep both thin packages
 
-Reference = Intent plus per-backend `[KoanService]` orchestration metadata (different `ContainerImage`/`DefaultTag`/`Env`: `docker.elastic.co/elasticsearch:8.13.4` + `xpack.security.enabled=false` vs `opensearchproject/opensearch:2.13.0` + `DISABLE_SECURITY_PLUGIN=true`) require **two** packages. Each keeps only: the `ISearchEngineDialect` impl, `[KoanService]` metadata + provider shortCode + `CanHandle`, the discovery adapter, telemetry/constants, the options-binding path, and the registrar describe entries. The options classes extend a shared `SearchEngineVectorOptions` base; the concrete classes carry only `ConnectionString` + `Readiness`.
+Reference = Intent plus per-backend `[KoanService]` orchestration metadata (different `ContainerImage`/`DefaultTag`/`Env`: `docker.elastic.co/elasticsearch/elasticsearch:9.4.3` + `xpack.security.enabled=false` vs `opensearchproject/opensearch:3.7.0` + `DISABLE_SECURITY_PLUGIN=true`) require **two** packages. Each keeps only: the `ISearchEngineDialect` impl, `[KoanService]` metadata + provider shortCode + `CanHandle`, the discovery adapter, telemetry/constants, the options-binding path, and the registrar describe entries. The options classes extend a shared `SearchEngineVectorOptions` base; the concrete classes carry only `ConnectionString` + `Readiness`.
 
 ### 5. Fix the drift bugs in the same move
 
@@ -90,5 +90,5 @@ DATA-0097 §6 (`DATA-0097-vector-pathway-parity.md:138-142`) deliberately kept t
 ## Verification
 
 - `dotnet build Koan.sln` — 0 errors.
-- Both `VectorAdapterSurface` Testcontainers suites (ES `docker.elastic.co/elasticsearch:8.13.4`, OS `opensearchproject/opensearch:2.13.0`) green, including the new `ExportAll`/`Stats` specs that prove the OS gap closed.
+- Both `VectorAdapterSurface` Testcontainers suites use the exact current stable engines (ES `docker.elastic.co/elasticsearch/elasticsearch:9.4.3`, OS `opensearchproject/opensearch:3.7.0`), including the `ExportAll`/`Stats` specs that prove the OS gap closed.
 - Grep gates: `grep -n elastic OpenSearchVectorAdapterFactory.cs` → 0; `grep -rn "DefaultTopK\|MaxTopK" src` over the ES connector → 0.

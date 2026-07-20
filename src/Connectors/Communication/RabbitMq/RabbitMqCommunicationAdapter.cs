@@ -134,7 +134,8 @@ internal sealed class RabbitMqCommunicationAdapter(
                 LastFailure);
             throw new InvalidOperationException(
                 "RabbitMQ Communication is directly selected but unavailable. Correct the endpoint, credentials, " +
-                "or broker readiness; Koan will not silently reduce the elected mesh to process-local reach.");
+                "or broker readiness; Koan will not silently reduce the elected mesh to process-local reach. " +
+                $"Broker reported: {LastFailure}");
         }
     }
 
@@ -239,7 +240,7 @@ internal sealed class RabbitMqCommunicationAdapter(
         await _consumer!.QueueDeclareAsync(
                 queue,
                 durable: !nodeScoped,
-                exclusive: false,
+                exclusive: nodeScoped,
                 autoDelete: nodeScoped,
                 cancellationToken: ct)
             .ConfigureAwait(false);

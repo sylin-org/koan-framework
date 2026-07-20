@@ -31,7 +31,7 @@ engineering material and is not alternate product guidance.
 | Add tenant segmentation | [Tenancy pillar map](../reference/cards/tenancy.md) | `Tenant.Use` and `[HostScoped]` |
 | Test Entity/provider behavior | [Testing your app](testing-your-app.md) | conformance specification |
 | Review composition drift | [Composition lockfile](composition-lockfile.md) | checked-in `koan.lock.json` |
-| Publish a native deployment | [NativeAOT map](../reference/cards/nativeaot.md) | build-time deployment choice |
+| Evaluate experimental native deployment | [NativeAOT boundary](../reference/cards/nativeaot.md) | current compiler blocker and JIT fallback |
 | Diagnose a running application | [Troubleshooting](../support/troubleshooting.md) | no new application concept |
 
 For AI/vector, media, storage, orchestration, and other surfaces, check the

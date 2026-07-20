@@ -1,26 +1,37 @@
 ---
 type: REF
 domain: orchestration
-title: "NativeAOT — sovereign native-deployment map"
+title: "NativeAOT — experimental deployment boundary"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-20
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-17
-  status: verified
-  scope: GardenCoop win-x64 native executable, business API, lifecycle result, and runtime facts
+  date_last_tested: 2026-07-20
+  status: blocked
+  scope: GardenCoop win-x64 publish currently stops inside the .NET 10.0.10 ILC analyzer
 ---
 
-# NativeAOT — sovereign native-deployment map
+# NativeAOT — experimental deployment boundary
 
-> One-screen map of the sovereign floor — publishing a self-contained native Koan deployment (no .NET runtime, container, or external server required). The floor of the deployment-footprint ladder. Full detail: [nativeaot-howto.md](../../guides/nativeaot-howto.md) · decision: [ARCH-0093](../../decisions/ARCH-0093-nativeaot-substrate.md).
+> NativeAOT is an experimental Koan deployment path, not a 0.20 guarantee. With the pinned .NET 10.0.302 SDK and
+> 10.0.10 runtime packs, GardenCoop Chapter 1 currently stops inside the ILC analyzer with an
+> `IndexOutOfRangeException` before producing an executable. Use self-contained or single-file JIT publication for
+> the current candidate. The retained implementation map is documented in
+> [nativeaot-howto.md](../../guides/nativeaot-howto.md); [ARCH-0093](../../decisions/ARCH-0093-nativeaot-substrate.md)
+> remains the dated substrate decision, not executable proof.
 
-**What it does** — An AOT-compatible Koan application publishes as a native executable that boots without an installed .NET runtime. The deployment directory may also contain application assets and native connector libraries; NativeAOT does not imply one physical file. Reference = Intent still selects adapters, and the build emits `obj/koan.trimroots.xml` to keep referenced Koan modules reachable. The current public sample proves the full GardenCoop Chapter 1 result on **win-x64**; other RIDs and native connectors remain separate claims until freshly exercised.
+**Intended result** — An AOT-compatible Koan application can publish as a native executable that boots without an
+installed .NET runtime. The deployment directory may also contain application assets and native connector libraries;
+NativeAOT does not imply one physical file. Reference = Intent still selects adapters, and the build emits
+`obj/koan.trimroots.xml` to keep referenced Koan modules reachable. No RID or complete Koan application currently has
+a candidate-grade NativeAOT claim.
 
-## The one canonical pattern
+## Retained diagnostic pattern
 
-Gate AOT behind `-p:KoanAot=true` (set `PublishAot` **locally** — a global property trips the netstandard2.0 generators with `NETSDK1207`), then publish for a RID. Root your own serialized types so Newtonsoft can reflect over them.
+This is the implementation shape under investigation, not a promised working candidate recipe. Gate AOT behind
+`-p:KoanAot=true` (set `PublishAot` **locally** — a global property trips the netstandard2.0 generators with
+`NETSDK1207`), publish for a RID, and root application-owned serialized types.
 
 ```xml
 <!-- App.csproj -->
@@ -60,6 +71,8 @@ dotnet publish App.csproj -c Release -r win-x64 -p:KoanAot=true -p:IlcUseEnviron
 
 No AOT toolchain (or a connector that isn't AOT-clean yet)? Publish **single-file JIT** instead — `-p:PublishSingleFile=true --self-contained` — and Koan still discovers the bundled Reference=Intent connectors via the embedded `koan.modules.manifest` + `Assembly.Load` (the same module list, a different mechanism). Or simply move **up** the footprint ladder: the same app runs unchanged on one Docker host, k8s, or cloud — "sovereign" is the *floor*, not the only rung.
 
-## The sample that shows it
+## Current sample boundary
 
-[`GardenCoop Chapter 1`](../../../samples/journeys/GardenCoop/01-GardenJournal/) — one native application deployment serving its dashboard, SQLite-backed garden API, lifecycle automation, and composition facts with no external service.
+[`GardenCoop Chapter 1`](../../../samples/journeys/GardenCoop/01-GardenJournal/) retains the smallest AOT opt-in and
+application-root descriptors so the upstream/compiler boundary remains reproducible. Its ordinary JIT application
+path is verified; its native publish is not.

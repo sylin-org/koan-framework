@@ -9,8 +9,8 @@ namespace Koan.Data.Vector.Connector.Weaviate;
 
 [ProviderPriority(10)]
 [KoanService(ServiceKind.Vector, shortCode: "weaviate", name: "Weaviate",
-    ContainerImage = "semitechnologies/weaviate",
-    DefaultTag = "1.25.6",
+    ContainerImage = "cr.weaviate.io/semitechnologies/weaviate",
+    DefaultTag = "1.37.6",
     DefaultPorts = new[] { 8080 },
     Capabilities = new[] { "protocol=http", "vector-search=true" },
     Env = new[]
@@ -22,7 +22,7 @@ namespace Koan.Data.Vector.Connector.Weaviate;
         "CLUSTER_HOSTNAME=node1",
         "RAFT_BOOTSTRAP_EXPECT=1"
     },
-    Volumes = new[] { "./Data/weaviate:/var/lib/weaviate" },
+    Volumes = new[] { "./Data/weaviate-1.37:/var/lib/weaviate" },
     AppEnv = new[] { "Koan__Data__Weaviate__Endpoint=http://{serviceId}:{port}" },
     HealthEndpoint = "/v1/.well-known/ready",
     HealthIntervalSeconds = 5,

@@ -20,9 +20,10 @@ related_guides:
 
 This guide walks through Koan's AI-powered semantic-search surfaces, from a first embedding to hybrid
 and personalization patterns. [GardenCoop Chapter 2](../../samples/journeys/GardenCoop/02-LocalDiscovery/)
-proves the smallest local embed-save-search path. [AnimeRecommendations](../../samples/applications/AnimeRecommendations/)
-grows that path into a bounded, explainable personalization workflow. Neither sample claims production-scale
-recommendation quality; advanced hybrid and tuning recipes remain compositional patterns.
+proves the smallest local embed-save-search path. Standalone
+[Usagi Picks](https://github.com/lbotinelly/usagipicks) grows that path into a bounded, explainable personalization
+workflow. Neither application claims production-scale recommendation quality; advanced hybrid and tuning recipes
+remain compositional patterns.
 
 **Related Guides:**
 - [Entity Capabilities](entity-capabilities-howto.md) – Core entity patterns for data access
@@ -100,7 +101,7 @@ Console.WriteLine($"Generated {embedding.Length}-dimensional vector");
 **Usage scenarios & benefits**
 
 - *GardenCoop Chapter 2* generates embeddings from produce names and descriptions for local semantic search
-- *AnimeRecommendations* embeds a present-tense mood plus a bounded set of strongly rated anime
+- *Usagi Picks* embeds a present-tense mood plus a bounded set of strongly rated anime
 - Developers can swap embedding models (all-minilm → nomic-embed → OpenAI) by changing config
 - Same embedding can be used across multiple vector databases
 
@@ -875,8 +876,8 @@ await foreach (var batch in vectorRepo.ExportAll(batchSize: 100, ct))
 5. Add personalization for returning users (section 5)
 
 Run [GardenCoop Chapter 2](../../samples/journeys/GardenCoop/02-LocalDiscovery/) for the smallest current local
-embed-save-search path. Run [AnimeRecommendations](../../samples/applications/AnimeRecommendations/) for the
-bounded ratings → intent → vector candidates → explanation workflow. Treat hybrid matching, internet-scale
+embed-save-search path. Run [Usagi Picks](https://github.com/lbotinelly/usagipicks) for the bounded ratings → intent
+→ vector candidates → explanation workflow. Treat hybrid matching, internet-scale
 recommendation quality, and production tuning as separate claims that need their own provider and workload evidence.
 
 **Related Guides:**

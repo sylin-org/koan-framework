@@ -30,7 +30,7 @@ public sealed class ElasticSearchVectorAodbConformanceSpec : VectorAodbConforman
         IContainer es;
         try
         {
-            es = new ContainerBuilder("docker.elastic.co/elasticsearch/elasticsearch:8.13.4")
+            es = new ContainerBuilder("docker.elastic.co/elasticsearch/elasticsearch:9.4.3")
                 .WithEnvironment("discovery.type", "single-node")
                 .WithEnvironment("xpack.security.enabled", "false")
                 .WithEnvironment("ES_JAVA_OPTS", "-Xms512m -Xmx512m")

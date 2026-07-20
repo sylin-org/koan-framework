@@ -1,7 +1,7 @@
 name: koan-order-intake
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18.4-alpine
     environment:
       POSTGRES_DB: order_intake
       POSTGRES_USER: koan
@@ -15,7 +15,7 @@ services:
       - "5094:5432"
 
   mongo:
-    image: mongo:8.0
+    image: mongo:8.3.4
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
@@ -25,7 +25,7 @@ services:
       - "5093:27017"
 
   redis:
-    image: redis:7-alpine
+    image: redis:8.8.0-alpine
     command: redis-server --appendonly yes
     ports:
       - "5095:6379"

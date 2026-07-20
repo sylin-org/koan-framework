@@ -77,7 +77,7 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
             // deterministic CI behavior. Qdrant follows semver rigorously so REST surface is
             // stable across 1.x. Using the image-constructor overload (the parameterless
             // ContainerBuilder() is now CS0618-obsolete in Testcontainers 4.11+).
-            _qdrant = new ContainerBuilder("qdrant/qdrant:v1.10.0")
+            _qdrant = new ContainerBuilder("qdrant/qdrant:v1.18.3")
                 .WithPortBinding(6333, true)
                 .WithPortBinding(6334, true)
                 // /readyz returns 200 once the node has loaded collections and is accepting

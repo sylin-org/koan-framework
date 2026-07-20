@@ -11,6 +11,6 @@
     <ProjectReference Include="..\Koan.Redis.Abstractions\Koan.Redis.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="StackExchange.Redis" Version="2.9.32" />
+    <PackageReference Include="StackExchange.Redis" />
   </ItemGroup>
 </Project>

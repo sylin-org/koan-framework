@@ -54,6 +54,25 @@ Dependency-only bundles are SDK projects with `IncludeBuildOutput=false`, `Inclu
 ProjectReferences to their members. Do not author a parallel nuspec or substitute one bundle version
 for its independently versioned dependencies.
 
+## Dependency constitution
+
+Release-relevant projects inherit one external NuGet dependency constitution from the repository
+root `Directory.Packages.props`. Consumer projects keep their `PackageReference` declarations because
+those references express intent, but they do not repeat versions. Internal `Sylin.Koan.*` references
+used by package-only acceptance applications and templates retain their generated range tokens.
+
+The default is the newest listed stable release, pinned exactly. The same rule applies to the .NET SDK,
+repository tools, GitHub Actions, CDN assets, and sample container images. A dependency may remain below
+latest only when a current compatibility, licensing, or distribution constraint has been reproduced;
+record that exception beside the central pin and keep the newest compatible stable release. Historical
+trees under `attic/`, `shelved/`, `samples/archive/`, and `docs/case-studies/` are frozen evidence rather
+than release inputs and retain their original manifests.
+
+Dependency promotion is a deliberate quality event: restore the entire solution, audit direct and
+transitive vulnerabilities, then build the solution and run focused tests for the affected owners.
+Do not introduce floating versions such as `latest`, major-only container tags, wildcard SDKs, or
+version-tagged GitHub Actions.
+
 ## Package-affecting build inputs
 
 Version ownership follows source, never generated output. Analyzer ProjectReferences automatically

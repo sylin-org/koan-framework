@@ -10,10 +10,10 @@ namespace Koan.Data.Vector.Connector.Qdrant;
 [ProviderPriority(30)]
 [KoanService(ServiceKind.Vector, shortCode: "qdrant", name: "Qdrant",
     ContainerImage = "qdrant/qdrant",
-    DefaultTag = "v1.10.0",
+    DefaultTag = "v1.18.3",
     DefaultPorts = new[] { 6333, 6334 },
     Capabilities = new[] { "protocol=http", "vector-search=true", "filters=true", "synchronous-writes=true", "profile=lean", "quantization=scalar-default" },
-    Volumes = new[] { "./Data/qdrant:/qdrant/storage" },
+    Volumes = new[] { "./Data/qdrant-1.18:/qdrant/storage" },
     AppEnv = new[] { "Koan__Data__Qdrant__Endpoint=http://{serviceId}:{port}" },
     HealthEndpoint = "/readyz",
     HealthIntervalSeconds = 5,

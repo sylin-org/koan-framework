@@ -15,7 +15,7 @@
     <ProjectReference Include="..\..\..\Koan.Redis\Koan.Redis.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="StackExchange.Redis" Version="2.9.32" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="StackExchange.Redis" />
+    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 </Project>

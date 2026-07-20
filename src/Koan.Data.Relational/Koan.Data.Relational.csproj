@@ -10,8 +10,8 @@
     <!-- Comparable-encoding contract (DATA-0100): the shared JsonConverters that canonicalise
          DateTimeOffset/TimeSpan/DateOnly/TimeOnly on the relational write path. Relational adapters
          persist entities as a JSON document via Newtonsoft. -->
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />

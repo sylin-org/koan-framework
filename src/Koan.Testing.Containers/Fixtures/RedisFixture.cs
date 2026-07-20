@@ -23,7 +23,7 @@ public sealed class RedisFixture : KoanContainerFixture
 
     protected override async Task<string> StartContainerAsync()
     {
-        _container = new RedisBuilder("redis:7-alpine").Build();
+        _container = new RedisBuilder("redis:8.8.0-alpine").Build();
         await _container.StartAsync().ConfigureAwait(false);
         return _container.GetConnectionString();
     }

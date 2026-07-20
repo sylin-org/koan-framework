@@ -27,7 +27,7 @@ public sealed class CockroachFixture : KoanContainerFixture
     {
         // v23.2.x is a stable, widely-cached tag that pulls reliably. start-single-node --insecure brings up a
         // ready-to-query node with the `root` superuser, no password, and TLS disabled.
-        _container = new ContainerBuilder("cockroachdb/cockroach:v23.2.4")
+        _container = new ContainerBuilder("cockroachdb/cockroach:v26.2.3")
             .WithCommand("start-single-node", "--insecure")
             .WithPortBinding(SqlPort, true)
             .WithPortBinding(HttpPort, true)

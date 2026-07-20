@@ -33,7 +33,7 @@ public sealed class QdrantVectorAodbConformanceSpec : VectorAodbConformanceSpecs
         IContainer qdrant;
         try
         {
-            qdrant = new ContainerBuilder("qdrant/qdrant:v1.10.0")
+            qdrant = new ContainerBuilder("qdrant/qdrant:v1.18.3")
                 .WithPortBinding(6333, true)
                 .WithPortBinding(6334, true)
                 .WithWaitStrategy(Wait.ForUnixContainer()

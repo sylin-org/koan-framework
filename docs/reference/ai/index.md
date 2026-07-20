@@ -158,7 +158,7 @@ those through their owning Koan/ASP.NET Core concerns before exposing AI routes 
 
 - [Entity data](../data/index.md)
 - [Vector providers](../cards/vector.md)
-- [AnimeRecommendations complete local sample](../../../samples/applications/AnimeRecommendations/)
+- [Usagi Picks standalone recommendation application](https://github.com/lbotinelly/usagipicks)
 - [MCP and agent-facing surfaces](../cards/mcp.md)
 - [Ollama package](../../../src/Connectors/AI/Ollama/README.md)
 - [LM Studio package](../../../src/Connectors/AI/LMStudio/README.md)

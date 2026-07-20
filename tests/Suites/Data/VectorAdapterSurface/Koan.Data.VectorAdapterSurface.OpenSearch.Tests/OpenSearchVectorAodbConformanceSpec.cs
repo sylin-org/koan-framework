@@ -30,7 +30,7 @@ public sealed class OpenSearchVectorAodbConformanceSpec : VectorAodbConformanceS
         IContainer opensearch;
         try
         {
-            opensearch = new ContainerBuilder("opensearchproject/opensearch:2.13.0")
+            opensearch = new ContainerBuilder("opensearchproject/opensearch:3.7.0")
                 .WithEnvironment("discovery.type", "single-node")
                 .WithEnvironment("DISABLE_SECURITY_PLUGIN", "true")
                 .WithEnvironment("OPENSEARCH_JAVA_OPTS", "-Xms512m -Xmx512m")

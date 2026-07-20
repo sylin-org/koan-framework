@@ -47,7 +47,7 @@ public sealed class RedisDatabaseRoutingSpec : IAsyncLifetime
     {
         try
         {
-            _container = new RedisBuilder("redis:7-alpine").Build();
+            _container = new RedisBuilder("redis:8.8.0-alpine").Build();
             await _container.StartAsync().ConfigureAwait(false);
         }
         catch (Exception ex)

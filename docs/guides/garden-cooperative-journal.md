@@ -4,12 +4,12 @@ domain: data
 title: "Garden Cooperative Journal"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-20
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-17
+  date_last_tested: 2026-07-20
   status: tested
-  scope: cumulative GardenCoop journey; four-line host, lifecycle automation, local semantic discovery, facts, and NativeAOT Chapter 1
+  scope: cumulative GardenCoop JIT journey; four-line host, lifecycle automation, local semantic discovery, and facts
 ---
 
 # Garden Cooperative Journal
@@ -170,9 +170,10 @@ becomes acknowledged.
 
 ## 6. Deployment claim
 
-GardenCoop has a measured win-x64 NativeAOT path. It publishes a self-contained native deployment
-directory—not a falsely advertised physical single file—containing the executable, dashboard assets,
-and SQLite native library. The exact command and current boundary live in the
+GardenCoop retains an experimental win-x64 NativeAOT configuration, but the pinned toolchain currently fails inside
+the ILC analyzer before producing an executable. NativeAOT is therefore not a 0.20 deployment claim. The ordinary
+JIT application remains the verified journey; use self-contained or single-file JIT publication when a runtime-free
+native executable is not required. The diagnostic command and current blocker live in the
 [Chapter 1 README](../../samples/journeys/GardenCoop/01-GardenJournal/README.md) and the
 [NativeAOT guide](nativeaot-howto.md).
 

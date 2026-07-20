@@ -45,8 +45,8 @@
     <_KoanCompositionEnabled Condition="'$(_KoanCompositionEnabled)' == '' and '$(KoanComposition)' != 'false' and '$(OutputType)' == 'Exe'">true</_KoanCompositionEnabled>
     <!-- Reference and module closure can vary by Configuration/TFM/RID. This target can be imported
          before the SDK finalizes IntermediateOutputPath, so derive the same stable dimensions directly. -->
-    <_KoanCompositionIntermediatePath>$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\</_KoanCompositionIntermediatePath>
-    <_KoanCompositionIntermediatePath Condition="'$(RuntimeIdentifier)' != ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\</_KoanCompositionIntermediatePath>
+    <_KoanCompositionIntermediatePath>$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/</_KoanCompositionIntermediatePath>
+    <_KoanCompositionIntermediatePath Condition="'$(RuntimeIdentifier)' != ''">$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/$(RuntimeIdentifier)/</_KoanCompositionIntermediatePath>
     <_KoanModuleManifestFile>$(_KoanCompositionIntermediatePath)koan.modules.manifest</_KoanModuleManifestFile>
     <_KoanReferenceManifestFile>$(_KoanCompositionIntermediatePath)koan.references.manifest</_KoanReferenceManifestFile>
     <_KoanTrimRootsFile>$(_KoanCompositionIntermediatePath)koan.trimroots.xml</_KoanTrimRootsFile>
@@ -78,7 +78,7 @@
 
   <UsingTask TaskName="WriteKoanLockfile"
              TaskFactory="RoslynCodeTaskFactory"
-             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
     <ParameterGroup>
       <ModuleAssemblies ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
       <DirectReferences ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
@@ -172,7 +172,7 @@
 
   <UsingTask TaskName="WriteKoanReferenceManifest"
              TaskFactory="RoslynCodeTaskFactory"
-             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
     <ParameterGroup>
       <PackageReferences ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
       <ActivationNodes ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
@@ -182,7 +182,7 @@
       <OutputPath ParameterType="System.String" Required="true" />
     </ParameterGroup>
     <Task>
-      <Reference Include="$(MSBuildToolsPath)\Microsoft.Build.Utilities.Core.dll" />
+      <Reference Include="$(MSBuildToolsPath)/Microsoft.Build.Utilities.Core.dll" />
       <Using Namespace="System" />
       <Using Namespace="System.Collections.Generic" />
       <Using Namespace="System.IO" />
@@ -338,7 +338,7 @@
                        DirectReferences="@(_KoanDirectReference)"
                        AppName="$(AssemblyName)"
                        Tfm="$(TargetFramework)"
-                       OutputPath="$(MSBuildProjectDirectory)\koan.lock.json" />
+                       OutputPath="$(MSBuildProjectDirectory)/koan.lock.json" />
   </Target>
 
   <!--

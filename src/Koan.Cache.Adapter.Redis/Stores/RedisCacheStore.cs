@@ -291,7 +291,7 @@ public sealed class RedisCacheStore : ICacheStore
         }
 
         var payload = RedisCacheJsonConverter.SerializeEnvelope(envelope);
-        await _database.StringSetAsync(redisKey, payload, expiry).ConfigureAwait(false);
+        await _database.StringSetAsync(redisKey, payload, ToRedisExpiration(expiry)).ConfigureAwait(false);
         await IndexTags(redisKey, envelope.Options.Tags, expiry).ConfigureAwait(false);
     }
 
@@ -314,7 +314,7 @@ public sealed class RedisCacheStore : ICacheStore
 
         var expiry = DetermineExpiry(now, newAbsolute, newStale);
         var payload = RedisCacheJsonConverter.SerializeEnvelope(envelope);
-        await _database.StringSetAsync(redisKey, payload, expiry).ConfigureAwait(false);
+        await _database.StringSetAsync(redisKey, payload, ToRedisExpiration(expiry)).ConfigureAwait(false);
         await IndexTags(redisKey, cachedOptions.Tags, expiry).ConfigureAwait(false);
     }
 
@@ -339,6 +339,9 @@ public sealed class RedisCacheStore : ICacheStore
                 await _database.KeyExpireAsync(tagKey, expiry).ConfigureAwait(false);
         }
     }
+
+    private static Expiration ToRedisExpiration(TimeSpan? expiry) =>
+        expiry is { } value ? new Expiration(value) : Expiration.Default;
 
     private async Task RemoveTags(RedisKey redisKey, IEnumerable<string> tags)
     {

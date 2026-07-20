@@ -15,7 +15,7 @@
     <ProjectReference Include="..\..\..\..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Core\Koan.Core.csproj" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 </Project>

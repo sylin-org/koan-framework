@@ -24,7 +24,7 @@ public sealed class PostgresContainerHelper : IAsyncDisposable
 
         try
         {
-            _container = new PostgreSqlBuilder("postgres:16-alpine")
+            _container = new PostgreSqlBuilder("postgres:18.4-alpine")
                 .WithDatabase("koan_surface")
                 .WithUsername("koan")
                 .WithPassword("koan")

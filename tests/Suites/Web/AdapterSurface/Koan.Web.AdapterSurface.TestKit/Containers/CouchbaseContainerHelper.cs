@@ -36,7 +36,7 @@ public sealed class CouchbaseContainerHelper : IAsyncDisposable
             // Pin to the rolling community image — 7.0.2 (the Testcontainers default) doesn't
             // fully support collection-level CREATE PRIMARY INDEX in N1QL ("syntax error - at .").
             // The rolling tag tracks a 7.6+ release that accepts the 3-part keyspace path.
-            _container = new CouchbaseBuilder("couchbase:community").Build();
+            _container = new CouchbaseBuilder("couchbase:community-8.0.2").Build();
             await _container.StartAsync().ConfigureAwait(false);
             ConnectionString = _container.GetConnectionString();
             // CouchbaseContainer maps management port 8091 to a random host port — surface it

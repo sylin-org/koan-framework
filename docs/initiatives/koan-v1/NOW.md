@@ -4,12 +4,12 @@ domain: framework
 title: "Koan 0.20 Preview Current Handoff"
 audience: [maintainers, ai-agents]
 status: current
-last_updated: 2026-07-19
-framework_version: source-first
+last_updated: 2026-07-20
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-19
+  date_last_tested: 2026-07-20
   status: tested
-  scope: R12 opening, selective 0.20 guarantee promotion, and coherent-public-narrative mandate
+  scope: passed R12-04 public narrative and post-extraction graph; R12-05 ready for exact candidate freeze
 ---
 
 # Koan 0.20 preview current handoff
@@ -53,31 +53,27 @@ product-surface compiler enforces claim/version/dependency agreement in both dir
 maintained allowlist or stamping layer. Focused graph/version tests pass 41/41, lineage/planner tests
 pass 39/39, and the packaging tool builds warning-clean.
 
-[R12-04](work-items/r12/R12-04-coherent-public-narrative.md) is active. Compile the exact public-content
-graph now covers 699 current assets, 676 current text surfaces, 107 historical boundaries, 42 navigation
-targets, and 12 graduated sample roots. Root, site, package, template, sample, tool, contributor, and
-agent-skill surfaces now tell one present-tense path: package install, four-line host, first Entity result,
-progressive capability references, runtime facts and correction, application responsibilities, and the
-generated maturity boundary. Obsolete duplicate Web/OpenAPI/AI/transaction/CLI/Aspire/Flow/Messaging
-instruction was removed or classified as history; the competing docs inventory and hand-maintained adapter
-matrix were retired. Historical ADRs and initiatives remain evidence outside the ordinary learning graph.
+[R12-04](work-items/r12/R12-04-coherent-public-narrative.md) passes. The derived
+post-extraction graph contains 677 current assets, 656 current text surfaces, 107 historical boundaries,
+42 navigation targets, and eleven graduated curriculum roots containing ten executable samples. Root, site,
+package, template, sample, tool, contributor, and agent-skill surfaces tell one present-tense path: package
+install, four-line host, first Entity result, progressive capability references, runtime facts and correction,
+application responsibilities, and the generated maturity boundary. Historical ADRs and initiatives remain
+dated evidence outside the ordinary learning graph.
 
-Focused R12-04 evidence passes: public-doc truth, 17/17 product/quality compiler tests, warning-clean
-packaging build, byte-identical generated reports, all eleven graduated sample Release builds and their exact
-selective-0.20 lock audit, 20 strict skills, 20/20 instructional examples, whitespace checks, and broad
-documentation structure with zero errors / 1,375 non-gating warnings. No full ratchet or remote mutation
-ran. The maintainer is the sole validation authority. The first independent coding-agent read supplied useful
-cold-read evidence and its accepted corrections are committed; no second agent or human review is a completion
-gate. Direct sample-command validation is the remaining maintainer handoff before R12-04 closes.
+The earlier 699/676/12 graph and eleven-executable build/run proof remain valid evidence for the pre-extraction
+commit where AnimeRecommendations was bundled. They are not current inventory claims. Current sample admission,
+local paths, solution membership, and AI/vector guidance have been reconciled around the standalone
+[`lbotinelly/usagipicks`](https://github.com/lbotinelly/usagipicks) product repository without adding a redirect,
+sample manifest, alternate launcher, or second documentation ledger. The maintainer remains the sole validation
+authority; no additional human or agent review is a completion gate.
 
-All eleven graduated sample commands have now been executed from the repository root. LocalChecklist and both
-GardenCoop chapters needed one standard MSBuild `RunWorkingDirectory` declaration so relative data, settings,
-assets, and lockfiles resolve under the owning sample. After correction, LocalChecklist exits with its expected
-result and `lockfile ok`; all ten Web hosts start on their documented ports, return liveness/runtime facts, and
-reach their named entry surface. The three affected focused sample suites pass 1/1 each. No sample-owned wrapper
-script exists or is needed. AnimeRecommendations subsequently starts on its documented port, curates and indexes
-24 titles locally, returns explained recommendations from Mika's three starter ratings plus a mood, and changes the
-next result after a new rating; its focused host suite passes 1/1. The maintainer's direct validation is next.
+Focused closure evidence passes the intended public patch in an isolated clean worktree at 677/656/107/42/11,
+reports zero current or solution references to the removed local application, passes scoped whitespace checks,
+and reports zero documentation-structure errors with fourteen non-gating frontmatter warnings. The in-place public
+gate stops only because its isolation guard correctly sees the unrelated `DATA-0103` and `SERV-0001` edits already
+present in the dirty worktree; this slice neither changes those ADRs nor weakens the guard. No full ratchet or remote
+mutation ran.
 
 A separate focused check found that GardenCoop Chapter 1's previously measured NativeAOT publication currently
 fails inside the .NET 10.0.10 ILC analyzer with an `IndexOutOfRangeException`. It fails with the original plain SDK
@@ -85,26 +81,32 @@ as well as the rejected Web-SDK experiment, so the start-command repair did not 
 re-prove or narrow that public deployment claim before freezing the candidate; do not expand the present sample-run
 slice into a framework-wide trim/AOT repair without a checkpoint.
 
-The maintainer has superseded R10-09's deletion of `S5.Recs`: restore the product as
-`samples/applications/AnimeRecommendations`, but do not restore its 96-file architecture. The recorded R12-04
-checkpoint makes it a local-first golden application: three Entities, automatic embedding-on-save, direct vector
-search, one irreducible multi-Entity recommendation workflow, thin controllers, module-owned starter state, and a
-compact UI. The result is a 21-file application plus four focused-test files; its Release build is warning-clean,
-the exact documented command and product journey work, the focused suite passes 1/1, and the public graph accepts
-it as the eleventh executable graduated sample. Manual provider discovery, worker pipelines, duplicate profiles,
-custom caches, admin/control-plane surface, and compatibility paths remain retired.
+The restored recommendation baseline has now graduated out of the framework repository into the standalone
+`lbotinelly/usagipicks` product repository. The application, focused tests, ONNX asset, source cache, SQLite state,
+versioned Mongo/Weaviate data, and Ollama model state moved together; the old solution entries and bundled public
+links are retired. The new repository preserves the lean four-line host, Entity/vector/Jobs implementation, embedded
+and distributed topologies, and durability evidence while making Anime the first product vertical rather than a
+permanent sample boundary. Its accepted continuation specification restores authentication, member libraries,
+Manga, Koan.Media-owned artwork, multiple explainable discovery modes, protected catalog administration, and the
+mature UI experience without reviving S5.Recs' 96-file architecture. Historical eleven-sample evidence above remains
+valid for the commit where it ran; the current bundled portfolio contains ten executable graduated samples.
 
-Every graduated sample executable now has the required root-level `start.bat`. Eleven tiny root-local launchers keep
-standard `dotnet run` as execution owner, normalize the working directory, name the exact project, forward application
+Every graduated sample executable has the required root-level `start.bat`. Ten tiny root-local launchers keep standard
+`dotnet run` as execution owner, normalize the working directory, name the exact project, forward application
 arguments, and preserve the exit code. LocalChecklist exits successfully with its meaningful result; all ten Web
-launchers accept isolated `--urls` arguments and return HTTP 200 from liveness. The existing public sample graph now
-rejects a missing/malformed launcher or untracked target project and passes at 699 current assets. No shared runner,
+launchers in the pre-extraction audit accepted isolated `--urls` arguments and returned HTTP 200 from liveness; nine
+Web launchers remain bundled after Usagi Picks graduated. The existing public sample graph rejects a
+missing/malformed launcher or untracked target project and derives the current 677-asset graph. No shared runner,
 generator, Docker bootstrap, second sample registry, new Koan command, or retained sample process was introduced.
 
-[R12-05](work-items/r12/R12-05-public-consumer-journey.md) now owns only the frozen local candidate: final
+[R12-05](work-items/r12/R12-05-public-consumer-journey.md) is active and now owns only the frozen local candidate: final
 release-ready copy, one exact source SHA, the complete local ratchet, selective package graph, clean-room
 templates/FirstUse/GoldenJourney, and deterministic escrow. It adds no second harness or CLI and waits for
-R12-04's maintainer disposition.
+no additional narrative review. The workstation resolves the exact pinned SDK 10.0.302; read-only preflight finds
+no durable package-lineage branch and therefore requires the existing all-owner bootstrap. `NUGET_API_KEY` exists by
+name and remains promotion-only; immutable Releases are not affirmed by the repository API and stay an R12-06
+prerequisite. GardenCoop NativeAOT is narrowed to an experimental, currently compiler-blocked path before freeze;
+self-contained and single-file JIT remain the current deployment correction.
 
 [R12-06](work-items/r12/R12-06-publish-and-observe-first-wave.md) owns the separately authorized `dev`
 advancement, existing API-key promotion, immutable Release/NuGet observation, and the first genuine public-feed

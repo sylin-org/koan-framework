@@ -54,8 +54,8 @@
 
   <ItemGroup>
     <!-- Pinned to the ImageSharp line used by Koan.Media.Core. -->
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
-    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.6" />
+    <PackageReference Include="SixLabors.ImageSharp" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" />
   </ItemGroup>
 
 </Project>

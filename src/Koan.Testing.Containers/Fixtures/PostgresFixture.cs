@@ -17,7 +17,7 @@ public sealed class PostgresFixture : KoanContainerFixture
 
     protected override async Task<string> StartContainerAsync()
     {
-        _container = new PostgreSqlBuilder("postgres:16-alpine")
+        _container = new PostgreSqlBuilder("postgres:18.4-alpine")
             .WithDatabase("koan")
             .WithUsername("koan")
             .WithPassword("koan")

@@ -21,7 +21,7 @@ internal static class Constants
     {
         internal const string ServiceName = "rabbitmq";
         internal const string ContainerImage = "rabbitmq";
-        internal const string ContainerTag = "3.13-management";
+        internal const string ContainerTag = "4.3.2-management";
         internal const string ContainerImageReference = ContainerImage + ":" + ContainerTag;
         internal const int AmqpPort = 5672;
         internal const int ManagementPort = 15672;

@@ -7,7 +7,7 @@ namespace Koan.Data.Connector.OpenSearch;
 [ProviderPriority(Infrastructure.Constants.Provider.Priority)]
 [KoanService(ServiceKind.Vector, shortCode: Infrastructure.Constants.Provider.Id, name: "OpenSearch",
     ContainerImage = "opensearchproject/opensearch",
-    DefaultTag = "2.13.0",
+    DefaultTag = "3.7.0",
     DefaultPorts = new[] { 9200 },
     Capabilities = new[] { "protocol=http", "vector-search=true", "filters=true" },
     Env = new[]
@@ -16,7 +16,7 @@ namespace Koan.Data.Connector.OpenSearch;
         "DISABLE_SECURITY_PLUGIN=true",
         "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
     },
-    Volumes = new[] { "./Data/opensearch:/usr/share/opensearch/data" },
+    Volumes = new[] { "./Data/opensearch-3.7:/usr/share/opensearch/data" },
     AppEnv = new[] { "Koan__Data__OpenSearch__Endpoint=http://{serviceId}:{port}" },
     HealthEndpoint = "/_cluster/health",
     HealthIntervalSeconds = 5,

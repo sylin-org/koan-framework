@@ -620,7 +620,7 @@ Service invocations happen via HTTP to announced endpoints, NOT via multicast.
 
 **Dockerfile**:
 ```dockerfile
-FROM mcr.microsoft.com/dotnet/aspnet:9.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.10
 WORKDIR /app
 COPY publish/ .
 

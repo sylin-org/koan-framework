@@ -58,7 +58,7 @@ public sealed class ElasticSearchTestFactory : IVectorAdapterTestFactory
         {
 #pragma warning disable CS0618 // Testcontainers parameterless ContainerBuilder ctor deprecated; still functional.
             _container = new ContainerBuilder()
-                .WithImage("docker.elastic.co/elasticsearch/elasticsearch:8.13.4")
+                .WithImage("docker.elastic.co/elasticsearch/elasticsearch:9.4.3")
                 .WithEnvironment("discovery.type", "single-node")
                 .WithEnvironment("xpack.security.enabled", "false")
                 .WithEnvironment("ES_JAVA_OPTS", "-Xms512m -Xmx512m")

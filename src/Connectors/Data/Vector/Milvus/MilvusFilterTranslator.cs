@@ -27,7 +27,10 @@ internal static class MilvusFilterTranslator
         FilterOperator.Gt, FilterOperator.Gte, FilterOperator.Lt, FilterOperator.Lte,
         FilterOperator.In,
         FilterOperator.StartsWith, FilterOperator.EndsWith, FilterOperator.Contains,
-        FilterOperator.Has, FilterOperator.HasAny, FilterOperator.HasAll);
+        FilterOperator.Has, FilterOperator.HasAny, FilterOperator.HasAll) with
+    {
+        SupportsNegation = false
+    };
 
     public static string? Translate(Filter? filter, string metadataField)
         => filter is null ? null : Visit(filter, metadataField);
@@ -38,7 +41,8 @@ internal static class MilvusFilterTranslator
         {
             AllOf and => string.Join(" && ", and.Operands.Select(f => $"({Visit(f, metadataField)})")),
             AnyOf or => string.Join(" || ", or.Operands.Select(f => $"({Visit(f, metadataField)})")),
-            Not not => $"!({Visit(not.Operand, metadataField)})",
+            Not => throw new NotSupportedException(
+                "Milvus cannot faithfully negate metadata filters because missing JSON keys do not satisfy boolean negation."),
             FieldFilter cmp => TranslateLeaf(cmp, metadataField),
             _ => throw new NotSupportedException($"Milvus cannot translate filter node '{filter.GetType().Name}'.")
         };

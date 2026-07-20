@@ -18,10 +18,10 @@ namespace Koan.Data.Connector.Cockroach;
 [ProviderPriority(13)]
 [KoanService(ServiceKind.Database, shortCode: "cockroach", name: "CockroachDB",
     ContainerImage = "cockroachdb/cockroach",
-    DefaultTag = "v23.2.4",
+    DefaultTag = "v26.2.3",
     DefaultPorts = new[] { 26257 },
     Capabilities = new[] { "protocol=postgres" },
-    Volumes = new[] { "./Data/cockroach:/cockroach/cockroach-data" },
+    Volumes = new[] { "./Data/cockroach-26.2:/cockroach/cockroach-data" },
     AppEnv = new[] { "Koan__Data__Cockroach__ConnectionString={scheme}://{host}:{port}", "Koan__Data__Cockroach__Database=Koan" },
     Scheme = "postgres", Host = "cockroach", EndpointPort = 26257, UriPattern = "postgres://{host}:{port}",
     LocalScheme = "postgres", LocalHost = "localhost", LocalPort = 26257, LocalPattern = "postgres://{host}:{port}")]

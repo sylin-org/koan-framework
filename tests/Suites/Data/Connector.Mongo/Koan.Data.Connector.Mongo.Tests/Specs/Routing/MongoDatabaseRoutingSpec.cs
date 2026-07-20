@@ -42,7 +42,7 @@ public sealed class MongoDatabaseRoutingSpec : IAsyncLifetime
     {
         try
         {
-            _container = new MongoDbBuilder("mongo:7").Build();
+            _container = new MongoDbBuilder("mongo:8.3.4").Build();
             await _container.StartAsync().ConfigureAwait(false);
         }
         catch (Exception ex)

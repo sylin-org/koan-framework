@@ -24,7 +24,7 @@ public sealed class RedisContainerHelper : IAsyncDisposable
 
         try
         {
-            _container = new RedisBuilder("redis:7-alpine")
+            _container = new RedisBuilder("redis:8.8.0-alpine")
                 .Build();
             await _container.StartAsync().ConfigureAwait(false);
             var connection = _container.GetConnectionString();
