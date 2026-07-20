@@ -14,6 +14,7 @@ using System.Text;
 [ProviderPriority(0)]
 public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IServerSideCopy, IListOperations
 {
+    private static readonly char[] PortableInvalidKeyCharacters = ['<', '>', ':', '"', '|', '?', '*'];
     private readonly string _basePath;
 
     public LocalStorageProvider(IOptions<LocalStorageOptions> options)
@@ -153,8 +154,10 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
         {
             if (part == "." || part == "..")
                 throw new InvalidOperationException("Path traversal or invalid segment detected.");
-            // disallow path-breaking chars
-            if (part.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            // Keep the logical key language stable across hosts, then honor any additional filesystem restriction.
+            if (part.IndexOfAny(PortableInvalidKeyCharacters) >= 0
+                || part.Any(char.IsControl)
+                || part.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
                 throw new InvalidOperationException("Invalid characters in key.");
         }
         return string.Join('/', parts);

@@ -252,6 +252,59 @@ bounded proof.
 sticks in `Processing`, treat that as a production defect and inspect the write/state boundary rather than relaxing
 the assertion.
 
+### 2026-07-20 portable-local-storage-key recovery checkpoint
+
+**Task:** Correct the Local storage contract failure from release run `29760623578` without moving provider-specific
+filesystem policy into the Storage abstraction or weakening traversal protection.
+
+**Application intent:** An application using Local storage should get the same accepted key language on Windows,
+Linux, and macOS, so a key does not become invalid merely because the application or persisted files move hosts.
+
+**Public expression:** Applications keep ordinary slash-delimited object keys and the existing Local provider. No
+registration, option, attribute, package, or API is added.
+
+**Guarantee/correction:** Every key segment rejects control characters and the portable Windows-reserved punctuation
+`< > : " | ? *` on every operating system, in addition to characters the current filesystem reports invalid.
+Slash remains the logical segment separator and backslash retains its existing normalization to slash. Traversal,
+empty-key, containment, sharding, and listing behavior remain unchanged.
+
+**Complete intent surface:** The fourth run passed the repaired Data AI suite and continued through the later test
+inventory before Local storage failed `SECURITY-003`; all docs/skills/blueprint legs passed. Current staging,
+promotion, escrow, lineage, tag, Release, and public package creation were skipped again.
+
+**Public concepts:** None beyond standard filesystem segments, `Path.GetInvalidFileNameChars`, and `char.IsControl`.
+
+**Docs read:** the Local connector README promises keys normalized below the configured base and rejection of invalid
+filename characters; its technical contract locates physical layout and path safety in the connector and promises a
+corrective `InvalidOperationException`; the Storage abstractions leave key interpretation to providers.
+
+**Code read:** `LocalStorageProvider.GetPath` is the single path owner; `SanitizeKey` normalizes separators, rejects
+dot segments, and currently relies only on the platform-varying `Path.GetInvalidFileNameChars`; all CRUD, range,
+stat, and copy paths converge there. `LocalStorageProviderTests.SECURITY-003` explicitly supplies Windows-invalid
+punctuation, which Windows rejects and Linux accepts under the current implementation.
+
+**Reusing:** The existing private sanitizer, standard `Path` validation, the existing corrective exception, and the
+focused Local connector suite.
+
+**Creating new:** One private static character set inside `LocalStorageProvider` records the stable portable
+punctuation floor. It is connector implementation policy, not a public constant or cross-module contract.
+
+**Coalescence:** Keep validation at the existing Local-provider chokepoint. Do not add a Storage-wide key validator,
+decorate models, duplicate checks across operations, sanitize by silently renaming keys, or weaken the test to a
+Linux-only invalid character. Expand the existing security case so each promised character is independently pinned.
+
+**Ergonomics:** Developers receive one predictable key language and the same corrective error on every supported
+host. Existing ordinary names and nested paths remain valid; no ceremony or provider-specific application code is
+introduced.
+
+**Constraints satisfied:** The connector remains isolated behind `IStorageProvider`; no controller, data model,
+streaming path, option, module, public API, or Koan-specific abstraction is added; standard .NET filesystem concepts
+remain the basis; the focused Local suite on Windows and Linux is the bounded proof.
+
+**Risks:** Linux applications that intentionally used the newly reserved punctuation in Local keys will now fail
+fast. That is the deliberate cost of a portable Local-provider promise and avoids silent incompatibility when moving
+the same application or storage tree to Windows.
+
 ## Work
 
 1. Revalidate that local HEAD exactly equals the passed R12-05 source and that no later tracked change exists.

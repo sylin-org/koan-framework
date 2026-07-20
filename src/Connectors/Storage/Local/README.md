@@ -44,8 +44,9 @@ var text = await document.ReadAllText();
 
 ## Guarantees and boundaries
 
-- Keys are normalized below `BasePath/container`; traversal segments, rooted escapes, and invalid filename characters
-  are rejected.
+- Keys are normalized below `BasePath/container`; traversal segments and rooted escapes are rejected. Key segments
+  use one portable filename floor on every host: control characters and `< > : " | ? *` are invalid, along with any
+  additional character rejected by the current filesystem.
 - Writes use a temporary file followed by same-filesystem replacement. Cross-platform crash durability and atomic
   replacement semantics are filesystem guarantees, not stronger Koan guarantees.
 - Full reads return a seekable file stream. Range reads currently materialize the requested range in memory.

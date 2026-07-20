@@ -11,6 +11,8 @@ once when the singleton provider is constructed.
 Objects live under `<base>/<container>/<sha1-prefix>/<normalized-key>`. The two-byte hash prefix reduces hot
 directories without changing the provider key returned to callers. The provider validates the final full path with
 `Path.GetRelativePath` against the resolved base, so container or key input cannot escape the root.
+Each slash-delimited key segment also rejects control characters and the portable Windows-reserved punctuation
+`< > : " | ? *` on every host, plus any additional character the current filesystem reports invalid.
 
 Writes copy into a unique sibling temporary file, flush managed buffers, and replace the destination. Cancellation or
 failure removes the temporary file. The provider does not promise disk write-through, journal policy, or recovery of

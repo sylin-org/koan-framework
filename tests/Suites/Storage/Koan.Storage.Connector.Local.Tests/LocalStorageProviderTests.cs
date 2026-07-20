@@ -165,12 +165,20 @@ public class LocalStorageProviderTests : IDisposable
             .WithMessage("*Path traversal*");
     }
 
-    [Fact(DisplayName = "SECURITY-003: Should block invalid characters in key")]
-    public async Task Should_Block_Invalid_Characters()
+    [Theory(DisplayName = "SECURITY-003: Should block portable invalid characters in key")]
+    [InlineData("<")]
+    [InlineData(">")]
+    [InlineData(":")]
+    [InlineData("\"")]
+    [InlineData("|")]
+    [InlineData("?")]
+    [InlineData("*")]
+    [InlineData("\u0001")]
+    public async Task Should_Block_Invalid_Characters(string invalidCharacter)
     {
         // Arrange
         const string container = "secure-container";
-        const string invalidKey = "file<>|?.txt"; // Windows invalid chars
+        var invalidKey = $"file{invalidCharacter}.txt";
 
         // Act
         Func<Task> act = async () =>
