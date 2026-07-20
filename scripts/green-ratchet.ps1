@@ -9,8 +9,8 @@
     0.  Tools       dotnet tool restore      — pinned repository tools used by executable proofs.
     A.  Build       dotnet build Koan.sln   — framework + every dogfood sample
                     (the samples live in Koan.sln, so one build covers both).
-    A'. Test        dotnet test  Koan.sln    — runs every runnable suite with bounded project fan-out
-                    and per-host hang detection. Container-gated integration specs skip cleanly when
+    A'. Test        dotnet test per project  — runs every runnable suite in its own host lifecycle
+                    with per-host hang detection. Container-gated integration specs skip cleanly when
                     infra is absent. Skip with -SkipTests.
     B.  Docs lint   scripts/docs-lint.ps1    — links / front-matter / anchors / terms.
                     Errors are fatal; warnings are not.
@@ -57,7 +57,7 @@ $ErrorActionPreference = 'Continue'
 $root = (Resolve-Path "$PSScriptRoot/..").ProviderPath
 # Certification policy: provider suites remain comprehensive and project-isolated; shared provider
 # resources cannot make release evidence order-dependent, and an inactive host cannot retain the queue.
-$testProjectConcurrency = 1
+$testProjectMarker = 'Microsoft.NET.Test.Sdk'
 $testHostHangTimeout = '5m'
 Push-Location $root
 
@@ -78,7 +78,7 @@ try {
         $Base = if ($LASTEXITCODE -eq 0) { 'origin/main' } else { 'main' }
     }
     Write-Host "[ratchet] config=$Configuration  docs-base=$Base  skipTests=$SkipTests  fullDocs=$FullDocs  publicRelease=$PublicRelease"
-    Write-Host "[ratchet] test-project-concurrency=$testProjectConcurrency  test-host-hang-timeout=$testHostHangTimeout"
+    Write-Host "[ratchet] test-project-isolation=one-process-per-project  test-host-hang-timeout=$testHostHangTimeout"
 
     Invoke-Leg '0. tools' { & dotnet tool restore }
 
@@ -101,16 +101,40 @@ try {
 
     if (-not $SkipTests) {
         Invoke-Leg "A'. test" {
-            $arguments = @(
-                'test', "$root/Koan.sln",
-                '-c', $Configuration,
-                '--no-build',
-                '--nologo',
-                "-m:$testProjectConcurrency",
-                '--blame-hang-timeout', $testHostHangTimeout,
-                '--blame-hang-dump-type', 'none'
+            $testProjects = @(
+                Get-ChildItem -Path "$root/tests" -Recurse -Filter '*.csproj' -File |
+                    Where-Object {
+                        $projectXml = [System.IO.File]::ReadAllText($_.FullName)
+                        $projectXml.Contains($testProjectMarker, [StringComparison]::Ordinal) -and
+                            -not $projectXml.Contains('<IsTestProject>false</IsTestProject>', [StringComparison]::OrdinalIgnoreCase)
+                    } |
+                    Sort-Object FullName
             )
-            & dotnet @arguments
+
+            if ($testProjects.Count -eq 0) {
+                Write-Error "No runnable test projects were discovered under '$root/tests'."
+                $global:LASTEXITCODE = 1
+                return
+            }
+
+            Write-Host "[ratchet] runnable-test-projects=$($testProjects.Count)"
+            foreach ($project in $testProjects) {
+                $relativeProject = [System.IO.Path]::GetRelativePath($root, $project.FullName)
+                Write-Host "[ratchet] test-project=$relativeProject"
+                $arguments = @(
+                    'test', $project.FullName,
+                    '-c', $Configuration,
+                    '--no-build',
+                    '--nologo',
+                    '--blame-hang-timeout', $testHostHangTimeout,
+                    '--blame-hang-dump-type', 'none'
+                )
+                & dotnet @arguments
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host "[ratchet] test-project failed: $relativeProject" -ForegroundColor Red
+                    return
+                }
+            }
         }
     }
 

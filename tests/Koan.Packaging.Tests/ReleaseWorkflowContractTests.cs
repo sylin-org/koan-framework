@@ -18,16 +18,18 @@ public sealed class ReleaseWorkflowContractTests
     ];
 
     [Fact]
-    public void ReleaseRatchetBoundsSolutionTestTopology()
+    public void ReleaseRatchetIsolatesEveryRunnableTestProject()
     {
         var ratchet = File.ReadAllText(Path.Combine(
             FindKoanRoot(),
             "scripts",
             "green-ratchet.ps1"));
 
-        Assert.Contains("$testProjectConcurrency = 1", ratchet, StringComparison.Ordinal);
+        Assert.Contains("$testProjectMarker = 'Microsoft.NET.Test.Sdk'", ratchet, StringComparison.Ordinal);
+        Assert.Contains("Get-ChildItem -Path \"$root/tests\" -Recurse -Filter '*.csproj' -File", ratchet, StringComparison.Ordinal);
+        Assert.Contains("foreach ($project in $testProjects)", ratchet, StringComparison.Ordinal);
+        Assert.Contains("'test', $project.FullName", ratchet, StringComparison.Ordinal);
         Assert.Contains("$testHostHangTimeout = '5m'", ratchet, StringComparison.Ordinal);
-        Assert.Contains("\"-m:$testProjectConcurrency\"", ratchet, StringComparison.Ordinal);
         Assert.Contains("'--blame-hang-timeout', $testHostHangTimeout", ratchet, StringComparison.Ordinal);
         Assert.Contains("'--blame-hang-dump-type', 'none'", ratchet, StringComparison.Ordinal);
     }
