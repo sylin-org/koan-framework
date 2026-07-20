@@ -305,6 +305,58 @@ remain the basis; the focused Local suite on Windows and Linux is the bounded pr
 fast. That is the deliberate cost of a portable Local-provider promise and avoids silent incompatibility when moving
 the same application or storage tree to Windows.
 
+### 2026-07-20 SQLite claim-scale sentinel recovery checkpoint
+
+**Task:** Correct the wall-clock-only Jobs SQLite failure from release run `29763701310` without weakening FIFO,
+conditional-claim, or indexed-window behavior and without changing production code.
+
+**Application intent:** A durable Jobs host should claim the oldest visible job from a 100,000-row SQLite backlog
+through the bounded, pushed-down claim window rather than materializing the ledger in application memory.
+
+**Public expression:** None. Jobs declarations, options, persistence selection, dispatch semantics, and public APIs
+remain unchanged.
+
+**Guarantee/correction:** The scale spec continues to seed 100,000 rows, require the exact FIFO head, require its
+atomic transition to `Running`, and retain a coarse three-second regression ceiling. The ceiling is test-runner
+headroom, not a production latency SLA; a result 8 ms beyond the former 1.5-second cutoff cannot by itself establish
+a query-shape regression.
+
+**Complete intent surface:** The fifth run again passed the repaired Data AI boundary but stopped in the Jobs SQLite
+suite before reaching Local storage. The same Jobs suite passed the previous run, no Jobs production source changed
+between runs, and pack, staging, promotion, escrow, lineage, tag, Release, and public package creation were skipped.
+
+**Public concepts:** None. Standard `Stopwatch` remains only a coarse scale-regression sentinel.
+
+**Docs read:** the Jobs code contract describes the durable ledger as provider-backed and the claim as a bounded
+indexed lane seek; this R12 card keeps the workflow as the broad certification owner. No public documentation claims
+an absolute 1.5-second SQLite dispatch SLA.
+
+**Code read:** `DataJobLedger.ClaimNext` queries a paginated window ordered by `VisibleAt` and `FirstSubmittedAt`, then
+uses provider conditional replacement; `JobRecord` declares the leading `Status, VisibleAt, FirstSubmittedAt` claim
+index and the lane claim index. `HighVolumeScanShapeSpec` seeds 100,000 queued rows and correctly pins FIFO/status,
+but its class comment claimed a sublinearity ratio that it never measured and its 1.5-second cutoff had no runner
+margin. Run `29763701310` measured 1,508 ms; the immediately prior run passed the unchanged suite.
+
+**Reusing:** The existing real SQLite harness, 100,000-row seed, production claim path, FIFO/status assertions, and
+single coarse elapsed-time guard.
+
+**Creating new:** None. Change one test threshold and make the existing comment honest; add no helper, benchmark
+framework, option, API, or production branch.
+
+**Coalescence:** Keep performance intent in the one existing scale spec. Do not add timing policy to production,
+duplicate the claim algorithm in a test, expose SQL internals solely for this recovery, or remove the gross-regression
+sentinel. Query-plan introspection can replace elapsed time only as a separately designed adapter testing capability.
+
+**Ergonomics:** Framework users see no change. Maintainers retain a meaningful guard against multi-second/full-ledger
+fallbacks without making shared-runner scheduler noise an eight-millisecond release veto.
+
+**Constraints satisfied:** No production, public API, controller, data model, option, constant, module, or docs promise
+changes; the focused scale test and full SQLite Jobs suite on Windows/Linux are the bounded proof.
+
+**Risks:** A three-second ceiling remains environment-sensitive and intentionally coarse. It catches gross fallback,
+not fine performance drift; a future deterministic query-plan seam would be stronger but is beyond this pre-staging
+recovery and is not justified by one 8 ms miss.
+
 ## Work
 
 1. Revalidate that local HEAD exactly equals the passed R12-05 source and that no later tracked change exists.

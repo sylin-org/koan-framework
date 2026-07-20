@@ -10,8 +10,8 @@ namespace Koan.Jobs.Adapter.Sqlite.Tests.Specs;
 /// <summary>
 /// JOBS-0005 §19 — Tier-0 push-down proven on a real indexed store at volume. The dashboard query and the claim
 /// loop must stay O(matches)/O(batch), not O(ledger): a pre-push-down ledger (materialize the whole work-type, then
-/// filter in memory) blows both the absolute ceiling and the sublinearity ratio here. Seeds ~100k rows directly into
-/// the ledger (bypassing the orchestrator) so the assertions are about the read path alone.
+/// filter in memory) blows the coarse regression ceilings here. Seeds ~100k rows directly into the ledger (bypassing
+/// the orchestrator) so the assertions are about the read path alone. These ceilings are not latency SLAs.
 /// </summary>
 [Trait("category", "scale")]
 public sealed class HighVolumeScanShapeSpec
@@ -50,8 +50,9 @@ public sealed class HighVolumeScanShapeSpec
         claimed.Should().NotBeNull();
         claimed!.WorkId.Should().Be("q0");              // seq 0 = earliest FirstSubmittedAt → ORDER pushed (true FIFO head)
         claimed.Status.Should().Be(JobStatus.Running);  // CAS claimed
-        // LIMIT pushed: the claim reads a bounded ordered window, not all 100k queued.
-        sw.ElapsedMilliseconds.Should().BeLessThan(1500);
+        // LIMIT pushed: the claim reads a bounded ordered window, not all 100k queued. Keep shared-runner headroom;
+        // this is a gross fallback sentinel, not a production latency SLA.
+        sw.ElapsedMilliseconds.Should().BeLessThan(3000);
     }
 
     [Fact]
