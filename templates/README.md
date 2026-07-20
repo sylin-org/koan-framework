@@ -48,8 +48,9 @@ reference priority and uses `.koan/data/Koan.sqlite`; there is no generated `app
 schema script, repository, or version prompt. Add configuration only when the application intends to override a
 derived default.
 
-Each template release carries compatibility ranges compiled from the exact independently versioned package family it
-was proved against. The application does not align Koan package versions itself.
+Each generated project carries an ordinary bounded NuGet range for the guaranteed 0.20 family:
+`[0.20.0,0.21.0)`. NuGet selects an available compatible 0.20 package and rejects a future breaking
+0.21 package. The application does not align Koan package versions itself.
 
 ## Inspectability and next steps
 
@@ -69,5 +70,4 @@ deployment guarantees.
   capability packages are referenced. The application still owns its policy declarations, exposed operations,
   credentials, HTTPS/network boundary, validation, backup, and deployment decisions.
 - SQLite provides durable embedded storage, not multi-node availability or a remote database service.
-- Direct `dotnet pack` of this template source is unsupported because it cannot prove dependency floors; the Koan
-  release compiler prepares and verifies the content-only package.
+- The template package is ordinary content-only NuGet packaging and supports direct `dotnet pack`.

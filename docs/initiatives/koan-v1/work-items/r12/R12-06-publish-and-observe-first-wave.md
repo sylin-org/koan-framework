@@ -130,6 +130,36 @@ system inside Koan.
   deliberately not executed.
 - No workflow was dispatched and no package or remote state was changed.
 
+## Standard template-pack checkpoint — 2026-07-20
+
+**Task:** Make `Sylin.Koan.Templates` ordinary, directly packable NuGet content after removal of the
+release compiler.
+
+**Application intent:** A maintainer runs standard `dotnet pack`; users install the template package
+and receive generated projects compatible with the guaranteed Koan 0.20 family.
+
+**Public expression:** Generated projects contain ordinary bounded NuGet `PackageReference` versions
+`[0.20.0,0.21.0)`.
+
+**Guarantee/correction:** NuGet resolves an available compatible 0.20 package and rejects 0.21 or
+later. Template packing fails only for ordinary MSBuild/NuGet errors, not because a Koan-only compiler
+failed to prepare hidden content.
+
+**Complete intent surface:** Pack the content-only project directly. No prepared template root,
+token replacement, release manifest, ProjectReference impact marker, or template-specific release
+command remains.
+
+**Public concepts:** Standard NuGet compatibility ranges and standard content-only template packing.
+
+**Coalescence:** Rebuild the template package as self-contained source. Delete the prepared-root
+content fork, unresolved range tokens, compiler-required error target, and suppressed release-impact
+ProjectReferences. The template project is the one owner because these ranges are part of the source
+it ships; release tooling is too broad and generated applications are too late.
+
+**Ergonomics:** One `dotnet pack` command and immediately readable generated project files. A future
+0.21 template deliberately changes its visible ranges and receives a new template identity through
+its existing local NBGV owner.
+
 ## Authorization boundary
 
 The maintainer authorized redesign and local implementation. Do not dispatch the workflow, publish a
