@@ -30,7 +30,7 @@ Package paths that embed output from another project include that source directl
 
 ### Publication is explicit
 
-`.github/workflows/release-packages.yml` is manually dispatched from `dev`. It contains one read-only
+`.github/workflows/release-on-dev.yml` is manually dispatched from `dev`. It contains one read-only
 repository job and uses only the established `NUGET_API_KEY` for nuget.org publication.
 
 The job:

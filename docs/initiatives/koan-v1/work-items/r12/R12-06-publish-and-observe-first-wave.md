@@ -53,7 +53,7 @@ and the existing NBGV `version.json` format. No release-specific Koan concept is
 
 **Code read:**
 
-- The former `.github/workflows/release-on-dev.yml` was a 773-line, six-job state machine; replace it with one
+- `.github/workflows/release-on-dev.yml` was rebuilt from a 773-line, six-job state machine into one
   manually dispatched job.
 - `tools/Koan.Packaging/Program.cs` exposes lineage, planning, clean-room packing, wave staging, and
   promotion commands; retain only inventory/product assessment commands.
