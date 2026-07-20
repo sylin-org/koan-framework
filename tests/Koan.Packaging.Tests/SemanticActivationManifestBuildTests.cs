@@ -832,11 +832,16 @@ public sealed class SemanticActivationManifestBuildTests
                 StringComparison.OrdinalIgnoreCase))
             .Select(reference => Path.GetFullPath(Path.Combine(
                 Path.GetDirectoryName(project)!,
-                (string)reference.Attribute("Include")!)))
+                NormalizeProjectReferenceInclude((string)reference.Attribute("Include")!))))
             .Where(knownProjects.Contains)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
+
+    private static string NormalizeProjectReferenceInclude(string include) =>
+        include
+            .Replace('\\', Path.DirectorySeparatorChar)
+            .Replace('/', Path.DirectorySeparatorChar);
 
     private static string[] ExpectedCommunicationDependents() =>
     [

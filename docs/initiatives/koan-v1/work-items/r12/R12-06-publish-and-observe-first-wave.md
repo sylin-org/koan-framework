@@ -91,6 +91,64 @@ first durable lineage may select every active owner once even though only 38 car
 multi-package transaction, so exact escrow, dependency order, visibility waits, and recovery are load-bearing.
 Remote trust settings are unstable facts and must be re-read immediately before authorization.
 
+### 2026-07-20 first-run portability recovery checkpoint
+
+**Task:** Correct the two Linux-only proof failures from release run `29755662142` without weakening the public
+ratchet or changing the release architecture.
+
+**Application intent:** A maintainer advances `dev` and receives the same exact release proof on the Linux workflow
+runner that passed on the Windows workstation.
+
+**Public expression:** None. Application code, package references, configuration, runtime prerequisites, package
+identities, and the one-push release instruction remain unchanged.
+
+**Guarantee/correction:** The Communication conformance probe must interpret ordinary MSBuild project-reference
+paths on both Windows and Linux, and the docs template must not advertise a placeholder as a real link. A real
+missing Communication dependency or documentation target still fails. Docs-lint failures must print their full
+path, severity, check, and correction in Actions rather than a width-truncated path-only table.
+
+**Complete intent surface:** No user action exists beyond the existing normal `dev` advancement. The first run
+failed before staging; `stage_current` and `promote_current` were skipped, no durable lineage branch, tag, Release,
+or public package exists, and the next ordinary event remains the all-owner bootstrap.
+
+**Public concepts:** None. Standard MSBuild path syntax, `System.IO.Path`, Markdown link syntax, and PowerShell
+diagnostic formatting are sufficient.
+
+**Docs read:** `docs/engineering/index.md` keeps the protected workflow and focused evidence authoritative;
+`docs/architecture/principles.md` requires standard .NET concepts and one decision owner; `docs/toc.yml` confirms no
+navigation change; the root `README.md` still honestly reports pre-publication status; `samples/CATALOG.md` is an
+unrelated retired boundary; `nuget-publishing.md` and this card require an ordinary source correction after a
+pre-staging proof failure.
+
+**Code read:** `SemanticActivationManifestBuildTests.cs` owns the conformance table but passes raw backslash XML
+includes to platform path APIs; `docs-lint.ps1` correctly identifies the placeholder target on Linux;
+`green-ratchet.ps1` requests width-sensitive table output; `docs/engineering/_template.md` owns the fake link; the
+six affected package projects use valid ordinary MSBuild backslash references.
+
+**Reusing:** The existing conformance graph, `Path.DirectorySeparatorChar`, `Path.AltDirectorySeparatorChar`, the
+existing docs link validator, the existing list output mode, and the unchanged release failure/retry path.
+
+**Creating new:**
+
+| New code | Location | Justification |
+|---|---|---|
+| project-reference include normalization helper | `tests/Koan.Packaging.Tests/SemanticActivationManifestBuildTests.cs` | one test-owned boundary converts cross-platform MSBuild path text before `System.IO` evaluates it |
+
+**Coalescence:** The closest pattern is the existing `ProjectReferences` test helper. Keep that test-local graph
+owner and absorb separator normalization there; do not introduce a production path service or evaluate a second
+package graph. Keep docs validation in `docs-lint.ps1`; change only its existing caller's rendering mode and make the
+template placeholder non-link text. No superseded runtime or release path is created.
+
+**Ergonomics:** Maintainers retain one release action and receive an actionable CI error. Framework users see no
+new API or concept, and ordinary MSBuild paths remain ordinary MSBuild paths.
+
+**Constraints satisfied:** No HTTP, data-access, streaming, options, constants, module, public type, or runtime
+behavior is involved; no inline endpoints or placeholders are added; current docs/ADR/TOC policy is unchanged; the
+focused Packaging test, Windows docs lint, and Linux container reproduction are the bounded proof.
+
+**Risks:** A second platform-specific failure may appear after these fail-fast cells clear. Preserve the same
+pre-staging stop boundary and fix only observed evidence; do not bypass either gate or manually stage/promote.
+
 ## Work
 
 1. Revalidate that local HEAD exactly equals the passed R12-05 source and that no later tracked change exists.

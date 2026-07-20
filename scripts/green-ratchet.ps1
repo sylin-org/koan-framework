@@ -138,7 +138,7 @@ try {
         }
     }
 
-    Invoke-Leg 'B. docs-lint' { & "$root/scripts/docs-lint.ps1" -Output table }
+    Invoke-Leg 'B. docs-lint' { & "$root/scripts/docs-lint.ps1" -Output list }
     Invoke-Leg "B'. public-docs" { & "$root/scripts/public-docs-lint.ps1" }
 
     if ($FullDocs) {

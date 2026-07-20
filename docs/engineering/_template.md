@@ -107,5 +107,5 @@ Things NOT to do, with the lesson behind each. Keep these short and concrete.
 ## References *(OPTIONAL — include when relevant)*
 
 - `ARCH-XXXX — title` — replace with the decision this workbook operationalizes
-- [scripts/path/to/Script.ps1](../../scripts/...) — the tool this workbook drives
+- `scripts/path/to/Script.ps1` — replace with a link to the tool this workbook drives
 - `sibling.md` — replace with a related workbook
