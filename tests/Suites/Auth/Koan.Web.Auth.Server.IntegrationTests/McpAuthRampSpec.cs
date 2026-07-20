@@ -94,15 +94,14 @@ public sealed class McpAuthRampSpec : IClassFixture<McpAuthRampFixture>
         var accessToken = tokenDoc.RootElement.GetProperty("access_token").GetString();
         accessToken.Should().NotBeNullOrEmpty();
 
-        // 3. present it to the MCP edge — auth + audience PASS, so we reach the transport. With no entities
-        //    registered the transport answers 404 no_entities; the point is it is NOT a 401 (the token reached
-        //    the gates). A 401 here would mean the on-ramp is broken.
+        // 3. present it to the MCP edge — auth + audience PASS, so we reach the live SSE transport.
+        //    ResponseHeadersRead is intentional: an SSE response remains open and must not be buffered to EOF.
         using var req = new HttpRequestMessage(HttpMethod.Get, "/mcp/sse");
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         var edgeRes = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, Quick);
 
-        edgeRes.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
+        edgeRes.StatusCode.Should().Be(HttpStatusCode.OK);
         edgeRes.Headers.Should().NotContain(h => h.Key == "WWW-Authenticate");
-        (await edgeRes.Content.ReadAsStringAsync(Quick)).Should().Contain("no_entities");
+        edgeRes.Content.Headers.ContentType!.MediaType.Should().Be("text/event-stream");
     }
 }

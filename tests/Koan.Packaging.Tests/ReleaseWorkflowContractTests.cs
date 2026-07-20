@@ -25,7 +25,7 @@ public sealed class ReleaseWorkflowContractTests
             "scripts",
             "green-ratchet.ps1"));
 
-        Assert.Contains("$testProjectConcurrency = 2", ratchet, StringComparison.Ordinal);
+        Assert.Contains("$testProjectConcurrency = 1", ratchet, StringComparison.Ordinal);
         Assert.Contains("$testHostHangTimeout = '5m'", ratchet, StringComparison.Ordinal);
         Assert.Contains("\"-m:$testProjectConcurrency\"", ratchet, StringComparison.Ordinal);
         Assert.Contains("'--blame-hang-timeout', $testHostHangTimeout", ratchet, StringComparison.Ordinal);

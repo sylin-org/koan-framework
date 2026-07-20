@@ -55,9 +55,9 @@ param(
 
 $ErrorActionPreference = 'Continue'
 $root = (Resolve-Path "$PSScriptRoot/..").ProviderPath
-# Certification policy: provider suites remain comprehensive, but heavyweight test projects do not all
-# compete for one host at once and an inactive test host cannot retain the release queue indefinitely.
-$testProjectConcurrency = 2
+# Certification policy: provider suites remain comprehensive and project-isolated; shared provider
+# resources cannot make release evidence order-dependent, and an inactive host cannot retain the queue.
+$testProjectConcurrency = 1
 $testHostHangTimeout = '5m'
 Push-Location $root
 

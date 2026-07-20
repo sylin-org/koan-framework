@@ -186,17 +186,17 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Lowercase_id_member_does_not_replace_the_entity_key_tiebreaker()
+    public async Task Business_id_member_does_not_replace_the_entity_key_tiebreaker()
     {
         _repository.Reset(Rows(1, 2, 3));
 
         _ = await Collect(StreamingRecord.AllStream(
-            sort => sort.OrderBy(record => record.id),
+            sort => sort.OrderBy(record => record.BusinessId),
             batchSize: 2));
 
         _repository.QueryCalls.Should().NotBeEmpty();
         _repository.QueryCalls[0].Sort.Select(spec => spec.Path.DotPath)
-            .Should().Equal(nameof(StreamingRecord.id), nameof(StreamingRecord.Id));
+            .Should().Equal(nameof(StreamingRecord.BusinessId), nameof(StreamingRecord.Id));
     }
 
     [Fact]
@@ -234,15 +234,13 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
     }
 
     [Fact]
-    public void Filter_field_resolution_prefers_exact_case_for_Id_and_lowercase_id()
+    public void Filter_field_resolution_distinguishes_the_entity_key_from_a_business_id()
     {
         var key = FieldPathResolver.Resolve(typeof(StreamingRecord), FieldPath.Of(nameof(StreamingRecord.Id)));
-        var business = FieldPathResolver.Resolve(typeof(StreamingRecord), FieldPath.Of(nameof(StreamingRecord.id)));
-        Action ambiguous = () => FieldPathResolver.Resolve(typeof(StreamingRecord), FieldPath.Of("iD"));
+        var business = FieldPathResolver.Resolve(typeof(StreamingRecord), FieldPath.Of(nameof(StreamingRecord.BusinessId)));
 
         key.Members.Single().Name.Should().Be(nameof(StreamingRecord.Id));
-        business.Members.Single().Name.Should().Be(nameof(StreamingRecord.id));
-        ambiguous.Should().Throw<InvalidFilterFieldException>();
+        business.Members.Single().Name.Should().Be(nameof(StreamingRecord.BusinessId));
     }
 
     [Fact]
@@ -441,7 +439,7 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
         => new()
         {
             Id = sequence.ToString("D4"),
-            id = sequence % 2,
+            BusinessId = sequence % 2,
             Sequence = sequence,
             Include = include
         };
@@ -449,7 +447,7 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
     [DataAdapter(FakeStreamingAdapterFactory.ProviderId)]
     private sealed class StreamingRecord : Entity<StreamingRecord>
     {
-        public int id { get; set; }
+        public int BusinessId { get; set; }
         public int Sequence { get; set; }
         public bool Include { get; set; }
         public string Title { get; set; } = "";
