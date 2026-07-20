@@ -83,10 +83,14 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
         if (!string.IsNullOrWhiteSpace(smStr) && Enum.TryParse<RelationalSchemaMatchingMode>(smStr, true, out var sm)) options.SchemaMatching = sm;
 
-        options.AllowProductionDdl = Koan.Core.Configuration.Read(
-            Configuration,
-            Constants.Configuration.Koan.AllowMagicInProduction,
-            options.AllowProductionDdl);
+        // SQLite is an embedded, application-owned store. Selecting AutoCreate is already the explicit schema
+        // lifecycle decision, so it must keep its literal meaning under the Generic Host's Production default.
+        // Validate/NoDdl and [ReadOnly] continue to prohibit schema mutation in the repository policy.
+        options.AllowProductionDdl = options.DdlPolicy == RelationalDdlPolicy.AutoCreate ||
+                                     Koan.Core.Configuration.Read(
+                                         Configuration,
+                                         Constants.Configuration.Koan.AllowMagicInProduction,
+                                         options.AllowProductionDdl);
 
         KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomeValues.Final,
             ("connection", Redaction.DeIdentify(options.ConnectionString)));

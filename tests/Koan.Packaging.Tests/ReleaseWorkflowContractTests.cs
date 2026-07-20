@@ -29,8 +29,11 @@ public sealed class ReleaseWorkflowContractTests
         Assert.Contains("Get-ChildItem -Path \"$root/tests\" -Recurse -Filter '*.csproj' -File", ratchet, StringComparison.Ordinal);
         Assert.Contains("[int]$TestProjectConcurrency = 0", ratchet, StringComparison.Ordinal);
         Assert.Contains("[Math]::Min(4, [Math]::Max(1, [Environment]::ProcessorCount))", ratchet, StringComparison.Ordinal);
-        Assert.Contains("$testProjects | ForEach-Object -Parallel", ratchet, StringComparison.Ordinal);
+        Assert.Contains("$parallelTestProjects | ForEach-Object -Parallel", ratchet, StringComparison.Ordinal);
         Assert.Contains("-ThrottleLimit $effectiveTestProjectConcurrency", ratchet, StringComparison.Ordinal);
+        Assert.Contains("$isolatedTestProjects = @($testProjects | Where-Object Name -eq 'Koan.Packaging.Tests.csproj')", ratchet, StringComparison.Ordinal);
+        Assert.Contains("$isolatedTestProjects | ForEach-Object", ratchet, StringComparison.Ordinal);
+        Assert.Contains("nested-process test-project started in isolation", ratchet, StringComparison.Ordinal);
         Assert.Contains("'test', $project.FullName", ratchet, StringComparison.Ordinal);
         Assert.Contains("$testHostHangTimeout = '5m'", ratchet, StringComparison.Ordinal);
         Assert.Contains("'--blame-hang-timeout', $hangTimeout", ratchet, StringComparison.Ordinal);
@@ -156,6 +159,16 @@ public sealed class ReleaseWorkflowContractTests
         Assert.Contains("@('requested', 'queued', 'in_progress', 'waiting', 'pending')", workflow, StringComparison.Ordinal);
         Assert.Contains("green-ratchet.ps1", proveCurrent, StringComparison.Ordinal);
         Assert.Contains("-PublicRelease", proveCurrent, StringComparison.Ordinal);
+        Assert.Contains("strategy:\n      fail-fast: false\n      matrix:\n        lane: [certification, packages]", proveCurrent, StringComparison.Ordinal);
+        Assert.Contains("if: steps.plan.outputs.has-packages == 'true' && matrix.lane == 'certification'", proveCurrent, StringComparison.Ordinal);
+        Assert.Equal(2, Regex.Matches(
+            proveCurrent,
+            "if: steps.plan.outputs.has-packages == 'true' && matrix.lane == 'packages'",
+            RegexOptions.CultureInvariant).Count);
+        Assert.Equal(2, Regex.Matches(
+            proveCurrent,
+            "if: matrix.lane == 'packages'",
+            RegexOptions.CultureInvariant).Count);
         Assert.Contains("runs-on: ubuntu-24.04", workflow, StringComparison.Ordinal);
         Assert.Contains("uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0", workflow, StringComparison.Ordinal);
         Assert.Contains("uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68", workflow, StringComparison.Ordinal);
@@ -220,7 +233,15 @@ public sealed class ReleaseWorkflowContractTests
             "if: steps.plan.outputs.has-packages == 'true'",
             RegexOptions.CultureInvariant).Count);
         Assert.Contains(
-            "- name: Prove exact current version commit\n        if: steps.plan.outputs.has-packages == 'true'",
+            "- name: Prove exact current version commit\n        if: steps.plan.outputs.has-packages == 'true' && matrix.lane == 'certification'",
+            proveCurrent,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "- name: Pack and prove current package closure\n        if: steps.plan.outputs.has-packages == 'true' && matrix.lane == 'packages'",
+            proveCurrent,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "- name: Preserve exact current release handoff\n        if: matrix.lane == 'packages'",
             proveCurrent,
             StringComparison.Ordinal);
         Assert.Contains("if ($env:CURRENT_STATE -eq 'published')", proveCurrent, StringComparison.Ordinal);

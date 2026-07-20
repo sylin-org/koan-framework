@@ -46,7 +46,7 @@ The workflow separates proof, GitHub mutation, and credential use into six jobs:
 | `prepare_prior` | contents read | Serialize the event; inspect, materialize, and prove any incomplete prior version wave. |
 | `stage_prior` | contents write | Stage only the exact prior bundle and marker on its draft Release. |
 | `promote_prior` | contents write + step-scoped API key | Recheck prepared prior escrow, then converge the prior wave from exact custody. |
-| `prove_current` | contents read | Compile lineage, run the release ratchet, pack, clean-room test, and build current escrow. |
+| `prove_current` | contents read | Compile lineage in two read-only matrix lanes: certification runs the release ratchet while packages concurrently packs, clean-room tests, and builds current escrow. |
 | `stage_current` | contents write | Persist the exact lineage candidate and stage the exact current draft escrow. |
 | `promote_current` | contents write + step-scoped API key | Recheck prepared current escrow, then converge the current wave from exact custody. |
 
@@ -66,11 +66,13 @@ source.
    `automation/package-lineage-dev`. Bootstrap covers every owner once; later events select direct
    changes, breaking reverse dependents, mapped shared-input consumers, and current identities absent
    from nuget.org.
-4. The exact lineage candidate is tested with the public-release ratchet. Runnable test projects retain
-   one process and hang detector per project while a processor-bounded wave executes up to four at once;
-   every result joins before package work begins. `release-set.json` is compiled from committed lineage
-   truth, packages are packed in dependency order, and FirstUse plus GoldenJourney run outside the
-   checkout against only the staged feed.
+4. Two isolated `prove_current` matrix lanes independently compile and verify the same exact lineage candidate.
+   The certification lane runs the public-release ratchet: ordinary runnable test projects retain one process and
+   hang detector per project while a processor-bounded wave executes up to four at once; the child-process-heavy
+   Packaging suite then runs alone instead of contending with that wave. Concurrently, the packages lane compiles
+   `release-set.json` from the same committed lineage truth, packs in dependency order, and runs generated templates,
+   FirstUse, and GoldenJourney outside the checkout against only the staged feed. Both read-only lanes must pass
+   before staging can begin.
 5. `wave-bundle` creates `release-wave-<full-VersionCommit>.zip` containing lineage, manifest, all
    selected nupkg/snupkg files, and both application proofs. `release-wave.json` binds its exact hashes,
    package count, version commit, and `release/dev/<full-VersionCommit>`.

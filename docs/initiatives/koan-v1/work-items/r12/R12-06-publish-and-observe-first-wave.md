@@ -423,6 +423,124 @@ such a collision is a test-ownership defect to correct, not a reason to restore 
 per-project output increases transient memory modestly but prevents unreadable interleaving and preserves complete
 failure diagnostics.
 
+### 2026-07-20 SQLite zero-configuration first-use recovery checkpoint
+
+**Task:** Restore the embedded SQLite first-use contract exposed by the package-only console template after release
+run `29769598076` passed the complete ratchet and failed its generated-application proof.
+
+**Application intent:** A developer creates or publishes an ordinary Koan console application, defines an Entity,
+and saves it. The local embedded database should be ready on first use without an environment label, schema script,
+or safety escape hatch.
+
+**Public expression:** The existing four-line shape remains sufficient: reference Koan and the SQLite connector,
+call `StartKoan()`, and use `Entity<T>.Save()`. `DdlPolicy=Validate` or `NoDdl` remains the deliberate choice for a
+pre-provisioned/read-only database; `[ReadOnly]` remains the model-level prohibition.
+
+**Guarantee/correction:** SQLite's default `AutoCreate` policy means auto-create in every ordinary host environment,
+including the Generic Host's standard `Production` default. The relational production guard remains unchanged for
+network databases. SQLite still performs no DDL under `Validate`, `NoDdl`, or `[ReadOnly]`. This restores the
+provider behavior removed accidentally when relational schema ownership was centralized in `a2facdefc`.
+
+**Complete intent surface:** Resolve the provider's existing schema policy once when a repository is created; map
+SQLite `AutoCreate` to permission for its own embedded file; preserve explicit non-creating policies and read-only
+override; verify a first save in a Production host creates and reads its table; verify `NoDdl` does not create it;
+update the SQLite contract and current release handoff; rerun only the SQLite owner and the generated console proof
+before another release event.
+
+**Public concepts:** Standard SQLite embedded storage, .NET Generic Host environment naming, and the existing
+`RelationalDdlPolicy`. No new Koan API, option, attribute, configuration key, or schema lifecycle is introduced.
+
+**Docs read:** SQLite README and TECHNICAL; DATA-0046; the historical JOBS-0005 integration-host finding;
+`tests/README.md`; the console template; R12-06 and the current handoff.
+
+**Code read:** `SqliteOptions`, `SqliteOptionsConfigurator`, `SqliteAdapterFactory`, `SqliteRepository`,
+`RelationalSchemaOrchestrator`, the pre-`a2facdefc` SQLite-to-relational bridge, `KoanEnv`, `KoanIntegrationHost`,
+SQLite fixture/specs, `PackagePipeline`, `TemplatePackageCompiler`, and `TemplatePackageProbe`.
+
+**Reusing:** The existing SQLite `DdlPolicy`, centralized relational orchestrator, repository schema-policy snapshot,
+read-only override, integration host, and package template probe.
+
+**Creating new:** None. Extend the existing SQLite configuration-truth spec with Production first-save and explicit
+`NoDdl` cases; do not add another fixture, test project, policy type, or process harness.
+
+**Coalescence:** Keep the relational orchestrator as the single schema executor and SQLite repository construction as
+the provider-policy chokepoint. Restore the former SQLite mapping there; do not add template configuration, pretend
+the host is Development, fork schema creation, or weaken the shared relational policy for other providers.
+
+**Ergonomics:** `AutoCreate` says exactly what it does, and the zero-config template works when published. A developer
+who needs provisioned schema chooses the existing `Validate`/`NoDdl` policy rather than enabling or disabling an
+unrelated global "magic" concept for a private embedded file.
+
+**Constraints satisfied:** No controller, endpoint, data model, module, registration, package, constant, or public API
+is added; standard .NET and SQLite concepts remain primary; the fix is isolated to the SQLite adapter's policy
+mapping; focused owner and generated-template evidence replace another complete local release run.
+
+**Risks:** Existing Production applications that left SQLite at its default `AutoCreate` but relied on missing-table
+failure will now receive the behavior the option and public zero-config promise already state. They can preserve
+pre-provisioning by selecting `Validate` or `NoDdl`. Explicit network-provider production guards are unaffected.
+
+### 2026-07-20 parallel read-only release-lanes checkpoint
+
+**Task:** Replace the monolithic current-wave proof job with two independent read-only lanes that join immediately
+before the first durable mutation, and prevent child-process-heavy Packaging tests from competing with the general
+test wave.
+
+**Application intent:** A maintainer should learn whether framework behavior and packaged first use are sound in one
+bounded feedback window, with the failing responsibility named directly, rather than waiting for those independent
+questions serially.
+
+**Public expression:** The release trigger, API key, package identities, tags, Releases, and public installation
+experience do not change. GitHub Actions presents separate certification and packages lanes under `prove_current`.
+
+**Guarantee/correction:** Both matrix lanes independently check out the same event SHA, compile and verify the same
+exact version commit, and remain read-only. The certification lane owns build/tests/docs; the packages lane owns
+pack, closure, generated templates, FirstUse, GoldenJourney, escrow assembly, and the sole handoff artifact.
+`stage_current` requires the complete matrix, so no lineage, escrow, tag, Release, or package mutation is reachable
+unless both lanes agree and pass.
+
+**Complete intent surface:** Preserve prior-wave recovery; compile deterministic current lineage in each isolated
+runner from the same source/prior inputs; skip both expensive lanes for already prepared/published replay; run test
+and package proof concurrently for a missing/staging wave; keep package artifacts solely in the package lane; join
+at staging; route every downstream output from the package lane; retain API-key scope only in promotion; keep the
+full ratchet complete while running `Koan.Packaging.Tests` alone after the bounded general project wave.
+
+**Public concepts:** Standard GitHub Actions jobs, `needs`, outputs, and least-privilege permissions; standard
+PowerShell process isolation. No custom scheduler, cache protocol, attestation format, or release state is added.
+
+**Docs read:** R12-06; NuGet publishing guidance; ARCH-0110; test authoring guidance; current release workflow and
+its workflow-contract tests.
+
+**Code read:** Complete `release-on-dev.yml`; complete `green-ratchet.ps1`; complete
+`ReleaseWorkflowContractTests`; package pipeline, template probe, FirstUse/GoldenJourney executable contracts; timing
+output from run `29769598076`.
+
+**Reusing:** Exact lineage compiler, existing read-only checkout/tool build, existing ratchet, existing package
+pipeline and clean-room, existing release-wave bundle, current handoff artifact, and the existing stage mutation
+barrier.
+
+**Creating new:** No job, script, manifest, artifact format, credential, or remote state. Give the existing read-only
+`prove_current` job a two-value standard Actions matrix; only its packages lane writes the already-existing handoff
+artifact.
+
+**Coalescence:** Split responsibilities inside `prove_current` rather than copy publication logic into another job or
+script. The two matrix instances share one declarative definition and differ only at their expensive proof steps;
+staging remains the first and single join/mutation chokepoint. Keep historical prior recovery intact because it is
+exceptional reconciliation, not the normal feedback path.
+
+**Ergonomics:** Test and package failures arrive independently and concurrently. Packaging's nested builds no longer
+fight three unrelated test processes, and its result is no longer buried inside a 30-minute job log. Maintainers can
+rerun or diagnose the named lane while the release safety model remains unchanged.
+
+**Constraints satisfied:** The API key remains only in promotion; no OIDC, remote setting, source cache, skipped
+suite, reduced package proof, public API, runtime capability, or new release command is introduced. `tmp/` remains
+outside evidence.
+
+**Risks:** Deterministic lineage/tool compilation occurs twice, trading a few concurrent CPU minutes for much lower
+wall-clock latency and stronger isolation. Divergence is caught because both lanes require HEAD to equal their
+compiled version commit and staging consumes only the package lane after the proof lane passes. Packaging isolation
+may reveal its true standalone duration; retain complete coverage and optimize specific executable contracts only
+from measured evidence.
+
 ## Work
 
 1. Revalidate that local HEAD exactly equals the passed R12-05 source and that no later tracked change exists.

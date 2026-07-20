@@ -333,6 +333,11 @@ jobs:
     needs:
       - prepare_prior
       - promote_prior
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [certification, packages]
+    name: prove_current (${{ matrix.lane }})
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     permissions:
@@ -455,7 +460,7 @@ jobs:
           "release-count=$releaseCount" | Out-File $env:GITHUB_OUTPUT -Append
 
       - name: Prove exact current version commit
-        if: steps.plan.outputs.has-packages == 'true'
+        if: steps.plan.outputs.has-packages == 'true' && matrix.lane == 'certification'
         shell: pwsh
         env:
           VERSION_COMMIT: ${{ steps.lineage.outputs.version-commit }}
@@ -473,7 +478,7 @@ jobs:
           }
 
       - name: Pack and prove current package closure
-        if: steps.plan.outputs.has-packages == 'true'
+        if: steps.plan.outputs.has-packages == 'true' && matrix.lane == 'packages'
         shell: pwsh
         run: |
           $tool = (Resolve-Path 'artifacts/current/tool/Koan.Packaging.dll').Path
@@ -484,7 +489,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Current package verification failed.' }
 
       - name: Prepare exact current release-wave escrow
-        if: steps.plan.outputs.has-packages == 'true'
+        if: steps.plan.outputs.has-packages == 'true' && matrix.lane == 'packages'
         shell: pwsh
         run: |
           $tool = (Resolve-Path 'artifacts/current/tool/Koan.Packaging.dll').Path
@@ -529,12 +534,14 @@ jobs:
           "release-count=$releaseCount" | Out-File $env:GITHUB_OUTPUT -Append
 
       - name: Bundle exact current lineage candidate
+        if: matrix.lane == 'packages'
         shell: pwsh
         run: |
           git bundle create artifacts/current/package-lineage.bundle refs/heads/automation/package-lineage-dev
           if ($LASTEXITCODE -ne 0) { throw 'Unable to preserve the exact current lineage candidate.' }
 
       - name: Preserve exact current release handoff
+        if: matrix.lane == 'packages'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: koan-current-${{ github.run_id }}-${{ github.run_attempt }}
@@ -548,7 +555,7 @@ jobs:
           retention-days: 90
 
       - name: Summarize current release impact
-        if: always() && steps.lineage.outcome == 'success'
+        if: always() && matrix.lane == 'packages' && steps.lineage.outcome == 'success'
         shell: pwsh
         run: |
           $lineage = Get-Content artifacts/current/release-lineage.json -Raw | ConvertFrom-Json

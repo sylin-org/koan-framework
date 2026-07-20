@@ -24,7 +24,10 @@ dotnet add package Sylin.Koan.Data.Connector.Sqlite
 ## Minimal setup
 
 Reference the package and keep the application's normal `services.AddKoan()` bootstrap. No provider registration,
-schema scaffold, or configuration is required. Configure a source only when the default target is not appropriate:
+schema scaffold, environment label, or configuration is required. The default `AutoCreate` policy creates the
+embedded store on first use even under the .NET Generic Host's standard `Production` environment. Choose
+`Validate` or `NoDdl` when schema is provisioned externally. Configure a source only when the default target is not
+appropriate:
 
 ```json
 {

@@ -15,7 +15,8 @@ public sealed class SqliteOptions : IAdapterOptions
     // Schema policy
     public RelationalDdlPolicy DdlPolicy { get; set; } = RelationalDdlPolicy.AutoCreate;
     public RelationalSchemaMatchingMode SchemaMatching { get; set; } = RelationalSchemaMatchingMode.Relaxed;
-    // Global safety: allow DDL in prod only with an explicit magic flag
+    // Effective production permission. AutoCreate implies permission for this embedded application-owned store;
+    // Validate/NoDdl remain the opt-in choices for externally provisioned schema.
     public bool AllowProductionDdl { get; set; } = false;
 
     public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();

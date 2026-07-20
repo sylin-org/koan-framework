@@ -11,13 +11,18 @@ last_updated: 2026-07-17
 
 - The adapter declares `DataCaps.Query.ProviderBoundedPaging` and applies numbered pages in SQLite
   before candidate rows are materialized into application memory.
-- Schema governance follows DATA-0046.
+- Schema governance follows DATA-0046 except that SQLite's embedded-store `AutoCreate` selection is itself
+  production permission. `Validate`, `NoDdl`, and `[ReadOnly]` still prohibit DDL.
 
 ## Configuration
 
 Reference the connector and call the application's normal `AddKoan()` bootstrap. With no configuration, SQLite
 uses `.koan/data/Koan.sqlite`; the directory is created on first elected use, not while an available-but-unused
 connector reports its boot facts.
+
+SQLite is application-owned embedded storage, so its default `AutoCreate` policy retains its literal meaning when
+the .NET Generic Host defaults to `Production`; no global magic flag is required. Select `Validate` or `NoDdl` for
+an externally provisioned file. `[ReadOnly]` models never create or alter schema.
 
 The effective Default-source connection is selected in this order:
 

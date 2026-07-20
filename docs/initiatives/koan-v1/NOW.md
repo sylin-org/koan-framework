@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-20
   status: tested
-  scope: R12-06 first-wave pre-staging recovery and bounded certification-wave redesign
+  scope: R12-06 SQLite first-use correction and parallel read-only release lanes
 ---
 
 # Koan 0.20 preview current handoff
@@ -21,8 +21,8 @@ Replace this file at every handoff. It is a restart point, not a diary.
 - R00 through R07, R09 through R11, and R12-01 through R12-04 pass. R08's local candidate evidence is
   retained; its public tail is owned by R12.
 - The public narrative, selective 0.20 guarantee boundary, package compiler, API-key release coordinator,
-  templates, FirstUse, and GoldenJourney are implemented. Exactly the 38 supported package owners carry
-  0.20 intent; repository membership or transitive dependency does not promote another package.
+  templates, FirstUse, and GoldenJourney are implemented. Exactly the supported package owners carry 0.20 intent;
+  repository membership or transitive dependency does not promote another package.
 - The CLI and Aspire families remain shelved outside `Koan.sln`. Usagi Picks is a standalone product at
   `lbotinelly/usagipicks`, not a bundled Koan sample.
 - [R12-06](work-items/r12/R12-06-publish-and-observe-first-wave.md) is active under the maintainer's explicit
@@ -37,54 +37,57 @@ only when genuinely inert and independently consumed.
 
 ## Active slice: R12-06 first public wave
 
-Five ordinary `dev` release events reached read-only exact-version proof and exposed independent runner defects.
-Each was corrected at its existing owner with focused Windows/Linux evidence:
+Release run [`29769598076`](https://github.com/sylin-org/koan-framework/actions/runs/29769598076) established two
+important facts before stopping safely:
 
-- `f6531198f`: cross-platform project-reference and docs-proof portability;
-- `7b176a8cb`: rooted Web Auth provider paths resolve as HTTP application-relative URIs on Linux;
-- `ea86be4b1`: deferred embedding fixture uses test-owned worker timing;
-- `3c6988d6c`: Local storage enforces one portable object-key language;
-- `d7d673719`: Jobs SQLite's 100,000-row claim sentinel has honest runner headroom.
+- all 106 isolated test projects passed under bounded concurrency; the exact ratchet took 19m46s;
+- the later package-only generated console failed on its first `Todo.Save()` because SQLite did not create its table
+  under the Generic Host's ordinary `Production` environment.
 
-Run `29766528071` was cancelled while still inside read-only proof after the maintainer rejected the accidental
-106-project serial queue. Pack, escrow, lineage persistence, staging, and promotion did not run. Terminal cancellation
-and empty lineage/tag/Release state were verified.
+The failure occurred before escrow, lineage persistence, staging, promotion, tags, Releases, or publication. Remote
+lineage/tag/Release absence was reverified after the run.
 
-The certification topology is now redesigned at the existing `scripts/green-ratchet.ps1` chokepoint:
+The SQLite defect is a regression from relational schema consolidation `a2facdefc`. SQLite previously treated its
+default `AutoCreate` policy as sufficient permission for its embedded application-owned file. That literal
+zero-configuration behavior is restored at the provider configuration chokepoint. `Validate`, `NoDdl`, and
+`[ReadOnly]` still prohibit schema mutation; network relational providers retain their production guard.
 
-- the full solution still builds once at the exact version commit;
-- every runnable test project still receives its own `dotnet test` process and five-minute hang detector;
-- a processor-derived wave runs at most four projects concurrently, with an explicit bounded override;
-- complete project logs are grouped, every project result is reported, and failures join once;
-- package pack/clean-room/escrow remains unreachable until the joined ratchet is green;
-- the same optimization applies to current proof and exceptional prior-wave reconstruction without adding a
-  workflow job, manifest, artifact handoff, scheduler, or credential boundary.
+The release feedback path is also redesigned:
 
-Focused redesign evidence is green: release workflow contract 10/10, Core 339/339, Cache topology 63/63, a live
-two-project concurrency probe, PowerShell parsing, broad docs with zero errors, and the public-docs truth gate.
-The full release ratchet is intentionally not rerun locally; the protected workflow owns that exact boundary.
+- `prove_current` uses two read-only matrix lanes over the same exact event/version commit;
+- certification runs build, complete tests, docs, skills, lockfile, and blueprint proof;
+- packages concurrently runs pack, closure, generated templates, FirstUse, GoldenJourney, and escrow assembly;
+- both lanes join at `stage_current`, which remains the first durable mutation;
+- the API key remains available only to the later prepared promotion step;
+- inside certification, 105 ordinary test projects run in the bounded process wave and the child-process-heavy
+  `Koan.Packaging.Tests` project runs alone afterward. Run `29769598076` measured that project at 639.7 seconds under
+  contention; focused standalone class probes completed in seconds to about one minute.
+
+Focused evidence is green: SQLite configuration truth 5/5, full SQLite connector 38/38, a source-referenced console
+template first save/query under explicit `Production`, release workflow contract 10/10, PowerShell parsing, YAML
+parsing, and `git diff --check`.
 
 ## Current repository state
 
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
-- Branch: `dev`; before the pending redesign commit, local and `origin/dev` both resolve to `d7d67371997c13baebfbab1add500c70704e0e14`.
-- Tracked pending changes are limited to the ratchet, its Packaging contract, NuGet publishing guidance, R12-06,
-  and this handoff.
-- `tmp/` is untracked local certification/evaluator material and must never be staged.
-- No process from the cancelled workflow is local. The deliberately stopped broad Packaging verification left no
-  owned test process; the exact contract class replaced it as the focused check.
+- Branch: `dev`; committed local and `origin/dev` HEAD before this pending batch are
+  `d00307ebe6a2ac6b7905fb0a15b95f2bd8bae38b`.
+- Pending tracked changes are limited to SQLite policy/tests/docs, the release matrix and ratchet scheduling,
+  workflow contracts, NuGet publishing guidance, R12-06, and this handoff.
+- `tmp/` is untracked local evidence and must never be staged. It includes a disposable console source probe.
+- No owned test, sample, packaging, or release process remains running.
 
 ## Resume here
 
 1. Verify status and HEAD; never stage `tmp/`.
-2. Commit the bounded certification-wave change and advance `dev` once through the normal path.
-3. Observe all six release authority jobs. The exact proof should now run up to four isolated project processes at
-   once and report all independent failures from that wave.
-4. On red, do not restart the complete local ratchet. Isolate only the reported owners, apply one bounded correction,
-   and let the next authorized `dev` event use coordinator recovery.
+2. Run docs/public-docs focused gates, inspect the exact diff, commit only the tracked batch, and advance `dev` once
+   through the authorized normal path.
+3. Observe both `prove_current` lanes. Certification and packages should execute concurrently; no staging can start
+   until both are green.
+4. On red, diagnose only the named owner/lane. Do not rerun the complete local ratchet or weaken the join.
 5. On terminal green, require NuGet visibility, exact lineage/tag/completion agreement, and an immutable GitHub
-   Release before beginning public-feed template, FirstUse, GoldenJourney, provider-swap, rejection, facts, health,
-   lockfile, and maintainer-comprehension observation.
+   Release before public-feed template, FirstUse, GoldenJourney, provider-swap, rejection, facts, health, lockfile,
+   and maintainer-comprehension observation.
 
 ## Do not redo
 
@@ -94,8 +97,8 @@ The full release ratchet is intentionally not rerun locally; the protected workf
   decoration for request context; Web context belongs at ordered contributor chokepoints.
 - Do not rerun Tenancy, Classification, completed package-family suites, or the complete local ratchet without an
   affected dependency and explicit need.
-- Do not create a GitHub test job per project, split version-lineage authority across artifacts, weaken one-process
-  isolation, skip suites, or permit staging before the joined proof succeeds.
+- Do not skip suites, let Packaging contend inside the general project wave, serialize independent test/package
+  proof, or permit staging before both read-only lanes succeed.
 - Do not stage `tmp/`, inspect private dogfood applications, hand-pack, manually choose packages, replace escrow,
   move tags, publish outside the coordinator, or mutate remote configuration.
 

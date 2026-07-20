@@ -3,10 +3,12 @@ using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Relational.Orchestration;
 using Koan.Core.Services;
 using Koan.Testing.Integration;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Data.Connector.Sqlite.Tests.Specs;
@@ -19,6 +21,79 @@ public sealed class SqliteConfigurationTruthSpec
     public sealed class ExplicitSqliteRecord : Entity<ExplicitSqliteRecord>
     {
         public string Value { get; set; } = "";
+    }
+
+    [Fact]
+    public async Task Production_host_keeps_zero_configuration_autocreate_literal()
+    {
+        var path = TempDatabase("production-autocreate");
+
+        try
+        {
+            await using (var host = await KoanIntegrationHost.Configure()
+                             .WithEnvironment(Environments.Production)
+                             .WithSetting("Koan:Data:Sqlite:ConnectionString", Connection(path))
+                             .ConfigureServices(services => services.AddKoan())
+                             .StartAsync())
+            {
+                host.Services.GetRequiredService<IHostEnvironment>()
+                    .EnvironmentName.Should().Be(Environments.Production);
+                host.Services.GetRequiredService<IOptions<SqliteOptions>>()
+                    .Value.AllowProductionDdl.Should().BeTrue(
+                        "SQLite AutoCreate is the schema decision for the embedded application-owned store");
+
+                var saved = await new ExplicitSqliteRecord { Value = "first use" }.Save();
+                (await ExplicitSqliteRecord.Get(saved.Id))!.Value.Should().Be("first use");
+            }
+
+            await using var connection = new SqliteConnection(Connection(path));
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=$name";
+            command.Parameters.AddWithValue("$name", typeof(ExplicitSqliteRecord).FullName!);
+            Convert.ToInt64(await command.ExecuteScalarAsync()).Should().Be(1);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task NoDdl_remains_an_explicit_non_creating_policy()
+    {
+        var path = TempDatabase("production-no-ddl");
+
+        try
+        {
+            await using (var host = await KoanIntegrationHost.Configure()
+                             .WithEnvironment(Environments.Production)
+                             .WithSetting("Koan:Data:Sqlite:ConnectionString", Connection(path))
+                             .WithSetting("Koan:Data:Sqlite:DdlPolicy", "NoDdl")
+                             .ConfigureServices(services => services.AddKoan())
+                             .StartAsync())
+            {
+                var options = host.Services.GetRequiredService<IOptions<SqliteOptions>>().Value;
+                options.DdlPolicy.Should().Be(RelationalDdlPolicy.NoDdl);
+                options.AllowProductionDdl.Should().BeFalse();
+
+                await FluentActions.Invoking(() => new ExplicitSqliteRecord { Value = "rejected" }.Save())
+                    .Should().ThrowAsync<SqliteException>();
+            }
+
+            await using var connection = new SqliteConnection(Connection(path));
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=$name";
+            command.Parameters.AddWithValue("$name", typeof(ExplicitSqliteRecord).FullName!);
+            Convert.ToInt64(await command.ExecuteScalarAsync()).Should().Be(0);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (File.Exists(path)) File.Delete(path);
+        }
     }
 
     [Fact]

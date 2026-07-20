@@ -129,9 +129,14 @@ try {
                 return
             }
 
-            Write-Host "[ratchet] runnable-test-projects=$($testProjects.Count)  concurrency=$effectiveTestProjectConcurrency"
+            # Packaging tests launch their own dotnet build/run processes. Running that nested process tree inside
+            # the outer wave made it 5-10x slower under CI contention, so keep the same suite complete but give it
+            # one uncontended host after the ordinary project wave.
+            $isolatedTestProjects = @($testProjects | Where-Object Name -eq 'Koan.Packaging.Tests.csproj')
+            $parallelTestProjects = @($testProjects | Where-Object Name -ne 'Koan.Packaging.Tests.csproj')
+            Write-Host "[ratchet] runnable-test-projects=$($testProjects.Count)  parallel=$($parallelTestProjects.Count)  nested-process-isolated=$($isolatedTestProjects.Count)  concurrency=$effectiveTestProjectConcurrency"
             $testResults = @(
-                $testProjects | ForEach-Object -Parallel {
+                $parallelTestProjects | ForEach-Object -Parallel {
                     $project = $_
                     $testRoot = $using:root
                     $configuration = $using:Configuration
@@ -159,6 +164,32 @@ try {
                         ElapsedSeconds = $timer.Elapsed.TotalSeconds
                     }
                 } -ThrottleLimit $effectiveTestProjectConcurrency
+
+                $isolatedTestProjects | ForEach-Object {
+                    $project = $_
+                    $relativeProject = [System.IO.Path]::GetRelativePath($root, $project.FullName)
+                    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+                    Write-Host "[ratchet] nested-process test-project started in isolation: $relativeProject"
+                    $arguments = @(
+                        'test', $project.FullName,
+                        '-c', $Configuration,
+                        '--no-build',
+                        '--nologo',
+                        '--blame-hang-timeout', $testHostHangTimeout,
+                        '--blame-hang-dump-type', 'none'
+                    )
+                    $output = @(& dotnet @arguments 2>&1 | ForEach-Object { $_.ToString() })
+                    $exitCode = $LASTEXITCODE
+                    $timer.Stop()
+                    $outputText = $output -join [Environment]::NewLine
+                    $status = if ($exitCode -eq 0) { 'PASS' } else { 'FAIL' }
+                    Write-Host ("`n=== [ratchet] test-project $status : $relativeProject ($([Math]::Round($timer.Elapsed.TotalSeconds, 1))s) ===`n$outputText")
+                    [pscustomobject]@{
+                        Project = $relativeProject
+                        ExitCode = $exitCode
+                        ElapsedSeconds = $timer.Elapsed.TotalSeconds
+                    }
+                }
             )
 
             $failedProjects = @($testResults | Where-Object ExitCode -ne 0 | Sort-Object Project)
