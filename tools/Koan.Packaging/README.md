@@ -80,6 +80,8 @@ and path and let the old owner retire.
 
 `SourceCommit` identifies the developer's `dev` event. `VersionCommit` identifies the exact linear
 projection that owns NBGV identities, SourceLink metadata, packed bytes, and release evidence. The
+compiler combines canonical bot identity with the source commit's timestamp, so identical source, predecessor,
+tree, and message inputs mint the same `VersionCommit` across isolated runners. The
 committed lineage state must match `release-lineage.json` before planning. Lineage schema 3 also keeps
 each owner's evaluated source-input map: analyzer ProjectReference sources are automatic, while
 external generated payloads use explicit `KoanPackageInput` ownership. Comparison of the prior and

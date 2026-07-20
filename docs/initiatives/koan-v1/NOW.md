@@ -63,26 +63,36 @@ The release feedback path is also redesigned:
   `Koan.Packaging.Tests` project runs alone afterward. Run `29769598076` measured that project at 639.7 seconds under
   contention; focused standalone class probes completed in seconds to about one minute.
 
-Focused evidence is green: SQLite configuration truth 5/5, full SQLite connector 38/38, a source-referenced console
-template first save/query under explicit `Production`, release workflow contract 10/10, PowerShell parsing, YAML
-parsing, and `git diff --check`.
+Run [`29773568971`](https://github.com/sylin-org/koan-framework/actions/runs/29773568971) then proved the redesign's
+useful boundaries: packages completed green in roughly nine minutes, including the exact generated console; the
+certification lane also completed green; and staging waited for both. Its first persistence check failed closed
+because the two isolated lineage compilers minted different commit IDs (`8462d4f...` vs `fb2f49e...`) from identical
+trees. Git's invocation-time committer timestamp was the hidden input. No lineage push, draft, escrow upload,
+promotion, tag, Release, or package publication occurred.
+
+Lineage compilation now derives both Git author and committer timestamps from the exact source commit. This makes
+`VersionCommit` a reproducible function of its declared source/tree/parent/message inputs while retaining the matrix
+and its stage equality assertion. Focused evidence is green: SQLite configuration truth 5/5, full SQLite connector
+38/38, a source-referenced console first save/query under explicit `Production`, release workflow contract 10/10,
+lineage Git acceptance 12/12 including a wall-clock-separated reproducibility fact, PowerShell/YAML parsing, docs
+with zero errors, public-docs truth, and `git diff --check`.
 
 ## Current repository state
 
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
-- Branch: `dev`; committed local and `origin/dev` HEAD before this pending batch are
-  `d00307ebe6a2ac6b7905fb0a15b95f2bd8bae38b`.
-- Pending tracked changes are limited to SQLite policy/tests/docs, the release matrix and ratchet scheduling,
-  workflow contracts, NuGet publishing guidance, R12-06, and this handoff.
+- Branch: `dev`; committed local and `origin/dev` HEAD are
+  `037625d2f4af8ee2805360735d368a0e63300c14`.
+- The SQLite/release-matrix batch is committed and pushed. Pending tracked changes are limited to reproducible
+  lineage commit metadata, its focused acceptance fact, R12-06, and this handoff.
 - `tmp/` is untracked local evidence and must never be staged. It includes a disposable console source probe.
 - No owned test, sample, packaging, or release process remains running.
 
 ## Resume here
 
 1. Verify status and HEAD; never stage `tmp/`.
-2. Run docs/public-docs focused gates, inspect the exact diff, commit only the tracked batch, and advance `dev` once
-   through the authorized normal path.
-3. Observe both `prove_current` lanes. Certification and packages should execute concurrently; no staging can start
+2. Inspect and commit only the reproducible-lineage batch, then advance `dev` once through the authorized normal
+   path.
+3. Observe both `prove_current` lanes. They must report one identical exact `VersionCommit`; no staging can start
    until both are green.
 4. On red, diagnose only the named owner/lane. Do not rerun the complete local ratchet or weaken the join.
 5. On terminal green, require NuGet visibility, exact lineage/tag/completion agreement, and an immutable GitHub

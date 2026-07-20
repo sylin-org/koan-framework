@@ -65,7 +65,8 @@ source.
 3. `prove_current` applies the exact prior-source to current-source delta onto
    `automation/package-lineage-dev`. Bootstrap covers every owner once; later events select direct
    changes, breaking reverse dependents, mapped shared-input consumers, and current identities absent
-   from nuget.org.
+   from nuget.org. Canonical bot identity plus the source commit's timestamp make that linear Git
+   `VersionCommit` reproducible across the two isolated proof runners; staging rejects any disagreement.
 4. Two isolated `prove_current` matrix lanes independently compile and verify the same exact lineage candidate.
    The certification lane runs the public-release ratchet: ordinary runnable test projects retain one process and
    hang detector per project while a processor-bounded wave executes up to four at once; the child-process-heavy

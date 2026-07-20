@@ -9,6 +9,8 @@ internal static class PackagingConstants
     public const string DefaultLineageBranch = "automation/package-lineage-dev";
     public const string LineageCommitterName = "Koan Release Automation";
     public const string LineageCommitterEmail = "release-automation@koan.dev";
+    public const string GitAuthorDateEnvironmentVariable = "GIT_AUTHOR_DATE";
+    public const string GitCommitterDateEnvironmentVariable = "GIT_COMMITTER_DATE";
     public const string VersionChangedReason = "version-changed";
     public const string BreakingRootReason = "breaking-root";
     public const string BreakingDependentReason = "breaking-dependent";

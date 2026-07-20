@@ -541,6 +541,58 @@ compiled version commit and staging consumes only the package lane after the pro
 may reveal its true standalone duration; retain complete coverage and optimize specific executable contracts only
 from measured evidence.
 
+### 2026-07-20 reproducible lineage-commit recovery checkpoint
+
+**Task:** Correct the matrix join failure from run `29773568971` by making the release compiler's claimed exact-input
+lineage projection reproducible across isolated runners.
+
+**Application intent:** Two read-only proof lanes evaluating the same release event should agree on one exact package
+identity without a coordinator database, timing dependency, or lane-selected winner.
+
+**Public expression:** None. Maintainers retain one `dev` advancement and see the same certification/packages lanes;
+consumers retain the same package versions and install surface.
+
+**Guarantee/correction:** For identical source commit, previous source/version commit, branch, compiler, and repository
+tree, lineage compilation must mint the same `VersionCommit` regardless of runner wall clock. Git author and committer
+identity are already canonical; their timestamp is now derived from the exact source commit rather than invocation
+time. Different source/tree/parent/message inputs still mint different commits.
+
+**Complete intent surface:** Read the source commit's canonical committer timestamp; supply it through Git's standard
+author/committer date environment for every initial/amended lineage commit; prove two compilations separated across a
+wall-clock second produce the same commit; preserve single-parent topology, tree/state validation, NBGV identity,
+replay, and tamper checks; rerun focused lineage/workflow contracts; advance normally. Run `29773568971` already
+proved both read-only lanes green and package clean-room green, then failed before its first push because certification
+reported `8462d4f...` while the packages handoff carried `fb2f49e...`.
+
+**Public concepts:** Standard Git commit identity and `GIT_AUTHOR_DATE`/`GIT_COMMITTER_DATE`. No Koan timestamp,
+distributed lock, cache, artifact broker, or winner-election concept is introduced.
+
+**Docs read:** ARCH-0110; versioning and NuGet publishing guidance; packaging tool README; R12-06 and NOW.
+
+**Code read:** `ReleaseLineageCompiler` including all three commit/amend points; `ProcessRunner` environment handling;
+`PackagingConstants`; `ReleaseLineageGitTests` and its disposable repository fixture; the failed stage log and exact
+packages handoff from run `29773568971`.
+
+**Reusing:** Existing canonical release bot identity, exact source commit, standard Git timestamp format, process
+environment seam, committed-state validation, and disposable Git acceptance fixture.
+
+**Creating new:** One focused reproducibility fact in the existing lineage Git suite and two internal standard-Git
+environment-name constants. No runtime type, workflow job, artifact, remote state, or public option is added.
+
+**Coalescence:** Make the compiler deterministic at its existing commit chokepoint. Do not add a seventh preparation
+job, serialize the read-only lanes, choose whichever matrix output finishes last, or pass an unverified lineage commit
+between proof responsibilities.
+
+**Ergonomics:** Independent lanes remain fast and understandable while exact identity becomes a property of inputs,
+not timing. The existing stage comparison stays as the fail-closed assertion that both lanes actually agreed.
+
+**Constraints satisfied:** Standard Git concepts first; existing API-key and six authority boundaries unchanged; no
+remote configuration or manual staging; no package/public/runtime semantics altered; focused proof only.
+
+**Risks:** Reproducibility requires every commit field and tree byte to remain canonical. The new acceptance fact
+covers wall-clock drift; the existing stage equality check continues to catch any future author, parent, message, or
+tree nondeterminism before remote mutation.
+
 ## Work
 
 1. Revalidate that local HEAD exactly equals the passed R12-05 source and that no later tracked change exists.

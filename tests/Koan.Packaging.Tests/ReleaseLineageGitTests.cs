@@ -11,6 +11,39 @@ namespace Koan.Packaging.Tests;
 public sealed class ReleaseLineageGitTests
 {
     [Fact]
+    public async Task Identical_inputs_mint_the_same_version_commit_across_wall_clock_time()
+    {
+        await using var fixture = await LineageRepository.CreateAsync();
+        var process = new ProcessRunner();
+        var repository = new RepositoryInspector(fixture.Root, process);
+        var compiler = new ReleaseLineageCompiler(fixture.Root, process, repository);
+
+        var first = await compiler.CompileAsync(
+            fixture.BaseCommit,
+            fixture.BaseCommit,
+            PackagingConstants.DefaultLineageBranch,
+            previousLineageRevision: null,
+            CancellationToken.None);
+
+        await fixture.SwitchAsync("dev");
+        await process.RequireAsync(
+            "git",
+            ["branch", "--delete", "--force", PackagingConstants.DefaultLineageBranch],
+            fixture.Root,
+            CancellationToken.None);
+        await Task.Delay(TimeSpan.FromSeconds(1.1));
+
+        var second = await compiler.CompileAsync(
+            fixture.BaseCommit,
+            fixture.BaseCommit,
+            PackagingConstants.DefaultLineageBranch,
+            previousLineageRevision: null,
+            CancellationToken.None);
+
+        Assert.Equal(first.VersionCommit, second.VersionCommit);
+    }
+
+    [Fact]
     public async Task CommittedLineageMaterializationIsExactAndReadOnly()
     {
         await using var fixture = await LineageRepository.CreateAsync();

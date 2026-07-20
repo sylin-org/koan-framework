@@ -926,6 +926,18 @@ internal sealed class ReleaseLineageCompiler(
 
     private async Task CommitAsync(string sourceCommit, bool amend, CancellationToken cancellationToken)
     {
+        // A VersionCommit is compiled identity, so wall-clock time cannot be one of its inputs. Git otherwise
+        // stamps each isolated runner at invocation time and gives identical trees different commit IDs.
+        var sourceTimestamp = await processRunner.RequireAsync(
+            "git",
+            ["show", "-s", "--format=%cI", sourceCommit],
+            repositoryRoot,
+            cancellationToken);
+        IReadOnlyDictionary<string, string?> environment = new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            [PackagingConstants.GitAuthorDateEnvironmentVariable] = sourceTimestamp,
+            [PackagingConstants.GitCommitterDateEnvironmentVariable] = sourceTimestamp
+        };
         var arguments = new List<string>
         {
             "-c", $"user.name={PackagingConstants.LineageCommitterName}",
@@ -947,7 +959,8 @@ internal sealed class ReleaseLineageCompiler(
             arguments,
             repositoryRoot,
             cancellationToken,
-            echo: true);
+            echo: true,
+            environment: environment);
     }
 
     private static ReleaseLineage ToCompilation(ReleaseLineageState state, string versionCommit) => new()
