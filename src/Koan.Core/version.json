@@ -3,6 +3,7 @@
   "version": "0.20",
   "versionHeightOffset": -1,
   "pathFilters": [
-    "."
+    ".",
+    "../Koan.Core.Registry.Generators"
   ]
 }

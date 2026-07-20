@@ -125,7 +125,6 @@ public sealed class PackageGraphTests
             "TECHNICAL.md",
             "Description",
             "koan;test",
-            references,
-            []);
+            references);
     }
 }

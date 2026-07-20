@@ -162,7 +162,7 @@
       href: ARCH-0108-corrective-host-context-failures.md
     - name: ARCH-0109 Bootstrap evidence partitioned by composition cost
       href: ARCH-0109-bounded-bootstrap-test-lanes.md
-    - name: ARCH-0110 Git-driven independent package releases from dev
+    - name: ARCH-0110 Explicit independently versioned package releases
       href: ARCH-0110-dev-release-compiler.md
     - name: ARCH-0111 One host-owned runtime fact envelope
       href: ARCH-0111-unified-runtime-facts.md

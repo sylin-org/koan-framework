@@ -384,7 +384,7 @@ If discovery in the connector picks the wrong endpoint (container DNS vs localho
 <PackageTags>$(CommonPackageTags);data;vector;<provider>;<key-capabilities></PackageTags>
 ```
 
-Re-run the release compiler inventory, then package verification for the affected release set.
+Re-run package inventory and the focused package checks for the connector.
 
 ---
 

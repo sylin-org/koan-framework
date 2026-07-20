@@ -46,9 +46,8 @@ Trade-off accepted: there is no longer a single "kernel version" number to cite;
 Adopt **Nerdbank.GitVersioning (nbgv)**. Each package declares its `major.minor` in a `version.json`; the **patch is the git commit height** of that package's path since its `major.minor` last changed. Consequences:
 
 - **Major/minor are a human decision** (the only judgment a tool can't make: "is this breaking / a feature?"). Bumped by editing `version.json`.
-- **Patch is automatic and deterministic** — same version-lineage commit → same version, reproducible
-  from a clean checkout. A package path with no source change keeps its height unless §4 deliberately
-  adds a reverse-closure marker because that package's compatibility contract changed.
+- **Patch is automatic and deterministic** — the same Git commit and path filters produce the same
+  version from a clean checkout.
 - **Per-package independence** via one nested `version.json` per packable project with `pathFilters: ["."]`, so height counts only commits touching that package's folder. A repo-root `version.json` is the fallback for unpublished projects (tests, samples).
 - nbgv also stabilizes `AssemblyVersion` at `major.minor.0.0` (reduces binding churn) while `FileVersion`/`PackageVersion` move freely, and stamps the git SHA into the informational version.
 - **Non-release branches get prerelease versions** (`0.17.3-g1a2b3c`) by default; clean release versions are produced on `main`/release branches (nbgv `publicReleaseRefSpec`) or with `-p:PublicRelease=true`. §3's range target only bands clean release versions (it skips prerelease deps, which are never published).
@@ -57,7 +56,7 @@ This replaces the bespoke `versions.props` + `Update-Versions.ps1` number comput
 
 **Baseline (as built):** the original package set started at **`0.17.0`** (`build/versions.props`
 retired; project-local `version.json` ownership was generated in the migration and is now enforced by
-the release compiler). To bump one package's compatibility tier, edit the `version` field in its
+evaluated package inventory). To bump one package's compatibility tier, edit the `version` field in its
 `version.json`; ordinary patches follow Git.
 
 ### 3. Compatibility: intra-Koan dependencies emit a bounded range, not a floor (Axis 2 — the fix)
@@ -69,18 +68,13 @@ Every Koan→Koan package dependency is packed as a **compatibility band** keyed
 
 Effect: an incompatible pair fails at **restore** (NU1107/NU1608 — loud, at build time) instead of `TypeLoadException` at runtime in a consumer's suite. **The whole game is moving the failure left.** Implemented as an MSBuild target (`build/compat-ranges.targets`) hooked `AfterTargets="_GetProjectReferenceVersions"` that rewrites each ProjectReference's emitted `ProjectVersion` to the band; gated by `$(KoanDisableCompatRanges)` for escape-hatch.
 
-### 4. Coordinated closure republish on a breaking bump, enforced by CI
+### 4. Coordinated closure identity on a breaking bump
 
-When any package makes a breaking (pre-1.0 minor) bump, **every package that depends on it must be rebuilt + republished** — its IL recompiles against the new surface and its band floor moves past the broken version. This is **not spam**: the dependent's *compatibility contract* changed even when its own code didn't. The closure is computed from the dependency graph (not a kernel manifest). A release-gate check fails the release if the published set does not include the full dependent closure of every breaking bump. This is the check that would have caught the missed Cache.
-
-Implemented by the serialized release-lineage compiler. Evaluated ProjectReferences form the graph.
-After the current `dev` tree delta is projected onto the prior linear version commit, NBGV determines
-which closure members already gained an identity. Only the remaining members receive deterministic
-package-local markers. The compiler then proves every member differs from the previous version commit;
-the planner independently re-derives the closure and rejects lineage/manifest drift. Each committed
-lineage state stores every package owner's exact identity, so later waves compare against minted facts
-rather than recalculating an old commit with today's SDK or NBGV. A conservative map of known shared
-policy and evaluated external packed inputs fans out through the same mechanism to mapped consumers.
+When a package advances its breaking tier, packages whose compatibility ranges depend on that tier
+must receive a new identity. Their NBGV `pathFilters` include the relevant dependency version intent,
+directly or through bundle composition, so the breaking `version.json` change advances the affected
+package heights without a second Git history or generated markers. The explicit release packs the
+complete repository surface; NuGet skips identities that did not change.
 
 ### 5. Change discipline: deprecate-then-remove in the kernel
 
@@ -91,7 +85,7 @@ The skew was *fatal* only because DATA-0096 **hard-deleted** a type. Pre-1.0, ke
 ### Positive
 - The skew bug class is structurally closed: incompatible pairs can't resolve, and if forced, don't crash.
 - Versions become truthful and reproducible; major/minor stay a deliberate human signal.
-- The release gate makes "missed a package in the breaking wave" a hard CI failure, not a consumer incident.
+- Dependency version intent participates in affected package identity without a separate release ledger.
 
 ### Negative / tradeoffs
 - **Upper bounds are viral.** They can cause restore conflicts when a consumer mixes packages built against different kernels — but that is exactly the case we *want* to fail loudly, and within a coherent release all bands align. The common "avoid upper bounds" guidance targets open-ecosystem libraries with unknown consumers; it does not apply to a cohesive family tracking one kernel with frequent pre-1.0 breaks.
@@ -106,13 +100,10 @@ The skew was *fatal* only because DATA-0096 **hard-deleted** a type. Pre-1.0, ke
    `versions.props` import + KoanPackageKind version PropertyGroups removed from
    `Directory.Build.targets`. The one-time mass-generation script is retired so it cannot overwrite
    package-specific baselines or bundle composition filters.
-3. ✅ **Release-pipeline rework.** ARCH-0110 replaces the legacy workflows and scripts with the
-   `dev` release compiler: full history, serialized linear version lineage, independently selected packages,
-   exact manifests, SDK bundle projects, advisory/metadata/closure checks, clean-room application
-   proof, trusted publishing, and resumable dependency-ordered publication.
-4. ✅ **Breaking dependent-closure invariant (§4).** The compiler detects deliberate breaking tiers,
-   derives the complete reverse-dependent graph closure, mints identities only where source did not,
-   and fails before packing if any required member remains stale or is absent from the exact plan.
+3. ✅ **Release path.** ARCH-0110 uses one explicit workflow, project-local NBGV versions, standard
+   `dotnet pack`, and API-key NuGet publication.
+4. ✅ **Breaking dependent identity (§4).** Package and bundle `pathFilters` include dependency
+   compatibility intent where a breaking tier changes their packed contract.
 
 ## Non-goals
 - `$(KoanPackageKind)` was subsequently deleted by ARCH-0118; it is neither authoring nor

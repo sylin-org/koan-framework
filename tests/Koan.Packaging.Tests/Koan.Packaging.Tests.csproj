@@ -12,6 +12,5 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../tools/Koan.Packaging/Koan.Packaging.csproj" />
-    <ProjectReference Include="../../samples/GoldenJourney/GoldenJourney.csproj" />
   </ItemGroup>
 </Project>

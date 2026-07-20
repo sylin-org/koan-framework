@@ -1,643 +1,136 @@
 ---
-type: SPEC
-domain: framework
-title: "R12-06 - Publish and Observe the First 0.20 Wave"
-audience: [architects, maintainers, release-engineers, developers, ai-agents]
-status: current
-last_updated: 2026-07-19
+type: WORK
+domain: release
+status: active
+last_updated: 2026-07-20
 framework_version: v0.20.0
-validation:
-  date_last_tested: 2026-07-20
-  status: in-progress
-  scope: maintainer-authorized first-wave execution; pre-staging recovery and bounded proof redesign
 ---
 
-# R12-06 — Publish and observe the first 0.20 wave
-
-- Tranche: `T7B — public product maturity`
-- Status: `in-progress — maintainer-authorized first-wave execution; no package staged or published yet`
-- Depends on: passed R12-05 exact frozen candidate
-- Unlocks: R12-07 public-to-later-wave upgrade and recovery proof
-- Owner: `release-on-dev.yml` owns publication; NuGet and immutable GitHub Release own public evidence;
-  independent consumers own comprehension evidence
-
-## Meaningful outcome
-
-The exact R12-05 candidate becomes one recoverable public 0.20 wave. A clean maintainer environment can install Koan
-from public NuGet, reach a useful Entity result, replace local persistence
-without changing business code, diagnose rejected intent, and explain composition using public guidance only.
-
-## Architecture checkpoint — publish once, then test the public product
-
-**Task:** Authorize one exact `dev` advancement, observe the existing API-key release state machine to terminal
-success, then test only the publicly visible packages and guidance.
-
-**Application intent:** “Install Koan normally from NuGet and trust that what I run is the exact candidate Koan
-proved, published, and can recover.”
-
-**Public expression:** `dotnet new install Sylin.Koan.Templates`, `dotnet new koan-web`, ordinary
-`PackageReference`, configuration, HTTP, health, runtime facts, and `koan.lock.json`. Exact-version commands are
-used only to bind validation to the manifest; the unqualified install must resolve to the same current template.
-
-**Guarantee/correction:** The pushed source must equal the frozen R12-05 source. The workflow must re-prove it,
-persist exact lineage, upload immutable escrow before promotion, use `NUGET_API_KEY` only in the prepared promotion
-step, publish in dependency order, wait for registry visibility, bind one completion receipt and exact tag, and
-finish with an immutable Release. Failure preserves the existing prepared escrow and follows coordinator recovery;
-it never hand-rebuilds, replaces evidence, moves a tag, or chooses packages manually.
-
-**Complete intent surface:** Revalidate the exact source and remote target; verify the existing publish-scoped
-secret and immutable/protected trust prerequisites without exposing the key; obtain explicit authorization;
-advance `dev` once; observe prior reconciliation, proof, staging, promotion, visibility, completion, tag, and
-immutability; wait for the complete manifest on public NuGet; use isolated CLI/global-package homes and public
-sources only; install both templates; run first results; replace SQLite with the supported JSON provider and back
-without changing Entity/controller/business-rule code; inspect startup, health, facts, and lock truth; provoke and
-recover one unavailable-adapter intent; run public package-only FirstUse and GoldenJourney; conduct the maintainer
-journey; record immutable identities, links, findings, and go/no-go for R12-07. Coding-agent evidence may supplement
-that journey but is not a gate; the maintainer remains the sole validation authority.
-
-**Public concepts:** Standard NuGet package visibility, SemVer `0.20.x`, `dotnet new`, PackageReference,
-configuration, GitHub Release, and Git commit/tag identity; existing Koan Entity, Reference = Intent, runtime facts,
-health, and lockfile concepts. “RC” is a process state, not a `-rc` package suffix.
-
-**Docs read:** R12 charter/R12-05; R08-05 retained publication contract; `nuget-publishing.md`; `packaging.md`;
-ARCH-0110; public README, quickstart, templates, provider guidance, FirstUse, GoldenJourney, product surface, and
-feedback templates.
-
-**Code read:** `release-on-dev.yml`; `ReleaseWaveCoordinator`; `GitHubReleaseWaveEscrow`;
-`NuGetPackagePromotionTarget`; release-wave marker/completion models and constants; template/FirstUse/
-GoldenJourney probes; workflow, promotion, escrow, visibility, recovery, and credential-redaction tests.
-
-**Reusing:** One push-triggered workflow, six existing permission boundaries, API-key promotion, deterministic
-lineage/manifest/escrow/completion, and existing application probes. Public readers use the same docs graph R12-04
-already protects. Findings become ordinary repository issues/corrections, not a new maturity database.
-
-**Creating new:** No publication mechanism, credential path, package list, recovery script, CLI, or consumer DSL.
-Add only bounded public-feed assertions to existing probes if observation exposes a missing executable promise.
-
-**Coalescence:** Absorb the former R12-05 independent consumer journey into this post-publication observation.
-Keep R12-05 as local freeze/certification and R12-07 as later-wave evolution. Preserve R08-05 as historical local
-evidence; do not execute or maintain a second release path from it.
-
-**Ergonomics:** The maintainer authorizes one exact source advancement. Automation owns versions, order, escrow,
-retry, and recovery. The developer installs one template and changes infrastructure through ordinary package/
-configuration intent; the business model remains untouched and runtime explanation is discoverable.
-
-**Constraints satisfied:** standard GitHub/NuGet/.NET concepts first; the existing API key remains; no OIDC or
-Koan-specific release ceremony is added; only guaranteed owners carry 0.20; public proof occurs only after public
-visibility; no private dogfood or `tmp/` enters evidence.
-
-**Risks:** `dev` advancement is immediately a release event and cannot be used as a harmless staging push. The
-first durable lineage may select every active owner once even though only 38 carry the 0.20 guarantee. NuGet has no
-multi-package transaction, so exact escrow, dependency order, visibility waits, and recovery are load-bearing.
-Remote trust settings are unstable facts and must be re-read immediately before authorization.
-
-### 2026-07-20 first-run portability recovery checkpoint
-
-**Task:** Correct the two Linux-only proof failures from release run `29755662142` without weakening the public
-ratchet or changing the release architecture.
-
-**Application intent:** A maintainer advances `dev` and receives the same exact release proof on the Linux workflow
-runner that passed on the Windows workstation.
-
-**Public expression:** None. Application code, package references, configuration, runtime prerequisites, package
-identities, and the one-push release instruction remain unchanged.
-
-**Guarantee/correction:** The Communication conformance probe must interpret ordinary MSBuild project-reference
-paths on both Windows and Linux, and the docs template must not advertise a placeholder as a real link. A real
-missing Communication dependency or documentation target still fails. Docs-lint failures must print their full
-path, severity, check, and correction in Actions rather than a width-truncated path-only table.
-
-**Complete intent surface:** No user action exists beyond the existing normal `dev` advancement. The first run
-failed before staging; `stage_current` and `promote_current` were skipped, no durable lineage branch, tag, Release,
-or public package exists, and the next ordinary event remains the all-owner bootstrap.
-
-**Public concepts:** None. Standard MSBuild path syntax, `System.IO.Path`, Markdown link syntax, and PowerShell
-diagnostic formatting are sufficient.
-
-**Docs read:** `docs/engineering/index.md` keeps the protected workflow and focused evidence authoritative;
-`docs/architecture/principles.md` requires standard .NET concepts and one decision owner; `docs/toc.yml` confirms no
-navigation change; the root `README.md` still honestly reports pre-publication status; `samples/CATALOG.md` is an
-unrelated retired boundary; `nuget-publishing.md` and this card require an ordinary source correction after a
-pre-staging proof failure.
-
-**Code read:** `SemanticActivationManifestBuildTests.cs` owns the conformance table but passes raw backslash XML
-includes to platform path APIs; `docs-lint.ps1` correctly identifies the placeholder target on Linux;
-`green-ratchet.ps1` requests width-sensitive table output; `docs/engineering/_template.md` owns the fake link; the
-six affected package projects use valid ordinary MSBuild backslash references.
-
-**Reusing:** The existing conformance graph, `Path.DirectorySeparatorChar`, `Path.AltDirectorySeparatorChar`, the
-existing docs link validator, the existing list output mode, and the unchanged release failure/retry path.
-
-**Creating new:**
-
-| New code | Location | Justification |
-|---|---|---|
-| project-reference include normalization helper | `tests/Koan.Packaging.Tests/SemanticActivationManifestBuildTests.cs` | one test-owned boundary converts cross-platform MSBuild path text before `System.IO` evaluates it |
-
-**Coalescence:** The closest pattern is the existing `ProjectReferences` test helper. Keep that test-local graph
-owner and absorb separator normalization there; do not introduce a production path service or evaluate a second
-package graph. Keep docs validation in `docs-lint.ps1`; change only its existing caller's rendering mode and make the
-template placeholder non-link text. No superseded runtime or release path is created.
-
-**Ergonomics:** Maintainers retain one release action and receive an actionable CI error. Framework users see no
-new API or concept, and ordinary MSBuild paths remain ordinary MSBuild paths.
-
-**Constraints satisfied:** No HTTP, data-access, streaming, options, constants, module, public type, or runtime
-behavior is involved; no inline endpoints or placeholders are added; current docs/ADR/TOC policy is unchanged; the
-focused Packaging test, Windows docs lint, and Linux container reproduction are the bounded proof.
-
-**Risks:** A second platform-specific failure may appear after these fail-fast cells clear. Preserve the same
-pre-staging stop boundary and fix only observed evidence; do not bypass either gate or manually stage/promote.
-
-### 2026-07-20 rooted-auth-URI recovery checkpoint
-
-**Task:** Correct the later Linux-only Web Auth failure from release run `29757857299` while preserving the
-existing self-hosted test-provider contract.
-
-**Application intent:** A relative self-hosted provider authority such as `/.testoauth` resolves against the
-application's Kestrel address in containers exactly as it does on Windows.
-
-**Public expression:** None beyond the existing relative test-provider authority and ordinary
-`ASPNETCORE_URLS`/`ASPNETCORE_HTTP_PORTS`/`ASPNETCORE_HTTPS_PORTS` host configuration. Real deployment providers
-continue to supply absolute HTTP(S) endpoints.
-
-**Guarantee/correction:** Only absolute HTTP or HTTPS endpoints bypass server-address resolution. A rooted Unix
-path must not be mistaken for an absolute `file:` URI; it resolves through the existing wildcard/port-aware owner or
-remains relative when no server address exists. Unsupported/unresolvable input retains the current safe fallback.
-
-**Complete intent surface:** No additional user action exists. The second run also failed in the read-only ratchet;
-staging and promotion were skipped and no lineage, tag, Release, escrow, or public package was created.
-
-**Public concepts:** None. Standard `System.Uri` HTTP/HTTPS scheme identity expresses the existing network-URL
-guarantee.
-
-**Docs read:** `Koan.Web.Auth/README.md` defines maintained external sign-in; `Koan.Web.Auth/TECHNICAL.md` reserves
-relative endpoints for the self-hosted local provider and requires absolute HTTP(S) deployment endpoints; the public
-Auth card keeps provider configuration as the only application surface; architecture principles keep this decision
-inside the Web Auth owner.
-
-**Code read:** `ServerAddressResolver.cs` owns the sole relative-to-server-address conversion and currently accepts
-any platform-defined absolute URI; `ServerAddressResolverTests.cs` already covers wildcard, concrete, IPv4, IPv6,
-port-fallback, absolute HTTPS, and unresolvable cases; `AuthSchemeSeeder` is only the consumer and needs no change.
-
-**Reusing:** The existing resolver, `Uri.TryCreate`, `Uri.UriSchemeHttp`, `Uri.UriSchemeHttps`, and all 39 focused
-Web Auth tests.
-
-**Creating new:** None. Tighten the existing absolute-endpoint predicate in place; no type, method, constant,
-option, DTO, service, or configuration key is added.
-
-**Coalescence:** Keep `ServerAddressResolver` as the single Web Auth decision owner. Absorb network-scheme validation
-into its existing early-return predicate; do not add a Unix branch, filesystem heuristic, alternate URI parser, or
-consumer-side workaround.
-
-**Ergonomics:** Windows and container users keep the same configuration and receive the same URL. The coding model,
-IntelliSense surface, and number of concepts remain unchanged.
-
-**Constraints satisfied:** No controller, route, data access, streaming, decoration, option, constant, module, or
-public API is added; standard .NET URI concepts are used; current documentation and ADR policy do not change; the
-focused Web Auth suite on Windows and Linux is the bounded proof.
-
-**Risks:** Restricting pass-through to HTTP(S) deliberately rejects treating non-network schemes as provider
-back-channel URLs; that matches the documented OAuth/OIDC HTTP contract. Continue fail-fast recovery if a later
-independent Linux cell appears.
-
-### 2026-07-20 async-embedding fixture recovery checkpoint
-
-**Task:** Correct the Data AI timing failure from release run `29759034113` without changing deferred-embedding
-production semantics or weakening the vector-only regression proof.
-
-**Application intent:** An application saving an `[Embedding(Async = true)]` Entity receives a durable job whose
-`Completed` state means the vector write and model-state confirmation have both completed, without a second save of
-the domain Entity.
-
-**Public expression:** None. Applications retain the existing `[Embedding(Async = true)]` declaration, normal
-`Save()`, and host-owned `Koan:Data:AI:EmbeddingWorker` policy. Production worker defaults remain unchanged.
-
-**Guarantee/correction:** The integration fixture must not use the production five-second idle cadence as its own
-five-second assertion deadline. It supplies a short test-only poll cadence and disables the unrelated global rate
-limit, then continues to require the persisted `Completed` state, exactly one domain upsert, and a searchable vector.
-
-**Complete intent surface:** No user action is added. The third run failed in the read-only ratchet after Packaging
-and Web Auth passed; staging and promotion were skipped and no lineage, tag, Release, escrow, or public package was
-created.
-
-**Public concepts:** None. Standard .NET options configuration on the integration host is sufficient.
-
-**Docs read:** `Koan.Data.AI/README.md` defines queue states and makes polling/rate limits host policy;
-`Koan.Data.AI/TECHNICAL.md` requires deferred work to converge on the vector-only writer and records the non-atomic
-write/state boundary; this card preserves fail-fast coordinator recovery.
-
-**Code read:** `EmbeddingWorker` persists `Processing`, performs the vector write and durable confirmation, then
-persists `Completed`; `EmbeddingWorkerOptions` defaults idle polling to five seconds; the failing fixture starts the
-host before enqueue and also polls for only 100 × 50 ms. The isolated test completes at that boundary, confirming a
-fixture deadline race rather than a stuck worker or incorrect terminal-state order.
-
-**Reusing:** The existing `EmbeddingWorkerOptions`, normal options configuration, existing integration host, and the
-same three behavioral assertions.
-
-**Creating new:** None. Configure the existing worker options inside the existing fixture; add no helper, signal,
-type, API, option, or production branch.
-
-**Coalescence:** Keep production ordering in `EmbeddingWorker` and test policy in the fixture. Do not add a second
-completion signal, expose worker internals, lengthen a blind wait, or move terminal state ahead of the durable write.
-
-**Ergonomics:** Framework users see no change. Maintainers get a fast deterministic proof that still observes the
-public durable state rather than a test-only side channel.
-
-**Constraints satisfied:** No controller, data-access abstraction, streaming path, public API, constant, module, or
-production behavior changes; standard .NET options are reused; the focused Data AI test on Windows and Linux is the
-bounded proof.
-
-**Risks:** A short fixture cadence increases background polling only inside this one host. If the focused test still
-sticks in `Processing`, treat that as a production defect and inspect the write/state boundary rather than relaxing
-the assertion.
-
-### 2026-07-20 portable-local-storage-key recovery checkpoint
-
-**Task:** Correct the Local storage contract failure from release run `29760623578` without moving provider-specific
-filesystem policy into the Storage abstraction or weakening traversal protection.
-
-**Application intent:** An application using Local storage should get the same accepted key language on Windows,
-Linux, and macOS, so a key does not become invalid merely because the application or persisted files move hosts.
-
-**Public expression:** Applications keep ordinary slash-delimited object keys and the existing Local provider. No
-registration, option, attribute, package, or API is added.
-
-**Guarantee/correction:** Every key segment rejects control characters and the portable Windows-reserved punctuation
-`< > : " | ? *` on every operating system, in addition to characters the current filesystem reports invalid.
-Slash remains the logical segment separator and backslash retains its existing normalization to slash. Traversal,
-empty-key, containment, sharding, and listing behavior remain unchanged.
-
-**Complete intent surface:** The fourth run passed the repaired Data AI suite and continued through the later test
-inventory before Local storage failed `SECURITY-003`; all docs/skills/blueprint legs passed. Current staging,
-promotion, escrow, lineage, tag, Release, and public package creation were skipped again.
-
-**Public concepts:** None beyond standard filesystem segments, `Path.GetInvalidFileNameChars`, and `char.IsControl`.
-
-**Docs read:** the Local connector README promises keys normalized below the configured base and rejection of invalid
-filename characters; its technical contract locates physical layout and path safety in the connector and promises a
-corrective `InvalidOperationException`; the Storage abstractions leave key interpretation to providers.
-
-**Code read:** `LocalStorageProvider.GetPath` is the single path owner; `SanitizeKey` normalizes separators, rejects
-dot segments, and currently relies only on the platform-varying `Path.GetInvalidFileNameChars`; all CRUD, range,
-stat, and copy paths converge there. `LocalStorageProviderTests.SECURITY-003` explicitly supplies Windows-invalid
-punctuation, which Windows rejects and Linux accepts under the current implementation.
-
-**Reusing:** The existing private sanitizer, standard `Path` validation, the existing corrective exception, and the
-focused Local connector suite.
-
-**Creating new:** One private static character set inside `LocalStorageProvider` records the stable portable
-punctuation floor. It is connector implementation policy, not a public constant or cross-module contract.
-
-**Coalescence:** Keep validation at the existing Local-provider chokepoint. Do not add a Storage-wide key validator,
-decorate models, duplicate checks across operations, sanitize by silently renaming keys, or weaken the test to a
-Linux-only invalid character. Expand the existing security case so each promised character is independently pinned.
-
-**Ergonomics:** Developers receive one predictable key language and the same corrective error on every supported
-host. Existing ordinary names and nested paths remain valid; no ceremony or provider-specific application code is
-introduced.
-
-**Constraints satisfied:** The connector remains isolated behind `IStorageProvider`; no controller, data model,
-streaming path, option, module, public API, or Koan-specific abstraction is added; standard .NET filesystem concepts
-remain the basis; the focused Local suite on Windows and Linux is the bounded proof.
-
-**Risks:** Linux applications that intentionally used the newly reserved punctuation in Local keys will now fail
-fast. That is the deliberate cost of a portable Local-provider promise and avoids silent incompatibility when moving
-the same application or storage tree to Windows.
-
-### 2026-07-20 SQLite claim-scale sentinel recovery checkpoint
-
-**Task:** Correct the wall-clock-only Jobs SQLite failure from release run `29763701310` without weakening FIFO,
-conditional-claim, or indexed-window behavior and without changing production code.
-
-**Application intent:** A durable Jobs host should claim the oldest visible job from a 100,000-row SQLite backlog
-through the bounded, pushed-down claim window rather than materializing the ledger in application memory.
-
-**Public expression:** None. Jobs declarations, options, persistence selection, dispatch semantics, and public APIs
-remain unchanged.
-
-**Guarantee/correction:** The scale spec continues to seed 100,000 rows, require the exact FIFO head, require its
-atomic transition to `Running`, and retain a coarse three-second regression ceiling. The ceiling is test-runner
-headroom, not a production latency SLA; a result 8 ms beyond the former 1.5-second cutoff cannot by itself establish
-a query-shape regression.
-
-**Complete intent surface:** The fifth run again passed the repaired Data AI boundary but stopped in the Jobs SQLite
-suite before reaching Local storage. The same Jobs suite passed the previous run, no Jobs production source changed
-between runs, and pack, staging, promotion, escrow, lineage, tag, Release, and public package creation were skipped.
-
-**Public concepts:** None. Standard `Stopwatch` remains only a coarse scale-regression sentinel.
-
-**Docs read:** the Jobs code contract describes the durable ledger as provider-backed and the claim as a bounded
-indexed lane seek; this R12 card keeps the workflow as the broad certification owner. No public documentation claims
-an absolute 1.5-second SQLite dispatch SLA.
-
-**Code read:** `DataJobLedger.ClaimNext` queries a paginated window ordered by `VisibleAt` and `FirstSubmittedAt`, then
-uses provider conditional replacement; `JobRecord` declares the leading `Status, VisibleAt, FirstSubmittedAt` claim
-index and the lane claim index. `HighVolumeScanShapeSpec` seeds 100,000 queued rows and correctly pins FIFO/status,
-but its class comment claimed a sublinearity ratio that it never measured and its 1.5-second cutoff had no runner
-margin. Run `29763701310` measured 1,508 ms; the immediately prior run passed the unchanged suite.
-
-**Reusing:** The existing real SQLite harness, 100,000-row seed, production claim path, FIFO/status assertions, and
-single coarse elapsed-time guard.
-
-**Creating new:** None. Change one test threshold and make the existing comment honest; add no helper, benchmark
-framework, option, API, or production branch.
-
-**Coalescence:** Keep performance intent in the one existing scale spec. Do not add timing policy to production,
-duplicate the claim algorithm in a test, expose SQL internals solely for this recovery, or remove the gross-regression
-sentinel. Query-plan introspection can replace elapsed time only as a separately designed adapter testing capability.
-
-**Ergonomics:** Framework users see no change. Maintainers retain a meaningful guard against multi-second/full-ledger
-fallbacks without making shared-runner scheduler noise an eight-millisecond release veto.
-
-**Constraints satisfied:** No production, public API, controller, data model, option, constant, module, or docs promise
-changes; the focused scale test and full SQLite Jobs suite on Windows/Linux are the bounded proof.
-
-**Risks:** A three-second ceiling remains environment-sensitive and intentionally coarse. It catches gross fallback,
-not fine performance drift; a future deterministic query-plan seam would be stronger but is beyond this pre-staging
-recovery and is not justified by one 8 ms miss.
-
-### 2026-07-20 bounded certification-wave checkpoint
-
-**Task:** Remove the accidental serial topology from the complete release proof without splitting exact-version
-authority across workflow jobs or weakening project-host isolation.
-
-**Application intent:** A maintainer advancing `dev` should receive the complete exact-version certification in
-bounded minutes, with independent suites using independent processes and all failures reported before package work
-can begin.
-
-**Public expression:** None. The release action remains one ordinary `dev` advancement and the local certification
-command remains `pwsh scripts/green-ratchet.ps1 -Configuration Release -PublicRelease`. Maintainers may use the
-existing script with an explicit bounded test-project concurrency when diagnosing a constrained workstation.
-
-**Guarantee/correction:** The ratchet continues to discover every runnable `Microsoft.NET.Test.Sdk` project, launch
-each project in its own `dotnet test` process with five-minute host-hang detection, and require every project to pass.
-Independent project processes now execute in one CPU-bounded worker wave instead of one alphabetical queue. Results
-join once inside the same read-only exact-version job; any failed worker makes the ratchet red before pack, escrow,
-lineage persistence, staging, or promotion.
-
-**Complete intent surface:** Discover the same project set deterministically; reject an empty set; choose an explicit
-positive concurrency or a processor-count-derived default capped at four; start at most that many project processes;
-retain each project's complete output and elapsed time; report results in stable project order; report every failure
-from the wave rather than hiding later independent defects; leave build, lockfile, docs, public docs, instructional
-code, skills, blueprints, pack, clean-room, escrow, and mutation ordering unchanged; use the same path for current
-proof and prior-wave recovery.
-
-**Public concepts:** Standard PowerShell parameters and parallel pipelines, `Environment.ProcessorCount`, and one
-ordinary child `dotnet test` process per project. No Koan-specific scheduler, test DSL, release identity, or workflow
-artifact is introduced.
-
-**Docs read:** `CLAUDE.md`; architecture principles; engineering and test-authoring front doors; `tests/README.md`;
-R11-07 certification boundary; R12-06; NuGet publishing guidance; ARCH-0110.
-
-**Code read:** `scripts/green-ratchet.ps1`; its bounded-solution and per-project-isolation history; the complete
-`release-on-dev.yml` job/output/permission graph; `ReleaseWorkflowContractTests.cs`; all runnable-project discovery,
-parallel-job, and test-host timeout references under `scripts/`, `tests/`, and `.github/`.
-
-**Reusing:** The existing ratchet, runnable-project marker, one-process-per-project contract, full solution build,
-five-minute VSTest hang detector, six release authority boundaries, and Packaging workflow-contract suite.
+# R12-06 — Publish the first 0.20 package wave
+
+## Outcome
+
+Publish correctly versioned NuGet packages through one explicit GitHub Actions job. Release
+automation must not become a second product.
+
+## Bare-bones release checkpoint — 2026-07-20
+
+**Task:** Replace the automatic release compiler with one explicit, one-job NuGet publication path.
+
+**Application intent:** A maintainer deliberately says, “Publish the repository's independently
+versioned packages now.”
+
+**Public expression:** Run the `Release packages` workflow from `dev`. Every packable project owns a
+local `version.json`; Nerdbank.GitVersioning computes its public package version; the established
+`NUGET_API_KEY` is the only credential.
+
+**Guarantee/correction:** The workflow evaluates the repository's packable projects, packs each with
+`PublicRelease=true`, and pushes the resulting packages to nuget.org. A missing API key, invalid or
+missing version owner, restore/pack failure, or NuGet push failure stops the single job. Existing
+immutable package identities are skipped by NuGet instead of being rebuilt into a recovery protocol.
+
+**Complete intent surface:** Change a package's major/minor in its own `version.json` only when its
+compatibility tier changes; dispatch the workflow from `dev`; read the ordinary job result. No branch
+advancement, package checklist, lineage seed, escrow preparation, tag operation, recovery state, or
+remote configuration is part of the release expression.
+
+**Public concepts:** Standard GitHub Actions manual dispatch, standard .NET restore/pack/NuGet push,
+and the existing NBGV `version.json` format. No release-specific Koan concept is exposed.
+
+**Docs read:**
+
+- `docs/engineering/index.md` establishes the repository guardrails; relevant because it previously
+  required the release compiler.
+- `docs/architecture/principles.md` requires standard .NET concepts and fewer owners; directly
+  supports deleting the parallel release state machine.
+- `docs/engineering/nuget-publishing.md` describes the current six-job path; it must be replaced.
+- `docs/engineering/versioning.md` establishes project-local version ownership; that valuable rule
+  remains.
+- `docs/engineering/packaging.md` establishes evaluated packability and package metadata; those
+  package-shape rules remain while release-wave policy is removed.
+- `docs/decisions/ARCH-0110-dev-release-compiler.md` owns the superseded release compiler decision and
+  will be amended to the simpler operator contract.
+
+**Code read:**
+
+- The former `.github/workflows/release-on-dev.yml` was a 773-line, six-job state machine; replace it with one
+  manually dispatched job.
+- `tools/Koan.Packaging/Program.cs` exposes lineage, planning, clean-room packing, wave staging, and
+  promotion commands; retain only inventory/product assessment commands.
+- `tools/Koan.Packaging/Services/RepositoryInspector.cs` evaluates packability and local version
+  ownership; retain it as the one package discovery chokepoint.
+- `tools/Koan.Packaging/Services/PackageGraph.cs` provides ordinary evaluated dependency structure to
+  product assessment; retain it.
+- `Directory.Build.props` and `Directory.Build.targets` attach NBGV and bounded internal dependency
+  ranges; retain those version and package semantics.
+
+**Reusing:** Existing package-local `version.json` files, NBGV stamping, evaluated package inventory,
+standard package metadata and compatibility-range targets, nuget.org, and `NUGET_API_KEY`.
 
 **Creating new:**
 
 | New code | Location | Justification |
 | --- | --- | --- |
-| None | — | Bounded scheduling belongs inside the existing ratchet owner; another script, workflow job, manifest, or artifact would only duplicate authority. |
+| None | — | The release is expressible with existing .NET and GitHub Actions concepts. |
 
-**Coalescence:** Restore the bounded concurrency promised by R11-07 while retaining the stronger per-project lifecycle
-introduced later. Do not return to one solution-wide VSTest invocation, create 106 GitHub jobs, or split release
-lineage compilation and proof across artifact handoffs. One ratchet remains the chokepoint for both current and prior
-exact-version certification.
+**Coalescence:** The closest pattern is the current workflow, but its disposition is **rebuild**.
+MSBuild/NBGV remain the version owner; the single workflow job becomes the release owner. Delete the
+lineage compiler, automation branch, manifests, release-wave escrow, GitHub Release coordinator,
+generated application proof harness, recovery model, and their release-specific tests. A broader
+release platform is wrong because NuGet already owns immutable package publication; a narrower
+per-package script is wrong because evaluated repository inventory already identifies the complete
+packable surface.
 
-**Ergonomics:** The default uses available CPU but never exceeds four concurrent projects; `-TestProjectConcurrency`
-provides a standard explicit override. Logs remain grouped per project and the final summary names every failed
-project, so faster feedback is also more actionable than serial fail-fast/restart cycles.
+**Ergonomics:** One deliberate workflow action, one job, one log, and one version file per package.
+There are no hidden remote prerequisites beyond the existing API key and no second Git history to
+understand.
 
-**Constraints satisfied:** Build/test/pack remains read-only and API-key-free; staging and promotion remain unreachable
-until the joined ratchet succeeds; every runnable suite remains included and process-isolated; no package identity,
-public API, HTTP/data path, module, option, constant, model, documentation curriculum, or remote configuration changes;
-`tmp/` remains excluded.
+**Constraints satisfied:**
 
-**Risks:** Concurrent integration projects consume more peak CPU, memory, and Docker capacity and may expose a suite
-that violates the existing isolated-partition/database/port rule. The cap is deliberately four and overrideable;
-such a collision is a test-ownership defect to correct, not a reason to restore a 106-project serial queue. Buffered
-per-project output increases transient memory modestly but prevents unreadable interleaving and preserves complete
-failure diagnostics.
+- Standard .NET, NuGet, NBGV, and GitHub Actions concepts are primary.
+- Per-project versions remain independent.
+- No runtime, data, controller, Entity, provider, or public framework API changes.
+- No new constants, options, DTOs, services, branches, tags, or ledgers.
+- Historical implementation detail remains available in Git history rather than current guidance.
+- Validation is limited to building the small packaging tool and checking the workflow's shape.
 
-### 2026-07-20 SQLite zero-configuration first-use recovery checkpoint
-
-**Task:** Restore the embedded SQLite first-use contract exposed by the package-only console template after release
-run `29769598076` passed the complete ratchet and failed its generated-application proof.
-
-**Application intent:** A developer creates or publishes an ordinary Koan console application, defines an Entity,
-and saves it. The local embedded database should be ready on first use without an environment label, schema script,
-or safety escape hatch.
-
-**Public expression:** The existing four-line shape remains sufficient: reference Koan and the SQLite connector,
-call `StartKoan()`, and use `Entity<T>.Save()`. `DdlPolicy=Validate` or `NoDdl` remains the deliberate choice for a
-pre-provisioned/read-only database; `[ReadOnly]` remains the model-level prohibition.
-
-**Guarantee/correction:** SQLite's default `AutoCreate` policy means auto-create in every ordinary host environment,
-including the Generic Host's standard `Production` default. The relational production guard remains unchanged for
-network databases. SQLite still performs no DDL under `Validate`, `NoDdl`, or `[ReadOnly]`. This restores the
-provider behavior removed accidentally when relational schema ownership was centralized in `a2facdefc`.
-
-**Complete intent surface:** Resolve the provider's existing schema policy once when a repository is created; map
-SQLite `AutoCreate` to permission for its own embedded file; preserve explicit non-creating policies and read-only
-override; verify a first save in a Production host creates and reads its table; verify `NoDdl` does not create it;
-update the SQLite contract and current release handoff; rerun only the SQLite owner and the generated console proof
-before another release event.
-
-**Public concepts:** Standard SQLite embedded storage, .NET Generic Host environment naming, and the existing
-`RelationalDdlPolicy`. No new Koan API, option, attribute, configuration key, or schema lifecycle is introduced.
-
-**Docs read:** SQLite README and TECHNICAL; DATA-0046; the historical JOBS-0005 integration-host finding;
-`tests/README.md`; the console template; R12-06 and the current handoff.
-
-**Code read:** `SqliteOptions`, `SqliteOptionsConfigurator`, `SqliteAdapterFactory`, `SqliteRepository`,
-`RelationalSchemaOrchestrator`, the pre-`a2facdefc` SQLite-to-relational bridge, `KoanEnv`, `KoanIntegrationHost`,
-SQLite fixture/specs, `PackagePipeline`, `TemplatePackageCompiler`, and `TemplatePackageProbe`.
-
-**Reusing:** The existing SQLite `DdlPolicy`, centralized relational orchestrator, repository schema-policy snapshot,
-read-only override, integration host, and package template probe.
-
-**Creating new:** None. Extend the existing SQLite configuration-truth spec with Production first-save and explicit
-`NoDdl` cases; do not add another fixture, test project, policy type, or process harness.
-
-**Coalescence:** Keep the relational orchestrator as the single schema executor and SQLite repository construction as
-the provider-policy chokepoint. Restore the former SQLite mapping there; do not add template configuration, pretend
-the host is Development, fork schema creation, or weaken the shared relational policy for other providers.
-
-**Ergonomics:** `AutoCreate` says exactly what it does, and the zero-config template works when published. A developer
-who needs provisioned schema chooses the existing `Validate`/`NoDdl` policy rather than enabling or disabling an
-unrelated global "magic" concept for a private embedded file.
-
-**Constraints satisfied:** No controller, endpoint, data model, module, registration, package, constant, or public API
-is added; standard .NET and SQLite concepts remain primary; the fix is isolated to the SQLite adapter's policy
-mapping; focused owner and generated-template evidence replace another complete local release run.
-
-**Risks:** Existing Production applications that left SQLite at its default `AutoCreate` but relied on missing-table
-failure will now receive the behavior the option and public zero-config promise already state. They can preserve
-pre-provisioning by selecting `Validate` or `NoDdl`. Explicit network-provider production guards are unaffected.
-
-### 2026-07-20 parallel read-only release-lanes checkpoint
-
-**Task:** Replace the monolithic current-wave proof job with two independent read-only lanes that join immediately
-before the first durable mutation, and prevent child-process-heavy Packaging tests from competing with the general
-test wave.
-
-**Application intent:** A maintainer should learn whether framework behavior and packaged first use are sound in one
-bounded feedback window, with the failing responsibility named directly, rather than waiting for those independent
-questions serially.
-
-**Public expression:** The release trigger, API key, package identities, tags, Releases, and public installation
-experience do not change. GitHub Actions presents separate certification and packages lanes under `prove_current`.
-
-**Guarantee/correction:** Both matrix lanes independently check out the same event SHA, compile and verify the same
-exact version commit, and remain read-only. The certification lane owns build/tests/docs; the packages lane owns
-pack, closure, generated templates, FirstUse, GoldenJourney, escrow assembly, and the sole handoff artifact.
-`stage_current` requires the complete matrix, so no lineage, escrow, tag, Release, or package mutation is reachable
-unless both lanes agree and pass.
-
-**Complete intent surface:** Preserve prior-wave recovery; compile deterministic current lineage in each isolated
-runner from the same source/prior inputs; skip both expensive lanes for already prepared/published replay; run test
-and package proof concurrently for a missing/staging wave; keep package artifacts solely in the package lane; join
-at staging; route every downstream output from the package lane; retain API-key scope only in promotion; keep the
-full ratchet complete while running `Koan.Packaging.Tests` alone after the bounded general project wave.
-
-**Public concepts:** Standard GitHub Actions jobs, `needs`, outputs, and least-privilege permissions; standard
-PowerShell process isolation. No custom scheduler, cache protocol, attestation format, or release state is added.
-
-**Docs read:** R12-06; NuGet publishing guidance; ARCH-0110; test authoring guidance; current release workflow and
-its workflow-contract tests.
-
-**Code read:** Complete `release-on-dev.yml`; complete `green-ratchet.ps1`; complete
-`ReleaseWorkflowContractTests`; package pipeline, template probe, FirstUse/GoldenJourney executable contracts; timing
-output from run `29769598076`.
-
-**Reusing:** Exact lineage compiler, existing read-only checkout/tool build, existing ratchet, existing package
-pipeline and clean-room, existing release-wave bundle, current handoff artifact, and the existing stage mutation
-barrier.
-
-**Creating new:** No job, script, manifest, artifact format, credential, or remote state. Give the existing read-only
-`prove_current` job a two-value standard Actions matrix; only its packages lane writes the already-existing handoff
-artifact.
-
-**Coalescence:** Split responsibilities inside `prove_current` rather than copy publication logic into another job or
-script. The two matrix instances share one declarative definition and differ only at their expensive proof steps;
-staging remains the first and single join/mutation chokepoint. Keep historical prior recovery intact because it is
-exceptional reconciliation, not the normal feedback path.
-
-**Ergonomics:** Test and package failures arrive independently and concurrently. Packaging's nested builds no longer
-fight three unrelated test processes, and its result is no longer buried inside a 30-minute job log. Maintainers can
-rerun or diagnose the named lane while the release safety model remains unchanged.
-
-**Constraints satisfied:** The API key remains only in promotion; no OIDC, remote setting, source cache, skipped
-suite, reduced package proof, public API, runtime capability, or new release command is introduced. `tmp/` remains
-outside evidence.
-
-**Risks:** Deterministic lineage/tool compilation occurs twice, trading a few concurrent CPU minutes for much lower
-wall-clock latency and stronger isolation. Divergence is caught because both lanes require HEAD to equal their
-compiled version commit and staging consumes only the package lane after the proof lane passes. Packaging isolation
-may reveal its true standalone duration; retain complete coverage and optimize specific executable contracts only
-from measured evidence.
-
-### 2026-07-20 reproducible lineage-commit recovery checkpoint
-
-**Task:** Correct the matrix join failure from run `29773568971` by making the release compiler's claimed exact-input
-lineage projection reproducible across isolated runners.
-
-**Application intent:** Two read-only proof lanes evaluating the same release event should agree on one exact package
-identity without a coordinator database, timing dependency, or lane-selected winner.
-
-**Public expression:** None. Maintainers retain one `dev` advancement and see the same certification/packages lanes;
-consumers retain the same package versions and install surface.
-
-**Guarantee/correction:** For identical source commit, previous source/version commit, branch, compiler, and repository
-tree, lineage compilation must mint the same `VersionCommit` regardless of runner wall clock. Git author and committer
-identity are already canonical; their timestamp is now derived from the exact source commit rather than invocation
-time. Different source/tree/parent/message inputs still mint different commits.
-
-**Complete intent surface:** Read the source commit's canonical committer timestamp; supply it through Git's standard
-author/committer date environment for every initial/amended lineage commit; prove two compilations separated across a
-wall-clock second produce the same commit; preserve single-parent topology, tree/state validation, NBGV identity,
-replay, and tamper checks; rerun focused lineage/workflow contracts; advance normally. Run `29773568971` already
-proved both read-only lanes green and package clean-room green, then failed before its first push because certification
-reported `8462d4f...` while the packages handoff carried `fb2f49e...`.
-
-**Public concepts:** Standard Git commit identity and `GIT_AUTHOR_DATE`/`GIT_COMMITTER_DATE`. No Koan timestamp,
-distributed lock, cache, artifact broker, or winner-election concept is introduced.
-
-**Docs read:** ARCH-0110; versioning and NuGet publishing guidance; packaging tool README; R12-06 and NOW.
-
-**Code read:** `ReleaseLineageCompiler` including all three commit/amend points; `ProcessRunner` environment handling;
-`PackagingConstants`; `ReleaseLineageGitTests` and its disposable repository fixture; the failed stage log and exact
-packages handoff from run `29773568971`.
-
-**Reusing:** Existing canonical release bot identity, exact source commit, standard Git timestamp format, process
-environment seam, committed-state validation, and disposable Git acceptance fixture.
-
-**Creating new:** One focused reproducibility fact in the existing lineage Git suite and two internal standard-Git
-environment-name constants. No runtime type, workflow job, artifact, remote state, or public option is added.
-
-**Coalescence:** Make the compiler deterministic at its existing commit chokepoint. Do not add a seventh preparation
-job, serialize the read-only lanes, choose whichever matrix output finishes last, or pass an unverified lineage commit
-between proof responsibilities.
-
-**Ergonomics:** Independent lanes remain fast and understandable while exact identity becomes a property of inputs,
-not timing. The existing stage comparison stays as the fail-closed assertion that both lanes actually agreed.
-
-**Constraints satisfied:** Standard Git concepts first; existing API-key and six authority boundaries unchanged; no
-remote configuration or manual staging; no package/public/runtime semantics altered; focused proof only.
-
-**Risks:** Reproducibility requires every commit field and tree byte to remain canonical. The new acceptance fact
-covers wall-clock drift; the existing stage equality check continues to catch any future author, parent, message, or
-tree nondeterminism before remote mutation.
+**Risks:** nuget.org does not provide an atomic multi-package transaction. The minimal correction is
+to fix the cause and rerun the workflow: immutable identities are skipped and missing identities are
+pushed. This is sufficient for the first pre-release and avoids maintaining a speculative transaction
+system inside Koan.
 
 ## Work
 
-1. Revalidate that local HEAD exactly equals the passed R12-05 source and that no later tracked change exists.
-2. Read-only verify remote `dev`, release queue, durable lineage, workflow identity, immutable Release setting where
-   observable, branch/workflow protection, and presence/scope posture of `NUGET_API_KEY` without reading its value.
-3. Present the exact target, source, likely bootstrap posture, authority boundaries, stop map, and irreversible
-   effects; obtain separate explicit authorization for any required setup and the single `dev` advancement.
-4. Advance `dev` exactly once through the normal reviewed path. Do not invoke stage/promote manually.
-5. Observe all six workflow jobs. On failure, follow the recorded state-specific recovery and preserve escrow.
-6. Require every manifest nupkg visible, exact tag/lineage agreement, one completion receipt, and immutable Release.
-7. From clean isolated environments using public NuGet only, execute exact and unqualified template installs,
-   both first results, JSON provider replacement/removal, rejection/recovery, facts/health/lock inspection, and
-   public package-only FirstUse/GoldenJourney.
-8. Have the maintainer follow public guidance only. Record confusion, elapsed time, corrections, and the resulting
-   explanation of reference/application responsibility. Optional coding-agent evidence may supplement this record
-   but is not required.
-9. Record immutable evidence and bounded follow-ups. Do not call the wave successful while any public contradiction,
-   unavailable manifest package, mutable Release, or unexplained consumer failure remains.
+1. Replace automatic `dev` publication with manual workflow dispatch restricted to `dev`.
+2. Pack every evaluated packable project with its NBGV public version.
+3. Push the resulting nupkgs with the established API key and duplicate-safe NuGet semantics.
+4. Remove the unused lineage, escrow, coordinator, recovery, and clean-room release implementation.
+5. Realign current engineering guidance and mark the former compiler decision superseded.
+6. Build only `Koan.Packaging` and perform a static workflow check. Do not run the release ratchet.
 
 ## Acceptance
 
-1. The pushed source is exactly the passed R12-05 freeze and one normal `dev` event owns the wave.
-2. Proof/staging/promotion retain their least-privilege boundaries; only prepared promotion receives
-   `NUGET_API_KEY`.
-3. Durable lineage, source/version commits, manifest, package/symbol hashes, marker, completion receipt, exact tag,
-   NuGet visibility, and immutable Release all agree.
-4. Every supported owner carries its exact 0.20 identity; additional bootstrap/changed packages retain lower-line
-   identity and never acquire an implied support claim.
-5. Clean public-feed template, FirstUse, and GoldenJourney execution succeeds without repository/local-feed/cache
-   assistance.
-6. SQLite → JSON → SQLite changes only package/configuration intent; business code remains unchanged and facts/lock
-   explain each result. Invalid adapter intent rejects correctively and recovers by correcting/removing that intent.
-7. The maintainer completes the journey and leaves no unresolved contradiction or hidden prerequisite; no second
-   agent or human acceptance authority is required.
-8. Failures use exact coordinator recovery; no artifact rebuild, manual package choice, tag movement, evidence
-   replacement, unlisting, or parallel publication path occurs.
-9. Immutable links/identities and bounded feedback are recorded without copying package state into a new ledger.
+1. Release is one explicit workflow, one job, and one API key.
+2. Every packable project is discovered through evaluated MSBuild state and owns `version.json`.
+3. NBGV remains the sole package/assembly version source and `PublicRelease=true` removes local
+   build suffixes.
+4. The workflow restores, packs, and pushes; it does not test the repository, create Git history,
+   stage escrow, create tags/Releases, or mutate repository configuration.
+5. Current docs teach only this path.
 
-## Authorization and stop conditions
+## Implementation evidence — 2026-07-20
 
-- The maintainer explicitly authorized the normal `dev` release path. This does not authorize repository-secret or
-  repository-setting changes, manual tag/Release/package mutation, or publication outside the coordinator.
-- Stop if local HEAD differs from the R12-05 freeze or remote state contradicts its preflight assumptions.
-- Stop before advancing `dev` unless required trust prerequisites are positively verified and the exact operation is
-  explicitly authorized.
-- Stop on public package identity without exact prepared escrow, mutable terminal Release, tag mismatch, or unknown
-  partial publication. Preserve evidence and reconcile through the existing coordinator.
-- Stop if local-feed or automation-only evidence is substituted for independent public comprehension.
+- The workflow is 58 lines, manual-only, and contains one job, one API-key reference, no test command,
+  no Git mutation, and no lineage/release-wave state.
+- The surviving package inventory tool builds cleanly and evaluates 93 independently versioned
+  packages.
+- Eighteen supported product claims resolve to exactly 38 guaranteed package owners; all 38 declare
+  `versionIntent=0.20`. The remaining 55 packages preserve their lower maturity versions.
+- The packaging test project compiles after removal of the release-specific source set; tests were
+  deliberately not executed.
+- No workflow was dispatched and no package or remote state was changed.
+
+## Authorization boundary
+
+The maintainer authorized redesign and local implementation. Do not dispatch the workflow, publish a
+package, create a tag/Release, push, or change the remote API key/configuration during this work item.

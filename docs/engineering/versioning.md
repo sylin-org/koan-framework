@@ -4,36 +4,14 @@ domain: framework
 title: "Package versioning"
 audience: [maintainers, release-engineers]
 status: current
-last_updated: 2026-07-19
+last_updated: 2026-07-20
 framework_version: v0.20.0
 ---
 
 # Package versioning
 
-Koan packages version independently with Nerdbank.GitVersioning (NBGV). A package's `version.json`
-contains deliberate major/minor intent; Git history supplies the patch. Advancing `dev` is the release
-event. A serialized compiler projects that source advancement onto one durable linear version branch,
-then compares the previous and resulting package identities.
-
-> Governing decisions: [ARCH-0085](../decisions/ARCH-0085-versioning-compatibility-and-automation.md)
-> and [ARCH-0110](../decisions/ARCH-0110-dev-release-compiler.md).
-
-## Mental model
-
-```text
-dev source delta + package-local intent + mapped shared inputs
-                         ↓
-          durable linear VersionCommit
-                         ↓
-     breaking root? ── yes ──> reverse-dependent closure
-                         │                  │
-                         │      unchanged member gets marker
-                         ↓                  ↓
- previous identity differs from version identity? ──> release
-```
-
-Every packable project must have a `version.json` in its own directory. There is no kernel lockstep,
-root stamping pass, or package checklist. A typical file is:
+Each packable project owns its version independently through a project-local `version.json` and
+Nerdbank.GitVersioning (NBGV).
 
 ```json
 {
@@ -44,100 +22,27 @@ root stamping pass, or package checklist. A typical file is:
 }
 ```
 
-- `version` is the semantic major/minor floor. Change it only when you mean to change the
-  compatibility tier.
-- patch is the matching Git height and is never typed by hand;
-- `pathFilters` defines the package-affecting history. Most leaf packages own their directory;
-  bundles additionally include the paths that define their composition;
-- `versionHeightOffset` establishes a baseline. `-1` makes a version-resetting ownership commit
-  `.0`. A new child `version.json` that repeats the exact version already inherited from an ancestor does not reset
-  NBGV height; preview it before accepting the package identity. Some migrated, already-existing packages deliberately use `0` so the first dedicated
-  ownership commit cannot collide with an already published `.0`; preserve those baselines.
+- `version` is deliberate major/minor compatibility intent.
+- Git height supplies the patch.
+- `pathFilters` identifies source that changes the package's bits. Include a sibling path directly
+  when the package embeds output built from that sibling.
+- `PublicRelease=true` produces the stable public identity without a local commit suffix.
 
-The workflow passes `PublicRelease=true`, so the event's `VersionCommit` produces stable identities.
-`SourceCommit` remains the auditable developer input; it is not overloaded as the packed commit.
-Local non-release builds may carry NBGV's commit suffix.
-
-## Common tasks
-
-### Preview one package
+Preview a package before release:
 
 ```powershell
 dotnet nbgv get-version -p src/Koan.Core --public-release=true
 ```
 
-### Inspect the release surface
+For an ordinary patch, change the package-owned source and leave `version.json` alone. For a pre-1.0
+breaking compatibility change, advance the minor; after 1.0, advance the major. Do not set MSBuild
+`Version`, hand-edit patches, or use tags to influence package identity.
+
+Every packable project must have its own `version.json`. Repository inventory fails correctively when
+one is missing or malformed:
 
 ```powershell
 dotnet run --project tools/Koan.Packaging -- inventory
 ```
 
-The protected workflow is the canonical release execution and evidence path because it owns the serialized lineage. A
-controlled local `lineage`/`plan` rehearsal must run in a clean disposable checkout; the command
-intentionally creates and switches to its dedicated local lineage branch. See the
-[packaging tool README](../../tools/Koan.Packaging/README.md) for that sequence.
-
-### Make a normal patch release
-
-Change business/framework code in the package's owned path and push or merge it to `dev`. Do not edit
-the version file for an ordinary patch.
-
-### Change the compatibility tier
-
-Edit that package's `version.json` `version` field as part of the breaking/feature change. Before 1.0,
-the minor is the breaking tier; at 1.0 and later, the major is. Internal dependencies pack as bounded
-ranges (`[0.20.x,0.21.0)` for a 0.20 owner), so incompatible combinations fail during restore.
-
-The release compiler derives the complete transitive reverse-dependent closure from evaluated
-ProjectReferences. A closure member whose source already created a fresh identity is left alone; an
-otherwise unchanged member receives a deterministic Git marker. Planning fails if the complete wave
-is not present. The first lineage deliberately mints every owner once and requires its predecessor's
-package inventory to remain evaluable by the pinned toolchain. Afterward, committed lineage supplies
-each prior package identity without reinterpreting history through a newer toolchain. A conservative
-input map combines known shared build policy with evaluated external packed files; changes fan out to
-mapped package consumers. Lineage schema 3 persists each normalized owner map, and later impact uses
-the union of its prior and current paths. Add, change, delete, and rename therefore remain visible to
-the owning package even after a path disappears from current MSBuild evaluation.
-
-### Add a package
-
-Create its project-local `version.json`, README, metadata, and ProjectReferences. The declared major/minor is change
-intent: choose the new package's actual compatibility tier, not an inherited repository default. Then preview the
-public identity and inspect the package surface:
-
-```powershell
-dotnet nbgv get-version -p src/Koan.New.Package --public-release=true
-dotnet run --project tools/Koan.Packaging -- inventory
-```
-
-Inventory fails when a packable project lacks a local version owner or two projects claim one package
-ID. A surprising inherited patch height is also a stop signal: advance the deliberate compatibility tier so NBGV
-resets naturally. If a migration must retain the inherited major/minor, use a scoped `versionHeightOffset` together
-with `versionHeightOffsetAppliesTo`; never type a patch or add an MSBuild `Version` override.
-
-## Failure → recovery
-
-- **Unexpected prerelease suffix** — preview with `--public-release=true`; never compensate with a
-  `<Version>` property.
-- **Unexpected patch** — inspect commits matching `pathFilters` on
-  `automation/package-lineage-dev`, including any generated closure marker, and the package's
-  intentional baseline. The lineage is deliberately linear; source merge topology is not imported.
-- **Package absent from a release plan** — confirm its evaluated `IsPackable`, local `version.json`,
-  and whether `PreviousVersionCommit` and `VersionCommit` actually differ.
-- **Current version is missing publicly** — use an online plan; reconciliation includes it even if
-  the event itself did not change its version.
-- **Duplicate identity** — do not force-push or overwrite. Package identities are immutable; advance
-  the package through Git.
-- **Lineage artifact mismatch** — regenerate `release-lineage.json` from the committed version
-  lineage; never edit its closure or commit fields.
-
-## Anti-patterns
-
-- Do not set `<Version>`, `<PackageVersion>`, `<AssemblyVersion>`, or `<FileVersion>` per project.
-- Do not hand-edit a patch number or run `apply-version`.
-- Do not delete a package-local `version.json`; that destroys independent ownership.
-- Do not copy one version into a bundle's dependency ranges.
-- Do not tag to influence NBGV or trigger publication; release tags are post-publication evidence.
-
-See [packaging.md](packaging.md) for the package contract and
-[nuget-publishing.md](nuget-publishing.md) for the automated release path.
+See [NuGet publishing](nuget-publishing.md) for the explicit release action.

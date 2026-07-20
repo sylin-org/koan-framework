@@ -260,7 +260,6 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
             "Description",
             "koan;test",
             references ?? [],
-            [],
             VersionIntent: versionIntent);
     }
 

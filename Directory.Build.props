@@ -1,6 +1,5 @@
 <Project>
-  <!-- ARCH-0085/0110: every packable project owns an independent NBGV version;
-       advancing dev compiles and proves the affected release set. -->
+  <!-- ARCH-0085/0110: every packable project owns an independent NBGV version. -->
 
   <PropertyGroup>
     <!-- Generate XML docs for all projects to support API documentation. -->

@@ -196,7 +196,6 @@ public sealed class PackageQualityCompilerTests : IDisposable
             description,
             tags,
             references ?? [],
-            [],
             icon,
             "https://koan.dev",
             "https://github.com/sylin-org/koan-framework.git",

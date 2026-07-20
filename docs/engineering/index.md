@@ -17,7 +17,7 @@ validation:
 ## Contract
 
 - **Scope**: Day-to-day guardrails for contributors working inside the Koan repository.
-- **Inputs**: Existing modules, ADRs, the evaluated package release compiler, validation scripts, and framework conventions.
+- **Inputs**: Existing modules, ADRs, evaluated package inventory, focused validation, and framework conventions.
 - **Outputs**: Code and docs that comply with controller-first web APIs, entity-first data patterns, packaging standards, and documentation posture.
 - **Failure modes**: Inline endpoints, repository abstractions over entities, scattered magic literals, missing README/TECHNICAL companions, or drifting NuGet metadata.
 - **Success criteria**: Features land with controllers, entity statics, centralized constants/options, validated packaging metadata, and updated companion docs.
@@ -30,7 +30,7 @@ validation:
 - [Configuration provenance descriptors](provenance-configuration-descriptors.md)
 - [Architecture principles](../architecture/principles.md)
 - [Documentation posture (ARCH-0041)](../decisions/ARCH-0041-docs-posture-instructions-over-tutorials.md)
-- [Git-driven package releases (ARCH-0110)](../decisions/ARCH-0110-dev-release-compiler.md)
+- [Explicit package releases (ARCH-0110)](../decisions/ARCH-0110-dev-release-compiler.md)
 - [Runtime facts](runtime-facts.md)
 
 ## Prime Guardrails
@@ -55,9 +55,8 @@ validation:
 - Give every packable project a local `version.json`; NBGV owns patch and assembly/package stamping.
 - Ensure `<Description>`, `<PackageTags>`, and `<GenerateDocumentationFile>true</GenerateDocumentationFile>` are set.
 - Write or update per-project `README.md` with controller/entity examples.
-- Run `dotnet run --project tools/Koan.Packaging -- inventory` and the relevant packaging tests. The
-  protected `dev` workflow alone compiles and persists the canonical release plan; use a disposable
-  clone for controlled release rehearsals.
+- Run `dotnet run --project tools/Koan.Packaging -- inventory` and focused tests for the affected
+  package owner. Publication is an explicit manual workflow from `dev`.
 - Dotnet tools set `<PackAsTool>true</PackAsTool>` and document install commands; analyzers ship assets under `analyzers/dotnet/cs`.
 
 See the [NuGet packaging policy](packaging.md) for detailed expectations and follow-ups.
@@ -72,8 +71,8 @@ See the [NuGet packaging policy](packaging.md) for detailed expectations and fol
 
 1. **Trace existing surfaces**: Search the repo/samples before introducing new helpers.
 2. **Document decisions**: Add ADRs for structural changes; update `docs/engineering/**` and module-level companion docs.
-3. **Validate**: Run unit or integration tests applicable to touched components plus the docs build (`scripts/build-docs.ps1 -Strict`).
-4. **Package lint**: Run the release compiler inventory; the artifact gate checks evaluated metadata.
+3. **Validate**: Run unit or integration tests applicable to touched components; reserve full certification for milestones.
+4. **Package lint**: Run package inventory when package identity or metadata changes.
 
 ## Edge Cases & Escalation
 

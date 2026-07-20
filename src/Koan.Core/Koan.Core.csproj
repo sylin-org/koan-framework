@@ -34,12 +34,5 @@
           Pack="true"
           PackagePath="buildTransitive/tools/Koan.Core.Registry.Generators.dll"
           Visible="false" />
-    <!-- Core owns the generator as package payload. These evaluated source inputs feed the release
-         lineage compiler, so any generator change mints a fresh Core identity automatically. -->
-    <KoanPackageInput Include="$(MSBuildProjectDirectory)\..\Koan.Core.Registry.Generators\Koan.Core.Registry.Generators.csproj;
-                               $(MSBuildProjectDirectory)\..\Koan.Core.Registry.Generators\**\*.cs;
-                               $(MSBuildProjectDirectory)\..\Koan.Core.Registry.Generators\version.json"
-                      Exclude="$(MSBuildProjectDirectory)\..\Koan.Core.Registry.Generators\bin\**;
-                               $(MSBuildProjectDirectory)\..\Koan.Core.Registry.Generators\obj\**" />
   </ItemGroup>
 </Project>
