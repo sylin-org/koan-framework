@@ -149,6 +149,58 @@ focused Packaging test, Windows docs lint, and Linux container reproduction are 
 **Risks:** A second platform-specific failure may appear after these fail-fast cells clear. Preserve the same
 pre-staging stop boundary and fix only observed evidence; do not bypass either gate or manually stage/promote.
 
+### 2026-07-20 rooted-auth-URI recovery checkpoint
+
+**Task:** Correct the later Linux-only Web Auth failure from release run `29757857299` while preserving the
+existing self-hosted test-provider contract.
+
+**Application intent:** A relative self-hosted provider authority such as `/.testoauth` resolves against the
+application's Kestrel address in containers exactly as it does on Windows.
+
+**Public expression:** None beyond the existing relative test-provider authority and ordinary
+`ASPNETCORE_URLS`/`ASPNETCORE_HTTP_PORTS`/`ASPNETCORE_HTTPS_PORTS` host configuration. Real deployment providers
+continue to supply absolute HTTP(S) endpoints.
+
+**Guarantee/correction:** Only absolute HTTP or HTTPS endpoints bypass server-address resolution. A rooted Unix
+path must not be mistaken for an absolute `file:` URI; it resolves through the existing wildcard/port-aware owner or
+remains relative when no server address exists. Unsupported/unresolvable input retains the current safe fallback.
+
+**Complete intent surface:** No additional user action exists. The second run also failed in the read-only ratchet;
+staging and promotion were skipped and no lineage, tag, Release, escrow, or public package was created.
+
+**Public concepts:** None. Standard `System.Uri` HTTP/HTTPS scheme identity expresses the existing network-URL
+guarantee.
+
+**Docs read:** `Koan.Web.Auth/README.md` defines maintained external sign-in; `Koan.Web.Auth/TECHNICAL.md` reserves
+relative endpoints for the self-hosted local provider and requires absolute HTTP(S) deployment endpoints; the public
+Auth card keeps provider configuration as the only application surface; architecture principles keep this decision
+inside the Web Auth owner.
+
+**Code read:** `ServerAddressResolver.cs` owns the sole relative-to-server-address conversion and currently accepts
+any platform-defined absolute URI; `ServerAddressResolverTests.cs` already covers wildcard, concrete, IPv4, IPv6,
+port-fallback, absolute HTTPS, and unresolvable cases; `AuthSchemeSeeder` is only the consumer and needs no change.
+
+**Reusing:** The existing resolver, `Uri.TryCreate`, `Uri.UriSchemeHttp`, `Uri.UriSchemeHttps`, and all 39 focused
+Web Auth tests.
+
+**Creating new:** None. Tighten the existing absolute-endpoint predicate in place; no type, method, constant,
+option, DTO, service, or configuration key is added.
+
+**Coalescence:** Keep `ServerAddressResolver` as the single Web Auth decision owner. Absorb network-scheme validation
+into its existing early-return predicate; do not add a Unix branch, filesystem heuristic, alternate URI parser, or
+consumer-side workaround.
+
+**Ergonomics:** Windows and container users keep the same configuration and receive the same URL. The coding model,
+IntelliSense surface, and number of concepts remain unchanged.
+
+**Constraints satisfied:** No controller, route, data access, streaming, decoration, option, constant, module, or
+public API is added; standard .NET URI concepts are used; current documentation and ADR policy do not change; the
+focused Web Auth suite on Windows and Linux is the bounded proof.
+
+**Risks:** Restricting pass-through to HTTP(S) deliberately rejects treating non-network schemes as provider
+back-channel URLs; that matches the documented OAuth/OIDC HTTP contract. Continue fail-fast recovery if a later
+independent Linux cell appears.
+
 ## Work
 
 1. Revalidate that local HEAD exactly equals the passed R12-05 source and that no later tracked change exists.

@@ -25,7 +25,11 @@ internal static class ServerAddressResolver
     public static string? ToAbsolute(string? endpoint, string? aspnetcoreUrls, string? httpsPorts, string? httpPorts)
     {
         if (string.IsNullOrWhiteSpace(endpoint)) return endpoint;
-        if (Uri.TryCreate(endpoint, UriKind.Absolute, out _)) return endpoint;
+        if (Uri.TryCreate(endpoint, UriKind.Absolute, out var absolute) &&
+            (absolute.Scheme == Uri.UriSchemeHttp || absolute.Scheme == Uri.UriSchemeHttps))
+        {
+            return endpoint;
+        }
 
         var baseUrl = ResolveBase(aspnetcoreUrls, httpsPorts, httpPorts);
         if (baseUrl is null) return endpoint; // relative; back-channel BaseAddress (if any) resolves it
