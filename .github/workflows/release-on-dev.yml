@@ -27,6 +27,9 @@ jobs:
       - name: Pack
         shell: pwsh
         run: |
+          dotnet build src/Koan.Core.Registry.Generators/Koan.Core.Registry.Generators.csproj --configuration Release --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Embedded generator build failed.' }
+
           dotnet pack Koan.sln --configuration Release --artifacts-path artifacts/packages --property:PublicRelease=true --nologo
           if ($LASTEXITCODE -ne 0) { throw 'Solution pack failed.' }
 
