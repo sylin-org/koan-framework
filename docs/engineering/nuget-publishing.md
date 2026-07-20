@@ -66,9 +66,11 @@ source.
    `automation/package-lineage-dev`. Bootstrap covers every owner once; later events select direct
    changes, breaking reverse dependents, mapped shared-input consumers, and current identities absent
    from nuget.org.
-4. The exact lineage candidate is tested with the public-release ratchet. `release-set.json` is
-   compiled from committed lineage truth, packages are packed in dependency order, and FirstUse plus
-   GoldenJourney run outside the checkout against only the staged feed.
+4. The exact lineage candidate is tested with the public-release ratchet. Runnable test projects retain
+   one process and hang detector per project while a processor-bounded wave executes up to four at once;
+   every result joins before package work begins. `release-set.json` is compiled from committed lineage
+   truth, packages are packed in dependency order, and FirstUse plus GoldenJourney run outside the
+   checkout against only the staged feed.
 5. `wave-bundle` creates `release-wave-<full-VersionCommit>.zip` containing lineage, manifest, all
    selected nupkg/snupkg files, and both application proofs. `release-wave.json` binds its exact hashes,
    package count, version commit, and `release/dev/<full-VersionCommit>`.

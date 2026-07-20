@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-20
   status: tested
-  scope: passed R12-04 public narrative and post-extraction graph; R12-05 ready for exact candidate freeze
+  scope: R12-06 first-wave pre-staging recovery and bounded certification-wave redesign
 ---
 
 # Koan 0.20 preview current handoff
@@ -18,294 +18,95 @@ Replace this file at every handoff. It is a restart point, not a diary.
 
 ## Outcome
 
-- R00 through R07, R09, R10, and R11 pass.
-- R08 is stopped with all local release/candidate evidence retained; its unexecuted public-observation
-  and upgrade tail are superseded by R12.
-- [R12 — Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) is active. The preview is a
-  maturity cycle, not a feature campaign.
-- Only packages whose public contracts Koan explicitly guarantees earn the 0.20 version signal.
-  Demonstrated, experimental, and unassessed packages do not inherit 0.20 from build success,
-  repository membership, or transitive dependency.
-- [R12-04](work-items/r12/R12-04-coherent-public-narrative.md) owns the maintainer-mandated realignment
-  of every public-facing surface into one greenfield, present-tense narrative.
-- All 93 active packages have terminal topology dispositions, meaningful reference intent, package-owned presentation,
-  and objective package-quality finding count zero. Evaluated product truth is 93 packages and 29 claims; exactly
-  38 owners belong to supported claims and declare 0.20 intent.
-- The exact R11-07 local public-release ratchet is green from repair commit `736b82cc3`.
-- The exact R08-05 local candidate from source `844449dd8c` compiled version `378f43beb54f`, packed all 93 active
-  packages, proved both templates plus package-only FirstUse/GoldenJourney, and produced deterministic local escrow.
-- The bespoke Orchestration CLI and Aspire families remain shelved beyond V1 under `shelved/`, outside `Koan.sln`,
-  active package discovery, and the release graph. Standard .NET/Aspire/Compose/Docker/Podman/Kubernetes tooling owns
-  application topology.
-- No remote state was changed: no push, tag, publication, Release, deployment, or repository configuration mutation.
+- R00 through R07, R09 through R11, and R12-01 through R12-04 pass. R08's local candidate evidence is
+  retained; its public tail is owned by R12.
+- The public narrative, selective 0.20 guarantee boundary, package compiler, API-key release coordinator,
+  templates, FirstUse, and GoldenJourney are implemented. Exactly the 38 supported package owners carry
+  0.20 intent; repository membership or transitive dependency does not promote another package.
+- The CLI and Aspire families remain shelved outside `Koan.sln`. Usagi Picks is a standalone product at
+  `lbotinelly/usagipicks`, not a bundled Koan sample.
+- [R12-06](work-items/r12/R12-06-publish-and-observe-first-wave.md) is active under the maintainer's explicit
+  authorization. The established `NUGET_API_KEY` remains step-scoped to prepared promotion; OIDC is deferred.
+- No package has been staged or published. There is no durable `automation/package-lineage-dev` branch,
+  `release/dev/*` tag, GitHub Release, or public-wave escrow.
 
 The accepted architecture remains business intent first: fewer meaningful moving parts, Entity-first application
 language, references express capability intent, `AddKoan()` compiles host-owned decisions, pillars own meaning and
-runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive only
-when genuinely inert and independently consumed.
+runtime chokepoints, adapters own mechanics, and applications own business rules. Cross-module contracts survive
+only when genuinely inert and independently consumed.
 
-## Active slice: R12-04 coherent public narrative
+## Active slice: R12-06 first public wave
 
-R12-01 through R12-03 pass. The generated boundary is a 14-owner supported foundation plus 24
-supported-extension owners. Exactly those 38 owners declare project-local 0.20 intent, every public
-Koan dependency stays inside the supported closure, and no other package carries 0.20. The existing
-product-surface compiler enforces claim/version/dependency agreement in both directions; there is no
-maintained allowlist or stamping layer. Focused graph/version tests pass 41/41, lineage/planner tests
-pass 39/39, and the packaging tool builds warning-clean.
+Five ordinary `dev` release events reached read-only exact-version proof and exposed independent runner defects.
+Each was corrected at its existing owner with focused Windows/Linux evidence:
 
-[R12-04](work-items/r12/R12-04-coherent-public-narrative.md) passes. The derived
-post-extraction graph contains 677 current assets, 656 current text surfaces, 107 historical boundaries,
-42 navigation targets, and eleven graduated curriculum roots containing ten executable samples. Root, site,
-package, template, sample, tool, contributor, and agent-skill surfaces tell one present-tense path: package
-install, four-line host, first Entity result, progressive capability references, runtime facts and correction,
-application responsibilities, and the generated maturity boundary. Historical ADRs and initiatives remain
-dated evidence outside the ordinary learning graph.
+- `f6531198f`: cross-platform project-reference and docs-proof portability;
+- `7b176a8cb`: rooted Web Auth provider paths resolve as HTTP application-relative URIs on Linux;
+- `ea86be4b1`: deferred embedding fixture uses test-owned worker timing;
+- `3c6988d6c`: Local storage enforces one portable object-key language;
+- `d7d673719`: Jobs SQLite's 100,000-row claim sentinel has honest runner headroom.
 
-The earlier 699/676/12 graph and eleven-executable build/run proof remain valid evidence for the pre-extraction
-commit where AnimeRecommendations was bundled. They are not current inventory claims. Current sample admission,
-local paths, solution membership, and AI/vector guidance have been reconciled around the standalone
-[`lbotinelly/usagipicks`](https://github.com/lbotinelly/usagipicks) product repository without adding a redirect,
-sample manifest, alternate launcher, or second documentation ledger. The maintainer remains the sole validation
-authority; no additional human or agent review is a completion gate.
+Run `29766528071` was cancelled while still inside read-only proof after the maintainer rejected the accidental
+106-project serial queue. Pack, escrow, lineage persistence, staging, and promotion did not run. Terminal cancellation
+and empty lineage/tag/Release state were verified.
 
-Focused closure evidence passes the intended public patch in an isolated clean worktree at 677/656/107/42/11,
-reports zero current or solution references to the removed local application, passes scoped whitespace checks,
-and reports zero documentation-structure errors with fourteen non-gating frontmatter warnings. The in-place public
-gate stops only because its isolation guard correctly sees the unrelated `DATA-0103` and `SERV-0001` edits already
-present in the dirty worktree; this slice neither changes those ADRs nor weakens the guard. No full ratchet or remote
-mutation ran.
+The certification topology is now redesigned at the existing `scripts/green-ratchet.ps1` chokepoint:
 
-A separate focused check found that GardenCoop Chapter 1's previously measured NativeAOT publication currently
-fails inside the .NET 10.0.10 ILC analyzer with an `IndexOutOfRangeException`. It fails with the original plain SDK
-as well as the rejected Web-SDK experiment, so the start-command repair did not introduce it. R12-05 must either
-re-prove or narrow that public deployment claim before freezing the candidate; do not expand the present sample-run
-slice into a framework-wide trim/AOT repair without a checkpoint.
+- the full solution still builds once at the exact version commit;
+- every runnable test project still receives its own `dotnet test` process and five-minute hang detector;
+- a processor-derived wave runs at most four projects concurrently, with an explicit bounded override;
+- complete project logs are grouped, every project result is reported, and failures join once;
+- package pack/clean-room/escrow remains unreachable until the joined ratchet is green;
+- the same optimization applies to current proof and exceptional prior-wave reconstruction without adding a
+  workflow job, manifest, artifact handoff, scheduler, or credential boundary.
 
-The restored recommendation baseline has now graduated out of the framework repository into the standalone
-`lbotinelly/usagipicks` product repository. The application, focused tests, ONNX asset, source cache, SQLite state,
-versioned Mongo/Weaviate data, and Ollama model state moved together; the old solution entries and bundled public
-links are retired. The new repository preserves the lean four-line host, Entity/vector/Jobs implementation, embedded
-and distributed topologies, and durability evidence while making Anime the first product vertical rather than a
-permanent sample boundary. Its accepted continuation specification restores authentication, member libraries,
-Manga, Koan.Media-owned artwork, multiple explainable discovery modes, protected catalog administration, and the
-mature UI experience without reviving S5.Recs' 96-file architecture. Historical eleven-sample evidence above remains
-valid for the commit where it ran; the current bundled portfolio contains ten executable graduated samples.
-
-Every graduated sample executable has the required root-level `start.bat`. Ten tiny root-local launchers keep standard
-`dotnet run` as execution owner, normalize the working directory, name the exact project, forward application
-arguments, and preserve the exit code. LocalChecklist exits successfully with its meaningful result; all ten Web
-launchers in the pre-extraction audit accepted isolated `--urls` arguments and returned HTTP 200 from liveness; nine
-Web launchers remain bundled after Usagi Picks graduated. The existing public sample graph rejects a
-missing/malformed launcher or untracked target project and derives the current 677-asset graph. No shared runner,
-generator, Docker bootstrap, second sample registry, new Koan command, or retained sample process was introduced.
-
-[R12-05](work-items/r12/R12-05-public-consumer-journey.md) is active and now owns only the frozen local candidate: final
-release-ready copy, one exact source SHA, the complete local ratchet, selective package graph, clean-room
-templates/FirstUse/GoldenJourney, and deterministic escrow. It adds no second harness or CLI and waits for
-no additional narrative review. The workstation resolves the exact pinned SDK 10.0.302; read-only preflight finds
-no durable package-lineage branch and therefore requires the existing all-owner bootstrap. `NUGET_API_KEY` exists by
-name and remains promotion-only; immutable Releases are not affirmed by the repository API and stay an R12-06
-prerequisite. GardenCoop NativeAOT is narrowed to an experimental, currently compiler-blocked path before freeze;
-self-contained and single-file JIT remain the current deployment correction.
-
-[R12-06](work-items/r12/R12-06-publish-and-observe-first-wave.md) owns the separately authorized `dev`
-advancement, existing API-key promotion, immutable Release/NuGet observation, and the first genuine public-feed
-maintainer journey. Optional coding-agent evidence is not a gate. Local-feed automation is not external-consumer evidence. R12-07 stays unopened until
-that wave supplies a real public upgrade baseline.
-
-## Recently completed preview foundation
-
-R12-01 passed with the maintainer-accepted checkpoint: ordinary stable-format `0.20.x`, project-local
-`0.20` intent, NBGV-owned patches, claim-owned selective admission, and no automatic promotion by
-dependency or repository membership. Its 35 packages remain an assessment slate, not admitted truth.
-
-[R12-02](work-items/r12/R12-02-preview-blocking-seams.md) re-evaluated the complete PMC register
-against that slate. Each concern receives one current disposition: repair, close by current evidence,
-transfer to the preview phase that owns its terminal proof, or explicit exclusion/nonclaim. The first
-exploration checks Storage's remaining layered-activation invariant through Media. GardenCoop C2 now
-passes 1/1 without Storage in its graph, so the historical sample failure is closed and must not be
-repeated as the current defect.
-
-PMC-033 is now repaired at the generalized Storage chokepoint. Availability is inert until profile/
-default configuration or actual service use declares routing intent; configured routes still compile
-at startup, unconfigured use still fails correctively, and facts distinguish inactive availability.
-Focused Release evidence passes Media Web 8/8, Storage 20/20, bootstrap pillars 13/13, Data.AI 87/87,
-and GardenCoop C2 1/1. No full ratchet ran.
-
-PMC-025 is closed as stale current-state evidence, not repaired code. Current source and package-only
-FirstUse run on Windows without any EventLog override; the fresh focused source proof passes 1/1, and
-.NET 10.0.8 already disables only the EventLog sink on `SecurityException`. Koan retains standard
-host logging ownership.
-
-PMC-001 is now repaired without renaming stored data or adding an analyzer. The framework-owned
-`JobMetric` row is internal; its existing CLR/storage/`Count` identity remains unchanged. Applications
-see one business-facing `JobMetrics.Summary(...)` operation. Jobs passes 84/84, Tenancy 16/16, and the
-Jobs Release build is warning-clean.
-
-PMC-002 and PMC-004 are now repaired together. MCP transport choices live once at the host through
-explicit STDIO, Streamable HTTP, and deprecated legacy SSE switches; one `HttpRoute` and unified
-session vocabulary replace the transitional master/override and SSE-derived names. Per-Entity
-transport metadata is removed because every edge projects the same governed surface. One camelCase,
-`[McpIgnore]`-aware application JSON policy now covers Entity and custom tools plus Code Mode while
-protocol DTOs remain spec-owned. Conformance passes 80/80, Streamable/legacy HTTP 19/19, field
-exclusion 5/5, Code Mode 27/27, source FirstUse/GoldenJourney 3/3, bootstrap pillars 13/13, and the MCP build is warning-clean.
-
-PMC-007 and PMC-015 are now closed together at the existing Data/Web boundary. The current filter
-AST/coordinator already gives query-capable adapters execute-or-reject result semantics; shared HTTP
-proofs now cover compound/mixed-case input and reject malformed or unknown filters without dropping
-them. InMemory passes 74/74, JSON 52/52, and SQLite 52/52. Data's cached first-use Entity shape guard
-now rejects public properties that differ only by case before adapter creation, with one rename
-correction; exact owner tests pass 9/9 and affected builds are warning-clean. No provider flag,
-mapping attribute, or new filter layer was added.
-
-PMC-024 is repaired without production code. The direct-reference manifest fixture now stages a
-synthetic `Koan.Core` project, its local-only feed/cache, intermediates, and outputs under one temporary
-root while importing the real production targets read-only. It asserts that no `ProjectReference`
-escapes that root, preserves package/project manifest truth, and proves a missing package fails only
-inside the fixture. The exact packaging cell passes 1/1.
-
-PMC-003, PMC-028, and PMC-032 are closed by current evidence. R11-07's exact Release build is
-zero-warning; SQLite's current discovery fake compiles and its connector suite passes 36/36; a fresh
-XML inventory finds zero missing references across every test project. R12-02 therefore passes with
-every PMC repaired, closed, transferred, or explicitly excluded against the preview guarantee.
-
-[R12-03](work-items/r12/R12-03-preview-product-boundary.md) passes. It replaced the 35-package
-assessment slate with the exact 38-owner supported closure, promoted only those owners to 0.20, and
-made the generated product-surface compiler reject missing, leaked, or stray promotion.
-
-## Most recent completed slice: R08-05 local exact candidate
-
-The first rehearsal exposed and repaired two release-boundary defects without reopening package architecture:
-
-- `5aeabb2a6` deletes Git file-similarity rename guessing; evaluated package ID/path continuity remains the one owner.
-- `844449dd8` makes the first protected lineage bootstrap all current owners from the coherent source event instead of
-  requiring a manual seed or interpreting a legacy noncanonical tree.
-
-Focused lineage/workflow evidence passes 43/43 and focused docs lint passes. From exact source
-`844449dd8c4927881853d315cba5a569cdb817c9`, the local candidate produced:
-
-- version commit `378f43beb54f0e8ee8ca0876013526dc97597b4f`;
-- 93 bootstrap packages, 93 markers, 93 nupkgs, and 90 expected snupkgs;
-- clean-room pack in 723.2 seconds;
-- `Sylin.Koan.Templates` `0.17.613`, with both public shapes reaching their business result;
-- FirstUse in 3.546 seconds and GoldenJourney in 6.863 seconds with truthful lock/facts/readiness/rejection evidence;
-- local bundle SHA-256 `79a9305f77d63c520fcf4a41b7daf0a27a98568ca9479fad1a3ba0ea4a2999dc`.
-
-The bundle and evidence remain under `tmp/` and are not remote authority. No candidate process remains running.
-
-## Most recent completed slice: R11-07 certification
-
-The exact repository-owned command passed every leg:
-
-```powershell
-pwsh scripts/green-ratchet.ps1 -Configuration Release -PublicRelease
-```
-
-Evidence:
-
-- 20 minutes 22 seconds total;
-- public-release solution build: zero warnings/errors;
-- committed composition lockfiles: no drift;
-- 103 solution test projects: 4,648 passed, 30 intentional environment skips, 0 failed (4,678 total);
-- Packaging: 196/196, including source-checkout FirstUse and GoldenJourney;
-- broad docs: zero errors / 1,626 pre-existing non-gating warnings;
-- public docs: 233 current files / 42 navigation targets;
-- instructional examples: 20/20;
-- strict skills: 20, zero errors/warnings;
-- strict SQL blueprint: one, zero errors/warnings.
-
-The ratchet left no tracked drift. Its 19 retained MSBuild node-reuse workers were identified by exact parent and
-command line and stopped; no application/test process from this slice remains.
-
-## Certification repairs now committed
-
-- Removed a stale deleted Cache analyzer-test entry from `Koan.sln`.
-- Restored one shared DI-hosted transform round-trip oracle for Mongo/Postgres/SQL Server tests without restoring the
-  deleted process-static production pattern.
-- Reconciled the Data lockfile and GoldenJourney rejection proofs with the current fail-fast configured-default
-  promise: startup stops with the adapter, configuration key, safe connector correction, and no connection-string
-  detail.
-- Centralized the broad pillar suite's required Local Storage test profile rather than weakening provider validation.
-- Serialized source-build Packaging probes through the existing executable-probe collection and made synthetic NuGet
-  activation/caches deterministic.
-- Removed stale Packaging expectations for the shelved Orchestration package and the intentionally removed
-  Tenancy.Web → Communication edge.
-- Reconciled public skills and the SQL blueprint with current module identity, relationship, Media, Storage,
-  Observability, semantic activation, relational contracts, live samples, and the shelved CLI/Aspire boundary.
-- Refreshed tracked sample lockfiles for the relational-abstractions split and OrderIntake's Npgsql/Redis closure.
-
-No production runtime implementation was changed by R11-07. The only functional tool change is the executable probe's
-bounded process-exit observation so GoldenJourney can prove fail-fast startup truth.
-
-## Package graduation outcome that must remain closed
-
-- Foundation, package identity, templates, Storage, Cache, Redis, relational/Data providers, Vector, AI, MCP, Web,
-  Media, OpenGraph, Identity, Tenancy, Classification, Canon, RabbitMQ, Web request context/Data Access, Data
-  Backup/SoftDelete, Jobs, Observability, Security Trust, Testing, Web Admin, and ZenGarden completed R11 family work.
-- Canon's R10-11 automatic contributor discovery, functional/Web split, four-line CustomerCanon host, and
-  failed/parked non-persistence remain intact.
-- Context-aware Web behavior uses ordered `IWebContextContributor`s at the request chokepoint. Scoped-link evidence,
-  tenant, principal, capability scopes, rejection, and read predicates are centralized contributors; arbitrary durable
-  filter carriage and model decoration are not restored.
-- `Sylin.Koan.ZenGarden.Contracts` remains a dependency-free inert boundary; the runtime remains one functional
-  package with `ZenGarden.Offering`, `.Storage`, and `.Capability` as its application surfaces.
-- Observability remains one optional standard OpenTelemetry leaf; Jobs remains one capability with internal runtime
-  mechanics and Communication wake hints; Security Trust remains one ES256 trust path.
+Focused redesign evidence is green: release workflow contract 10/10, Core 339/339, Cache topology 63/63, a live
+two-project concurrency probe, PowerShell parsing, broad docs with zero errors, and the public-docs truth gate.
+The full release ratchet is intentionally not rerun locally; the protected workflow owns that exact boundary.
 
 ## Current repository state
 
 - Workspace: `F:\Files\repo\github\sylin-org\koan-framework`.
-- Branch: `dev`; R11 completion is `3f7ca5186`, followed by R08-05 repairs `5aeabb2a6` and `844449dd8`,
-  local-candidate closeout `e40cd4525`, API-key architecture amendment `5c346082c`, workflow wiring
-  `f1a816b02`, R12 selective-boundary commit `679ae4f97`, and coherent-public-narrative tranche
-  `8e62dee51`. Verify exact HEAD and ahead/behind counts before continuing.
-- `tmp/` is untracked certification/evaluator/artifact material and must never be staged.
-- The tracked worktree is expected clean after the R12-04 narrative and handoff commits.
+- Branch: `dev`; before the pending redesign commit, local and `origin/dev` both resolve to `d7d67371997c13baebfbab1add500c70704e0e14`.
+- Tracked pending changes are limited to the ratchet, its Packaging contract, NuGet publishing guidance, R12-06,
+  and this handoff.
+- `tmp/` is untracked local certification/evaluator material and must never be staged.
+- No process from the cancelled workflow is local. The deliberately stopped broad Packaging verification left no
+  owned test process; the exact contract class replaced it as the focused check.
 
 ## Resume here
 
-1. Verify `git status`, HEAD, and the R12-04 implementation/evidence record before work.
-2. Have the maintainer validate the corrected start commands for all eleven graduated sample executables. No second
-   agent or human review is required.
-3. Re-run only the focused checks affected by those corrections; do not substitute the full release ratchet.
-4. Before the exact candidate freeze, re-prove or narrow GardenCoop Chapter 1's NativeAOT claim; the current
-   .NET 10.0.10 ILC analyzer crashes during publication. Close R12-04 when the maintainer leaves no unresolved
-   public contradiction. Then begin
-   R12-05, finalize release-ready public copy, freeze one exact source commit, and run the single complete local
-   candidate boundary without further tracked changes.
-5. Preserve the R08 release compiler and API-key promotion path unless current evidence identifies a
-   defect required by the selective preview.
-6. Stop before repository-secret or repository/branch/environment settings, push/merge, tag, GitHub
-   Release, NuGet publication, deployment, or other remote mutation until R12-06 records and rechecks
-   its exact terminal target and gates.
+1. Verify status and HEAD; never stage `tmp/`.
+2. Commit the bounded certification-wave change and advance `dev` once through the normal path.
+3. Observe all six release authority jobs. The exact proof should now run up to four isolated project processes at
+   once and report all independent failures from that wave.
+4. On red, do not restart the complete local ratchet. Isolate only the reported owners, apply one bounded correction,
+   and let the next authorized `dev` event use coordinator recovery.
+5. On terminal green, require NuGet visibility, exact lineage/tag/completion agreement, and an immutable GitHub
+   Release before beginning public-feed template, FirstUse, GoldenJourney, provider-swap, rejection, facts, health,
+   lockfile, and maintainer-comprehension observation.
 
 ## Do not redo
 
 - Do not reopen R10-11 Canon or rebuild CustomerCanon.
-- Do not mass-promote all active packages to 0.20; the version is an earned guarantee signal.
-- Do not equate R11 structural/package quality or `verified` test maturity with an accepted compatibility guarantee.
-- Do not rerun R11 family suites or the complete ratchet without a new affected dependency or explicit certification
-  need; R11-07 has the one required green complete boundary.
-- Do not recreate Data Access ambient subjects, `[AccessScoped]`, durable arbitrary-filter carriage, Backup HTTP
-  control planes, Web Extensions partition-backed soft delete, or Jobs' removed public runtime/claim branches.
-- Do not restore Observability's manual registration/fixed source list, Trust's shared-secret/parallel issuer stack,
-  Testing's catch-all skips, Web Admin's false control plane/security bypasses, or ZenGarden's removed endpoint
-  manager/storage CDC/manual Configure/generic events.
-- Do not move shelved CLI or Aspire projects into `src/`/`Koan.sln` or present their source as V1 capability.
-- Do not stage `tmp/`, inspect private dogfood applications, or use private identities in public docs.
-- Do not push, tag, publish, release, deploy, or mutate remote configuration without separate explicit authorization.
+- Do not mass-promote all active packages to 0.20 or restore the shelved CLI/Aspire families.
+- Do not recreate Data Access ambient subjects, `[AccessScoped]`, arbitrary durable filter carriage, or model
+  decoration for request context; Web context belongs at ordered contributor chokepoints.
+- Do not rerun Tenancy, Classification, completed package-family suites, or the complete local ratchet without an
+  affected dependency and explicit need.
+- Do not create a GitHub test job per project, split version-lineage authority across artifacts, weaken one-process
+  isolation, skip suites, or permit staging before the joined proof succeeds.
+- Do not stage `tmp/`, inspect private dogfood applications, hand-pack, manually choose packages, replace escrow,
+  move tags, publish outside the coordinator, or mutate remote configuration.
 
 ## Accepted design laws
 
 - Design from the application inward: business sentence, smallest honest C# expression, exact guarantee, corrective
   failure, then internal types.
-- Assess context-aware Web behavior first as ordered contributors. Validate evidence once at the edge and project the
-  resulting context through the centralized enforcement seam.
-- Persistent Entity semantics belong in Data axes when decoration truthfully selects durable model behavior; they are
-  not request-context contributors.
+- Prefer contributors at capability chokepoints over decorations and spread.
 - `AddKoan()` / `Entity<T>` / `EntityController<T>` is the golden business-to-code comparison. Extra public concepts
   must express a real business decision, guarantee, or deliberate override.
-- Complexity is centralized at typed responsibility chokepoints. Core owns generic law; pillars own meaning and policy;
-  adapters own mechanics; applications own business intent.
+- Complexity is centralized at typed responsibility chokepoints. Core owns generic law; pillars own meaning and
+  policy; adapters own mechanics; applications own business intent.
 - Standard .NET concepts are preferred over Koan ceremony. Break-and-rebuild is justified only by current code and
   consumer evidence.

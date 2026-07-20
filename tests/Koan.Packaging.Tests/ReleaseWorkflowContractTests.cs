@@ -18,7 +18,7 @@ public sealed class ReleaseWorkflowContractTests
     ];
 
     [Fact]
-    public void ReleaseRatchetIsolatesEveryRunnableTestProject()
+    public void ReleaseRatchetRunsOneBoundedWaveOfIsolatedTestProjects()
     {
         var ratchet = File.ReadAllText(Path.Combine(
             FindKoanRoot(),
@@ -27,11 +27,16 @@ public sealed class ReleaseWorkflowContractTests
 
         Assert.Contains("$testProjectMarker = 'Microsoft.NET.Test.Sdk'", ratchet, StringComparison.Ordinal);
         Assert.Contains("Get-ChildItem -Path \"$root/tests\" -Recurse -Filter '*.csproj' -File", ratchet, StringComparison.Ordinal);
-        Assert.Contains("foreach ($project in $testProjects)", ratchet, StringComparison.Ordinal);
+        Assert.Contains("[int]$TestProjectConcurrency = 0", ratchet, StringComparison.Ordinal);
+        Assert.Contains("[Math]::Min(4, [Math]::Max(1, [Environment]::ProcessorCount))", ratchet, StringComparison.Ordinal);
+        Assert.Contains("$testProjects | ForEach-Object -Parallel", ratchet, StringComparison.Ordinal);
+        Assert.Contains("-ThrottleLimit $effectiveTestProjectConcurrency", ratchet, StringComparison.Ordinal);
         Assert.Contains("'test', $project.FullName", ratchet, StringComparison.Ordinal);
         Assert.Contains("$testHostHangTimeout = '5m'", ratchet, StringComparison.Ordinal);
-        Assert.Contains("'--blame-hang-timeout', $testHostHangTimeout", ratchet, StringComparison.Ordinal);
+        Assert.Contains("'--blame-hang-timeout', $hangTimeout", ratchet, StringComparison.Ordinal);
         Assert.Contains("'--blame-hang-dump-type', 'none'", ratchet, StringComparison.Ordinal);
+        Assert.Contains("$failedProjects = @($testResults | Where-Object ExitCode -ne 0", ratchet, StringComparison.Ordinal);
+        Assert.Contains("$global:LASTEXITCODE = 1", ratchet, StringComparison.Ordinal);
     }
 
     [Fact]

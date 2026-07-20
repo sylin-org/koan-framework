@@ -10,8 +10,8 @@
     A.  Build       dotnet build Koan.sln   — framework + every dogfood sample
                     (the samples live in Koan.sln, so one build covers both).
     A'. Test        dotnet test per project  — runs every runnable suite in its own host lifecycle
-                    with per-host hang detection. Container-gated integration specs skip cleanly when
-                    infra is absent. Skip with -SkipTests.
+                    through a bounded parallel wave with per-host hang detection. Container-gated
+                    integration specs skip cleanly when infra is absent. Skip with -SkipTests.
     B.  Docs lint   scripts/docs-lint.ps1    — links / front-matter / anchors / terms.
                     Errors are fatal; warnings are not.
     B'. Public docs scripts/public-docs-lint.ps1 — current navigation boundary, retired
@@ -40,6 +40,10 @@
 .PARAMETER PublicRelease
   Build the exact public package identity and enable the release audit floor. Used by the dev release compiler.
 
+.PARAMETER TestProjectConcurrency
+  Maximum number of isolated test-project processes in flight. Zero selects the processor-count-derived default,
+  capped at four. Set an explicit positive value only for a constrained or intentionally wider host.
+
 .EXAMPLE
   pwsh scripts/green-ratchet.ps1                 # full gate, diff-scoped doc-code vs main
   pwsh scripts/green-ratchet.ps1 -SkipTests      # build + lints only (fast)
@@ -50,7 +54,9 @@ param(
     [string]$Base = "",
     [switch]$SkipTests,
     [switch]$FullDocs,
-    [switch]$PublicRelease
+    [switch]$PublicRelease,
+    [ValidateRange(0, 16)]
+    [int]$TestProjectConcurrency = 0
 )
 
 $ErrorActionPreference = 'Continue'
@@ -59,6 +65,12 @@ $root = (Resolve-Path "$PSScriptRoot/..").ProviderPath
 # resources cannot make release evidence order-dependent, and an inactive host cannot retain the queue.
 $testProjectMarker = 'Microsoft.NET.Test.Sdk'
 $testHostHangTimeout = '5m'
+$effectiveTestProjectConcurrency = if ($TestProjectConcurrency -gt 0) {
+    $TestProjectConcurrency
+}
+else {
+    [Math]::Min(4, [Math]::Max(1, [Environment]::ProcessorCount))
+}
 Push-Location $root
 
 $results = [ordered]@{}
@@ -78,7 +90,7 @@ try {
         $Base = if ($LASTEXITCODE -eq 0) { 'origin/main' } else { 'main' }
     }
     Write-Host "[ratchet] config=$Configuration  docs-base=$Base  skipTests=$SkipTests  fullDocs=$FullDocs  publicRelease=$PublicRelease"
-    Write-Host "[ratchet] test-project-isolation=one-process-per-project  test-host-hang-timeout=$testHostHangTimeout"
+    Write-Host "[ratchet] test-project-isolation=one-process-per-project  test-project-concurrency=$effectiveTestProjectConcurrency  test-host-hang-timeout=$testHostHangTimeout"
 
     Invoke-Leg '0. tools' { & dotnet tool restore }
 
@@ -117,24 +129,52 @@ try {
                 return
             }
 
-            Write-Host "[ratchet] runnable-test-projects=$($testProjects.Count)"
-            foreach ($project in $testProjects) {
-                $relativeProject = [System.IO.Path]::GetRelativePath($root, $project.FullName)
-                Write-Host "[ratchet] test-project=$relativeProject"
-                $arguments = @(
-                    'test', $project.FullName,
-                    '-c', $Configuration,
-                    '--no-build',
-                    '--nologo',
-                    '--blame-hang-timeout', $testHostHangTimeout,
-                    '--blame-hang-dump-type', 'none'
-                )
-                & dotnet @arguments
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Host "[ratchet] test-project failed: $relativeProject" -ForegroundColor Red
-                    return
-                }
+            Write-Host "[ratchet] runnable-test-projects=$($testProjects.Count)  concurrency=$effectiveTestProjectConcurrency"
+            $testResults = @(
+                $testProjects | ForEach-Object -Parallel {
+                    $project = $_
+                    $testRoot = $using:root
+                    $configuration = $using:Configuration
+                    $hangTimeout = $using:testHostHangTimeout
+                    $relativeProject = [System.IO.Path]::GetRelativePath($testRoot, $project.FullName)
+                    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+                    Write-Host "[ratchet] test-project started: $relativeProject"
+                    $arguments = @(
+                        'test', $project.FullName,
+                        '-c', $configuration,
+                        '--no-build',
+                        '--nologo',
+                        '--blame-hang-timeout', $hangTimeout,
+                        '--blame-hang-dump-type', 'none'
+                    )
+                    $output = @(& dotnet @arguments 2>&1 | ForEach-Object { $_.ToString() })
+                    $exitCode = $LASTEXITCODE
+                    $timer.Stop()
+                    $outputText = $output -join [Environment]::NewLine
+                    $status = if ($exitCode -eq 0) { 'PASS' } else { 'FAIL' }
+                    Write-Host ("`n=== [ratchet] test-project $status : $relativeProject ($([Math]::Round($timer.Elapsed.TotalSeconds, 1))s) ===`n$outputText")
+                    [pscustomobject]@{
+                        Project = $relativeProject
+                        ExitCode = $exitCode
+                        ElapsedSeconds = $timer.Elapsed.TotalSeconds
+                    }
+                } -ThrottleLimit $effectiveTestProjectConcurrency
+            )
+
+            $failedProjects = @($testResults | Where-Object ExitCode -ne 0 | Sort-Object Project)
+            Write-Host "`n[ratchet] test-project summary ($($testResults.Count) project(s))"
+            foreach ($testResult in ($testResults | Sort-Object Project)) {
+                $status = if ($testResult.ExitCode -eq 0) { 'PASS' } else { 'FAIL' }
+                Write-Host ("  {0,-6} {1,8:N1}s  {2}" -f $status, $testResult.ElapsedSeconds, $testResult.Project) `
+                    -ForegroundColor $(if ($testResult.ExitCode -eq 0) { 'Green' } else { 'Red' })
             }
+
+            if ($failedProjects.Count -gt 0) {
+                Write-Host "[ratchet] failed-test-projects=$($failedProjects.Count): $($failedProjects.Project -join ', ')" -ForegroundColor Red
+                $global:LASTEXITCODE = 1
+                return
+            }
+            $global:LASTEXITCODE = 0
         }
     }
 

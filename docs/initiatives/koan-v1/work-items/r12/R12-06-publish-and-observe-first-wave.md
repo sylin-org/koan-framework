@@ -7,15 +7,15 @@ status: current
 last_updated: 2026-07-19
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-19
+  date_last_tested: 2026-07-20
   status: in-progress
-  scope: publication and public-consumer architecture checkpoint; no remote action authorized
+  scope: maintainer-authorized first-wave execution; pre-staging recovery and bounded proof redesign
 ---
 
 # R12-06 — Publish and observe the first 0.20 wave
 
 - Tranche: `T7B — public product maturity`
-- Status: `pending — execution requires passed R12-05 and separate remote authorization`
+- Status: `in-progress — maintainer-authorized first-wave execution; no package staged or published yet`
 - Depends on: passed R12-05 exact frozen candidate
 - Unlocks: R12-07 public-to-later-wave upgrade and recovery proof
 - Owner: `release-on-dev.yml` owns publication; NuGet and immutable GitHub Release own public evidence;
@@ -357,6 +357,72 @@ changes; the focused scale test and full SQLite Jobs suite on Windows/Linux are 
 not fine performance drift; a future deterministic query-plan seam would be stronger but is beyond this pre-staging
 recovery and is not justified by one 8 ms miss.
 
+### 2026-07-20 bounded certification-wave checkpoint
+
+**Task:** Remove the accidental serial topology from the complete release proof without splitting exact-version
+authority across workflow jobs or weakening project-host isolation.
+
+**Application intent:** A maintainer advancing `dev` should receive the complete exact-version certification in
+bounded minutes, with independent suites using independent processes and all failures reported before package work
+can begin.
+
+**Public expression:** None. The release action remains one ordinary `dev` advancement and the local certification
+command remains `pwsh scripts/green-ratchet.ps1 -Configuration Release -PublicRelease`. Maintainers may use the
+existing script with an explicit bounded test-project concurrency when diagnosing a constrained workstation.
+
+**Guarantee/correction:** The ratchet continues to discover every runnable `Microsoft.NET.Test.Sdk` project, launch
+each project in its own `dotnet test` process with five-minute host-hang detection, and require every project to pass.
+Independent project processes now execute in one CPU-bounded worker wave instead of one alphabetical queue. Results
+join once inside the same read-only exact-version job; any failed worker makes the ratchet red before pack, escrow,
+lineage persistence, staging, or promotion.
+
+**Complete intent surface:** Discover the same project set deterministically; reject an empty set; choose an explicit
+positive concurrency or a processor-count-derived default capped at four; start at most that many project processes;
+retain each project's complete output and elapsed time; report results in stable project order; report every failure
+from the wave rather than hiding later independent defects; leave build, lockfile, docs, public docs, instructional
+code, skills, blueprints, pack, clean-room, escrow, and mutation ordering unchanged; use the same path for current
+proof and prior-wave recovery.
+
+**Public concepts:** Standard PowerShell parameters and parallel pipelines, `Environment.ProcessorCount`, and one
+ordinary child `dotnet test` process per project. No Koan-specific scheduler, test DSL, release identity, or workflow
+artifact is introduced.
+
+**Docs read:** `CLAUDE.md`; architecture principles; engineering and test-authoring front doors; `tests/README.md`;
+R11-07 certification boundary; R12-06; NuGet publishing guidance; ARCH-0110.
+
+**Code read:** `scripts/green-ratchet.ps1`; its bounded-solution and per-project-isolation history; the complete
+`release-on-dev.yml` job/output/permission graph; `ReleaseWorkflowContractTests.cs`; all runnable-project discovery,
+parallel-job, and test-host timeout references under `scripts/`, `tests/`, and `.github/`.
+
+**Reusing:** The existing ratchet, runnable-project marker, one-process-per-project contract, full solution build,
+five-minute VSTest hang detector, six release authority boundaries, and Packaging workflow-contract suite.
+
+**Creating new:**
+
+| New code | Location | Justification |
+| --- | --- | --- |
+| None | — | Bounded scheduling belongs inside the existing ratchet owner; another script, workflow job, manifest, or artifact would only duplicate authority. |
+
+**Coalescence:** Restore the bounded concurrency promised by R11-07 while retaining the stronger per-project lifecycle
+introduced later. Do not return to one solution-wide VSTest invocation, create 106 GitHub jobs, or split release
+lineage compilation and proof across artifact handoffs. One ratchet remains the chokepoint for both current and prior
+exact-version certification.
+
+**Ergonomics:** The default uses available CPU but never exceeds four concurrent projects; `-TestProjectConcurrency`
+provides a standard explicit override. Logs remain grouped per project and the final summary names every failed
+project, so faster feedback is also more actionable than serial fail-fast/restart cycles.
+
+**Constraints satisfied:** Build/test/pack remains read-only and API-key-free; staging and promotion remain unreachable
+until the joined ratchet succeeds; every runnable suite remains included and process-isolated; no package identity,
+public API, HTTP/data path, module, option, constant, model, documentation curriculum, or remote configuration changes;
+`tmp/` remains excluded.
+
+**Risks:** Concurrent integration projects consume more peak CPU, memory, and Docker capacity and may expose a suite
+that violates the existing isolated-partition/database/port rule. The cap is deliberately four and overrideable;
+such a collision is a test-ownership defect to correct, not a reason to restore a 106-project serial queue. Buffered
+per-project output increases transient memory modestly but prevents unreadable interleaving and preserves complete
+failure diagnostics.
+
 ## Work
 
 1. Revalidate that local HEAD exactly equals the passed R12-05 source and that no later tracked change exists.
@@ -397,8 +463,8 @@ recovery and is not justified by one 8 ms miss.
 
 ## Authorization and stop conditions
 
-- This card records architecture only. It does not authorize remote inspection requiring new access, secret or
-  repository setting changes, push, tag, Release, or NuGet publication.
+- The maintainer explicitly authorized the normal `dev` release path. This does not authorize repository-secret or
+  repository-setting changes, manual tag/Release/package mutation, or publication outside the coordinator.
 - Stop if local HEAD differs from the R12-05 freeze or remote state contradicts its preflight assumptions.
 - Stop before advancing `dev` unless required trust prerequisites are positively verified and the exact operation is
   explicitly authorized.
