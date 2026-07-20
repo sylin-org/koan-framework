@@ -201,6 +201,57 @@ focused Web Auth suite on Windows and Linux is the bounded proof.
 back-channel URLs; that matches the documented OAuth/OIDC HTTP contract. Continue fail-fast recovery if a later
 independent Linux cell appears.
 
+### 2026-07-20 async-embedding fixture recovery checkpoint
+
+**Task:** Correct the Data AI timing failure from release run `29759034113` without changing deferred-embedding
+production semantics or weakening the vector-only regression proof.
+
+**Application intent:** An application saving an `[Embedding(Async = true)]` Entity receives a durable job whose
+`Completed` state means the vector write and model-state confirmation have both completed, without a second save of
+the domain Entity.
+
+**Public expression:** None. Applications retain the existing `[Embedding(Async = true)]` declaration, normal
+`Save()`, and host-owned `Koan:Data:AI:EmbeddingWorker` policy. Production worker defaults remain unchanged.
+
+**Guarantee/correction:** The integration fixture must not use the production five-second idle cadence as its own
+five-second assertion deadline. It supplies a short test-only poll cadence and disables the unrelated global rate
+limit, then continues to require the persisted `Completed` state, exactly one domain upsert, and a searchable vector.
+
+**Complete intent surface:** No user action is added. The third run failed in the read-only ratchet after Packaging
+and Web Auth passed; staging and promotion were skipped and no lineage, tag, Release, escrow, or public package was
+created.
+
+**Public concepts:** None. Standard .NET options configuration on the integration host is sufficient.
+
+**Docs read:** `Koan.Data.AI/README.md` defines queue states and makes polling/rate limits host policy;
+`Koan.Data.AI/TECHNICAL.md` requires deferred work to converge on the vector-only writer and records the non-atomic
+write/state boundary; this card preserves fail-fast coordinator recovery.
+
+**Code read:** `EmbeddingWorker` persists `Processing`, performs the vector write and durable confirmation, then
+persists `Completed`; `EmbeddingWorkerOptions` defaults idle polling to five seconds; the failing fixture starts the
+host before enqueue and also polls for only 100 × 50 ms. The isolated test completes at that boundary, confirming a
+fixture deadline race rather than a stuck worker or incorrect terminal-state order.
+
+**Reusing:** The existing `EmbeddingWorkerOptions`, normal options configuration, existing integration host, and the
+same three behavioral assertions.
+
+**Creating new:** None. Configure the existing worker options inside the existing fixture; add no helper, signal,
+type, API, option, or production branch.
+
+**Coalescence:** Keep production ordering in `EmbeddingWorker` and test policy in the fixture. Do not add a second
+completion signal, expose worker internals, lengthen a blind wait, or move terminal state ahead of the durable write.
+
+**Ergonomics:** Framework users see no change. Maintainers get a fast deterministic proof that still observes the
+public durable state rather than a test-only side channel.
+
+**Constraints satisfied:** No controller, data-access abstraction, streaming path, public API, constant, module, or
+production behavior changes; standard .NET options are reused; the focused Data AI test on Windows and Linux is the
+bounded proof.
+
+**Risks:** A short fixture cadence increases background polling only inside this one host. If the focused test still
+sticks in `Processing`, treat that as a production defect and inspect the write/state boundary rather than relaxing
+the assertion.
+
 ## Work
 
 1. Revalidate that local HEAD exactly equals the passed R12-05 source and that no later tracked change exists.

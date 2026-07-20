@@ -49,6 +49,12 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
             .ConfigureServices(s =>
             {
                 s.AddLogging();
+                s.Configure<EmbeddingWorkerOptions>(options =>
+                {
+                    options.PollInterval = TimeSpan.FromMilliseconds(10);
+                    options.IdlePollInterval = TimeSpan.FromMilliseconds(10);
+                    options.GlobalRateLimitPerMinute = 0;
+                });
                 s.AddSingleton<IAiAdapterRegistry>(_adapters);
                 s.AddKoan(() =>
                     AsyncEmbeddingDoc.Lifecycle.AfterUpsert(_ => Interlocked.Increment(ref _asyncDomainUpserts)));
