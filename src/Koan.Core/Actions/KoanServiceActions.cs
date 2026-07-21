@@ -1,34 +1,21 @@
 namespace Koan.Core.Actions;
 
 /// <summary>
-/// Constants for all Koan service actions to avoid magic strings
+/// Constants for Koan service actions to avoid magic strings.
+/// Only actions actually consumed by the framework's internal background
+/// services are kept here (G2 trim); unused action catalogs were removed.
 /// </summary>
 public static class KoanServiceActions
 {
-    public static class Outbox
-    {
-        public const string ProcessBatch = "process-batch";
-    }
-
     public static class Messaging
     {
+        // Consumed by Koan.Messaging.Core/MessagingLifecycleService.cs
         public const string RestartMessaging = "restart-messaging";
-    }
-
-    public static class Canon
-    {
-        public const string ProcessCanonEntity = "process-canon-entity";
-        public const string TriggerProcessing = "canon-trigger-processing";
-    }
-
-    public static class Scheduling
-    {
-        public const string TriggerTask = "trigger-task";
-        public const string ListTasks = "list-tasks";
     }
 
     public static class Health
     {
+        // Consumed by Koan.Core/Observability/Health/HealthProbeScheduler.cs
         public const string ForceProbe = "force-probe";
     }
 }

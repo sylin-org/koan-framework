@@ -4,16 +4,19 @@ using System.Linq;
 namespace Koan.Data.AI;
 
 /// <summary>
-/// Global registry of entity types tagged with <see cref="Attributes.EmbeddingAttribute"/>.
-/// Populated via source-generated module initializers; remains additive for runtime extensibility.
+/// Process-wide registry of immutable entity-type discovery facts for types tagged with
+/// <see cref="Attributes.EmbeddingAttribute"/>.
+/// Populated by source-generated module initializers; entries are additive, idempotent, and
+/// independent of any host, service provider, configuration, or backend.
 /// </summary>
 public static partial class EmbeddingRegistry
 {
     private static readonly ConcurrentDictionary<Type, byte> _registeredTypes = new(TypeEqualityComparer.Instance);
 
     /// <summary>
-    /// Registers entity types with <c>[Embedding]</c> attribute.
-    /// Source generators call this during module initialization; runtime callers can extend as needed.
+    /// Infrastructure entry point used by generated module initializers to record entity types with
+    /// <c>[Embedding]</c>. Registration is process-lifetime discovery, not per-host activation or a
+    /// supported runtime extension mechanism.
     /// </summary>
     public static void RegisterTypes(IEnumerable<Type> types)
     {

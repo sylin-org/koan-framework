@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Policies;
+using Koan.Core.Context;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core.Transactions;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,7 +24,7 @@ namespace Koan.Data.Core;
 /// </summary>
 public static class EntityContext
 {
-    private static readonly AsyncLocal<ContextState?> _current = new();
+    private const string TransactionOperation = "entity transaction";
 
     /// <summary>
     /// Routing context state combining source, adapter, partition, and transaction.
@@ -92,12 +93,12 @@ public static class EntityContext
     /// <summary>
     /// Get current routing context (null if not set).
     /// </summary>
-    public static ContextState? Current => _current.Value;
+    public static ContextState? Current => KoanContext.Get<ContextState>();
 
     /// <summary>
     /// Check if currently in a transaction.
     /// </summary>
-    public static bool InTransaction => _current.Value?.Transaction != null;
+    public static bool InTransaction => Current?.Transaction != null;
 
     /// <summary>
     /// The current transaction coordinator (null if not in a transaction) — exposes its declared
@@ -106,18 +107,34 @@ public static class EntityContext
     /// <see cref="Transactions.ITransactionCoordinator.TrackedOperationCount"/>.
     /// </summary>
     public static Transactions.ITransactionCoordinator? CurrentTransaction =>
-        _current.Value?.TransactionCoordinator;
+        Current?.TransactionCoordinator;
 
     /// <summary>
-    /// Set routing context. Replaces any previous context (does not merge).
+    /// Push a routing context for the lifetime of the returned scope. The new context is built
+    /// <b>inherit-unless-overridden</b>, not wholesale-replaced: each dimension whose argument is left
+    /// null adopts the ambient (previous) context's value for that dimension; a non-null argument
+    /// overrides it. Omitting an argument therefore <b>preserves</b> the inherited value — it does not
+    /// clear it — so a nested scope can change one axis (e.g. add a partition) while the rest carry over.
+    ///
+    /// <para>Mutual exclusion of source and adapter is enforced on the <b>effective</b> (post-inheritance)
+    /// values: because the two inherit independently, naming an <paramref name="adapter"/> while a source
+    /// is inherited from the ambient context — or a <paramref name="source"/> while an adapter is
+    /// inherited — throws <see cref="InvalidOperationException"/>. Switch routing axes from a scope that
+    /// does not inherit the other, or override both explicitly.</para>
+    ///
+    /// <para>Transaction carry-over is gated by <paramref name="preserveTransaction"/> (default true) and
+    /// is independent of the other dimensions: when true and no new <paramref name="transaction"/> is
+    /// named, the ambient transaction and its coordinator carry into the scope; when false they are
+    /// dropped. Disposing the returned scope restores the previous context.</para>
     /// </summary>
-    /// <param name="source">Named source configuration</param>
-    /// <param name="adapter">Adapter override</param>
-    /// <param name="partition">Storage partition suffix</param>
-    /// <param name="transaction">Transaction name for coordination</param>
+    /// <param name="source">Named source configuration; null inherits the ambient source.</param>
+    /// <param name="adapter">Adapter override; null inherits the ambient adapter.</param>
+    /// <param name="partition">Storage partition suffix; null inherits the ambient partition.</param>
+    /// <param name="transaction">Transaction name for coordination; null inherits the ambient transaction when <paramref name="preserveTransaction"/> is true.</param>
+    /// <param name="cacheBehavior">Per-request cache behavior override; null inherits the ambient behavior.</param>
     /// <param name="preserveTransaction">When true, retain the ambient transaction if one exists and no new transaction is specified.</param>
     /// <returns>Disposable that restores previous context on disposal</returns>
-    /// <exception cref="InvalidOperationException">Thrown when both source and adapter are specified, or when nesting transactions</exception>
+    /// <exception cref="InvalidOperationException">Thrown when source and adapter are both set on the effective context (directly or via inheritance), or when starting a transaction inside an existing one</exception>
     /// <exception cref="ArgumentException">Thrown when partition name is invalid</exception>
     public static IDisposable With(
         string? source = null,
@@ -127,7 +144,7 @@ public static class EntityContext
         CacheBehavior? cacheBehavior = null,
         bool preserveTransaction = true)
     {
-        var prev = _current.Value;
+        var prev = Current;
 
         // Prevent nested transactions when explicitly starting a new one
         if (!string.IsNullOrWhiteSpace(transaction) && prev?.Transaction != null)
@@ -166,8 +183,11 @@ public static class EntityContext
             newContext = newContext with { TransactionCoordinator = activeCoordinator };
         }
 
-        _current.Value = newContext;
-        return new TransactionScope(prev, coordinatorForScope);
+        var options = coordinatorForScope is null
+            ? null
+            : AppHost.Current?.GetService<IOptions<TransactionOptions>>()?.Value;
+        var contextScope = KoanContext.Push(newContext);
+        return new TransactionScope(contextScope, coordinatorForScope, options);
     }
 
     /// <summary>
@@ -219,7 +239,7 @@ public static class EntityContext
     /// <exception cref="TransactionException">Thrown when commit fails</exception>
     public static Task Commit(CancellationToken ct = default)
     {
-        var current = _current.Value;
+        var current = Current;
         if (current?.TransactionCoordinator == null)
             return Task.CompletedTask; // no active transaction → no-op
         return current.TransactionCoordinator.Commit(ct);
@@ -232,7 +252,7 @@ public static class EntityContext
     /// </summary>
     public static Task Rollback(CancellationToken ct = default)
     {
-        var current = _current.Value;
+        var current = Current;
         if (current?.TransactionCoordinator == null)
             return Task.CompletedTask; // no active transaction → no-op
         return current.TransactionCoordinator.Rollback(ct);
@@ -240,41 +260,25 @@ public static class EntityContext
 
     private static ITransactionCoordinator CreateTransactionCoordinator(string name)
     {
-        var sp = AppHost.Current;
-        if (sp == null)
-        {
-            throw new InvalidOperationException(
-                "AppHost.Current is not set. Ensure your application has called builder.Services.AddKoan().");
-        }
-
-        var factory = sp.GetService<ITransactionCoordinatorFactory>();
-        if (factory == null)
-        {
-            throw new InvalidOperationException(
-                "Transaction support not enabled. Call builder.Services.AddKoanTransactions() to enable transactions.");
-        }
-
+        var factory = AppHost.GetRequiredService<ITransactionCoordinatorFactory>(TransactionOperation);
         return factory.Create(name);
     }
 
     private sealed class TransactionScope : IDisposable
     {
-        private readonly ContextState? _previous;
+        private readonly IDisposable _contextScope;
         private readonly ITransactionCoordinator? _coordinator;
         private readonly TransactionOptions? _options;
         private bool _disposed;
 
-        public TransactionScope(ContextState? previous, ITransactionCoordinator? coordinator)
+        public TransactionScope(
+            IDisposable contextScope,
+            ITransactionCoordinator? coordinator,
+            TransactionOptions? options)
         {
-            _previous = previous;
+            _contextScope = contextScope;
             _coordinator = coordinator;
-
-            // Get options for auto-commit behavior
-            if (coordinator != null)
-            {
-                var sp = AppHost.Current;
-                _options = sp?.GetService<IOptions<TransactionOptions>>()?.Value;
-            }
+            _options = options;
         }
 
         public void Dispose()
@@ -304,8 +308,7 @@ public static class EntityContext
             }
             finally
             {
-                // Restore previous context
-                _current.Value = _previous;
+                _contextScope.Dispose();
             }
         }
     }

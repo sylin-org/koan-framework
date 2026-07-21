@@ -4,44 +4,32 @@ namespace Koan.Storage.Options;
 
 public sealed class StorageOptions
 {
-    // Named profiles (profile -> provider+container)
-    public Dictionary<string, StorageProfile> Profiles { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, StorageProfile> Profiles { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
-    // Optional default profile name used when caller does not specify a profile
-    public string? DefaultProfile { get; init; }
+    public string? DefaultProfile { get; set; }
 
-    // Fallback behavior when no profile is specified and DefaultProfile is not set
-    public StorageFallbackMode FallbackMode { get; init; } = StorageFallbackMode.SingleProfileOnly;
-
-    // If enabled, options validation will enforce basic invariants at resolution time
-    public bool ValidateOnStart { get; init; } = true;
+    internal bool DeclaresRoutingIntent
+        => (Profiles?.Count ?? 0) > 0 || !string.IsNullOrWhiteSpace(DefaultProfile);
 
     public sealed class StorageProfile
     {
         /// <summary>
-        /// Provider name. Nullable — when absent, StorageService auto-detects
+        /// Provider name. Nullable — when absent, the compiled Storage routing plan elects
         /// from registered providers based on <see cref="Mode"/>.
         /// </summary>
-        public string? Provider { get; init; }
+        public string? Provider { get; set; }
 
-        public required string Container { get; init; }
+        public string Container { get; set; } = "";
 
         /// <summary>
         /// Storage mode for this profile. Null = auto-detect from registered providers.
         /// </summary>
-        public StorageMode? Mode { get; init; }
+        public StorageMode? Mode { get; set; }
 
         /// <summary>
         /// Local cache configuration for replicated mode.
         /// Absent = unlimited cache (no eviction, full local mirror).
         /// </summary>
-        public LocalCacheOptions? LocalCache { get; init; }
-
-        /// <summary>
-        /// When true, wraps the resolved provider with <see cref="ResilientStorageDecorator"/>
-        /// for write-behind caching during primary unavailability.
-        /// Legacy — superseded by <see cref="Mode"/> = <see cref="StorageMode.Replicated"/>.
-        /// </summary>
-        public bool Resilient { get; init; }
+        public LocalCacheOptions? LocalCache { get; set; }
     }
 }

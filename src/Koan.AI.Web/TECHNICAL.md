@@ -1,38 +1,25 @@
-Koan.AI.Web - Technical reference
+# Sylin.Koan.AI.Web — technical contract
 
-Contract
+## Composition ownership
 
-- Inputs: HTTP requests to AI endpoints (controller-driven only), validated DTOs.
-- Outputs: JSON responses and server-sent events for streaming.
-- Success: 2xx with payload; Errors: 4xx for validation/auth, 5xx for provider/runtime.
+`AiWebModule` is the single activation owner. During `AddKoan()` it registers the assembly containing `AiController`
+with MVC through Koan Web's standard application-part seam. It registers no provider registry, AI pipeline, health
+subscriber, middleware, or duplicate routing policy.
 
-Architecture
+The package depends explicitly on `Sylin.Koan.AI`, `Sylin.Koan.AI.Contracts`, `Sylin.Koan.Web`, and
+`Sylin.Koan.Web.Sse`. A package reference therefore declares projection availability while provider references declare
+which native operations can execute.
 
-- Expose endpoints via MVC controllers (no inline MapGet/MapPost) per WEB-0035.
-- Depends on Koan.AI and Koan.AI.Contracts abstractions; does not couple to a specific provider.
-- Authentication/authorization integrates with Koan.Web.Auth when enabled.
+## Execution
 
-Options
+Controller actions use `IAiPipeline` for chat, streaming, and embeddings; semantic `Client` behavior for OCR; and the
+read-only `IAiAdapterRegistry` for inspection and explicit model-management requests. SSE emits non-empty text deltas
+and honors request cancellation. Model inventory captures a bounded adapter id/message for each provider that failed
+while listing models so partial results are inspectable.
 
-- Route bases, response buffering/streaming thresholds, max request size, timeouts.
-- CORS and caching policies configured via typed options; no scattered literals (ARCH-0040).
+## Failure and security boundaries
 
-Error modes
-
-- 400: invalid DTO, unsupported model; 401/403: auth failures; 408: timeout; 429: rate limited; 5xx: provider/backing service errors.
-
-Edge cases
-
-- Large payloads; client disconnects mid-stream; slow consumers; SSE retry behavior.
-- Concurrency limits and graceful shutdown honoring CancellationToken.
-
-Operations
-
-- Health endpoints and dependency probes; structured logging with correlation id.
-- Backpressure via server limits and per-endpoint quotas.
-
-References
-
-- ./README.md
-- /docs/api/web-http-api.md
-- /docs/engineering/index.md
+ASP.NET Core model binding owns malformed-request responses. Missing providers or capabilities fail through the AI
+runtime. Native HTTP/model failures are not normalized into promised 408/429/502 categories. The package adds no
+authorization metadata, body-size limit, CORS policy, retry, buffering threshold, or rate limiter. Applications must
+compose those concerns explicitly when exposing the routes beyond a trusted boundary.

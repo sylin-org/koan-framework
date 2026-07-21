@@ -1,36 +1,38 @@
-using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using Koan.Core;
 using Koan.Core.Observability.Health;
+using Koan.Data.Core;
+using Koan.Data.Core.Diagnostics;
+using Koan.Data.Core.Routing;
+using Koan.Data.Connector.Mongo.Infrastructure;
 
 namespace Koan.Data.Connector.Mongo;
 
-/// <summary>
-/// Health probe for Mongo connectivity and database ping.
-/// </summary>
-internal sealed class MongoHealthContributor(IOptions<MongoOptions> options) : IHealthContributor
+/// <summary>Reports readiness for the Mongo sources that actually participate in this application.</summary>
+internal sealed class MongoHealthContributor : DataAdapterHealthContributorBase
 {
-    public string Name => "data:mongo";
-    public bool IsCritical => true;
+    private const string ProviderName = Constants.Provider.Name;
+    private readonly IServiceProvider _services;
+    private readonly MongoAdapterFactory _factory;
 
-    public async Task<HealthReport> Check(CancellationToken ct = default)
+    public MongoHealthContributor(
+        IServiceProvider services,
+        IDataDiagnostics diagnostics,
+        DataProviderCatalog providers,
+        DataDefaultProviderPlan defaultProvider)
+        : base(ProviderName, services, diagnostics, defaultProvider)
     {
-        try
-        {
-            var client = new MongoClient(options.Value.ConnectionString);
-            var db = client.GetDatabase(options.Value.Database);
-            // ping
-            await db.RunCommandAsync((Command<BsonDocument>)new BsonDocument("ping", 1), cancellationToken: ct);
-            return new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Healthy, null, null, new Dictionary<string, object?>
-            {
-                ["database"] = options.Value.Database,
-                ["connectionString"] = Redaction.DeIdentify(options.Value.ConnectionString)
-            });
-        }
-        catch (Exception ex)
-        {
-            return new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Unhealthy, ex.Message, null, null);
-        }
+        _services = services;
+        _factory = providers.Find(ProviderName) as MongoAdapterFactory
+            ?? throw new InvalidOperationException("The MongoDB provider is absent from the host Data catalog.");
+    }
+
+    protected override async Task ProbeSource(string source, CancellationToken ct)
+    {
+        var route = _factory.ResolveRoute(_services, source);
+        var database = await route.Provider.GetDatabase(ct).ConfigureAwait(false);
+        await database.RunCommandAsync(
+            (Command<BsonDocument>)new BsonDocument("ping", 1),
+            cancellationToken: ct).ConfigureAwait(false);
     }
 }

@@ -1,63 +1,124 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
+using Koan.Data.Core.Routing;
 using Koan.Data.Vector.Abstractions;
 
 namespace Koan.Data.Vector;
 
-internal sealed class VectorService(IServiceProvider sp) : IVectorService
+internal sealed class VectorService(
+    IServiceProvider services,
+    IVectorAdapterParticipation participation) : IVectorService, IDisposable, IAsyncDisposable
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(Type, Type), object> _cache = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(Type, Type, string), object> _cache = new();
+    private int _disposed;
 
-    public IVectorSearchRepository<TEntity, TKey>? TryGetRepository<TEntity, TKey>() where TEntity : class, IEntity<TKey> where TKey : notnull
+    public IVectorSearchRepository<TEntity, TKey>? TryGetRepository<TEntity, TKey>()
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
     {
-        var key = (typeof(TEntity), typeof(TKey));
-        if (_cache.TryGetValue(key, out var existing)) return (IVectorSearchRepository<TEntity, TKey>?)existing;
-        var factories = sp.GetServices<IVectorAdapterFactory>().ToList();
-        if (factories.Count == 0) return null;
-        // 1) Entity-level vector role
-        string? desired = (Attribute.GetCustomAttribute(typeof(TEntity), typeof(VectorAdapterAttribute))
-            as VectorAdapterAttribute)?.Provider;
-        // 2) App defaults
-        desired ??= sp.GetService<IOptions<VectorDefaultsOptions>>()?.Value?.DefaultProvider;
-        // 3) Entity source provider (role-based)
-        if (string.IsNullOrWhiteSpace(desired))
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+
+        var source = RoutedSource.Resolve<TEntity>().Source ?? "Default";
+        var key = (typeof(TEntity), typeof(TKey), source);
+        if (_cache.TryGetValue(key, out var existing))
+            return (IVectorSearchRepository<TEntity, TKey>)existing;
+
+        var providers = services.GetRequiredService<VectorProviderCatalog>();
+        if (providers.Candidates.Count == 0) return null;
+
+        var explicitAttribute = (VectorAdapterAttribute?)Attribute.GetCustomAttribute(
+            typeof(TEntity),
+            typeof(VectorAdapterAttribute));
+        var explicitDefault = services.GetService<IOptions<VectorDefaultsOptions>>()?.Value?.DefaultProvider;
+        var required = !string.IsNullOrWhiteSpace(explicitAttribute?.Provider)
+            ? explicitAttribute.Provider
+            : !string.IsNullOrWhiteSpace(explicitDefault)
+                ? explicitDefault
+                : null;
+
+        IVectorAdapterFactory? factory;
+        if (required is not null)
         {
-            var src = (SourceAdapterAttribute?)Attribute.GetCustomAttribute(typeof(TEntity), typeof(SourceAdapterAttribute));
-            if (src is not null && !string.IsNullOrWhiteSpace(src.Provider)) desired = src.Provider;
-            else
-            {
-                var data = (DataAdapterAttribute?)Attribute.GetCustomAttribute(typeof(TEntity), typeof(DataAdapterAttribute));
-                if (data is not null && !string.IsNullOrWhiteSpace(data.Provider)) desired = data.Provider;
-            }
+            factory = providers.Find(required)
+                ?? throw RequiredProviderUnavailable<TEntity>(required, providers);
         }
-        // 4) Default to highest-priority data provider name when none specified
-        if (string.IsNullOrWhiteSpace(desired))
+        else
         {
-            var dataFactories = sp.GetServices<IDataAdapterFactory>().ToList();
-            if (dataFactories.Count > 0)
+            var preferred = PreferredRecordProvider<TEntity>();
+            if (string.IsNullOrWhiteSpace(preferred))
             {
-                var ranked = dataFactories
-                    .Select(f => new
-                    {
-                        Factory = f,
-                        Priority = (f.GetType().GetCustomAttributes(typeof(ProviderPriorityAttribute), inherit: false).FirstOrDefault() as ProviderPriorityAttribute)?.Priority ?? 0,
-                        Name = f.GetType().Name
-                    })
-                    .OrderByDescending(x => x.Priority)
-                    .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                var chosen = ranked.First().Factory.GetType().Name;
-                const string suffix = "AdapterFactory";
-                if (chosen.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) chosen = chosen[..^suffix.Length];
-                desired = chosen.ToLowerInvariant();
+                var dataProviders = services.GetService<DataProviderCatalog>();
+                if (dataProviders?.Candidates.Count > 0)
+                    preferred = services.GetRequiredService<DataDefaultProviderPlan>().ProviderId;
             }
+
+            factory = !string.IsNullOrWhiteSpace(preferred) ? providers.Find(preferred) : null;
+            factory ??= providers.SelectAutomatic();
         }
-        // Resolve vector factory
-        var factory = !string.IsNullOrWhiteSpace(desired) ? factories.FirstOrDefault(f => f.CanHandle(desired)) : null;
-        factory ??= factories.FirstOrDefault();
-        var repo = factory?.Create<TEntity, TKey>(sp);
-        if (repo is not null) _cache[key] = repo;
-        return repo;
+
+        if (factory is null) return null;
+        participation.Observe(factory.Provider, source);
+        var inner = factory.Create<TEntity, TKey>(services, source);
+        var repository = new ScopedVectorRepository<TEntity, TKey>(inner, services);
+        var winner = (IVectorSearchRepository<TEntity, TKey>)_cache.GetOrAdd(key, repository);
+        if (!ReferenceEquals(winner, repository))
+            repository.Dispose();
+        return winner;
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+
+        foreach (var repository in _cache.Values.Distinct(ReferenceEqualityComparer.Instance))
+        {
+            if (repository is IDisposable disposable)
+                disposable.Dispose();
+            else if (repository is IAsyncDisposable asyncDisposable)
+                asyncDisposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+
+        _cache.Clear();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+
+        foreach (var repository in _cache.Values.Distinct(ReferenceEqualityComparer.Instance))
+        {
+            if (repository is IAsyncDisposable asyncDisposable)
+                await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            else if (repository is IDisposable disposable)
+                disposable.Dispose();
+        }
+
+        _cache.Clear();
+    }
+
+    private static string? PreferredRecordProvider<TEntity>() where TEntity : class
+    {
+        var source = (SourceAdapterAttribute?)Attribute.GetCustomAttribute(
+            typeof(TEntity),
+            typeof(SourceAdapterAttribute));
+        if (!string.IsNullOrWhiteSpace(source?.Provider)) return source.Provider;
+
+        var data = (DataAdapterAttribute?)Attribute.GetCustomAttribute(
+            typeof(TEntity),
+            typeof(DataAdapterAttribute));
+        return !string.IsNullOrWhiteSpace(data?.Provider) ? data.Provider : null;
+    }
+
+    private static InvalidOperationException RequiredProviderUnavailable<TEntity>(
+        string requested,
+        VectorProviderCatalog providers)
+    {
+        var choices = providers.Candidates.Count == 0
+            ? "none"
+            : string.Join(", ", providers.Candidates.Select(static candidate => candidate.Id));
+        return new InvalidOperationException(
+            $"Entity '{typeof(TEntity).Name}' requires vector provider '{requested}', but it is unavailable. " +
+            $"Referenced vector providers: {choices}. Correct the VectorAdapter/default provider or reference the intended connector; Koan will not substitute an unrelated provider.");
     }
 }

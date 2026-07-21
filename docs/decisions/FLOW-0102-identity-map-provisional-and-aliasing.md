@@ -2,10 +2,14 @@
 id: FLOW-0102
 slug: identity-map-provisional-and-aliasing
 domain: flow
-status: accepted
+status: Retired
 date: 2025-08-31
 title: Identity map, provisional mappings, aliasing (cap=1), and value‑object indexing
 ---
+
+# FLOW-0102 - Identity map, provisional mappings, aliasing, and value-object indexing
+
+> **Status: Retired.** Describes the original Flow pillar generation, superseded by the Koan.Canon rebuild.
 
 ## Context
 

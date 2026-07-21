@@ -24,22 +24,6 @@ internal static class KoanAiProvenanceItems
         "Configured Sources",
         "List of AI sources explicitly declared under Koan:Ai:Sources.");
 
-    internal static readonly ProvenanceItem LegacyOllamaBaseUrl = new(
-        "AiLegacyOllamaBaseUrl",
-        "Legacy Ollama BaseUrl",
-        "BaseUrl provided via Koan:Ai:Ollama configuration (legacy fallback).",
-        false,
-        false,
-        null,
-        null,
-        null,
-        new[] { "Koan.AI" });
-
-    internal static readonly ProvenanceItem LegacyOllamaDefaultModel = new(
-        "AiLegacyOllamaDefaultModel",
-        "Legacy Ollama Default Model",
-        "Default model configured under Koan:Ai:Ollama:DefaultModel.");
-
     internal static readonly ProvenanceItem ActiveRecipe = new(
         "AiActiveRecipe",
         "Active Recipe",

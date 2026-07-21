@@ -1,6 +1,4 @@
-using System;
 using Koan.Data.AdapterSurface.TestKit;
-using Koan.Data.Connector.InMemory.Tests.Support;
 
 namespace Koan.Data.Connector.InMemory.Tests.Specs.Filtering;
 
@@ -12,22 +10,14 @@ namespace Koan.Data.Connector.InMemory.Tests.Specs.Filtering;
 /// the compiled-predicate oracle. (The offset-stripping round-trip assertion does NOT apply here: the
 /// in-memory store keeps the original CLR value, offset intact.)
 /// </summary>
-public sealed class InMemoryComparableEncodingSpec
+public sealed class InMemoryComparableEncodingSpec(InMemoryFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<InMemoryFixture>(fixture, output)
 {
-    private readonly ITestOutputHelper _output;
-    public InMemoryComparableEncodingSpec(ITestOutputHelper output) => _output = output;
-
     [Fact(DisplayName = "InMemory: composite-scalar comparisons converge with the CLR oracle (DATA-0100)")]
     public async Task Composite_scalars_converge_with_oracle()
     {
-        await TestPipeline
-            .For<InMemoryComparableEncodingSpec>(_output, nameof(Composite_scalars_converge_with_oracle))
-            .Using<InMemoryConnectorFixture>("fixture", static ctx => InMemoryConnectorFixture.Create(ctx))
-            .Assert(async ctx =>
-            {
-                ctx.GetRequiredItem<InMemoryConnectorFixture>("fixture").BindHost();
-                await TemporalConvergence.AssertConvergesAsync();
-            })
-            .Run();
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        await TemporalConvergence.AssertConvergesAsync();
     }
 }

@@ -3,7 +3,7 @@ namespace Koan.ZenGarden.Koi;
 /// <summary>
 /// A topology change event emitted by the Koi handler.
 /// </summary>
-public sealed record KoiTopologyEvent
+internal sealed record KoiTopologyEvent
 {
     public required KoiTopologyEventKind Kind { get; init; }
 

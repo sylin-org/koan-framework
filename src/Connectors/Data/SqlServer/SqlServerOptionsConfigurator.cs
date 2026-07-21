@@ -6,10 +6,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Adapters;
-using Koan.Core.Adapters.Configuration;
+using Koan.Data.Adapters.Configuration;
 using Koan.Core.Infrastructure;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Data.Relational.Orchestration;
 
 namespace Koan.Data.Connector.SqlServer;
 
@@ -43,11 +44,10 @@ internal sealed class SqlServerOptionsConfigurator : AdapterOptionsConfigurator<
 
     protected override void ConfigureProviderSpecific(SqlServerOptions options)
     {
-        Logger?.LogInformation("SQL Server Orchestration-Aware Configuration Started");
-        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
-            KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
-        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}'",
-            options.ConnectionString);
+        LogConfiguration(LogLevel.Debug, "initial",
+            ("environment", KoanEnv.EnvironmentName),
+            ("orchestrationMode", KoanEnv.OrchestrationMode),
+            ("connection", options.ConnectionString));
 
         // SQL Server-specific configuration
         var explicitConnectionString = ReadProviderConfiguration("",
@@ -58,35 +58,30 @@ internal sealed class SqlServerOptionsConfigurator : AdapterOptionsConfigurator<
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            Logger?.LogInformation("Using explicit connection string from configuration");
+            LogConfiguration(LogLevel.Information, "explicit");
             options.ConnectionString = explicitConnectionString;
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            Logger?.LogInformation("Auto-detection mode - using autonomous service discovery");
-            options.ConnectionString = ResolveAutonomousConnection(Logger);
+            LogConfiguration(LogLevel.Information, "auto");
+            options.ConnectionString = ResolveAutonomousConnection();
         }
         else
         {
-            Logger?.LogInformation("Using pre-configured connection string");
+            LogConfiguration(LogLevel.Information, "preconfigured");
         }
 
         // Configure other SQL Server-specific options
-        options.DefaultPageSize = ReadProviderConfiguration(
-            options.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-
         var ddlStr = ReadProviderConfiguration(options.DdlPolicy.ToString(),
             Infrastructure.Constants.Configuration.Keys.DdlPolicy,
             Infrastructure.Constants.Configuration.Keys.AltDdlPolicy);
-        if (!string.IsNullOrWhiteSpace(ddlStr) && Enum.TryParse<SchemaDdlPolicy>(ddlStr, true, out var ddl)) options.DdlPolicy = ddl;
+        if (!string.IsNullOrWhiteSpace(ddlStr) && Enum.TryParse<RelationalDdlPolicy>(ddlStr, true, out var ddl)) options.DdlPolicy = ddl;
 
         var smStr = ReadProviderConfiguration(options.SchemaMatching.ToString(),
             Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
             Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
-        if (!string.IsNullOrWhiteSpace(smStr) && Enum.TryParse<SchemaMatchingMode>(smStr, true, out var sm)) options.SchemaMatching = sm;
+        if (!string.IsNullOrWhiteSpace(smStr) && Enum.TryParse<RelationalSchemaMatchingMode>(smStr, true, out var sm)) options.SchemaMatching = sm;
 
         options.AllowProductionDdl = Koan.Core.Configuration.Read(
             Configuration,
@@ -107,24 +102,22 @@ internal sealed class SqlServerOptionsConfigurator : AdapterOptionsConfigurator<
             Infrastructure.Constants.Configuration.Keys.JsonIgnoreNullValues,
             options.JsonIgnoreNullValues);
 
-        Logger?.LogInformation("Final SQL Server Configuration");
-        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
-        Logger?.LogInformation("SQL Server Orchestration-Aware Configuration Complete");
+        LogConfiguration(LogLevel.Information, "final", ("connection", options.ConnectionString));
     }
 
-    private string ResolveAutonomousConnection(ILogger? logger)
+    private string ResolveAutonomousConnection()
     {
         try
         {
             if (IsAutoDetectionDisabled())
             {
-                logger?.LogInformation("Auto-detection disabled via configuration - using localhost");
+                LogDiscovery(LogLevel.Information, "disabled", ("fallback", "localhost"));
                 return BuildSqlServerConnectionString("localhost", 1433);
             }
 
             if (_discoveryCoordinator == null)
             {
-                logger?.LogWarning("Service discovery coordinator not available, falling back to localhost");
+                LogDiscovery(LogLevel.Warning, "coordinator-missing", ("fallback", "localhost"));
                 return BuildSqlServerConnectionString("localhost", 1433);
             }
 
@@ -147,18 +140,18 @@ internal sealed class SqlServerOptionsConfigurator : AdapterOptionsConfigurator<
 
             if (result.IsSuccessful)
             {
-                logger?.LogInformation("SQL Server discovered via autonomous discovery: {ServiceUrl}", result.ServiceUrl);
+                LogDiscovery(LogLevel.Information, "success", ("url", result.ServiceUrl));
                 return result.ServiceUrl;
             }
             else
             {
-                logger?.LogWarning("Autonomous SQL Server discovery failed, falling back to localhost");
+                LogDiscovery(LogLevel.Warning, "fallback", ("reason", result.ErrorMessage), ("fallback", "localhost"));
                 return BuildSqlServerConnectionString("localhost", 1433);
             }
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Error in autonomous SQL Server discovery, falling back to localhost");
+            LogDiscovery(LogLevel.Error, "exception", ("error", ex), ("fallback", "localhost"));
             return BuildSqlServerConnectionString("localhost", 1433);
         }
     }

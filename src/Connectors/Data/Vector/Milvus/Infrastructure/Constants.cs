@@ -5,13 +5,14 @@ internal static class Constants
 {
     public const string Section = "Koan:Data:Milvus";
     public const string HttpClientName = "milvus";
+    public const string DefaultEndpoint = "http://localhost:19530";
+    public const int DefaultPort = 19530;
 
     internal static class Configuration
     {
         internal static class Keys
         {
             public const string ConnectionString = Section + ":ConnectionString";
-            public const string AltConnectionString = "Koan:Data:ConnectionString";
             public const string Endpoint = Section + ":Endpoint";
             public const string Database = Section + ":Database";
             public const string DatabaseName = Section + ":DatabaseName";
@@ -35,6 +36,11 @@ internal static class Constants
             public const string AutoCreate = Section + ":AutoCreate";
             public const string DisableAutoDetection = Section + ":DisableAutoDetection";
         }
+    }
+
+    internal static class Logging
+    {
+        public const string Health = "data.milvus.health";
     }
 }
 

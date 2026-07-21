@@ -14,4 +14,4 @@ validation:
 
 # Bootstrap Failures (Moved)
 
-The startup task runbook now lives inside the [Koan Troubleshooting Hub](../../support/troubleshooting.md#boot--auto-registration). Refer there for discovery checks, dependency waits, and logging tips.
+The startup task runbook now lives inside the [Koan Troubleshooting Hub](../../support/troubleshooting.md#boot-and-module-activation). Refer there for activation checks, dependency waits, and logging tips.

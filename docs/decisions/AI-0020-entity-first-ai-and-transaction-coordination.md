@@ -9,19 +9,39 @@ implemented: 2025-11-13
 
 # ADR: Entity-First AI Integration and Transaction Coordination
 
+> **R07-05 implementation amendment (2026-07-15).** Embedding-on-save now declares host-owned
+> `Entity<T>.Lifecycle` behavior during module composition. The former process-static `Entity.Events`
+> registry and executor types referenced below were removed; transaction-deferred after-handler
+> semantics and the entity-first capability remain.
+
+> **R07-06 implementation amendment (2026-07-15).** Both generic AI pipeline generations described
+> below are retired. Ordinary indexing is owned by `[Embedding]` persistence Lifecycle; explicit
+> finite-set and whole-collection rebuilds are owned by `EmbeddingMigrator.ReEmbed(...)` and
+> `ReEmbedAll<T>(...)`, which return operation outcomes without claiming atomicity or retry. The
+> proposed `koan ai migrate-embeddings` CLI did not ship. Treat all pipeline/CLI designs and completion
+> claims below as historical rationale, not current API.
+
+> **Partially superseded (C11, 2026-06-15).** The fluent **pipeline-class surface** introduced
+> here — `Ai.FromText()` / `TextPipeline` / `ImagePipeline` / `PipelineContext` / `IAiPipelineStage`
+> / `StorageResult` (`src/Koan.AI/Pipelines/**`) — shipped inert (internal ctors, no entry point,
+> `ImagePipeline.ToImage` throws) and was deleted as superseded by the live `EntityAi` API
+> (`Embed`/`Chat`/`Ocr`). The entity-first embedding-on-save and transaction-coordination decisions
+> below remain in force. The later stream DSL (`AllStream().Tokenize().SaveWithVectors()`) was also
+> removed by R07-06 in favor of pillar-owned Lifecycle and migration operations.
+
 **Contract**
 
-- **Inputs:** Entity classes with `[Embedding]` attributes, active `EntityContext` with transaction coordinators, AI pipeline configuration from `Koan:Ai:*`, entity lifecycle events (BeforeUpsert, AfterUpsert).
-- **Outputs:** Automatic embedding generation synchronized with entity lifecycle, transactionally-coordinated vector operations, fluent pipeline API (`Ai.FromText().ToImage().ToStorage()`), embedding state tracking via `EmbeddingState<T>`, intelligent warnings for token limits and schema changes.
+- **Inputs:** Entity classes with `[Embedding]` attributes, active `EntityContext` with transaction coordinators, AI configuration from `Koan:Ai:*`, and host-owned Entity Lifecycle.
+- **Outputs:** Automatic embedding generation synchronized with Entity Lifecycle, transactionally-coordinated vector operations, explicit migration outcomes, embedding state tracking via `EmbeddingState<T>`, and warnings for token limits and schema changes.
 - **Error Modes:** Vector operation outside transaction logs warning but completes; embedding generation failure marks entity state as failed without blocking entity save; token limit exceeded triggers dev warning and intelligent truncation; schema evolution detected triggers re-embedding prompt.
-- **Acceptance Criteria:** `[Embedding()]` on entity auto-generates embeddings on save, vector saves within transactions defer until commit, rollback discards pending vector operations, pipeline API chains transformations lazily, embedding changes tracked by content signature, production deployments include cost tracking and migration tooling.
+- **Acceptance Criteria:** `[Embedding()]` on an Entity auto-generates embeddings on save, vector saves within transactions defer until commit, rollback discards pending vector operations, embedding changes are tracked by content signature, and explicit migration APIs report partial outcomes.
 
 **Edge Cases**
 
 - Entity save succeeds but embedding generation fails: Entity persists, `EmbeddingState<T>` marks as `Failed`, background worker retries with exponential backoff.
 - Rollback after vector save: All vector operations tracked in transaction discarded, no compensation needed (deferred execution pattern).
 - Token limit exceeded: Development mode shows warning with truncation preview, production mode logs telemetry, both use intelligent truncation (preserve structure, remove verbose fields).
-- Schema evolution (added fields): Existing embeddings remain valid for search, `koan ai migrate-embeddings` CLI command re-embeds with new schema, hybrid search during migration prevents downtime.
+- Schema evolution (added fields): Existing embeddings remain until an operator invokes `EmbeddingMigrator`; zero-downtime and hybrid migration policy remain application concerns.
 - Multiple embedding attributes on single entity: Not supported, registrar throws clear error during bootstrap with remediation guidance.
 - Custom source routing per entity: `[Embedding(Source = "ollama-primary")]` uses `Client.Context()` scoping in lifecycle hook.
 

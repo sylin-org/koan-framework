@@ -32,7 +32,7 @@ Reserve contiguous blocks of 10 ports per sample starting at 5034 (visual hint t
   - S12: 5154 (block 5150–5159). ~~ARCHIVED~~
   - S14: 5174 (block 5170–5179). HTTP binds to 5174 (S14.AdapterBench).
   - S15: 5184 (block 5180–5189). ~~ARCHIVED~~
-  - S16: 5194 (block 5190–5199). HTTP binds to 5194 (S16.PantryPal).
+  - S16: 5194 (block 5190–5199). ~~S16.PantryPal~~ RETIRED (2026-06); block free for reallocation.
 
 ## Consequences
 - Lower chance of conflicts with common dev ports.

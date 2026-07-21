@@ -5,8 +5,8 @@ namespace Koan.Cache.Abstractions.Stores;
 /// <summary>
 /// Typed entry point to the cache pillar. Composes read, write, scope, fluent-builder, and
 /// tag-flush surfaces. The <c>Store</c> property is intentionally absent — direct store
-/// access bypasses the layered cache and breaks topology invariants. Use
-/// <c>ICacheStoreRegistry</c> if you genuinely need a single-tier handle.
+/// access bypasses the compiled topology and breaks its invariants. Use the builder's
+/// <c>WithTier</c> semantic when an operation intentionally targets one tier.
 /// </summary>
 public interface ICacheClient : ICacheReader, ICacheWriter
 {

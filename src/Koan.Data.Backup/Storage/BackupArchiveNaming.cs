@@ -1,26 +1,21 @@
-using System;
 using System.Globalization;
-using System.IO;
 using System.Text;
 
 namespace Koan.Data.Backup.Storage;
 
-/// <summary>
-/// Produces consistent archive naming artifacts for backups so storage and tests agree on paths.
-/// </summary>
-public static class BackupArchiveNaming
+internal static class BackupArchiveNaming
 {
-    public static BackupArchiveDescriptor Create(string backupName, DateTimeOffset createdAt)
+    public static BackupArchiveDescriptor Create(string backupName, DateTimeOffset createdAt, string archiveId)
     {
         if (string.IsNullOrWhiteSpace(backupName))
-            throw new ArgumentException("Backup name is required", nameof(backupName));
+            throw new ArgumentException("Backup name is required.", nameof(backupName));
+        if (string.IsNullOrWhiteSpace(archiveId))
+            throw new ArgumentException("Archive ID is required.", nameof(archiveId));
 
         var safeName = SanitizeName(backupName);
-        var fileName = $"{safeName}-{createdAt:yyyyMMdd-HHmmss}.zip";
+        var fileName = $"{safeName}-{createdAt:yyyyMMdd-HHmmss}-{archiveId}.zip";
         var datePath = createdAt.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture);
-        var storageKey = string.Join('/', safeName, datePath, fileName);
-
-        return new BackupArchiveDescriptor(safeName, createdAt, fileName, storageKey);
+        return new BackupArchiveDescriptor(fileName, string.Join('/', safeName, datePath, fileName));
     }
 
     private static string SanitizeName(string name)
@@ -35,29 +30,10 @@ public static class BackupArchiveNaming
                 builder.Append(char.ToLowerInvariant(ch));
                 lastWasSeparator = false;
             }
-            else if (ch is '-' or '_' or '.')
+            else if (!lastWasSeparator)
             {
-                if (!lastWasSeparator)
-                {
-                    builder.Append('-');
-                    lastWasSeparator = true;
-                }
-            }
-            else if (char.IsWhiteSpace(ch))
-            {
-                if (!lastWasSeparator)
-                {
-                    builder.Append('-');
-                    lastWasSeparator = true;
-                }
-            }
-            else
-            {
-                if (!lastWasSeparator)
-                {
-                    builder.Append('-');
-                    lastWasSeparator = true;
-                }
+                builder.Append('-');
+                lastWasSeparator = true;
             }
         }
 
@@ -66,15 +42,4 @@ public static class BackupArchiveNaming
     }
 }
 
-public readonly record struct BackupArchiveDescriptor(string SafeName, DateTimeOffset CreatedAt, string FileName, string StorageKey)
-{
-    public string GetDisplayPath(string basePath)
-    {
-        if (string.IsNullOrWhiteSpace(basePath))
-            throw new ArgumentException("Base path is required", nameof(basePath));
-
-        var relative = Path.Combine("backups", StorageKey.Replace('/', Path.DirectorySeparatorChar));
-        return Path.Combine(basePath, relative);
-    }
-}
-
+internal readonly record struct BackupArchiveDescriptor(string FileName, string StorageKey);

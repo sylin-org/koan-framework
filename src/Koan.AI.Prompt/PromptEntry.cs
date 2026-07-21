@@ -3,13 +3,12 @@ using Koan.Data.Core.Model;
 namespace Koan.AI.Prompt;
 
 /// <summary>
-/// Entity-backed prompt storage. Enables versioning, A/B testing, and
-/// editing by domain experts without code deploys.
+/// Entity-backed prompt storage for versioned prompts that can be edited
+/// without redeploying application code.
 ///
 /// <code>
-/// var prompt = await Prompt.Load("support-response");          // Active version
-/// var prompt = await Prompt.Load("support-response", version: 3); // Specific version
-/// var prompt = await Prompt.Load("support-response", PromptStrategy.ABTest); // A/B test
+/// var prompt = await PromptCatalog.Load("support-response");
+/// var pinned = await PromptCatalog.Load("support-response", version: 3);
 /// </code>
 /// </summary>
 public class PromptEntry : Entity<PromptEntry>
@@ -67,9 +66,11 @@ public class PromptEntry : Entity<PromptEntry>
         var entries = await PromptEntry.Query(
             e => e.Name == name && e.Status == PromptStatus.Active, ct);
 
-        return entries
-            .OrderByDescending(e => e.Version)
-            .FirstOrDefault();
+        if (entries.Count == 0)
+            return null;
+
+        var newestVersion = entries.Max(entry => entry.Version);
+        return RequireSingleIdentity(entries.Where(entry => entry.Version == newestVersion), name, newestVersion);
     }
 
     /// <summary>Find a specific version of a prompt.</summary>
@@ -79,17 +80,23 @@ public class PromptEntry : Entity<PromptEntry>
         var entries = await PromptEntry.Query(
             e => e.Name == name && e.Version == version, ct);
 
-        return entries.FirstOrDefault();
+        return RequireSingleIdentity(entries, name, version);
     }
 
-    /// <summary>Find all active versions (for A/B testing).</summary>
-    internal static async Task<IReadOnlyList<PromptEntry>> FindAllActive(
-        string name, CancellationToken ct = default)
+    private static PromptEntry? RequireSingleIdentity(
+        IEnumerable<PromptEntry> entries,
+        string name,
+        int version)
     {
-        var entries = await PromptEntry.Query(
-            e => e.Name == name && e.Status == PromptStatus.Active, ct);
-
-        return entries.OrderByDescending(e => e.Version).ToList();
+        var matches = entries.Take(2).ToArray();
+        return matches.Length switch
+        {
+            0 => null,
+            1 => matches[0],
+            _ => throw new InvalidOperationException(
+                $"Prompt catalog contains multiple entries for '{name}' version {version}. " +
+                "Prompt name and version must identify exactly one Entity.")
+        };
     }
 }
 

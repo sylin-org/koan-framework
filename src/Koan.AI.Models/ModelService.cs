@@ -3,7 +3,7 @@ using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Shared;
 using Koan.AI.Resolution;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Koan.Data.Core;
 
 namespace Koan.AI.Models;
@@ -211,7 +211,7 @@ internal sealed class ModelService(IAiAdapterRegistry registry) : IModelService
 
         foreach (var entry in toPrune)
         {
-            await entry.Delete(ct);
+            await entry.Remove(ct);
         }
     }
 
@@ -335,8 +335,8 @@ internal sealed class ModelService(IAiAdapterRegistry registry) : IModelService
 
     public Task<ModelEntry> Merge(string baseModelId, string adapterId, string? outputName, CancellationToken ct)
     {
-        throw new InvalidOperationException(
-            "LoRA merge requires a training runtime. Use Training.Run() with a merge script.");
+        throw new NotSupportedException(
+            "LoRA merge is not provided by the current model adapter. Use a model adapter that declares merge support.");
     }
 
     // ── Deployment (via adapter with Serve.* capability) ──

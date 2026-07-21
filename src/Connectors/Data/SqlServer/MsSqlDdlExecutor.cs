@@ -33,22 +33,25 @@ WHERE t.name = @t AND s.name = @s AND c.name = @c";
     public void CreateTableIdJson(string schema, string table, string idColumn = "Id", string jsonColumn = "Json")
     {
         using var cmd = _conn.CreateCommand();
-        var safe = System.Text.RegularExpressions.Regex.Replace(table, "[^A-Za-z0-9_]+", "_");
+        // Inline UNNAMED primary key: SQL Server auto-generates a constraint name that always fits sysname (128).
+        // An explicit CONSTRAINT [PK_<table>_<id>] overflows 128 when the table name (already up to its 128-byte
+        // MaxIdentifierBytes limit under a long entity namespace + partition suffix) is prefixed/suffixed — the
+        // failure SQL Server surfaces as a later "Invalid object name" because the CREATE was silently lost.
         cmd.CommandText = $@"IF OBJECT_ID(N'[{schema}].[{table}]', N'U') IS NULL
 BEGIN
     CREATE TABLE [{schema}].[{table}] (
-        [{idColumn}] NVARCHAR(128) NOT NULL CONSTRAINT [PK_{safe}_{idColumn}] PRIMARY KEY,
+        [{idColumn}] NVARCHAR(128) NOT NULL PRIMARY KEY,
         [{jsonColumn}] NVARCHAR(MAX) NOT NULL
     );
 END";
-        cmd.ExecuteNonQuery();
+        try { cmd.ExecuteNonQuery(); }
+        catch when (TableExists(schema, table)) { /* created concurrently — idempotent, not an error */ }
     }
 
     // Create table with provided columns (Id, Json already included in columns list expected by orchestrator)
-    public void CreateTableWithColumns(string schema, string table, List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
+    public void CreateTableWithColumns(string schema, string table, IReadOnlyList<RelationalColumnDefinition> columns)
     {
         using var cmd = _conn.CreateCommand();
-        var safe = System.Text.RegularExpressions.Regex.Replace(table, "[^A-Za-z0-9_]+", "_");
         // Build column definitions. Expect Id and Json to be present as first two columns.
         var defs = new System.Text.StringBuilder();
         foreach (var col in columns)
@@ -56,7 +59,10 @@ END";
             if (defs.Length > 0) defs.AppendLine(",");
             if (string.Equals(col.Name, "Id", StringComparison.OrdinalIgnoreCase))
             {
-                defs.Append($"[{col.Name}] NVARCHAR(128) NOT NULL CONSTRAINT [PK_{safe}_{col.Name}] PRIMARY KEY");
+                // Inline UNNAMED primary key (see CreateTableIdJson): an explicit CONSTRAINT [PK_<table>_Id]
+                // overflows sysname's 128-byte limit when the table name is already at its MaxIdentifierBytes
+                // cap, and the failed CREATE was silently swallowed → later "Invalid object name".
+                defs.Append($"[{col.Name}] NVARCHAR(128) NOT NULL PRIMARY KEY");
                 continue;
             }
             if (string.Equals(col.Name, "Json", StringComparison.OrdinalIgnoreCase))
@@ -83,7 +89,10 @@ BEGIN
 {defs}
     );
 END";
-        try { cmd.ExecuteNonQuery(); } catch { }
+        // Surface a genuine CREATE TABLE failure (an idempotent concurrent create is tolerated). Previously this
+        // swallowed ALL errors, hiding schema-creation failures behind a downstream "Invalid object name".
+        try { cmd.ExecuteNonQuery(); }
+        catch when (TableExists(schema, table)) { /* created concurrently — idempotent, not an error */ }
 
         // Create indexes for any indexed columns
         for (int i = 0; i < columns.Count; i++)
@@ -116,12 +125,24 @@ END";
 
     public void CreateIndex(string schema, string table, string indexName, IReadOnlyList<string> columns, bool unique)
     {
+        indexName = BoundIdentifier(indexName);
         using var cmd = _conn.CreateCommand();
         var uq = unique ? "UNIQUE " : "";
         var cols = string.Join(", ", columns.Select(c => $"[{c}]"));
         cmd.CommandText = $@"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'{indexName}' AND object_id = OBJECT_ID(N'[{schema}].[{table}]'))
 CREATE {uq}INDEX [{indexName}] ON [{schema}].[{table}] ({cols});";
         try { cmd.ExecuteNonQuery(); } catch { }
+    }
+
+    // Keep a generated identifier within SQL Server's 128-byte sysname limit, preserving uniqueness by
+    // appending a short stable hash of the full name when truncation is needed.
+    private static string BoundIdentifier(string name)
+    {
+        const int Max = 128;
+        if (name.Length <= Max) return name;
+        var hash = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(name)))[..8];
+        return string.Concat(name.AsSpan(0, Max - hash.Length - 1), "_", hash);
     }
 
     private static string MapType(Type clr)

@@ -2,12 +2,14 @@
 id: MESS-0029
 slug: MESS-0029-terse-handler-delegates-and-aliases
 domain: MESS
-status: Accepted
+status: Retired
 date: 2025-08-24
 title: Terse handler delegates and semantic aliases (On/Handle; Command/Event)
 ---
 
 # 0029 - Terse handler delegates and semantic aliases
+
+> **Status: Retired.** Describes a prior messaging generation; the inbox/alias/provisioning features no longer exist in code.
 
 ## Context
 

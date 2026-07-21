@@ -5,7 +5,7 @@ title: "Docs build and lint"
 audience: [maintainers, developers]
 status: current
 last_updated: 2025-10-09
-framework_version: v0.6.3
+framework_version: v0.20.0
 validation:
   status: not-yet-tested
   scope: docs/engineering/docs-build-and-lint.md

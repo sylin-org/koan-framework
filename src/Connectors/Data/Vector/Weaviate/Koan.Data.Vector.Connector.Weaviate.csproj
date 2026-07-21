@@ -1,23 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Koan.Data.Vector.Connector.Weaviate</AssemblyName>
     <RootNamespace>Koan.Data.Vector.Connector.Weaviate</RootNamespace>
-    <Description>Weaviate vector adapter for Koan: schema ensure, KNN search, filter pushdown via AST→GraphQL translator, and health checks.</Description>
+    <Description>Weaviate vector provider for Koan: entity-first KNN and hybrid search, GraphQL filter pushdown, continuation, export, and schema management.</Description>
     <PackageTags>$(CommonPackageTags);data;vector;weaviate;graphql;knn</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\..\..\..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
-    <ProjectReference Include="..\..\..\..\Koan.ZenGarden.Core\Koan.ZenGarden.Core.csproj" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <ProjectReference Include="..\..\..\..\Koan.ZenGarden.Contracts\Koan.ZenGarden.Contracts.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 </Project>

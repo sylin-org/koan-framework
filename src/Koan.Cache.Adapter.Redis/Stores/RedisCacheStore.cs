@@ -5,10 +5,14 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Primitives;
+using Koan.Cache.Abstractions.Capabilities;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Adapter.Redis.Options;
 using Koan.Cache.Adapter.Redis.Serialization;
+using Koan.Cache.Adapter.Redis.Infrastructure;
 using Koan.Data.Abstractions;
+using Koan.Core;
+using Koan.Core.Capabilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
@@ -16,10 +20,10 @@ using StackExchange.Redis;
 namespace Koan.Cache.Adapter.Redis.Stores;
 
 /// <summary>
-/// Distributed L2 cache store backed by Redis. Pure storage — coherence is the responsibility
-/// of <c>RedisCoherenceChannel</c> in the <c>Koan.Cache.Adapter.Redis.Coherence</c> namespace.
+/// Distributed L2 cache store backed by Redis. Pure storage; Cache owns invalidation meaning and
+/// the layered Redis Communication capability owns physical node broadcast.
 /// </summary>
-[ProviderPriority(100)]
+[ProviderPriority(Constants.ProviderPriority)]
 public sealed class RedisCacheStore : ICacheStore
 {
     private readonly IConnectionMultiplexer _multiplexer;
@@ -41,20 +45,19 @@ public sealed class RedisCacheStore : ICacheStore
 
         _database = _multiplexer.GetDatabase(_options.Database >= 0 ? _options.Database : -1);
         _instancePrefix = NormalizePrefix(_options.InstanceName);
-        _keyPrefix = NormalizePrefix(string.IsNullOrWhiteSpace(_options.KeyPrefix) ? "cache" : _options.KeyPrefix!);
-        _tagPrefix = NormalizePrefix(string.IsNullOrWhiteSpace(_options.TagPrefix) ? "cache:tag" : _options.TagPrefix!);
+        _keyPrefix = NormalizePrefix(string.IsNullOrWhiteSpace(_options.KeyPrefix) ? Constants.DefaultKeyPrefix : _options.KeyPrefix!);
+        _tagPrefix = NormalizePrefix(string.IsNullOrWhiteSpace(_options.TagPrefix) ? Constants.DefaultTagPrefix : _options.TagPrefix!);
     }
 
-    public string Name => "redis";
+    public string Name => Constants.ProviderId;
 
     public CacheStorePlacement Placement => CacheStorePlacement.Remote;
 
-    public CacheStoreCapabilities Capabilities { get; } = new(
-        SupportsTags: true,
-        SupportsSlidingTtl: true,
-        SupportsStaleWhileRevalidate: true,
-        SupportsBinary: true,
-        SupportsPersistence: true);
+    public void Describe(ICapabilities caps)
+        => caps.Add(CacheCaps.Tags)
+            .Add(CacheCaps.SlidingExpiration)
+            .Add(CacheCaps.BoundedStaleServing)
+            .Add(CacheCaps.BinaryPayload);
 
     public async ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheReadOptions options, CancellationToken ct)
     {
@@ -288,7 +291,7 @@ public sealed class RedisCacheStore : ICacheStore
         }
 
         var payload = RedisCacheJsonConverter.SerializeEnvelope(envelope);
-        await _database.StringSetAsync(redisKey, payload, expiry).ConfigureAwait(false);
+        await _database.StringSetAsync(redisKey, payload, ToRedisExpiration(expiry)).ConfigureAwait(false);
         await IndexTags(redisKey, envelope.Options.Tags, expiry).ConfigureAwait(false);
     }
 
@@ -311,7 +314,7 @@ public sealed class RedisCacheStore : ICacheStore
 
         var expiry = DetermineExpiry(now, newAbsolute, newStale);
         var payload = RedisCacheJsonConverter.SerializeEnvelope(envelope);
-        await _database.StringSetAsync(redisKey, payload, expiry).ConfigureAwait(false);
+        await _database.StringSetAsync(redisKey, payload, ToRedisExpiration(expiry)).ConfigureAwait(false);
         await IndexTags(redisKey, cachedOptions.Tags, expiry).ConfigureAwait(false);
     }
 
@@ -336,6 +339,9 @@ public sealed class RedisCacheStore : ICacheStore
                 await _database.KeyExpireAsync(tagKey, expiry).ConfigureAwait(false);
         }
     }
+
+    private static Expiration ToRedisExpiration(TimeSpan? expiry) =>
+        expiry is { } value ? new Expiration(value) : Expiration.Default;
 
     private async Task RemoveTags(RedisKey redisKey, IEnumerable<string> tags)
     {

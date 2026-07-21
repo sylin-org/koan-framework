@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Web.Infrastructure;
@@ -21,14 +22,20 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
     {
         return app =>
         {
+            // Pipeline construction needs the web provider ambiently, but must not replace a newer
+            // process owner. The flow scope also covers downstream startup filters and restores on exit.
+            using var hostScope = Koan.Core.Hosting.App.AppHost.PushScope(app.ApplicationServices);
+
             var opts = options.Value;
             var pipeline = pipelineOptions.Value ?? new WebPipelineOptions();
             const string appliedKey = "Koan.Web.Applied";
             if (!app.Properties.ContainsKey(appliedKey))
             {
                 app.Properties[appliedKey] = true;
-                // Greenfield boot: set AppHost, initialize env, run runtime
-                Koan.Core.Hosting.App.AppHost.Current = app.ApplicationServices;
+                // Greenfield boot: initialize env and run the runtime against the scoped web provider.
+                // KoanEnv.TryInitialize is itself best-effort and swallows its own failures (KoanEnv.cs),
+                // so this guard is belt-and-suspenders against an unexpected throw during env snapshot init;
+                // env not being initialized here is non-fatal — downstream callers re-try TryInitialize.
                 try { Koan.Core.KoanEnv.TryInitialize(app.ApplicationServices); } catch { }
                 var rt = app.ApplicationServices.GetService(typeof(Koan.Core.Hosting.Runtime.IAppRuntime)) as Koan.Core.Hosting.Runtime.IAppRuntime;
                 rt?.Discover();
@@ -39,7 +46,8 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                 {
                     app.UseExceptionHandler();
                 }
-                if (opts.EnableStaticFiles)
+                var webEnvironment = app.ApplicationServices.GetRequiredService<IWebHostEnvironment>();
+                if (opts.EnableStaticFiles && webEnvironment.WebRootFileProvider is not NullFileProvider)
                 {
                     app.UseDefaultFiles();
                     app.UseStaticFiles();

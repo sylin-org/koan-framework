@@ -1,36 +1,53 @@
-# Koan.Data.SearchEngine
+# Sylin.Koan.Data.SearchEngine
 
-Shared support for the search-engine vector connectors — `Koan.Data.Connector.ElasticSearch` and
-`Koan.Data.Connector.OpenSearch`. Both engines are built on Apache Lucene and speak the same query
-DSL, so the metadata-filter translation lives here once instead of being duplicated per adapter. The
-package is named for the engine *category* (the same convention as `Koan.Data.Relational`), so the
-dependency reads clearly without Lucene-internals knowledge.
+Shared runtime mechanics for Koan's Elasticsearch and OpenSearch vector connectors. Application
+developers reference one of those connector packages; it brings this implementation dependency
+transitively. This package is not a third provider and requires no direct application registration.
 
-- `SearchEngineFilterTranslator` — the single source of truth for translating the unified `Filter` AST
-  into the Elasticsearch/OpenSearch query DSL, plus the one `VectorFilterCapabilities` constant both
-  adapters expose.
+- Target framework: net10.0
+- License: Apache-2.0
 
-## Capabilities
-- Translate the unified `Filter` AST → the search-engine query DSL (`term`/`terms`/`range`/`wildcard`/
-  `bool`/`exists`).
-- One operator-aware `VectorFilterCapabilities` value shared by both adapters.
-- Null-inclusive negation (`Ne`/`Nin`/`HasNone`) via Lucene `bool/must_not`.
+## Install
 
-## Usage
+Do not install this package directly in an application. Choose the provider that owns your data:
 
-Each connector calls the shared translator, passing its own engine label so a not-supported error
-names the right adapter:
-
-```csharp
-var query = SearchEngineFilterTranslator.TranslateWhereClause(
-    options.Filter, metadataField, engine: "Elasticsearch");
+```powershell
+dotnet add package Sylin.Koan.Data.Connector.ElasticSearch
+# or
+dotnet add package Sylin.Koan.Data.Connector.OpenSearch
 ```
 
-Notes:
-- The `engine` label only personalizes not-supported exception messages; the translation is identical.
-- The repositories stay separate (their REST/transport wiring differs); only the translation and the
-  capability constant are shared.
+Provider authors extending the shared mechanism can reference it directly:
+
+```powershell
+dotnet add package Sylin.Koan.Data.SearchEngine
+```
+
+> **Maturity:** This shared provider layer is available below the supported 0.20 boundary. Package presence is not a
+> support claim; check the [generated product surface](https://github.com/sylin-org/Koan-framework/blob/main/docs/reference/product-surface.md).
+
+## What it adds
+
+- one REST repository for index ensure, upsert, bulk operations, deletion, count, scroll export, and kNN search;
+- one filter translator for the unified Koan `Filter` AST and Lucene query DSL;
+- one configuration, discovery, authentication, health-participation, naming, and startup-reporting path;
+- a three-member dialect seam for the Elasticsearch and OpenSearch request shapes that genuinely differ.
+
+Provider packages keep only their identity, orchestration metadata, discovery vocabulary, and native dialect.
+Applications continue to use the `Vector<TEntity>` facade and do not depend on these mechanics.
+
+## Boundaries
+
+- This is a vector-search implementation, not a general Elasticsearch/OpenSearch document repository.
+- One configured cluster endpoint serves all sources; source and partition isolation are expressed through
+  generated index names. Per-source cluster endpoints are not supported.
+- An explicit `IndexName` pins every context to one index and can defeat source, tenant, or partition isolation;
+  Koan reports that conflict rather than silently rewriting the user's name.
+- Automatic discovery probes unauthenticated endpoints. Secured clusters should use exact configuration.
+- Provider-native dialect differences remain in their connector assemblies; they are not hidden behind a claim
+  that both products accept identical kNN or mapping requests.
 
 ## References
-- Vector pathway + filter model: `~/decisions/DATA-0097-vector-pathway-parity.md`
-- Embedding↔vector seam (§10.4, the ES/OS shared base): `~/decisions/AI-0036-embedding-vector-seam.md`
+
+- [Technical reference](https://github.com/sylin-org/Koan-framework/blob/main/src/Koan.Data.SearchEngine/TECHNICAL.md)
+- [Vector runtime](https://github.com/sylin-org/Koan-framework/blob/main/src/Koan.Data.Vector/README.md)

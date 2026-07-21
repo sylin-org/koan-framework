@@ -1,38 +1,29 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
-using Couchbase;
-using Couchbase.Diagnostics;
-using Koan.Core;
-using Koan.Core.Observability.Health;
+using Koan.Data.Core;
+using Koan.Data.Core.Diagnostics;
+using Koan.Data.Core.Routing;
 
 namespace Koan.Data.Connector.Couchbase;
 
-internal sealed class CouchbaseHealthContributor(IOptions<CouchbaseOptions> options, CouchbaseClusterProvider provider) : IHealthContributor
+/// <summary>Reports readiness only for Couchbase sources that participate in this application.</summary>
+internal sealed class CouchbaseHealthContributor : DataAdapterHealthContributorBase
 {
-    public string Name => "data:couchbase";
-    public bool IsCritical => true;
+    private const string ProviderName = Infrastructure.Constants.Provider.Name;
+    private readonly IServiceProvider _services;
+    private readonly CouchbaseAdapterFactory _factory;
 
-    public async Task<HealthReport> Check(CancellationToken ct = default)
+    public CouchbaseHealthContributor(
+        IServiceProvider services,
+        IDataDiagnostics diagnostics,
+        DataProviderCatalog providers,
+        DataDefaultProviderPlan defaultProvider)
+        : base(ProviderName, services, diagnostics, defaultProvider)
     {
-        try
-        {
-            var context = await provider.GetCollectionContext(options.Value.Collection ?? "", ct);
-            await context.Cluster.PingAsync(new PingOptions().CancellationToken(ct));
-            return new HealthReport(Name, HealthState.Healthy, null, null, new Dictionary<string, object?>
-            {
-                ["bucket"] = context.BucketName,
-                ["scope"] = context.ScopeName,
-                ["collection"] = context.CollectionName,
-                ["connectionString"] = Redaction.DeIdentify(options.Value.ConnectionString)
-            });
-        }
-        catch (Exception ex)
-        {
-            return new HealthReport(Name, HealthState.Unhealthy, ex.Message, null, null);
-        }
+        _services = services;
+        _factory = providers.Find(ProviderName) as CouchbaseAdapterFactory
+            ?? throw new InvalidOperationException("The Couchbase provider is absent from the host Data catalog.");
     }
+
+    protected override Task ProbeSource(string source, CancellationToken ct)
+        => _factory.ResolveRoute(_services, source).Provider.Probe(ct);
 }
 

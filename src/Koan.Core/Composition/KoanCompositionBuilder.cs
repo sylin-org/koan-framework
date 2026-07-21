@@ -1,0 +1,187 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Koan.Core.Diagnostics;
+using Koan.Core.Infrastructure;
+using Koan.Core.Providers;
+
+namespace Koan.Core.Composition;
+
+/// <summary>
+/// Safe projection writer used by Core and active retained modules to enrich the resolved composition
+/// twin without depending on the internal <see cref="KoanLockfile"/> shape. Koan.Core seeds
+/// app/modules/config-keys; pillars add elections, capabilities and entities. Last write wins per key.
+/// </summary>
+public sealed class KoanCompositionBuilder
+{
+    private readonly Dictionary<string, KoanLockElection> _elections = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IReadOnlyList<string>> _capabilities = new(StringComparer.Ordinal);
+    private readonly List<KoanLockEntity> _entities = new();
+    private readonly HashSet<string> _configKeys = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, KoanFact> _facts = new(StringComparer.Ordinal);
+
+    /// <summary>Record a resolved election, e.g. <c>data:default</c> → adapter <c>postgres</c>.</summary>
+    public void AddElection(
+        string key,
+        string adapter,
+        string via,
+        int? priority = null,
+        string? source = null,
+        string? factCode = null)
+    {
+        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(adapter)) return;
+        _elections[key] = new KoanLockElection(adapter, via ?? "unknown", priority);
+        AddFact(KoanFact.Create(
+            factCode ?? Constants.Diagnostics.Codes.ElectionSelected,
+            KoanFactKind.Election,
+            KoanFactState.Selected,
+            key,
+            $"Koan selected adapter '{adapter}' for '{key}'.",
+            string.IsNullOrWhiteSpace(via) ? "unknown" : via,
+            null,
+            source ?? "composition",
+            key));
+    }
+
+    /// <summary>Project one canonical provider-selection receipt without reconstructing its decision.</summary>
+    public void AddElection(
+        ProviderSelectionReceipt receipt,
+        string? source = null,
+        string? factCode = null)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        AddElection(
+            receipt.Subject,
+            receipt.ProviderId,
+            receipt.Reason,
+            receipt.Priority,
+            source,
+            factCode);
+    }
+
+    /// <summary>Record a rejected composition decision without accepting provider-specific payloads.</summary>
+    public void AddRejection(
+        string key,
+        string reasonCode,
+        string correction,
+        string? source = null,
+        string? factCode = null)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return;
+        AddFact(KoanFact.Create(
+            factCode ?? Constants.Diagnostics.Codes.CollectionFailed,
+            KoanFactKind.Rejection,
+            KoanFactState.Rejected,
+            key,
+            $"Koan could not resolve composition for '{key}'.",
+            reasonCode,
+            correction,
+            source ?? "composition",
+            key));
+    }
+
+    /// <summary>Record a provider's negotiated capability tokens, e.g. <c>data:postgres</c> → query.linq, …</summary>
+    public void AddCapability(string owner, IEnumerable<string> tokens)
+    {
+        if (string.IsNullOrWhiteSpace(owner) || tokens is null) return;
+        var ordered = tokens.Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(t => t, StringComparer.Ordinal)
+            .ToArray();
+        if (ordered.Length > 0) _capabilities[owner] = ordered;
+    }
+
+    /// <summary>Record an inspectable host-composition observation that is not a provider election.</summary>
+    public void AddObservation(
+        string code,
+        string subject,
+        string summary,
+        string reasonCode,
+        string? source = null)
+    {
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(subject)) return;
+        AddFact(KoanFact.Create(
+            code,
+            KoanFactKind.Discovery,
+            KoanFactState.Observed,
+            subject,
+            summary,
+            reasonCode,
+            null,
+            source ?? "composition",
+            subject));
+    }
+
+    /// <summary>Project one active, value-free guarantee from its concern-owned plan or realization receipt.</summary>
+    public void AddGuarantee(
+        string code,
+        string subject,
+        string summary,
+        string reasonCode,
+        string? source = null)
+    {
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(subject)) return;
+        AddFact(KoanFact.Create(
+            code,
+            KoanFactKind.Guarantee,
+            KoanFactState.Observed,
+            subject,
+            summary,
+            reasonCode,
+            null,
+            source ?? "composition",
+            subject));
+    }
+
+    /// <summary>Record a Koan-namespaced configuration KEY consumed. Never pass a value.</summary>
+    public void AddConfigKey(string key)
+    {
+        if (!string.IsNullOrWhiteSpace(key)) _configKeys.Add(key);
+    }
+
+    /// <summary>Record an entity and the traits it declares (e.g. <c>Embedding</c>).</summary>
+    public void AddEntity(string type, IEnumerable<string>? traits = null)
+    {
+        if (string.IsNullOrWhiteSpace(type)) return;
+        var list = traits?.Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(t => t, StringComparer.Ordinal)
+            .ToArray() ?? Array.Empty<string>();
+        _entities.Add(new KoanLockEntity(type, list));
+    }
+
+    /// <summary>Materialize the accumulated sections into the deterministic lockfile shape (internal).</summary>
+    internal void ApplyTo(
+        out IReadOnlyDictionary<string, KoanLockElection>? elections,
+        out IReadOnlyDictionary<string, IReadOnlyList<string>>? capabilities,
+        out IReadOnlyList<string>? configKeys,
+        out IReadOnlyList<KoanLockEntity>? entities,
+        out IReadOnlyList<KoanFact> facts)
+    {
+        elections = _elections.Count == 0
+            ? null
+            : _elections.OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+        capabilities = _capabilities.Count == 0
+            ? null
+            : _capabilities.OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+        configKeys = _configKeys.Count == 0
+            ? null
+            : _configKeys.OrderBy(k => k, StringComparer.Ordinal).ToArray();
+        entities = _entities.Count == 0
+            ? null
+            : _entities.OrderBy(e => e.Type, StringComparer.Ordinal).ToArray();
+        facts = _facts.Values
+            .OrderBy(fact => fact.Kind)
+            .ThenBy(fact => fact.Code, StringComparer.Ordinal)
+            .ThenBy(fact => fact.Subject, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    internal void AddFact(KoanFact fact)
+    {
+        ArgumentNullException.ThrowIfNull(fact);
+        _facts[fact.Id] = fact;
+    }
+}

@@ -1,65 +1,53 @@
-﻿# Koan.Media.Core
+# Sylin.Koan.Media.Core
 
-## Contract
+The Koan media runtime: Entity-backed originals, content-addressed deduplication, recipe discovery and validation,
+lazy image pipelines, encoder selection, and inspectable startup facts.
 
-- **Purpose**: Provide the runtime pipeline for Koan media operations, including variant orchestration, task scheduling, and storage integration.
-- **Primary inputs**: Media configuration options, adapter capabilities, and the shared media abstractions.
-- **Outputs**: Registered media operators, background pipelines that execute `MediaTask` workloads, and storage routes for asset lifecycle management.
-- **Failure modes**: Missing storage adapter registration, unconfigured operators, or variant handlers throwing during execution.
-- **Success criteria**: Media assets progress through configured pipelines, operators report health, and storage writes use the appropriate provider profiles.
+## Install
 
-## Quick start
-
-```csharp
-using Koan.Media.Core;
-using Koan.Media.Core.Options;
-
-public sealed class MediaAutoRegistrar : IKoanAutoRegistrar
-{
-    public string ModuleName => "Media";
-
-    public void Initialize(IServiceCollection services)
-    {
-        services.AddMediaCore(options =>
-        {
-            options.DefaultStorageProfile = "cdn";
-            options.Pipelines.Add(new MediaPipelineDescriptor
-            {
-                PipelineId = "video-transcode",
-                Operators = { MediaOperatorDescriptor.For<VideoTranscodeOperator>() }
-            });
-        });
-    }
-
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
-        => report.AddNote("Media pipelines registered");
-}
+```powershell
+dotnet add package Sylin.Koan.Media.Core
 ```
 
-- Call `services.AddMediaCore(...)` inside your auto-registrar to register pipelines, operators, and storage defaults.
-- Operators can leverage `MediaAsset.SaveAsync()` or other entity statics to update assets after processing.
+An application also references Data and Storage providers appropriate to its environment. `AddKoan()` discovers
+Media Core; no media-specific registration call is required for Entity or direct-pipeline use.
 
-## Configuration
+## Smallest meaningful use
 
-- Set `MediaOptions.DefaultStorageProfile` and per-pipeline overrides.
-- Register custom operators implementing `IMediaOperator` and describe their capabilities for observability.
-- Integrate Koan Storage adapters to route uploads and generated variants.
+```csharp
+using Koan.Media;
 
-## Edge cases
+public sealed class Photo : MediaEntity<Photo> { }
 
-- Large concurrent pipelines: configure `MaxConcurrentOperations` to avoid oversaturating resources.
-- Operator failures: use retry policies and mark variants with failure metadata to keep asset state consistent.
-- Storage latency: prefer streaming uploads for multi-GB media to avoid buffering in memory.
-- Multitenancy: scope pipeline IDs and storage profiles per tenant to prevent cross-tenant leaks.
+var photo = await Photo.Upload(source, "original.jpg", "image/jpeg", ct: ct);
+await using var bytes = await Photo.OpenRead(photo.Key, ct);
+```
 
-## Related packages
+`Photo.Store(bytes, ...)` uses a SHA-256 key and returns the existing Entity when identical content is already
+present. `Photo.Upload(...)` preserves caller-owned naming.
 
-- `Koan.Media.Abstractions` – schema consumed by core pipelines.
-- `Koan.Media.Web` – HTTP interface layered atop the core runtime.
-- `Koan.Storage` – abstraction for media file persistence.
+Direct processing is lazy until a terminal:
 
-## Reference
+```csharp
+using Koan.Media.Abstractions.Recipes;
+using Koan.Media.Core.Pipeline;
 
-- `MediaOptions` – master configuration for pipelines and storage.
-- `IMediaOperator` – contract for implementing operators.
-- `MediaPipelineDescriptor` – describes pipeline stages.
+var output = await source.AsMedia()
+    .Resize(width: 320)
+    .EncodeAs("jpeg", Quality.Web)
+    .WriteToAsync(destination, ct);
+```
+
+Static `[MediaRecipe]` factories and `Koan:Media:Recipes` configuration enter one catalog. Invalid steps, duplicate
+names, reserved shortcut collisions, and unavailable output encoders stop host startup before traffic.
+
+## Guarantees and boundaries
+
+- Media Core is an in-process Entity/media runtime, not a durable rendering job system.
+- `MediaEntity.Store(Stream, ...)` currently buffers the complete source to compute its hash.
+- A successful `Upload` writes storage and returns hydrated Entity metadata; callers own any additional domain save.
+- Pipeline output can stream, but decoders may retain complete pixel/frame state; direct callers own ingress limits.
+- Recipes do not imply prewarming, background scheduling, orphan cleanup, HTTP routes, or access policy.
+- `Sylin.Koan.Media.Web` owns bounded HTTP rendering, negotiation, diagnostics, and access-gated source resolution.
+
+See [TECHNICAL.md](./TECHNICAL.md) and the [Media reference](../../docs/reference/media/index.md).

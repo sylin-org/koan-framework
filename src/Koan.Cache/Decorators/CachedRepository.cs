@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
+using Koan.Cache.Entity;
+using Koan.Cache.Stores;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
@@ -29,30 +31,28 @@ internal sealed class CachedRepository<TEntity, TKey> :
     private readonly IQueryRepository<TEntity, TKey>? _query;
     private readonly IRawQueryRepository<TEntity, TKey>? _rawQuery;
     private readonly IInstructionExecutor<TEntity>? _instructionExecutor;
-    private readonly ICacheClient _cacheClient;
+    private readonly CacheClient _cacheClient;
     private readonly CachePolicyDescriptor _entityPolicy;
-    private readonly CacheKeyTemplate _entityTemplate;
+    private readonly EntityCachePlan.Resolution _plan;
     private readonly ILogger<CachedRepository<TEntity, TKey>> _logger;
-    private readonly Func<TEntity, TKey> _keyAccessor;
     private readonly string _entityName;
 
     public CachedRepository(
         IDataRepository<TEntity, TKey> inner,
-        ICacheClient cacheClient,
-        CachePolicyDescriptor entityPolicy,
+        CacheClient cacheClient,
+        EntityCachePlan.Resolution plan,
         ILogger<CachedRepository<TEntity, TKey>> logger)
     {
         _inner = inner ?? throw new ArgumentNullException(nameof(inner));
         _cacheClient = cacheClient ?? throw new ArgumentNullException(nameof(cacheClient));
-        _entityPolicy = entityPolicy ?? throw new ArgumentNullException(nameof(entityPolicy));
+        _plan = plan ?? throw new ArgumentNullException(nameof(plan));
+        _entityPolicy = plan.Policy;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        _entityTemplate = CacheKeyTemplate.For(_entityPolicy.KeyTemplate);
         _query = inner as IQueryRepository<TEntity, TKey>;
         _rawQuery = inner as IRawQueryRepository<TEntity, TKey>;
         _instructionExecutor = inner as IInstructionExecutor<TEntity>;
-        _keyAccessor = static entity => ((IEntity<TKey>)entity).Id;
-        _entityName = typeof(TEntity).Name;
+        _entityName = plan.EntityName;
     }
 
     // ARCH-0084: forward the inner provider's unified capabilities (native IDescribesCapabilities,
@@ -63,6 +63,13 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
+        // The cache decorates outside Data's canonical read fold. A dynamic request predicate therefore has to bypass
+        // the global id entry here, before a cache hit can short-circuit the scoped store read.
+        if (_plan.IsReadScopedNow())
+        {
+            return await _inner.Get(id, ct);
+        }
+
         var effectiveStrategy = ResolveEffectiveStrategy();
 
         if (effectiveStrategy is CacheStrategy.NoCache or CacheStrategy.SetOnly or CacheStrategy.Invalidate)
@@ -83,11 +90,11 @@ internal sealed class CachedRepository<TEntity, TKey> :
                 {
                     var value = await _inner.Get(id, innerCt);
                     return value;
-                }, options, ct);
+                }, options, typeof(TEntity), ct);
 
             case CacheStrategy.GetOnly:
                 {
-                    var cached = await _cacheClient.GetAsync<TEntity>(key, options, ct);
+                    var cached = await _cacheClient.GetAsync<TEntity>(key, options, typeof(TEntity), ct);
                     if (cached is not null)
                     {
                         return cached;
@@ -272,6 +279,13 @@ internal sealed class CachedRepository<TEntity, TKey> :
             return;
         }
 
+        // Never seed a globally keyed cache from a request-scoped write. Remove a possible older entry instead.
+        if (_plan.IsReadScopedNow())
+        {
+            if (!IsDefaultKey(entity.Id)) await Remove(entity.Id, ct);
+            return;
+        }
+
         var key = ResolveKey(entity);
         if (key is null)
         {
@@ -283,18 +297,18 @@ internal sealed class CachedRepository<TEntity, TKey> :
             case CacheStrategy.GetOrSet:
             case CacheStrategy.SetOnly:
                 var options = _entityPolicy.ToOptions();
-                await _cacheClient.SetAsync(key.Value, entity, options, ct);
+                await _cacheClient.SetAsync(key.Value, entity, options, typeof(TEntity), ct);
                 break;
             case CacheStrategy.GetOnly:
             case CacheStrategy.Invalidate:
-                await _cacheClient.Remove(key.Value, ct);
+                await _cacheClient.Remove(key.Value, typeof(TEntity), ct);
                 break;
         }
     }
 
     private async ValueTask Remove(TKey id, CancellationToken ct)
     {
-        if (_entityPolicy.Strategy is CacheStrategy.NoCache or CacheStrategy.SetOnly)
+        if (_entityPolicy.Strategy is CacheStrategy.NoCache)
         {
             return;
         }
@@ -304,12 +318,12 @@ internal sealed class CachedRepository<TEntity, TKey> :
             return;
         }
 
-        await _cacheClient.Remove(key, ct);
+        await _cacheClient.Remove(key, typeof(TEntity), ct);
     }
 
     private CacheKey? ResolveKey(TEntity entity)
     {
-        var id = _keyAccessor(entity);
+        var id = entity.Id;
         if (IsDefaultKey(id))
         {
             _logger.LogDebug("Entity of type {Entity} produced a default key; skipping cache interaction.", _entityName);
@@ -326,37 +340,14 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     private bool TryBuildEntityKey(TEntity? entity, object? id, out CacheKey key)
     {
-        // Ambient context for the key template. {Partition} and {Source} are pulled from
-        // EntityContext so the same Id under different partitions / data sources produces
-        // distinct keys (correctness — without this, multi-partition deployments collide).
-        var ctx = EntityContext.Current;
-        var ambient = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        if (!_plan.TryBuildKey(entity, id, out key))
         {
-            ["Id"] = id,
-            ["Key"] = id,
-            ["TypeName"] = _entityName,
-            ["Partition"] = string.IsNullOrWhiteSpace(ctx?.Partition) ? "_" : ctx.Partition,
-            ["Source"] = string.IsNullOrWhiteSpace(ctx?.Source) ? "_" : ctx.Source,
-        };
-
-        if (entity is not null)
-        {
-            ambient["Entity"] = entity;
-        }
-
-        var formatted = _entityTemplate.TryFormat(entity, ambient, out var missingToken);
-        if (formatted is null)
-        {
-            if (missingToken)
-            {
-                _logger.LogDebug("Cache policy for {Entity} could not resolve key template '{Template}'. Skipping cache interaction.", _entityName, _entityPolicy.KeyTemplate);
-            }
-
-            key = default;
+            _logger.LogDebug(
+                "Cache policy for {Entity} could not resolve key template '{Template}'. Skipping cache interaction.",
+                _entityName,
+                _entityPolicy.KeyTemplate);
             return false;
         }
-
-        key = new CacheKey(formatted);
         return true;
     }
 

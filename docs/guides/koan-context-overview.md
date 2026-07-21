@@ -1,3 +1,13 @@
+---
+type: GUIDE
+domain: ai
+audience: [maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # Koan.Context: AI-Powered Semantic Code Search and Context Engine
 
 **Version:** 1.0.0
@@ -126,15 +136,6 @@ When asking "How does authentication work in this codebase?", developers need:
 │    └───────────────────┘    └───────────────────┘             │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
-        │                                          │
-        │  Self-Orchestration Layer                │
-        │  (Auto-provisions dependencies)          │
-        └──────────────────────────────────────────┘
-                    │
-        ┌───────────┴───────────┐
-        │   Docker/Podman       │
-        │   (Weaviate container)│
-        └───────────────────────┘
 ```
 
 ### Data Flow
@@ -177,36 +178,14 @@ When asking "How does authentication work in this codebase?", developers need:
 
 ## Unique Features
 
-### 1. **Zero-Configuration Self-Orchestration**
+### 1. **Standard topology, automatic connection discovery**
 
-Most RAG systems require complex infrastructure setup. Koan.Context is **truly self-contained**:
+Koan.Context does not create its own container lifecycle. Run Weaviate and Ollama with a standard Aspire AppHost,
+Compose, Docker, Kubernetes, or managed service, then provide the normal connection strings/service endpoints. Koan's
+connectors discover those endpoints, validate elected dependencies, and report the selected mechanics.
 
-```bash
-# Traditional RAG setup
-docker-compose up weaviate
-docker-compose up ollama
-pip install langchain
-python setup_vector_db.py
-python create_embeddings.py
-python start_api.py
-
-# Koan.Context
-dotnet run
-# That's it. Service auto-provisions Weaviate, connects to Ollama, and is ready.
-```
-
-**How it works:**
-
-- **Service Discovery**: Auto-detects running Weaviate/Ollama instances (local, Docker, Kubernetes)
-- **Auto-Provisioning**: Launches Docker containers if services not found
-- **Health Checking**: Waits for dependencies to be healthy before proceeding
-- **Session Management**: Cleans up containers on graceful shutdown
-
-**Technologies:**
-
-- `BaseOrchestrationEvaluator` pattern for extensible dependency detection
-- `WeaviateOrchestrationEvaluator` for vector database provisioning
-- Docker API integration via Koan.Orchestration.Aspire
+With Aspire, the AppHost authors ordinary resources and `WithReference`; the application remains ordinary Koan code.
+This keeps infrastructure ownership explicit while preserving automatic connector configuration.
 
 ### 2. **Differential Indexing with SHA256**
 
@@ -1034,10 +1013,11 @@ cd koan-framework/src/Koan.Context
 dotnet run
 ```
 
-**First run:**
+**Before first run:** start Weaviate and Ollama with Aspire, Compose, Docker, or another topology owner, then supply
+their standard endpoints. On startup Koan.Context:
 
-- Auto-provisions Weaviate container on port 8080
-- Auto-detects Ollama on `localhost:11434` (or provisions if configured)
+- discovers Weaviate on the supplied endpoint (commonly port 8080)
+- discovers Ollama on the supplied endpoint (commonly `localhost:11434`)
 - Creates `.koan/data/` directory for persistence
 - Opens browser UI at `http://localhost:27500`
 
@@ -1096,12 +1076,6 @@ docker run -d \
         "Provider": "ollama",
         "Model": "all-minilm",
         "Endpoint": "http://localhost:11434"
-      }
-    },
-
-    "Orchestration": {
-      "Services": {
-        "weaviate": "always" // Options: always, auto, never, disabled
       }
     }
   }

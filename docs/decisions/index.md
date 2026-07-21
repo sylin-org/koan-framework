@@ -8,6 +8,14 @@ This index aggregates accepted and proposed decision records. Each ADR is:
 
 Refer to `toc.yml` for categorized navigation. Use the template (`AAAA-0000`) for new ADRs.
 
+## Cross-Repo Stack Canon (STACK)
+
+Decisions that bind all three Sylin sibling repos (Koi, Zen Garden, Koan). Authored once and copied verbatim into each repo's decision directory — edits must propagate to all three.
+
+| ID | Title | Status | Scope |
+|----|-------|--------|-------|
+| STACK-0001 | [The Sylin stack — layering, contracts, and trust topology](STACK-0001-sylin-stack-canon.md) | Accepted (2026-06-13) | Koi → Zen Garden → Koan layering law, contract types per seam, trust topology, mission canon (ten decisions) |
+
 ## AI Lifecycle Expansion (AI-0022 – AI-0030)
 
 Vision and capability expansion for Koan.AI: model catalog, compute fabric, prompt primitive, chain composition, media analysis, training, evaluation, and review queues.
@@ -41,6 +49,19 @@ Storage, variant routing, transform pipeline, and the recipe-based rendering sur
 | ID | Title | Intent |
 |----|-------|--------|
 | ARCH-0062 | S8 legacy snapshot removal and sample streamline | Removed obsolete duplicate S8 snapshot; clarified single active sample path. |
+
+## Product Constitution and Entity Language
+
+| ID | Title | Status | Scope |
+|----|-------|--------|-------|
+| ARCH-0105 | [Koan product constitution and proposal decision test](ARCH-0105-product-constitution.md) | Accepted | Durable product principles, meaningful-step definition, evidence boundary, and proposal decision test |
+| ARCH-0106 | [Entity language admission, facets, and responsibility boundaries](ARCH-0106-entity-semantics-contract.md) | Accepted | Entity admission test, C# 14 module facets, context/lifecycle boundaries, and migration rules |
+| ARCH-0113 | [Entity capability lifting and the Communication boundary](ARCH-0113-entity-capability-communication.md) | Accepted | Lifecycle/Events/Transport separation, scalar/set/stream law, Core context ownership, and greenfield rebuild map |
+| ARCH-0114 | [Layered capability activation](ARCH-0114-layered-capability-activation.md) | Accepted | Inert declaration, Reference = Intent activation, concern-owned election, adapter interpretation, and inspectable outcomes |
+| ARCH-0115 | [Semantic Application Model and typed contribution compilation](ARCH-0115-semantic-contribution-compilation.md) | Accepted | Business-to-code design input, specificity cascade, typed contribution compiler, immutable host plans, and truthful projections |
+| ARCH-0116 | [One module lifecycle](ARCH-0116-one-module-lifecycle.md) | Accepted | One retained `KoanModule` per implementation assembly; standard identity, isolated contracts, and no legacy or reference-metadata bridge |
+| ARCH-0117 | [Safe connector telemetry by construction](ARCH-0117-safe-connector-telemetry.md) | Accepted | One credential grammar and structured log boundary; shared configuration/discovery narration; no application ceremony or global logger interception |
+| ARCH-0118 | [Evidence-derived product surface](ARCH-0118-evidence-derived-product-surface.md) | Accepted | Standard project facts plus one irreducible claims input compile every human, agent, and release projection |
 
 ## Authoring Principles
 

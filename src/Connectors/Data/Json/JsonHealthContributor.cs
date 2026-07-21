@@ -1,42 +1,63 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
-using Koan.Core;
 using Koan.Core.Observability.Health;
+using Koan.Data.Connector.Json.Infrastructure;
+using Koan.Data.Core;
+using Koan.Data.Core.Diagnostics;
+using Koan.Data.Core.Routing;
+using Koan.Data.Abstractions;
 
 namespace Koan.Data.Connector.Json;
 
-internal sealed class JsonHealthContributor(IOptions<JsonDataOptions> options) : IHealthContributor
+internal sealed class JsonHealthContributor : DataAdapterHealthContributorBase
 {
-    public string Name => "data:json";
-    public bool IsCritical => true;
+    private readonly IConfiguration _configuration;
+    private readonly DataSourceRegistry _sourceRegistry;
+    private readonly IOptions<JsonDataOptions> _options;
+    private readonly IAdapterFactory _sourceOwner;
 
-    public Task<HealthReport> Check(CancellationToken ct = default)
+    public JsonHealthContributor(
+        IServiceProvider services,
+        IConfiguration configuration,
+        DataSourceRegistry sourceRegistry,
+        IDataDiagnostics diagnostics,
+        IOptions<JsonDataOptions> options,
+        DataProviderCatalog providers,
+        DataDefaultProviderPlan defaultProvider)
+        : base(Constants.Provider.Name, services, diagnostics, defaultProvider)
     {
-        var path = options.Value.DirectoryPath;
-        var data = new Dictionary<string, object?> { ["path"] = path };
+        _configuration = configuration;
+        _sourceRegistry = sourceRegistry;
+        _options = options;
+        _sourceOwner = providers.Find(Constants.Provider.Name)
+            ?? throw new InvalidOperationException("The JSON provider is absent from the host Data catalog.");
+    }
 
-        try
+    protected override Task ProbeSource(string source, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var path = AdapterConnectionResolver.GetSourceSetting(
+            _configuration,
+            _sourceRegistry,
+            Constants.Provider.Name,
+            source,
+            Constants.Configuration.Keys.DirectoryPath,
+            _options.Value.DirectoryPath,
+            _sourceOwner);
+
+        if (string.IsNullOrWhiteSpace(path))
         {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return Task.FromResult(new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Degraded, "DirectoryPath is not configured", null, data));
-            }
-
-            if (!Directory.Exists(path))
-            {
-                return Task.FromResult(new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Unhealthy, "Data directory does not exist", null, data));
-            }
-
-            // Write test: create and delete a small temp file to verify write access
-            var probe = Path.Combine(path, ".__healthcheck.json.tmp");
-            using (File.Create(probe, 1, FileOptions.DeleteOnClose)) { }
-            if (File.Exists(probe)) File.Delete(probe);
-
-            return Task.FromResult(new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Healthy, null, null, data));
+            throw new InvalidOperationException(
+                $"JSON directory is not configured for source '{source}'.");
         }
-        catch (Exception ex)
-        {
-            return Task.FromResult(new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Unhealthy, ex.Message, null, data));
-        }
+
+        // JsonRepository provisions its directory on first use. Readiness exercises that same
+        // contract so a fresh, selected JSON store is ready without manual scaffolding.
+        Directory.CreateDirectory(path);
+        var probe = Path.Combine(path, $".__koan-health-{Guid.NewGuid():N}.tmp");
+        using (File.Create(probe, 1, FileOptions.DeleteOnClose)) { }
+        if (File.Exists(probe)) File.Delete(probe);
+        return Task.CompletedTask;
     }
 }
 

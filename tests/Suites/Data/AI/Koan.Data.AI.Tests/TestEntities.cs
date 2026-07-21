@@ -50,7 +50,7 @@ public class TestPost : Entity<TestPost>
 /// Test entity with async embedding
 /// </summary>
 [Storage(Name = "TestAsyncDocs")]
-[Embedding(Async = true, RateLimitPerMinute = 30)]
+[Embedding(Async = true)]
 public class TestAsyncDocument : Entity<TestAsyncDocument>
 {
     public string Title { get; set; } = "";

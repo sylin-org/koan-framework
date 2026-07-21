@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>GardenCoop.C02</AssemblyName>
+    <RootNamespace>GardenCoop</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RunWorkingDirectory>$(MSBuildProjectDirectory)</RunWorkingDirectory>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Chapter 1: the complete garden journal. -->
+    <ProjectReference Include="..\..\..\..\src\Connectors\Web\Auth\Test\Koan.Web.Auth.Connector.Test.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Web.Admin\Koan.Web.Admin.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Web.OpenApi\Koan.Web.OpenApi.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+
+    <!-- Chapter 2: local semantic produce discovery. -->
+    <ProjectReference Include="..\..\..\..\src\Connectors\Data\Vector\SqliteVec\Koan.Data.Vector.Connector.SqliteVec.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Data.AI\Koan.Data.AI.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Connectors\AI\Onnx\Koan.AI.Connector.Onnx.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\..\..\assets\models\all-MiniLM-L6-v2\model_quantized.onnx"
+             Link="models\model_quantized.onnx"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\..\..\assets\models\all-MiniLM-L6-v2\vocab.txt"
+             Link="models\vocab.txt"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

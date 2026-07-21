@@ -4,7 +4,7 @@ using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Shared;
 using Koan.AI.Models;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

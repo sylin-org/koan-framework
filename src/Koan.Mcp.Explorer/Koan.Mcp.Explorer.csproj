@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Human inspection console for Koan MCP: caller-visible tools, governed try-it, and fail-closed access-map diagnostics.</Description>
+    <PackageTags>$(CommonPackageTags);mcp;explorer;console;agent;devex</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Mcp\Koan.Mcp.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Embedded SPA: the console HTML/CSS/JS is vendored (no CDN) and served from the manifest, so it works
+         offline / in air-gapped containers. LogicalName flattens wwwroot/foo.js -> Koan.Mcp.Explorer.wwwroot.foo.js. -->
+    <EmbeddedResource Include="wwwroot\**\*.*" LogicalName="Koan.Mcp.Explorer.wwwroot.%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

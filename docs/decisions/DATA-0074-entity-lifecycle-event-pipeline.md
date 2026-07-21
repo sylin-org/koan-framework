@@ -2,15 +2,21 @@
 id: DATA-0074
 slug: data-0074-entity-lifecycle-event-pipeline
 domain: DATA
-status: Accepted
+status: Superseded
 date: 2025-09-28
 ---
 
 # ADR DATA-0074: Entity Lifecycle Event Pipeline
 
+> **Superseded by [ARCH-0113](ARCH-0113-entity-capability-communication.md) and R07-05
+> (2026-07-15).** The current persistence surface is host-owned `Entity<T>.Lifecycle`, declared in
+> `AddKoan(...)`, and executes at the canonical Data boundary. `Entity.Events`, `Setup`, the
+> process-static registry, aggregate batch outcomes, and claimed framework batch atomicity were
+> removed. This document remains as historical rationale.
+
 Date: 2025-09-28
 
-Status: Accepted
+Status: Superseded
 
 ## Context
 

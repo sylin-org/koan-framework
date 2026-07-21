@@ -8,31 +8,27 @@ using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
 using Koan.AI.Pillars;
 using Koan.Core.Provenance;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.AI.Infrastructure;
 
 /// <summary>
-/// Emits live adapter and source health snapshots into provenance once the application starts.
+/// Projects the adapter and source decisions compiled by <c>AiModule.Start</c> into live provenance.
 /// </summary>
 internal sealed class AiProvenancePublisher(
     IAiAdapterRegistry adapters,
     IAiSourceRegistry sources,
-    ILogger<AiProvenancePublisher> logger) : BackgroundService
+    ILogger<AiProvenancePublisher> logger)
 {
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    public async Task Publish(CancellationToken cancellationToken)
     {
         try
         {
-            // Allow the hosting pipeline to finish building adapters before capturing state.
-            await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
-            await PublishSnapshot(stoppingToken).ConfigureAwait(false);
+            await PublishSnapshot(cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // Expected when host is shutting down.
+            throw;
         }
         catch (Exception ex)
         {

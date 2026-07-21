@@ -1,75 +1,61 @@
-﻿# Koan.Data.Backup
+# Sylin.Koan.Data.Backup
 
-> ✅ Validated against streaming backup/restore pipelines and maintenance loops on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for the full reference.
+Create and restore one integrity-checked Entity archive through Koan Storage.
 
-## Contract
+## Install
 
-- **Purpose**: Provide backup and restore orchestration for Koan data entities with streaming export, import staging, and progress tracking.
-- **Primary inputs**: `BackupPlan` definitions, entity metadata from `Data<TEntity, TKey>`, storage adapters registered through Koan Core.
-- **Outputs**: Snapshot archives streamed via `BackupSession`, restore jobs orchestrated through `IDataRestoreService`, and progress metrics surfaced to Web controllers.
-- **Failure modes**: Storage adapters lacking backup capability, long-running exports exceeding timeout, or restore pipelines missing entity registrations.
-- **Success criteria**: Backups stream without choking memory, progress endpoints report accurate percentages, and restore jobs reconcile entity versions safely.
-
-## Quick start
-
-```csharp
-using Koan.Data.Backup.Core;
-using Koan.Data.Backup.Models;
-
-public static class BackupPlans
-{
-    public static BackupPlan OrdersDaily() => new()
-    {
-        PlanId = "orders:daily",
-        Description = "Incremental order backup",
-        Entities =
-        {
-            BackupEntity.For<Order>(bucket: "orders", scope: "tenant-a"),
-            BackupEntity.For<Invoice>(bucket: "billing", scope: "tenant-a")
-        }
-    };
-}
-
-public sealed class BackupAutoRegistrar : IKoanAutoRegistrar
-{
-    public string ModuleName => "Backup";
-
-    public void Initialize(IServiceCollection services)
-        => services.AddBackupPlan(BackupPlans.OrdersDaily());
-
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
-        => report.AddModule("Backup", "daily");
-}
+```powershell
+dotnet add package Sylin.Koan.Data.Backup
 ```
 
-- Define backup plans with strong typing and register them through Koan auto-registrar to activate background jobs and HTTP APIs.
-- Use `BackupSession.StartAsync(...)` to trigger on-demand exports or `RestoreSession` for imports, leveraging `Data<TEntity, TKey>` statics for persistence.
+Reference a provider-bounded Data connector and a Storage provider as well. The package composes through the
+application's existing `AddKoan()` call; there is no Backup-specific registration.
 
-## Configuration
+## Usage: create and restore
 
-- Configure storage-specific settings (e.g., bucket, scope, container) via options bound in your adapter.
-- For large datasets, enable streaming exports (`AllStream`) and chunked uploads.
-- Inject `IBackupDiscoveryService` to query available plans and wiring into UI or CLI surfaces.
+Resolve the standard DI service at the operational boundary that owns recovery:
 
-## Edge cases
+```csharp
+var backup = services.GetRequiredService<IBackupService>();
 
-- Paused backups: resume by reinvoking `BackupSession.ResumeAsync` with the stored continuation token.
-- Partially restored entities: use `RestoreDiagnostics` to replay failed rows and avoid duplicates.
-- Tenant isolation: ensure plan bucket/scope values isolate multi-tenant data to prevent leakage.
-- Storage quota: monitor adapter capability responses (`AdapterCapabilities`) to avoid saturating cold storage.
+var created = await backup.Create<Order, string>(
+    "orders-before-import",
+    new BackupRequest
+    {
+        StorageProfile = "recovery",
+        Partition = "customer-a",
+        PageSize = 500
+    },
+    cancellationToken);
 
-## Related packages
+var restored = await backup.Restore<Order, string>(
+    created.StorageKey,
+    new RestoreRequest
+    {
+        StorageProfile = "recovery",
+        BatchSize = 500
+    },
+    cancellationToken);
+```
 
-- `Koan.Data.Core` – entity persistence primitives powering backup sessions.
-- `Koan.Web.Backup` – HTTP controllers for monitoring and controlling backups.
-- `Koan.Core.Adapters` – capability plumbing used by backup storage providers.
+`Create` pages through the selected provider, writes a bounded temporary ZIP, and publishes only after the Entity
+data and manifest are complete. `Restore` downloads to bounded temporary storage, validates format, Entity/key
+identity, every JSON record, count, and SHA-256 before the first upsert. Its receipt identifies exactly what was
+applied.
 
-## Documentation
+## Boundaries
 
-- [`TECHNICAL.md`](./TECHNICAL.md) – end-to-end architecture, workflows, configuration, and edge cases.
+- The selected Data provider must advertise provider-bounded paging. InMemory, JSON, and Redis reject before query
+  or publication rather than pretending to stream.
+- Restore is batched upsert, not replacement and not a cross-record/provider transaction. Provider failure or caller
+  cancellation after mutation begins can leave a partial restore; retry is expected to be idempotent for Entity IDs.
+- The archive contains one Entity type and one source partition. An explicit restore target overrides the original
+  partition; otherwise the original partition is used.
+- The archive is compressed and integrity-checked, but it is not encrypted. Use a Storage provider and operational
+  policy appropriate for the data.
+- There is no whole-application scan, attribute policy, retention scheduler, catalog, progress dashboard, HTTP
+  control plane, or archive deletion API. Orchestrate recurring/durable work with the application's operations layer.
+- Archive compatibility is format-versioned, but long-term schema migration is not promised. The current Entity type
+  must remain JSON-compatible with the archived records.
 
-## Reference
-
-- `IBackupPlanRegistry` – plan discovery and registration.
-- `IDataBackupService` – programmatic API for running backups.
-- `Data.Backup.Extensions` – helper methods for DI registration.
+See [TECHNICAL.md](TECHNICAL.md) for archive invariants and failure ordering.

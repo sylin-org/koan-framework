@@ -23,8 +23,8 @@ namespace Koan.Cache.Diagnostics;
 /// distributed); both unreachable = <c>Unhealthy</c>.
 /// </para>
 /// <para>
-/// Coherence state is informational — an inactive coordinator (no channels registered)
-/// in <c>CoherenceMode.AutoDetect</c> is healthy by design.
+/// Peer-invalidation state is informational in AutoDetect; local-only and remote-only topologies
+/// need no cross-node L1 eviction and are healthy with the coordinator inactive.
 /// </para>
 /// </remarks>
 public sealed class CacheHealthCheck : IHealthCheck
@@ -56,7 +56,8 @@ public sealed class CacheHealthCheck : IHealthCheck
         data["topology.local"] = topology.Local?.Name ?? "none";
         data["topology.remote"] = topology.Remote?.Name ?? "none";
         data["coherence.active"] = _coordinator.IsActive;
-        data["coherence.channels"] = _coordinator.Channels.Count;
+        data["coherence.provider"] = _coordinator.ProviderId;
+        data["coherence.assurance"] = _coordinator.Assurance;
         data["node.id"] = _coordinator.NodeId.ToString("D");
 
         var localOk = await ProbeStore(topology.Local, "local", data, cancellationToken).ConfigureAwait(false);

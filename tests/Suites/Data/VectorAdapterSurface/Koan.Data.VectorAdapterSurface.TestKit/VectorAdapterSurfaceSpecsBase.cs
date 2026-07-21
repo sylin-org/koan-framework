@@ -12,7 +12,7 @@ namespace Koan.Data.VectorAdapterSurface.TestKit;
 /// binding via xUnit's IClassFixture pattern. Mirrors <c>AdapterSurfaceSpecsBase</c> from the
 /// data matrix.
 /// </summary>
-public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory>, IAsyncLifetime
+public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IAsyncLifetime
     where TFactory : class, IVectorAdapterTestFactory
 {
     protected readonly TFactory Factory;
@@ -23,7 +23,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
         Factory = factory;
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
         Koan.Data.Core.AggregateConfigs.Reset();
@@ -34,15 +34,15 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
         try { await Vector<TodoVector>.EnsureCreated(); } catch { /* not all adapters need this */ }
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _scope?.Dispose();
         _scope = null;
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     protected void SkipIfUnavailable()
-        => Skip.If(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
+        => Assert.SkipWhen(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
 
     protected float[] Embed(string category, int seed) => EmbeddingFactory.ForCategory(category, seed, Factory.EmbeddingDimension);
     protected float[] RandomEmbed(int seed) => EmbeddingFactory.Random(seed, Factory.EmbeddingDimension);
@@ -51,7 +51,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
     // Upsert
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task Upsert_single_storesVectorAndIsSearchable()
     {
         SkipIfUnavailable();
@@ -64,7 +64,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
         result.Matches[0].Id.Should().Be("v1");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Upsert_overwritesExisting()
     {
         SkipIfUnavailable();
@@ -80,10 +80,10 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
         hitsBeta.Matches.Should().Contain(m => m.Id.Equals("v1"));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UpsertMany_bulkInsertsAllVectors()
     {
-        Skip.If(!Factory.SupportsBulkOperations, "Adapter does not support bulk operations.");
+        Assert.SkipWhen(!Factory.SupportsBulkOperations, "Adapter does not support bulk operations.");
         SkipIfUnavailable();
 
         var items = Enumerable.Range(1, 5)
@@ -98,10 +98,10 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
         found.Matches.Select(m => m.Id).Should().Contain(new[] { "v1", "v2", "v3", "v4", "v5" });
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UpsertMany_handlesEmptyList()
     {
-        Skip.If(!Factory.SupportsBulkOperations, "Adapter does not support bulk operations.");
+        Assert.SkipWhen(!Factory.SupportsBulkOperations, "Adapter does not support bulk operations.");
         SkipIfUnavailable();
 
         var inserted = await Vector<TodoVector>.Save(Array.Empty<(string, float[], object?)>());
@@ -112,10 +112,10 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
     // Delete
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task Delete_removesVector_andIsAbsentFromSearch()
     {
-        Skip.If(!Factory.SupportsDeleteImmediatelyVisibleToSearch,
+        Assert.SkipWhen(!Factory.SupportsDeleteImmediatelyVisibleToSearch,
             "Adapter does not guarantee a deleted vector is immediately invisible to KNN search " +
             "(e.g. Milvus 2.4 REST has no flush/compact endpoint and search runs against growing " +
             "segments where filter-based deletes lag).");
@@ -132,7 +132,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
         hits.Matches.Select(m => m.Id).Should().Contain("v2");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Delete_nonExistentId_returnsFalse()
     {
         SkipIfUnavailable();
@@ -141,10 +141,10 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
         deleted.Should().BeFalse();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DeleteMany_bulkRemoves()
     {
-        Skip.If(!Factory.SupportsBulkOperations, "Adapter does not support bulk operations.");
+        Assert.SkipWhen(!Factory.SupportsBulkOperations, "Adapter does not support bulk operations.");
         SkipIfUnavailable();
 
         foreach (var i in Enumerable.Range(1, 5))
@@ -161,10 +161,10 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
     // GetEmbedding / GetEmbeddings  (capability-gated)
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task GetEmbedding_returnsStoredVector()
     {
-        Skip.If(!Factory.SupportsGetEmbedding, "Adapter does not implement GetEmbedding.");
+        Assert.SkipWhen(!Factory.SupportsGetEmbedding, "Adapter does not implement GetEmbedding.");
         SkipIfUnavailable();
 
         var embed = Embed("alpha", 1);
@@ -175,20 +175,20 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
         fetched!.Length.Should().Be(Factory.EmbeddingDimension);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetEmbedding_unknownId_returnsNull()
     {
-        Skip.If(!Factory.SupportsGetEmbedding, "Adapter does not implement GetEmbedding.");
+        Assert.SkipWhen(!Factory.SupportsGetEmbedding, "Adapter does not implement GetEmbedding.");
         SkipIfUnavailable();
 
         var fetched = await Vector<TodoVector>.GetEmbedding("nope");
         fetched.Should().BeNull();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetEmbeddings_batchReturnsKnown_andOmitsUnknown()
     {
-        Skip.If(!Factory.SupportsGetEmbedding, "Adapter does not implement GetEmbeddings.");
+        Assert.SkipWhen(!Factory.SupportsGetEmbedding, "Adapter does not implement GetEmbeddings.");
         SkipIfUnavailable();
 
         await Vector<TodoVector>.Save("v1", Embed("alpha", 1));
@@ -203,7 +203,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
     // Search
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task Search_topK_ordersBySimilarity()
     {
         SkipIfUnavailable();
@@ -222,7 +222,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
         topThreeIds.Should().AllSatisfy(id => id.Should().StartWith("alpha-"));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Search_topK_respectsLimit()
     {
         SkipIfUnavailable();
@@ -234,7 +234,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
         hits.Matches.Should().HaveCount(3);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Search_onEmptyIndex_returnsEmptyResult()
     {
         SkipIfUnavailable();
@@ -247,10 +247,10 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
     // Flush  (capability-gated; default-throws per IVectorSearchRepository contract)
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task Flush_clearsAllVectors()
     {
-        Skip.If(!Factory.SupportsFlush, "Adapter does not implement Flush.");
+        Assert.SkipWhen(!Factory.SupportsFlush, "Adapter does not implement Flush.");
         SkipIfUnavailable();
 
         await Vector<TodoVector>.Save("v1", Embed("alpha", 1));
@@ -266,7 +266,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
     // EnsureCreated
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task EnsureCreated_isIdempotent()
     {
         SkipIfUnavailable();

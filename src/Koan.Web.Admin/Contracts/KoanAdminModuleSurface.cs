@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using Koan.Admin.Contracts;
+using System.Text.Json.Serialization;
 
 namespace Koan.Web.Admin.Contracts;
 
@@ -7,17 +6,12 @@ public sealed record KoanAdminModuleSurface(
     string Name,
     string? Version,
     string? Description,
-    bool IsStub,
+    string Pillar,
+    string PillarColor,
+    string PillarIcon,
     IReadOnlyList<KoanAdminModuleSurfaceSetting> Settings,
     IReadOnlyList<string> Notes,
-    string Pillar,
-    string PillarClass,
-    string ModuleClass,
-    string Icon,
-    string ColorHex,
-    string ColorRgb,
-    IReadOnlyList<KoanAdminModuleSurfaceTool> Tools
-);
+    IReadOnlyList<KoanAdminModuleSurfaceTool> Tools);
 
 public sealed record KoanAdminModuleSurfaceSetting(
     string Key,
@@ -27,17 +21,20 @@ public sealed record KoanAdminModuleSurfaceSetting(
     bool Secret,
     KoanAdminSettingSource Source,
     string SourceKey,
-    IReadOnlyList<string> Consumers
-);
+    IReadOnlyList<string> Consumers);
 
 public sealed record KoanAdminModuleSurfaceTool(
     string Name,
     string Route,
     string? Description,
-    string? Capability
-);
+    string? Capability);
 
-public sealed record KoanAdminStartupNote(
-    string Module,
-    string Note
-);
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum KoanAdminSettingSource
+{
+    Unknown,
+    Auto,
+    AppSettings,
+    Environment,
+    Custom
+}

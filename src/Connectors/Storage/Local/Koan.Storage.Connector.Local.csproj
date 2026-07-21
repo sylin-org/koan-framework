@@ -1,13 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Local file-system storage provider for Koan.</Description>
+    <Description>Safe local-filesystem provider for Koan Storage with seek, range, stat, listing, and same-provider copy.</Description>
     <PackageTags>$(CommonPackageTags);storage;local;filesystem</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
   </ItemGroup>
 </Project>

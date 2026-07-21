@@ -1,18 +1,20 @@
+using Microsoft.Extensions.Hosting;
+
 namespace Koan.Web.Auth.Connector.Test.Options;
 
 public sealed class TestProviderOptions
 {
     public const string SectionPath = "Koan:Web:Auth:TestProvider";
-    public bool Enabled { get; init; } = false; // Auto-registrar treats Development as enabled even if false
-    public string RouteBase { get; init; } = "/.testoauth";
+    // Opt-in flag for non-Development. In Development the provider is active by default (see IsActive); set this
+    // true to expose the OAuth/OIDC simulator endpoints outside Development.
+    public bool Enabled { get; init; } = false;
     public string ClientId { get; init; } = "test-client";
     public string ClientSecret { get; init; } = "test-secret";
-    public bool ExposeInDiscoveryOutsideDevelopment { get; init; } = false;
     public string[] AllowedRedirectUris { get; init; } = [];
 
     // Caps and DX knobs
-    public int MaxRoles { get; init; } = 256; // align with Koan.Web.Auth.Roles default
-    public int MaxPermissions { get; init; } = 1024; // align with Koan.Web.Auth.Roles default
+    public int MaxRoles { get; init; } = 256;
+    public int MaxPermissions { get; init; } = 1024;
     public int MaxCustomClaimTypes { get; init; } = 64;
     public int MaxValuesPerClaimType { get; init; } = 32;
 
@@ -32,5 +34,12 @@ public sealed class TestProviderOptions
     public bool EnableClientCredentials { get; set; } = false;
     public Dictionary<string, ClientCredentialsClient> RegisteredClients { get; init; } = new();
     public string[] AllowedScopes { get; set; } = [];
+
+    /// <summary>
+    /// The single source of truth for whether the local provider is available for automatic election. Its stable
+    /// attribute-routed endpoints remain fail-closed outside Development unless explicitly enabled.
+    /// </summary>
+    public bool IsActive(IHostEnvironment? env)
+        => Enabled || (env?.IsDevelopment() ?? false);
 }
 

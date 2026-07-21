@@ -2,12 +2,17 @@
 id: OPS-0015
 slug: OPS-0015-default-configuration-fallback
 domain: OPS
-status: Accepted
+status: Superseded
 date: 2025-08-16
 title: Default IConfiguration fallback in Koan
+superseded_by: ARCH-0119
 ---
  
 # 0015: Default IConfiguration fallback in Koan
+
+> Superseded by [ARCH-0119](ARCH-0119-one-console-host-lifecycle.md). `StartKoan()` now uses the
+> standard .NET Generic Host and its configuration pipeline instead of maintaining a raw-provider
+> fallback.
 
 ## Context
 Adapters and modules bind options from `IConfiguration`. In host-based apps (ASP.NET Core), the host builds and registers `IConfiguration`. In console or non-host scenarios, `IConfiguration` might be absent, causing option configurators to fail.

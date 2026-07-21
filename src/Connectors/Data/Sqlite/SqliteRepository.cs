@@ -1,10 +1,8 @@
-using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Infrastructure;
 using Koan.Core.Logging;
@@ -15,16 +13,18 @@ using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Core.Semantics;
 using Koan.Data.Relational;
+using Koan.Data.Relational.Ado;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Data;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using Newtonsoft.Json;
 
@@ -45,9 +45,18 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 {
     public void Describe(ICapabilities caps) => caps
         .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
+        .Add(DataCaps.Query.ProviderBoundedPaging)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
         .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
+        // The AODB three-mode ledger (ARCH-0103 §6). Shared (DATA-0105 §3b): persists a framework-managed discriminator
+        // inside the (Id, Json) envelope + pushes scalar equality (json_extract) + a conflict-aware upsert verifies
+        // ownership. Container: a distinct partition-suffixed table per ambient partition. Database: a per-source file
+        // connection. Co-defined with the AodbConformanceSpecsBase cells that prove each.
+        .Add(DataCaps.Isolation.RowScoped)
+        .Add(DataCaps.Isolation.ContainerScoped)
+        .Add(DataCaps.Isolation.DatabaseScoped)
+        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Native))
         .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     private readonly IServiceProvider _sp;
@@ -55,19 +64,17 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private readonly IStorageNameResolver _nameResolver;
     private readonly StorageNameResolver.Convention _conv;
     private readonly ILinqSqlDialect _dialect = new SqliteDialect();
-    private readonly int _defaultPageSize;
     private readonly ILogger _logger;
-    private readonly RelationalMaterializationOptions _relOptions;
+    private readonly RelationalSchemaPolicy _schemaPolicy;
     private readonly StorageOptimizationInfo _optimizationInfo;
-    private static readonly ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
-    private static readonly ConcurrentDictionary<string, bool> _visibilityCache = new(StringComparer.Ordinal);
+    private readonly SqliteConnectionLifecycle _connections;
+    private readonly string _source;
+    private readonly ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, bool> _visibilityCache = new(StringComparer.Ordinal);
+    private readonly JsonSerializerSettings _json;
 
-    // Performance caches to eliminate redundant parsing/checks
-    private static readonly ConcurrentDictionary<string, (string dataSource, string? directory)> _connectionInfoCache = new(StringComparer.Ordinal);
+    // Immutable reflection metadata is safe to share across repositories and host lifetimes.
     private static readonly ConcurrentDictionary<string, System.Reflection.PropertyInfo?> _propertyInfoCache = new(StringComparer.Ordinal);
-
-    // Connection pooling infrastructure to eliminate connection creation overhead
-    private static readonly ConcurrentDictionary<string, ConnectionPool> _connectionPools = new(StringComparer.Ordinal);
 
     private static string BuildCacheKey(SqliteConnection conn, string table)
         => ($"{conn.DataSource}/{conn.Database}::{table}");
@@ -86,17 +93,29 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             _healthyCache.TryRemove(key, out _);
             _visibilityCache.TryRemove(key, out _);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            // Degradable: failing to evict the schema-health cache only forces an extra re-validate
+            // next call; it cannot corrupt data. Log so a recurring failure is visible.
+            KoanLog.DataDebug(_logger, "invalidate_health", "failed", ("table", table), ("error", ex.Message));
+        }
     }
 
     // Storage optimization support
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
-    public SqliteRepository(IServiceProvider sp, SqliteOptions options, IStorageNameResolver resolver)
+    public SqliteRepository(
+        IServiceProvider sp,
+        SqliteOptions options,
+        IStorageNameResolver resolver,
+        SqliteConnectionLifecycle connections,
+        string source)
     {
         _sp = sp;
         _options = options;
         _nameResolver = resolver;
+        _connections = connections;
+        _source = string.IsNullOrWhiteSpace(source) ? "Default" : source;
         // Initialize runtime snapshot so AllowMagicInProduction and environment are honored in tests and apps
         KoanEnv.TryInitialize(sp);
         // Logger: prefer typed logger; fall back to category
@@ -105,13 +124,23 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                       ? lf.CreateLogger($"Koan.Data.Connector.Sqlite[{typeof(TEntity).FullName}]")
                       : NullLogger.Instance);
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
-        _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
-        // Orchestration options (global, provider-agnostic)
-        _relOptions = (sp.GetService(typeof(IOptions<RelationalMaterializationOptions>)) as IOptions<RelationalMaterializationOptions>)?.Value
-                      ?? new RelationalMaterializationOptions();
+        _schemaPolicy = new RelationalSchemaPolicy
+        {
+            Projections = RelationalProjectionMode.PhysicalColumns,
+            Ddl = typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), false).Any()
+                ? RelationalDdlPolicy.NoDdl
+                : options.DdlPolicy,
+            Matching = options.SchemaMatching,
+            AllowProductionDdl = options.AllowProductionDdl,
+            DefaultSchema = "main"
+        };
 
         // Get storage optimization info from AggregateBag
         _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
+        var segmentation = sp.GetRequiredService<DataSegmentationPlan>().For(typeof(TEntity));
+        _json = ComparableScalarEncoding.Apply(
+            new JsonSerializerSettings(),
+            segmentation.Fields);
 
         KoanLog.DataDebug(_logger, LogActions.RepositoryInit, "ready",
             ("entity", typeof(TEntity).FullName),
@@ -125,127 +154,61 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     private SqliteConnection CreateConnection()
     {
-        var cs = _options.ConnectionString;
-
-        // Cache connection string parsing and directory resolution
-        if (!_connectionInfoCache.TryGetValue(cs, out var info))
-        {
-            try
-            {
-                // Best-effort: create directory for file-based connection strings
-                var builder = new SqliteConnectionStringBuilder(cs);
-                var dataSource = builder.DataSource;
-                string? directory = null;
-
-                if (!string.IsNullOrWhiteSpace(dataSource))
-                {
-                    var fullPath = dataSource;
-                    try { fullPath = Path.GetFullPath(dataSource); } catch { }
-                    directory = Path.GetDirectoryName(fullPath);
-                }
-
-                info = (dataSource, directory);
-                _connectionInfoCache[cs] = info;
-            }
-            catch
-            {
-                // Cache empty info to avoid repeated failures
-                info = ("", null);
-                _connectionInfoCache[cs] = info;
-            }
-        }
-
-        // Create directory if needed (only on first access or if it doesn't exist)
-        if (!string.IsNullOrWhiteSpace(info.directory))
-        {
-            try { Directory.CreateDirectory(info.directory); } catch { /* non-fatal */ }
-        }
-
-        var conn = new SqliteConnection(cs);
+        var conn = _connections.Create(_options.ConnectionString, _source);
         conn.Open();
         return conn;
     }
 
-    private IDbConnection Open()
+    private SqliteConnection Open()
     {
-        var cs = _options.ConnectionString;
-
-        // Ensure directory exists before renting from pool
-        if (!_connectionInfoCache.TryGetValue(cs, out var info))
-        {
-            try
-            {
-                var builder = new SqliteConnectionStringBuilder(cs);
-                var dataSource = builder.DataSource;
-                string? directory = null;
-
-                if (!string.IsNullOrWhiteSpace(dataSource))
-                {
-                    var fullPath = dataSource;
-                    try { fullPath = Path.GetFullPath(dataSource); } catch { }
-                    directory = Path.GetDirectoryName(fullPath);
-                }
-
-                info = (dataSource, directory);
-                _connectionInfoCache[cs] = info;
-            }
-            catch
-            {
-                info = ("", null);
-                _connectionInfoCache[cs] = info;
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(info.directory))
-        {
-            try { Directory.CreateDirectory(info.directory); } catch { }
-        }
-
-        // Rent connection from pool - eliminates connection creation overhead
-        var pool = _connectionPools.GetOrAdd(cs, key => new ConnectionPool(key));
-        var pooledConn = pool.Rent();
-
-        // Extract underlying SqliteConnection for EnsureOrchestrated
-        var connField = typeof(PooledConnection).GetField("_connection",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var conn = (SqliteConnection)connField!.GetValue(pooledConn)!;
-
-        EnsureOrchestrated(conn);
-
-        // Extra barrier: ensure the table and projected columns are visible on this connection
-        // Use cache to avoid expensive PRAGMA queries on every connection
-        var cacheKey = BuildCacheKey(conn, TableName);
-        if (_visibilityCache.TryGetValue(cacheKey, out var visible) && visible)
-        {
-            return pooledConn; // Return wrapper, not raw connection
-        }
-
+        var conn = CreateConnection();
         try
         {
-            var ddl = new SqliteDdlExecutor(conn, TableName);
-            var projections = ProjectionResolver.Get(typeof(TEntity));
-            var required = projections.Select(p => p.ColumnName).ToArray();
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var maxMs = 2000;
-            var delay = 5;
-            while (sw.ElapsedMilliseconds < maxMs)
+            EnsureOrchestrated(conn);
+
+            // Extra barrier: ensure the table and projected columns are visible on this connection.
+            var cacheKey = BuildCacheKey(conn, TableName);
+            if (_visibilityCache.TryGetValue(cacheKey, out var visible) && visible) return conn;
+
+            try
             {
-                try
+                var ddl = new SqliteDdlExecutor(conn, TableName);
+                var projections = ProjectionResolver.Get(typeof(TEntity));
+                var required = projections.Select(p => p.ColumnName).ToArray();
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var maxMs = 2000;
+                var delay = 5;
+                while (sw.ElapsedMilliseconds < maxMs)
                 {
-                    if (ddl.TableExists("", TableName) && required.All(cn => ddl.ColumnExists("", TableName, cn)))
+                    try
                     {
-                        // Cache successful visibility check
-                        _visibilityCache[cacheKey] = true;
-                        break;
+                        if (ddl.TableExists("", TableName) && required.All(cn => ddl.ColumnExists("", TableName, cn)))
+                        {
+                            _visibilityCache[cacheKey] = true;
+                            break;
+                        }
                     }
+                    catch (SqliteException)
+                    {
+                        // A transient PRAGMA/probe error mid-poll means "not visible yet"; retry with backoff.
+                    }
+                    Thread.Sleep(delay);
+                    delay = Math.Min(200, delay * 2);
                 }
-                catch { }
-                Thread.Sleep(delay);
-                delay = Math.Min(200, delay * 2);
             }
+            catch (Exception ex)
+            {
+                // This is only a visibility warm-up barrier. The real query path retains its ensure-and-retry.
+                KoanLog.DataDebug(_logger, "visibility_barrier", "failed", ("table", TableName), ("error", ex.Message));
+            }
+
+            return conn;
         }
-        catch { }
-        return pooledConn; // Return wrapper, not raw connection
+        catch
+        {
+            conn.Dispose();
+            throw;
+        }
     }
 
     private Task EnsureOrchestrated(SqliteConnection conn, CancellationToken ct)
@@ -276,95 +239,32 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
         var ddl = new SqliteDdlExecutor(conn, table);
         var feats = new SqliteStoreFeatures();
-        // Always validate first to discover DDL allowance and current state
-        var vReport = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
-        var vState = (vReport["State"] as string) ?? "Unknown";
-        var vDdlAllowed = vReport.TryGetValue("DdlAllowed", out var vDa) && vDa is bool vb && vb;
-        var vTableExists = vReport.TryGetValue("TableExists", out var vTe) && vTe is bool vtb && vtb;
+        var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, table, _schemaPolicy, ct);
+        var ddlAllowed = report.TryGetValue("DdlAllowed", out var da) && da is true;
+        if (ddlAllowed)
+        {
+            KoanLog.DataDebug(_logger, LogActions.Ensure, "create", ("table", table));
+            await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, table, _schemaPolicy, ct);
+            report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, table, _schemaPolicy, ct);
+        }
 
-        // If table is missing but this adapter is configured for AutoCreate, attempt a local create
-        // This covers test fixtures where orchestrator denies DDL but tests expect local auto-create.
-        if (!vTableExists && _options.DdlPolicy == SchemaDdlPolicy.AutoCreate)
+        var state = report.TryGetValue("State", out var value) ? value as string : null;
+        if (_schemaPolicy.Matching == RelationalSchemaMatchingMode.Strict && state != "Healthy")
         {
-            try
-            {
-                KoanLog.DataDebug(_logger, LogActions.Ensure, "fallback-create",
-                    ("table", table));
-                var projections = ProjectionResolver.Get(typeof(TEntity));
-                var allColumns = new List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)>();
-                allColumns.Add(("Id", typeof(string), false, false, null, false));
-                allColumns.Add(("Json", typeof(string), false, false, null, false));
-                foreach (var p in projections) allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
-                ((dynamic)ddl).CreateTableWithColumns("", table, allColumns);
-                // update the table exists flag after creating
-                vTableExists = ddl.TableExists("", table);
-            }
-            catch { }
+            var missing = report.TryGetValue("MissingColumns", out var columns) && columns is string[] names ? names : [];
+            throw new SchemaMismatchException(typeof(TEntity).FullName!, table, _schemaPolicy.Projections.ToString(), missing, [], ddlAllowed);
         }
-        // If FailOnMismatch, escalate when unhealthy/degraded
-        if (_relOptions.FailOnMismatch)
-        {
-            if (!string.Equals(vState, "Healthy", StringComparison.OrdinalIgnoreCase))
-            {
-                var missing = vReport.TryGetValue("MissingColumns", out var mc) && mc is string[] ms ? ms : [];
-                string[] extra = [];
-                var policy = _relOptions.Materialization.ToString();
-                throw new SchemaMismatchException(typeof(TEntity).FullName!, table, policy, missing, extra, vDdlAllowed);
-            }
-            _healthyCache[cacheKey] = true; return;
-        }
-        // Non-fail path: only ensure when DDL is allowed; otherwise just mark healthy if table exists
-        if (vDdlAllowed)
-        {
-            KoanLog.DataDebug(_logger, LogActions.Ensure, "create",
-                ("table", table));
-            try
-            {
-                await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
-            }
-            catch (InvalidOperationException ex) when (ex.Message?.Contains("DDL is disabled", StringComparison.OrdinalIgnoreCase) == true)
-            {
-                // Orchestrator refused to perform DDL; fall back to best-effort local creation for tests
-                var projections = ProjectionResolver.Get(typeof(TEntity));
-                var allColumns = new List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)>();
-                allColumns.Add(("Id", typeof(string), false, false, null, false));
-                allColumns.Add(("Json", typeof(string), false, false, null, false));
-                foreach (var p in projections)
-                {
-                    allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
-                }
-                ((dynamic)ddl).CreateTableWithColumns("", table, allColumns);
-            }
-            // Wait for expected projected columns to appear (poll with small backoff)
-            try
-            {
-                var projections = ProjectionResolver.Get(typeof(TEntity));
-                var required = projections.Select(p => p.ColumnName).ToArray();
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                var maxMs = 1000; // total wait time
-                while (sw.ElapsedMilliseconds < maxMs)
-                {
-                    var missing = required.Where(c => !ddl.ColumnExists("", table, c)).ToArray();
-                    if (missing.Length == 0) break;
-                    Thread.Sleep(20);
-                }
-            }
-            catch { }
-            _healthyCache[cacheKey] = true; return;
-        }
-        if (vTableExists && string.Equals(vState, "Healthy", StringComparison.OrdinalIgnoreCase))
-        { _healthyCache[cacheKey] = true; }
+
+        if (report.TryGetValue("TableExists", out var exists) && exists is true)
+            _healthyCache[cacheKey] = true;
     }
 
     // Comparable-encoding contract (DATA-0100): the canonical converters make DateTimeOffset (UTC-ISO
     // text), TimeSpan (ticks), DateOnly/TimeOnly (fixed text) persist in an order-preserving form that
     // matches the filter comparand. Default (PascalCase) naming is preserved — ResolveColumnSql reads
     // json_extract($.{prop}) with the PascalCase property name.
-    private static readonly JsonSerializerSettings _json =
-        ComparableScalarEncoding.Apply(new JsonSerializerSettings());
-
     // Basic serialization helpers
-    private static TEntity FromRow((string Id, string Json) row)
+    private TEntity FromRow((string Id, string Json) row)
         => JsonConvert.DeserializeObject<TEntity>(row.Json, _json)!;
     private (string Id, string Json) ToRow(TEntity e)
     {
@@ -429,8 +329,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.get");
         act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
-        var row = await conn.QuerySingleOrDefaultAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE Id = @Id", new { Id = id!.ToString()! });
-        return row == default ? null : FromRow(row);
+        var rows = await AdoCommands.QueryIdJsonAsync(conn, $"SELECT Id, Json FROM [{TableName}] WHERE Id = @Id", new SqlParameters().Add("Id", id!.ToString()!), null, ct);
+        return rows.Count == 0 ? null : FromRow(rows[0]);
     }
 
     public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
@@ -449,9 +349,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var stringIds = idList.Select(id => id!.ToString()!).ToArray();
 
         // Use IN clause for bulk query
-        var rows = await conn.QueryAsync<(string Id, string Json)>(
+        var rows = await AdoCommands.QueryIdJsonAsync(conn,
             $"SELECT Id, Json FROM [{TableName}] WHERE Id IN @Ids",
-            new { Ids = stringIds });
+            new SqlParameters().Add("Ids", stringIds), null, ct);
 
         // Build dictionary for O(1) lookup
         var entityMap = rows.Select(FromRow).ToDictionary(e => e.Id);
@@ -483,23 +383,25 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         if (whereSql is not null) sb.Append(" WHERE ").Append(whereSql);
         sb.Append(' ').Append(orderBy);
 
+        // LIMIT/OFFSET is only a correct candidate bound when SQLite owns the complete requested
+        // ordering. Otherwise the coordinator must materialize, finish the sort, and page afterwards.
+        var sortFullyHandled = query.Sort is null || query.Sort.Count == 0 || sortHandled.Count == query.Sort.Count;
         var paginationHandled = false;
-        if (query.HasPagination)
+        if (query.HasPagination && sortFullyHandled)
         {
             var size = query.EffectivePageSize();
-            var offset = (query.EffectivePage() - 1) * size;
+            var offset = query.EffectiveOffset();
             sb.Append(" LIMIT ").Append(size).Append(" OFFSET ").Append(offset);
             paginationHandled = true;
         }
 
-        var dyn = ToDapper(parameters);
-        var items = await ExecuteRows(sb.ToString(), dyn, ct);
+        var items = await ExecuteRows(sb.ToString(), SqlParameters.Positional(parameters), ct);
 
         long? totalCount = null;
-        if (paginationHandled)
-            totalCount = await CountCore(whereSql, parameters, ct);
-        else
-            totalCount = items.Count;
+        if (query.CountStrategy is not null)
+            totalCount = paginationHandled
+                ? await CountCore(whereSql, parameters, ct)
+                : items.Count;
 
         return new RepositoryQueryResult<TEntity>
         {
@@ -527,10 +429,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var sql = whereSql is null
             ? $"SELECT COUNT(1) FROM [{TableName}]"
             : $"SELECT COUNT(1) FROM [{TableName}] WHERE {whereSql}";
-        var dyn = ToDapper(parameters);
+        var p = SqlParameters.Positional(parameters);
         try
         {
-            return await conn.ExecuteScalarAsync<long>(sql, dyn);
+            return await AdoCommands.ExecuteScalarInt64Async(conn, sql, p, null, ct);
         }
         catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
         {
@@ -538,16 +440,16 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var sqliteConn = (SqliteConnection)conn;
             InvalidateHealth(sqliteConn, TableName);
             EnsureOrchestrated(sqliteConn);
-            return await conn.ExecuteScalarAsync<long>(sql, dyn);
+            return await AdoCommands.ExecuteScalarInt64Async(conn, sql, p, null, ct);
         }
     }
 
-    private async Task<IReadOnlyList<TEntity>> ExecuteRows(string sql, DynamicParameters dyn, CancellationToken ct)
+    private async Task<IReadOnlyList<TEntity>> ExecuteRows(string sql, SqlParameters p, CancellationToken ct)
     {
         using var conn = Open();
         try
         {
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
+            var rows = await AdoCommands.QueryIdJsonAsync(conn, sql, p, null, ct);
             return rows.Select(FromRow).ToList();
         }
         catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
@@ -556,7 +458,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var sqliteConn = (SqliteConnection)conn;
             InvalidateHealth(sqliteConn, TableName);
             EnsureOrchestrated(sqliteConn);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
+            var rows = await AdoCommands.QueryIdJsonAsync(conn, sql, p, null, ct);
             return rows.Select(FromRow).ToList();
         }
     }
@@ -605,26 +507,32 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             return ("ORDER BY Id", RepositoryQueryResult<TEntity>.NoSortHandled);
 
         var parts = new List<string>(sort.Count);
+        var handled = new HashSet<SortSpec>();
         foreach (var spec in sort)
         {
+            // The SQLite JSON expression below addresses one top-level scalar. Nested and collection
+            // paths require the coordinator's full-set sorter and therefore cannot be claimed here.
+            if (spec.Path.TraversesCollection || spec.Path.Members.Count != 1) continue;
+
             var leaf = spec.Path.Members[spec.Path.Members.Count - 1].Name;
             // Resolve the leaf so ResolveColumnSql applies the comparable-encoding cast (TimeSpan ->
             // INTEGER) to the ORDER BY column too, not only to filter predicates (DATA-0100). Fall back
             // to the bare expression on an unresolvable path.
             ResolvedField? rf = null;
-            try { rf = FieldPathResolver.Resolve(typeof(TEntity), FieldPath.Of(leaf)); } catch { /* leave null */ }
+            // Degradable: an unresolvable leaf (e.g. a JSON-only path with no CLR projection) just means
+            // no comparable-encoding cast — ResolveColumnSql falls back to the bare json_extract expression.
+            try { rf = FieldPathResolver.Resolve(typeof(TEntity), FieldPath.Of(leaf)); }
+            catch (InvalidFilterFieldException) { /* leave null — bare expression is correct for sort */ }
             var col = ResolveColumnSql(FieldPath.Of(leaf), rf!);
             parts.Add($"{col} {(spec.Desc ? "DESC" : "ASC")}");
+            handled.Add(spec);
         }
-        var orderBy = "ORDER BY " + string.Join(", ", parts);
-        return (orderBy, sort.ToFrozenSet());
-    }
 
-    private static DynamicParameters ToDapper(IReadOnlyList<object?> parameters)
-    {
-        var dyn = new DynamicParameters();
-        for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-        return dyn;
+        if (parts.Count == 0)
+            return ("ORDER BY Id", RepositoryQueryResult<TEntity>.NoSortHandled);
+
+        var orderBy = "ORDER BY " + string.Join(", ", parts);
+        return (orderBy, handled.ToFrozenSet());
     }
 
     // ==================== Conditional compare-and-set (IConditionalWriteRepository) ====================
@@ -634,14 +542,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     public async Task<bool> ConditionalReplaceAsync(TEntity model, Expression<Func<TEntity, bool>> guard, CancellationToken ct = default)
     {
         var (whereSql, parameters) = BuildWhere(LinqFilterCompiler.Compile(guard));
-        var dyn = ToDapper(parameters);
+        var p = SqlParameters.Positional(parameters);
         var (id, json) = ToRow(model);
-        dyn.Add("__id", id);
-        dyn.Add("__json", json);
+        p.Add("__id", id);
+        p.Add("__json", json);
         var guardClause = whereSql is null ? string.Empty : $" AND ({whereSql})";
         var sql = $"UPDATE [{TableName}] SET Json = @__json WHERE Id = @__id{guardClause}";
         using var conn = Open();
-        var affected = await conn.ExecuteAsync(sql, dyn);
+        var affected = await AdoCommands.ExecuteAsync(conn, sql, p, null, ct);
         return affected > 0;
     }
 
@@ -665,9 +573,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         else
         {
             var whereSql = RewriteWhereForProjection(query);
-            var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
-            var offset = shaping.HasPagination ? (shaping.EffectivePage() - 1) * size : 0;
-            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} LIMIT {size} OFFSET {offset}";
+            var paging = shaping.HasPagination
+                ? $" LIMIT {shaping.EffectivePageSize()} OFFSET {shaping.EffectiveOffset()}"
+                : string.Empty;
+            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql}{paging}";
             var items = await QueryRowsWithRetry(conn, sql, parameters);
             return new RepositoryQueryResult<TEntity>
             {
@@ -683,9 +592,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         using var conn = Open();
         var whereSql = RewriteWhereForProjection(query);
         var sql = $"SELECT COUNT(1) FROM [{TableName}] WHERE {whereSql}";
+        var p = ToSqlParameters(parameters);
         try
         {
-            return CountResult.Exact(await conn.ExecuteScalarAsync<long>(sql, parameters));
+            return CountResult.Exact(await AdoCommands.ExecuteScalarInt64Async(conn, sql, p, null, ct));
         }
         catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
         {
@@ -693,15 +603,16 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var sqliteConn = (SqliteConnection)conn;
             InvalidateHealth(sqliteConn, TableName);
             EnsureOrchestrated(sqliteConn);
-            return CountResult.Exact(await conn.ExecuteScalarAsync<long>(sql, parameters));
+            return CountResult.Exact(await AdoCommands.ExecuteScalarInt64Async(conn, sql, p, null, ct));
         }
     }
 
     private async Task<IReadOnlyList<TEntity>> QueryRowsWithRetry(IDbConnection conn, string sql, object? parameters)
     {
+        var p = ToSqlParameters(parameters);
         try
         {
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
+            var rows = await AdoCommands.QueryIdJsonAsync(conn, sql, p, null, CancellationToken.None);
             return rows.Select(FromRow).ToList();
         }
         catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
@@ -710,16 +621,17 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var sqliteConn = (SqliteConnection)conn;
             InvalidateHealth(sqliteConn, TableName);
             EnsureOrchestrated(sqliteConn);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
+            var rows = await AdoCommands.QueryIdJsonAsync(conn, sql, p, null, CancellationToken.None);
             return rows.Select(FromRow).ToList();
         }
     }
 
-    private async Task<IEnumerable<dynamic>> QueryDynamicWithRetry(IDbConnection conn, string sql, object? parameters)
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> QueryDynamicWithRetry(IDbConnection conn, string sql, object? parameters)
     {
+        var p = ToSqlParameters(parameters);
         try
         {
-            return await conn.QueryAsync(sql, parameters);
+            return await AdoCommands.QueryRowsAsync(conn, sql, p, null, CancellationToken.None);
         }
         catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
         {
@@ -727,7 +639,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var sqliteConn = (SqliteConnection)conn;
             InvalidateHealth(sqliteConn, TableName);
             EnsureOrchestrated(sqliteConn);
-            return await conn.QueryAsync(sql, parameters);
+            return await AdoCommands.QueryRowsAsync(conn, sql, p, null, CancellationToken.None);
         }
     }
 
@@ -770,31 +682,68 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private async Task<int> UpsertBatch(IDbConnection conn, IReadOnlyCollection<TEntity> models, CancellationToken ct)
     {
         using var tx = conn.BeginTransaction();
-        const string sqlTemplate = "INSERT INTO [{0}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;";
-        var sql = string.Format(sqlTemplate, TableName);
+        var (sql, managed, guarded) = ManagedUpsert(TableName);
         var count = 0;
         foreach (var e in models)
         {
             ct.ThrowIfCancellationRequested();
             var row = ToRow(e);
-            await conn.ExecuteAsync(sql, new { row.Id, row.Json }, tx);
+            var affected = await AdoCommands.ExecuteAsync(conn, sql,
+                WithManaged(new SqlParameters().Add("Id", row.Id).Add("Json", row.Json), managed), tx, ct);
+            if (guarded && affected == 0) throw CrossScopeWrite(TableName, row.Id);
             count++;
         }
         tx.Commit();
         return count;
     }
 
+    // Managed-field conflict-aware upsert (DATA-0105 §3b — the write-verify half). When a managed write-scope is
+    // active, the row's JSON already carries the managed keys (the ManagedFieldJsonInjector injected them on
+    // serialize) AND the ON CONFLICT update is guarded so an existing row owned by a DIFFERENT managed scope is
+    // NOT overwritten — rows-affected = 0 then means a rejected cross-scope write (e.g. tenant B upserting tenant
+    // A's id). Generic: reads the scope dict, never names tenant/classification. Off ⇒ the original SQL verbatim.
+    private static (string Sql, KeyValuePair<string, object?>[] Managed, bool Guarded) ManagedUpsert(string table)
+    {
+        var scope = ManagedFieldWriteScope.Current;
+        if (scope is null || scope.Count == 0)
+            return ($"INSERT INTO [{table}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;",
+                    Array.Empty<KeyValuePair<string, object?>>(), false);
+
+        var conds = new List<string>(scope.Count);
+        var prms = new List<KeyValuePair<string, object?>>(scope.Count);
+        var i = 0;
+        foreach (var kv in scope)
+        {
+            var p = "mf" + i++;
+            // Unqualified Json in the DO UPDATE clause refers to the EXISTING row's value (excluded.* is the new row).
+            conds.Add($"json_extract(Json, '$.{kv.Key}') = @{p}");
+            prms.Add(new KeyValuePair<string, object?>(p, kv.Value));
+        }
+        var sql = $"INSERT INTO [{table}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json WHERE {string.Join(" AND ", conds)};";
+        return (sql, prms.ToArray(), true);
+    }
+
+    private static SqlParameters WithManaged(SqlParameters p, KeyValuePair<string, object?>[] managed)
+    {
+        foreach (var kv in managed) p.Add(kv.Key, kv.Value);
+        return p;
+    }
+
+    private static InvalidOperationException CrossScopeWrite(string table, string id)
+        => new($"Rejected a cross-scope write to '{table}' id '{id}': the row is owned by a different managed scope " +
+               "(e.g. tenant/classification). A managed-field-scoped entity cannot overwrite another scope's row.");
+
     public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         using var conn = Open();
-        var count = await conn.ExecuteAsync($"DELETE FROM [{TableName}] WHERE Id IN @Ids", new { Ids = ids.Select(i => i!.ToString()!).ToArray() });
+        var count = await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{TableName}] WHERE Id IN @Ids", new SqlParameters().Add("Ids", ids.Select(i => i!.ToString()!).ToArray()), null, ct);
         return count;
     }
 
     public async Task<int> DeleteAll(CancellationToken ct = default)
     {
         using var conn = Open();
-        return await conn.ExecuteAsync($"DELETE FROM [{TableName}]");
+        return await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{TableName}]", null, null, ct);
     }
 
     public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
@@ -808,12 +757,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
         // SQLite has no TRUNCATE - both strategies use DELETE
         var countResult = await Count(QueryDefinition.All, ct);
-        await conn.ExecuteAsync($"DELETE FROM [{TableName}]", ct);
+        await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{TableName}]", null, null, ct);
 
         if (effectiveStrategy == RemoveStrategy.Fast)
         {
             // Fast strategy: reclaim space via VACUUM
-            await conn.ExecuteAsync("VACUUM", ct);
+            await AdoCommands.ExecuteAsync(conn, "VACUUM", null, null, ct);
         }
 
         return countResult.Value;
@@ -855,15 +804,18 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
             // Atomic path: use autocommit (no explicit transaction)
             using var conn = repo.Open();
+            var (upsertSql, managed, guarded) = ManagedUpsert(repo.TableName);
             foreach (var e in upserts)
             {
                 ct.ThrowIfCancellationRequested();
                 var row = repo.ToRow(e);
-                await conn.ExecuteAsync($"INSERT INTO [{repo.TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json });
+                var affected = await AdoCommands.ExecuteAsync(conn, upsertSql,
+                    WithManaged(new SqlParameters().Add("Id", row.Id).Add("Json", row.Json), managed), null, ct);
+                if (guarded && affected == 0) throw CrossScopeWrite(repo.TableName, row.Id);
             }
             if (_deletes.Any())
             {
-                deleted = await conn.ExecuteAsync($"DELETE FROM [{repo.TableName}] WHERE Id IN @Ids", new { Ids = _deletes.Select(i => i!.ToString()!).ToArray() });
+                deleted = await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{repo.TableName}] WHERE Id IN @Ids", new SqlParameters().Add("Ids", _deletes.Select(i => i!.ToString()!).ToArray()), null, ct);
             }
             return new BatchResult(added, updated, deleted);
         }
@@ -890,7 +842,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     {
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.instruction");
         act?.SetTag("entity", typeof(TEntity).FullName);
-        using var conn = new SqliteConnection(_options.ConnectionString);
+        using var conn = _connections.Create(_options.ConnectionString, _source);
         await conn.OpenAsync(ct);
         switch (instruction.Name)
         {
@@ -899,77 +851,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new SqliteDdlExecutor(conn, TableName);
                     var feats = new SqliteStoreFeatures();
-                    var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
-                    // Normalize to provider options for tests: override MatchingMode/DdlAllowed and compute missing projected columns
-                    var projections = ProjectionResolver.Get(typeof(TEntity));
-                    var required = projections.Select(p => p.ColumnName).ToArray();
-                    var tableExists = ddl.TableExists("", TableName);
-                    // Debug aid (suppressed in Release): PRAGMA table_info snapshot during validate
-#if DEBUG
-                    try
-                    {
-                        using var dbg = conn.CreateCommand();
-                        dbg.CommandText = $"PRAGMA table_info('{TableName}')";
-                        using var rdr = dbg.ExecuteReader();
-                        System.Diagnostics.Debug.WriteLine($"[VALIDATE] PRAGMA table_info for {TableName} (begin):");
-                        while (rdr.Read())
-                        {
-                            var nm = rdr.IsDBNull(1) ? "(null)" : rdr.GetString(1);
-                            var tp = rdr.IsDBNull(2) ? "(null)" : rdr.GetString(2);
-                            System.Diagnostics.Debug.WriteLine($"[VALIDATE]   name={nm}, type={tp}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[VALIDATE] PRAGMA table_info failed for {TableName}: {ex.Message}");
-                    }
-#endif
-                    var missing = required.Where(c => !ddl.ColumnExists("", TableName, c)).ToArray();
-                    // Quick retry to avoid races where another operation creates columns concurrently
-                    if (missing.Length > 0)
-                    {
-                        try
-                        {
-                            Thread.Sleep(30);
-                            missing = required.Where(c => !ddl.ColumnExists("", TableName, c)).ToArray();
-                        }
-                        catch { }
-                    }
-                    // Debug: print ColumnExists outcome per required column (debug only)
-#if DEBUG
-                    try
-                    {
-                        foreach (var c in required)
-                        {
-                            try
-                            {
-                                var exists = ddl.ColumnExists("", TableName, c);
-                                System.Diagnostics.Debug.WriteLine($"[VALIDATE] ColumnExists check: table={TableName}, column={c}, exists={exists}");
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"[VALIDATE] ColumnExists check error for {c}: {ex.Message}");
-                            }
-                        }
-                    }
-                    catch { }
-#endif
-                    report["TableExists"] = tableExists;
-                    report["MissingColumns"] = missing;
-                    // Matching mode: prefer explicit config (including env override)
-                    var modeStr = Configuration.ReadFirst(
-                        _sp.GetRequiredService<IConfiguration>(),
-                        defaultValue: _options.SchemaMatching.ToString(),
-                        Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
-                        Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
-                    if (string.IsNullOrWhiteSpace(modeStr)) modeStr = _options.SchemaMatching.ToString();
-                    report["MatchingMode"] = modeStr;
-                    var ddlAllowed = _options.DdlPolicy == SchemaDdlPolicy.AutoCreate && (!KoanEnv.IsProduction || _options.AllowProductionDdl);
-                    if (typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: false).Any()) ddlAllowed = false;
-                    report["DdlAllowed"] = ddlAllowed;
-                    var strict = string.Equals(modeStr, "Strict", StringComparison.OrdinalIgnoreCase);
-                    var state = !tableExists ? (strict ? "Unhealthy" : "Degraded") : (missing.Length > 0 ? (strict ? "Unhealthy" : "Degraded") : "Healthy");
-                    report["State"] = state;
+                    var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, ct);
                     return (TResult)report;
                 }
             case DataInstructions.EnsureCreated:
@@ -981,37 +863,31 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new SqliteDdlExecutor(conn, TableName);
                     var feats = new SqliteStoreFeatures();
-                    try
-                    {
-                        await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
-                    }
-                    catch (InvalidOperationException ex) when (ex.Message?.Contains("DDL is disabled", StringComparison.OrdinalIgnoreCase) == true)
-                    {
-                        // Orchestrator refused to perform DDL. Fall back to a best-effort local creation so tests that expect AutoCreate succeed.
-                        var projections = ProjectionResolver.Get(typeof(TEntity));
-                        var allColumns = new List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)>();
-                        allColumns.Add(("Id", typeof(string), false, false, null, false));
-                        allColumns.Add(("Json", typeof(string), false, false, null, false));
-                        foreach (var p in projections)
-                        {
-                            allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
-                        }
-                        ((dynamic)ddl).CreateTableWithColumns("", TableName, allColumns);
-                    }
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, ct);
                     object d_ok = true; return (TResult)d_ok;
                 }
             case RelationalInstructions.SchemaClear:
                 {
                     // Remove the table if present; do not create it.
                     var drop = $"DROP TABLE IF EXISTS \"{TableName}\";";
-                    try { await conn.ExecuteAsync(drop); } catch { }
+                    try { await AdoCommands.ExecuteAsync(conn, drop, null, null, ct); }
+                    catch (SqliteException ex)
+                    {
+                        // Correctness path: SchemaClear's contract is to drop the table. A failed DROP must
+                        // not be silently reported as success — surface it (log-error; behavior preserved).
+                        KoanLog.DataError(_logger, "schema_clear", "drop-failed", ("table", TableName), ("code", ex.SqliteErrorCode), ("error", ex.Message));
+                    }
                     // Invalidate health cache so a subsequent operation will re-ensure the schema
-                    try { InvalidateHealth(conn, TableName); } catch { }
+                    try { InvalidateHealth(conn, TableName); }
+                    catch (Exception ex)
+                    {
+                        KoanLog.DataDebug(_logger, "schema_clear", "invalidate-failed", ("table", TableName), ("error", ex.Message));
+                    }
                     object res = 0; return (TResult)res;
                 }
             case DataInstructions.Clear:
                 EnsureOrchestrated(conn);
-                var del = await conn.ExecuteAsync($"DELETE FROM [{TableName}]");
+                var del = await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{TableName}]", null, null, ct);
                 object d_res = del;
                 return (TResult)d_res;
             case RelationalInstructions.SchemaEnsureCreated:
@@ -1019,7 +895,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new SqliteDdlExecutor(conn, TableName);
                     var feats = new SqliteStoreFeatures();
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, ct);
                     object ok = true; return (TResult)ok;
                 }
             case RelationalInstructions.SqlScalar:
@@ -1028,7 +904,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var p = GetParamsFromInstruction(instruction);
                     try
                     {
-                        var result = await conn.ExecuteScalarAsync(sql, p);
+                        var result = await AdoCommands.ExecuteScalarAsync(conn, sql, p, null, ct);
                         return CastScalar<TResult>(result);
                     }
                     catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
@@ -1036,7 +912,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
                         InvalidateHealth(conn, TableName);
                         EnsureOrchestrated(conn);
-                        var result = await conn.ExecuteScalarAsync(sql, p);
+                        var result = await AdoCommands.ExecuteScalarAsync(conn, sql, p, null, ct);
                         return CastScalar<TResult>(result);
                     }
                 }
@@ -1045,11 +921,16 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     sql = MaybeRewriteInsertForProjection(sql);
                     // Ensure table exists if targeting this entity table
-                    try { EnsureOrchestrated(conn); } catch { }
+                    // Degradable: this is a best-effort pre-ensure; the no-such-table retry below re-ensures.
+                    try { EnsureOrchestrated(conn); }
+                    catch (Exception ex)
+                    {
+                        KoanLog.DataDebug(_logger, "sql_nonquery", "pre-ensure-failed", ("table", TableName), ("error", ex.Message));
+                    }
                     var p = GetParamsFromInstruction(instruction);
                     try
                     {
-                        var affected = await conn.ExecuteAsync(sql, p);
+                        var affected = await AdoCommands.ExecuteAsync(conn, sql, p, null, ct);
                         object res = affected;
                         return (TResult)res;
                     }
@@ -1058,7 +939,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
                         InvalidateHealth(conn, TableName);
                         EnsureOrchestrated(conn);
-                        var affected = await conn.ExecuteAsync(sql, p);
+                        var affected = await AdoCommands.ExecuteAsync(conn, sql, p, null, ct);
                         object res = affected;
                         return (TResult)res;
                     }
@@ -1068,10 +949,15 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
                     // Best-effort ensure for entity table
-                    try { EnsureOrchestrated(conn); } catch { }
+                    // Degradable: best-effort pre-ensure; the no-such-table retry below re-ensures.
+                    try { EnsureOrchestrated(conn); }
+                    catch (Exception ex)
+                    {
+                        KoanLog.DataDebug(_logger, "sql_query", "pre-ensure-failed", ("table", TableName), ("error", ex.Message));
+                    }
                     try
                     {
-                        var rows = await conn.QueryAsync(sql, p);
+                        var rows = await AdoCommands.QueryRowsAsync(conn, sql, p, null, ct);
                         var list = MapDynamicRows(rows);
                         return (TResult)(object)list;
                     }
@@ -1080,7 +966,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
                         InvalidateHealth(conn, TableName);
                         EnsureOrchestrated(conn);
-                        var rows = await conn.QueryAsync(sql, p);
+                        var rows = await AdoCommands.QueryRowsAsync(conn, sql, p, null, ct);
                         var list = MapDynamicRows(rows);
                         return (TResult)(object)list;
                     }
@@ -1099,8 +985,36 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         if (string.IsNullOrWhiteSpace(sql)) throw new ArgumentException("Instruction payload missing Sql.");
         return sql!;
     }
-    private static object? GetParamsFromInstruction(Instruction instruction)
-        => instruction.Parameters is null ? null : new DynamicParameters(new Dictionary<string, object?>(instruction.Parameters));
+    private static SqlParameters GetParamsFromInstruction(Instruction instruction)
+        => instruction.Parameters is null ? SqlParameters.None : SqlParameters.FromDictionary(instruction.Parameters);
+
+    // Raw-query escape hatch: normalise the open `object?` parameter into the AOT-clean SqlParameters model.
+    // Dictionaries and SqlParameters pass through; a POCO/anonymous object is reflected (as Dapper did) — that
+    // reflective branch is the only AOT-soft spot, confined to the rarely-used raw path.
+    private static SqlParameters ToSqlParameters(object? parameters)
+    {
+        switch (parameters)
+        {
+            case null: return SqlParameters.None;
+            case SqlParameters sp: return sp;
+            case IReadOnlyDictionary<string, object?> rod: return SqlParameters.FromDictionary(rod);
+            case IDictionary<string, object?> dict:
+            {
+                var bag = new SqlParameters();
+                foreach (var kv in dict) bag.Add(kv.Key, kv.Value);
+                return bag;
+            }
+            default:
+            {
+                var bag = new SqlParameters();
+                foreach (var prop in parameters.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+                {
+                    if (prop.CanRead && prop.GetIndexParameters().Length == 0) bag.Add(prop.Name, prop.GetValue(parameters));
+                }
+                return bag;
+            }
+        }
+    }
 
     private static bool IsFullSelect(string sql)
     {
@@ -1120,7 +1034,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             this.tableName = tableName;
         }
         // New: Create table with all columns in one statement
-        public void CreateTableWithColumns(string schema, string table, List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
+        public void CreateTableWithColumns(string schema, string table, IReadOnlyList<RelationalColumnDefinition> columns)
         {
             var tname = string.IsNullOrWhiteSpace(table) ? tableName : table;
             var colDefs = new List<string>();
@@ -1189,7 +1103,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Degradable: per-column ensure is best-effort shape repair; each column already has its own
+                // typed catch above. This outer guard only catches an enumeration-level fault.
+                System.Diagnostics.Debug.WriteLine($"[DDL] Error ensuring columns for {tname}: {ex.Message}");
+            }
             // Wait for table and required columns to be visible to other connections.
             try
             {
@@ -1206,7 +1125,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                             break;
                         }
                     }
-                    catch { }
+                    catch (SqliteException)
+                    {
+                        // Degradable: a transient probe error mid-poll means "not visible yet"; loop retries.
+                    }
                     Thread.Sleep(delay);
                     delay = Math.Min(200, delay * 2);
                 }
@@ -1215,7 +1137,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     System.Diagnostics.Debug.WriteLine($"[DDL] Timeout waiting for table '{tname}' and columns to become visible ({required.Length} columns)");
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Degradable: visibility wait is a cross-connection settle barrier; the query path re-ensures.
+                System.Diagnostics.Debug.WriteLine($"[DDL] Visibility wait failed for {tname}: {ex.Message}");
+            }
         }
         public bool TableExists(string schema, string table)
         {
@@ -1295,124 +1221,6 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         public string ProviderName => "sqlite";
     }
 
-    /// <summary>
-    /// Connection pool for SQLite to eliminate connection creation overhead.
-    /// Manages a pool of reusable connections per connection string.
-    /// </summary>
-    private sealed class ConnectionPool
-    {
-        private readonly string _connectionString;
-        private readonly ConcurrentBag<SqliteConnection> _availableConnections = new();
-        private readonly SemaphoreSlim _semaphore = new(20, 20); // Max 20 concurrent connections
-        private int _totalCreated;
-
-        public ConnectionPool(string connectionString)
-        {
-            _connectionString = connectionString;
-        }
-
-        public PooledConnection Rent()
-        {
-            _semaphore.WaitAsync();
-
-            // Try to get an existing connection from the pool
-            if (_availableConnections.TryTake(out var conn))
-            {
-                try
-                {
-                    // Verify connection is still valid
-                    if (conn.State == ConnectionState.Open)
-                    {
-                        return new PooledConnection(conn, this);
-                    }
-                    // Connection was closed, reopen it
-                    conn.Open();
-                    return new PooledConnection(conn, this);
-                }
-                catch
-                {
-                    // Connection is bad, dispose and create new
-                    try { conn.Dispose(); } catch { }
-                }
-            }
-
-            // Create a new connection
-            var newConn = new SqliteConnection(_connectionString);
-            newConn.Open();
-            Interlocked.Increment(ref _totalCreated);
-            return new PooledConnection(newConn, this);
-        }
-
-        public void Return(SqliteConnection conn)
-        {
-            try
-            {
-                if (conn.State == ConnectionState.Open)
-                {
-                    // Return connection to pool for reuse
-                    _availableConnections.Add(conn);
-                }
-                else
-                {
-                    // Connection is closed, dispose it
-                    try { conn.Dispose(); } catch { }
-                }
-            }
-            finally
-            {
-                _semaphore.Release();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Wrapper around SqliteConnection that returns to pool on Dispose.
-    /// </summary>
-    private sealed class PooledConnection : IDbConnection
-    {
-        private SqliteConnection? _connection;
-        private readonly ConnectionPool _pool;
-        private bool _disposed;
-
-        public PooledConnection(SqliteConnection connection, ConnectionPool pool)
-        {
-            _connection = connection;
-            _pool = pool;
-        }
-
-        [AllowNull]
-        public string ConnectionString
-        {
-            get => _connection?.ConnectionString ?? "";
-            set
-            {
-                if (_connection != null) _connection.ConnectionString = value ?? "";
-            }
-        }
-
-        public int ConnectionTimeout => _connection?.ConnectionTimeout ?? 0;
-        public string Database => _connection?.Database ?? "";
-        public ConnectionState State => _connection?.State ?? ConnectionState.Closed;
-
-        public IDbTransaction BeginTransaction() => _connection!.BeginTransaction();
-        public IDbTransaction BeginTransaction(IsolationLevel il) => _connection!.BeginTransaction(il);
-        public void ChangeDatabase(string databaseName) => _connection?.ChangeDatabase(databaseName);
-        public void Close() { } // Don't actually close - return to pool on Dispose
-        public IDbCommand CreateCommand() => _connection!.CreateCommand();
-        public void Open() => _connection?.Open();
-
-        public void Dispose()
-        {
-            if (!_disposed && _connection != null)
-            {
-                _disposed = true;
-                // Return connection to pool instead of disposing it
-                _pool.Return(_connection);
-                _connection = null;
-            }
-        }
-    }
-
     private string RewriteEntityToken(string sql)
     {
         var token = typeof(TEntity).Name;
@@ -1440,14 +1248,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return msg.IndexOf("no such table", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
-    private static List<TEntity> MapRowsToEntities(IEnumerable<dynamic> rows)
+    private List<TEntity> MapRowsToEntities(IEnumerable<IReadOnlyDictionary<string, object?>> rows)
     {
         var list = new List<TEntity>();
         var t = typeof(TEntity);
         var idProp = t.GetProperty("Id");
-        foreach (var row in rows)
+        foreach (var dict in rows)
         {
-            var dict = (IDictionary<string, object?>)row;
             // Prefer Json column if present
             if (dict.TryGetValue("Json", out var jsonVal) && jsonVal is string jsonStr && !string.IsNullOrWhiteSpace(jsonStr))
             {
@@ -1459,14 +1266,23 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var ent2 = Activator.CreateInstance<TEntity>();
             if (idProp is not null && dict.TryGetValue("Id", out var idv) && idv is not null)
             {
-                // TKey may not be string; attempt change type if needed
+                // TKey may not be string; attempt change type if needed.
+                // Benign conversion fallback: when the raw id can't be coerced to TKey, set it verbatim.
                 try { idProp.SetValue(ent2, (TKey)Convert.ChangeType(idv, typeof(TKey))); }
-                catch { idProp.SetValue(ent2, idv); }
+                catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
+                {
+                    idProp.SetValue(ent2, idv);
+                }
             }
             var titleProp = t.GetProperty("Title", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
             if (titleProp is not null && dict.TryGetValue("Title", out var tv))
             {
-                try { titleProp.SetValue(ent2, tv?.ToString()); } catch { }
+                // Degradable: 'Title' is an optional convenience column in the rare non-Json raw-row path.
+                try { titleProp.SetValue(ent2, tv?.ToString()); }
+                catch (Exception ex) when (ex is ArgumentException or System.Reflection.TargetException or System.Reflection.TargetInvocationException)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MAP] Failed to set Title on {t.Name}: {ex.Message}");
+                }
             }
             var metaProp = t.GetProperty("Meta", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
             if (metaProp is not null && dict.TryGetValue("Meta", out var mv))
@@ -1479,7 +1295,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         if (obj is not null) metaProp.SetValue(ent2, obj);
                     }
                 }
-                catch { /* ignore */ }
+                catch (Exception ex) when (ex is JsonException or ArgumentException or System.Reflection.TargetException or System.Reflection.TargetInvocationException)
+                {
+                    // Degradable: 'Meta' is an optional column; malformed/incompatible JSON leaves it unset.
+                    System.Diagnostics.Debug.WriteLine($"[MAP] Failed to set Meta on {t.Name}: {ex.Message}");
+                }
             }
             list.Add(ent2);
         }
@@ -1533,29 +1353,23 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         if (value is null) return default!;
         var t = typeof(TResult);
         if (t.IsAssignableFrom(value.GetType())) return (TResult)value;
-        try { return (TResult)Convert.ChangeType(value, t); } catch { return default!; }
+        // Benign coercion fallback: an unconvertible scalar (e.g. NULL-ish or shape mismatch) yields default.
+        try { return (TResult)Convert.ChangeType(value, t); }
+        catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SCALAR] Cannot coerce '{value}' to {t.Name}: {ex.Message}");
+            return default!;
+        }
     }
 
-    private static IReadOnlyList<Dictionary<string, object?>> MapDynamicRows(IEnumerable<dynamic> rows)
+    private static IReadOnlyList<Dictionary<string, object?>> MapDynamicRows(IEnumerable<IReadOnlyDictionary<string, object?>> rows)
     {
         var list = new List<Dictionary<string, object?>>();
         foreach (var row in rows)
         {
-            if (row is IDictionary<string, object?> map)
-            {
-                list.Add(new Dictionary<string, object?>(map, StringComparer.OrdinalIgnoreCase));
-            }
-            else
-            {
-                var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-                var props = ((object)row).GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                foreach (var p in props)
-                {
-                    if (!p.CanRead) continue;
-                    dict[p.Name] = p.GetValue(row);
-                }
-                list.Add(dict);
-            }
+            var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in row) dict[kv.Key] = kv.Value;
+            list.Add(dict);
         }
         return list;
     }

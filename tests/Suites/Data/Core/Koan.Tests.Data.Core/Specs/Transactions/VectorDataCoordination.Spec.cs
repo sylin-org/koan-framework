@@ -23,18 +23,6 @@ public sealed class VectorDataCoordinationSpec
         _output = output ?? throw new ArgumentNullException(nameof(output));
     }
 
-    private static string EnsurePartition(TestContext ctx)
-    {
-        const string Key = "partition";
-        if (!ctx.TryGetItem<string>(Key, out var partition))
-        {
-            partition = $"vector-data-{ctx.ExecutionId:n}";
-            ctx.SetItem(Key, partition);
-        }
-
-        return partition;
-    }
-
     /// <summary>
     /// Test #6: SaveWithVector_WithTransaction_DefersBoth
     /// Validates that both entity and vector operations are deferred when transaction is active.
@@ -42,62 +30,53 @@ public sealed class VectorDataCoordinationSpec
     [Fact]
     public async Task SaveWithVector_with_transaction_defers_both_operations()
     {
-        await TestPipeline.For<VectorDataCoordinationSpec>(_output, nameof(SaveWithVector_with_transaction_defers_both_operations))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"vector-data-{Guid.CreateVersion7():n}";
+
+        if (!Vector<TodoEntity>.IsAvailable)
+        {
+            _output.WriteLine("Vector database not available - skipping test");
+            return;
+        }
+
+        var entity = new TodoEntity
+        {
+            Title = "SaveWithVector Test",
+            Description = "Testing coordinated save"
+        };
+
+        var embedding = GenerateTestEmbedding(1536);
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            using (EntityContext.Transaction("save-with-vector-tx"))
             {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                // SaveWithVector should defer both operations
+                await VectorData<TodoEntity>.SaveWithVector(entity, embedding, null);
 
-                if (!Vector<TodoEntity>.IsAvailable)
-                {
-                    ctx.Diagnostics.Info("Vector database not available - skipping test");
-                    return;
-                }
+                // Neither should be persisted yet
+                var entityCount = await TodoEntity.Count;
+                entityCount.Should().Be(0, "entity should not be persisted during transaction");
 
-                var entity = new TodoEntity
-                {
-                    Title = "SaveWithVector Test",
-                    Description = "Testing coordinated save"
-                };
+                var vectorExists = await TryGetVector(entity.Id);
+                vectorExists.Should().BeFalse("vector should not be persisted during transaction");
 
-                var embedding = GenerateTestEmbedding(1536);
+                await EntityContext.Commit();
+            }
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    using (EntityContext.Transaction("save-with-vector-tx"))
-                    {
-                        // SaveWithVector should defer both operations
-                        await VectorData<TodoEntity>.SaveWithVector(entity, embedding, null);
+            // Both should be persisted after commit
+            var entityCountAfter = await TodoEntity.Count;
+            entityCountAfter.Should().Be(1, "entity should be persisted after commit");
 
-                        // Neither should be persisted yet
-                        var entityCount = await TodoEntity.Count;
-                        entityCount.Should().Be(0, "entity should not be persisted during transaction");
+            var vectorExistsAfter = await TryGetVector(entity.Id);
+            vectorExistsAfter.Should().BeTrue("vector should be persisted after commit");
 
-                        var vectorExists = await TryGetVector(entity.Id);
-                        vectorExists.Should().BeFalse("vector should not be persisted during transaction");
-
-                        await EntityContext.Commit();
-                    }
-
-                    // Both should be persisted after commit
-                    var entityCountAfter = await TodoEntity.Count;
-                    entityCountAfter.Should().Be(1, "entity should be persisted after commit");
-
-                    var vectorExistsAfter = await TryGetVector(entity.Id);
-                    vectorExistsAfter.Should().BeTrue("vector should be persisted after commit");
-
-                    // Verify entity is retrievable
-                    var retrieved = await TodoEntity.Get(entity.Id);
-                    retrieved.Should().NotBeNull();
-                    retrieved!.Title.Should().Be("SaveWithVector Test");
-                }
-            })
-            .Run();
+            // Verify entity is retrievable
+            var retrieved = await TodoEntity.Get(entity.Id);
+            retrieved.Should().NotBeNull();
+            retrieved!.Title.Should().Be("SaveWithVector Test");
+        }
     }
 
     /// <summary>
@@ -107,45 +86,36 @@ public sealed class VectorDataCoordinationSpec
     [Fact]
     public async Task SaveWithVector_without_transaction_executes_sequentially()
     {
-        await TestPipeline.For<VectorDataCoordinationSpec>(_output, nameof(SaveWithVector_without_transaction_executes_sequentially))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
-            {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var partition = ctx.GetRequiredItem<string>("partition");
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
 
-                if (!Vector<TodoEntity>.IsAvailable)
-                {
-                    ctx.Diagnostics.Info("Vector database not available - skipping test");
-                    return;
-                }
+        var partition = $"vector-data-{Guid.CreateVersion7():n}";
 
-                var entity = new TodoEntity
-                {
-                    Title = "Sequential Test",
-                    Description = "No transaction coordination"
-                };
+        if (!Vector<TodoEntity>.IsAvailable)
+        {
+            _output.WriteLine("Vector database not available - skipping test");
+            return;
+        }
 
-                var embedding = GenerateTestEmbedding(1536);
+        var entity = new TodoEntity
+        {
+            Title = "Sequential Test",
+            Description = "No transaction coordination"
+        };
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    // No transaction - should execute immediately
-                    await VectorData<TodoEntity>.SaveWithVector(entity, embedding, null);
+        var embedding = GenerateTestEmbedding(1536);
 
-                    // Both should be persisted immediately
-                    var entityCount = await TodoEntity.Count;
-                    entityCount.Should().Be(1, "entity should be persisted immediately");
+        using (var _ = EntityContext.Partition(partition))
+        {
+            // No transaction - should execute immediately
+            await VectorData<TodoEntity>.SaveWithVector(entity, embedding, null);
 
-                    var vectorExists = await TryGetVector(entity.Id);
-                    vectorExists.Should().BeTrue("vector should be persisted immediately");
-                }
-            })
-            .Run();
+            // Both should be persisted immediately
+            var entityCount = await TodoEntity.Count;
+            entityCount.Should().Be(1, "entity should be persisted immediately");
+
+            var vectorExists = await TryGetVector(entity.Id);
+            vectorExists.Should().BeTrue("vector should be persisted immediately");
+        }
     }
 
     /// <summary>
@@ -156,72 +126,63 @@ public sealed class VectorDataCoordinationSpec
     [Fact]
     public async Task SaveWithVector_vector_failure_after_entity_save_throws_coordination_exception()
     {
-        await TestPipeline.For<VectorDataCoordinationSpec>(_output, nameof(SaveWithVector_vector_failure_after_entity_save_throws_coordination_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"vector-data-{Guid.CreateVersion7():n}";
+
+        if (!Vector<TodoEntity>.IsAvailable)
+        {
+            _output.WriteLine("Vector database not available - skipping test");
+            _output.WriteLine("Note: This test requires vector database to validate coordination exception");
+            return;
+        }
+
+        // Create entity with invalid vector (e.g., wrong dimensions) to force vector failure
+        var entity = new TodoEntity
+        {
+            Title = "Error Test",
+            Description = "Testing vector failure"
+        };
+
+        // Invalid embedding - most vector DBs expect specific dimensions (e.g., 1536 for OpenAI)
+        // Using wrong size should cause vector save to fail
+        var invalidEmbedding = GenerateTestEmbedding(10); // Wrong size
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            VectorCoordinationException? caughtException = null;
+
+            try
             {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
+                await VectorData<TodoEntity>.SaveWithVector(entity, invalidEmbedding, null);
+            }
+            catch (VectorCoordinationException ex)
             {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                caughtException = ex;
+            }
 
-                if (!Vector<TodoEntity>.IsAvailable)
-                {
-                    ctx.Diagnostics.Info("Vector database not available - skipping test");
-                    ctx.Diagnostics.Info("Note: This test requires vector database to validate coordination exception");
-                    return;
-                }
+            // If vector DB accepts any dimension, this test becomes a documentation test
+            if (caughtException == null)
+            {
+                _output.WriteLine("Vector database accepted invalid dimensions - test inconclusive");
+                _output.WriteLine("This test validates VectorCoordinationException behavior");
+                return;
+            }
 
-                // Create entity with invalid vector (e.g., wrong dimensions) to force vector failure
-                var entity = new TodoEntity
-                {
-                    Title = "Error Test",
-                    Description = "Testing vector failure"
-                };
+            // Validate exception properties
+            caughtException.EntitySaved.Should().BeTrue("entity should be persisted before vector failed");
+            caughtException.VectorSaved.Should().BeFalse("vector save should have failed");
+            caughtException.EntityId.Should().Be(entity.Id);
+            caughtException.Message.Should().Contain("after entity was persisted");
 
-                // Invalid embedding - most vector DBs expect specific dimensions (e.g., 1536 for OpenAI)
-                // Using wrong size should cause vector save to fail
-                var invalidEmbedding = GenerateTestEmbedding(10); // Wrong size
+            // Entity should still exist in database (saved before vector failure)
+            var retrievedEntity = await TodoEntity.Get(entity.Id);
+            retrievedEntity.Should().NotBeNull("entity should be persisted despite vector failure");
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    VectorCoordinationException? caughtException = null;
-
-                    try
-                    {
-                        await VectorData<TodoEntity>.SaveWithVector(entity, invalidEmbedding, null);
-                    }
-                    catch (VectorCoordinationException ex)
-                    {
-                        caughtException = ex;
-                    }
-
-                    // If vector DB accepts any dimension, this test becomes a documentation test
-                    if (caughtException == null)
-                    {
-                        ctx.Diagnostics.Info("Vector database accepted invalid dimensions - test inconclusive");
-                        ctx.Diagnostics.Info("This test validates VectorCoordinationException behavior");
-                        return;
-                    }
-
-                    // Validate exception properties
-                    caughtException.EntitySaved.Should().BeTrue("entity should be persisted before vector failed");
-                    caughtException.VectorSaved.Should().BeFalse("vector save should have failed");
-                    caughtException.EntityId.Should().Be(entity.Id);
-                    caughtException.Message.Should().Contain("after entity was persisted");
-
-                    // Entity should still exist in database (saved before vector failure)
-                    var retrievedEntity = await TodoEntity.Get(entity.Id);
-                    retrievedEntity.Should().NotBeNull("entity should be persisted despite vector failure");
-
-                    // Vector should NOT exist
-                    var vectorExists = await TryGetVector(entity.Id);
-                    vectorExists.Should().BeFalse("vector should not exist after failure");
-                }
-            })
-            .Run();
+            // Vector should NOT exist
+            var vectorExists = await TryGetVector(entity.Id);
+            vectorExists.Should().BeFalse("vector should not exist after failure");
+        }
     }
 
     /// <summary>
@@ -231,58 +192,49 @@ public sealed class VectorDataCoordinationSpec
     [Fact]
     public async Task SaveWithVector_entity_failure_throws_original_exception()
     {
-        await TestPipeline.For<VectorDataCoordinationSpec>(_output, nameof(SaveWithVector_entity_failure_throws_original_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"vector-data-{Guid.CreateVersion7():n}";
+
+        if (!Vector<TodoEntity>.IsAvailable)
+        {
+            _output.WriteLine("Vector database not available - skipping test");
+            return;
+        }
+
+        // Entity with validation that will fail
+        var entity = new TodoEntity
+        {
+            Title = "", // Empty title might trigger validation failure
+            Description = "Testing entity failure"
+        };
+
+        var embedding = GenerateTestEmbedding(1536);
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            // For this test to work properly, we need validation to fail
+            // If validation doesn't fail on empty title, this documents the behavior
+            try
             {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
+                await VectorData<TodoEntity>.SaveWithVector(entity, embedding, null);
+
+                // If we reach here, validation didn't fail - test is informative only
+                _output.WriteLine("Entity save succeeded despite empty title");
+                _output.WriteLine("This test validates that entity failures are NOT wrapped in VectorCoordinationException");
+            }
+            catch (VectorCoordinationException)
             {
-                var partition = ctx.GetRequiredItem<string>("partition");
-
-                if (!Vector<TodoEntity>.IsAvailable)
-                {
-                    ctx.Diagnostics.Info("Vector database not available - skipping test");
-                    return;
-                }
-
-                // Entity with validation that will fail
-                var entity = new TodoEntity
-                {
-                    Title = "", // Empty title might trigger validation failure
-                    Description = "Testing entity failure"
-                };
-
-                var embedding = GenerateTestEmbedding(1536);
-
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    // For this test to work properly, we need validation to fail
-                    // If validation doesn't fail on empty title, this documents the behavior
-                    try
-                    {
-                        await VectorData<TodoEntity>.SaveWithVector(entity, embedding, null);
-
-                        // If we reach here, validation didn't fail - test is informative only
-                        ctx.Diagnostics.Info("Entity save succeeded despite empty title");
-                        ctx.Diagnostics.Info("This test validates that entity failures are NOT wrapped in VectorCoordinationException");
-                    }
-                    catch (VectorCoordinationException)
-                    {
-                        Assert.Fail("Entity save failure should NOT throw VectorCoordinationException");
-                    }
-                    catch (Exception ex)
-                    {
-                        ctx.Diagnostics.Info($"Entity save failed with expected exception: {ex.GetType().Name}");
-                        // This is expected - entity save failures should propagate as-is
-                        ex.Should().NotBeOfType<VectorCoordinationException>(
-                            "entity failures should propagate original exception type");
-                    }
-                }
-            })
-            .Run();
+                Assert.Fail("Entity save failure should NOT throw VectorCoordinationException");
+            }
+            catch (Exception ex)
+            {
+                _output.WriteLine($"Entity save failed with expected exception: {ex.GetType().Name}");
+                // This is expected - entity save failures should propagate as-is
+                ex.Should().NotBeOfType<VectorCoordinationException>(
+                    "entity failures should propagate original exception type");
+            }
+        }
     }
 
     /// <summary>
@@ -291,50 +243,41 @@ public sealed class VectorDataCoordinationSpec
     [Fact]
     public async Task SaveWithVector_with_metadata_stores_metadata_in_vector_db()
     {
-        await TestPipeline.For<VectorDataCoordinationSpec>(_output, nameof(SaveWithVector_with_metadata_stores_metadata_in_vector_db))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
-            {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var partition = ctx.GetRequiredItem<string>("partition");
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
 
-                if (!Vector<TodoEntity>.IsAvailable)
-                {
-                    ctx.Diagnostics.Info("Vector database not available - skipping test");
-                    return;
-                }
+        var partition = $"vector-data-{Guid.CreateVersion7():n}";
 
-                var entity = new TodoEntity
-                {
-                    Title = "Metadata Test",
-                    Description = "Testing metadata storage"
-                };
+        if (!Vector<TodoEntity>.IsAvailable)
+        {
+            _output.WriteLine("Vector database not available - skipping test");
+            return;
+        }
 
-                var embedding = GenerateTestEmbedding(1536);
-                var metadata = new Dictionary<string, object>
-                {
-                    ["category"] = "test",
-                    ["priority"] = 5,
-                    ["tags"] = new[] { "urgent", "backend" }
-                };
+        var entity = new TodoEntity
+        {
+            Title = "Metadata Test",
+            Description = "Testing metadata storage"
+        };
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    await VectorData<TodoEntity>.SaveWithVector(entity, embedding, metadata);
+        var embedding = GenerateTestEmbedding(1536);
+        var metadata = new Dictionary<string, object>
+        {
+            ["category"] = "test",
+            ["priority"] = 5,
+            ["tags"] = new[] { "urgent", "backend" }
+        };
 
-                    // Verify entity and vector exist
-                    var retrievedEntity = await TodoEntity.Get(entity.Id);
-                    retrievedEntity.Should().NotBeNull();
+        using (var _ = EntityContext.Partition(partition))
+        {
+            await VectorData<TodoEntity>.SaveWithVector(entity, embedding, metadata);
 
-                    var vectorExists = await TryGetVector(entity.Id);
-                    vectorExists.Should().BeTrue("vector with metadata should be persisted");
-                }
-            })
-            .Run();
+            // Verify entity and vector exist
+            var retrievedEntity = await TodoEntity.Get(entity.Id);
+            retrievedEntity.Should().NotBeNull();
+
+            var vectorExists = await TryGetVector(entity.Id);
+            vectorExists.Should().BeTrue("vector with metadata should be persisted");
+        }
     }
 
     #region Helper Methods

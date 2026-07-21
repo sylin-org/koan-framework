@@ -219,7 +219,7 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
         CancellationToken ct = default)
         => VectorData<TEntity>.Search(new VectorQueryOptions(
             Query: vector,
-            TopK: topK,
+            TopK: topK ?? VectorQueryOptions.DefaultTopK,
             ContinuationToken: continuationToken,
             Filter: VectorFilterReader.Read(filter),
             VectorName: vectorName,
@@ -237,7 +237,7 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
         float[] vector, VectorRetrieveOptions options, CancellationToken ct = default)
         => VectorData<TEntity>.Search(new VectorQueryOptions(
             Query: vector,
-            TopK: options.TopK,
+            TopK: options.TopK ?? VectorQueryOptions.DefaultTopK,
             Filter: options.Filter,
             SearchText: options.Text,
             Alpha: options.Alpha

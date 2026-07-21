@@ -3,8 +3,8 @@ type: ARCHITECTURE
 domain: framework
 title: "Bootstrap Lifecycle - Deep Dive"
 audience: [developers, architects]
-status: current
-last_updated: 2025-01-27
+status: superseded
+last_updated: 2026-07-17
 framework_version: v0.6.3
 validation:
     status: not-yet-tested
@@ -12,6 +12,10 @@ validation:
 ---
 
 # Bootstrap Lifecycle - Deep Dive
+
+> Superseded by the single `KoanModule` lifecycle and compiled host constitution. Use the
+> [Framework Utilities Guide](../framework-utilities.md#bootstrap--modules) for current authoring guidance.
+> The material below is retained only as historical design context.
 
 <!-- Previous inline metadata kept above has been normalized into front-matter. -->
 
@@ -573,7 +577,7 @@ Resolution:
 
 - [Auto-Provisioning System](auto-provisioning-system.md) - Schema provisioning integration
 - [Adapter & Data Connectivity](../../support/troubleshooting.md#adapter--data-connectivity) - Troubleshooting bootstrap-adjacent failures
-- [Boot & Auto-Registration](../../support/troubleshooting.md#boot--auto-registration) - Startup sequencing runbook
+- [Boot and module activation](../../support/troubleshooting.md#boot-and-module-activation) - Startup sequencing runbook
 - [Framework Principles](../../architecture/principles.md) - Understanding framework design philosophy
 
 ---

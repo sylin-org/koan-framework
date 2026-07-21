@@ -3,7 +3,7 @@
 **Date:** 2025-01-16
 **Status:** Implemented (outbound only) — **Superseded by [SEC-0001](SEC-0001-fleet-identity-and-trust-fabric.md)** (2026-06-06), which completes the deferred inbound validation half, replaces the deterministic dev client secret / HS256 signing with asymmetric (ES256) signing, and generalizes service-to-service auth into a cross-channel fleet identity/trust fabric. The outbound `Koan.Web.Auth.Services` (`DelegatingHandler`) described here remains valid.
 **Decision Makers:** Development Team
-**Related:** [PROP-0052](../proposals/PROP-0052-service-authentication.md) · superseded by [SEC-0001](SEC-0001-fleet-identity-and-trust-fabric.md)
+**Related:** [PROP-0052](../archive/proposals/PROP-0052-service-authentication.md) · superseded by [SEC-0001](SEC-0001-fleet-identity-and-trust-fabric.md)
 
 ## Context
 
@@ -335,5 +335,4 @@ KOAN_SERVICE_ANALYTICS_SERVICE_URL=https://analytics-internal.company.com
 - [RFC 6749: OAuth 2.0 Authorization Framework](https://tools.ietf.org/html/rfc6749)
 - [RFC 6750: OAuth 2.0 Bearer Token Usage](https://tools.ietf.org/html/rfc6750)
 - [RFC 7519: JSON Web Token (JWT)](https://tools.ietf.org/html/rfc7519)
-- [PROP-0052: Service Authentication Proposal](../proposals/PROP-0052-service-authentication.md)
-- [Zero-Configuration Analysis](../../src/Koan.Web.Auth.Services/ZERO-CONFIG-ANALYSIS.md) - Complete configuration elimination analysis
+- [PROP-0052: Service Authentication Proposal](../archive/proposals/PROP-0052-service-authentication.md)

@@ -1,0 +1,167 @@
+---
+type: GUIDE
+domain: framework
+title: "Koan V1 Post-Main-Cycle Todo Register"
+audience: [maintainers, architects, ai-agents]
+status: current
+last_updated: 2026-07-18
+framework_version: v0.20.0
+validation:
+  date_last_tested: 2026-07-18
+  status: reviewed
+  scope: bounded design and polish debt deliberately deferred from active V1 slices
+---
+
+# Koan V1 post-main-cycle todo register
+
+## Contract
+
+This register preserves small but real issues that deserve deliberate treatment after the active
+V1 slice. It prevents two failure modes: widening the active repair until it never
+finishes, and losing a design concern because the immediate warning or symptom was made quiet.
+
+An entry is not authorization to change a public contract. Before implementation, give it a bounded
+card, apply the normal exploration workflow, decide compatibility explicitly, and name executable
+acceptance evidence. If new evidence makes an entry a correctness, security, or release blocker,
+promote it into the active backlog instead of waiting for this list.
+
+## Current register
+
+| ID | Surface | Deferred issue | Why it stays out of the main cycle | Decision required before work | Acceptance evidence |
+|---|---|---|---|---|---|
+| PMC-005 | Release tooling | Repository discovery accepts a `.git` directory but not the `.git` indirection file used by linked worktrees. | The verified clean-clone release path works; linked-worktree convenience is not release correctness. | Decide whether all Git worktree shapes are supported and centralize root discovery rather than adding command-specific exceptions. | Release-plan and package rehearsal from a linked worktree plus unchanged clean-clone coverage. |
+| PMC-006 | Release tooling | Long package plans capture child output and can appear idle between package completions. | Buffered output does not weaken artifact evidence, but it makes operator supervision unnecessarily uncertain. | Define concise live progress events without leaking secrets or making resumable state depend on console rendering. | A bounded slow-process test proving periodic progress, failure context, and unchanged machine-readable evidence. |
+| PMC-008 | Data / vector transactions | `VectorSaveOperation` crosses the Data.Core→Vector boundary through reflection, method-name lookup, and a runtime `Task` cast; nearby error text still says `UpsertAsync` while lookup uses `Upsert`. | The nullable-array correction is behavior-preserving; replacing the bridge changes a cross-project contract and transaction behavior. | Decide whether a small Core-owned capability seam can remove reflection without reversing dependency direction; otherwise make the reflection contract explicit and fail-loud. | Transactional vector save/delete integration proof, missing/incompatible method mutations, cancellation, and non-atomic reporting. |
+| PMC-009 | Documentation tooling | XML documentation defects can remain invisible until a public sample rebuild happens to traverse the owning project. | The supported contracts now reject warnings, but repository-wide doc-link validation belongs with the broader warning policy. | Decide whether packable projects or the solution should treat XML-doc reference warnings as errors and how generated/legacy code is scoped. | A deliberately broken `cref` mutation fails the selected CI lane; current shipping modules pass it. |
+| PMC-013 | Data/Web Backup | Web operation tracking is process-local and polling-only; its cancel endpoint marks tracker state but does not stop active I/O. Global export is sequential despite a `MaxConcurrency` option, the complete ZIP is memory-resident, and Web Backup has no executable suite. | R07-02 needs one real Backup consumer and truthful public boundaries, not a production recovery subsystem rebuild. | Decide whether to graduate Backup: real cancellation ownership, durable operation state, archive streaming, intentional concurrency, authorization, recovery guarantees, and push notifications must be designed as one operational contract. | End-to-end Web tests prove submit/poll/cancel/restart/authorization; cancellation stops provider work; a large archive does not require full memory; recovery drills prove restore integrity. |
+| PMC-014 | Data Backup security | `Encrypt` and `EncryptByDefault` currently record policy intent/manifest metadata only; the archive payload is not encrypted. Public docs now state that boundary explicitly. | Quietly inventing cryptography or key custody inside a streaming repair would be unsafe; retaining an implementation-looking flag indefinitely is also a footgun. | Either remove/rename the metadata-only flags in the next breaking wave, or specify authenticated encryption, key identity/rotation, failure posture, and restore-time key resolution before implementing them. | Known-plaintext archive inspection, authenticated-tamper rejection, wrong/missing/rotated-key cases, redacted facts/logs, and a documented recovery drill. |
+| PMC-018 | Remote data providers | PostgreSQL, SQL Server, CockroachDB, MongoDB, and Couchbase still pre-resolve generic `ConnectionStrings:Default` inside provider options. Their routed factories now reject foreign generic source definitions/settings, but an opaque `resolvedDefault` can lose that provenance before Data.Core applies ownership. SQLite no longer has this ambiguity. | R07-04's supported release-floor root is the local SQLite/Jobs path; remote providers remain separately evidenced extensions and should not be mechanically changed without their live health/boot contracts. | Move generic source fallback exclusively into Data.Core, or carry explicit origin/ownership with every provider default. Reconcile repository, Direct, readiness, and boot-report resolution as one provider contract. | A shared precedence/ownership matrix runs through each built-in remote configurator and real factory; foreign Default values never reach the provider; owned generic values, provider-scoped overrides, `auto`, health, Direct, and startup provenance agree. |
+| PMC-020 | Certification evidence | The public-release ratchet prints per-project VSTest summaries but does not persist one machine-readable aggregate test/pass/fail/skip/duration manifest. A buffered or truncated supervising console therefore cannot reconstruct exact aggregate counts after a successful run. | R07-04's exact clean certification is green and every project summary was emitted; adding an evidence subsystem inside that closure would widen a successful runner repair. | Choose a durable TRX/JUnit collection convention and a deterministic aggregator that preserves project identity, execution sequence, failed or hung owner, and local/CI parity without changing pass/fail semantics. | One retained artifact reports total/pass/fail/skip/duration by project and aggregate, names the failed or hung project and sequence, and agrees between the local ratchet and protected CI. |
+| PMC-021 | Entity Communication authoring | `[EventDetailsRequired]` makes payloadless `Raise<TEvent>()` fail before source enumeration at runtime, but no build-time diagnostic guides the author at the call site. | R07-08 deliberately keeps one Communication package and avoids introducing an analyzer assembly for a misuse that already fails safely and clearly. | Decide whether this friction occurs often enough to earn a shared Koan analyzer rule, and define generic/event-attribute resolution without coupling analyzers to runtime discovery. | A compile fixture rejects payloadless Raise only for details-required event kinds, accepts optional and explicit-details calls, supplies one corrective message, and leaves runtime enforcement unchanged. |
+| PMC-022 | Media derivative lifecycle | Public `MediaDerivation` exposes framework storage mechanics, keys persisted output by source id plus recipe fingerprint without source-contract identity, and requires applications to query framework rows for targeted cleanup or statistics. | R07-17 removes a false generic sweep safely, but a correct replacement needs one context-aware render/lifecycle owner and an explicit migration rather than another speculative storage SPI. Current on-demand and targeted application behavior remains honest. | Centralize derivative identity, storage, access, and cleanup behind a Media-owned coordinator keyed by source contract/type and logical context; decide compatibility and migration for existing rows before hiding framework storage. | Multi-source-type collision and isolation proofs, tenant/access context safety, targeted cleanup and statistics, HTTP/direct-render convergence, restart behavior, and an explicit migration fixture for existing derivatives. |
+| PMC-023 | Entity Communication evolution | Distributed receiver groups and wire contracts currently derive identity from CLR application types. A type rename changes the group/contract identity; there is no stable alias, schema-version negotiation, or heterogeneous application manifest. | R07-18 completes one-application business-channel policy and real RabbitMQ carriage. Inventing aliases before an integration/rolling-upgrade use case would add a second naming system without proving migration semantics. | Define stable contract and receiver-group aliases, ownership, version compatibility, rollout precedence, collision handling, and whether aliases belong on business types, handlers, or host composition. Keep cross-application integration distinct from Entity replication. | A rolling two-version RabbitMQ fixture proves compatible old/new participants, rename migration, collision rejection, exact startup/facts manifests, authenticated context, and fail-loud incompatible schemas without duplicate group delivery. |
+| PMC-026 | Package impact precision | Analyzer ProjectReference sources conservatively mint every consuming package when the analyzer changes, even when a generator emits no source for a particular consumer or a diagnostic-only analyzer cannot change its assembly bytes. | Conservative automatic impact is release-safe and operator-free; proving output-sensitive selection requires compiler evidence and must not reintroduce a maintained package list or stale identity risk. | Decide whether generator-emission fingerprints can safely narrow release impact while diagnostic analyzers retain an intentional policy, with conservative mapping as the fail-safe default. | A generator change selects every consumer whose compiled/generated bytes can change, leaves proven non-emitting consumers untouched, handles diagnostics/config changes deliberately, and mutation tests reject any false negative. |
+| PMC-027 | Storage connector tests | `Koan.Storage.Connector.Local.Tests` is not marked as a test project and its dormant sources no longer compile against current Storage options/capability contracts. R09-05 repaired and proves Local listing through the active Tenancy integration suite, but the connector-owned suite cannot currently execute. | Repairing an entire stale connector suite would widen the hard-segmentation slice after the real provider behavior is already covered. | Decide whether to migrate this project wholesale to the current xUnit v3 test contract or replace it with a smaller connector-owned behavioral suite; do not preserve obsolete option shapes merely to compile old tests. | The project runs by default under the focused test command, compiles without compatibility shims, and proves flat/nested listing, prefix filtering, sharding opacity, range reads, capabilities, and current configuration validation. |
+| PMC-029 | First-use startup truth | The exact R08-04 package console completed persistence/query work but reported two framework-owned collection failures. The repair is implemented: `StartKoan()` now owns one standard Generic Host lifecycle, focused host/Communication suites pass 8/8, a source-equivalent template console starts hosted capabilities and completes Entity work without either failure, and a focused Data.Core nupkg carries the required Host dependency. | Rebuilding the complete 108-package bootstrap solely to repeat package execution would spend a release-certification wave after the owner and consumer proofs are already green. A truthful Diagnostics section may still contain useful elections, guarantees, and corrections; the defect is a false `CollectionFailed` fact, not the existence of inspectability. | Keep [ARCH-0119](../../decisions/ARCH-0119-one-console-host-lifecycle.md) as the lifecycle owner. On the next exact candidate, make the existing package-only probes reject Communication-composition and health-registry collection failures before any public promotion. | The next exact package-only console, FirstUse, and GoldenJourney contain no false Communication or health-registry collection failure; focused tests continue to prove standard host services, hosted start/stop, real corrective faults, and clean disposal. Truthful non-failure Diagnostics remain visible. |
+| PMC-030 | AI adapter lifetime | `InMemoryAdapterRegistry` stores adapters created by contributors, including disposable ONNX sessions, but `IAiAdapterRegistry.Add` does not state whether the registry or DI owns each adapter. Other contributors add DI-owned adapters, so blindly disposing the full registry risks double ownership. | R10-06 moves contributor execution into `AiModule.Start` and proves process behavior; resolving mixed adapter ownership requires a deliberate contract rather than sample teardown code or an ONNX-only exception. | Choose one ownership model: registry-owned registrations, explicit ownership metadata, or DI-created adapters only. Align contributor construction and removal semantics before adding disposal. | Repeated-host ONNX and DI-owned-adapter fixtures prove exactly-once disposal, removal disposal policy, failed-contribution cleanup, no retained inference sessions, and unchanged routing/provenance behavior. |
+| PMC-034 | Web Auth / Identity factors | The retired Credentials, Passwords, and MFA packages contained real BCrypt, TOTP, recovery, `amr`/`acr`, and checkup mechanics, but no supported authentication ceremony connected primary proof, step-up continuation, factor verification, and cookie issuance. The former specs manufactured proof claims and redispatched the lifecycle, while a real provider callback could be aborted by an untranslated gate exception. | Shipping or polishing those packages would turn application-auth scaffolding into a falsely complete framework claim. R11 removes the partial surface so V1 stays semantically honest; the dated SEC-0007 decision remains historical input. | Design one Web Auth-owned ceremony engine for external and Koan-managed primary factors. Put cross-module factor vocabulary in an inert contracts assembly; keep factor storage/mechanics in opt-in leaves; define continuation secrecy/lifetime, return handling, local-login collision and lockout, distributed single-use semantics, rate limiting, CSRF/origin posture, data-protection key persistence, enrollment/recovery authorization, startup/facts/health, and explicit unsupported guarantees. | A package-only application adds Passwords and/or MFA by reference plus existing `AddKoan()`; real controller/provider round trips prove password-only success, enrolled-MFA interruption and resume, TOTP/recovery single use under concurrency, callback continuity, restart/key behavior, lockout/rate limiting, CSRF/origin posture, no session before all factors, standard session/role projection after completion, and matching startup/runtime facts. |
+| PMC-035 | Identity × Tenancy invitations | The former invitation record and acceptance service were retired together. Their check-then-write flow could grant one token to two different people under multi-node contention; verified-email matching also depended on upstream assurance and was not itself an inbox-ownership ceremony. | A process-local keyed lease would hide rather than solve the distributed claim problem; fail-closed pre-claim without recovery could consume an invitation without creating its seat. R11 keeps no placeholder type for a guarantee the framework does not complete. | Design one explicit invitation claim state machine with claimant identity, attempt/accepted timestamps, provider-independent conditional-write requirements or transaction ownership, idempotent recovery after partial failure, token hashing/uniqueness, expiry/revocation races, verified-address assurance policy, role validation, audit, and controller/browser security posture. | Two identities racing one token across multiple hosts yield exactly one seat and one durable claimant; retries recover every injected failure boundary without double grant or lost invitation; token/revocation/expiry/email-assurance/role cases fail correctly; package reference plus existing `AddKoan()` exposes one supported acceptance ceremony with startup/runtime explanation. |
+
+## Promoted and resolved history
+
+- **PMC-003 / PMC-028 / PMC-032 — warning and connector-test graph premises.** Closed by current
+  evidence in R12-02 on 2026-07-19. R11-07's exact public-release solution build reports zero warnings
+  and errors, superseding PMC-003's 19-warning baseline. SQLite's discovery fake implements
+  `ResolveServiceIntent`, and its full connector-owned Release suite passes 36/36. A fresh XML-based
+  inventory of every test-project `ProjectReference` finds zero missing targets and no retired
+  `Koan.Core.Adapters.csproj` reference. No suppression, replacement dependency, or compatibility fake
+  was added for defects that no longer exist.
+
+- **PMC-024 — direct-reference build-fixture isolation.** Resolved in R12-02 on 2026-07-19. The
+  fixture no longer restores `src/Koan.Core` under a throwaway NuGet configuration. A synthetic
+  `Koan.Core` project, package feed, global package cache, intermediates, outputs, and every evaluated
+  `ProjectReference` now live under one temporary root; only the real composition targets are imported
+  read-only. The focused fixture passes 1/1 offline, preserves package/project direct-reference truth,
+  asserts graph containment, and proves a planted missing package fails inside the temporary root.
+  No asset backup/restore, repository build lock, or production helper was added.
+
+- **PMC-007 / PMC-015 — Web filtering and portable Entity names.** Closed in R12-02 on
+  2026-07-19. PMC-007's unsafe-degradation premise was stale: Web parses one filter AST, Data pushes
+  only declared nodes and evaluates the residual before sort/pagination, and malformed, unknown, or
+  unsupported input maps to 400. The shared HTTP surface now pins compound operators, mixed-case
+  field binding, and malformed/unknown anti-drop behavior across InMemory 74/74, JSON 52/52, and
+  SQLite 52/52. PMC-015 is repaired at Data's existing cached first-use shape guard: public Entity
+  properties that differ only by case reject with both names and one rename correction before adapter
+  creation. Exact guard/activation tests pass 9/9 and affected builds are warning-clean. No provider
+  flag, model annotation, persisted-name mapping, or new filter layer was added.
+
+- **PMC-002 / PMC-004 — MCP host transport and application JSON contract.** Resolved locally in
+  R12-02 on 2026-07-19 as a deliberate pre-0.20 break. The transitional HTTP master/nullable
+  override, SSE-derived primary names, and per-Entity transport metadata are removed. Hosts now own
+  three explicit edges (`EnableStdioTransport`, `EnableStreamableHttpTransport`, and deprecated
+  `EnableLegacySseTransport`), one `HttpRoute`, and unified session limits. Entity and custom-tool
+  payloads, schemas, deltas, binding, and Code Mode share one camelCase `[McpIgnore]`-aware contract;
+  protocol DTO names remain spec-owned. Conformance passes 80/80, Streamable/legacy HTTP 19/19,
+  field exclusion 5/5, Code Mode 27/27, source FirstUse/GoldenJourney 3/3, bootstrap pillars 13/13,
+  and the MCP Release build is warning-clean. Public docs pass 233/42. No aliases preserve the
+  misleading pre-preview vocabulary.
+
+- **PMC-001 — Entity / Jobs metric collision.** Resolved locally in R12-02 on 2026-07-19. The
+  `JobMetric` Entity was framework-owned persistence accidentally exposed as application language;
+  users were only taught its summary operation. The row is now internal with its CLR type, storage
+  identity, and `Count` field unchanged. One public `JobMetrics.Summary(...)` concept owns retained
+  throughput intent. Jobs passes 84/84, Tenancy 16/16, and the Jobs Release build is warning-clean.
+  No alias, field migration, model attribute, or analyzer assembly was added.
+
+- **PMC-025 — Windows first use.** Closed as a stale historical premise in R12-02 on 2026-07-19.
+  The current `ApplicationProbeHost` supplies no EventLog override, the exact R08-05 Windows candidate
+  passed package-only FirstUse, R11-07 passed the same public contract, and the current source
+  FirstUse proof passes 1/1. The repository's Microsoft.Extensions.Logging.EventLog 10.0.8 runtime
+  disables the EventLog sink after a `SecurityException` while other providers continue. Koan keeps
+  standard ASP.NET Core provider ownership rather than adding a parallel logging switch or removing
+  application-selected providers for a defect that no longer reproduces.
+
+- **PMC-033 — Storage layered activation.** Resolved locally in R12-02 on 2026-07-19. The historical
+  GardenCoop C2 trigger had already disappeared with its obsolete Storage dependency and now passes
+  1/1. The remaining invariant was repaired at the Storage chokepoint: a reference makes Storage
+  available; a declared profile/default or actual service use activates its one routing plan.
+  Profile configuration still validates at startup, unconfigured service use still fails with the
+  existing correction, and facts distinguish inactive availability from selected routes. Media Web
+  passes 8/8, Storage 20/20, bootstrap pillars 13/13, and Data.AI 87/87 without sample-only profiles.
+
+- **PMC-031 — Tenancy / Local Storage test composition.** Resolved locally on 2026-07-18. The shared Tenancy runtime
+  fixture now supplies an isolated temporary Local Storage profile because its test graph intentionally references the
+  functional Local connector. The two formerly blocked Cache/Tenancy contracts reach their assertions and the full
+  focused Tenancy suite passes 87/87 without weakening Local's missing-path validation. The separate question of
+  transitive unused Storage activation was later resolved by PMC-033.
+
+- **PMC-010 — public module catalog.** Promoted into
+  [R08-03](work-items/r08/R08-03-canonical-product-surface.md) and resolved locally on 2026-07-17.
+  The stale hand-maintained catalog is retired. One compiler now joins 108 evaluated standard
+  package/project facts to 14 explicit evidence claims and generates both human and machine references.
+  Thirty-seven missing package-owned READMEs and 88 unassessed packages remain visible rather than being
+  converted into support claims.
+- **PMC-019 — connector logging security.** Promoted into
+  [R08-02](work-items/r08/R08-02-safe-connector-telemetry.md) and resolved locally on 2026-07-17.
+  `Redaction` owns one credential grammar, `KoanLog` sanitizes structured connector context once, shared
+  configuration/discovery/orchestration chokepoints own narration, and a repository policy rejects direct
+  logger bypasses in the bounded source surface. Runtime mutation proof passes 28/28, the policy passes 1/1,
+  and 17 affected connector projects build. The exact non-claim excludes arbitrary application, driver,
+  third-party, and business-payload logs.
+- **PMC-016 — exact cross-event release recovery.** Promoted into
+  [R08-01](work-items/r08/R08-01-durable-release-wave.md) and resolved locally on 2026-07-16. One
+  hash-bound GitHub Release escrow retains the exact nupkg/snupkg and evidence bytes; the resumable
+  coordinator reconciles an incomplete prior wave before later source, replays symbols, and refuses
+  public identity without exact prepared custody. Failure-injection and workflow-contract evidence is
+  recorded in R08-01. Real immutable-Release observation remains an operator-gated R08 step.
+- **PMC-017 — release input lineage.** Promoted into
+  [R08-01](work-items/r08/R08-01-durable-release-wave.md) and resolved on 2026-07-16. Lineage schema
+  3 persists normalized per-package evaluated input maps; compiler and planner independently compare
+  prior and current ownership. Real Git add/change/rename/delete scenarios select only the owner,
+  while missing, noncanonical, or tampered maps fail closed.
+- **PMC-012 — layered service discovery.** Resolved on 2026-07-15 through ARCH-0114's uniform
+  adapter-declaration and engine-activation contract. Core Unit passes 112/112, Mongo 70/70, and the
+  prior Couchbase 17/17 proof is corroborated by the final clean aggregate completing without the
+  earlier node-readiness failure. No adapter-specific election fork remains.
+- **PMC-011 — automatic reverse-dependent release closure.** Promoted into
+  [R07-03](work-items/r07/R07-03-automatic-package-lineage.md) and resolved on 2026-07-15. The
+  evaluated graph, durable Git lineage, complete breaking closure, and independent leaf behavior are
+  recorded in that card and in [PROGRESS.md](PROGRESS.md). This history remains here so the original
+  release-safety concern cannot disappear when the active register changes.
+
+## Working order
+
+Before the first real automatic publication, compile one evidence-derived public product boundary;
+PMC-019 and PMC-016 are already resolved locally, while release recovery still awaits real observation.
+Then start with the inventory-oriented items (`PMC-003`, `PMC-007`, `PMC-009`, `PMC-018`), because they establish
+the real size and severity of the work. Discuss
+compatibility-sensitive API choices (`PMC-001`, `PMC-002`, `PMC-004`, `PMC-008`, `PMC-014`,
+`PMC-015`, `PMC-022`, `PMC-023`) and the bounded Backup graduation decision (`PMC-013`) next. Finish with independently
+useful release-tooling polish (`PMC-005`, `PMC-006`, `PMC-020`). Fewer cards may result if one root repair
+responsibly closes several entries.
+
+## Closure rule
+
+Remove an entry only when its decision and evidence are linked from `PROGRESS.md`, or when a recorded
+review rejects the work as unnecessary. Do not mark an item complete merely because its warning was
+suppressed, its documentation was softened, or the active cycle ended.

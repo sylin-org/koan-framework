@@ -6,9 +6,9 @@ namespace Koan.Data.Abstractions;
 public enum RemoveStrategy
 {
     /// <summary>
-    /// Safe removal with lifecycle hooks and full transaction support.
+    /// Safe removal with per-entity Lifecycle participation and provider transaction support.
     /// <para>
-    /// - Fires BeforeDelete/AfterDelete hooks<br/>
+    /// - Runs configured BeforeRemove/AfterRemove handlers<br/>
     /// - Participates in transactions<br/>
     /// - Returns exact count of deleted records<br/>
     /// - Safe for production use
@@ -17,9 +17,9 @@ public enum RemoveStrategy
     Safe = 0,
 
     /// <summary>
-    /// Fast removal bypassing lifecycle hooks for maximum performance.
+    /// Fast removal explicitly bypassing per-entity Lifecycle for maximum performance.
     /// <para>
-    /// - BYPASSES BeforeDelete/AfterDelete hooks<br/>
+    /// - BYPASSES BeforeRemove/AfterRemove handlers<br/>
     /// - May not participate in transactions (provider-dependent)<br/>
     /// - Resets auto-increment/identity counters<br/>
     /// - 10-100x faster on large tables<br/>
@@ -37,10 +37,11 @@ public enum RemoveStrategy
     Fast = 1,
 
     /// <summary>
-    /// Framework chooses optimal strategy based on provider capabilities.
+    /// Framework chooses an optimal strategy while preserving configured Lifecycle semantics.
     /// <para>
-    /// - Provider supports FastRemove: Uses Fast (TRUNCATE, DROP, etc.)<br/>
-    /// - Provider lacks FastRemove: Uses Safe (DELETE with hooks)<br/>
+    /// - Lifecycle configured: Uses Safe so every visible entity participates<br/>
+    /// - No Lifecycle: Provider may use Fast (TRUNCATE, DROP, etc.) when supported<br/>
+    /// - Provider lacks FastRemove: Uses Safe<br/>
     /// - Default choice when strategy not explicitly specified<br/>
     /// - Consistent behavior across all environments
     /// </para>

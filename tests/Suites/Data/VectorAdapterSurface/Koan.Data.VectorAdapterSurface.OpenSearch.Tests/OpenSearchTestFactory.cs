@@ -13,7 +13,7 @@ using Koan.Data.VectorAdapterSurface.TestKit;
 namespace Koan.Data.VectorAdapterSurface.OpenSearch.Tests;
 
 /// <summary>
-/// OpenSearch cell of the vector matrix. Uses opensearchproject/opensearch:2.13.0 with
+/// OpenSearch cell of the vector matrix. Uses opensearchproject/opensearch:3.7.0 with
 /// security disabled. The OS adapter was previously broken (emitted ES-style KNN syntax that
 /// OpenSearch rejects); this factory exercises the post-rewrite adapter that emits OS-native
 /// `knn_vector` field types and `query.knn.{field}.{vector,k}` query bodies.
@@ -34,7 +34,7 @@ public sealed class OpenSearchTestFactory : IVectorAdapterTestFactory
     public bool SupportsGetEmbedding         => false; // not implemented in OS vector repo
     public bool SupportsBulkOperations       => true;
     public bool SupportsFlush                => true;  // adapter overrides: DELETE /<index>
-    public bool SupportsExportAll            => false; // no export override yet
+    public bool SupportsExportAll            => true;  // DATA-0103: gap closed — OS now uses the shared scroll/_count base
     public bool SupportsHybridSearch         => false;
     public bool SupportsMetadataFilters      => true;  // metadata.<key>.keyword mapping (live-verified; OS pre-filters via query.knn.filter)
     public bool SupportsContinuationToken    => false;
@@ -43,7 +43,7 @@ public sealed class OpenSearchTestFactory : IVectorAdapterTestFactory
     public bool SupportsDynamicCollections   => true;
     public bool SupportsScoreNormalization   => false;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (_initialized) return;
         _initialized = true;
@@ -62,7 +62,7 @@ public sealed class OpenSearchTestFactory : IVectorAdapterTestFactory
         {
 #pragma warning disable CS0618 // Testcontainers parameterless ContainerBuilder ctor deprecated; still functional.
             _container = new ContainerBuilder()
-                .WithImage("opensearchproject/opensearch:2.13.0")
+                .WithImage("opensearchproject/opensearch:3.7.0")
                 .WithEnvironment("discovery.type", "single-node")
                 .WithEnvironment("DISABLE_SECURITY_PLUGIN", "true")
                 .WithEnvironment("OPENSEARCH_JAVA_OPTS", "-Xms512m -Xmx512m")
@@ -88,7 +88,7 @@ public sealed class OpenSearchTestFactory : IVectorAdapterTestFactory
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _adminHttp?.Dispose();
         if (_sp is not null) await _sp.DisposeAsync();
@@ -133,7 +133,7 @@ public sealed class OpenSearchTestFactory : IVectorAdapterTestFactory
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddLogging();
         services.AddHttpClient("opensearch", c => c.BaseAddress = new Uri(_endpoint));
-        services.AddKoanDataVector();
+        services.AddVectorAdapterTestRuntime();
 
         services.AddOptions<OpenSearchOptions>().Configure(o =>
         {

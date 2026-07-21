@@ -11,7 +11,7 @@ namespace Koan.Data.VectorAdapterSurface.TestKit;
 /// than the raw API surface. Adapters that don't support a scenario flag it off via the
 /// capability interface and the spec skips green.
 /// </summary>
-public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory>, IAsyncLifetime
+public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
     where TFactory : class, IVectorAdapterTestFactory
 {
     protected readonly TFactory Factory;
@@ -19,7 +19,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
 
     protected VectorSemanticSpecsBase(TFactory factory) { Factory = factory; }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
         Koan.Data.Core.AggregateConfigs.Reset();
@@ -28,19 +28,19 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
         try { await Vector<TodoVector>.EnsureCreated(); } catch { }
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _scope?.Dispose();
         _scope = null;
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     protected void SkipIfUnavailable()
-        => Skip.If(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
+        => Assert.SkipWhen(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
 
     protected float[] Embed(string category, int seed) => EmbeddingFactory.ForCategory(category, seed, Factory.EmbeddingDimension);
 
-    [SkippableFact]
+    [Fact]
     public async Task DocumentSimilarity_findsRelatedContent()
     {
         SkipIfUnavailable();
@@ -59,7 +59,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
         topThree.Should().AllSatisfy(id => id.Should().StartWith("tech-"));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Recommendation_findsSimilarItemsByVector()
     {
         SkipIfUnavailable();
@@ -79,7 +79,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
         ids.Should().Contain(id => id.StartsWith("electronics-"));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DuplicateDetection_findsNearDuplicates()
     {
         SkipIfUnavailable();
@@ -96,10 +96,10 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
         topTwo.Should().Contain("dup-b");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task HybridSearch_combinesVectorAndKeyword()
     {
-        Skip.If(!Factory.SupportsHybridSearch, "Adapter does not support hybrid search (Alpha + SearchText).");
+        Assert.SkipWhen(!Factory.SupportsHybridSearch, "Adapter does not support hybrid search (Alpha + SearchText).");
         SkipIfUnavailable();
 
         // Save with embeddings; the adapter must also index 'Title' as text for BM25.
@@ -116,7 +116,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
         hits.Should().NotBeNull();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task CapabilitySurface_matchesAdvertisedFlags()
     {
         SkipIfUnavailable();
@@ -129,5 +129,73 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
             caps.Has(Koan.Data.Vector.Abstractions.Capabilities.VectorCaps.Hybrid).Should().BeTrue();
         if (Factory.SupportsContinuationToken)
             caps.Has(Koan.Data.Vector.Abstractions.Capabilities.VectorCaps.NativeContinuation).Should().BeTrue();
+    }
+
+    // ============================================================================================
+    // ExportAll / Stats  (capability-gated; the migration/backup surface — DATA-0103)
+    //
+    // These exercise IVectorSearchRepository.ExportAll (scroll streaming) and the IndexStats
+    // instruction. For the search-engine connectors this is the regression net that proves the
+    // OpenSearch capability gap is closed: OpenSearch now goes through the SHARED scroll/_count
+    // implementation instead of the throwing default-interface-method it previously hit.
+    // ============================================================================================
+
+    [Fact]
+    public async Task ExportAll_streamsAllStoredVectors()
+    {
+        Assert.SkipWhen(!Factory.SupportsExportAll, "Adapter does not implement ExportAll.");
+        SkipIfUnavailable();
+
+        await Vector<TodoVector>.Save("v1", Embed("alpha", 1));
+        await Vector<TodoVector>.Save("v2", Embed("alpha", 2));
+        await Vector<TodoVector>.Save("v3", Embed("beta", 1));
+
+        var repo = (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IVectorService)) as IVectorService)
+            ?.TryGetRepository<TodoVector, string>();
+        repo.Should().NotBeNull("ExportAll is exercised directly against the repository (not on the Vector<T> facade)");
+
+        var exported = new List<string>();
+        await foreach (var batch in repo!.ExportAll())
+        {
+            exported.Add((string)(object)batch.Id);
+            batch.Embedding.Length.Should().Be(Factory.EmbeddingDimension);
+        }
+
+        exported.Should().Contain(new[] { "v1", "v2", "v3" });
+    }
+
+    [Fact]
+    public async Task ExportAll_onMissingIndex_returnsEmpty()
+    {
+        Assert.SkipWhen(!Factory.SupportsExportAll, "Adapter does not implement ExportAll.");
+        SkipIfUnavailable();
+
+        await Vector<TodoVector>.Flush();
+
+        var repo = (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IVectorService)) as IVectorService)
+            ?.TryGetRepository<TodoVector, string>();
+        repo.Should().NotBeNull();
+
+        var exported = new List<string>();
+        await foreach (var batch in repo!.ExportAll())
+            exported.Add((string)(object)batch.Id);
+
+        exported.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Stats_returnsStoredVectorCount()
+    {
+        // Stats is the vector.index.stats instruction (count of stored vectors). It is gated on its own
+        // capability — ES/OS (shared base), Weaviate, and the in-memory reference implement it; Qdrant and
+        // Milvus do not expose it through the instruction surface (distinct from ExportAll, which they can do).
+        Assert.SkipWhen(!Factory.SupportsIndexStats, "Adapter does not implement the IndexStats instruction.");
+        SkipIfUnavailable();
+
+        await Vector<TodoVector>.Save("v1", Embed("alpha", 1));
+        await Vector<TodoVector>.Save("v2", Embed("alpha", 2));
+
+        var count = await Vector<TodoVector>.Stats();
+        count.Should().BeGreaterThanOrEqualTo(2);
     }
 }

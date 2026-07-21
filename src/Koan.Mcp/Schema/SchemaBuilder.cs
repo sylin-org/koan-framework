@@ -26,7 +26,6 @@ public sealed class SchemaBuilder
 
     private readonly IServiceProvider _services;
     private readonly ILogger<SchemaBuilder> _logger;
-    private readonly HashSet<string> _warnedEntities = new();
 
     public SchemaBuilder(IServiceProvider services, ILogger<SchemaBuilder> logger)
     {
@@ -196,6 +195,7 @@ public sealed class SchemaBuilder
         props["model"] = BuildEntitySchema(entityType, "Entity payload to insert or update.", EntityEndpointOperationKind.Upsert);
         props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         props["accept"] = CreateStringProperty("Optional Accept header override (view negotiation).");
+        props["dry_run"] = DryRunProperty();
         schema["required"] = new JsonArray { "model" };
         return schema;
     }
@@ -212,9 +212,15 @@ public sealed class SchemaBuilder
             ["items"] = BuildEntitySchema(entityType, operation: EntityEndpointOperationKind.UpsertMany)
         };
         props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
+        props["dry_run"] = DryRunProperty();
         schema["required"] = new JsonArray { "models" };
         return schema;
     }
+
+    // AN11 (A1, invariant #14) — every state-mutating verb advertises the reserved dry_run posture so an
+    // agent can discover that the mutation is rehearsable without trying it.
+    private static JsonObject DryRunProperty()
+        => CreateBooleanProperty(Koan.Mcp.Execution.McpDryRun.SchemaDescription);
 
     private JsonObject BuildDeleteSchema(Type keyType, EntityEndpointOperationDescriptor operation)
     {
@@ -226,6 +232,7 @@ public sealed class SchemaBuilder
         {
             props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         }
+        props["dry_run"] = DryRunProperty();
         return schema;
     }
 
@@ -244,6 +251,7 @@ public sealed class SchemaBuilder
         {
             props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         }
+        props["dry_run"] = DryRunProperty();
         return schema;
     }
 
@@ -257,17 +265,19 @@ public sealed class SchemaBuilder
         {
             props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         }
+        props["dry_run"] = DryRunProperty();
         return schema;
     }
 
     private JsonObject BuildDeleteAllSchema(EntityEndpointOperationDescriptor operation)
     {
         var schema = CreateObjectSchema();
+        var props = (JsonObject)schema["properties"]!;
         if (operation.SupportsDatasetRouting)
         {
-            var props = (JsonObject)schema["properties"]!;
             props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         }
+        props["dry_run"] = DryRunProperty();
         return schema;
     }
 
@@ -303,6 +313,7 @@ public sealed class SchemaBuilder
         };
         props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         props["accept"] = CreateStringProperty("Optional Accept header override (view negotiation).");
+        props["dry_run"] = DryRunProperty();
         schema["required"] = new JsonArray { "id", "patch" };
         return schema;
     }
@@ -312,26 +323,22 @@ public sealed class SchemaBuilder
         var schema = CreateObjectSchema().WithDescription(description);
         var props = new JsonObject();
         var required = new JsonArray();
-        var missingDescriptions = new List<string>();
 
         foreach (var property in entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (property.GetGetMethod() is null) continue;
-            var propSchema = CreateSchemaForProperty(property, operation, missingDescriptions);
+            // [McpIgnore] (input-excluded) drops the property from the upsert/patch input schema and the
+            // Code Mode entity interface (which is derived from this schema).
+            if (McpFieldPolicy.IsExcludedFromInput(property)) continue;
+            var propSchema = CreateSchemaForProperty(property, operation);
             if (propSchema is null) continue;
-            props[property.Name] = propSchema;
+            // Honor a Newtonsoft [JsonProperty] rename so the advertised name matches the actual wire name.
+            var wireName = McpFieldPolicy.ResolveWireName(property);
+            props[wireName] = propSchema;
             if (IsRequired(property))
             {
-                required.Add(property.Name);
+                required.Add(wireName);
             }
-        }
-
-        if (missingDescriptions.Count > 0 && _warnedEntities.Add(entityType.FullName ?? entityType.Name))
-        {
-            _logger.LogWarning("{Entity}: Missing metadata for {Count} properties: [{Properties}]. Using fallback.",
-                entityType.Name,
-                missingDescriptions.Count,
-                string.Join(", ", missingDescriptions));
         }
 
         schema["properties"] = props;
@@ -349,9 +356,9 @@ public sealed class SchemaBuilder
         return requiredAttribute is not null && !requiredAttribute.AllowEmptyStrings;
     }
 
-    private JsonObject? CreateSchemaForProperty(PropertyInfo property, EntityEndpointOperationKind? operation, List<string>? missingDescriptions = null)
+    private JsonObject? CreateSchemaForProperty(PropertyInfo property, EntityEndpointOperationKind? operation)
     {
-        var schema = CreateSimpleTypeSchema(property.PropertyType, GetPropertyDescription(property, operation, missingDescriptions));
+        var schema = CreateSimpleTypeSchema(property.PropertyType, GetPropertyDescription(property, operation));
         if (schema is null)
         {
             _logger.LogDebug("Skipping property {Property} on {Entity} because it cannot be translated to JSON schema.", property.Name, property.DeclaringType?.FullName);
@@ -359,7 +366,7 @@ public sealed class SchemaBuilder
         return schema;
     }
 
-    private string? GetPropertyDescription(PropertyInfo property, EntityEndpointOperationKind? operation, List<string>? missingDescriptions = null)
+    private static string GetPropertyDescription(PropertyInfo property, EntityEndpointOperationKind? operation)
     {
         foreach (var attribute in property.GetCustomAttributes<McpDescriptionAttribute>())
         {
@@ -386,7 +393,6 @@ public sealed class SchemaBuilder
             return description.Description;
         }
 
-        missingDescriptions?.Add(property.Name);
         return property.Name;
     }
 

@@ -2,8 +2,11 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Newtonsoft.Json.Linq;
+using System.Security.Claims;
 using System.Threading;
+using Koan.Mcp;
 using Koan.Web.Attributes;
 using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
@@ -18,17 +21,13 @@ namespace Koan.Mcp.Execution;
 
 public sealed class RequestTranslator
 {
-    private static readonly JsonSerializerSettings SerializerSettings = new()
-    {
-        NullValueHandling = NullValueHandling.Ignore
-    };
-
     public RequestTranslation Translate(
         IServiceProvider services,
         McpEntityRegistration registration,
         McpToolDefinition tool,
     JObject? arguments,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ClaimsPrincipal? user = null)
     {
         if (services is null) throw new ArgumentNullException(nameof(services));
         if (registration is null) throw new ArgumentNullException(nameof(registration));
@@ -36,7 +35,7 @@ public sealed class RequestTranslator
 
     var args = arguments ?? new JObject();
         var builder = services.GetRequiredService<EntityRequestContextBuilder>();
-        var context = BuildContext(builder, registration.EntityType, args, cancellationToken);
+        var context = BuildContext(builder, registration.EntityType, args, cancellationToken, user);
 
         return tool.Operation switch
         {
@@ -76,7 +75,8 @@ public sealed class RequestTranslator
                 new EntityDeleteAllRequest
                 {
                     Context = context,
-                    Set = ReadString(args, "set")
+                    Set = ReadString(args, "set"),
+                    DryRun = ReadBool(args, McpDryRun.ArgumentName) ?? false
                 }),
             EntityEndpointOperationKind.Patch => new RequestTranslation(
                 nameof(IEntityEndpointService<object, object>.Patch),
@@ -144,6 +144,7 @@ public sealed class RequestTranslator
         SetProperty(request, nameof(EntityUpsertRequest<object>.Model), ConvertEntity(modelNode, registration.EntityType));
         SetProperty(request, nameof(EntityUpsertRequest<object>.Set), ReadString(args, "set"));
         SetProperty(request, nameof(EntityUpsertRequest<object>.Accept), ReadString(args, "accept"));
+        SetProperty(request, nameof(EntityUpsertRequest<object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
     }
 
@@ -155,6 +156,7 @@ public sealed class RequestTranslator
         var modelsNode = TryGet(args, "models") ?? throw new JsonException("Missing required 'models' payload.");
         SetProperty(request, nameof(EntityUpsertManyRequest<object>.Models), ConvertEntityCollection(modelsNode, registration.EntityType));
         SetProperty(request, nameof(EntityUpsertManyRequest<object>.Set), ReadString(args, "set"));
+        SetProperty(request, nameof(EntityUpsertManyRequest<object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
     }
 
@@ -167,6 +169,7 @@ public sealed class RequestTranslator
         SetProperty(request, nameof(EntityDeleteRequest<object>.Id), ConvertValue(idNode, registration.KeyType));
         SetProperty(request, nameof(EntityDeleteRequest<object>.Set), ReadString(args, "set"));
         SetProperty(request, nameof(EntityDeleteRequest<object>.Accept), ReadString(args, "accept"));
+        SetProperty(request, nameof(EntityDeleteRequest<object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
     }
 
@@ -178,6 +181,7 @@ public sealed class RequestTranslator
         var idsNode = TryGet(args, "ids") ?? throw new JsonException("Missing required 'ids' collection.");
         SetProperty(request, nameof(EntityDeleteManyRequest<object>.Ids), ConvertKeyCollection(idsNode, registration.KeyType));
         SetProperty(request, nameof(EntityDeleteManyRequest<object>.Set), ReadString(args, "set"));
+        SetProperty(request, nameof(EntityDeleteManyRequest<object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
     }
 
@@ -193,7 +197,8 @@ public sealed class RequestTranslator
         {
             Context = context,
             Query = query!,
-            Set = ReadString(args, "set")
+            Set = ReadString(args, "set"),
+            DryRun = ReadBool(args, McpDryRun.ArgumentName) ?? false
         };
     }
 
@@ -205,13 +210,15 @@ public sealed class RequestTranslator
         var idNode = TryGet(args, "id") ?? throw new JsonException("Missing required 'id' parameter.");
         SetProperty(request, nameof(EntityPatchRequest<object, object>.Id), ConvertValue(idNode, registration.KeyType));
         var patchNode = TryGet(args, "patch") ?? throw new JsonException("Missing required 'patch' payload.");
+        RejectInputExcludedPatchTargets(patchNode, registration.EntityType);
         SetProperty(request, nameof(EntityPatchRequest<object, object>.Patch), ConvertPatchDocument(patchNode, registration.EntityType));
         SetProperty(request, nameof(EntityPatchRequest<object, object>.Set), ReadString(args, "set"));
         SetProperty(request, nameof(EntityPatchRequest<object, object>.Accept), ReadString(args, "accept"));
+        SetProperty(request, nameof(EntityPatchRequest<object, object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
     }
 
-    private static EntityRequestContext BuildContext(EntityRequestContextBuilder builder, Type entityType, JObject args, CancellationToken cancellationToken)
+    private static EntityRequestContext BuildContext(EntityRequestContextBuilder builder, Type entityType, JObject args, CancellationToken cancellationToken, ClaimsPrincipal? user)
     {
         var options = new QueryOptions();
 
@@ -249,7 +256,28 @@ public sealed class RequestTranslator
             }
         }
 
-        return builder.Build(options, cancellationToken);
+        // SEC-0004 Phase 3.3: thread the MCP caller's principal (null = anonymous) into EntityRequestContext.User,
+        // so the data-layer gate / constrain / projection evaluate against the real caller instead of anonymous.
+        var context = builder.Build(options, cancellationToken, httpContext: null, user: user);
+
+        // AN11 — every MCP mutation opts into the state delta (the pre-mutation read + the prospective/
+        // retrospective diff). REST stays cost-free until it opts in the same way.
+        context.Items[EntityMutationProbe.WantsDeltaKey] = true;
+
+        // SEC-0004 (§C) — the MCP edge opts into the per-row capability projection BY DEFAULT: agents need the
+        // `can:[]` manifest to plan, and MCP carries structured metadata natively. REST opts in per request
+        // (?access=true). The endpoint computes the manifest once and stashes it for the ResponseTranslator.
+        context.Items[Koan.Web.Authorization.AccessProjection.RequestKey] = true;
+
+        // AN9 — the pin: accept a client-supplied correlation id as an opaque, untrusted, authority-free
+        // label (mint a time-ordered GUIDv7 when absent). It is threaded into the request for audit
+        // stitching only; it gates NOTHING (continuity ≠ authority — see McpCorrelation).
+        var correlationId = ReadString(args, McpCorrelation.ArgumentName);
+        context.Items[McpCorrelation.ItemsKey] = string.IsNullOrWhiteSpace(correlationId)
+            ? Koan.Core.StringId.New()
+            : correlationId;
+
+        return context;
     }
 
     private static JToken? TryGet(JObject args, string property)
@@ -336,14 +364,14 @@ public sealed class RequestTranslator
 
     private static object ConvertEntity(JToken node, Type entityType)
     {
-        try { return node.ToObject(entityType) ?? throw new JsonException($"Unable to deserialize payload as {entityType.Name}."); }
+        try { return node.ToObject(entityType, McpJson.CreateApplicationSerializer()) ?? throw new JsonException($"Unable to deserialize payload as {entityType.Name}."); }
         catch (Exception ex) { throw new JsonException($"Unable to deserialize payload as {entityType.Name}: {ex.Message}"); }
     }
 
     private static object ConvertEntityCollection(JToken node, Type entityType)
     {
         var listType = typeof(List<>).MakeGenericType(entityType);
-        try { return node.ToObject(listType) ?? throw new JsonException($"Unable to deserialize collection payload as {entityType.Name} list."); }
+        try { return node.ToObject(listType, McpJson.CreateApplicationSerializer()) ?? throw new JsonException($"Unable to deserialize collection payload as {entityType.Name} list."); }
         catch (Exception ex) { throw new JsonException($"Unable to deserialize collection payload as {entityType.Name} list: {ex.Message}"); }
     }
 
@@ -367,6 +395,38 @@ public sealed class RequestTranslator
         }
 
         return list;
+    }
+
+    private static void RejectInputExcludedPatchTargets(JToken patchNode, Type entityType)
+    {
+        if (patchNode is not JArray operations) return;
+
+        foreach (var operation in operations)
+        {
+            var path = operation?["path"]?.Value<string>();
+            if (string.IsNullOrWhiteSpace(path)) continue;
+
+            // JSON Pointer: "/segment/..." — only the first segment maps to a top-level entity property.
+            var segment = path!.TrimStart('/').Split('/')[0];
+            if (string.IsNullOrWhiteSpace(segment)) continue;
+
+            var property = FindPropertyByName(entityType, segment);
+            if (property is not null && McpFieldPolicy.IsExcludedFromInput(property))
+            {
+                throw new JsonException($"Property '{segment}' cannot be modified via MCP.");
+            }
+        }
+    }
+
+    private static PropertyInfo? FindPropertyByName(Type entityType, string name)
+    {
+        foreach (var property in entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase)) return property;
+            if (string.Equals(McpFieldPolicy.ResolveWireName(property), name, StringComparison.OrdinalIgnoreCase)) return property;
+        }
+
+        return null;
     }
 
     private static object ConvertPatchDocument(JToken node, Type entityType)

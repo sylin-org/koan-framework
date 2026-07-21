@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("Koan.Tests.Cache.Web")]
+[assembly: InternalsVisibleTo("Koan.Media.Web.Tests")]

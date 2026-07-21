@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Threading;
+using Koan.Core.Hosting.App;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Core.Logging;
@@ -10,31 +10,17 @@ namespace Koan.Core.Logging;
 /// </summary>
 public static class KoanLog
 {
-    private static ILoggerFactory? _loggerFactory;
-
-    internal static void AttachFactory(ILoggerFactory factory)
-    {
-        if (factory is null) throw new ArgumentNullException(nameof(factory));
-        Interlocked.Exchange(ref _loggerFactory, factory);
-    }
-
-    internal static void DetachFactory(ILoggerFactory factory)
-    {
-        if (factory is null) return;
-        Interlocked.CompareExchange(ref _loggerFactory, null, factory);
-    }
-
     internal static ILogger? CreateLogger(string categoryName)
     {
-        var factory = Volatile.Read(ref _loggerFactory);
-        if (factory is null || string.IsNullOrWhiteSpace(categoryName))
+        if (string.IsNullOrWhiteSpace(categoryName))
         {
             return null;
         }
 
         try
         {
-            return factory.CreateLogger(categoryName);
+            var factory = AppHost.Current?.GetService(typeof(ILoggerFactory)) as ILoggerFactory;
+            return factory?.CreateLogger(categoryName);
         }
         catch
         {
@@ -156,11 +142,50 @@ public static class KoanLog
     public static void HostError(ILogger? logger, string action, string? outcome = null, params (string Key, object? Value)[] context)
         => StageError(logger, KoanLogStage.Host, action, outcome, context);
 
+    /// <summary>
+    /// Test-only seam (InternalsVisibleTo). When set, every <see cref="Write"/> call is mirrored here BEFORE
+    /// the logger dispatch and REGARDLESS of whether a logger is resolved — so a test can deterministically
+    /// observe a KoanLog emission without depending on ambient host selection or a configured logging provider.
+    /// Always <c>null</c> in production (one static null-check on this diagnostic path).
+    /// </summary>
+    internal static Action<KoanLogStage, LogLevel, string, string?, (string Key, object? Value)[]>? TestSink;
+
     internal static void Write(ILogger? logger, KoanLogStage stage, LogLevel level, string action, string? outcome, (string Key, object? Value)[] context)
     {
-        if (logger is null) return;
-        logger.LogKoanStage(stage, level, action, outcome, context);
+        var testSink = TestSink;
+        if (testSink is null && (logger is null || !logger.IsEnabled(level))) return;
+
+        var safeContext = DeIdentify(context);
+        testSink?.Invoke(stage, level, action, outcome, safeContext);
+        if (logger is not null && logger.IsEnabled(level))
+        {
+            logger.LogKoanStage(stage, level, action, outcome, safeContext);
+        }
     }
+
+    private static (string Key, object? Value)[] DeIdentify((string Key, object? Value)[] context)
+    {
+        (string Key, object? Value)[]? safe = null;
+        for (var index = 0; index < context.Length; index++)
+        {
+            var value = DeIdentify(context[index].Value);
+            if (ReferenceEquals(value, context[index].Value)) continue;
+
+            safe ??= context.ToArray();
+            safe[index] = (context[index].Key, value);
+        }
+
+        return safe ?? context;
+    }
+
+    private static object? DeIdentify(object? value)
+        => value switch
+        {
+            string text when !string.IsNullOrWhiteSpace(text) => Redaction.DeIdentify(text),
+            Uri uri => Redaction.DeIdentify(uri.OriginalString),
+            Exception exception => Redaction.DeIdentify(exception.ToString()),
+            _ => value
+        };
 
     private static string GetCategoryName(Type type)
     {
@@ -171,30 +196,12 @@ public static class KoanLog
     public sealed class KoanLogScope
     {
         private readonly string _categoryName;
-        private ILogger? _logger;
-
         internal KoanLogScope(string categoryName)
         {
             _categoryName = categoryName;
         }
 
-        private ILogger? ResolveLogger()
-        {
-            var logger = Volatile.Read(ref _logger);
-            if (logger is not null)
-            {
-                return logger;
-            }
-
-            var created = CreateLogger(_categoryName);
-            if (created is null)
-            {
-                return null;
-            }
-
-            Interlocked.CompareExchange(ref _logger, created, null);
-            return Volatile.Read(ref _logger);
-        }
+        private ILogger? ResolveLogger() => CreateLogger(_categoryName);
 
         public void StageDebug(KoanLogStage stage, string action, string? outcome = null, params (string Key, object? Value)[] context)
             => KoanLog.StageDebug(ResolveLogger(), stage, action, outcome, context);

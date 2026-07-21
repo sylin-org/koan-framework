@@ -3,9 +3,9 @@ type: REF
 domain: core
 title: "Guard Utilities Reference"
 audience: [developers, architects]
-status: current
+status: archived
 last_updated: 2025-10-12
-framework_version: v0.6.3
+framework_version: v0.20.0
 validation:
   date_last_tested: 2025-10-12
   status: verified
@@ -637,20 +637,34 @@ public class TodosController : EntityController<Todo>
 }
 ```
 
-### Flow Pipeline Validation
+### Validating a streamed business operation
 
 ```csharp
-await Flow.Pipeline("process-orders")
-          .ForEach(await Order.AllStream())
-          .Do(async (order, ct) =>
-          {
-              // Validate during pipeline processing
-              order.Amount = order.Amount.Must().Be.Positive();
-              order.Status = order.Status.Must().Be.Defined<OrderStatus>();
-              await order.Save();
-          })
-          .RunAsync(ct);
+await foreach (var order in Order.AllStream(ct: ct).WithCancellation(ct))
+{
+    order.Amount = order.Amount.Must().Be.Positive();
+    order.Status = order.Status.Must().Be.Defined<OrderStatus>();
+    await order.Save(ct);
+}
 ```
+
+Give repeated operations a business name instead of hiding them in a generic composition DSL:
+
+```csharp
+static async Task ValidateOpenOrders(CancellationToken ct)
+{
+    await foreach (var order in Order.QueryStream(
+        order => order.Status == OrderStatus.Open,
+        ct: ct).WithCancellation(ct))
+    {
+        order.Amount = order.Amount.Must().Be.Positive();
+        await order.Save(ct);
+    }
+}
+```
+
+The Entity source requires `DataCaps.Query.ProviderBoundedPaging`. The application owns any
+additional concurrency, batching, retry, and operation-level outcome semantics.
 
 ---
 
@@ -729,7 +743,7 @@ public void CreateTodo_WithValidInputs_Succeeds()
 4. Automatic parameter name capture
 5. Use `RangeType` for precise range control: `Between(min, max, RangeType.InclusiveExclusive)`
 6. Comprehensive type coverage: strings, numbers, collections, enums
-7. Integrates seamlessly with Entity<T>, EntityController<T>, and Flow pipelines
+7. Integrates with `Entity<T>`, `EntityController<T>`, and Jobs pipelines
 
 ---
 

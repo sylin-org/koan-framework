@@ -8,7 +8,7 @@ namespace Koan.Web.AdapterSurface.TestKit.Containers;
 /// Bootstraps a Mongo backend for adapter-surface tests. Honours, in order:
 ///   1. Koan_TESTS_MONGO env var
 ///   2. mongodb://localhost:27017 if reachable
-///   3. Testcontainers-provisioned mongo:7
+///   3. Testcontainers-provisioned mongo:8.3.4
 /// </summary>
 public sealed class MongoContainerHelper : IAsyncDisposable
 {
@@ -39,7 +39,7 @@ public sealed class MongoContainerHelper : IAsyncDisposable
 
         try
         {
-            _container = new MongoDbBuilder("mongo:7")
+            _container = new MongoDbBuilder("mongo:8.3.4")
                 .Build();
             await _container.StartAsync().ConfigureAwait(false);
             var connection = EnsureDatabase(_container.GetConnectionString(), Database);

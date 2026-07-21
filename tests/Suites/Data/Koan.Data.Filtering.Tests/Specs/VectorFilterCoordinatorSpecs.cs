@@ -85,4 +85,18 @@ public sealed class VectorFilterCoordinatorSpecs
         var f = (FieldFilter)Filter.On(FieldPath.Of("name"), FilterOperator.Eq, FilterValue.Of("acme")) with { IgnoreCase = true };
         VectorFilterCoordinator.Validate(f, caps, "test").Should().BeSameAs(f);
     }
+
+    [Fact]
+    public void Structural_negation_throws_when_provider_cannot_preserve_missing_key_semantics()
+    {
+        var caps = ScalarOnly with { SupportsNegation = false };
+        var f = Filter.Negate(Filter.Eq("category", "legal"));
+
+        var exception = ((Action)(() => VectorFilterCoordinator.Validate(f, caps, "milvus")))
+            .Should().Throw<VectorFilterUnsupportedException>().Which;
+
+        exception.Provider.Should().Be("milvus");
+        exception.Operator.Should().Be(FilterOperator.Eq);
+        exception.Field.Should().Be("category");
+    }
 }

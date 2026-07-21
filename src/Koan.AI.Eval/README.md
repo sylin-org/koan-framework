@@ -1,76 +1,44 @@
-# Koan.AI.Eval
+# Sylin.Koan.AI.Eval
 
-Model evaluation, quality gates, regression detection, and distribution drift monitoring for Koan. Plug in metrics adapters and gate deployments automatically.
+Measure model results, enforce metric gates, compare candidates, and detect score drift through AI adapter capabilities.
 
-- Target framework: net10.0
-- License: Apache-2.0
-- Version: 0.6.3
-
-## Install
-
-```powershell
+```bash
 dotnet add package Sylin.Koan.AI.Eval
 ```
 
-## Quick Start
+## Meaningful use
+
+Reference the package, retain `AddKoan()`, and call the facade from a running host:
 
 ```csharp
-// Measure quality of a model response
-var result = await Eval.Measure("llama3", new[]
-{
-    new EvalCase { Input = "What is 2+2?", Expected = "4", Actual = await Client.ChatAsync("What is 2+2?", ct) }
-}, metrics: [Metric.Accuracy, Metric.Faithfulness]);
+var result = await Eval.Measure(
+    new ModelRef("support-model", Version: 4),
+    new DatasetRef("support-regression", Hash: datasetHash),
+    [Metric.Accuracy, Metric.F1],
+    cancellationToken);
 
-Console.WriteLine($"Accuracy: {result.Scores[Metric.Accuracy]:P1}");
-Console.WriteLine($"Pass: {result.Passed}");
+Console.WriteLine(result);
 ```
 
-## Core API
+Make a failing gate explicit:
 
 ```csharp
-Eval.Measure(model, cases, metrics)      // → EvalResult   — run metrics on output samples
-Eval.Gate(model, cases)                  // → GateBuilder   — define pass/fail conditions
-Eval.Compare(modelA, modelB, cases)      // → ComparisonResult — A/B metric comparison
-Eval.Regress(model, baseline, cases)     // → bool           — true if regression detected
-Eval.Drift(currentMetrics, baseline)     // → DriftResult    — distribution drift analysis
-Eval.Benchmark(model, suite)             // → BenchmarkResult — standard benchmark run
+await Eval.Gate(
+    new ModelRef("support-model", 4),
+    baseline: new ModelRef("support-model", 3),
+    data: new DatasetRef("support-regression", datasetHash),
+    require: gate => gate.Metric(Metric.Accuracy, min: 0.90).NoRegression(0.02),
+    ct: cancellationToken);
 ```
 
-## Quality Gates
+## Guarantees and limitations
 
-Gates block deployment when conditions fail:
+- Reference plus `AddKoan()` registers `IEvalService` automatically.
+- Measurement requires an active AI adapter that advertises `MetricCompute`; otherwise the operation fails with that
+  exact correction. Dataset storage and metric implementation belong to the selected adapter.
+- `Gate` throws `GateFailedException` with violations. `Regress` returns a failed `EvalResult`; `Compare` ranks by
+  average requested score; `Drift` compares shared scores already present in two results.
+- The package does not capture prompts/responses, create datasets, train models, deploy gates, schedule monitoring, or
+  claim statistical significance. Applications own dataset provenance and the decision that follows a gate.
 
-```csharp
-var gate = await Eval.Gate("llama3", testCases)
-    .Metric(Metric.RougeL,    min: 0.85)
-    .Metric(Metric.Accuracy,  min: 0.90)
-    .NoRegression(baselineResult)
-    .EvaluateAsync(ct);
-
-// Throws GateFailedException if any condition fails
-// gate.Violations — list of GateViolation for failed conditions
-```
-
-## Well-Known Metrics (`Metric` constants)
-
-| Constant | What it measures |
-|----------|-----------------|
-| `Metric.RougeL` | Longest common subsequence overlap |
-| `Metric.Bleu` | N-gram precision (translation quality) |
-| `Metric.F1` | Token-level F1 |
-| `Metric.Accuracy` | Exact-match accuracy |
-| `Metric.Faithfulness` | Grounded response vs. context |
-
-## Drift Detection
-
-```csharp
-var drift = await Eval.Drift(currentMetrics, baselineMetrics);
-// DriftStatus: OK | Notice | Warning
-// drift.Shifts — metric deltas that moved significantly
-// drift.Recommendation — action string
-```
-
-## Reference
-
-- **ADR**: `docs/decisions/AI-0021-category-driven-ai-with-convention-defaults.md`
-- **Related**: `Koan.AI.Review` (HITL gates), `Koan.AI.Models` (deployment lifecycle), `Koan.AI.Training`
+See [TECHNICAL.md](TECHNICAL.md) for capability resolution and result semantics.

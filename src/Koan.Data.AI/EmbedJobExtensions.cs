@@ -1,4 +1,6 @@
 using Koan.Data.Abstractions;
+using Koan.Core.Context;
+using Koan.Core.Hosting.App;
 using Koan.Data.Core;
 
 namespace Koan.Data.AI;
@@ -9,6 +11,8 @@ namespace Koan.Data.AI;
 /// </summary>
 public static class EmbedJobExtensions
 {
+    private const string ContextLookupOperation = "embedding job lookup";
+
     /// <summary>
     /// Retries all failed jobs for a specific entity type.
     /// Resets status to Pending and clears retry count.
@@ -156,7 +160,7 @@ public static class EmbedJobExtensions
         {
             JobId = j.Id!,
             EntityId = j.EntityId,
-            EntityType = j.EntityType,
+            EntityType = typeof(TEntity).Name,
             Status = j.Status.ToString(),
             Error = j.Error ?? "Unknown error",
             RetryCount = j.RetryCount,
@@ -167,14 +171,30 @@ public static class EmbedJobExtensions
     }
 
     /// <summary>
-    /// Requeues a specific job by entity ID.
+    /// Requeues the job for <paramref name="entityId"/> in the current Koan context. Scoped queue identities include
+    /// that context, so an operator acting outside it should use <see cref="RequeueJobById{TEntity}"/> with the durable
+    /// id returned by <see cref="GetFailedJobs{TEntity}"/>.
     /// </summary>
     public static async Task<bool> RequeueJob<TEntity>(
         string entityId,
         CancellationToken ct = default)
         where TEntity : class, IEntity<string>
     {
-        var jobId = EmbedJob<TEntity>.MakeId(entityId);
+        var contextCarriers = AppHost.GetRequiredService<KoanContextCarrierRegistry>(ContextLookupOperation);
+        var jobId = EmbedJob<TEntity>.MakeId(entityId, contextCarriers.Capture());
+        return await RequeueJobById<TEntity>(jobId, ct);
+    }
+
+    /// <summary>
+    /// Requeues one exact durable embedding queue row. This is the context-independent operator path for a job id
+    /// obtained from <see cref="GetFailedJobs{TEntity}"/> or another queue inspection surface.
+    /// </summary>
+    public static async Task<bool> RequeueJobById<TEntity>(
+        string jobId,
+        CancellationToken ct = default)
+        where TEntity : class, IEntity<string>
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
         var job = await EmbedJob<TEntity>.Get(jobId, ct);
 
         if (job == null)

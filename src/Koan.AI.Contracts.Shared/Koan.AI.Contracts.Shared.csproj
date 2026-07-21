@@ -1,10 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Kernel</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Description>Shared boundary models for the Koan AI lifecycle: ModelRef, DatasetRef, ComputeRequirement, JobRef, EvalScore, Lineage, Accelerator, ModelFormat.</Description>
-    <PackageTags>$(CommonPackageTags);ai;contracts;shared</PackageTags>
+    <Description>Dependency-free identities and result vocabulary shared across Koan-compatible model, dataset, compute, job, evaluation, and lineage workflows.</Description>
+    <PackageTags>$(CommonPackageTags);ai;contracts;lifecycle;models;datasets;lineage</PackageTags>
   </PropertyGroup>
 </Project>

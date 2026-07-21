@@ -1,35 +1,31 @@
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
-using Koan.Core.Hosting.App;
+using Koan.Core.Context;
 
 namespace Koan.Core.Hosting.App;
 
 // Generic-host binder: ensures AppHost.Current is set and KoanEnv is initialized early
-internal sealed class AppHostBinderHostedService(System.IServiceProvider sp) : IHostedService
+internal sealed class AppHostBinderHostedService(
+    System.IServiceProvider sp,
+    KoanContextCarrierRegistry? contextCarriers = null) : IHostedService
 {
+    private IDisposable? _hostLease;
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        // Set ambient host once
-        if (AppHost.Current is null)
-            AppHost.Current = sp;
+        // Force validation of this host's carrier composition before application work starts. The registry itself is
+        // host-owned; resolving it here does not attach logical-flow context to the host.
+        _ = contextCarriers;
+        Interlocked.Exchange(ref _hostLease, null)?.Dispose();
+        _hostLease = AppHost.Attach(sp);
         try { KoanEnv.TryInitialize(sp); } catch { }
-
-        try
-        {
-            var cfg = sp.GetService(typeof(IConfiguration)) as IConfiguration;
-            var env = sp.GetService(typeof(IHostEnvironment)) as IHostEnvironment;
-            AppHost.SetIdentity(global::Koan.Core.Hosting.App.ApplicationIdentityDefaults.Resolve(cfg, env));
-        }
-        catch
-        {
-            // identity population is best-effort; never block host startup
-        }
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
-        => Task.CompletedTask;
+    {
+        Interlocked.Exchange(ref _hostLease, null)?.Dispose();
+        return Task.CompletedTask;
+    }
 }

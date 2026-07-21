@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Koan.Data.SoftDelete</AssemblyName>
+    <RootNamespace>Koan.Data.SoftDelete</RootNamespace>
+    <Description>Opt-in recoverable Entity deletion: ordinary reads hide soft-removed rows while type-targeted recycle-bin, restore, and purge verbs remain explicit.</Description>
+    <PackageTags>$(CommonPackageTags);soft-delete;audit;recycle-bin</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+  </ItemGroup>
+</Project>

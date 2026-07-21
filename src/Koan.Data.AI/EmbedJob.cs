@@ -1,5 +1,6 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
+using Koan.Core.Context;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 
@@ -11,7 +12,7 @@ namespace Koan.Data.AI;
 /// </summary>
 /// <typeparam name="TEntity">Entity type with [Embedding] attribute</typeparam>
 [Storage(Name = "EmbedJobs")]
-public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>
+public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>, IAmbientExempt
     where TEntity : class, IEntity<string>
 {
     /// <summary>
@@ -20,19 +21,20 @@ public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>
     public required string EntityId { get; set; }
 
     /// <summary>
-    /// Entity type name (for diagnostics and filtering)
+    /// The durable Koan service context (tenant and other registered carrier axes) captured at enqueue, keyed by axis. The embedding worker is a
+/// global background service with no context of its own, so it restores this before loading the
+    /// entity + writing the vector/state — without it, a tenant-scoped entity reads back as "not found" and its
+    /// embedding never lands. Request-only Web filters are intentionally not durable job context; a job that needs
+    /// authorization must re-resolve its own application capability. Null when no carrier axis was in scope.
+    /// Carried opaquely (this record names no axis), mirroring <c>JobRecord.AmbientCarrier</c>.
+    /// The property name is retained for persisted-wire compatibility.
     /// </summary>
-    public required string EntityType { get; set; }
+    public Dictionary<string, string>? AmbientCarrier { get; set; }
 
     /// <summary>
     /// Content signature (SHA256 hash) of the entity content at time of queueing
     /// </summary>
     public required string ContentSignature { get; set; }
-
-    /// <summary>
-    /// Embedding text computed at time of queueing
-    /// </summary>
-    public required string EmbeddingText { get; set; }
 
     /// <summary>
     /// Job status: Pending, Processing, Completed, Failed
@@ -43,11 +45,6 @@ public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>
     /// Number of retry attempts (0 for first attempt)
     /// </summary>
     public int RetryCount { get; set; }
-
-    /// <summary>
-    /// Maximum retry attempts before marking as permanently failed
-    /// </summary>
-    public int MaxRetries { get; set; } = 3;
 
     /// <summary>
     /// Error message if job failed
@@ -70,23 +67,30 @@ public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>
     public DateTimeOffset? CompletedAt { get; set; }
 
     /// <summary>
-    /// Model to use for embedding generation (optional, uses default if null)
-    /// </summary>
-    public string? Model { get; set; }
-
-    /// <summary>
-    /// Priority for job processing (higher = more urgent)
-    /// </summary>
-    public int Priority { get; set; } = 0;
-
-    /// <summary>
-    /// Creates a unique ID for an embed job based on entity ID.
-    /// Format: "embedjob:{EntityType}:{EntityId}"
+    /// Creates the durable queue identity for one Entity in one captured Koan context. The unscoped form retains the
+    /// original <c>embedjob:{EntityType}:{EntityId}</c> shape; a scoped form uses a value-opaque context fingerprint so
+    /// equal Entity ids in different tenants/subjects cannot overwrite or suppress one another.
     /// </summary>
     public static string MakeId(string entityId)
+        => MakeId(entityId, null);
+
+    /// <summary>
+    /// Creates the durable queue identity for one Entity in the supplied captured Koan context.
+    /// </summary>
+    public static string MakeId(
+        string entityId,
+        IReadOnlyDictionary<string, string>? capturedContext)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(entityId);
         var entityType = typeof(TEntity).Name;
-        return $"embedjob:{entityType}:{entityId}";
+        if (capturedContext is null || capturedContext.Count == 0)
+            return $"embedjob:{entityType}:{entityId}";
+
+        var fingerprint = KoanContextFingerprint.Compute(
+            capturedContext,
+            typeof(TEntity).FullName ?? entityType,
+            entityId);
+        return $"koan-context-embedjob:v1:{fingerprint}";
     }
 }
 

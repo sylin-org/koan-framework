@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 namespace Koan.Cache.Abstractions.Primitives;
 
@@ -83,15 +84,47 @@ public readonly record struct CacheKey
     /// <summary>
     /// Build the canonical entity cache key for <paramref name="entityType"/>. Non-generic form.
     /// </summary>
+    /// <remarks>
+    /// The tokens are rendered to byte-match the read path's template (<c>CacheKeyTemplate</c>), so an out-of-band
+    /// evict hits the same entry the read path cached (redesign gap B): the partition is taken <b>verbatim</b> (NOT
+    /// trimmed — the template stores <c>EntityContext.Partition</c> raw, and two distinct partitions must never
+    /// collapse to one cache key), and the id is rendered <b>culture-invariantly</b> for an
+    /// <see cref="IFormattable"/> key (matching the template's invariant rendering) so a negative-int / DateTime key
+    /// keys identically under any process culture.
+    /// </remarks>
     public static CacheKey For(Type entityType, object id, string? partition = null)
     {
         if (entityType is null) throw new ArgumentNullException(nameof(entityType));
         if (id is null) throw new ArgumentNullException(nameof(id));
 
-        var typeName = entityType.Name;
-        var partitionToken = string.IsNullOrWhiteSpace(partition) ? "_" : partition.Trim();
-        var idToken = id.ToString() ?? throw new ArgumentException("Id.ToString() returned null.", nameof(id));
+        var typeName = EntityTypeName(entityType);
+        var partitionToken = string.IsNullOrWhiteSpace(partition) ? "_" : partition;
+        var idToken = (id is IFormattable f ? f.ToString(null, CultureInfo.InvariantCulture) : id.ToString())
+            ?? throw new ArgumentException("Id.ToString() returned null.", nameof(id));
 
         return new CacheKey($"{typeName}:{partitionToken}:{idToken}");
+    }
+
+    /// <summary>
+    /// Stable, collision-free type token for cache keys and tags. For a non-generic type this is
+    /// <c>Type.Name</c> (unchanged). For a closed generic it strips the arity marker AND appends
+    /// the (recursive) type-argument tokens — so <c>EmbeddingState&lt;Produce&gt;</c> and
+    /// <c>EmbeddingState&lt;Other&gt;</c> don't both collapse to <c>EmbeddingState`1</c> (a silent cross-type
+    /// cache collision) the way <c>Type.Name</c> does. Cache keys are ephemeral, so no migration is needed.
+    /// (Stripping the arity alone is insufficient — it would still collide; the type args are what disambiguate.)
+    /// </summary>
+    public static string EntityTypeName(Type type)
+    {
+        if (type is null) throw new ArgumentNullException(nameof(type));
+        if (!type.IsGenericType) return type.Name;
+
+        var name = type.Name;
+        var tick = name.IndexOf('`');
+        if (tick >= 0) name = name[..tick];
+
+        var args = type.GetGenericArguments();
+        var rendered = new string[args.Length];
+        for (var i = 0; i < args.Length; i++) rendered[i] = EntityTypeName(args[i]);
+        return name + "<" + string.Join(",", rendered) + ">";
     }
 }

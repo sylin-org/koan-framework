@@ -24,17 +24,17 @@ public interface ICacheEntryBuilder<T>
 
     ICacheEntryBuilder<T> AllowStaleFor(TimeSpan duration);
 
+    ICacheEntryBuilder<T> WithTier(CacheTier tier);
+
     ICacheEntryBuilder<T> WithTags(params string[] tags);
 
     ICacheEntryBuilder<T> WithContentKind(CacheContentKind kind);
 
     /// <summary>
     /// Toggle coherence broadcast on writes through this builder. Default is on
-    /// (writes broadcast invalidations to peer nodes when a coherence channel is registered).
+    /// (writes broadcast invalidations to peer L1 caches when an every-node provider is active).
     /// </summary>
     ICacheEntryBuilder<T> BroadcastInvalidation(bool value = true);
-
-    ICacheEntryBuilder<T> WithConsistency(CacheConsistencyMode mode);
 
     ValueTask<T?> Get(CancellationToken ct);
 

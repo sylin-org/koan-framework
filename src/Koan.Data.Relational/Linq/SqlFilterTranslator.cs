@@ -64,7 +64,11 @@ public sealed class SqlFilterTranslator
     private string VisitField(FieldFilter f)
     {
         var resolved = FieldPathResolver.Resolve(_entityType, f.Field);
-        var column = _columnResolver(f.Field, resolved);
+        // JSON filters bind member names case-insensitively, but relational stores extract values from
+        // case-sensitive JSON paths. Hand adapters the canonical resolved member path rather than the
+        // caller's spelling (for example, `subject` resolves to `Subject`). Manually-built filters from
+        // older callers remain compatible because CanonicalPath is optional on ResolvedField.
+        var column = _columnResolver(resolved.CanonicalPath ?? f.Field, resolved);
 
         if (resolved.TargetsCollection)
             return VisitCollection(f, resolved, column);

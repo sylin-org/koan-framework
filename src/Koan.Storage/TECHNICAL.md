@@ -1,45 +1,42 @@
-# Koan.Storage Technical Notes
+# Sylin.Koan.Storage technical contract
 
-Contract
-- IStorageService orchestrates provider lookup and object lifecycle.
-- Auto-registration: This assembly exposes Initialization/KoanAutoRegistrar implementing IKoanAutoRegistrar. Options bind from Koan:Storage and IStorageService is registered if missing.
-- Constants: Configuration paths are centralized under Storage.Infrastructure.Constants per ARCH-0040.
-- Providers implement IStorageProvider and optional capabilities:
-  - IStatOperations.HeadAsync → ObjectStat
-  - IServerSideCopy.CopyAsync → server-side copy
-  - IPresignOperations.PresignRead/Write → presigned URLs
+## Runtime ownership
 
-Routing and fallbacks
-- Profiles map logical names to a provider+container.
-- DefaultProfile (optional) is used when callers omit the profile.
-- FallbackMode governs behavior if DefaultProfile is not set:
-  - SingleProfileOnly: allow implicit fallback only when a single profile exists; otherwise throw.
-  - Disabled / NamedDefault: require explicit profile or configure DefaultProfile.
-- ValidateOnStart enforces invariants at startup (providers exist, containers set, default exists if provided).
+`StorageModule` is the only supported registration path. It binds `Koan:Storage`, compiles one provider catalog and
+one immutable routing plan, registers the physical-identity decorator, forces plan construction during module start,
+and projects the same decisions into composition facts. Contract vocabulary lives in inert
+`Sylin.Koan.Storage.Abstractions`.
 
-Hashing and metadata
-- For seekable uploads, SHA-256 is computed by the orchestrator.
-- HeadAsync returns lightweight ObjectStat when the provider supports it; otherwise the service may fall back to a short open-read.
+## Provider catalog and routing plan
 
-Copy/Move semantics
-- TransferToProfileAsync(source, container, key, target, targetContainer?, deleteSource=false) is the core operation.
-- Helpers:
-  - CopyTo(...) → deleteSource=false
-  - MoveTo(...) → deleteSource=true
-- If both profiles use the same provider and it implements IServerSideCopy, server-side copy is used; otherwise the service streams from source to target.
+Core `ProviderCatalog<IStorageProvider>` owns normalized identities, priority metadata, stable ties, and duplicate
+rejection. Storage specializes it with provider placement, unified `StorageCaps`, interface/capability conformance,
+profile semantics, and corrections.
 
-Presign
-- PresignRead/Write calls are routed only when the provider implements IPresignOperations; otherwise NotSupported is thrown.
+Every configured profile compiles to one `StorageRoute`: provider/composite instance, container, capability set, and
+`ProviderSelectionReceipt`. Explicit pins are required intent. Automatic routes select the highest-priority candidate
+within a placement. A single profile becomes the implicit default; multiple profiles without `DefaultProfile` remain
+valid only for explicitly addressed operations.
 
-Safety & performance
-- Local provider sanitizes keys, uses temp+rename for atomic writes, supports range reads.
-- For large downloads, prefer ReadRangeAsync and set appropriate HTTP headers in web controllers.
+Replication is a compiled composite owned and disposed by the routing plan. Explicit Replicated mode requires Local
+and Remote candidates. Automatic mode composes them when both exist; one candidate remains a single-tier route.
+Storage options are composition inputs and are not silently reinterpreted on each operation.
 
-Testing
-- Unit tests cover write/read/range/delete, exists/head, transfer, onboarding from file/URL, and copy/move helpers.
+## Identity and segmentation
 
-References
-- docs/reference/storage.md
-- docs/decisions/STOR-0001-storage-module-and-contracts.md
-- docs/decisions/STOR-0006-storage-default-routing-and-fallbacks.md
-- docs/decisions/STOR-0007-storage-dx-helpers.md
+`ScopedStorageService` is the physical-identity chokepoint. It combines the immutable Storage identity plan with an
+operation's Entity/host scope, applies guards, maps logical keys to physical keys, and maps results back without
+changing Entity identity. Cross-cutting modules contribute generic segmentation; Storage contains no tenant branch.
+
+## Operations and optional capabilities
+
+`StorageService` is a thin executor over the compiled route. It requires the matching `StorageCaps` token before
+presign/list operations, uses stat when declared, and attempts server-side copy only for the same provider with the
+declared capability. Capability/interface disagreement is rejected while compiling the catalog.
+
+Seekable uploads are hashed with SHA-256 while preserving caller position. Non-seekable uploads are buffered once so
+they can be hashed and replayed; their reported size remains unknown (`0`) unless the contract changes. Cross-provider
+copy reads then writes; move deletes only after target success.
+
+Provider docs own actual streaming, consistency, range, stat, presign, durability, and atomicity guarantees. Storage
+does not normalize a backend into stronger semantics or claim an atomic commit across provider bytes and Data rows.

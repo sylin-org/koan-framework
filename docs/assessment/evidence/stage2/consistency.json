@@ -184,7 +184,7 @@
     {
       "concept": "Service identity attribute",
       "ways": [
-        "Koan.Orchestration.Attributes.KoanServiceAttribute(ServiceKind, shortCode, name) — alive: every data/AI connector factory carries it",
+        "Koan.Core.Services.KoanServiceAttribute(ServiceKind, shortCode, name) — alive: every data/AI connector factory carries it",
         "Koan.Web.Auth.Services.Attributes.KoanServiceAttribute(serviceId, ProvidedScopes) — consumers: its own registrar + one sample controller (S5.Recs)",
         "Koan.ServiceMesh.Abstractions.KoanServiceAttribute(ServiceId, DisplayName) — zero-consumer experimental stratum (Translation service + S8.PolyglotShop sample)"
       ],

@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SnapVault</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Koan Framework -->
+    <ProjectReference Include="..\..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
+    <!-- Upload progress is a Server-Sent Events projection of the durable Jobs ledger. -->
+    <ProjectReference Include="..\..\..\src\Koan.Web.Sse\Koan.Web.Sse.csproj" />
+
+    <!-- Every non-[HostScoped] Entity<T> is isolated by the ambient studio. -->
+    <ProjectReference Include="..\..\..\src\Koan.Tenancy\Koan.Tenancy.csproj" />
+
+    <!-- Durable, studio-carrying background jobs. -->
+    <ProjectReference Include="..\..\..\src\Koan.Jobs\Koan.Jobs.csproj" />
+
+    <!-- The zero-infrastructure durable local provider. -->
+    <ProjectReference Include="..\..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
+
+    <!-- On-demand media recipes served from one access-scoped original. -->
+    <ProjectReference Include="..\..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Media.Web\Koan.Media.Web.csproj" />
+
+    <!-- Storage -->
+    <ProjectReference Include="..\..\..\src\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
+
+    <!-- AI/vector semantics. Add provider connector references when enrichment is desired. -->
+    <ProjectReference Include="..\..\..\src\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Data.AI\Koan.Data.AI.csproj" />
+
+    <ProjectReference Include="..\..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Studio-to-client identity and access lifecycle. -->
+    <ProjectReference Include="..\..\..\src\Koan.Identity\Koan.Identity.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Identity.Tenancy\Koan.Identity.Tenancy.csproj" />
+    <!-- Cookie authentication and a zero-configuration Development sign-in provider. -->
+    <ProjectReference Include="..\..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
+    <ProjectReference Include="..\..\..\src\Connectors\Web\Auth\Test\Koan.Web.Auth.Connector.Test.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Pinned to the ImageSharp line used by Koan.Media.Core. -->
+    <PackageReference Include="SixLabors.ImageSharp" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" />
+  </ItemGroup>
+
+</Project>

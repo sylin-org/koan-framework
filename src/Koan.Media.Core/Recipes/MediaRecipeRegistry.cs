@@ -215,7 +215,6 @@ public sealed class MediaRecipeRegistry : IMediaRecipeRegistry, IDisposable
                         Description = attr.Description ?? recipe.Description,
                         Version = attr.Version,
                         AllowedMutators = attr.Mutators,
-                        Eager = attr.Eager,
                         Source = RecipeSource.Code,
                     };
                     RecipeOutputFormatValidator.EnsureProducible(recipe, attr.Name);

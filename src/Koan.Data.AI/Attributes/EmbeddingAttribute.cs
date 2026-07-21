@@ -4,6 +4,7 @@ namespace Koan.Data.AI.Attributes;
 /// Marks an entity for automatic embedding generation and vectorization.
 /// Supports three modes: Policy-based auto-discovery, Template-based composition, or explicit Properties list.
 /// Precedence: Template > Properties > Policy
+/// Worker throughput and retry policy are configured once for the host, not per Entity type.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class)]
 public class EmbeddingAttribute : Attribute
@@ -40,21 +41,8 @@ public class EmbeddingAttribute : Attribute
     public string? Model { get; set; }
 
     /// <summary>
-    /// Batch size for async queue processing (default: 10).
-    /// Only applies when Async = true.
-    /// </summary>
-    public int BatchSize { get; set; } = 10;
-
-    /// <summary>
-    /// Rate limit per minute for this entity type (optional).
-    /// If 0, uses global rate limit from configuration.
-    /// Only applies when Async = true.
-    /// </summary>
-    public int RateLimitPerMinute { get; set; } = 0;
-
-    /// <summary>
     /// AI source or group name for routing embeddings to specific providers.
-    /// Flows through Client.Scope(all: ...) to route to appropriate AI service.
+    /// Flows through the embedding-category source scope to route to the appropriate AI service.
     /// Examples: "ollama-primary", "openai-prod", "azure-embeddings"
     /// If null, uses default routing.
     /// </summary>

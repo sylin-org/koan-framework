@@ -1,29 +1,18 @@
 using System;
-using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Bson.IO;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Serializers;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Koan.Core.Hosting.App;
 
 namespace Koan.Data.Connector.Mongo.Initialization;
 
 /// <summary>
 /// Serializes a <see cref="JObject"/> to and from BSON.
 /// </summary>
-public class JObjectSerializer : SerializerBase<JObject>, IBsonSerializer<object>
+internal sealed class JObjectSerializer : SerializerBase<JObject>, IBsonSerializer<object>
 {
-    private readonly ILogger? _logger;
-
-    public JObjectSerializer()
-    {
-        // It's possible that the ServiceProvider is not available when this serializer is registered
-        // so we need to handle the case where the logger is not available.
-        _logger = (ILogger?)AppHost.Current?.GetService(typeof(ILogger<JObjectSerializer>));
-    }
-
     object IBsonSerializer<object>.Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
     {
         return Deserialize(context, args);
@@ -84,20 +73,7 @@ public class JObjectSerializer : SerializerBase<JObject>, IBsonSerializer<object
             return;
         }
 
-        var json = value.ToString(Formatting.None);
-        // _logger?.LogDebug("[JObjectSerializer] Serializing JObject: {Json}", json);
-
-        try
-        {
-            var document = BsonSerializer.Deserialize<BsonDocument>(json);
-            BsonDocumentSerializer.Instance.Serialize(context, document);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogWarning(ex, "[JObjectSerializer] Failed to serialize JObject as BsonDocument. JObject value: {Json}. Falling back to writing as string.", json);
-            // Fallback for simple JObject like { "value": "some_string" }
-            context.Writer.WriteString(value.ToString());
-        }
+        var document = BsonSerializer.Deserialize<BsonDocument>(value.ToString(Formatting.None));
+        BsonDocumentSerializer.Instance.Serialize(context, document);
     }
 }
-

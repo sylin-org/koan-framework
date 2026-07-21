@@ -13,8 +13,6 @@ public static class StorageConstants
             {
                 public const string Profiles = nameof(Profiles);
                 public const string DefaultProfile = nameof(DefaultProfile);
-                public const string FallbackMode = nameof(FallbackMode);
-                public const string ValidateOnStart = nameof(ValidateOnStart);
             }
         }
     }

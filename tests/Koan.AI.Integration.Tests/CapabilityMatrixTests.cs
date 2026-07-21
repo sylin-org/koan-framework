@@ -1,6 +1,6 @@
 using AwesomeAssertions;
 using Koan.AI.Integration.Tests.Fixtures;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Xunit;
 
 namespace Koan.AI.Integration.Tests;

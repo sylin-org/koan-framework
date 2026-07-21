@@ -1,6 +1,8 @@
 # 0027: Standalone MQ services and naming (Inbox service; Publisher Relay vs Outbox)
 
-- Status: Accepted
+> **Status: Retired.** Describes a prior messaging generation; the inbox/alias/provisioning features no longer exist in code.
+
+- Status: Retired
 - Date: 2025-08-17
 - Owners: Koan Messaging
 

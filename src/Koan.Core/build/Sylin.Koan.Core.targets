@@ -1,0 +1,400 @@
+<Project>
+  <PropertyGroup>
+    <KoanModuleIdentity Condition="'$(PackageId)' != ''">$(PackageId)</KoanModuleIdentity>
+    <KoanModuleIdentity Condition="'$(KoanModuleIdentity)' == '' and '$(AssemblyName)' != ''">$(AssemblyName)</KoanModuleIdentity>
+    <KoanModuleIdentity Condition="'$(KoanModuleIdentity)' == ''">$(MSBuildProjectName)</KoanModuleIdentity>
+  </PropertyGroup>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="PackageId" />
+    <CompilerVisibleProperty Include="IsTestProject" />
+    <AssemblyMetadata Remove="KoanModuleIdentity" />
+    <AssemblyMetadata Include="KoanModuleIdentity" Value="$(KoanModuleIdentity)" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildThisFileDirectory)tools/Sylin.Koan.SemanticActivation.targets"
+          Condition="'$(KoanSemanticActivationTargetsImported)' != 'true' and Exists('$(MSBuildThisFileDirectory)tools/Sylin.Koan.SemanticActivation.targets')" />
+
+  <PropertyGroup>
+    <_KoanRegistryGeneratorAssembly>$(MSBuildThisFileDirectory)tools/Koan.Core.Registry.Generators.dll</_KoanRegistryGeneratorAssembly>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(_KoanRegistryGeneratorAssembly)')">
+    <Analyzer Include="$(_KoanRegistryGeneratorAssembly)" />
+  </ItemGroup>
+
+  <!--
+    P1.1 / R07-09 · Composition lockfile and direct-reference provenance (build-time emitter).
+
+    NuGet auto-imports buildTransitive/<PackageId>.targets for direct and transitive PackageReference
+    consumers, so referencing a Koan application bundle gives an app a checked-in koan.lock.json
+    refreshed on every build — `git diff` then shows composition drift in PR review WITHOUT booting
+    the app. The boot-time host writes the richer resolved twin (obj/koan.lock.resolved.json) and compares.
+
+    Build-time we can honestly emit app + resolved modules + direct application references
+    (capabilities/elections/entities are runtime-negotiated — ARCH-0084). Direct references come
+    from @(PackageReference)/@(ProjectReference), never the flattened @(ReferencePath), so transitive
+    connectors cannot masquerade as application intent. Module versions are major.minor (ARCH-0085
+    pre-1.0 breaking tier) so the checked-in file is byte-stable across commits and diffs stay meaningful.
+
+    Scope: app projects (OutputType=Exe) by default; force on/off with $(KoanComposition)=true|false.
+    ProjectReference does not import package build assets. The repository's supported source
+    application contracts import this file centrally from Directory.Build.targets; package consumers
+    receive it transitively without project-file ceremony.
+  -->
+  <PropertyGroup>
+    <_KoanCompositionEnabled Condition="'$(KoanComposition)' == 'true'">true</_KoanCompositionEnabled>
+    <_KoanCompositionEnabled Condition="'$(_KoanCompositionEnabled)' == '' and '$(KoanComposition)' != 'false' and '$(OutputType)' == 'Exe'">true</_KoanCompositionEnabled>
+    <!-- Reference and module closure can vary by Configuration/TFM/RID. This target can be imported
+         before the SDK finalizes IntermediateOutputPath, so derive the same stable dimensions directly. -->
+    <_KoanCompositionIntermediatePath>$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/</_KoanCompositionIntermediatePath>
+    <_KoanCompositionIntermediatePath Condition="'$(RuntimeIdentifier)' != ''">$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/$(RuntimeIdentifier)/</_KoanCompositionIntermediatePath>
+    <_KoanModuleManifestFile>$(_KoanCompositionIntermediatePath)koan.modules.manifest</_KoanModuleManifestFile>
+    <_KoanReferenceManifestFile>$(_KoanCompositionIntermediatePath)koan.references.manifest</_KoanReferenceManifestFile>
+    <_KoanTrimRootsFile>$(_KoanCompositionIntermediatePath)koan.trimroots.xml</_KoanTrimRootsFile>
+    <!-- The trim-root descriptor is only meaningful for a trimming/NativeAOT publish; emitting it for plain
+         builds would be inert noise. PublishAot is set in the app csproj before this import, so it's visible here. -->
+    <_KoanTrimRootsEnabled Condition="'$(_KoanCompositionEnabled)' == 'true' and ('$(PublishAot)' == 'true' or '$(PublishTrimmed)' == 'true')">true</_KoanTrimRootsEnabled>
+  </PropertyGroup>
+
+  <!-- Declared statically so the resource is in @(EmbeddedResource) from evaluation (a target adding it later
+       misses the resource pipeline's snapshot). The file content is produced by KoanWriteModuleManifest before
+       CoreCompile; with LogicalName set, nothing reads the file until Csc embeds it. -->
+  <ItemGroup Condition="'$(_KoanCompositionEnabled)' == 'true'">
+    <!-- Lets runtime distinguish an unsupported no-target fallback from a supported build whose
+         required resource was lost or mismatched. Keep the key synchronized with Constants.Composition. -->
+    <AssemblyMetadata Include="KoanSemanticActivationManifest" Value="1" />
+    <EmbeddedResource Include="$(_KoanModuleManifestFile)" LogicalName="koan.modules.manifest" Visible="false" />
+    <EmbeddedResource Include="$(_KoanReferenceManifestFile)" LogicalName="koan.references.manifest" Visible="false" />
+    <!-- Snapshot application-authored items during evaluation. ResolveProjectReferences may add
+         transitive project items later; those are module presence, never direct application intent. -->
+    <_KoanDeclaredPackageReference Include="@(PackageReference)" />
+    <_KoanDeclaredProjectReference Include="@(ProjectReference)" />
+  </ItemGroup>
+
+  <!-- AOT/trim discovery roots. The file is produced by KoanWriteTrimRoots before CoreCompile (well before ILC
+       reads the descriptor at publish); declaring the item here is harmless if the file is absent until then. -->
+  <ItemGroup Condition="'$(_KoanTrimRootsEnabled)' == 'true'">
+    <TrimmerRootDescriptor Include="$(_KoanTrimRootsFile)" />
+  </ItemGroup>
+
+  <UsingTask TaskName="WriteKoanLockfile"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <ModuleAssemblies ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <DirectReferences ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <AppName ParameterType="System.String" Required="true" />
+      <Tfm ParameterType="System.String" Required="true" />
+      <OutputPath ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Text" />
+      <Using Namespace="System.Reflection" />
+      <Using Namespace="System.Collections.Generic" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        Func<Version, string> majorMinor = v => v == null ? "0.0" : v.Major + "." + v.Minor;
+        Func<string, string> esc = s => (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+        var modules = new List<KeyValuePair<string, string>>();
+        string koan = null;
+        foreach (var item in ModuleAssemblies)
+        {
+            var path = item.GetMetadata("FullPath");
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) continue;
+            var id = Path.GetFileNameWithoutExtension(path);
+            Version ver = null;
+            try { ver = AssemblyName.GetAssemblyName(path).Version; } catch { }
+            var mm = majorMinor(ver);
+            modules.Add(new KeyValuePair<string, string>(id, mm));
+            if (string.Equals(id, "Koan.Core", StringComparison.Ordinal)) koan = mm;
+        }
+
+        var distinct = modules
+            .GroupBy(m => m.Key, StringComparer.Ordinal)
+            .Select(g => g.First())
+            .OrderBy(m => m.Key, StringComparer.Ordinal)
+            .ToList();
+        if (koan == null) koan = distinct.Count > 0 ? distinct[0].Value : "0.0";
+
+        var directReferences = (DirectReferences ?? Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+            .Select(item => item.ItemSpec.Split(new[] { '|' }, 2))
+            .Where(parts => parts.Length == 2 && parts[0].Length > 0 && parts[1].Length > 0)
+            .Select(parts => new KeyValuePair<string, string>(parts[0], parts[1]))
+            .GroupBy(reference => reference.Key + "|" + reference.Value, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .OrderBy(reference => reference.Key, StringComparer.Ordinal)
+            .ThenBy(reference => reference.Value, StringComparer.Ordinal)
+            .ToList();
+
+        var sb = new StringBuilder();
+        sb.Append("{\n");
+        sb.Append("  \"schema\": 2,\n");
+        sb.Append("  \"app\": {\n");
+        sb.Append("    \"name\": \"" + esc(AppName) + "\",\n");
+        sb.Append("    \"koan\": \"" + esc(koan) + "\",\n");
+        sb.Append("    \"tfm\": \"" + esc(Tfm) + "\"\n");
+        sb.Append("  },\n");
+        sb.Append("  \"modules\": [");
+        for (int i = 0; i < distinct.Count; i++)
+        {
+            sb.Append(i == 0 ? "\n" : ",\n");
+            sb.Append("    {\n");
+            sb.Append("      \"id\": \"" + esc(distinct[i].Key) + "\",\n");
+            sb.Append("      \"version\": \"" + esc(distinct[i].Value) + "\"\n");
+            sb.Append("    }");
+        }
+        sb.Append(distinct.Count == 0 ? "],\n" : "\n  ],\n");
+        sb.Append("  \"directReferences\": [");
+        for (int i = 0; i < directReferences.Count; i++)
+        {
+            sb.Append(i == 0 ? "\n" : ",\n");
+            sb.Append("    {\n");
+            sb.Append("      \"kind\": \"" + esc(directReferences[i].Key) + "\",\n");
+            sb.Append("      \"id\": \"" + esc(directReferences[i].Value) + "\"\n");
+            sb.Append("    }");
+        }
+        sb.Append(directReferences.Count == 0 ? "]\n" : "\n  ]\n");
+        sb.Append("}\n");
+        var content = sb.ToString();
+
+        // Write only when the content changes — avoids touch churn, rebuild loops, and noisy diffs.
+        string existing = File.Exists(OutputPath) ? File.ReadAllText(OutputPath) : null;
+        if (!string.Equals(existing, content, StringComparison.Ordinal))
+        {
+            File.WriteAllText(OutputPath, content);
+            Log.LogMessage(MessageImportance.Normal, "Koan composition: wrote " + OutputPath + " (" + distinct.Count + " modules).");
+        }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <UsingTask TaskName="WriteKoanReferenceManifest"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <PackageReferences ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <ActivationNodes ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <SourceActivationRecords ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <ActivationEdges ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <DirectReferences ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
+      <OutputPath ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Reference Include="$(MSBuildToolsPath)/Microsoft.Build.Utilities.Core.dll" />
+      <Using Namespace="System" />
+      <Using Namespace="System.Collections.Generic" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        Func<string, bool> validIdentity = value =>
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length > 256) return false;
+            foreach (var ch in value)
+            {
+                if (char.IsLetterOrDigit(ch) || ch == '.' || ch == '-' || ch == '_') continue;
+                return false;
+            }
+            return true;
+        };
+
+        var references = new List<string>();
+        var activationNodes = new HashSet<string>(
+            (ActivationNodes ?? Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+                .Select(item => item.ItemSpec)
+                .Where(validIdentity),
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var item in PackageReferences ?? Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+        {
+            var id = item.ItemSpec;
+            if (activationNodes.Contains(id)) references.Add("reference|package|" + id + "|" + id);
+        }
+        foreach (var item in SourceActivationRecords ?? Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+        {
+            if (!string.Equals(item.GetMetadata("Kind"), "Root", StringComparison.OrdinalIgnoreCase)) continue;
+            var raw = item.GetMetadata("RawIdentity");
+            var canonical = item.GetMetadata("CanonicalIdentity");
+            if (!validIdentity(raw) || !validIdentity(canonical))
+            {
+                Log.LogError("Koan activation root is malformed. Give the referenced project a stable PackageId and rebuild.");
+                return false;
+            }
+            references.Add("reference|project|" + raw + "|" + canonical);
+        }
+
+        var dependencies = new List<string>();
+        Action<Microsoft.Build.Framework.ITaskItem> addDependency = item =>
+        {
+            var parts = (item.ItemSpec ?? string.Empty).Split(new[] { '|' }, StringSplitOptions.None);
+            if (parts.Length != 2 || !validIdentity(parts[0]) || !validIdentity(parts[1]))
+            {
+                Log.LogError("Koan activation dependency is malformed. Rebuild the declaring package before rebuilding the application.");
+                return;
+            }
+            dependencies.Add("dependency|" + parts[0] + "|" + parts[1]);
+        };
+        foreach (var item in SourceActivationRecords ?? Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+        {
+            if (string.Equals(item.GetMetadata("Kind"), "Dependency", StringComparison.OrdinalIgnoreCase)) addDependency(item);
+        }
+        foreach (var item in ActivationEdges ?? Array.Empty<Microsoft.Build.Framework.ITaskItem>()) addDependency(item);
+        if (Log.HasLoggedErrors) return false;
+
+        var referenceLines = references
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(line => line, StringComparer.Ordinal)
+            .ToArray();
+        var dependencyEdges = dependencies
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(line => line.Split(new[] { '|' }, StringSplitOptions.None))
+            .Select(parts => new KeyValuePair<string, string>(parts[1], parts[2]))
+            .ToArray();
+        var adjacency = dependencyEdges
+            .GroupBy(edge => edge.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(edge => edge.Value).ToArray(),
+                StringComparer.OrdinalIgnoreCase);
+        Func<KeyValuePair<string, string>, bool> isTransitivelyRedundant = candidate =>
+        {
+            var pending = new Stack<string>();
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            pending.Push(candidate.Key);
+            while (pending.Count > 0)
+            {
+                var current = pending.Pop();
+                if (!visited.Add(current) || !adjacency.TryGetValue(current, out var children)) continue;
+                foreach (var child in children)
+                {
+                    if (string.Equals(current, candidate.Key, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(child, candidate.Value, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    if (string.Equals(child, candidate.Value, StringComparison.OrdinalIgnoreCase)) return true;
+                    pending.Push(child);
+                }
+            }
+            return false;
+        };
+        var dependencyLines = dependencyEdges
+            .Where(edge => !isTransitivelyRedundant(edge))
+            .Select(edge => "dependency|" + edge.Key + "|" + edge.Value)
+            .OrderBy(line => line, StringComparer.Ordinal)
+            .ToArray();
+        DirectReferences = referenceLines
+            .Select(line => line.Split(new[] { '|' }, StringSplitOptions.None))
+            .Select(parts => (Microsoft.Build.Framework.ITaskItem)new Microsoft.Build.Utilities.TaskItem(parts[1] + "|" + parts[2]))
+            .ToArray();
+        var lines = new[] { "schema|1" }.Concat(referenceLines).Concat(dependencyLines).ToArray();
+        var content = string.Join(Environment.NewLine, lines) + Environment.NewLine;
+        var existing = File.Exists(OutputPath) ? File.ReadAllText(OutputPath) : null;
+        if (!string.Equals(existing, content, StringComparison.Ordinal)) File.WriteAllText(OutputPath, content);
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <!--
+    Direct reference provenance. @(PackageReference) and @(ProjectReference) are application-authored
+    inputs; @(ReferencePath) is the resolved transitive closure. Preserve that distinction so an
+    indirectly supplied connector cannot become an automatic provider candidate.
+  -->
+  <Target Name="KoanWriteReferenceManifest"
+          BeforeTargets="PrepareResources;CoreCompile"
+          Condition="'$(_KoanCompositionEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <_KoanActivationProjectReference Include="@(_KoanDeclaredProjectReference)"
+                                       Condition="'%(_KoanDeclaredProjectReference.ReferenceOutputAssembly)' != 'false' and '%(_KoanDeclaredProjectReference.OutputItemType)' != 'Analyzer'" />
+    </ItemGroup>
+    <MSBuild Projects="@(_KoanActivationProjectReference)"
+             Targets="KoanDescribeActivationNode"
+             BuildInParallel="true"
+             SkipNonexistentTargets="true"
+             Condition="'@(_KoanActivationProjectReference)' != ''">
+      <Output TaskParameter="TargetOutputs" ItemName="_KoanSourceActivationRecord" />
+    </MSBuild>
+    <WriteKoanReferenceManifest PackageReferences="@(_KoanDeclaredPackageReference)"
+                                ActivationNodes="@(KoanActivationNode)"
+                                SourceActivationRecords="@(_KoanSourceActivationRecord)"
+                                ActivationEdges="@(KoanActivationEdge)"
+                                OutputPath="$(_KoanReferenceManifestFile)">
+      <Output TaskParameter="DirectReferences" ItemName="_KoanDirectReference" />
+    </WriteKoanReferenceManifest>
+    <ItemGroup>
+      <FileWrites Include="$(_KoanReferenceManifestFile)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="KoanWriteCompositionLockfile"
+          AfterTargets="Build"
+          DependsOnTargets="KoanWriteReferenceManifest"
+          Condition="'$(_KoanCompositionEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <_KoanModuleAssembly Include="@(ReferencePath)"
+                           Condition="$([System.String]::Copy('%(Filename)').StartsWith('Koan.'))" />
+    </ItemGroup>
+    <WriteKoanLockfile ModuleAssemblies="@(_KoanModuleAssembly)"
+                       DirectReferences="@(_KoanDirectReference)"
+                       AppName="$(AssemblyName)"
+                       Tfm="$(TargetFramework)"
+                       OutputPath="$(MSBuildProjectDirectory)/koan.lock.json" />
+  </Target>
+
+  <!--
+    X-aot-substrate · Boot module manifest (embedded). Reference=Intent connectors are referenced via
+    <ProjectReference> but never symbol-used, so the compiler drops them from the app's metadata (the boot
+    reference-fixpoint can't see them) and a single-file publish leaves no loose Koan.*.dll to scan. The same
+    @(ReferencePath) Koan-filter that drives the lockfile is written one-name-per-line and EMBEDDED in the app
+    assembly — embedded resources survive single-file bundling, so AppBootstrapper.LoadIntentModulesFromManifest
+    can Assembly.Load each module by name at boot. Runs before CoreCompile so the resource is included; only for
+    app projects that opt into composition (same gate as the lockfile).
+  -->
+  <Target Name="KoanWriteModuleManifest"
+          BeforeTargets="PrepareResources;CoreCompile"
+          DependsOnTargets="ResolveAssemblyReferences"
+          Condition="'$(_KoanCompositionEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <_KoanManifestModule Include="@(ReferencePath)"
+                           Condition="$([System.String]::Copy('%(Filename)').StartsWith('Koan.'))" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(_KoanModuleManifestFile)"
+                      Lines="@(_KoanManifestModule->'%(Filename)')"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <FileWrites Include="$(_KoanModuleManifestFile)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    X-aot-substrate · Trim/AOT discovery roots (NativeAOT leg). Trimming and ILC start reachability at the entry
+    point; a Reference=Intent connector is never symbol-reachable, so ILC trims the whole assembly and its
+    source-generated [ModuleInitializer] self-registration never runs — boot discovers no adapters. Even an
+    assembly kept by a static reference loses members it only constructs reflectively: the registrar is reached
+    via Activator.CreateInstance(Type), whose parameterless .ctor ILC drops (MissingMethodException at boot).
+    Both are cured by rooting each Koan module with preserve="all": the same @(ReferencePath) Koan-filter that
+    drives the lockfile and manifest, written as an ILLink descriptor that ILC honors. Whole-assembly preservation
+    is deliberate — Koan's discovery is reflection-deep (Activator.CreateInstance on registrars, GetTypes() scans),
+    so member-level trimming would silently strip what reflection needs. Only emitted for trimming/AOT publishes.
+  -->
+  <Target Name="KoanWriteTrimRoots"
+          BeforeTargets="PrepareResources;CoreCompile"
+          DependsOnTargets="ResolveAssemblyReferences"
+          Condition="'$(_KoanTrimRootsEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <_KoanTrimRootModule Include="@(ReferencePath)"
+                           Condition="$([System.String]::Copy('%(Filename)').StartsWith('Koan.'))" />
+      <_KoanTrimRootLine Include="&lt;linker&gt;" />
+      <_KoanTrimRootLine Include="@(_KoanTrimRootModule->'  &lt;assembly fullname=&quot;%(Filename)&quot; preserve=&quot;all&quot; /&gt;')" />
+      <_KoanTrimRootLine Include="&lt;/linker&gt;" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(_KoanTrimRootsFile)"
+                      Lines="@(_KoanTrimRootLine)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <FileWrites Include="$(_KoanTrimRootsFile)" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -58,7 +58,7 @@ public sealed class CacheL1TtlPolicySpec
     [Fact]
     public void Sub_second_L2_clamps_to_L2_not_floor()
     {
-        // 200ms L2 → must clamp to 200ms. This is the failure mode the SWR integration test caught.
+        // 200ms L2 → must clamp to 200ms. This is the failure mode the bounded-stale integration test caught.
         CacheL1TtlPolicy.Derive(TimeSpan.FromMilliseconds(200), null)
             .Should().Be(TimeSpan.FromMilliseconds(200));
     }

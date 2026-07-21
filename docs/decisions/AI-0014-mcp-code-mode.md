@@ -239,6 +239,8 @@ public Task<ToolsListResponse> ListToolsAsync(CancellationToken ct)
 
 ### Proof of Concept: S16 PantryPal
 
+> **Retired (2026-06):** S16.PantryPal was removed from the repo (a single-user anonymous app that did not exercise the agent-native access surface). MCP Code Mode is now validated by the `Koan.Samples.McpCodeMode` sample + `tests/Suites/Mcp/Koan.Mcp.Conformance.Tests`; a purpose-built MCP showcase sample is forthcoming. The original POC framing below is kept for historical context.
+
 - S16 PantryPal will serve as the reference implementation and validation suite for MCP code mode.
 - It will demonstrate agentic AI pipelines that reason over, discover, and orchestrate workflows using the code-enabled MCP service.
 - Multi-step workflows (e.g., photo → detection → pantry update → meal suggestion) will be implemented as single code-mode scripts, showcasing the value of the approach.
@@ -410,6 +412,7 @@ Centralized in `CodeModeErrorCodes` (namespace `Koan.Mcp.CodeMode.Execution`). A
 | `ToolNotFound` | `tool_not_found` | Requested tool name missing from registry | Endpoint discovery / client bug |
 | `ServiceUnavailable` | `service_unavailable` | Backend `IEntityEndpointService` not resolved from DI scope | Misconfiguration / partial registration |
 | `InvalidPayload` | `invalid_payload` | JSON payload translation failure / schema mismatch | Thrown during request translation phase |
+| `CodeModeDisabled` | `code_mode_disabled` | `CodeModeOptions.Enabled=false`, the active exposure mode does not surface code, or no `ICodeExecutor` is registered | Returned by the RPC invoke path (`koan.code.execute` / `koan.code.validate`) when a client calls a gated code tool by name |
 
 Planned Additional (if implemented):
 
@@ -454,3 +457,28 @@ Acceptance Gate (implemented):
 | Capability Negotiation | `Auto` selects Code or Tools based on client handshake metadata (test simulating capabilities) |
 
 Failure to meet any Phase 2 gate blocks promotion to public preview; Phase 3 gates required for GA.
+
+### 2026-06-14 Update: RPC invoke path honors the code-mode gates
+
+`tools/call` dispatches `koan.code.execute` / `koan.code.validate` by name. The handler only guarded
+`_codeExecutor == null`, but `AddKoanMcp` always registers `JintCodeExecutor`, so the executor is
+never null. The result: with `Exposure=Tools` (or `CodeMode:Enabled=false`), the code tools were
+correctly hidden from `tools/list` yet **still invocable by name**, running sandboxed JavaScript that
+discovery would never have surfaced. The capabilities and SDK-definitions endpoints already gated on
+`CodeModeOptions.Enabled` (`EndpointRouteBuilderExtensions`); the RPC path was the only surface that
+did not — hiding a tool from the listing is not a security control on its own.
+
+**Resolution.** `McpRpcHandler` now applies two gates, in `ListTools` and at the top of both
+`ExecuteCode` and `ExecuteCodeValidation` (`TryDenyCodeExecution`):
+
+1. `CodeModeOptions.Enabled` — the functional kill switch (defaults true; a misconfigured host with
+   the options unregistered fails closed).
+2. The resolved exposure mode must surface code (`Code` or `Full`).
+
+A gated invoke-by-name returns the `code_mode_disabled` error contract (now a `CodeModeErrorCodes`
+constant, replacing the bare string literal — satisfying the registry consistency gate). `ListTools`
+additionally suppresses the code tools when `Enabled=false`, so listing and invocation agree.
+
+Coverage: `CodeModeGatingSpec` (Disabled-Full and Tools-only fixtures) asserts the code tools are
+absent from `tools/list` and that calling either by name returns an error envelope with
+`errorCode = code_mode_disabled`, while entity tools remain exposed under Full.

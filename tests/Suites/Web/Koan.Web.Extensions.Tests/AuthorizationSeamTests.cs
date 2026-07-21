@@ -5,10 +5,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Microsoft.Extensions.Options;
+using Koan.Web.Authorization;
 using Koan.Web.Extensions.Authorization;
 using Koan.Web.Hooks;
 using Xunit;
-using AuthorizeRequest = Koan.Web.Extensions.Authorization.AuthorizeRequest;
 
 namespace Koan.Web.Extensions.Tests;
 

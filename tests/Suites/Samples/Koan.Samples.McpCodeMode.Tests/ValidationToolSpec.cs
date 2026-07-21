@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 
 namespace Koan.Samples.McpCodeMode.Tests;
 
@@ -39,21 +39,27 @@ public class ValidationToolSpec : IClassFixture<TestPipelineFixture>
     public async Task Validate_ValidScript()
     {
         var resp = await Call("koan.code.validate", new { code = "function run() { return 1+1; }" });
-    resp["Result"]!["valid"]!.Value<bool>().Should().BeTrue();
+        var text = resp["content"]?[0]?["text"]?.Value<string>();
+        var obj = JObject.Parse(text!);
+        obj["valid"]!.Value<bool>().Should().BeTrue();
     }
 
     [Fact(DisplayName = "Validation tool returns valid=false with error for syntax issue")]
     public async Task Validate_InvalidScript()
     {
         var resp = await Call("koan.code.validate", new { code = "function run( {" });
-    resp["Result"]!["valid"]!.Value<bool>().Should().BeFalse();
-    resp["Result"]!["error"].Should().NotBeNull();
+        var text = resp["content"]?[0]?["text"]?.Value<string>();
+        var obj = JObject.Parse(text!);
+        obj["valid"]!.Value<bool>().Should().BeFalse();
+        obj["error"].Should().NotBeNull();
     }
 
     [Fact(DisplayName = "Validation tool returns valid=false for empty code")]
     public async Task Validate_Empty()
     {
         var resp = await Call("koan.code.validate", new { code = "" });
-    resp["Result"]!["valid"]!.Value<bool>().Should().BeFalse();
+        var text = resp["content"]?[0]?["text"]?.Value<string>();
+        var obj = JObject.Parse(text!);
+        obj["valid"]!.Value<bool>().Should().BeFalse();
     }
 }

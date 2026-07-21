@@ -1,17 +1,16 @@
-using System.Text;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
+using Koan.Core;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
-using Koan.Orchestration;
-using Koan.Orchestration.Attributes;
+using Koan.Core.Services;
 
 namespace Koan.Data.Vector.Connector.Weaviate;
 
 [ProviderPriority(10)]
 [KoanService(ServiceKind.Vector, shortCode: "weaviate", name: "Weaviate",
-    ContainerImage = "semitechnologies/weaviate",
-    DefaultTag = "1.25.6",
+    ContainerImage = "cr.weaviate.io/semitechnologies/weaviate",
+    DefaultTag = "1.37.6",
     DefaultPorts = new[] { 8080 },
     Capabilities = new[] { "protocol=http", "vector-search=true" },
     Env = new[]
@@ -23,7 +22,7 @@ namespace Koan.Data.Vector.Connector.Weaviate;
         "CLUSTER_HOSTNAME=node1",
         "RAFT_BOOTSTRAP_EXPECT=1"
     },
-    Volumes = new[] { "./Data/weaviate:/var/lib/weaviate" },
+    Volumes = new[] { "./Data/weaviate-1.37:/var/lib/weaviate" },
     AppEnv = new[] { "Koan__Data__Weaviate__Endpoint=http://{serviceId}:{port}" },
     HealthEndpoint = "/v1/.well-known/ready",
     HealthIntervalSeconds = 5,
@@ -35,9 +34,9 @@ public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
 {
     public string Provider => "weaviate";
 
-    public bool CanHandle(string provider) => string.Equals(provider, "weaviate", StringComparison.OrdinalIgnoreCase);
-
-    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
+    // ARCH-0103 §4.1: accepts the routed source for contract alignment; per-source physical placement (native
+    // multi-tenancy / per-cluster) is realized in P4. Until then a Database-mode route resolves but is not yet honored here.
+    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
@@ -45,7 +44,7 @@ public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
             ?? throw new InvalidOperationException("IHttpClientFactory not registered; call services.AddHttpClient().");
         var options = (IOptions<WeaviateOptions>?)sp.GetService(typeof(IOptions<WeaviateOptions>))
             ?? throw new InvalidOperationException("WeaviateOptions not configured; bind Koan:Data:Weaviate.");
-        return new WeaviateVectorRepository<TEntity, TKey>(httpFactory, options, sp);
+        return new WeaviateVectorRepository<TEntity, TKey>(httpFactory, options, sp, this, source);
     }
 
     // Weaviate class names are GraphQL types: FullNamespace + '_' separator, and the partition uses '_'

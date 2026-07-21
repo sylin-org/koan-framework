@@ -11,7 +11,7 @@ namespace Koan.Jobs;
 /// One engine subsumes the legacy reaper (<c>@continuous</c> reclaim), boot recovery (<c>@boot</c>), and recurring
 /// reconciles. Every submit is a type-level <see cref="IJobCoordinator.TriggerAsync"/> against the per-type singleton.
 /// </summary>
-public sealed class JobScheduler
+internal sealed class JobScheduler
 {
     private readonly IJobCoordinator _coordinator;
     private readonly JobTypeRegistry _registry;

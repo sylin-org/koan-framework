@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Koan.Tenancy</AssemblyName>
+    <RootNamespace>Koan.Tenancy</RootNamespace>
+    <Description>Local-first multi-tenancy for Koan: ambient Tenant.Use/None scope, [HostScoped] exceptions, durable context carriage, and one hard segmentation contribution compiled independently by active framework pillars.</Description>
+    <PackageTags>$(CommonPackageTags);tenancy;multitenant;isolation;saas</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+  </ItemGroup>
+</Project>

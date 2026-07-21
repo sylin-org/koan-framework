@@ -1,10 +1,14 @@
 # ARCH-0082 — Two-tier versioning: kernel lockstep, periphery independent
 
-**Status**: Accepted
+**Status**: Superseded by ARCH-0085
 **Date**: 2026-05-16
 **Deciders**: Enterprise Architect
 **Scope**: NuGet package versioning across the Koan monorepo
 **Related**: ARCH-0079 (integration tests as canon), ARCH-0080 (shared transport ownership), ARCH-0081 (typed registration helpers)
+
+> **R09-02 implementation note (2026-07-16).** The generator remains part of Core's contract surface,
+> but its standalone package identity is retired before V1. `Sylin.Koan.Core` now owns and ships the
+> generator as a transitive build tool. The generator package rows below describe the superseded model.
 
 ---
 
@@ -85,7 +89,7 @@ Full operational guide: [docs/guides/versioning-workbook.md](../guides/versionin
 
 ### Edge cases handled
 
-- **Source generators (`Koan.Core.Registry.Generators`).** Generates code into Koan.Core consumers; treated as kernel because its output is part of the framework contract.
+- **Source generators (`Koan.Core.Registry.Generators`).** Before R09-02, this was treated as a kernel package; it is now a non-packable build project owned and delivered by `Sylin.Koan.Core` because its generated output remains part of the framework contract.
 - **Analyzers (`Koan.Cache.Analyzers`).** Pure enforcement, no API consumers depend on. **Periphery.**
 - **Renamed packages.** `Koan.AI.Contracts` is de-facto abstractions despite the name; included in kernel. No rename today; flagged for future cleanup.
 

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Koan.Web.Auth.Server</RootNamespace>
+    <Description>SEC-0006 embedded OAuth 2.1 Authorization Server for Koan: the MCP auth on-ramp. Mints asymmetric (ES256) access tokens for OAuth clients via Authorization Code + PKCE and the Device Authorization Grant, advertises itself per the MCP authorization spec, and reuses the trust fabric for issuance. Opt-in leaf (Reference = Intent).</Description>
+    <PackageTags>$(CommonPackageTags);web;auth;oauth;oauth2;authorization-server;mcp;pkce</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\Koan.Web.Auth.Abstractions\Koan.Web.Auth.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Web.Auth\Koan.Web.Auth.csproj" />
+    <ProjectReference Include="..\Koan.Security.Trust\Koan.Security.Trust.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Koan.Web.Auth.Server.IntegrationTests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

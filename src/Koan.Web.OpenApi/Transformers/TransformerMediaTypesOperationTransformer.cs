@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.OpenApi;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
+using Koan.Web.Transformers;
 
 namespace Koan.Web.OpenApi.Transformers;
 
@@ -20,15 +22,8 @@ internal sealed class TransformerMediaTypesOperationTransformer : IOpenApiOperat
         ArgumentNullException.ThrowIfNull(context);
 
         // Controllers opt into the transformer pipeline by implementing ITransformerActivationPredicate
-        // (WEB-0067). We look the interface up reflectively so the OpenAPI module stays loosely
-        // coupled to Koan.Web.Transformers.
-        var predicateType = Type.GetType("Koan.Web.Transformers.ITransformerActivationPredicate, Koan.Web.Transformers");
-        var registryType = Type.GetType("Koan.Web.Transformers.ITransformerRegistry, Koan.Web.Transformers");
-        if (predicateType is null || registryType is null)
-        {
-            return Task.CompletedTask;
-        }
-
+        // (WEB-0067). Koan.Web.OpenApi references Koan.Web (which now owns the transformers), so we use
+        // the public predicate + registry types directly.
         var controllerMethod = ResolveMethod(context);
         if (controllerMethod is null)
         {
@@ -36,23 +31,23 @@ internal sealed class TransformerMediaTypesOperationTransformer : IOpenApiOperat
         }
 
         var declaringType = controllerMethod.DeclaringType;
-        var optsIn = declaringType is not null && predicateType.IsAssignableFrom(declaringType);
+        var optsIn = declaringType is not null && typeof(ITransformerActivationPredicate).IsAssignableFrom(declaringType);
         if (!optsIn)
         {
             return Task.CompletedTask;
         }
 
-        var registry = context.ApplicationServices?.GetService(registryType);
+        var registry = context.ApplicationServices?.GetService<ITransformerRegistry>();
         if (registry is null)
         {
             return Task.CompletedTask;
         }
 
-        TryAugmentResponseTypes(operation, controllerMethod.ReturnType, registryType, registry);
+        TryAugmentResponseTypes(operation, controllerMethod.ReturnType, registry);
 
         foreach (var parameter in controllerMethod.GetParameters())
         {
-            TryAugmentRequestTypes(operation, parameter.ParameterType, registryType, registry);
+            TryAugmentRequestTypes(operation, parameter.ParameterType, registry);
         }
 
         return Task.CompletedTask;
@@ -64,7 +59,7 @@ internal sealed class TransformerMediaTypesOperationTransformer : IOpenApiOperat
         return actionDescriptor?.MethodInfo;
     }
 
-    private static void TryAugmentResponseTypes(OpenApiOperation operation, Type returnType, Type registryType, object registry)
+    private static void TryAugmentResponseTypes(OpenApiOperation operation, Type returnType, ITransformerRegistry registry)
     {
         var entityType = TryResolveEntityType(returnType);
         if (entityType is null)
@@ -72,13 +67,7 @@ internal sealed class TransformerMediaTypesOperationTransformer : IOpenApiOperat
             return;
         }
 
-        var getMethod = registryType.GetMethod("GetContentTypes", new[] { typeof(Type) });
-        if (getMethod is null)
-        {
-            return;
-        }
-
-        if (getMethod.Invoke(registry, new object?[] { entityType }) is IReadOnlyList<string> list && list.Count > 0)
+        if (registry.GetContentTypes(entityType) is { Count: > 0 } list)
         {
             var responses = EnsureResponses(operation);
             if (!responses.TryGetValue("200", out var okResponse) || okResponse is not OpenApiResponse mutableResponse)
@@ -98,7 +87,7 @@ internal sealed class TransformerMediaTypesOperationTransformer : IOpenApiOperat
         }
     }
 
-    private static void TryAugmentRequestTypes(OpenApiOperation operation, Type parameterType, Type registryType, object registry)
+    private static void TryAugmentRequestTypes(OpenApiOperation operation, Type parameterType, ITransformerRegistry registry)
     {
         var entityType = TryResolveEntityType(parameterType);
         if (entityType is null)
@@ -106,13 +95,7 @@ internal sealed class TransformerMediaTypesOperationTransformer : IOpenApiOperat
             return;
         }
 
-        var getMethod = registryType.GetMethod("GetContentTypes", new[] { typeof(Type) });
-        if (getMethod is null)
-        {
-            return;
-        }
-
-        if (getMethod.Invoke(registry, new object?[] { entityType }) is IReadOnlyList<string> list && list.Count > 0)
+        if (registry.GetContentTypes(entityType) is { Count: > 0 } list)
         {
             operation.RequestBody ??= new OpenApiRequestBody { Required = true };
             if (operation.RequestBody is OpenApiRequestBody requestBody)

@@ -10,8 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Transfers;
-using Koan.Data.Core.Events;
+using Koan.Data.Core.Lifecycle;
 using Koan.Data.Core.Relationships;
+using Koan.Data.Core.Selection;
 
 namespace Koan.Data.Core.Model
 {
@@ -60,18 +61,19 @@ namespace Koan.Data.Core.Model
         [Key]
         public virtual TKey Id { get; set; } = default!;
 
-        public static EntityEventsBuilder<TEntity, TKey> Events => EntityEventRegistry<TEntity, TKey>.Builder;
+        /// <summary>Declares host-owned behavior around this entity's persistence lifecycle.</summary>
+        public static EntityLifecycleBuilder<TEntity, TKey> Lifecycle { get; } = new();
 
         // Static conveniences forward to the data facade without exposing its namespace in domain types
         public static Task<TEntity?> Get(TKey id, CancellationToken ct = default)
-            => EntityEventExecutor<TEntity, TKey>.ExecuteLoad(token => Data<TEntity, TKey>.Get(id, token), ct);
+            => Data<TEntity, TKey>.Get(id, ct);
         public static Task<IReadOnlyList<TEntity?>> Get(IEnumerable<TKey> ids, CancellationToken ct = default)
-            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadMany(token => Data<TEntity, TKey>.GetMany(ids, token), ct);
+            => Data<TEntity, TKey>.GetMany(ids, ct);
         // Partition-aware variants
         public static Task<TEntity?> Get(TKey id, string partition, CancellationToken ct = default)
-            => EntityEventExecutor<TEntity, TKey>.ExecuteLoad(token => Data<TEntity, TKey>.Get(id, partition, token), ct);
+            => Data<TEntity, TKey>.Get(id, partition, ct);
         public static Task<IReadOnlyList<TEntity?>> Get(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
-            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadMany(token => Data<TEntity, TKey>.GetMany(ids, partition, token), ct);
+            => Data<TEntity, TKey>.GetMany(ids, partition, ct);
 
         public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
             => Data<TEntity, TKey>.All(ct);
@@ -107,23 +109,44 @@ namespace Koan.Data.Core.Model
         public static Task<IReadOnlyList<TEntity>> QueryRaw(string providerQuery, object? parameters = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.QueryRaw(providerQuery, parameters, null, ct);
 
-        // Streaming (IAsyncEnumerable). When sort is specified, streaming materializes the full result
-        // before yielding the first item — see ADR-0093.
+        // Streaming (IAsyncEnumerable). Supported adapters enforce bounded candidate pages; unsupported
+        // execution rejects rather than silently materializing the complete result.
         public static IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.AllStream(batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> AllStream(CancellationToken ct)
+            => Data<TEntity, TKey>.AllStream(ct);
         public static IAsyncEnumerable<TEntity> AllStream(string sort, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.AllStream(sort, batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> AllStream(string sort, CancellationToken ct)
+            => Data<TEntity, TKey>.AllStream(sort, ct);
         public static IAsyncEnumerable<TEntity> AllStream(Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.AllStream(sort, batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> AllStream(Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, CancellationToken ct)
+            => Data<TEntity, TKey>.AllStream(sort, ct);
 
         public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.QueryStream(predicate, batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, CancellationToken ct)
+            => Data<TEntity, TKey>.QueryStream(predicate, ct);
         public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, string sort, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.QueryStream(predicate, sort, batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, string sort, CancellationToken ct)
+            => Data<TEntity, TKey>.QueryStream(predicate, sort, ct);
         public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.QueryStream(filterJson, batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, CancellationToken ct)
+            => Data<TEntity, TKey>.QueryStream(filterJson, ct);
         public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, string sort, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.QueryStream(filterJson, sort, batchSize, ct);
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
+        public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, string sort, CancellationToken ct)
+            => Data<TEntity, TKey>.QueryStream(filterJson, sort, ct);
 
         // Basic paging helpers (materialized). Sort overloads thread through the orchestrator (ADR-0093).
         public static Task<IReadOnlyList<TEntity>> FirstPage(int size, CancellationToken ct = default)
@@ -215,12 +238,7 @@ namespace Koan.Data.Core.Model
         public static Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
         {
             if (model is null) throw new ArgumentNullException(nameof(model));
-
-            return EntityEventExecutor<TEntity, TKey>.ExecuteUpsert(
-                model,
-                (entity, token) => Data<TEntity, TKey>.Upsert(entity, token),
-                token => LoadPriorSnapshot(model, token),
-                ct);
+            return Data<TEntity, TKey>.Upsert(model, ct);
         }
 
         public static Task<TEntity> Upsert(TEntity model, string partition, CancellationToken ct = default)
@@ -228,47 +246,52 @@ namespace Koan.Data.Core.Model
             if (model is null) throw new ArgumentNullException(nameof(model));
             if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
 
-            return EntityEventExecutor<TEntity, TKey>.ExecuteUpsert(
-                model,
-                (entity, token) => Data<TEntity, TKey>.Upsert(entity, partition, token),
-                token => LoadPriorSnapshot(model, token, partition),
-                ct);
+            return Data<TEntity, TKey>.Upsert(model, partition, ct);
         }
 
-        public static async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
+        /// <summary>
+        /// Writes only when the caller's model differs from the current stored application value.
+        /// Lifecycle participates only when this comparison selects a real Upsert.
+        /// </summary>
+        public static async Task<bool> UpsertIfChanged(TEntity model, CancellationToken ct = default)
+        {
+            if (model is null) throw new ArgumentNullException(nameof(model));
+            var prior = await Data<TEntity, TKey>.Get(model.Id, ct).ConfigureAwait(false);
+            if (prior is not null && SameValue(prior, model)) return false;
+            await Data<TEntity, TKey>.Upsert(model, ct).ConfigureAwait(false);
+            return true;
+        }
+
+        /// <summary>Partitioned form of <see cref="UpsertIfChanged(TEntity, CancellationToken)"/>.</summary>
+        public static async Task<bool> UpsertIfChanged(TEntity model, string partition, CancellationToken ct = default)
+        {
+            if (model is null) throw new ArgumentNullException(nameof(model));
+            if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
+
+            var prior = await Data<TEntity, TKey>.Get(model.Id, partition, ct).ConfigureAwait(false);
+            if (prior is not null && SameValue(prior, model)) return false;
+            await Data<TEntity, TKey>.Upsert(model, partition, ct).ConfigureAwait(false);
+            return true;
+        }
+
+        public static Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
         {
             if (models is null) throw new ArgumentNullException(nameof(models));
 
-            var list = models as IReadOnlyList<TEntity> ?? models.ToList();
-            return await EntityEventExecutor<TEntity, TKey>.ExecuteUpsertMany(
-                    list,
-                    (payload, token) => Data<TEntity, TKey>.UpsertMany(payload, token),
-                    (entity, token) => LoadPriorSnapshot(entity, token),
-                    ct)
-                ;
+            return Data<TEntity, TKey>.UpsertMany(models, ct);
         }
 
-        public static async Task<int> UpsertMany(IEnumerable<TEntity> models, string partition, CancellationToken ct = default)
+        public static Task<int> UpsertMany(IEnumerable<TEntity> models, string partition, CancellationToken ct = default)
         {
             if (models is null) throw new ArgumentNullException(nameof(models));
             if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
 
-            var list = models as IReadOnlyList<TEntity> ?? models.ToList();
-            return await EntityEventExecutor<TEntity, TKey>.ExecuteUpsertMany(
-                list,
-                (payload, token) => Data<TEntity, TKey>.UpsertMany(payload, partition, token),
-                (entity, token) => LoadPriorSnapshot(entity, token, partition),
-                ct)
-            ;
+            return Data<TEntity, TKey>.UpsertMany(models, partition, ct);
         }
 
         // Removal helpers
         public static Task<bool> Remove(TKey id, CancellationToken ct = default)
-            => EntityEventExecutor<TEntity, TKey>.ExecuteRemove(
-                id,
-                token => Data<TEntity, TKey>.Get(id, token),
-                (entity, token) => Data<TEntity, TKey>.Delete(entity.Id, token),
-                ct);
+            => Data<TEntity, TKey>.Delete(id, ct);
 
         public static Task<bool> Remove(TKey id, QueryDefinition? options, CancellationToken ct = default)
         {
@@ -280,27 +303,11 @@ namespace Koan.Data.Core.Model
             return Remove(id, ct);
         }
 
-        public static async Task<int> Remove(IEnumerable<TKey> ids, CancellationToken ct = default)
+        public static Task<int> Remove(IEnumerable<TKey> ids, CancellationToken ct = default)
         {
             if (ids is null) throw new ArgumentNullException(nameof(ids));
 
-            var list = ids as IReadOnlyList<TKey> ?? ids.ToList();
-            if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
-            {
-                return await Data<TEntity, TKey>.DeleteMany(list, ct);
-            }
-
-            var entities = await LoadEntities(list, null, ct);
-            if (entities.Count == 0)
-            {
-                return 0;
-            }
-
-            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveMany(
-                    entities,
-                    (payload, token) => Data<TEntity, TKey>.DeleteMany(ExtractKeys(payload), token),
-                    ct)
-                ;
+            return Data<TEntity, TKey>.DeleteMany(ids, ct);
         }
 
         public static Task<int> Remove(IEnumerable<TKey> ids, QueryDefinition? options, CancellationToken ct = default)
@@ -318,76 +325,27 @@ namespace Koan.Data.Core.Model
         {
             if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
 
-            return EntityEventExecutor<TEntity, TKey>.ExecuteRemove(
-                id,
-                token => Data<TEntity, TKey>.Get(id, partition, token),
-                (entity, token) => Data<TEntity, TKey>.Delete(entity.Id, partition, token),
-                ct);
+            return Data<TEntity, TKey>.Delete(id, partition, ct);
         }
 
-        public static async Task<int> Remove(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
+        public static Task<int> Remove(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
         {
             if (ids is null) throw new ArgumentNullException(nameof(ids));
             if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
 
-            var list = ids as IReadOnlyList<TKey> ?? ids.ToList();
-            if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
-            {
-                return await Data<TEntity, TKey>.DeleteMany(list, partition, ct);
-            }
-
-            var entities = await LoadEntities(list, partition, ct);
-            if (entities.Count == 0)
-            {
-                return 0;
-            }
-
-            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveMany(
-                    entities,
-                    (payload, token) => Data<TEntity, TKey>.DeleteMany(ExtractKeys(payload), partition, token),
-                    ct)
-                ;
+            return Data<TEntity, TKey>.DeleteMany(ids, partition, ct);
         }
 
-        private static ValueTask<TEntity?> LoadPriorSnapshot(TEntity entity, CancellationToken cancellationToken, string? partition = null)
+        private static bool SameValue(TEntity left, TEntity right)
         {
-            if (entity is null) throw new ArgumentNullException(nameof(entity));
-
-            var key = entity.Id;
-            if (EqualityComparer<TKey>.Default.Equals(key, default!))
+            try
             {
-                return new ValueTask<TEntity?>((TEntity?)null);
+                return string.Equals(
+                    System.Text.Json.JsonSerializer.Serialize(left, left.GetType()),
+                    System.Text.Json.JsonSerializer.Serialize(right, right.GetType()),
+                    StringComparison.Ordinal);
             }
-
-            return partition is null
-                ? new ValueTask<TEntity?>(Data<TEntity, TKey>.Get(key, cancellationToken))
-                : new ValueTask<TEntity?>(Data<TEntity, TKey>.Get(key, partition, cancellationToken));
-        }
-
-        private static async Task<IReadOnlyList<TEntity>> LoadEntities(IReadOnlyList<TKey> ids, string? partition, CancellationToken cancellationToken)
-        {
-            var results = new List<TEntity>(ids.Count);
-            foreach (var id in ids)
-            {
-                var entity = partition is null
-                    ? await Data<TEntity, TKey>.Get(id, cancellationToken)
-                    : await Data<TEntity, TKey>.Get(id, partition, cancellationToken);
-
-                if (entity != null)
-                {
-                    results.Add(entity);
-                }
-            }
-
-            return results;
-        }
-
-        private static IEnumerable<TKey> ExtractKeys(IReadOnlyList<TEntity> entities)
-        {
-            for (var i = 0; i < entities.Count; i++)
-            {
-                yield return entities[i].Id;
-            }
+            catch { return false; }
         }
 
         /// <summary>
@@ -403,21 +361,7 @@ namespace Koan.Data.Core.Model
         public static async Task<int> RemoveByQuery(string query, CancellationToken ct = default)
         {
             var items = await Data<TEntity, TKey>.Query(query, ct);
-            if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
-            {
-                return await Data<TEntity, TKey>.DeleteMany(items.Select(e => e.Id), ct);
-            }
-
-            if (items.Count == 0)
-            {
-                return 0;
-            }
-
-            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveMany(
-                    items,
-                    (payload, token) => Data<TEntity, TKey>.DeleteMany(ExtractKeys(payload), token),
-                    ct)
-                ;
+            return await Data<TEntity, TKey>.DeleteMany(items.Select(e => e.Id), ct);
         }
 
         /// <summary>Partitioned variant of <see cref="RemoveByQuery(string, CancellationToken)"/>.</summary>
@@ -425,27 +369,13 @@ namespace Koan.Data.Core.Model
         {
             using var _ = Data<TEntity, TKey>.WithPartition(partition);
             var items = await Data<TEntity, TKey>.Query(query, ct);
-            if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
-            {
-                return await Data<TEntity, TKey>.DeleteMany(items.Select(e => e.Id), partition, ct);
-            }
-
-            if (items.Count == 0)
-            {
-                return 0;
-            }
-
-            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveMany(
-                    items,
-                    (payload, token) => Data<TEntity, TKey>.DeleteMany(ExtractKeys(payload), partition, token),
-                    ct)
-                ;
+            return await Data<TEntity, TKey>.DeleteMany(items.Select(e => e.Id), partition, ct);
         }
 
         /// <summary>
-        /// Removes all entities using Optimized strategy (framework chooses based on provider capabilities).
+        /// Removes all entities using Optimized strategy.
         /// Uses current EntityContext or default partition.
-        /// Provider with FastRemove: Uses Fast (TRUNCATE/DROP). Provider without: Uses Safe (DELETE with hooks).
+        /// Configured remove Lifecycle is preserved; otherwise the provider may select its fast path.
         /// </summary>
         /// <param name="ct">Cancellation token</param>
         /// <returns>Number of entities removed, or -1 if unknown</returns>
@@ -456,7 +386,7 @@ namespace Koan.Data.Core.Model
         /// Removes all entities using the specified strategy.
         /// Uses current EntityContext or default partition.
         /// </summary>
-        /// <param name="strategy">Removal strategy (Safe fires hooks, Fast bypasses for performance)</param>
+        /// <param name="strategy">Removal strategy (Safe preserves Lifecycle; Fast explicitly bypasses it)</param>
         /// <param name="ct">Cancellation token</param>
         /// <returns>Number of entities removed, or -1 if unknown (TRUNCATE doesn't report count)</returns>
         public static Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
@@ -465,7 +395,7 @@ namespace Koan.Data.Core.Model
         /// <summary>
         /// Removes all entities in the specified partition using the given strategy.
         /// </summary>
-        /// <param name="strategy">Removal strategy (Safe fires hooks, Fast bypasses for performance)</param>
+        /// <param name="strategy">Removal strategy (Safe preserves Lifecycle; Fast explicitly bypasses it)</param>
         /// <param name="partition">Partition name to target</param>
         /// <param name="ct">Cancellation token</param>
         /// <returns>Number of entities removed, or -1 if unknown</returns>
@@ -660,6 +590,10 @@ namespace Koan.Data.Core.Model
         /// Throws InvalidOperationException if the entity has no children or multiple child types.
         /// </summary>
         public async Task<IReadOnlyList<object>> GetChildren(CancellationToken ct = default)
+            => await GetChildren(RelationshipQueryPolicy.Strict, ct);
+
+        /// <summary>Gets the only child relationship using an explicit execution safety policy.</summary>
+        public async Task<IReadOnlyList<object>> GetChildren(RelationshipQueryPolicy policy, CancellationToken ct = default)
         {
             var relationshipService = GetRelationshipService();
             relationshipService.ValidateRelationshipCardinality(typeof(TEntity), "getchildren");
@@ -667,13 +601,18 @@ namespace Koan.Data.Core.Model
             var childTypes = relationshipService.GetAllChildTypes(typeof(TEntity));
             var childType = childTypes[0];
 
-            return await LoadChildEntities(childType, ct);
+            return await LoadChildEntities(childType, policy, ct);
         }
 
         /// <summary>
         /// Gets all children of the specified type for this entity.
         /// </summary>
         public async Task<IReadOnlyList<TChild>> GetChildren<TChild>(CancellationToken ct = default)
+            where TChild : class, IEntity<TKey>
+            => await GetChildren<TChild>(RelationshipQueryPolicy.Strict, ct);
+
+        /// <summary>Gets children of the specified type using an explicit execution safety policy.</summary>
+        public async Task<IReadOnlyList<TChild>> GetChildren<TChild>(RelationshipQueryPolicy policy, CancellationToken ct = default)
             where TChild : class, IEntity<TKey>
         {
             var relationshipService = GetRelationshipService();
@@ -687,7 +626,7 @@ namespace Koan.Data.Core.Model
             var allChildren = new List<TChild>();
             foreach (var (referenceProperty, _) in childRelationships)
             {
-                var children = await LoadChildrenByProperty<TChild>(referenceProperty, ct);
+                var children = await LoadChildrenByProperty<TChild>(referenceProperty, policy, ct);
                 allChildren.AddRange(children);
             }
 
@@ -699,42 +638,37 @@ namespace Koan.Data.Core.Model
         /// </summary>
         public async Task<IReadOnlyList<TChild>> GetChildren<TChild>(string referenceProperty, CancellationToken ct = default)
             where TChild : class, IEntity<TKey>
+            => await GetChildren<TChild>(referenceProperty, RelationshipQueryPolicy.Strict, ct);
+
+        /// <summary>Gets a named child edge using an explicit execution safety policy.</summary>
+        public async Task<IReadOnlyList<TChild>> GetChildren<TChild>(string referenceProperty, RelationshipQueryPolicy policy, CancellationToken ct = default)
+            where TChild : class, IEntity<TKey>
         {
-            return await LoadChildrenByProperty<TChild>(referenceProperty, ct);
+            return await LoadChildrenByProperty<TChild>(referenceProperty, policy, ct);
         }
 
         /// <summary>
         /// Gets the full relationship graph for this entity, including all parents and children.
         /// Returns a RelationshipGraph with selective enrichment - only this entity is enriched.
         /// </summary>
-        public async Task<RelationshipGraph<TEntity>> GetRelatives(CancellationToken ct = default)
+        public Task<RelationshipGraph<TEntity>> Relatives(CancellationToken ct = default)
+            => Relatives(RelationshipQueryPolicy.Strict, ct);
+
+        /// <summary>
+        /// Gets this Entity's direct relationship graph using an explicit execution safety policy for
+        /// child edges. The same operation lifts to finite and asynchronous Entity sources.
+        /// </summary>
+        public async Task<RelationshipGraph<TEntity>> Relatives(RelationshipQueryPolicy policy, CancellationToken ct = default)
         {
-            var relationshipGraph = new RelationshipGraph<TEntity>
+            ArgumentNullException.ThrowIfNull(policy);
+            var loader = Koan.Core.Hosting.App.AppHost.GetRequiredService<RelationshipGraphLoader>("relationship graph loading");
+            var source = EntityCardinality.One((TEntity)(object)this, ct);
+            await foreach (var graph in loader.Load<TEntity, TKey>(source, policy, ct).ConfigureAwait(false))
             {
-                Entity = (TEntity)(object)this
-            };
-
-            // Load all parents
-            relationshipGraph.Parents = await GetParents(ct);
-
-            // Load all children grouped by class name
-            var relationshipService = GetRelationshipService();
-            var childRelationships = relationshipService.GetChildRelationships(typeof(TEntity));
-
-            foreach (var (referenceProperty, childType) in childRelationships)
-            {
-                var children = await LoadChildEntitiesByProperty(childType, referenceProperty, ct);
-
-                var childTypeName = childType.Name;
-                if (!relationshipGraph.Children.ContainsKey(childTypeName))
-                {
-                    relationshipGraph.Children[childTypeName] = new Dictionary<string, IReadOnlyList<object>>();
-                }
-
-                relationshipGraph.Children[childTypeName][referenceProperty] = children;
+                return graph;
             }
 
-            return relationshipGraph;
+            throw new InvalidOperationException($"Relationship graph loading returned no result for {typeof(TEntity).Name}.");
         }
 
         // Helper methods for relationship loading
@@ -795,130 +729,71 @@ namespace Koan.Data.Core.Model
             return resultProperty?.GetValue(task);
         }
 
-        private async Task<IReadOnlyList<object>> LoadChildEntities(Type childType, CancellationToken ct)
+        private async Task<IReadOnlyList<object>> LoadChildEntities(Type childType, RelationshipQueryPolicy policy, CancellationToken ct)
         {
-            // Use reflection to call Data<TChild, TKey>.Query to find children referencing this entity
-            var dataType = typeof(Data<,>).MakeGenericType(childType, typeof(TKey));
-            var allMethod = dataType.GetMethod("All", new[] { typeof(CancellationToken) });
-
-            if (allMethod == null) return new List<object>().AsReadOnly();
-
-            var task = (Task)allMethod.Invoke(null, new object[] { ct })!;
-            await task;
-
-            var resultProperty = task.GetType().GetProperty("Result");
-            var allResults = (System.Collections.IEnumerable?)resultProperty?.GetValue(task);
-
-            if (allResults == null) return new List<object>().AsReadOnly();
-
-            // Filter children that reference this entity
             var children = new List<object>();
             var relationshipService = GetRelationshipService();
             var childRelationships = relationshipService.GetChildRelationships(typeof(TEntity))
                 .Where(x => x.ChildType == childType);
-
-            foreach (var item in allResults)
+            foreach (var (referenceProperty, _) in childRelationships)
             {
-                foreach (var (referenceProperty, _) in childRelationships)
-                {
-                    var property = childType.GetProperty(referenceProperty);
-                    if (property != null)
-                    {
-                        var referenceValue = property.GetValue(item);
-                        if (Equals(referenceValue, Id))
-                        {
-                            children.Add(item);
-                            break; // Found a match, no need to check other reference properties for this item
-                        }
-                    }
-                }
+                children.AddRange(await LoadChildEntitiesByProperty(childType, referenceProperty, policy, ct));
             }
-
-            return children.AsReadOnly();
+            return children.Distinct().ToList().AsReadOnly();
         }
 
-        private async Task<IReadOnlyList<TChild>> LoadChildrenByProperty<TChild>(string referenceProperty, CancellationToken ct)
+        private async Task<IReadOnlyList<TChild>> LoadChildrenByProperty<TChild>(
+            string referenceProperty,
+            RelationshipQueryPolicy policy,
+            CancellationToken ct)
             where TChild : class, IEntity<TKey>
         {
-            // For now, load all children and filter in memory
-            // This could be optimized with query support in the future
-            var allChildren = await Data<TChild, TKey>.All(ct);
-
-            var matchingChildren = new List<TChild>();
-            var property = typeof(TChild).GetProperty(referenceProperty);
-
-            if (property != null)
-            {
-                foreach (var child in allChildren)
-                {
-                    var referenceValue = property.GetValue(child);
-                    if (Equals(referenceValue, Id))
-                    {
-                        matchingChildren.Add(child);
-                    }
-                }
-            }
-
-            return matchingChildren.AsReadOnly();
+            var executor = Koan.Core.Hosting.App.AppHost.GetRequiredService<IRelationshipQueryExecutor>("relationship child loading");
+            var result = await executor.LoadChildren<TEntity, TChild, TKey>(
+                new[] { Id }, referenceProperty, policy: policy, ct: ct);
+            return result.ByParent.TryGetValue(Id, out var children)
+                ? children
+                : Array.Empty<TChild>();
         }
 
-        private async Task<IReadOnlyList<object>> LoadChildEntitiesByProperty(Type childType, string referenceProperty, CancellationToken ct)
+        private async Task<IReadOnlyList<object>> LoadChildEntitiesByProperty(
+            Type childType,
+            string referenceProperty,
+            RelationshipQueryPolicy policy,
+            CancellationToken ct)
         {
-            // Use reflection to call Data<TChild, TKey>.All() and filter by reference property
-            var dataType = typeof(Data<,>).MakeGenericType(childType, typeof(TKey));
-            var allMethod = dataType.GetMethod("All", new[] { typeof(CancellationToken) });
-
-            if (allMethod == null) return new List<object>().AsReadOnly();
-
-            var task = (Task)allMethod.Invoke(null, new object[] { ct })!;
-            await task;
-
-            var resultProperty = task.GetType().GetProperty("Result");
-            var allResults = (System.Collections.IEnumerable?)resultProperty?.GetValue(task);
-
-            if (allResults == null) return new List<object>().AsReadOnly();
-
-            var children = new List<object>();
-            var property = childType.GetProperty(referenceProperty);
-
-            if (property != null)
-            {
-                foreach (var item in allResults)
-                {
-                    var referenceValue = property.GetValue(item);
-                    if (Equals(referenceValue, Id))
-                    {
-                        children.Add(item);
-                    }
-                }
-            }
-
-            return children.AsReadOnly();
+            var method = GetType().GetMethod(
+                nameof(LoadChildEntitiesByPropertyTyped),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .MakeGenericMethod(childType);
+            return await (Task<IReadOnlyList<object>>)method.Invoke(this, new object[] { referenceProperty, policy, ct })!;
         }
 
-        // Static accessor for relationship metadata service (set by DI registration)
-        private static IRelationshipMetadata? _cachedMetadata;
-        private static readonly object _metadataLock = new();
+        private async Task<IReadOnlyList<object>> LoadChildEntitiesByPropertyTyped<TChild>(
+            string referenceProperty,
+            RelationshipQueryPolicy policy,
+            CancellationToken ct)
+            where TChild : class, IEntity<TKey>
+        {
+            var rows = await LoadChildrenByProperty<TChild>(referenceProperty, policy, ct);
+            return rows.Cast<object>().ToArray();
+        }
+
+        // Hostless metadata inspection needs no runtime owner; its reflection facts are immutable.
+        // Hosted calls must resolve the active host's singleton on every invocation so a closed
+        // Entity type never retains a service from an earlier, disposed host.
+        private static readonly IRelationshipMetadata FallbackRelationshipMetadata = new RelationshipMetadataService();
 
         public IRelationshipMetadata GetRelationshipService()
         {
-            if (_cachedMetadata != null) return _cachedMetadata;
-            lock (_metadataLock)
+            var accessor = EntityMetadataProvider.RelationshipMetadataAccessor;
+            var services = Koan.Core.Hosting.App.AppHost.Current;
+            if (accessor != null && services != null)
             {
-                if (_cachedMetadata != null) return _cachedMetadata;
-                if (EntityMetadataProvider.RelationshipMetadataAccessor != null)
-                {
-                    var sp = Koan.Core.Hosting.App.AppHost.Current;
-                    if (sp != null)
-                    {
-                        _cachedMetadata = EntityMetadataProvider.RelationshipMetadataAccessor(sp);
-                        return _cachedMetadata;
-                    }
-                }
-                // Fallback for test scenarios
-                _cachedMetadata = new RelationshipMetadataService();
-                return _cachedMetadata;
+                return accessor(services);
             }
+
+            return FallbackRelationshipMetadata;
         }
 
     }

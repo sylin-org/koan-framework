@@ -1,43 +1,39 @@
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Koan.Web.AdapterSurface.TestKit;
 
 namespace Koan.Web.AdapterSurface.Sqlite.Tests;
 
-public sealed class SqliteAdapterFactory : WebApplicationFactory<Program>, IAdapterTestFactory
+public sealed class SqliteAdapterFactory : AdapterTestFactoryBase
 {
-    private readonly string _dbPath;
-    private readonly string _connectionString;
+    private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"koan-surface-sqlite-{Guid.NewGuid():N}.db");
+    private string ConnectionString => $"Data Source={_dbPath}";
 
-    public bool IsAvailable => true;
-    public string? UnavailableReason => null;
-    public HttpClient Client => CreateClient();
-    public new IServiceProvider Services => base.Services;
+    public override bool IsAvailable => true;
 
-    public SqliteAdapterFactory()
+    protected override IEnumerable<KeyValuePair<string, string?>> AdapterConfiguration() => new Dictionary<string, string?>
     {
-        _dbPath = Path.Combine(Path.GetTempPath(), $"koan-surface-sqlite-{Guid.NewGuid():N}.db");
-        _connectionString = $"Data Source={_dbPath}";
-    }
+        ["Koan:Environment"] = "Development",
+        ["Koan:AllowMagicInProduction"] = "true",
+        ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
+        ["Koan:Data:Sources:Default:ConnectionString"] = ConnectionString,
+        ["Koan:Data:Sqlite:ConnectionString"] = ConnectionString,
+        ["Koan:Data:Sqlite:DdlPolicy"] = "AutoCreate",
+        ["Koan:Data:Relational:Materialization:FailOnMismatch"] = "false",
+        ["Koan:BackgroundServices:Enabled"] = "false",
+        ["Logging:LogLevel:Default"] = "Warning",
+    };
 
-    public Task InitializeAsync() => Task.CompletedTask;
-
-    async Task IAsyncLifetime.DisposeAsync()
+    protected override ValueTask StopBackingStoreAsync()
     {
-        await base.DisposeAsync();
         try { if (File.Exists(_dbPath)) File.Delete(_dbPath); } catch { }
+        return ValueTask.CompletedTask;
     }
 
-    public async Task ResetAsync()
+    public override async Task ResetAsync()
     {
         try
         {
-            await using var conn = new SqliteConnection(_connectionString);
+            await using var conn = new SqliteConnection(ConnectionString);
             await conn.OpenAsync().ConfigureAwait(false);
             var names = new List<string>();
             await using (var read = conn.CreateCommand())
@@ -57,34 +53,5 @@ public sealed class SqliteAdapterFactory : WebApplicationFactory<Program>, IAdap
             }
         }
         catch { /* best effort */ }
-    }
-
-    protected override IHost CreateHost(IHostBuilder builder)
-    {
-        builder.ConfigureWebHost(webBuilder =>
-        {
-            webBuilder.UseContentRoot(AppContext.BaseDirectory);
-            webBuilder.UseTestServer();
-            webBuilder.UseEnvironment("Development");
-            webBuilder.ConfigureAppConfiguration((_, cfg) =>
-            {
-                cfg.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Koan:Environment"] = "Development",
-                    ["Koan:AllowMagicInProduction"] = "true",
-                    ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
-                    ["Koan:Data:Sources:Default:ConnectionString"] = _connectionString,
-                    ["Koan:Data:Sqlite:ConnectionString"] = _connectionString,
-                    ["Koan:Data:Sqlite:DdlPolicy"] = "AutoCreate",
-                    ["Koan:Data:Relational:Materialization:FailOnMismatch"] = "false",
-                    ["Koan:BackgroundServices:Enabled"] = "false",
-                    ["Logging:LogLevel:Default"] = "Warning",
-                });
-            });
-            webBuilder.ConfigureServices(_ => { Koan.Core.Hosting.App.AppHost.Current = null; });
-        });
-        var host = builder.Build();
-        host.Start();
-        return host;
     }
 }

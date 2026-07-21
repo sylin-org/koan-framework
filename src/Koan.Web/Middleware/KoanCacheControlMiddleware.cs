@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace Koan.Web.Middleware;
 
 /// <summary>
-/// Maps HTTP cache-control intent onto <see cref="EntityContext.CacheBehavior"/> for the
+/// Maps HTTP cache-control intent onto <c>EntityContext.WithCacheBehavior</c> for the
 /// duration of the request. Standard <c>Cache-Control</c> semantics are honoured, and a
 /// framework-specific <c>X-Koan-Cache</c> header offers finer control.
 /// </summary>

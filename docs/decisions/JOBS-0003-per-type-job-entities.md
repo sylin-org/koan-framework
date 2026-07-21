@@ -1,6 +1,8 @@
 # JOBS-0003: Per-type job entities (table-per-type), generic runtime, typed payloads
 
-**Status**: Accepted
+> **Status: Superseded by JOBS-0005.** The Job Orchestrator rebuild replaces this per-type model and the discarded `Koan.Jobs.Core` runtime.
+
+**Status**: Superseded by JOBS-0005
 **Date**: 2026-05-28
 **Deciders**: Enterprise Architect
 **Scope**: Koan.Jobs.Core - the Job model, store, runtime, builder

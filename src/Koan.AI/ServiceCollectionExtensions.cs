@@ -13,7 +13,6 @@ using Koan.AI.Infrastructure;
 using Koan.AI.Pipeline;
 using Koan.AI.Sources;
 using Koan.Core;
-using Koan.Core.AI;
 using Koan.Core.Modules;
 
 namespace Koan.AI;
@@ -48,7 +47,8 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IHealthContributor, AiSourcesHealthContributor>();
 
         // Register infrastructure
-        services.TryAddSingleton<IAiAdapterRegistry, InMemoryAdapterRegistry>();
+        services.TryAddSingleton<InMemoryAdapterRegistry>();
+        services.TryAddSingleton<IAiAdapterRegistry>(sp => sp.GetRequiredService<InMemoryAdapterRegistry>());
         services.TryAddSingleton<IAiRecipeProvider>(sp =>
         {
             var configuration = sp.GetRequiredService<IConfiguration>();

@@ -1,3 +1,13 @@
+---
+type: GUIDE
+domain: ai
+audience: [developers, ai-engineers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # Embedding Best Practices
 
 > **Production Guidance** for Koan Framework's attribute-driven embedding system
@@ -685,6 +695,6 @@ What's your budget?
 
 ## See Also
 
-- [How-To: Embeddings](../how-to/embeddings.md) - Comprehensive usage guide
+- [How-To: Embeddings](../archive/how-to/embeddings.md) - Comprehensive usage guide
 - [ADR AI-0020](../decisions/AI-0020-entity-first-ai-and-transaction-coordination.md) - Architecture decision
-- [Sample: S5.Recs](../../samples/S5.Recs) - Production example
+- [GardenCoop Chapter 2](../../samples/journeys/GardenCoop/02-LocalDiscovery/) - current local embedding and semantic-search example

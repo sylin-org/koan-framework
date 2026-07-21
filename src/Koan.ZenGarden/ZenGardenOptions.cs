@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations;
 using Koan.ZenGarden.Infrastructure;
+using Microsoft.Extensions.Options;
 
 namespace Koan.ZenGarden;
 
@@ -23,21 +25,25 @@ public sealed class ZenGardenOptions
     /// <summary>
     /// Discovery request timeout in seconds.
     /// </summary>
+    [Range(1, int.MaxValue)]
     public int DiscoveryTimeoutSeconds { get; set; } = Constants.Discovery.DefaultTimeoutSeconds;
 
     /// <summary>
     /// Discovery UDP port (default 7184).
     /// </summary>
+    [Range(1, 65535)]
     public int DiscoveryPort { get; set; } = Constants.Discovery.DefaultPort;
 
     /// <summary>
     /// Discovery multicast group (default 239.255.42.99).
     /// </summary>
+    [Required(AllowEmptyStrings = false)]
     public string DiscoveryMulticastGroup { get; set; } = Constants.Discovery.DefaultMulticastGroup;
 
     /// <summary>
     /// Cache TTL for discovered stones.
     /// </summary>
+    [Range(1, int.MaxValue)]
     public int DiscoveryCacheTtlSeconds { get; set; } = Constants.Discovery.DefaultCacheTtlSeconds;
 
     /// <summary>
@@ -53,16 +59,19 @@ public sealed class ZenGardenOptions
     /// <summary>
     /// HTTP timeout used for snapshot and stream requests.
     /// </summary>
+    [Range(1, int.MaxValue)]
     public int HttpTimeoutSeconds { get; set; } = 30;
 
     /// <summary>
     /// Delay between stream reconnect attempts after failures.
     /// </summary>
+    [Range(1, int.MaxValue)]
     public int StreamReconnectDelaySeconds { get; set; } = 3;
 
     /// <summary>
     /// Max number of event ids kept for dedupe.
     /// </summary>
+    [Range(1, int.MaxValue)]
     public int DedupeWindowSize { get; set; } = 4096;
 
     /// <summary>
@@ -75,11 +84,13 @@ public sealed class ZenGardenOptions
     /// Host alias or explicit endpoint used when containerized.
     /// Examples: "host.docker.internal", "moss-host", "http://moss-host:7185".
     /// </summary>
+    [Required(AllowEmptyStrings = false)]
     public string ContainerHost { get; set; } = "host.docker.internal";
 
     /// <summary>
     /// Moss port used when ContainerHost is a hostname without explicit port.
     /// </summary>
+    [Range(1, 65535)]
     public int ContainerHostPort { get; set; } = Constants.Moss.DefaultPort;
 
     /// <summary>
@@ -98,6 +109,7 @@ public sealed class ZenGardenOptions
     /// Persisted entries use a longer TTL than in-memory entries to support
     /// failover scenarios where the primary Moss may be down for extended periods.
     /// </summary>
+    [Range(1, int.MaxValue)]
     public int PersistedCacheTtlHours { get; set; } = Constants.Persistence.DefaultPersistedCacheTtlHours;
 
     /// <summary>
@@ -119,6 +131,7 @@ public sealed class ZenGardenOptions
     /// <summary>
     /// TTL in seconds for cached model recommendations. Default: 300 (5 minutes).
     /// </summary>
+    [Range(1, int.MaxValue)]
     public int RecommendationCacheTtlSeconds { get; set; } = 300;
 
     // ── Koi topology handler ─────────────────────────────────────────
@@ -162,4 +175,28 @@ public sealed class ZenGardenOptions
     /// and the maximum backoff cap when in <c>Reconnecting</c> state.
     /// </summary>
     public TimeSpan KoiRetryInterval { get; set; } = TimeSpan.FromSeconds(30);
+}
+
+internal sealed class ZenGardenOptionsValidator : IValidateOptions<ZenGardenOptions>
+{
+    public ValidateOptionsResult Validate(string? name, ZenGardenOptions options)
+    {
+        var errors = new List<string>();
+
+        AddPositiveDurationError(errors, options.KoiHealthTimeout, nameof(options.KoiHealthTimeout));
+        AddPositiveDurationError(errors, options.KoiBrowseIdleTimeout, nameof(options.KoiBrowseIdleTimeout));
+        AddPositiveDurationError(errors, options.KoiRetryInterval, nameof(options.KoiRetryInterval));
+
+        return errors.Count == 0
+            ? ValidateOptionsResult.Success
+            : ValidateOptionsResult.Fail(errors);
+    }
+
+    private static void AddPositiveDurationError(List<string> errors, TimeSpan value, string property)
+    {
+        if (value <= TimeSpan.Zero)
+        {
+            errors.Add($"Koan:ZenGarden:{property} must be greater than zero.");
+        }
+    }
 }

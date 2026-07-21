@@ -3,7 +3,7 @@
 **Status:** ✅ **ACCEPTED**
 **Date:** 2025-11-05
 **Scope:** Vector<T> integration with EntityContext partition routing
-**Related:** [DATA-0077](./DATA-0077-entity-context-source-adapter-partition-routing.md), [Koan Context proposal](../proposals/Koan-context.md)
+**Related:** [DATA-0077](./DATA-0077-entity-context-source-adapter-partition-routing.md), [Koan Context proposal](../archive/proposals/Koan-context.md)
 
 ## Decisions Made
 
@@ -439,8 +439,8 @@ Different providers handle partitions differently:
 
 ## References
 
-- **Koan Context Proposal:** [docs/proposals/Koan-context.md](../proposals/Koan-context.md)
-- **Implementation Checklist:** [docs/proposals/Koan-context-checklist.md](../proposals/Koan-context-checklist.md)
+- **Koan Context Proposal:** [docs/archive/proposals/Koan-context.md](../archive/proposals/Koan-context.md)
+- **Implementation Checklist:** [docs/archive/proposals/Koan-context-checklist.md](../archive/proposals/Koan-context-checklist.md)
 - **Related ADR:** [ARCH-0070: Attribute-Driven AI Embeddings](./ARCH-0070-attribute-driven-ai-embeddings.md)
 - **AsyncLocal<T> Docs:** https://learn.microsoft.com/en-us/dotnet/api/system.threading.asynclocal-1
 

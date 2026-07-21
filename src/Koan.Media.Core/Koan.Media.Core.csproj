@@ -1,34 +1,34 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Media core for Koan: Ensure, pipelines, ancestry, and URL helpers over Koan.Storage.</Description>
-    <PackageTags>$(CommonPackageTags);media;images;video;pdf;pipeline;derivative</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>Koan media runtime for Entity-backed originals, recipe discovery, validated image pipelines, rendering, and runtime facts.</Description>
+    <PackageTags>$(CommonPackageTags);media;runtime;images;recipes;pipeline;derivative</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
-    <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.8" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="SixLabors.ImageSharp" />
     <!-- MEDIA-0004 overlays: ImageSharp.Drawing brings DrawImage (compositing),
          DrawText (text overlays), and Fill (background fills). Brings SixLabors.Fonts
          transitively for text rendering. -->
-    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.6" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" />
     <!-- MEDIA-0006: SVG decoder + Skia rasterizer. SkiaSharp + Svg.Skia provide
          the Vector → Raster bridge for SVG inputs. Native binaries are pulled per
          platform RID at publish time; the managed assembly weight is ~8.3 MiB.
          Windows natives come implicitly via the default SkiaSharp dependency chain. -->
-    <PackageReference Include="SkiaSharp" Version="3.119.4" />
-    <PackageReference Include="Svg.Skia" Version="3.0.6" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" />
-    <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="3.119.4" />
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="Svg.Skia" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
+    <PackageReference Include="SkiaSharp.NativeAssets.macOS" />
   </ItemGroup>
 </Project>

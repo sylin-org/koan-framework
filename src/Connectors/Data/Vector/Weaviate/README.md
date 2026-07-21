@@ -1,36 +1,35 @@
 # Sylin.Koan.Data.Vector.Connector.Weaviate
 
-Weaviate adapter for Koan vector data.
+Use Weaviate behind Koan's entity-first vector API. Referencing this package activates the adapter; `AddKoan()` owns
+registration, provider election, schema naming, health participation, and startup reporting.
 
-- Target framework: net10.0
-- License: Apache-2.0
-
-## Install
+## Install and use
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Vector.Connector.Weaviate
 ```
 
-## Capabilities
-- Save/search embeddings for entities via the `Koan.Data.Vector` facade
-- Weaviate client options and class mapping helpers
-- Operator-aware metadata filtering pushed into the query. Weaviate is the intentionally **reduced**
-  reference adapter: it declares a smaller operator set (notably no `In`), and an operator outside that
-  set is a hard error rather than a silent match-all.
-
-## Example
-
 ```csharp
-using Koan.Data.Abstractions.Filtering;
+public sealed class Article : Entity<Article> { }
 
-await Vector<MyDoc>.Save("doc-1", embedding, metadata: new { category = "support" });
-
-var results = await Vector<MyDoc>.Search(
-    embedding,
-    topK: 10,
-    filter: Filter.Eq("category", "support"));
+await Vector<Article>.Save(article.Id, embedding, new { category = "support" });
+var matches = await Vector<Article>.Search(embedding, topK: 12);
 ```
 
-## Links
-- Vector pathway + filter model: `~/decisions/DATA-0097-vector-pathway-parity.md`
-- Data access patterns: `~/guides/data/all-query-streaming-and-pager.md`
+No Weaviate-specific registration is required. With Weaviate at `http://localhost:8080`, no configuration is required.
+Set `Koan:Data:Weaviate:Endpoint` for another deployment and `ApiKey` when authentication is enabled.
+
+Weaviate derives dimension from the first embedding and rejects later dimension changes for that entity collection.
+Koan defaults `topK` to 10; an explicit positive value is sent unchanged.
+
+## Honest capability boundary
+
+Weaviate supports KNN and hybrid text/vector search, native search continuation, metadata filtering, bulk operations,
+embedding reads, export, collection clear, and dynamic collection naming. Its filter operator set is deliberately
+declared and smaller than Koan's full AST (notably no `In`); unsupported predicates fail before I/O instead of silently
+broadening a query.
+
+When `Koan.ZenGarden` is also referenced and active, its Weaviate offering becomes one health-checked discovery
+candidate. Without that engine the capability remains inert. An explicit native endpoint always wins.
+
+See [TECHNICAL.md](./TECHNICAL.md) for layered discovery, naming, health, and failure behavior.

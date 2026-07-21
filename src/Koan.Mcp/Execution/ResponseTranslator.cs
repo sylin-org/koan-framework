@@ -10,11 +10,6 @@ namespace Koan.Mcp.Execution;
 
 public sealed class ResponseTranslator
 {
-    private static readonly JsonSerializerSettings SerializerSettings = new()
-    {
-        NullValueHandling = NullValueHandling.Ignore
-    };
-
     public McpToolExecutionResult Translate(McpEntityRegistration registration, McpToolDefinition tool, EntityEndpointResult result)
     {
         if (registration is null) throw new ArgumentNullException(nameof(registration));
@@ -33,6 +28,19 @@ public sealed class ResponseTranslator
             ["shortCircuited"] = result.IsShortCircuited
         };
 
+        // AN9 — echo the pin so the agent can stitch its trajectory across calls. Authority-free: it is
+        // diagnostics only, never a credential.
+        if (result.Context.Items.TryGetValue(McpCorrelation.ItemsKey, out var correlation) && correlation is string pin)
+        {
+            diagnostics["correlationId"] = pin;
+        }
+
+        // AN11 — project the dry-run posture + the semantic state delta (prospective on a rehearsal,
+        // retrospective on a real run; identical shape). Walled-means-silent is enforced inside the projector.
+        var (dryRun, delta) = MutationDeltaProjector.Project(registration.EntityType, result);
+        if (dryRun) diagnostics["dryRun"] = true;
+        if (delta is not null) diagnostics["delta"] = delta;
+
         if (shortCircuit is JObject scObj && scObj.TryGetValue("statusCode", out var statusToken) && statusToken.Type == JTokenType.Integer)
         {
             diagnostics["shortCircuitStatusCode"] = statusToken;
@@ -49,6 +57,14 @@ public sealed class ResponseTranslator
             {
                 diagnostics["totalCount"] = totalCount;
             }
+        }
+
+        // SEC-0004 (§C) — the per-row capability manifest (id → { can }), default-on for agents. Computed once in
+        // the shared endpoint and read off the context here, rendered into the tool-result metadata. A single-item
+        // operation carries its verbs in the Koan-Access header (already in `headers`) instead.
+        if (result.Context.Items.TryGetValue(Koan.Web.Authorization.AccessProjection.ManifestKey, out var manifest) && manifest is not null)
+        {
+            diagnostics["access"] = SerializeObject(manifest);
         }
 
         return McpToolExecutionResult.SuccessResult(payload, shortCircuit, headers, warnings, diagnostics);
@@ -143,7 +159,13 @@ public sealed class ResponseTranslator
     {
         if (value is null) return null;
         if (value is JToken token) return token;
-        try { return JToken.FromObject(value, JsonSerializer.Create(SerializerSettings)); }
-        catch { return JValue.CreateNull(); }
+        try { return McpJson.FromApplicationObject(value); }
+        catch (Exception ex)
+        {
+            // F2 burn-down: a tool result that cannot be serialised is an ERROR, not a null result. Mirror
+            // RequestTranslator's rethrow-as-JsonException-with-context pattern so the dispatch boundary logs it and
+            // maps it to a JSON-RPC error — instead of silently handing the client a null payload.
+            throw new JsonException($"Unable to serialise MCP tool result of type {value.GetType().Name}: {ex.Message}", ex);
+        }
     }
 }

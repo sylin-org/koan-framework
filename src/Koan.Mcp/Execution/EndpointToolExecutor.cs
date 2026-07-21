@@ -1,4 +1,5 @@
 using System;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Web.Endpoints;
@@ -32,7 +33,10 @@ public sealed class EndpointToolExecutor
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<McpToolExecutionResult> Execute(string toolName, JObject? arguments, CancellationToken cancellationToken)
+    // SEC-0004 Phase 3.3: the caller's principal threads through to EntityRequestContext.User so the data-layer
+    // gate / constrain / projection see the real MCP caller. Default null = anonymous (the STDIO default, and the
+    // safe fallback for any caller that does not supply one).
+    public async Task<McpToolExecutionResult> Execute(string toolName, JObject? arguments, CancellationToken cancellationToken, ClaimsPrincipal? user = null)
     {
         if (!_registry.TryGetTool(toolName, out var registration, out var tool))
         {
@@ -54,9 +58,30 @@ public sealed class EndpointToolExecutor
                 $"Entity endpoint service for '{registration.DisplayName}' is not available.");
         }
 
+        // AN11 (A3) — project schema-only "did you mean?" corrections BEFORE binding the payload, so an enum
+        // typo or a missing required field returns the valid members instead of an opaque bind error. Schema
+        // facts only — never row data (walled-means-silent on the error channel).
+        if (tool.IsMutation)
+        {
+            var issues = Schema.SchemaValidator.Validate(tool.InputSchema, arguments);
+            if (issues.Count > 0)
+            {
+                var diag = new JObject
+                {
+                    ["tool"] = toolName,
+                    ["reason"] = "validation",
+                    ["didYouMean"] = issues
+                };
+                return McpToolExecutionResult.Failure(
+                    CodeMode.Execution.CodeModeErrorCodes.InvalidPayload,
+                    "Validation failed — see didYouMean for schema-derived corrections.",
+                    diag);
+            }
+        }
+
         try
         {
-            var translation = _requestTranslator.Translate(provider, registration, tool, arguments, cancellationToken);
+            var translation = _requestTranslator.Translate(provider, registration, tool, arguments, cancellationToken, user);
             var endpointResult = await InvokeService(service, translation);
             return _responseTranslator.Translate(registration, tool, endpointResult);
         }

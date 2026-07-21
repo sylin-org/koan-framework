@@ -1,7 +1,5 @@
-﻿using Koan.Testing;
 using Koan.Mcp.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
 using Koan.Mcp.Options;
 using Koan.Core;
@@ -17,23 +15,30 @@ using Microsoft.AspNetCore.Http;
 using Koan.Data.Abstractions; // for IEntity<>
 using Microsoft.Extensions.Options; // for IOptions<>
 using System.Reflection; // for reflection to access internal provider
+using Microsoft.Extensions.Hosting;
 
 namespace Koan.Samples.McpCodeMode.Tests;
 
-public class TestPipelineFixture : KoanTestPipelineFixtureBase
+public class TestPipelineFixture : TestHostFixtureBase
 {
     public TestPipelineFixture() : base(typeof(Program)) { }
 
     protected override void ConfigureTestServices(IServiceCollection services)
     {
         services.AddKoan().AsProxiedApi();
-        services.AddKoanMcp();
         services.AddKoanWeb();
+
+        var stdioService = services.FirstOrDefault(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(Koan.Mcp.Hosting.StdioTransport));
+        if (stdioService != null)
+        {
+            services.Remove(stdioService);
+        }
+
         // No need to register KoanSdkBindings; executor constructs it per invocation.
         services.Configure<McpServerOptions>(o =>
         {
             o.Exposure = McpExposureMode.Full;
-            o.EnableHttpSseTransport = true;
+            o.EnableStreamableHttpTransport = true;
         });
         // Controllers from test host assembly
         services.AddKoanControllersFrom<TodosController>();
@@ -70,28 +75,20 @@ public class TestPipelineFixture : KoanTestPipelineFixtureBase
                     JObject? arguments = @params["arguments"] as JObject;
                     var callParams = new Koan.Mcp.Hosting.McpRpcHandler.ToolsCallParams { Name = name, Arguments = arguments };
                     var callResult = await handler.CallTool(callParams, ctx.RequestAborted);
-                    if (callResult.Success && callResult.Result is not null)
-                    {
-                        result = callResult.Result; // flatten inner result payload (matches tests expectation)
-                    }
-                    else
-                    {
-                        result = JToken.FromObject(callResult);
-                    }
+                    result = JToken.FromObject(callResult);
                 }
                 else
                 {
                     ctx.Response.StatusCode = 400;
                     var err = JsonConvert.SerializeObject(new { jsonrpc = "2.0", error = new { code = -32601, message = "Method not found" }, id });
                     ctx.Response.ContentType = "application/json";
-                    await ctx.Response.Write(err, ctx.RequestAborted);
+                    await ctx.Response.WriteAsync(err, ctx.RequestAborted);
                     return;
                 }
                 var payload = JsonConvert.SerializeObject(new { jsonrpc = "2.0", result, id });
                 ctx.Response.ContentType = "application/json";
-                await ctx.Response.Write(payload, ctx.RequestAborted);
+                await ctx.Response.WriteAsync(payload, ctx.RequestAborted);
             });
-            endpoints.MapKoanMcpEndpoints();
             endpoints.MapControllers();
         });
     }

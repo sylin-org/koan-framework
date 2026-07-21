@@ -24,7 +24,7 @@ public sealed class RequestOptionsHookPredicateSpecs : IClassFixture<InMemoryAda
         _factory = factory;
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         AggregateConfigs.Reset();
         _scope = AppHost.PushScope(_factory.Services);
@@ -32,11 +32,11 @@ public sealed class RequestOptionsHookPredicateSpecs : IClassFixture<InMemoryAda
         await VisibilityWidget.RemoveAll();
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _scope?.Dispose();
         _scope = null;
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact]

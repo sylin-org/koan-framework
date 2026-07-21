@@ -18,7 +18,8 @@ internal sealed class HealthAggregator(HealthAggregatorOptions options) : IHealt
         {
             Component = component,
             Reason = reason,
-            NotAfterUtc = DateTimeOffset.UtcNow + options.Policy.SnapshotStalenessWindow
+            NotAfterUtc = DateTimeOffset.UtcNow + options.Policy.SnapshotStalenessWindow,
+            CancellationToken = ct
         };
         // Targeted: if scoped handlers exist for the component, invoke them and skip the general event
         bool invokedScoped = false;

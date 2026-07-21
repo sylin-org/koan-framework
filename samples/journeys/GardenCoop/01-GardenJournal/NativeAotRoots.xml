@@ -1,0 +1,8 @@
+﻿<linker>
+  <assembly fullname="GardenCoop.C01">
+    <type fullname="GardenCoop.Controllers.*" preserve="all" />
+    <type fullname="GardenCoop.Models.*" preserve="all" />
+    <type fullname="GardenCoop.Automation.GardenAutomation" preserve="all" />
+  </assembly>
+  <assembly fullname="Koan.Web.Admin" preserve="all" />
+</linker>

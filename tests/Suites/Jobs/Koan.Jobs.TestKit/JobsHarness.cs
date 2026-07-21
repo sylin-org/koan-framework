@@ -1,6 +1,5 @@
 using System.IO;
 using Koan.Core;
-using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
@@ -21,13 +20,11 @@ namespace Koan.Jobs.TestKit;
 public sealed class JobsHarness : IAsyncDisposable
 {
     private readonly IntegrationHost _host;
-    private readonly IServiceProvider? _prev;
     private readonly string? _dbPath;
 
-    private JobsHarness(IntegrationHost host, IServiceProvider? prev, FakeTimeProvider clock, string? dbPath)
+    private JobsHarness(IntegrationHost host, FakeTimeProvider clock, string? dbPath)
     {
         _host = host;
-        _prev = prev;
         _dbPath = dbPath;
         Clock = clock;
         Orchestrator = host.Services.GetRequiredService<JobOrchestrator>();
@@ -39,47 +36,47 @@ public sealed class JobsHarness : IAsyncDisposable
 
     public FakeTimeProvider Clock { get; }
     public IServiceProvider Services => _host.Services;
-    public JobOrchestrator Orchestrator { get; }
-    public JobScheduler Scheduler { get; }
+    internal JobOrchestrator Orchestrator { get; }
+    internal JobScheduler Scheduler { get; }
     public IJobCoordinator Coordinator { get; }
     public IJobLedger Ledger { get; }
-    public JobTypeRegistry Registry { get; }
+    internal JobTypeRegistry Registry { get; }
 
     /// <summary>In-memory tier — uses whatever (non-durable) data adapter the consuming project references.</summary>
-    public static Task<JobsHarness> StartInMemoryAsync(Action<JobsOptions>? configure = null)
-        => StartCore(configure, null, null);
+    public static Task<JobsHarness> StartInMemoryAsync(Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
+        => StartCore(configure, null, null, configureServices: configureServices);
 
     /// <summary>SQLite durable tier — a temp-file database (the consuming project references the SQLite connector).</summary>
-    public static Task<JobsHarness> StartSqliteAsync(Action<JobsOptions>? configure = null)
+    public static Task<JobsHarness> StartSqliteAsync(Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
     {
         var dbPath = Path.Combine(Path.GetTempPath(), $"koan-jobs-{Guid.NewGuid():n}.db");
         var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
-            ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={dbPath}",
+            ["Koan:Data:Sources:Default:ConnectionString"] = SqliteConnectionString(dbPath),
         };
-        return StartCore(configure, settings, dbPath);
+        return StartCore(configure, settings, dbPath, configureServices: configureServices);
     }
 
     /// <summary>Generic durable tier — caller supplies the data-source settings (Mongo/Postgres/SqlServer).</summary>
-    public static Task<JobsHarness> StartWithSettingsAsync(IReadOnlyDictionary<string, string?> settings, Action<JobsOptions>? configure = null)
-        => StartCore(configure, settings, null);
+    public static Task<JobsHarness> StartWithSettingsAsync(IReadOnlyDictionary<string, string?> settings, Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
+        => StartCore(configure, settings, null, configureServices: configureServices);
 
     /// <summary>SQLite against a specific db file (for crash/restart tests). <paramref name="clearOnStart"/> false =
     /// reuse the existing data (a "reboot"); <paramref name="ownsDb"/> false = leave the file for the test to manage.</summary>
-    public static Task<JobsHarness> StartSqliteAtAsync(string dbPath, bool clearOnStart, bool ownsDb, Action<JobsOptions>? configure = null)
+    public static Task<JobsHarness> StartSqliteAtAsync(string dbPath, bool clearOnStart, bool ownsDb, Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
     {
         var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
-            ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={dbPath}",
+            ["Koan:Data:Sources:Default:ConnectionString"] = SqliteConnectionString(dbPath),
         };
-        return StartCore(configure, settings, ownsDb ? dbPath : null, clearOnStart);
+        return StartCore(configure, settings, ownsDb ? dbPath : null, clearOnStart, configureServices);
     }
 
-    private static async Task<JobsHarness> StartCore(Action<JobsOptions>? configure, IReadOnlyDictionary<string, string?>? settings, string? dbPath, bool clearOnStart = true)
+    private static async Task<JobsHarness> StartCore(Action<JobsOptions>? configure, IReadOnlyDictionary<string, string?>? settings, string? dbPath, bool clearOnStart = true, Action<IServiceCollection>? configureServices = null)
     {
         var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z"));
         var builder = KoanIntegrationHost.Configure();
@@ -95,11 +92,10 @@ public sealed class JobsHarness : IAsyncDisposable
                     o.RescheduleJitter = TimeSpan.Zero;
                     configure?.Invoke(o);
                 });
+                configureServices?.Invoke(s);
             })
             .Build();
         await host.StartAsync();
-        var prev = AppHost.Current;
-        AppHost.Current = host.Services;
         if (clearOnStart)
         {
             await EnsureJobSchema();   // framework-defined entities need their tables ensured on some adapters
@@ -109,20 +105,24 @@ public sealed class JobsHarness : IAsyncDisposable
             // document delete has no DDL and is reliable on every tier.
             await JobRecord.RemoveAll(RemoveStrategy.Safe);
             await JobGateRecord.RemoveAll(RemoveStrategy.Safe);
-            await JobClaimTicket.RemoveAll(RemoveStrategy.Safe);
             await JobMetric.RemoveAll(RemoveStrategy.Safe);
         }
-        return new JobsHarness(host, prev, clock, dbPath);
+        return new JobsHarness(host, clock, dbPath);
     }
+
+    private static string SqliteConnectionString(string dbPath)
+        => $"Data Source={dbPath};Pooling=False";
 
     private static async Task EnsureJobSchema()
     {
         var ensure = new Instruction(DataInstructions.EnsureCreated);
         try { await Data<JobRecord, string>.Execute<object?>(ensure); } catch { /* no-op on adapters without schema */ }
         try { await Data<JobGateRecord, string>.Execute<object?>(ensure); } catch { }
-        try { await Data<JobClaimTicket, string>.Execute<object?>(ensure); } catch { }
         try { await Data<JobMetric, string>.Execute<object?>(ensure); } catch { }
     }
+
+    /// <summary>In-process stage-handler executor. Runs exactly one stage per call through the real orchestration path.</summary>
+    public JobStagePilot Pilot => new(this);
 
     public void Advance(TimeSpan by) => Clock.Advance(by);
     public Task Drain(CancellationToken ct = default) => Orchestrator.DrainAsync(ct);
@@ -143,12 +143,7 @@ public sealed class JobsHarness : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        AppHost.Current = _prev!;
-        try { await _host.StopAsync(); } catch { /* best-effort */ }
         await _host.DisposeAsync();
-        if (_dbPath is not null)
-        {
-            try { if (File.Exists(_dbPath)) File.Delete(_dbPath); } catch { /* best-effort */ }
-        }
+        if (_dbPath is not null && File.Exists(_dbPath)) File.Delete(_dbPath);
     }
 }

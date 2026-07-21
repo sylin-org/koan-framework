@@ -66,7 +66,6 @@ internal sealed record CacheEntryOptionsModel
     public long? SlidingTtlTicks { get; init; }
     public long? AllowStaleForTicks { get; init; }
     public long? SingleflightTimeoutTicks { get; init; }
-    public CacheConsistencyMode Consistency { get; init; }
     public bool ForceCoherenceBroadcast { get; init; }
     public CacheContentKind ContentKind { get; init; }
     public string[] Tags { get; init; } = [];
@@ -86,7 +85,6 @@ internal sealed record CacheEntryOptionsModel
             SlidingTtl = SlidingTtlTicks.HasValue ? TimeSpan.FromTicks(SlidingTtlTicks.Value) : null,
             AllowStaleFor = AllowStaleForTicks.HasValue ? TimeSpan.FromTicks(AllowStaleForTicks.Value) : null,
             SingleflightTimeout = SingleflightTimeoutTicks.HasValue ? TimeSpan.FromTicks(SingleflightTimeoutTicks.Value) : null,
-            Consistency = Consistency,
             ForceCoherenceBroadcast = ForceCoherenceBroadcast,
             ContentKind = ContentKind,
             Region = Region,
@@ -109,7 +107,6 @@ internal sealed record CacheEntryOptionsModel
         SlidingTtlTicks = options.SlidingTtl?.Ticks,
         AllowStaleForTicks = options.AllowStaleFor?.Ticks,
         SingleflightTimeoutTicks = options.SingleflightTimeout?.Ticks,
-        Consistency = options.Consistency,
         ForceCoherenceBroadcast = options.ForceCoherenceBroadcast,
         ContentKind = options.ContentKind,
         Region = options.Region,

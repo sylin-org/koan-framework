@@ -1,11 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Web capability extensions (moderation, soft-delete, audit) for Koan applications.</Description>
-    <PackageTags>$(CommonPackageTags);web;aspnetcore;controllers;capabilities;moderation;soft-delete;audit</PackageTags>
+    <Description>Entity-first REST exposure plus optional moderation, audit, and capability-policy controllers for Koan web applications.</Description>
+    <PackageTags>$(CommonPackageTags);web;aspnetcore;controllers;capabilities;moderation;audit</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />

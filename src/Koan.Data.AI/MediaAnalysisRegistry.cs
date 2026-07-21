@@ -3,17 +3,19 @@ using System.Collections.Concurrent;
 namespace Koan.Data.AI;
 
 /// <summary>
-/// Global registry of entity types tagged with <see cref="Attributes.MediaAnalysisAttribute"/>.
-/// Populated via source-generated module initializers; remains additive for runtime extensibility.
-/// Mirrors <see cref="EmbeddingRegistry"/> for media analysis entities.
+/// Process-wide registry of immutable entity-type discovery facts for types tagged with
+/// <see cref="Attributes.MediaAnalysisAttribute"/>.
+/// Populated by loaded-assembly discovery; entries are additive, idempotent, and independent of any
+/// host, service provider, configuration, or backend.
 /// </summary>
 public static class MediaAnalysisRegistry
 {
     private static readonly ConcurrentDictionary<Type, byte> _registeredTypes = new(TypeEqualityComparer.Instance);
 
     /// <summary>
-    /// Registers entity types with <c>[MediaAnalysis]</c> attribute.
-    /// Source generators call this during module initialization; runtime callers can extend as needed.
+    /// Infrastructure entry point for recording a batch of entity types with <c>[MediaAnalysis]</c>.
+    /// Registration is process-lifetime discovery, not per-host activation or a supported runtime
+    /// extension mechanism.
     /// </summary>
     public static void RegisterTypes(IEnumerable<Type> types)
     {
@@ -28,7 +30,8 @@ public static class MediaAnalysisRegistry
 
     /// <summary>
     /// Registers a single entity type with <c>[MediaAnalysis]</c> attribute.
-    /// Used by assembly scanning in <see cref="Initialization.KoanAutoRegistrar"/>.
+    /// Used by loaded-assembly discovery in <see cref="Initialization.DataAiModule"/>; this records
+    /// a process-lifetime type fact and does not activate host-owned behavior.
     /// </summary>
     public static void Register(Type type, bool async)
     {

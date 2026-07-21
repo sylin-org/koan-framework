@@ -12,7 +12,13 @@ namespace Koan.Web.Admin.Infrastructure;
 
 internal static class KoanAdminRuntimeSurfaceFactory
 {
-    public static KoanAdminRuntimeSurface Capture(bool sanitized, bool locked, string? lockReason)
+    public static KoanAdminRuntimeSurface Capture()
+        => Capture(
+            sanitized: true,
+            locked: true,
+            lockReason: "Sensitive process and machine identity fields are never projected by Koan Web Admin.");
+
+    private static KoanAdminRuntimeSurface Capture(bool sanitized, bool locked, string? lockReason)
     {
         var capturedAt = DateTimeOffset.UtcNow;
         using var process = Process.GetCurrentProcess();

@@ -2,7 +2,8 @@ namespace Koan.Jobs;
 
 /// <summary>
 /// The single source of truth and the single writer (JOBS-0005 §7). The ledger <em>is</em> the queue: dispatch
-/// claims the next ready row by atomic CAS; there is no separate volatile queue to reconcile. Physical layout
+/// claims the next ready row directly; there is no separate volatile queue to reconcile. Data-backed implementations
+/// use provider CAS when available and retain an explicit optimistic at-least-once fallback otherwise. Physical layout
 /// (in-memory, data-backed, hot/cold partitions) hides behind this interface; the orchestrator is storage-agnostic.
 /// </summary>
 public interface IJobLedger
@@ -21,11 +22,14 @@ public interface IJobLedger
     /// <summary>
     /// Atomically claim the next ready job: <c>Status==Queued &amp;&amp; VisibleAt&lt;=now &amp;&amp; CancelRequestedAt==null</c>,
     /// whose lane is not in <paramref name="saturatedLanes"/> and whose <c>GateKey</c> is not under an active gate;
+    /// for pool jobs, elects a free member from <paramref name="pools"/> and stamps it as <c>GateKey</c>;
     /// CAS to <see cref="JobStatus.Running"/>, stamping <paramref name="owner"/> + <paramref name="leaseUntil"/>.
-    /// Returns null if nothing is claimable. This is the hot path and must be atomic under contention.
+    /// Returns null if nothing is claimable. This is the hot path; implementations use their strongest available
+    /// concurrency primitive while preserving the documented at-least-once floor.
     /// </summary>
     Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
-        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct);
+        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,
+        IReadOnlyDictionary<string, PoolDispatchContext>? pools = null);
 
     /// <summary>Persist a transition (settle / advance / defer / cancel). The orchestrator is the only caller — single writer.</summary>
     Task Update(JobRecord record, CancellationToken ct);
@@ -64,4 +68,8 @@ public interface IJobLedger
     /// <summary>Count active (non-terminal) rows for a work-type — the cheap pushed probe behind the §19.4
     /// job-per-row guardrail.</summary>
     Task<long> CountActive(string workType, CancellationToken ct);
+
+    /// <summary>A cheap, bounded global health snapshot (JOBS-0008): a few pushed-down COUNTs + one LIMIT-1 oldest-due
+    /// seek — index-served and O(1) in lanes, never a per-lane fan-out. Powers the <c>JobsHealthContributor</c>.</summary>
+    Task<JobsHealthSnapshot> HealthSnapshot(DateTimeOffset now, CancellationToken ct);
 }

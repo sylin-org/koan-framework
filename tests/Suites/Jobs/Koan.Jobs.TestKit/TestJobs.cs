@@ -31,6 +31,13 @@ public sealed class GreetJob : Entity<GreetJob>, IKoanJob<GreetJob>
     public static void Reset() => Executions = 0;
 }
 
+/// <summary>Reports one durable progress value so settlement cannot erase the observer-visible update.</summary>
+public sealed class ProgressJob : Entity<ProgressJob>, IKoanJob<ProgressJob>
+{
+    public static Task Execute(ProgressJob job, JobContext ctx, CancellationToken ct)
+        => ctx.Progress(0.75, "three quarters");
+}
+
 /// <summary>Multi-action linear pipeline (declared chain). Carries saga state across stages.</summary>
 [JobChain(Stage.Fetch, Stage.Parse, Stage.Mint, Stage.Publish)]
 public sealed class Pipeline : Entity<Pipeline>, IKoanJob<Pipeline>
@@ -322,6 +329,28 @@ public sealed class NightlyJob : Entity<NightlyJob>, IKoanJob<NightlyJob>
     public static void Reset() => Executions = 0;
 }
 
+/// <summary>Upstream pipeline lane (JOBS-0008 fairness specs): declares Lane="crawl" so the durable tier enumerates it.</summary>
+[JobAction(Crawl, Lane = "crawl")]
+public sealed class CrawlJob : Entity<CrawlJob>, IKoanJob<CrawlJob>
+{
+    public const string Crawl = nameof(Crawl);
+    public static int Executions;
+    public static Task Execute(CrawlJob job, JobContext ctx, CancellationToken ct)
+    { Interlocked.Increment(ref Executions); return Task.CompletedTask; }
+    public static void Reset() => Executions = 0;
+}
+
+/// <summary>Downstream pipeline lane (JOBS-0008 fairness specs): declares Lane="translation".</summary>
+[JobAction(Translate, Lane = "translation")]
+public sealed class TranslationJob : Entity<TranslationJob>, IKoanJob<TranslationJob>
+{
+    public const string Translate = nameof(Translate);
+    public static int Executions;
+    public static Task Execute(TranslationJob job, JobContext ctx, CancellationToken ct)
+    { Interlocked.Increment(ref Executions); return Task.CompletedTask; }
+    public static void Reset() => Executions = 0;
+}
+
 internal static class Probe
 {
     public static void Max(ref int target, int value)
@@ -330,6 +359,30 @@ internal static class Probe
         do { seen = target; if (value <= seen) return; }
         while (Interlocked.CompareExchange(ref target, value, seen) != seen);
     }
+}
+
+/// <summary>Two-stage chain where step "a" can be held open by the test, ignoring the cancellation token, to
+/// simulate a cancel landing in the settle window after the handler has already returned successfully.</summary>
+[JobChain("a", "b")]
+public sealed class ChainCancelRaceJob : Entity<ChainCancelRaceJob>, IKoanJob<ChainCancelRaceJob>
+{
+    public bool StepBRan { get; set; }
+    public static int StepAExecutions;
+    public static TaskCompletionSource? Unblock;
+
+    public static async Task Execute(ChainCancelRaceJob job, JobContext ctx, CancellationToken ct)
+    {
+        if (ctx.Action == "a")
+        {
+            Interlocked.Increment(ref StepAExecutions);
+            // Deliberately ignore ct: the handler completes normally even when the linked token is cancelled,
+            // reproducing the settle-time window where the cancel marker is set AFTER Execute returns.
+            if (Unblock is not null) await Unblock.Task;
+        }
+        else job.StepBRan = true;
+    }
+
+    public static void Reset() { StepAExecutions = 0; Unblock = null; }
 }
 
 /// <summary>Conditional auto-save footgun (§17.1): the handler edits a SECOND copy and saves it, never touching
@@ -422,6 +475,52 @@ public sealed class RemoteFetch : Entity<RemoteFetch>, IKoanJob<RemoteFetch>
     }
 
     public static void Reset() { Ran.Clear(); Executed = 0; Throttled = null; }
+}
+
+/// <summary>Submission-only probe whose gate resolver can fail inside the Jobs acceptance boundary.</summary>
+[JobGate(nameof(ResolveGate))]
+public sealed class SubmissionGateJob : Entity<SubmissionGateJob>, IKoanJob<SubmissionGateJob>
+{
+    public bool Reject { get; set; }
+
+    public Task<string?> ResolveGate(IServiceProvider services, CancellationToken ct)
+        => Reject
+            ? Task.FromException<string?>(new InvalidOperationException("acceptance failed deliberately"))
+            : Task.FromResult<string?>("submission-probe");
+
+    public static Task Execute(SubmissionGateJob job, JobContext ctx, CancellationToken ct)
+        => Task.CompletedTask;
+}
+
+/// <summary>Dispatch-time pool job (JOBS-0007): claims a slot from the registered <see cref="TestPoolResolver"/>
+/// at claim time, not at submit. GateKey is null at submit and stamped by the ledger on claim.</summary>
+[JobPool("test-ai-servers")]
+public sealed class PoolJob : Entity<PoolJob>, IKoanJob<PoolJob>
+{
+    public static int Executions;
+
+    public static Task Execute(PoolJob job, JobContext ctx, CancellationToken ct)
+    {
+        Interlocked.Increment(ref Executions);
+        return Task.CompletedTask;
+    }
+
+    public static void Reset() => Executions = 0;
+}
+
+/// <summary>Mutable pool resolver for JOBS-0007 tests: the test updates Members at runtime to simulate
+/// admin add/remove of AiServer rows without restarting the harness.</summary>
+public sealed class TestPoolResolver : IJobPoolResolver
+{
+    private volatile IReadOnlyList<string> _members;
+
+    public TestPoolResolver(IReadOnlyList<string> members) => _members = members;
+
+    public string PoolName => "test-ai-servers";
+    public int CapacityPerMember { get; set; } = 1;
+    public IReadOnlyList<string> Members { get => _members; set => _members = value; }
+
+    public Task<IReadOnlyList<string>> GetMembersAsync(CancellationToken ct) => Task.FromResult(_members);
 }
 
 /// <summary>Cursor-conveyor (JOBS-0005 §19.4): processes one window of a (fake) source, advances its own cursor, and

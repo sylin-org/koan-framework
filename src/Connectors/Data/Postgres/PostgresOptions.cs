@@ -1,6 +1,7 @@
 using Koan.Core.Adapters;
-using Koan.Core.Adapters.Configuration;
+using Koan.Data.Adapters.Configuration;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Relational.Orchestration;
 using System.ComponentModel.DataAnnotations;
 
 namespace Koan.Data.Connector.Postgres;
@@ -14,9 +15,8 @@ public sealed class PostgresOptions : IAdapterOptions
     public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.HashedNamespace;
     public string Separator { get; set; } = ".";
     public string? SearchPath { get; set; } = "public";
-    public int DefaultPageSize { get; set; } = 50;
-    public SchemaDdlPolicy DdlPolicy { get; set; } = SchemaDdlPolicy.AutoCreate;
-    public SchemaMatchingMode SchemaMatching { get; set; } = SchemaMatchingMode.Relaxed;
+    public RelationalDdlPolicy DdlPolicy { get; set; } = RelationalDdlPolicy.AutoCreate;
+    public RelationalSchemaMatchingMode SchemaMatching { get; set; } = RelationalSchemaMatchingMode.Relaxed;
     public bool AllowProductionDdl { get; set; } = false;
 
     public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();

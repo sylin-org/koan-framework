@@ -5,15 +5,15 @@ networks:
 
 services:
   mongo:
-    image: "mongo:7"
+    image: "mongo:8.3.4"
     ports:
       - "35500:27017"
     volumes:
-      - ./Data/mongo:/data/db
+      - ./Data/mongo-8.3:/data/db
     networks:
       - Koan_internal
   weaviate:
-    image: "semitechnologies/weaviate:1.25.6"
+    image: "cr.weaviate.io/semitechnologies/weaviate:1.37.6"
     environment:
       QUERY_DEFAULTS_LIMIT: "25"
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
@@ -22,11 +22,11 @@ services:
       CLUSTER_HOSTNAME: "node1"
       RAFT_BOOTSTRAP_EXPECT: "1"
     volumes:
-      - ./Data/weaviate:/var/lib/weaviate
+      - ./Data/weaviate-1.37:/var/lib/weaviate
     networks:
       - Koan_internal
   ollama:
-    image: "ollama/ollama:latest"
+    image: "ollama/ollama:0.32.0"
     volumes:
       - ./Data/ollama:/root/.ollama
     networks:

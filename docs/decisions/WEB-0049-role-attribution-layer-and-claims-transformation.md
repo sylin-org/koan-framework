@@ -177,7 +177,7 @@ Consequences
 
 Positive
 
-- Controllers can use [Authorize(Roles = "admin")] or [Authorize(Policy = KoanWebPolicyNames.SoftDeleteActor)] immediately.
+- Controllers can use [Authorize(Roles = "admin")] or [Authorize(Policy = KoanWebPolicyNames.AuditActor)] immediately.
 - Providers and modules can contribute role/permission mappings via IRoleMapContributor without tight coupling.
 - Keeps existing capability policies and WEB-0047 defaults intact; this layer makes them actually plug-and-play.
 

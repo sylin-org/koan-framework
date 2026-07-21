@@ -1,5 +1,7 @@
 # ADR: Koan.Messaging Developer Experience and Topology Provisioning
 
+> **Status: Retired.** Describes a prior messaging generation; the inbox/alias/provisioning features no longer exist in code.
+
 ## Context
 
 Koan.Messaging aims to provide a simple, powerful, and provider-agnostic messaging abstraction for .NET. Current APIs focus on message send/receive and handler registration, with strong conventions and auto-registration. However, there is no public, agnostic API for consumers to declaratively request or provision custom MQ topologies (exchanges, queues, bindings) at runtime. There is also an opportunity to further improve developer experience (DX) with a more fluent, discoverable, and testable API surface.

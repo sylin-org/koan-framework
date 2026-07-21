@@ -19,7 +19,7 @@ public readonly struct KoanIdentity
 
     public bool IsAuthenticated => _principal?.Identity?.IsAuthenticated == true;
 
-    /// <summary>Subject id — <c>sub</c> for a bearer KSVID, <c>NameIdentifier</c> for a cookie principal.</summary>
+    /// <summary>Subject id — <c>sub</c> for a bearer token, <c>NameIdentifier</c> for a cookie principal.</summary>
     public string? Id =>
         _principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
         ?? _principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;

@@ -1,11 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Description>Uri-inspired prompt primitive for Koan AI: parse, build, version, and A/B test prompts with entity-backed storage.</Description>
-    <PackageTags>$(CommonPackageTags);ai;prompt</PackageTags>
+    <Description>Optional Entity-backed catalog for storing and resolving versioned Koan AI prompts.</Description>
+    <PackageTags>$(CommonPackageTags);ai;prompt;catalog;data</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />

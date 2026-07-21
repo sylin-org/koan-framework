@@ -3,7 +3,7 @@ namespace Koan.ZenGarden.Koi;
 /// <summary>
 /// Classifies a topology change detected by the Koi handler.
 /// </summary>
-public enum KoiTopologyEventKind
+internal enum KoiTopologyEventKind
 {
     /// <summary>A new Moss Stone appeared on the network (mDNS resolved).</summary>
     StoneOnline,

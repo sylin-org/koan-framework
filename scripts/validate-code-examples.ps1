@@ -12,11 +12,17 @@ param(
 )
 
 # Leg C of the green ratchet (docs/architecture/foundation-consolidation-plan.md).
-# Only INSTRUCTIONAL docs are compile-validated. Decision/design/proposal/archive docs
-# legitimately contain aspirational or historical code, so they are out of scope by design.
+# Only INSTRUCTIONAL docs are in scope; decision/design/proposal/archive docs legitimately contain
+# aspirational or historical code and are out of scope by design.
+#
+# OPT-IN model: within those docs, a C# block is compiled ONLY if it is marked `<!-- validate -->`
+# (a complete, self-contained example the author asserts must compile). Everything else is prose-grade
+# and is not compiled — documentation is teaching material, mostly fragments, so "compile every block"
+# is the wrong default. The marked set is the gate's real signal: those examples must never go stale.
 $script:InstructionalRoots = @(
     'docs/guides', 'docs/how-to', 'docs/reference', 'docs/getting-started',
-    'docs/examples', 'docs/workbooks', 'docs/patterns', 'docs/api'
+    'docs/examples', 'docs/workbooks', 'docs/patterns', 'docs/api',
+    '.claude/skills'   # DX-0048: each skill's canonical pattern is a `<!-- validate -->` block.
 )
 function Test-Instructional {
     param([string]$RelativePath)
@@ -59,11 +65,15 @@ function Extract-CodeBlocks {
 
     foreach ($match in $matches) {
         $code = $match.Groups[1].Value.Trim()
-        # Opt-out: a `<!-- validate:skip -->` marker in the ~120 chars before the fence
-        # exempts an intentionally non-compiling snippet (pseudo-code, partial illustration).
+        # OPT-IN (documentation is prose-first): a C# block is compile-validated ONLY when an author marks
+        # it a complete, self-contained example with `<!-- validate -->` on the line(s) just before the
+        # fence. Unmarked blocks are illustrative by default — fragments, partial snippets, multi-pillar
+        # montages, snippets that reference types defined in prose — and are NOT compiled. Trying to compile
+        # every teaching fragment as a standalone program is a category error (it is what made the old gate
+        # validate nothing reliably). Legacy `<!-- validate:skip -->` markers are now redundant and ignored.
         $preStart = [Math]::Max(0, $match.Index - 120)
         $preceding = $content.Substring($preStart, $match.Index - $preStart)
-        if ($preceding -match '<!--\s*validate:skip\s*-->') { continue }
+        if ($preceding -notmatch '<!--\s*validate\s*-->') { continue }
         if ($code -and $code.Length -gt 10) { # Skip trivial examples
             $blocks += [PSCustomObject]@{
                 File = $FilePath
@@ -76,6 +86,65 @@ function Extract-CodeBlocks {
     return $blocks
 }
 
+# Curated using set that a real Koan app would have on hand. Every entry MUST resolve to a real
+# namespace in the temp project's referenced assemblies (Koan.Core/Data.Core/Data.Abstractions/Web/AI
+# + Microsoft.AspNetCore.App) — a using for a non-existent namespace is itself a CS0246 that would fail
+# every snippet. This removes the false-failure class where a correct snippet just lacked a using
+# (EntityContext, DI, the host builder) that the doc reader obviously has. It does NOT mask genuine
+# staleness: a removed pillar (e.g. the old Koan.Flow) has no namespace here, so its references still fail.
+$script:RichUsings = @(
+    'using System;'
+    'using System.Collections.Generic;'
+    'using System.Linq;'
+    'using System.Threading;'
+    'using System.Threading.Tasks;'
+    'using Microsoft.AspNetCore.Builder;'
+    'using Microsoft.AspNetCore.Http;'
+    'using Microsoft.AspNetCore.Mvc;'
+    'using Microsoft.Extensions.Configuration;'
+    'using Microsoft.Extensions.DependencyInjection;'
+    'using Microsoft.Extensions.Hosting;'
+    'using Microsoft.Extensions.Logging;'
+    'using Koan.Core;'
+    'using Koan.Core.Capabilities;'
+    'using Koan.Data;'
+    'using Koan.Data.Abstractions;'
+    'using Koan.Data.Abstractions.Capabilities;'
+    'using Koan.Data.Core;'
+    'using Koan.Data.Core.Model;'   # Entity<T>/Entity<T,TKey> — the base class nearly every entity example uses
+    'using Koan.Web;'
+    'using Koan.Web.Controllers;'   # EntityController<T> — the documented REST base controller
+)
+
+# Pull the snippet's own leading using-directives out of the body so they can sit at file scope
+# (a using inside a wrapper method/class is a compile error) and be deduped against the rich set.
+function Split-Usings {
+    param([string]$Code)
+    $usings = New-Object System.Collections.Generic.List[string]
+    $bodyLines = New-Object System.Collections.Generic.List[string]
+    foreach ($line in ($Code -split "`r?`n")) {
+        if ($line -match '^\s*(global\s+)?using\s+(static\s+)?[\w\.]+\s*(=\s*[\w\.<>,\s]+)?;\s*$') {
+            $usings.Add(($line.Trim())) | Out-Null
+        } else {
+            $bodyLines.Add($line) | Out-Null
+        }
+    }
+    return [PSCustomObject]@{ Usings = $usings; Body = ($bodyLines -join "`n") }
+}
+
+# top-level (host entrypoint) | declaration (its own namespace/type) | fragment (statements).
+function Get-BlockKind {
+    param([string]$Code)
+    if ($Code -match '\bWebApplication\s*\.\s*Create' -or $Code -match '\bHost\s*\.\s*CreateApplicationBuilder\b') {
+        return 'toplevel'
+    }
+    if ($Code -match '(?m)^\s*namespace\s+\w' -or
+        $Code -match '(?m)^\s*(\[[^\]]*\]\s*)*((public|internal|sealed|abstract|static|partial|file)\s+)*(class|record|struct|interface|enum)\s+\w') {
+        return 'declaration'
+    }
+    return 'fragment'
+}
+
 function Test-CodeBlock {
     param(
         [PSCustomObject]$Block,
@@ -86,19 +155,43 @@ function Test-CodeBlock {
         # Create a test file
         $testFile = Join-Path $TempProjectDir "TestCode$([System.IO.Path]::GetRandomFileName().Replace('.', '')).cs"
 
-        # Wrap the code in a class if it's not already wrapped
-        $wrappedCode = $Block.Code
+        $split = Split-Usings -Code $Block.Code
+        $kind = Get-BlockKind -Code $Block.Code
+        $body = $split.Body
 
-        if (-not ($wrappedCode -match 'namespace\s+|class\s+|public\s+class\s+')) {
-            $wrappedCode = @"
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Koan.Core;
-using Koan.Data;
-using Koan.Data.Abstractions;
-using Koan.Web;
+        # Dedup the curated set with the snippet's own usings (preserve order, rich first).
+        $allUsings = [System.Collections.Generic.List[string]]::new()
+        foreach ($u in $script:RichUsings) { if (-not $allUsings.Contains($u)) { $allUsings.Add($u) | Out-Null } }
+        foreach ($u in $split.Usings) { if (-not $allUsings.Contains($u)) { $allUsings.Add($u) | Out-Null } }
+        $usingBlock = ($allUsings -join "`n")
+
+        switch ($kind) {
+            'declaration' {
+                # Body already declares its own namespace/types; just give it the usings.
+                $wrappedCode = "$usingBlock`n`n$body"
+            }
+            'toplevel' {
+                # Host-entrypoint snippet: wrap in Main(args) so `args` + the builder/app locals resolve
+                # (a method body, not true top-level statements, so it composes in the Library temp project).
+                $wrappedCode = @"
+$usingBlock
+
+namespace CodeValidation
+{
+    public static class Program_$([System.IO.Path]::GetRandomFileName().Replace('.', ''))
+    {
+        public static async Task Main(string[] args)
+        {
+$body
+        }
+    }
+}
+"@
+            }
+            default {
+                # Statement fragment.
+                $wrappedCode = @"
+$usingBlock
 
 namespace CodeValidation
 {
@@ -106,11 +199,12 @@ namespace CodeValidation
     {
         public async Task TestMethod()
         {
-$($Block.Code)
+$body
         }
     }
 }
 "@
+            }
         }
 
         Set-Content -Path $testFile -Value $wrappedCode -Encoding UTF8
@@ -159,6 +253,18 @@ function Create-TestProject {
     <ProjectReference Include="..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
+    <!-- DX-0048: pillar refs so each skill's canonical pattern compiles under the gate. -->
+    <ProjectReference Include="..\..\src\Koan.Jobs\Koan.Jobs.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Cache\Koan.Cache.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.AI\Koan.Data.AI.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Communication\Koan.Communication.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Observability\Koan.Observability.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Mcp\Koan.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Tenancy\Koan.Tenancy.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -211,25 +317,38 @@ try {
             }
         }
         if (Test-Path $ReadmePath) { $candidates.Add('README.md') | Out-Null }
+        # DX-0048: skill canonical-pattern blocks are in scope for the full sweep too.
+        $skillsRoot = Join-Path $repoRootPath '.claude/skills'
+        if (Test-Path $skillsRoot) {
+            Get-ChildItem -Path $skillsRoot -Recurse -Filter '*.md' | ForEach-Object {
+                $rel = [System.IO.Path]::GetRelativePath($repoRootPath, $_.FullName)
+                if (Test-Instructional $rel) { $candidates.Add(($rel -replace '\\', '/')) | Out-Null }
+            }
+        }
         Write-Host "Scope: full instructional sweep -> $($candidates.Count) doc(s)"
     }
 
-    $files = @()
+    # NOTE: do NOT name these locals $full / $files. PowerShell variable names are
+    # case-insensitive, so $full aliases the typed [switch]$Full parameter (string -> bool
+    # coercion throws a MetadataError) and $files aliases the typed [string[]]$Files
+    # parameter (Get-Item FileInfo objects get flattened to strings, so .FullName is empty).
+    # Either collision silently kills the sweep, degrading the gate to "validate nothing".
+    $scopedFiles = @()
     foreach ($c in $candidates) {
-        $full = Join-Path $repoRootPath $c
-        if (Test-Path $full) { $files += Get-Item $full }
+        $fullPath = Join-Path $repoRootPath $c
+        if (Test-Path $fullPath) { $scopedFiles += Get-Item $fullPath }
     }
 
-    if ($files.Count -eq 0) {
+    if ($scopedFiles.Count -eq 0) {
         Write-Success "No instructional docs in scope to validate."
         exit 0
     }
 
-    Write-Host "Found $($files.Count) documentation file(s) in scope"
+    Write-Host "Found $($scopedFiles.Count) documentation file(s) in scope"
 
     # Extract all code blocks
     $allBlocks = @()
-    foreach ($file in $files) {
+    foreach ($file in $scopedFiles) {
         if ($Verbose) {
             Write-Host "Processing: $($file.FullName)" -ForegroundColor DarkGray
         }

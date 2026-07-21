@@ -8,7 +8,8 @@ public interface IHealthAggregator
     /// - Per-component TTL: Only applied when a component explicitly supplies a TTL in Push(..., ttl).
     ///   If no TTL is provided, the entry does not expire on its own; overall staleness is driven by policy.
     /// - Probe workflow: Call RequestProbe() to invite contributors to publish status. This raises ProbeRequested.
-    ///   Handlers should respond by calling Push(...). The event is fire-and-forget; no synchronous guarantees.
+    ///   Handlers receive the request cancellation token and should respond by calling Push(...). Handler dispatch
+    ///   is synchronous, but a handler may deliberately schedule asynchronous work, so sample completion is not implied.
     /// - Idempotency: Repeated Push from the same component is an upsert of that component’s status.
     /// - Readiness: Overall readiness uses aggregator policy; do not fabricate per-component TTLs.
 

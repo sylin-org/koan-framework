@@ -27,6 +27,17 @@
           AfterTargets="_GetProjectReferenceVersions"
           Condition="'$(KoanDisableCompatRanges)' != 'true'">
     <ItemGroup>
+      <!-- 0. Default the computed metadata to empty on EVERY item first, so a later BATCHED metadata
+           reference never trips MSB4096 ("item does not define metadata") for an item we deliberately
+           skip — a prerelease ProjectVersion, or a non-Koan internal ProjectReference. Without this, a
+           single un-bandable ProjectReference aborts pack for the whole project (surfaced packing a
+           multi-project package on a prerelease/dev version). Defaulting means the bands apply only to
+           clean-release refs and everything else keeps the floor-only default cleanly. -->
+      <_ProjectReferencesWithVersions>
+        <_KoanMajor></_KoanMajor>
+        <_KoanMinor></_KoanMinor>
+        <_KoanCeiling></_KoanCeiling>
+      </_ProjectReferencesWithVersions>
       <!-- 1. Capture major/minor of each referenced project's version. Only CLEAN 3-part release
            versions are banded: nbgv stamps prerelease builds on non-release branches as
            "0.17.3-g1a2b3c", which is not a parseable System.Version and is never published anyway,

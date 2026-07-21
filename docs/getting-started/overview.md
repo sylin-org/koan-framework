@@ -4,212 +4,150 @@ domain: core
 title: "Getting started with Koan"
 audience: [developers, architects, ai-agents]
 status: current
-nav: true
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation:
+  date_last_tested: 2026-07-19
+  status: passed
+  scope: source-built 0.20 Entity-first grammar and graduated capability examples
 ---
 
 # Getting started with Koan
 
-This is the golden path: zero to a working, explained application, one concept at a time.
-Every code block on this page compiles against the current source — if one doesn't, that is a
-bug; please report it.
+Koan's golden path is V0 to V1 in meaningful small steps. Each new line should express a business
+decision or a deliberate capability; framework and adapter mechanics stay behind stable semantic
+chokepoints.
 
-> **Pre-1.0 note**: until 1.0, the recommended path is **building from source** (Path A below).
-> Published NuGet packages use the `Sylin.Koan.*` prefix and may lag the repo.
+> **0.20 preview:** run `dotnet run --project samples/FirstUse` from the source checkout today. After the first
+> public wave is visible on NuGet, `dotnet new install Sylin.Koan.Templates` becomes the canonical entry. The exact
+> candidate has local package evidence, but local evidence is not public availability.
 
-## The concept budget
+## Step 1 — make one Entity useful
 
-Hello-CRUD needs exactly **eight Koan concepts**. This page introduces them in order; nothing
-else is required:
-
-1. `Entity<T>` — your model, with a string `Id` (GUID v7, generated on first read)
-2. Entity statics & instance verbs — `Get` / `All` / `Query` / `Save()` / `Remove()`
-3. `EntityController<T>` — the REST surface over an entity
-4. `AddKoan()` — the single bootstrap call ("Reference = Intent": referenced packages register themselves)
-5. Provider election — the referenced data connector wins; zero-config defaults (SQLite → `./data/app.db`)
-6. The boot report — what the app prints at startup is the primary debugging surface
-7. Auto schema ("magic") — created in Development; gated by `Koan:AllowMagicInProduction` elsewhere
-8. Web defaults — controllers, `/api/health`, secure headers auto-wired; JSON is **camelCase,
-   nulls omitted** (Newtonsoft.Json — chosen for predictable polymorphic serialization)
-
-## Path A — run it from the repo (60 seconds)
-
-```bash
-git clone https://github.com/sylin-org/koan-framework
-cd koan-framework
-dotnet run --project samples/S1.Web
+```csharp
+public sealed class Todo : Entity<Todo>
+{
+    public string Title { get; set; } = "";
+    public bool Done { get; set; }
+}
 ```
 
-Browse the printed URL; hit `/api/health`; read the boot report in the console — it lists every
-discovered module, the elected adapters, and the boot phases. Then read
-[samples/README.md](../../samples/README.md) for the learning ladder
-(S0 → S1 → S10 → S14).
-
-## Path B — from scratch
-
-```bash
-dotnet new web -n MyApp
-cd MyApp
-dotnet add package Sylin.Koan.Core
-dotnet add package Sylin.Koan.Web
-dotnet add package Sylin.Koan.Data.Connector.Sqlite
+```csharp
+var todo = await new Todo { Title = "Ship the meaningful step" }.Save();
+var same = await Todo.Get(todo.Id);
+var open = await Todo.Query(item => !item.Done);
+await todo.Remove();
 ```
 
-**Program.cs — this is complete.** Resist the urge to add more; the web pipeline, controllers,
-health endpoints, and discovery are auto-wired when `Koan.Web` is referenced:
+The string `Id` is generated lazily as a GUID v7. Provider-bounded paging and streaming use the same
+Entity grammar; optional physical guarantees depend on the elected adapter.
+
+## Step 2 — expose the same Entity through HTTP
+
+```csharp
+[Route("api/todos")]
+public sealed class TodosController : EntityController<Todo>;
+```
+
+The complete host remains four lines:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
 var app = builder.Build();
-app.Run();
+await app.RunAsync();
 ```
 
-Model + API:
+Referenced modules contribute the web pipeline, controller discovery, selected data provider,
+health, and facts. The application does not enumerate them.
+
+## Step 3 — make infrastructure intent explicit
+
+A reference makes a provider available; the owning pillar elects among eligible providers. If the
+business requires a stable choice as references grow, pin that intent on the Entity or a named source:
 
 ```csharp
-using Koan.Data.Core.Model;
-using Koan.Web.Controllers;
-using Microsoft.AspNetCore.Mvc;
+[DataAdapter("sqlite")]
+public sealed class Approval : Entity<Approval>
+{
+    public string Subject { get; set; } = "";
+}
+```
 
-public sealed class Todo : Entity<Todo>
+Configured intent is fail-loud. An unavailable or incapable provider produces a correction instead
+of silently falling back. Startup and `/.well-known/Koan/facts` report the resolved decision.
+
+## Step 4 — add only the capability the business needs
+
+### Durable work
+
+```csharp
+public sealed class ReviewRequest : Entity<ReviewRequest>, IKoanJob<ReviewRequest>
 {
     public string Title { get; set; } = "";
-    public bool IsCompleted { get; set; }
-}
 
-[Route("api/[controller]")]
-public sealed class TodoController : EntityController<Todo> { }
-```
-
-Run and verify:
-
-```bash
-dotnet run
-curl -X POST http://localhost:5000/api/todo -H "Content-Type: application/json" -d '{"title":"Experience Koan"}'
-curl http://localhost:5000/api/todo
-curl http://localhost:5000/api/health
-```
-
-Working with data (the verbs — note: `Query`, not `Where`; `Remove`, not `Delete`):
-
-```csharp
-var todo  = await Todo.Get(id);                      // null when missing
-var open  = await Todo.Query(t => !t.IsCompleted);   // pushed down when the adapter supports it
-var page  = await Todo.FirstPage(20);
-await new Todo { Title = "Ship it" }.Save();
-await todo.Remove();
-await foreach (var t in Todo.AllStream(batchSize: 1000)) { /* streaming, constant memory */ }
-```
-
-## Growing by intent (one package + one attribute each)
-
-Each step below is independent. New concepts per step are listed — that's the price you pay.
-
-### Swap the database (+1 concept: connection configuration)
-
-```bash
-dotnet add package Sylin.Koan.Data.Connector.Postgres
-```
-
-```json
-{ "Koan": { "Data": { "Postgres": { "ConnectionString": "Host=localhost;Database=myapp" } } } }
-```
-
-Same entities, same controllers. Capability differences are negotiated, not hidden:
-
-```csharp
-if (Data<Todo, string>.Capabilities.Has(DataCaps.Query.Linq)) { /* pushdown active */ }
-```
-
-### Cache entities (+1 concept: `[Cacheable]`)
-
-```bash
-dotnet add package Sylin.Koan.Cache
-```
-
-```csharp
-[Cacheable(300)]   // 5-minute TTL; L1/L2 layering and cross-node coherence by reference
-public sealed class Todo : Entity<Todo> { /* … */ }
-```
-
-Reads past TTL return fresh-or-null — stale data is opt-in, never a surprise.
-
-### Background jobs (+2 concepts: `IKoanJob<T>`, `JobContext`)
-
-```bash
-dotnet add package Sylin.Koan.Jobs
-```
-
-```csharp
-public sealed class ImportJob : Entity<ImportJob>, IKoanJob<ImportJob>
-{
-    public string Source { get; set; } = "";
-
-    public static async Task Execute(ImportJob job, JobContext ctx, CancellationToken ct)
+    public static async Task Execute(ReviewRequest request, JobContext context, CancellationToken ct)
     {
-        // at-least-once, retried, schedulable (interval / cron / @boot), progress-reporting
+        request.Assess();
+        await context.Progress(1, "Ready for recommendation");
     }
 }
+
+await request.Job.Submit(ct: ct);
 ```
 
-Jobs ride the data pillar: in-memory by default, durable + distributed when a database connector
-is present. See the [jobs guide](../guides/jobs-howto.md).
+Jobs own orchestration, persistence, retries, schedules, and progress. The Entity owns business work.
 
-### Messaging (+1 concept: `.Send()`)
-
-```bash
-dotnet add package Sylin.Koan.Messaging.Connector.RabbitMq
-```
+### Entity communication
 
 ```csharp
-await new TodoCompleted { TodoId = todo.Id }.Send();
+await order.Events.Raise<OrderApproved>(ct);
+await order.Transport.Send(ct);
 ```
 
-### Semantic search (+2 concepts: `[Embedding]`, vector adapters)
+Events mean something happened to the Entity. Transport means distribute an isolated copy of its
+current state. Both work locally with no external adapter and lift pointwise over finite Entity
+collections and lazy streams. Referenced connectors can extend the mesh only when their declared
+guarantees satisfy the channel.
 
-```bash
-dotnet add package Sylin.Koan.Data.AI
-dotnet add package Sylin.Koan.AI.Connector.Ollama
-dotnet add package Sylin.Koan.Data.Vector.Connector.Weaviate
-```
+### Semantic search
 
 ```csharp
-[Embedding(Properties = new[] { nameof(Title) })]
-public sealed class Todo : Entity<Todo> { /* embeddings maintained by a background worker */ }
+[Embedding(Template = "{Name}. {Description}", Model = "all-MiniLM-L6-v2")]
+public sealed class Produce : Entity<Produce>
+{
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+}
 ```
+
+The Entity keeps the semantic intent. Referenced AI and vector providers own model execution and
+index mechanics. This combined surface remains experimental outside the specifically exercised
+provider paths.
+
+### Agent access
 
 ```csharp
-using static Koan.Data.AI.EntityEmbeddingExtensions;
-
-var related = await SemanticSearch<Todo>("groceries and meal planning", limit: 10);
+[McpEntity(Name = "Todo", Description = "Work the team intends to finish")]
+public sealed class Todo : Entity<Todo>;
 ```
 
-### Agent tools (+1 concept: `[McpEntity]`)
+Referencing `Koan.Mcp` activates its module through `AddKoan()`. No `AddKoanMcp()` or endpoint mapping
+belongs in ordinary application code. Access policy governs REST and MCP projections of the same Entity.
 
-```bash
-dotnet add package Sylin.Koan.Mcp
-```
+## Step 5 — inspect before guessing
 
-```csharp
-[McpEntity]
-public sealed class Todo : Entity<Todo> { /* exposed to agents over MCP (HTTP/SSE) */ }
-```
+When behavior surprises you:
 
-## When something goes wrong
+1. Read the startup report.
+2. Check `/health/live` for process liveness and `/health/ready` for dependency readiness.
+3. Read `/.well-known/Koan/facts` or `koan://facts` for the same redacted runtime decisions.
+4. Review `koan.lock.json` for referenced-module drift.
+5. Check the selected provider's declared capabilities before assuming parity.
 
-1. **Read the boot report first.** It names every module discovered, the adapter elections, and
-   the boot phases — most "why isn't X registered" questions are answered there.
-2. Resolution failures throw messages that name the exact configuration keys to set.
-3. [Troubleshooting hub](../support/troubleshooting.md) · [debugging guide patterns](../guides/README.md).
+## Executable curriculum
 
-## Where next
-
-- **Samples ladder**: [samples/README.md](../../samples/README.md) — S0 (console, 5 min) →
-  S1 (CRUD + relationships) → S10 (live multi-provider switching) → S14 (jobs + benchmarks),
-  then the dogfood flagships (S5 recommendations, S16 vision+MCP).
-- **Guides**: [building APIs](../guides/building-apis.md) ·
-  [data modeling](../guides/data-modeling.md) · [AI integration](../guides/ai-integration.md) ·
-  [auth setup](../guides/authentication-setup.md) · [jobs](../guides/jobs-howto.md).
-- **Why it's built this way**: [architecture principles](../architecture/principles.md) ·
-  [ADR index](../decisions/index.md).
-- **What's settled vs experimental**: [the framework's own assessment](../assessment/00-overview.md).
+- [FirstUse](../../samples/FirstUse/README.md) — the shortest persisted, inspectable REST/MCP result.
+- [GoldenJourney](../../samples/GoldenJourney/README.md) — cumulative business rule, job, agent boundary, and recovery.
+- [Graduated samples](../../samples/README.md) — only examples with a focused meaningful proof.
+- [Product surface](../reference/product-surface.md) — current maturity and package evidence.

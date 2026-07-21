@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Globalization;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Data.Connector.SqlServer;
 
@@ -16,11 +15,6 @@ internal static class SqlServerProvenanceItems
     };
 
     private static readonly IReadOnlyCollection<string> NamingConsumers = new[]
-    {
-        "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
-    };
-
-    private static readonly IReadOnlyCollection<string> PagingConsumers = new[]
     {
         "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
     };
@@ -53,13 +47,6 @@ internal static class SqlServerProvenanceItems
         "Indicates whether the adapter supports Create/EnsureCreated semantics.",
         DefaultValue: BoolString(true),
         DefaultConsumers: NamingConsumers);
-
-    internal static readonly ProvenanceItem DefaultPageSize = new(
-        Constants.Configuration.Keys.DefaultPageSize,
-        "Default Page Size",
-        "Default number of rows returned when paging through results.",
-        DefaultValue: Defaults.DefaultPageSize.ToString(CultureInfo.InvariantCulture),
-        DefaultConsumers: PagingConsumers);
 
     private static string BoolString(bool value) => value ? "true" : "false";
 }

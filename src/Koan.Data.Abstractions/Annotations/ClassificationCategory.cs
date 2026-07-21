@@ -1,0 +1,41 @@
+namespace Koan.Data.Abstractions.Annotations;
+
+/// <summary>
+/// A single data-classification category token — the FACT an entity declares about a property
+/// (<c>[Pii]</c>, <c>[Phi]</c>, …). The <see cref="Name"/> is a stable lowercase token for diagnostics and future
+/// handling policy.
+/// <para>
+/// The four well-known categories are statics; the raw-string constructor is the extension escape hatch
+/// (an app may declare its own, e.g. <c>new("trade-secret")</c>) — classification is "one extensible axis,
+/// not N hard-coded attributes" (tenancy-design §5a). Deliberately shaped like
+/// <see cref="Koan.Core.Capabilities.Capability"/>. See ARCH-0098.
+/// </para>
+/// </summary>
+public readonly record struct ClassificationCategory
+{
+    /// <summary>Creates a category from its stable lowercase token.</summary>
+    public ClassificationCategory(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("A classification category name must be a non-empty string.", nameof(name));
+        Name = name.Trim().ToLowerInvariant();
+    }
+
+    /// <summary>The stable lowercase token, e.g. <c>"pii"</c>. Equality is by this value.</summary>
+    public string Name { get; }
+
+    /// <summary>Personally Identifiable Information — name, email, address, government id.</summary>
+    public static readonly ClassificationCategory Pii = new("pii");
+
+    /// <summary>Protected Health Information (HIPAA).</summary>
+    public static readonly ClassificationCategory Phi = new("phi");
+
+    /// <summary>Payment Card Industry data — PAN, CVV (PCI-DSS).</summary>
+    public static readonly ClassificationCategory Pci = new("pci");
+
+    /// <summary>A secret value — API keys or credentials.</summary>
+    public static readonly ClassificationCategory Secret = new("secret");
+
+    /// <inheritdoc />
+    public override string ToString() => Name;
+}

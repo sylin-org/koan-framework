@@ -17,6 +17,15 @@ public sealed class EntityEndpointOptions
 
     public bool AllowRelationshipExpansion { get; set; } = true;
 
+    /// <summary>Maximum children materialized for one relationship edge across a request.</summary>
+    public int RelationshipMaxResults { get; set; } = KoanWebConstants.Defaults.MaxPageSize;
+
+    /// <summary>
+    /// Optional candidate bound for scan-backed relationship expansion. Null is the safe default:
+    /// scan providers are rejected until the application explicitly chooses a finite budget.
+    /// </summary>
+    public int? RelationshipFallbackMaxCandidates { get; set; }
+
     /// <summary>
     /// When true, unresolvable sort fields are silently skipped (with a <c>Koan-Sort-Skipped</c> response header)
     /// instead of producing a 400 Bad Request. Default false (strict) — see DATA-0092.

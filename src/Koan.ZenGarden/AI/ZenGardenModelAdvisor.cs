@@ -1,7 +1,7 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using System.Text.Json.Serialization;
-using Koan.Core.AI;
-using Koan.ZenGarden.Core;
+using Koan.AI.Contracts;
+using Koan.ZenGarden;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.ZenGarden.AI;

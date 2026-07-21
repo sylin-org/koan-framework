@@ -6,12 +6,7 @@ internal static class Constants
 
     public static class Configuration
     {
-        public static class Keys
-        {
-            public const string BaseUrl = Section + ":BaseUrl";
-            public const string ConnectionString = Section + ":ConnectionString";
-            public const string Urls0 = Section + ":Urls:0";
-        }
+        public const string ConnectionString = "ConnectionStrings:Ollama";
     }
 
     public static class Discovery

@@ -10,11 +10,12 @@ using Koan.Cache.Abstractions.Serialization;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Coherence;
 using Koan.Cache.Diagnostics;
+using Koan.Cache.Identity;
 using Koan.Cache.Options;
 using Koan.Cache.Scope;
 using Koan.Cache.Stores.Internal;
 using Koan.Cache.Topology;
-using Koan.Core.Singleflight;
+using Koan.Core.Concurrency;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -24,15 +25,16 @@ namespace Koan.Cache.Stores;
 /// Public typed surface over <see cref="LayeredCache"/>. Owns serializer resolution,
 /// scope projection, singleflight gating, and developer-facing options shaping.
 /// </summary>
-internal sealed class CacheClient : ICacheClient
+internal sealed class CacheClient : ICacheClient, ICacheSubjectClient
 {
     private const string LayeredProviderTag = "layered";
 
     private readonly LayeredCache _layered;
     private readonly IReadOnlyList<ICacheSerializer> _serializers;
-    private readonly ISingleflightRegistry _singleflight;
+    private readonly IKeyedLeaseGate _singleflight;
     private readonly ICacheScopeAccessor _scopeAccessor;
     private readonly CacheInstrumentation _instrumentation;
+    private readonly CacheIdentityPlan _identity;
     private readonly CoherenceCoordinator _coherence;
     private readonly IOptionsMonitor<CacheOptions> _options;
     private readonly ILogger<CacheClient> _logger;
@@ -41,9 +43,10 @@ internal sealed class CacheClient : ICacheClient
     public CacheClient(
         LayeredCache layered,
         IEnumerable<ICacheSerializer> serializers,
-        ISingleflightRegistry singleflight,
+        IKeyedLeaseGate singleflight,
         ICacheScopeAccessor scopeAccessor,
         CacheInstrumentation instrumentation,
+        CacheIdentityPlan identity,
         CoherenceCoordinator coherence,
         IOptionsMonitor<CacheOptions> options,
         ILogger<CacheClient> logger)
@@ -51,12 +54,13 @@ internal sealed class CacheClient : ICacheClient
         _layered = layered ?? throw new ArgumentNullException(nameof(layered));
         _serializers = serializers?.ToArray() ?? Array.Empty<ICacheSerializer>();
         if (_serializers.Count == 0)
-            throw new InvalidOperationException("No cache serializers registered. Ensure AddKoanCache() was called.");
+            throw new InvalidOperationException("No cache serializers are registered. Reference Sylin.Koan.Cache and call AddKoan().");
 
         _singleflight = singleflight ?? throw new ArgumentNullException(nameof(singleflight));
         _coherence = coherence ?? throw new ArgumentNullException(nameof(coherence));
         _scopeAccessor = scopeAccessor;
         _instrumentation = instrumentation;
+        _identity = identity;
         _options = options;
         _logger = logger;
     }
@@ -69,12 +73,18 @@ internal sealed class CacheClient : ICacheClient
 
     public ICacheEntryBuilder<T> CreateEntry<T>(CacheKey key)
     {
-        // Per ARCH-0078: default consistency is Strict. Callers opt into SWR via .AllowStaleFor(...)
-        // on the builder, or via [Cacheable(AllowStaleForSeconds = N)] at the entity level.
+        var defaults = _options.CurrentValue;
         var options = new CacheEntryOptions
         {
-            Consistency = CacheConsistencyMode.Strict,
-            SingleflightTimeout = _options.CurrentValue.DefaultSingleflightTimeout
+            AbsoluteTtl = defaults.DefaultTtlSeconds > 0
+                ? TimeSpan.FromSeconds(defaults.DefaultTtlSeconds)
+                : null,
+            L1AbsoluteTtl = defaults.DefaultL1TtlSeconds is > 0
+                ? TimeSpan.FromSeconds(defaults.DefaultL1TtlSeconds.Value)
+                : null,
+            Tier = defaults.DefaultTier,
+            ForceCoherenceBroadcast = defaults.BroadcastInvalidationByDefault,
+            SingleflightTimeout = defaults.DefaultSingleflightTimeout
         };
 
         var scope = _scopeAccessor.Current;
@@ -84,79 +94,156 @@ internal sealed class CacheClient : ICacheClient
         return new CacheEntryBuilder<T>(this, key, options);
     }
 
-    public async ValueTask<CacheFetchResult> Get(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask<CacheFetchResult> Get(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+        => Get(key, options, subject: null, ct);
+
+    internal async ValueTask<CacheFetchResult> Get(
+        CacheKey key,
+        CacheEntryOptions options,
+        Type? subject,
+        CancellationToken ct)
     {
         var normalized = ApplyScope(options);
-        var result = await _layered.Read(key, normalized.ToReadOptions(), ct).ConfigureAwait(false);
-        if (result.Hit) _instrumentation.RecordHit(key.Value, LayeredProviderTag);
-        else _instrumentation.RecordMiss(key.Value, LayeredProviderTag);
+        var physical = _identity.Bind(key, normalized.Tags, subject, "cache read");
+        var result = await _layered.Read(physical.Key, normalized.ToReadOptions(), normalized.Tier, ct).ConfigureAwait(false);
+        if (result.Hit) _instrumentation.RecordHit(physical.Key.Value, LayeredProviderTag);
+        else _instrumentation.RecordMiss(physical.Key.Value, LayeredProviderTag);
         return result;
     }
 
-    public async ValueTask<T?> GetAsync<T>(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask<T?> GetAsync<T>(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+        => GetAsync<T>(key, options, subject: null, ct);
+
+    internal async ValueTask<T?> GetAsync<T>(
+        CacheKey key,
+        CacheEntryOptions options,
+        Type? subject,
+        CancellationToken ct)
     {
-        var (found, value) = await TryGetValueAsync<T>(key, options, ct).ConfigureAwait(false);
+        var normalized = ApplyScope(options);
+        var physical = _identity.Bind(key, normalized.Tags, subject, "cache read");
+        var (found, value) = await TryGetPhysicalValueAsync<T>(physical.Key, normalized, ct).ConfigureAwait(false);
         return found ? value : default;
     }
 
     public ValueTask<T?> GetOrAddAsync<T>(CacheKey key, Func<CancellationToken, ValueTask<T?>> valueFactory, CacheEntryOptions options, CancellationToken ct)
+        => GetOrAddAsync(key, valueFactory, options, subject: null, ct);
+
+    internal ValueTask<T?> GetOrAddAsync<T>(
+        CacheKey key,
+        Func<CancellationToken, ValueTask<T?>> valueFactory,
+        CacheEntryOptions options,
+        Type? subject,
+        CancellationToken ct)
     {
         if (valueFactory is null) throw new ArgumentNullException(nameof(valueFactory));
-        return ExecuteGetOrAddAsync(key, valueFactory, options, ct);
+        return ExecuteGetOrAddAsync(key, valueFactory, options, subject, ct);
     }
 
     public ValueTask<bool> Exists(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+        => Exists(key, options, subject: null, ct);
+
+    internal ValueTask<bool> Exists(
+        CacheKey key,
+        CacheEntryOptions options,
+        Type? subject,
+        CancellationToken ct)
     {
-        _ = ApplyScope(options);
-        return _layered.Exists(key, ct);
+        var normalized = ApplyScope(options);
+        var physical = _identity.Bind(key, normalized.Tags, subject, "cache exists");
+        return _layered.Exists(physical.Key, normalized.Tier, ct);
     }
 
-    public async ValueTask SetAsync<T>(CacheKey key, T value, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask SetAsync<T>(CacheKey key, T value, CacheEntryOptions options, CancellationToken ct)
+        => SetAsync(key, value, options, subject: null, ct);
+
+    internal async ValueTask SetAsync<T>(
+        CacheKey key,
+        T value,
+        CacheEntryOptions options,
+        Type? subject,
+        CancellationToken ct)
     {
         if (value is null)
         {
-            await Remove(key, ct).ConfigureAwait(false);
+            await Remove(key, subject, ct).ConfigureAwait(false);
             return;
         }
 
         var normalized = ApplyScope(options);
+        var physical = _identity.Bind(key, normalized.Tags, subject, "cache write");
+        normalized = WithTags(normalized, physical.Tags);
+        await SetPhysicalAsync(physical.Key, value, normalized, ct).ConfigureAwait(false);
+    }
+
+    private async ValueTask SetPhysicalAsync<T>(
+        CacheKey key,
+        T value,
+        CacheEntryOptions normalized,
+        CancellationToken ct)
+    {
         var serializer = ResolveSerializer(typeof(T), normalized.ContentKind);
         var cacheValue = await serializer.Serialize(value!, typeof(T), normalized, ct).ConfigureAwait(false);
-        await _layered.Write(key, cacheValue, normalized.ToWriteOptions(), ct).ConfigureAwait(false);
+        await _layered.Write(key, cacheValue, normalized.ToWriteOptions(), normalized.Tier, ct).ConfigureAwait(false);
         _instrumentation.RecordSet(key.Value, LayeredProviderTag);
 
         if (normalized.ForceCoherenceBroadcast)
         {
-            await _coherence.BroadcastEvict(key, normalized.Region, ct).ConfigureAwait(false);
+            await _coherence.BroadcastEvict(key, ct).ConfigureAwait(false);
             _instrumentation.RecordInvalidation(key.Value, LayeredProviderTag, "write-broadcast");
         }
     }
 
-    public async ValueTask<bool> Remove(CacheKey key, CancellationToken ct)
+    public ValueTask<bool> Remove(CacheKey key, CancellationToken ct)
+        => Remove(key, subject: null, ct);
+
+    public async ValueTask<bool> Remove(CacheKey key, Type? subject, CancellationToken ct)
+    {
+        var physical = _identity.Bind(key, tags: null, subject, "cache remove");
+        return await RemovePhysical(physical.Key, ct).ConfigureAwait(false);
+    }
+
+    private async ValueTask<bool> RemovePhysical(CacheKey key, CancellationToken ct)
     {
         var success = await _layered.Evict(key, ct).ConfigureAwait(false);
         _instrumentation.RecordRemove(key.Value, LayeredProviderTag, success);
         // Removes always broadcast — peers must drop their L1 entries even if the key wasn't present locally.
-        await _coherence.BroadcastEvict(key, region: null, ct).ConfigureAwait(false);
+        await _coherence.BroadcastEvict(key, ct).ConfigureAwait(false);
         return success;
     }
 
     public ValueTask Touch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+        => Touch(key, options, subject: null, ct);
+
+    internal ValueTask Touch(
+        CacheKey key,
+        CacheEntryOptions options,
+        Type? subject,
+        CancellationToken ct)
     {
         var normalized = ApplyScope(options);
-        return _layered.Touch(key, normalized.AbsoluteTtl, ct);
+        var physical = _identity.Bind(key, normalized.Tags, subject, "cache touch");
+        return _layered.Touch(physical.Key, normalized.AbsoluteTtl, normalized.Tier, ct);
     }
 
     public async ValueTask<long> FlushTags(IReadOnlyCollection<string> tags, CancellationToken ct)
+        => await FlushTags(tags, subject: null, ct).ConfigureAwait(false);
+
+    public async ValueTask<long> FlushTags(
+        IReadOnlyCollection<string> tags,
+        Type? subject,
+        CancellationToken ct)
     {
         if (tags is null) throw new ArgumentNullException(nameof(tags));
 
         var normalized = NormalizeTags(tags);
         if (normalized.Count == 0) return 0;
+        normalized = _identity.BindTags(normalized, subject, "cache tag flush");
 
         ct.ThrowIfCancellationRequested();
 
         var keys = new HashSet<CacheKey>();
+        var expiredKeys = new HashSet<CacheKey>();
         var now = DateTimeOffset.UtcNow;
 
         foreach (var tag in normalized)
@@ -167,12 +254,18 @@ internal sealed class CacheClient : ICacheClient
             {
                 if (entry.IsExpired(now))
                 {
-                    await Remove(entry.Key, ct).ConfigureAwait(false);
+                    expiredKeys.Add(entry.Key);
                     continue;
                 }
 
                 keys.Add(entry.Key);
             }
+        }
+
+        foreach (var expiredKey in expiredKeys)
+        {
+            ct.ThrowIfCancellationRequested();
+            await RemovePhysical(expiredKey, ct).ConfigureAwait(false);
         }
 
         var removed = 0L;
@@ -180,7 +273,7 @@ internal sealed class CacheClient : ICacheClient
         {
             ct.ThrowIfCancellationRequested();
 
-            if (await Remove(key, ct).ConfigureAwait(false))
+            if (await RemovePhysical(key, ct).ConfigureAwait(false))
                 removed++;
         }
 
@@ -188,15 +281,23 @@ internal sealed class CacheClient : ICacheClient
     }
 
     public async ValueTask<long> CountTags(IReadOnlyCollection<string> tags, CancellationToken ct)
+        => await CountTags(tags, subject: null, ct).ConfigureAwait(false);
+
+    public async ValueTask<long> CountTags(
+        IReadOnlyCollection<string> tags,
+        Type? subject,
+        CancellationToken ct)
     {
         if (tags is null) throw new ArgumentNullException(nameof(tags));
 
         var normalized = NormalizeTags(tags);
         if (normalized.Count == 0) return 0;
+        normalized = _identity.BindTags(normalized, subject, "cache tag count");
 
         ct.ThrowIfCancellationRequested();
 
         var keys = new HashSet<CacheKey>();
+        var expiredKeys = new HashSet<CacheKey>();
         var now = DateTimeOffset.UtcNow;
 
         foreach (var tag in normalized)
@@ -207,7 +308,7 @@ internal sealed class CacheClient : ICacheClient
             {
                 if (entry.IsExpired(now))
                 {
-                    await Remove(entry.Key, ct).ConfigureAwait(false);
+                    expiredKeys.Add(entry.Key);
                     continue;
                 }
 
@@ -215,12 +316,23 @@ internal sealed class CacheClient : ICacheClient
             }
         }
 
+        foreach (var expiredKey in expiredKeys)
+        {
+            ct.ThrowIfCancellationRequested();
+            await RemovePhysical(expiredKey, ct).ConfigureAwait(false);
+        }
+
         return keys.Count;
     }
 
-    internal async ValueTask<(bool Found, T? Value)> TryGetValueAsync<T>(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    private async ValueTask<(bool Found, T? Value)> TryGetPhysicalValueAsync<T>(
+        CacheKey key,
+        CacheEntryOptions normalized,
+        CancellationToken ct)
     {
-        var result = await Get(key, options, ct).ConfigureAwait(false);
+        var result = await _layered.Read(key, normalized.ToReadOptions(), normalized.Tier, ct).ConfigureAwait(false);
+        if (result.Hit) _instrumentation.RecordHit(key.Value, LayeredProviderTag);
+        else _instrumentation.RecordMiss(key.Value, LayeredProviderTag);
         if (!result.Hit || result.Value is null)
             return (false, default);
 
@@ -265,24 +377,42 @@ internal sealed class CacheClient : ICacheClient
         });
     }
 
-    private async ValueTask<T?> ExecuteGetOrAddAsync<T>(CacheKey key, Func<CancellationToken, ValueTask<T?>> valueFactory, CacheEntryOptions options, CancellationToken ct)
+    private async ValueTask<T?> ExecuteGetOrAddAsync<T>(
+        CacheKey key,
+        Func<CancellationToken, ValueTask<T?>> valueFactory,
+        CacheEntryOptions options,
+        Type? subject,
+        CancellationToken ct)
     {
-        var (found, existing) = await TryGetValueAsync<T>(key, options, ct).ConfigureAwait(false);
+        var normalized = ApplyScope(options);
+        var physical = _identity.Bind(key, normalized.Tags, subject, "cache get-or-add");
+        normalized = WithTags(normalized, physical.Tags);
+        var (found, existing) = await TryGetPhysicalValueAsync<T>(physical.Key, normalized, ct).ConfigureAwait(false);
         if (found) return existing;
 
-        var timeout = options.SingleflightTimeout ?? _options.CurrentValue.DefaultSingleflightTimeout;
-        return await _singleflight.RunAsync<T?>(key.Value, timeout, async innerCt =>
+        var timeout = normalized.SingleflightTimeout ?? _options.CurrentValue.DefaultSingleflightTimeout;
+        return await _singleflight.RunAsync<T?>(physical.Key.Value, timeout, async innerCt =>
         {
-            var (innerFound, innerValue) = await TryGetValueAsync<T>(key, options, innerCt).ConfigureAwait(false);
+            var (innerFound, innerValue) = await TryGetPhysicalValueAsync<T>(physical.Key, normalized, innerCt).ConfigureAwait(false);
             if (innerFound) return innerValue;
 
             var created = await valueFactory(innerCt).ConfigureAwait(false);
             if (created is null) return default;
 
-            await SetAsync(key, created, options, innerCt).ConfigureAwait(false);
+            await SetPhysicalAsync(physical.Key, created, normalized, innerCt).ConfigureAwait(false);
             return created;
         }, ct).ConfigureAwait(false);
     }
+
+    private static CacheEntryOptions WithTags(
+        CacheEntryOptions options,
+        IReadOnlyCollection<string> tags)
+        => options with
+        {
+            Tags = tags.Count == 0
+                ? new HashSet<string>()
+                : new HashSet<string>(tags, StringComparer.OrdinalIgnoreCase)
+        };
 
     private static IReadOnlyList<string> NormalizeTags(IEnumerable<string> tags)
     {

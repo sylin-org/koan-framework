@@ -15,10 +15,6 @@ namespace Koan.Data.AI;
 /// </summary>
 public static class EntityAi
 {
-    private static readonly ILogger? _logger =
-        (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(ILoggerFactory)) as ILoggerFactory)
-            ?.CreateLogger("Koan.Data.AI.EntityAi");
-
     // ========================================================================
     // Embed — entity convention inference
     // ========================================================================
@@ -123,7 +119,7 @@ public static class EntityAi
         var bytes = ExtractBytes(entity);
         if (bytes is null || bytes.Length == 0)
         {
-            _logger?.LogWarning(
+            ResolveLogger()?.LogWarning(
                 "No binary content found on {EntityType} for OCR. " +
                 "Ensure the entity has a byte[] property (Data, Content, ImageData, Bytes, or FileData).",
                 typeof(TEntity).Name);
@@ -143,7 +139,7 @@ public static class EntityAi
         var bytes = ExtractBytes(entity);
         if (bytes is null || bytes.Length == 0)
         {
-            _logger?.LogWarning(
+            ResolveLogger()?.LogWarning(
                 "No binary content found on {EntityType} for OCR.",
                 typeof(TEntity).Name);
             return "";
@@ -162,7 +158,7 @@ public static class EntityAi
         var bytes = ExtractBytes(entity);
         if (bytes is null || bytes.Length == 0)
         {
-            _logger?.LogWarning(
+            ResolveLogger()?.LogWarning(
                 "No binary content found on {EntityType} for OCR.",
                 typeof(TEntity).Name);
             return new Koan.AI.Contracts.Models.OcrResult { Text = "" };
@@ -266,10 +262,23 @@ public static class EntityAi
 
     private static void LogEmptyContent<TEntity>(string operation)
     {
-        _logger?.LogWarning(
+        ResolveLogger()?.LogWarning(
             "No embeddable content found on {EntityType} for {Operation}. " +
             "Add [Embedding] to configure auto-embed-on-save, or ensure the entity has string properties. " +
             "Convention: all public string properties (excluding Id) are used by default.",
             typeof(TEntity).Name, operation);
+    }
+
+    private static ILogger? ResolveLogger()
+    {
+        try
+        {
+            return (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(ILoggerFactory)) as ILoggerFactory)
+                ?.CreateLogger("Koan.Data.AI.EntityAi");
+        }
+        catch (ObjectDisposedException)
+        {
+            return null;
+        }
     }
 }

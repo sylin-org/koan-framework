@@ -1,0 +1,68 @@
+{
+  "schema": 2,
+  "app": {
+    "name": "TaskGraph",
+    "koan": "0.20",
+    "tfm": "net10.0"
+  },
+  "modules": [
+    {
+      "id": "Koan.Cache",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Cache.Abstractions",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Communication",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Core",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Data.Abstractions",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Data.Connector.Sqlite",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Data.Core",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Data.Relational",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Data.Relational.Abstractions",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Web",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Web.Extensions",
+      "version": "0.20"
+    }
+  ],
+  "directReferences": [
+    {
+      "kind": "project",
+      "id": "Koan.Cache"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Connector.Sqlite"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Web.Extensions"
+    }
+  ]
+}

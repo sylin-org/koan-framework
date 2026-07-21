@@ -1,7 +1,6 @@
-﻿global using AwesomeAssertions;
-global using Koan.Testing;
-global using Koan.Testing.Diagnostics;
-global using Koan.Testing.Fixtures;
-global using Koan.Testing.Infrastructure;
-global using Koan.Testing.Pipeline;
+global using AwesomeAssertions;
+global using Koan.Data.Abstractions;
+global using Koan.Data.Core;
+global using Koan.Data.Core.Model;
+global using Koan.Testing.Containers;
 global using Xunit;

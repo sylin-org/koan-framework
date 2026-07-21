@@ -41,6 +41,16 @@ internal static class ConfigurationConstants
             $"{ConfigurationConstants.Section}:{providerId}:{settingKey}";
     }
 
+    public static class Readiness
+    {
+        public const string Policy = Section + ":Readiness:Policy";
+        public const string Timeout = Section + ":Readiness:Timeout";
+
+        public static string PolicyForProvider(string provider) => $"{Section}:{provider}:Readiness:Policy";
+        public static string TimeoutForProvider(string provider) => $"{Section}:{provider}:Readiness:Timeout";
+        public static string GatingForProvider(string provider) => $"{Section}:{provider}:Readiness:EnableReadinessGating";
+    }
+
     public static class Runtime
     {
         public const string Section = ConfigurationConstants.Section + ":Runtime";

@@ -49,16 +49,21 @@ public sealed class JobsOptions
     /// (deterministic tests advance the clock and call Drain/Reap/ReleaseScheduled themselves).</summary>
     public bool EnableWorker { get; set; } = true;
 
-    /// <summary>How the durable tier secures a claim under competing consumers (default <see cref="ClaimStrategy.Optimistic"/>).</summary>
-    public ClaimStrategy ClaimStrategy { get; set; } = ClaimStrategy.Optimistic;
-
-    /// <summary>The reservation window for <see cref="ClaimStrategy.Ticket"/> — must exceed clock skew + write propagation.</summary>
-    public TimeSpan ClaimWindow { get; set; } = TimeSpan.FromSeconds(1);
-
-    /// <summary>Max ready rows the claim loop pulls (ordered, pushed down) per scan before applying the in-memory
-    /// lane/gate/exclusive filter (JOBS-0005 §19.3). Bounds the claim's work to O(batch) instead of O(backlog).
-    /// If the whole batch is filtered out (pathological head-blocking), the candidate waits for the next poll.</summary>
+    /// <summary>Max ready rows the per-lane claim seek pulls per page (ordered, pushed down) before applying the
+    /// in-memory pool/gate/exclusive filter. Bounds each lane's head seek to O(batch); a lane pages forward past its
+    /// own unclaimable head (gated / pool-exhausted / busy) to its oldest claimable row (JOBS-0008).</summary>
     public int ClaimScanBatch { get; set; } = 64;
+
+    /// <summary>Relative per-lane scheduling weight for the lane-fair claim (JOBS-0008). A lane absent from the map has
+    /// weight 1; a lane with weight 2 gets ~twice the dispatch share of a weight-1 lane. Empty (default) = equal-share
+    /// round-robin across all lanes — zero-config fairness. Weights are relative, never strict priority (no starvation).</summary>
+    public Dictionary<string, double> LaneWeights { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Self-reporting starvation tripwire (JOBS-0008): a lane whose oldest due-but-unclaimed job has waited
+    /// longer than this flips the <c>JobsHealthContributor</c> to <c>Degraded</c>. Zero (default) = off — the per-lane
+    /// depth/age facts are always published for scraping, but no Degraded signal unless an operator sets a budget
+    /// (opt-in, matching <see cref="JobPerRowWarnThreshold"/> / <see cref="MetricsEnabled"/>).</summary>
+    public TimeSpan QueueAgeWarning { get; set; } = TimeSpan.Zero;
 
     /// <summary>Benign terminal rows (Completed/Cancelled) older than this are purged to keep the active ledger lean.
     /// Zero or negative disables this window.</summary>
@@ -82,9 +87,9 @@ public sealed class JobsOptions
     public int JobPerRowWarnThreshold { get; set; } = 100_000;
 
     /// <summary>Opt-in throughput rollup (JOBS-0005 §20.2). When true, each node accumulates terminal outcomes in
-    /// memory and periodically flushes a node-sharded <see cref="JobMetric"/> — cheap throughput/trend dashboards that
-    /// survive retention. Off by default: the zero-config path stays write-free. (Active counts don't need this — they
-    /// come from the indexed ledger, §20.1.)</summary>
+    /// memory and periodically flushes a node-sharded internal rollup. <see cref="JobMetrics"/> provides cheap
+    /// throughput/trend summaries that survive retention. Off by default: the zero-config path stays write-free.
+    /// (Active counts don't need this — they come from the indexed ledger, §20.1.)</summary>
     public bool MetricsEnabled { get; set; }
 
     /// <summary>How often the worker flushes the in-memory metrics accumulator to its shard rows (when

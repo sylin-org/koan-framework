@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    ARCH-0091 + P2.1: the xUnit v3 container-fixture library. Thin IAsyncLifetime fixtures over the
+    official Testcontainers 4.x module builders, shared per engine assembly via
+    [assembly: AssemblyFixture(...)]. KoanDataSpec boots a real compiled Koan host + leases an
+    isolation partition per engine. Promoted to src/ and shipped (Sylin.Koan.Testing.Containers) so the
+    conformance kit's container-gated batteries (and consumers) reuse the same real fixtures.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <Description>Koan test harness — xUnit v3 Testcontainers fixtures (KoanContainerFixture / KoanDataSpec) for engine-backed integration tests.</Description>
+    <PackageTags>$(CommonPackageTags);testing;integration-testing;testcontainers;xunit</PackageTags>
+    <!-- ARCH-0091: xUnit1051 (thread TestContext cancellation token) is advisory; was suppressed
+         tree-wide by tests/Directory.Build.props, which src/ does not inherit — re-add it here. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3.extensibility.core" />
+    <PackageReference Include="xunit.v3.assert" />
+    <!-- Engine modules are added here as each engine is rolled out (ARCH-0091 staged rollout). -->
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.MongoDb" />
+    <PackageReference Include="Testcontainers.Redis" />
+    <PackageReference Include="Testcontainers.MsSql" />
+    <PackageReference Include="Testcontainers.Couchbase" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+  </ItemGroup>
+</Project>

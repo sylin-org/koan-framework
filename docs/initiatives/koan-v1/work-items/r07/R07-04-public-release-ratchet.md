@@ -1,0 +1,233 @@
+---
+type: SPEC
+domain: framework
+title: "R07-04 - Restore a Trustworthy Public-Release Ratchet"
+audience: [architects, maintainers, ai-agents]
+status: current
+last_updated: 2026-07-15
+framework_version: v0.17.0
+validation:
+  date_last_tested: 2026-07-15
+  status: passed
+  scope: exact public-release ratchet from clean commit 50002c262
+---
+
+# R07-04 — Restore a trustworthy public-release ratchet
+
+- Tranche: `T6 — semantic capability ring`
+- Status: `passed`
+- Depends on: R07-03
+- Unlocks: canonical Lifecycle; advances the first trusted automatic `dev` publication, which remains
+  gated by [PMC-016 and PMC-017](../../POST-CYCLE-TODO.md#current-register)
+- Owner: repository test architecture and the public-release ratchet
+
+## Meaningful outcome
+
+The exact command used by the protected `dev` release workflow is green from a clean checkout, or a
+real product/test defect keeps it red with one actionable owner. No helper library is launched as a
+test assembly, no suite relies on leaked process-static host state, and no infrastructure lane is
+silently skipped merely to permit publication.
+
+```powershell
+pwsh scripts/green-ratchet.ps1 -Configuration Release -PublicRelease
+```
+
+This is not a request for a blanket “make CI green” cleanup. It restores one meaningful guarantee:
+Koan's automatic publisher cannot pass a repository state whose declared release floor is red.
+
+## Evidence at opening
+
+R07-03's affected surface is green: packaging passes 52/52; the public-release solution build,
+composition lock, docs, changed examples, skills, and blueprint legs pass. The whole-solution test leg
+fails closed, and no package, tag, release, or remote ref is changed.
+
+Isolated reruns show that the red result is not only whole-solution contention:
+
+- Identity: 70/114 pass; 44 cases reject because no active host supplies `IDataService`.
+- Canon integration: 4/6 pass; two Entity-backed flows reject through the same host-ownership seam.
+- Jobs SQLite: 73/78 pass; five scheduling/concurrency behaviors fail independently.
+- Mongo: 67/68 pass; the existing ZenGarden endpoint-precedence defect remains
+  [PMC-012](../../POST-CYCLE-TODO.md#current-register).
+- `Koan.Jobs.TestKit` is a shared helper library but is launched as a test assembly, aborting before
+  discovery on its `AwesomeAssertions` runtime dependency. An existing Web test-kit pattern already
+  marks this library shape `IsTestProject=false`.
+- The concurrent solution run also reports provider-specific Jobs failures. Reproduce those after the
+  deterministic local failures are removed; do not infer their root cause from the aggregate log.
+
+## Progress
+
+### Shared TestKit classification — passed
+
+- Evaluated solution state identified one actual misclassification: `Koan.Jobs.TestKit` inherited
+  `IsTestProject=true` from xUnit v2 even though it contains only shared abstract specs and fixtures.
+  Data and Vector TestKits were non-runnable only because the property happened to remain unset.
+- All five `*.TestKit.csproj` libraries now explicitly declare `IsTestProject=false`. The six concrete
+  Jobs consumers and the Data, Vector, Web, and MCP consumer matrices continue to own execution.
+- A release-workflow contract requires every TestKit under `tests/` to retain exactly that explicit
+  boundary. The contract class passes 2/2, all five projects evaluate false, and the previously
+  aborting direct Jobs TestKit invocation exits successfully without launching a test host.
+
+### Deterministic packaging subprocess lifetime — passed
+
+- Complete 53-test packaging reruns initially produced no result before 240- and 300-second outer
+  timeouts; the known child trees were cleaned. Focused lineage, graph, and workflow contracts still
+  passed 30/30.
+- A bounded blame run located the wait in the Golden Journey probe's `dotnet build`: reusable MSBuild
+  workers retained redirected pipe handles after the parent exited. An external node-reuse override
+  first proved the diagnosis with Golden Journey 2/2 and aggregate packaging 53/53.
+- `ProcessRunner` now disables MSBuild worker-node reuse for every packaging subprocess. This one
+  child-scoped policy covers source probes and release-time restore, evaluation, build, and pack
+  commands without an operator environment setting. The executable contracts pass 3/3 and the
+  complete packaging suite passes 53/53 in 1 minute 20 seconds.
+
+### Identity host selection and Canon persistence — passed
+
+- Identity's 44 failures were one order-dependent test ownership cascade. Its shared fixture started a
+  correct `AddKoan()` host; the intentional failed-start fact then replaced and correctly released the
+  process default. Core deliberately did not resurrect the older fixture provider.
+- One test-local base now selects `fixture.Services` through `AppHost.PushScope` for every complete
+  xUnit fact flow. The negative host test selects its nested provider explicitly. No production host,
+  lease, Entity, or Data fallback changed; Identity passes 114/114.
+- Canon's 2 failures had a different root. `ICanonPersistence` owned canonical writes and indexes, but
+  aggregation and rebuild bypassed it through `CanonEntity<T>.Get`; a legacy exception-message filter
+  silently treated the former host error as an absent snapshot.
+- `ICanonPersistence.GetCanonicalAsync<T>` now completes the storage boundary. Aggregation and rebuild
+  load only through the configured implementation, default persistence alone lowers to Entity/Data,
+  provider failures propagate, and explicit-service-provider extensions select that provider for the
+  full operation. The obsolete message parser is deleted.
+- The public interface addition intentionally advances `Sylin.Koan.Canon.Domain` from compatibility
+  tier 0.17 to 0.18; automatic lineage owns its reverse-dependent rebuild. Package companions and the
+  current Canon reference now state the exact default/custom persistence and host boundary.
+- Canon unit passes 35/35 and integration passes 6/6. Focused proofs cover prior-state loading from a
+  hostless custom store, rebuild through that store, failure propagation, and provider-scope
+  restoration.
+
+### Jobs SQLite source and connection ownership — passed
+
+- The five Jobs failures shared one root rather than five scheduling defects. An explicit generic
+  Default source could be consumed by a foreign adapter fallback; the test harness manually changed
+  the process host; and SQLite layered a process-static repository pool over the driver's own pool
+  without a host disposal boundary.
+- Built-in routed factories now filter generic source connections and settings through their existing
+  `CanHandle` predicates, so aliases remain adapter-owned without a central alias table; provider-scoped
+  source configuration remains an intentional override. SQLite additionally keeps its pre-resolved
+  provider default free of generic `ConnectionStrings:Default`, closing the opaque-fallback bypass for
+  the supported local path. Equivalent remote-provider provenance is tracked in PMC-018.
+- Repository and Direct use record a separate host-owned adapter-participation ledger. Readiness is
+  active for sources actually requested at runtime, while type discovery and an available-but-unused
+  connector remain inert. Direct source/adapter/default intent resolves through the provider factory;
+  `WithConnectionString(...)` remains a literal physical override, and unresolved blank/`auto` intent
+  rejects before provider I/O.
+- SQLite now has one host-owned connection lifecycle. File operations use ordinary driver-owned pooled
+  connections; memory targets are host/source-isolated named databases with one lifetime keeper;
+  directories are created on elected use; and disposal closes keepers and clears observed driver pool
+  groups. The Jobs harness relies on the normal host binder and owns only its explicit test placement.
+- Jobs core passes 77/77. Jobs SQLite passes 79/79 on three complete sequential runs and on two
+  simultaneous complete processes. SQLite passes 35/35, Data.Core 349/349, Core Unit 112/112, JSON
+  20/20, Data axes integration 18/18, Web SQLite 49/49, and Tenancy 110/110.
+
+### Layered discovery and Mongo endpoint precedence — passed
+
+- The remaining Mongo fact encoded the pre-health-check era: a manually registered Zen Garden provider
+  was expected to short-circuit `auto`, even though the activated engine now contributes candidates to
+  the shared coordinator. The fixture composed neither the engine nor its contributor.
+- ARCH-0114 now makes the general rule explicit: an adapter declares compatibility; the optional engine
+  activates contribution; the concern-owned coordinator elects; the adapter normalizes and validates.
+  `ServiceDiscoveryAdapterBase` owns a non-replaceable candidate template, with one narrow runtime-
+  topology hook. The former LM Studio whole-pipeline override now uses that hook.
+- Candidate precedence is named and enforced: concrete explicit configuration, legacy environment hints, then
+  Aspire / activated contributors / runtime topology, followed by host-gateway and loopback fallbacks.
+  Optional contributors and adapter topology cannot promote themselves above explicit intent.
+- Startup reports distinguish adapter-declared compatibility from an active Zen Garden contributor.
+  The coordinator records the selected method or rejection as a redacted runtime fact without the raw
+  endpoint.
+- Core Unit passes 112/112 and Mongo passes 70/70. Release solution build succeeds with the reviewed
+  19-warning baseline and 0 errors;
+  docs lint is 0 errors / 1568 historical warnings; surface lint passes 34 rows. Couchbase builds
+  0-warning and its Docker-free specs pass 9/9. The final clean aggregate completed without the earlier
+  node-readiness failure, closing the cross-provider certification rather than relabeling an unavailable
+  lane as green.
+
+### Bounded certification topology — passed
+
+- The first clean exact rerun completed in 14 minutes 35 seconds. Every non-test leg passed. The
+  solution-test leg reported only three failures: SQLite's high-volume FIFO claim bound, PostgreSQL's
+  parallel-safe same-entity behavior, and SQL Server's different-entity concurrency behavior.
+- Those exact facts pass individually 1/1 in 5, 2, and 2 seconds. No Jobs behavior, threshold, or
+  assertion changed. The aggregate red was certification resource contention, not three product roots.
+- `green-ratchet.ps1` now gives solution testing a two-project concurrency budget and applies VSTest's
+  five-minute per-host inactivity bound with dump collection disabled. A stalled provider therefore
+  fails with sequence diagnostics instead of occupying the release queue indefinitely or producing a
+  large local dump.
+- `ReleaseWorkflowContractTests` pins both bounds. PowerShell parsing, the focused contract, and a real
+  test-host invocation with the exact argument combination pass.
+- The exact public-release ratchet then passed all eight legs from clean commit `50002c262` in 24
+  minutes 33 seconds. The three aggregate-only Jobs failures did not recur and no hang timeout fired.
+  Docs lint reported 0 errors / 1567 historical warnings; changed examples passed 25/25, skills 20/20,
+  and blueprint lint 1/1. No package, tag, release, push, or remote mutation occurred.
+
+## Decisions
+
+### DECIDED
+
+- Keep the complete public-release ratchet. Do not exclude a failing runnable suite, soften failures,
+  or publish from a narrower package-only lane.
+- Classify shared test libraries as non-runnable at the project boundary; retain their compilation
+  through their real consumer suites.
+- Repair host ownership at its shared test/application seam. Do not reintroduce a process-static
+  production fallback to satisfy tests.
+- Treat Identity and Canon as distinct roots despite their shared exception: Identity owns explicit
+  test-flow selection; Canon owns one complete replaceable persistence boundary.
+- Treat Jobs behavior failures and Mongo endpoint election as their own behavioral roots, with focused
+  evidence before the aggregate rerun.
+- Certification is allowed controlled project concurrency; unrestricted solution fan-out is not a
+  stronger proof when it creates provider contention. Keep every runnable suite and bound inactive hosts.
+- Lifecycle production changes remain stopped until this base is green. Stable release truth is a
+  prerequisite, not post-cycle polish.
+
+### DEFAULT
+
+- Prefer one root repair that restores multiple suites over per-test initialization patches.
+- Preserve explicit infrastructure lanes and their existing capability/availability reporting.
+
+### OPEN
+
+- None within R07-04. The ratchet emits per-project VSTest summaries but does not persist one
+  machine-readable aggregate count; [PMC-020](../../POST-CYCLE-TODO.md#current-register) owns that
+  observability improvement without reopening this passed certification.
+
+## Red/green plan
+
+1. **Complete.** Inventory every solution project that `dotnet test Koan.sln` treats as runnable;
+   classify real suites, shared test libraries, and explicit infrastructure runners from evaluated
+   project state.
+2. **Complete.** Correct shared-library classification using the existing `IsTestProject=false`
+   pattern and add a structural regression so another test kit cannot silently enter the release run.
+3. **Complete.** Repair Identity's explicit test-flow selection and Canon's complete persistence
+   boundary; rerun both complete projects and their focused regressions.
+4. **Complete.** Make packaging subprocess lifetime deterministic and pass the complete 53-test suite
+   without an operator environment override.
+5. **Complete.** Reproduce the five Jobs SQLite failures from a clean isolated output, group them by
+   root, and repair behavior or isolation without lowering assertions.
+6. **Complete.** Resolve endpoint precedence through
+   [ARCH-0114](../../../../decisions/ARCH-0114-layered-capability-activation.md), pass the shared matrix
+   and Mongo 70/70, and retain Couchbase's live recheck in the exact ratchet.
+7. **Complete through focused evidence.** Run the exact public-release ratchet once, isolate its three
+   aggregate-only Jobs failures, prove each fact alone, and bound the solution-test topology without
+   changing behavior or assertions.
+8. **Complete.** Run one exact bounded public-release ratchet from clean commit `50002c262`. All eight
+   legs passed in 24 minutes 33 seconds; docs reported 0 errors / 1567 historical warnings, changed
+   examples 25/25, skills 20/20, and blueprint lint 1/1. No package, tag, release, push, or remote
+   mutation occurred. Per-project VSTest counts were emitted to the console but are not retained as one
+   aggregate artifact; that operator-evidence improvement is deferred to PMC-020.
+
+## Acceptance
+
+- `dotnet test Koan.sln -c Release --no-build --nologo` does not launch shared helper libraries.
+- Identity, Canon integration, Jobs SQLite, and Mongo each pass their complete isolated suite.
+- Infrastructure-dependent suites either execute successfully or report an intentional existing lane
+  decision; absence never becomes an accidental pass.
+- The exact `pwsh scripts/green-ratchet.ps1 -Configuration Release -PublicRelease` command passes every
+  leg from a clean checkout without retrying away a deterministic failure.
+- No test exclusion, warning suppression, process-static production fallback, package publication, or
+  remote Git mutation is introduced to obtain green.

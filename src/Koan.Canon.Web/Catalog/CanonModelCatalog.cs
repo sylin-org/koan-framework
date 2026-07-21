@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -27,14 +27,17 @@ public sealed class CanonModelCatalog : ICanonModelCatalog
         foreach (var descriptor in _all)
         {
             var slug = descriptor.Slug;
-            if (!string.IsNullOrWhiteSpace(slug))
+            if (!string.IsNullOrWhiteSpace(slug) && !_bySlug.TryAdd(slug, descriptor))
             {
-                _bySlug[slug!] = descriptor;
+                throw new InvalidOperationException($"Duplicate Canon Web slug '{slug}' reached the model catalog.");
             }
 
             var modelType = descriptor.ModelType;
             ArgumentNullException.ThrowIfNull(modelType);
-            _byType[modelType] = descriptor;
+            if (!_byType.TryAdd(modelType, descriptor))
+            {
+                throw new InvalidOperationException($"Duplicate Canon model type '{modelType.FullName}' reached the Web catalog.");
+            }
         }
     }
 

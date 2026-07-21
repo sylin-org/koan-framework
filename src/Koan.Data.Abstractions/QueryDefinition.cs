@@ -25,6 +25,10 @@ public sealed record QueryDefinition
     public int? Page { get; init; }
     public int? PageSize { get; init; }
     public string? Partition { get; init; }
+    /// <summary>
+    /// Requested total-count strategy. A null value means the query caller does not need a total;
+    /// adapters must not issue count work merely because pagination is present.
+    /// </summary>
     public CountStrategy? CountStrategy { get; init; }
 
     public bool HasFilter => Filter is not null;
@@ -34,6 +38,19 @@ public sealed record QueryDefinition
 
     public int EffectivePage(int fallback = 1) => Page is > 0 ? Page.Value : fallback;
     public int EffectivePageSize(int fallback = 50) => PageSize is > 0 ? PageSize.Value : fallback;
+    /// <summary>
+    /// Returns the zero-based provider offset and rejects a range that cannot be represented by the
+    /// current Int32 Skip/OFFSET contract.
+    /// </summary>
+    public int EffectiveOffset()
+    {
+        if (!HasPagination) return 0;
+        var offset = ((long)EffectivePage() - 1L) * EffectivePageSize();
+        if (offset > int.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(Page), Page,
+                "The requested page exceeds the supported provider offset range.");
+        return (int)offset;
+    }
 
     public QueryDefinition Where(Filter? filter) => this with { Filter = filter };
     public QueryDefinition WithSort(IReadOnlyList<SortSpec> sort) => this with { Sort = sort ?? Array.Empty<SortSpec>() };
@@ -42,7 +59,9 @@ public sealed record QueryDefinition
     {
         if (page <= 0) throw new ArgumentOutOfRangeException(nameof(page));
         if (pageSize <= 0) throw new ArgumentOutOfRangeException(nameof(pageSize));
-        return this with { Page = page, PageSize = pageSize };
+        var paged = this with { Page = page, PageSize = pageSize };
+        _ = paged.EffectiveOffset();
+        return paged;
     }
     public QueryDefinition WithoutPagination() => this with { Page = null, PageSize = null };
     public QueryDefinition ForPartition(string? partition) => this with { Partition = partition };

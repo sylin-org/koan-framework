@@ -48,6 +48,7 @@ public static class FilterSplitter
             }
             case Not n:
             {
+                if (!caps.SupportsNegation) return new FilterSplit(null, filter);
                 var inner = Split(n.Operand, caps, entityType);
                 return inner.Residual is null ? new FilterSplit(filter, null) : new FilterSplit(null, filter);
             }
@@ -102,6 +103,7 @@ public static class FilterSplitter
             }
             case Not n:
             {
+                if (!caps.SupportsNegation) return new FilterSplit(null, filter);
                 var inner = Split(n.Operand, caps);
                 return inner.Residual is null ? new FilterSplit(filter, null) : new FilterSplit(null, filter);
             }

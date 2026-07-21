@@ -3,6 +3,62 @@ namespace Koan.Core.Infrastructure;
 // Centralized constants across the Koan platform
 public static class Constants
 {
+    public static class Composition
+    {
+        public const string ModuleManifestResourceName = "koan.modules.manifest";
+        public const string ReferenceManifestResourceName = "koan.references.manifest";
+        public const string ReferenceManifestRequiredMetadataName = "KoanSemanticActivationManifest";
+        public const string ModuleIdentityMetadataName = "KoanModuleIdentity";
+    }
+
+    public static class Semantics
+    {
+        public static class Reasons
+        {
+            public const string ModuleContributionFailed = "module-contribution-failed";
+        }
+    }
+
+    public static class Diagnostics
+    {
+        public const int FactSchemaVersion = 2;
+
+        public static class Codes
+        {
+            public const string ModuleActivated = "koan.bootstrap.module.activated";
+            public const string ModuleRejected = "koan.bootstrap.module.rejected";
+            public const string SemanticComponentActive = "koan.semantic.component.active";
+            public const string SemanticComponentInactive = "koan.semantic.component.inactive";
+            public const string SemanticComponentRejected = "koan.semantic.component.rejected";
+            public const string SemanticContributionApplied = "koan.semantic.contribution.applied";
+            public const string SegmentationDimensionsActive = "koan.segmentation.dimensions.active";
+            public const string SegmentationRealizationActive = "koan.segmentation.realization.active";
+            public const string SegmentationRealizationRejected = "koan.segmentation.realization.rejected";
+            public const string CollectionFailed = "koan.diagnostics.collection.failed";
+            public const string ElectionSelected = "koan.composition.election.selected";
+            public const string LockfileMatched = "koan.composition.lockfile.matched";
+            public const string LockfileDrifted = "koan.composition.lockfile.drifted";
+            public const string LockfileMissing = "koan.composition.lockfile.missing";
+            public const string ServiceDiscovery = "koan.discovery.service";
+        }
+
+        public static class Reasons
+        {
+            public const string ModuleActivationFailed = "module-activation-failed";
+            public const string ReporterFailed = "reporter-failed";
+            public const string LockfileMatched = "lockfile-matched";
+            public const string LockfileDrifted = "lockfile-drifted";
+            public const string LockfileMissing = "lockfile-missing";
+            public const string DiscoverySelected = "discovery-selected";
+            public const string DiscoveryFailed = "discovery-failed";
+            public const string DiscoveryAdapterMissing = "discovery-adapter-missing";
+            public const string SemanticContributionApplied = "semantic-contribution-applied";
+            public const string SegmentationCompiled = "segmentation-compiled";
+            public const string SegmentationRealizationInstalled = "segmentation-realization-installed";
+            public const string SegmentationRealizationConflict = "segmentation-realization-conflict";
+        }
+    }
+
     public static class Configuration
     {
         public static class Koan
@@ -12,11 +68,7 @@ public static class Constants
 
         public static class Orchestration
         {
-            public const string Section = "Koan:Orchestration";
             public const string ForceOrchestrationMode = "Koan:Orchestration:ForceOrchestrationMode";
-            public const string EnableSelfOrchestration = "Koan:Orchestration:EnableSelfOrchestration";
-            public const string ValidateNetworking = "Koan:Orchestration:ValidateNetworking";
-            public const string NetworkValidationTimeoutMs = "Koan:Orchestration:NetworkValidationTimeoutMs";
         }
 
         public static class Observability

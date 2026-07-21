@@ -108,4 +108,4 @@ validation:
 - `Koan.Core.Hosting.Bootstrap.ProvenanceItem`
 - `Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions`
 - `Koan.Core.Configuration.ReadWithSource`
-- Module examples: `Koan.Admin.Initialization.KoanAdminAutoRegistrar`, `Koan.Data.Backup.Initialization.KoanAutoRegistrar`, `Koan.Data.Connector.Mongo.Initialization.KoanAutoRegistrar`, `Koan.Mcp.Initialization.KoanMcpAutoRegistrar`, `Koan.Scheduling.Initialization.KoanAutoRegistrar`, `Koan.Web.Initialization.KoanAutoRegistrar`, `Koan.Web.Auth.Initialization.KoanAutoRegistrar`, `Koan.Web.Auth.Services.Initialization.KoanAutoRegistrar`
+- Module examples: `AdminModule`, `DataBackupModule`, `MongoModule`, `McpModule`, `WebModule`, `AuthModule`, and `AuthServicesModule`.

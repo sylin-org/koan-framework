@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+
 namespace Koan.Jobs;
 
 /// <summary>
@@ -5,11 +7,21 @@ namespace Koan.Jobs;
 /// <em>clones</em> so behavior converges with the durable tier (which round-trips through a store), and serializes
 /// all mutations under one lock so <see cref="ClaimNext"/> is an atomic CAS. Non-durable: lost on restart.
 /// </summary>
-public sealed class InMemoryJobLedger : IJobLedger
+internal sealed class InMemoryJobLedger : IJobLedger
 {
     private readonly object _gate = new();
     private readonly Dictionary<string, JobRecord> _records = new(StringComparer.Ordinal);
     private readonly Dictionary<string, JobGate> _gates = new(StringComparer.Ordinal);
+    // JOBS-0008: per-lane WFQ virtual time. The Local tier is single-process, so this in-process dict IS the whole
+    // fairness state — the identical LaneFairSelector runs over it (the durable tier supplies LaneCursor rows instead).
+    private readonly Dictionary<string, double> _virtual = new(StringComparer.Ordinal);
+    private readonly Func<string, double> _weight;
+
+    public InMemoryJobLedger(IOptions<JobsOptions>? options = null)
+    {
+        var weights = options?.Value.LaneWeights;
+        _weight = weights is null ? _ => 1.0 : lane => weights.GetValueOrDefault(lane, 1.0);
+    }
 
     public Task Append(JobRecord record, CancellationToken ct)
     {
@@ -33,14 +45,17 @@ public sealed class InMemoryJobLedger : IJobLedger
     {
         lock (_gate)
         {
+            // Queued-only: a Running job does not block a new submit — the submit queues a trailing execution
+            // (at most 1 running + 1 queued per coalesce key, the debounce / trailing-edge pattern).
             var hit = _records.Values.FirstOrDefault(r =>
-                !r.IsTerminal && r.WorkType == workType && r.CoalesceKey == coalesceKey);
+                r.Status == JobStatus.Queued && r.WorkType == workType && r.CoalesceKey == coalesceKey);
             return Task.FromResult(hit?.Clone());
         }
     }
 
     public Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
-        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)
+        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,
+        IReadOnlyDictionary<string, PoolDispatchContext>? pools = null)
     {
         lock (_gate)
         {
@@ -50,22 +65,61 @@ public sealed class InMemoryJobLedger : IJobLedger
                 .Where(r => r.Status == JobStatus.Running)
                 .Select(r => (r.WorkType, r.WorkId))
                 .ToHashSet();
-            var candidate = _records.Values
+
+            // Build member slot counts for pool dispatch (JOBS-0007): member key -> running count.
+            Dictionary<string, int>? memberSlots = null;
+            if (pools is { Count: > 0 })
+            {
+                memberSlots = new Dictionary<string, int>(StringComparer.Ordinal);
+                foreach (var ctx in pools.Values)
+                    foreach (var member in ctx.Members)
+                        memberSlots.TryAdd(member, 0);
+                foreach (var r in _records.Values)
+                    if (r.Status == JobStatus.Running && r.GateKey is not null && memberSlots.ContainsKey(r.GateKey))
+                        memberSlots[r.GateKey]++;
+            }
+
+            // JOBS-0008: gather each lane's oldest claimable head, then pick the fairest lane (weighted fair queuing
+            // over per-lane virtual time). This replaces "take the globally-oldest claimable row", which let a
+            // continuously-fed / older upstream lane monopolize dispatch and starve a downstream lane. Within a lane,
+            // the head stays the oldest claimable row (gated / pool-exhausted older rows are skipped to the next).
+            var heads = new Dictionary<string, JobRecord>(StringComparer.Ordinal);
+            foreach (var r in _records.Values
                 .Where(r => r.Status == JobStatus.Queued
                             && r.VisibleAt <= now
                             && r.CancelRequestedAt is null
                             && !saturatedLanes.Contains(r.Lane)
-                            && !IsGated(r.GateKey, now)
                             && !(r.Exclusive && busy.Contains((r.WorkType, r.WorkId))))
                 .OrderBy(r => r.VisibleAt)
-                .ThenBy(r => r.FirstSubmittedAt)
-                .FirstOrDefault();
-            if (candidate is null) return Task.FromResult<JobRecord?>(null);
+                .ThenBy(r => r.FirstSubmittedAt))
+            {
+                if (heads.ContainsKey(r.Lane)) continue;   // already hold this lane's oldest claimable head
+                if (r.PoolKey is not null)
+                {
+                    if (pools is null || !pools.TryGetValue(r.PoolKey, out var ctx)) continue;
+                    if (!ctx.Members.Any(m => memberSlots!.GetValueOrDefault(m) < ctx.CapacityPerMember)) continue;
+                }
+                else if (IsGated(r.GateKey, now)) continue;
+                heads[r.Lane] = r;
+            }
+
+            if (heads.Count == 0) return Task.FromResult<JobRecord?>(null);
+
+            var lane = LaneFairSelector.Pick(heads.Keys, _virtual)!;
+            var candidate = heads[lane];
+
+            // Stamp the elected pool member atomically with the claim transition.
+            if (candidate.PoolKey is not null)
+            {
+                var ctx = pools![candidate.PoolKey];
+                candidate.GateKey = ctx.Members.First(m => memberSlots!.GetValueOrDefault(m) < ctx.CapacityPerMember);
+            }
 
             candidate.Attempt++;
             Transition(candidate, JobStatus.Running, now, $"claimed by {owner}");
             candidate.Owner = owner;
             candidate.LeaseUntil = leaseUntil;
+            _virtual[lane] = LaneFairSelector.Charged(_virtual.GetValueOrDefault(lane), _weight(lane));
             return Task.FromResult<JobRecord?>(candidate.Clone());
         }
     }
@@ -200,6 +254,30 @@ public sealed class InMemoryJobLedger : IJobLedger
     {
         lock (_gate)
             return Task.FromResult((long)_records.Values.Count(r => r.WorkType == workType && !r.IsTerminal));
+    }
+
+    public Task<JobsHealthSnapshot> HealthSnapshot(DateTimeOffset now, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            long queued = 0, running = 0, reclaim = 0;
+            DateTimeOffset? oldestDue = null;
+            foreach (var r in _records.Values)
+            {
+                if (r.Status == JobStatus.Queued)
+                {
+                    queued++;
+                    if (r.VisibleAt <= now && (oldestDue is null || r.VisibleAt < oldestDue)) oldestDue = r.VisibleAt;
+                }
+                else if (r.Status == JobStatus.Running)
+                {
+                    running++;
+                    if (r.LeaseUntil is { } l && l < now) reclaim++;
+                }
+            }
+            var age = oldestDue is { } od && now > od ? now - od : TimeSpan.Zero;
+            return Task.FromResult(new JobsHealthSnapshot(queued, running, reclaim, age));
+        }
     }
 
     private bool IsGated(string? gateKey, DateTimeOffset now)

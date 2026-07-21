@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OrderIntake · Koan</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #07111f; color: #e5edf7; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 15% 0%, #14315a 0, transparent 38%), #07111f; }
+    main { width: min(1040px, calc(100% - 32px)); margin: 0 auto; padding: 64px 0 80px; }
+    header { max-width: 760px; margin-bottom: 32px; }
+    .eyebrow { color: #67e8f9; font-size: .78rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { margin: 10px 0 14px; font-size: clamp(2.5rem, 7vw, 5.5rem); letter-spacing: -.065em; line-height: .95; }
+    header p { color: #a9bad0; font-size: 1.08rem; line-height: 1.65; }
+    .grid { display: grid; grid-template-columns: minmax(280px, .72fr) minmax(0, 1.28fr); gap: 20px; }
+    .card { background: rgba(10, 26, 46, .86); border: 1px solid #243c5c; border-radius: 18px; padding: 24px; box-shadow: 0 24px 70px rgba(0,0,0,.22); }
+    h2 { margin: 0 0 18px; font-size: 1rem; letter-spacing: .04em; }
+    label { display: grid; gap: 8px; margin: 16px 0; color: #b7c6d9; font-size: .85rem; }
+    select, input, button { width: 100%; border: 1px solid #355170; border-radius: 11px; padding: 12px 13px; font: inherit; }
+    select, input { background: #09182b; color: #edf6ff; }
+    button { margin-top: 8px; border: 0; background: linear-gradient(135deg, #22d3ee, #60a5fa); color: #03111f; font-weight: 850; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .hint, .empty { color: #879bb5; font-size: .85rem; line-height: 1.55; }
+    .status-line { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; margin-bottom: 16px; }
+    .status { color: #67e8f9; font-weight: 850; }
+    progress { width: 100%; height: 9px; accent-color: #22d3ee; }
+    .message { min-height: 24px; margin: 12px 0 20px; color: #a9bad0; }
+    .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
+    .metric { padding: 13px 10px; border-radius: 12px; background: #09182b; border: 1px solid #1d3553; text-align: center; }
+    .metric strong { display: block; font-size: 1.35rem; }
+    .metric span { color: #8196b0; font-size: .69rem; text-transform: uppercase; }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 15px; margin: 20px 0 0; font-size: .83rem; }
+    dt { color: #7f93ad; } dd { margin: 0; overflow-wrap: anywhere; }
+    .error { margin-top: 16px; padding: 14px; border: 1px solid #7f3650; background: #321425; border-radius: 12px; color: #fecdd3; white-space: pre-wrap; }
+    footer { margin-top: 22px; color: #7990ab; font-size: .8rem; }
+    a { color: #67e8f9; }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } .metrics { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">Koan · meaningful provider evidence</div>
+      <h1>One workload.<br>One honest receipt.</h1>
+      <p>Accept a bounded order batch through a named source, read every order back, remove exactly that trial's data,
+        and keep the durable evidence. Local works immediately; optional sources explain how to become available.</p>
+    </header>
+
+    <section class="grid">
+      <form id="trial-form" class="card">
+        <h2>Run an order-intake trial</h2>
+        <label>Target
+          <select id="target">
+            <option value="Local">Local · SQLite · ready now</option>
+            <option value="Documents">Documents · MongoDB · optional</option>
+            <option value="Relational">Relational · PostgreSQL · optional</option>
+            <option value="KeyValue">KeyValue · Redis · optional</option>
+          </select>
+        </label>
+        <label>Orders
+          <input id="count" type="number" min="1" max="1000" value="100" required>
+        </label>
+        <button id="run" type="submit">Run and verify</button>
+        <p class="hint">The receipt describes this run. It does not declare a winner or recommend an architecture.</p>
+      </form>
+
+      <section class="card" aria-live="polite">
+        <div class="status-line"><h2>Durable trial</h2><span id="status" class="status">Ready</span></div>
+        <progress id="progress" max="1" value="0"></progress>
+        <p id="message" class="message">Choose Local for the zero-infrastructure path.</p>
+        <div id="receipt" class="empty">A verified receipt will appear here.</div>
+        <div id="error" class="error" hidden></div>
+      </section>
+    </section>
+
+    <footer>Inspect the same composition at <a href="/.well-known/Koan/facts">/.well-known/Koan/facts</a>.</footer>
+  </main>
+
+  <script>
+    const form = document.querySelector('#trial-form');
+    const runButton = document.querySelector('#run');
+    const statusNode = document.querySelector('#status');
+    const progressNode = document.querySelector('#progress');
+    const messageNode = document.querySelector('#message');
+    const receiptNode = document.querySelector('#receipt');
+    const errorNode = document.querySelector('#error');
+    const terminal = new Set(['Completed', 'Failed', 'Dead', 'Cancelled']);
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      runButton.disabled = true;
+      errorNode.hidden = true;
+      receiptNode.textContent = 'Submitting durable work…';
+      try {
+        const target = document.querySelector('#target').value;
+        const count = document.querySelector('#count').value;
+        const response = await fetch(`/api/trials/${encodeURIComponent(target)}?count=${encodeURIComponent(count)}`, { method: 'POST' });
+        if (!response.ok) throw new Error(await response.text());
+        let trial = await response.json();
+        render(trial);
+        while (!terminal.has(trial.status)) {
+          await new Promise(resolve => setTimeout(resolve, 350));
+          const statusResponse = await fetch(`/api/trials/${encodeURIComponent(trial.id)}`);
+          if (!statusResponse.ok) throw new Error(await statusResponse.text());
+          trial = await statusResponse.json();
+          render(trial);
+        }
+      } catch (error) {
+        statusNode.textContent = 'Request failed';
+        errorNode.textContent = error.message;
+        errorNode.hidden = false;
+      } finally {
+        runButton.disabled = false;
+      }
+    });
+
+    function render(trial) {
+      statusNode.textContent = `${trial.status} · ${trial.target}`;
+      progressNode.value = trial.progress || 0;
+      messageNode.textContent = trial.progressMessage || 'Waiting for the worker…';
+      if (trial.receipt) renderReceipt(trial.receipt);
+      if (trial.error || trial.correction) {
+        errorNode.textContent = [trial.error, trial.correction].filter(Boolean).join('\n\n');
+        errorNode.hidden = false;
+      } else {
+        errorNode.hidden = true;
+      }
+    }
+
+    function renderReceipt(receipt) {
+      receiptNode.replaceChildren();
+      const metrics = document.createElement('div');
+      metrics.className = 'metrics';
+      for (const [label, value] of [['requested', receipt.requested], ['written', receipt.written], ['read', receipt.readBack], ['verified', receipt.verified], ['removed', receipt.removed]]) {
+        const cell = document.createElement('div');
+        cell.className = 'metric';
+        const strong = document.createElement('strong'); strong.textContent = value;
+        const span = document.createElement('span'); span.textContent = label;
+        cell.append(strong, span); metrics.append(cell);
+      }
+      const details = document.createElement('dl');
+      const rows = [
+        ['Provider', receipt.provider],
+        ['Capabilities', receipt.capabilities.join(', ')],
+        ['Write', duration(receipt.writeDuration)],
+        ['Read + verify', duration(receipt.readDuration)],
+        ['Cleanup', duration(receipt.cleanupDuration)],
+        ['Total', duration(receipt.totalDuration)],
+        ['Runtime', `${receipt.framework} · ${receipt.architecture}`]
+      ];
+      for (const [label, value] of rows) {
+        const dt = document.createElement('dt'); dt.textContent = label;
+        const dd = document.createElement('dd'); dd.textContent = value;
+        details.append(dt, dd);
+      }
+      receiptNode.append(metrics, details);
+    }
+
+    function duration(value) {
+      if (typeof value === 'string') return value;
+      return `${value} ms`;
+    }
+  </script>
+</body>
+</html>

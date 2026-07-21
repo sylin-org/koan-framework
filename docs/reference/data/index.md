@@ -1,347 +1,189 @@
 ---
 type: REF
 domain: data
-title: "Data Pillar Reference"
+title: "Entity Data Foundation"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-09-28
-framework_version: v0.6.3
+last_updated: 2026-07-15
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2025-10-07
+  date_last_tested: 2026-07-15
   status: verified
-  scope: docs/reference/data/index.md
+  scope: Entity data grammar, local-provider roles, negotiation, and current support boundary
 ---
 
-# Data Pillar Reference
+# Entity data foundation
 
-## Contract
+## Current contract
 
-- **Inputs**: Familiarity with Koan entities, dependency injection configured via `services.AddKoan()`, and at least one data adapter package (`Koan.Data.Connector.Sqlite`, `Koan.Data.Connector.Postgres`, etc.).
-- **Outputs**: Production-ready patterns for modeling entities, enforcing policy, streaming large datasets, and adding semantic/vector capabilities with minimal boilerplate.
-- **Error Modes**: Misaligned provider capabilities (e.g., using vector APIs with adapters that do not advertise `vector-search`), lifecycle hooks cancelling mutations, missing configuration values, or long-running streams without pagination.
-- **Success Criteria**: Entities handle CRUD, relationships, and business rules through static helpers; streaming and paging guardrails prevent memory pressure; vector workflows and direct SQL escape hatches co-exist without duplicated repositories.
-
-### Edge Cases
-
-- **Provider capability checks** – always read `EntityCaps<T>` (or review adapter documentation) before assuming support for vectors, transactions, or bulk operations.
-- **Lifecycle protection** – hooks can cancel writes; surface errors to callers with contextual codes.
-- **Streaming cancellation** – pass `CancellationToken` to `AllStream`/`QueryStream` consumers to prevent runaway jobs.
-- **Large joins** – prefer raw SQL or CQRS projections when cross-entity materialization would otherwise cause N+1 lookups.
-- **Vector storage** – confirm embedding dimensions and provider limits before performing large batch inserts.
-
----
-
-
-## Pillar Overview
-
-**Test Coverage:**
-
-- All Data pillar connectors and adapters (Sqlite, Postgres, SqlServer, Mongo, Redis, Json, Couchbase, OpenSearch, Vector) are covered by automated test suites as of 2025-10-07.
-- See `tests/Suites/` for per-connector and per-pillar test implementations.
-
-Koan’s Data pillar unifies persistence across SQL, NoSQL, JSON, and vector databases. Every entity is a rich domain object with first-class static helpers (`All`, `Query`, `AllStream`, `FirstPage`, etc.) and lifecycle hooks. Capabilities are discovered automatically from installed adapters.
-
-**Core packages**: `Koan.Data.Core`, adapter-specific packages (for example `Koan.Data.Connector.Postgres`, `Koan.Data.Connector.MongoDB`, `Koan.Data.Connector.Redis`, `Koan.Data.Vector.Redis`).
-
-➤ **Caching**: See the [Koan Cache Reference](./cache.md) for fluent builders, tag invalidation, and policy-driven caching that integrates with `Entity<TEntity>`.
-
----
-
-## Modeling Quick Start
+Koan's data foundation is `Entity<T>` plus deterministic provider negotiation. The common application
+path needs no repository, `DbContext`, provider registration, or schema bootstrap code:
 
 ```csharp
-public class Product : Entity<Product>
+public sealed class Todo : Entity<Todo>
 {
-  public string Name { get; set; } = "";
-  public decimal Price { get; set; }
-  public string Category { get; set; } = "";
-  public bool IsActive { get; set; } = true;
+    public string Title { get; set; } = "";
+    public bool Done { get; set; }
 }
 
-// Create
-var product = await new Product { Name = "Widget", Price = 10.00m }.Save();
-
-// Read
-var all = await Product.All();
-var widget = await Product.Get(product.Id);
-
-// Update
-widget.Price = 15.00m;
-await widget.Save();
-
-// Delete
-await widget.Delete();
+var saved = await new Todo { Title = "Ship the meaningful step" }.Save();
+var same = await Todo.Get(saved.Id);
+var open = await Todo.Query(todo => !todo.Done);
+await saved.Remove();
 ```
 
-All default columns (`Id`, `Created`, `Modified`, etc.) are managed automatically by the adapter.
+Entity persistence, query, and SQLite belong to the supported 0.20 foundation. That guarantee does not extend to
+every available provider: use the [generated product surface](../product-surface.md) for the exact boundary.
+Public-feed publication and observation follow the final package-only proof; the source checkout and staged
+candidate exercise the same application contract today.
 
----
+## Smallest durable application path
 
-## Static APIs & Business Queries
+The maintained Level-1 application references:
 
-Centralize domain logic on the entity itself, not in separate repositories.
+- `Sylin.Koan.App` for Core, Entity data, the automatic JSON floor, and controller-based Web composition;
+- `Sylin.Koan.Data.Connector.Sqlite` for the selected durable local provider; and
+- only the capability packages the application actually needs.
+
+`AddKoan()` is the complete registration call. Referencing SQLite makes it available; FirstUse also
+pins its business Entity to SQLite so adding another connector cannot silently move its data.
+
+[`samples/FirstUse`](../../../samples/FirstUse/README.md) is the executable contract. It proves SQLite
+create/read/query, REST, startup facts, readiness, a checked-in composition lockfile, and agent/operator
+inspection from source and from a staged package-only clean room.
+
+## Local provider roles
+
+The providers below are deliberately not described as interchangeable.
+
+| Provider | Role in the foundation | Current evidence | Explicit limits |
+|---|---|---|---|
+| SQLite | Durable local/single-node application path | connector 35/35; FirstUse 8-step and GoldenJourney 11-step source/package proofs | No claim for multi-node writes, every transaction shape, production migration policy, or remote-database behavior. |
+| InMemory | Fast conformance oracle and ephemeral test/development store | connector 56/56; Koan.Testing 12 passed with 3 capability/trait skips | Process-local and non-durable; never a production persistence claim. |
+| JSON | Automatic zero-infrastructure floor carried by `Sylin.Koan` | connector 21/21, including selection-aware readiness and persistence safety | File-backed, limited concurrency, and not the durable V1 application proof. |
+
+Postgres, SQL Server, MongoDB, Couchbase, Redis, and other providers are valuable extensions. Each
+needs its own current conformance, operations, packaging, and compatibility evidence; their existence
+does not expand this foundation boundary.
+
+## Reference is availability; negotiation selects
+
+Provider selection follows one order:
+
+1. an explicit `EntityContext` source;
+2. a database-axis route;
+3. an explicit `EntityContext` adapter override;
+4. `[SourceAdapter]` or `[DataAdapter]` on the Entity;
+5. `Koan:Data:Sources:Default:Adapter`; then
+6. the highest-priority referenced provider.
+
+Configured intent is fail-loud. If the selected adapter was not referenced, Koan reports
+`adapter-unavailable`, lists referenced choices, and names the configuration/package correction. It
+does not substitute a different provider. Availability alone is inspectable but does not make an
+unused connector a readiness dependency.
+
+Use explicit selection when business durability must not change as references grow:
 
 ```csharp
-public class Product : Entity<Product>
+[DataAdapter("sqlite")]
+public sealed class Approval : Entity<Approval>
 {
-  public static Task<Product[]> InCategory(string category) =>
-    Query().Where(p => p.Category == category);
-
-  public static Task<Product[]> Featured() =>
-    Query().Where(p => p.IsActive && p.Created > DateTimeOffset.UtcNow.AddDays(-7));
-}
-
-var featured = await Product.Featured();
-```
-
-Use `Query()` for composable LINQ pipelines, `Where` shortcuts for simple filters, and `FirstPage`/`Page` for cursor-based pagination when returning results to APIs.
-
----
-
-## Relationships & Navigation
-
-Foreign keys and collection helpers stay on the entity surface.
-
-```csharp
-public class Order : Entity<Order>
-{
-  public string UserId { get; set; } = "";
-  public decimal Total { get; set; }
-
-  public Task<User?> GetUser() => User.Get(UserId);
-
-  public static Task<Order[]> ForUser(string userId) =>
-    Query().Where(o => o.UserId == userId);
-}
-
-public class User : Entity<User>
-{
-  public string Name { get; set; } = "";
-
-  public Task<Order[]> GetOrders() =>
-    Order.Query().Where(o => o.UserId == Id).ToArrayAsync();
+    public string Subject { get; set; } = "";
 }
 ```
 
-For high-volume navigation, combine `QueryStream` or `FirstPage` with dedicated DTOs to avoid loading entire aggregates at once.
-
----
-
-## Value Objects & Enums
-
-Value objects embed structure without extra tables.
-
-```csharp
-public record Address(string Street, string City, string State, string ZipCode, string Country);
-
-public class Customer : Entity<Customer>
-{
-  public Address Shipping { get; set; } = new("1 Main", "Seattle", "WA", "98101", "USA");
-  public Address Billing { get; set; } = new("1 Main", "Seattle", "WA", "98101", "USA");
-}
-```
-
-Enums remain serialised as strings by default, keeping queries legible.
-
-```csharp
-public enum OrderStatus { Pending, Confirmed, Shipped, Delivered, Cancelled, Returned }
-
-public class Order : Entity<Order>
-{
-  public OrderStatus Status { get; set; } = OrderStatus.Pending;
-
-  public bool CanCancel() => Status is OrderStatus.Pending or OrderStatus.Confirmed;
-  public bool CanShip() => Status == OrderStatus.Confirmed;
-}
-```
-
----
-
-## Business Logic & Validation
-
-Encapsulate rules behind intentful methods. Save invariants and side effects live beside the data.
-
-```csharp
-public class Order : Entity<Order>
-{
-  public async Task AddItem(string productId, int quantity)
-  {
-  var product = await Product.Get(productId)
-      ?? throw new InvalidOperationException("Product not found");
-
-    await new OrderItem
-    {
-      OrderId = Id,
-      ProductId = productId,
-      Quantity = quantity,
-      Price = product.Price
-    }.Save();
-
-    await RecalculateTotal();
-  }
-
-  public async Task RecalculateTotal()
-  {
-    var items = await OrderItem.Where(i => i.OrderId == Id);
-    Total = items.Sum(i => i.Price * i.Quantity);
-    await Save();
-  }
-}
-```
-
----
-
-## Query Patterns
-
-Compose queries with familiar LINQ operators. Koan pushes down expressions whenever the adapter supports them and falls back to in-memory evaluation otherwise.
-
-```csharp
-public static Task<Product[]> LowStock(int threshold = 10) =>
-  Query()
-    .Where(p => p.StockLevel < threshold && p.IsActive)
-    .OrderByDescending(p => p.StockLevel)
-    .ToArrayAsync();
-```
-
-For analytical workloads or reporting, prefer `FirstPage`/`Page` to maintain cursor-based pagination:
-
-```csharp
-var firstPage = await Product.FirstPage(pageSize: 50, orderBy: p => p.Created);
-var nextPage = await firstPage.NextPage();
-```
-
----
-
-## Streaming & Background Workloads
-
-Stream massive result sets without materializing everything into memory.
-
-```csharp
-await foreach (var product in Product.AllStream(ct))
-{
-  await product.SyncToSearchIndex();
-}
-```
-
-Combine streaming with semantic pipelines (see the Flow pillar) when orchestrating AI-augmented enrichment.
-
----
-
-## Vector Search & AI Integration
-
-Add embeddings directly to entities for semantic retrieval.
-
-```csharp
-public class Document : Entity<Document>
-{
-  public string Title { get; set; } = "";
-  public string Content { get; set; } = "";
-
-  [VectorField]
-  public float[] ContentEmbedding { get; set; } = [];
-
-  public static Task<Document[]> SimilarTo(string query) =>
-    Vector<Document>.SearchAsync(query, limit: 20);
-}
-```
-
-Pair with the AI pillar to generate embeddings inside pipelines or background services.
-
----
-
-## Lifecycle Events & Policy Enforcement
-
-Lifecycle hooks wrap every mutation, enabling policy gates, enrichment, and telemetry.
-
-```csharp
-public static class ProductLifecycle
-{
-  static ProductLifecycle()
-  {
-    Product.Events
-      .Setup(ctx =>
-      {
-        ctx.ProtectAll();
-        ctx.AllowMutation(nameof(Product.Price));
-      })
-      .BeforeUpsert(ctx =>
-      {
-        if (ctx.Current.Price < 0)
-        {
-          return ctx.Cancel("Price must be non-negative.", "product.price_negative");
-        }
-
-        return ctx.Proceed();
-      });
-  }
-}
-```
-
-See the dedicated [Entity Lifecycle Events reference](./entity-lifecycle-events.md) for the full hook matrix, cancellation semantics, and batching guidance.
-
----
-
-## Direct SQL & Escape Hatches
-
-Drop to raw SQL or command APIs when you need custom joins, projections, or adapter-specific features.
-
-```csharp
-var results = await Data<Product>.Query(@"
-  SELECT p.*, c.Name AS CategoryName
-  FROM Products p
-  JOIN Categories c ON p.CategoryId = c.Id
-  WHERE p.Price > @minPrice",
-  new { minPrice = 100 });
-```
-
-All direct commands respect configured connections, logging, and retry policies.
-
----
-
-## Provider Matrix
-
-| Provider   | Package                         | Primary Use Case                        |
-| ---------- | ------------------------------- | --------------------------------------- |
-| SQLite     | `Koan.Data.Connector.Sqlite`    | Local development, embedded deployments |
-| Postgres   | `Koan.Data.Connector.Postgres`  | Production relational workloads         |
-| SQL Server | `Koan.Data.Connector.SqlServer` | Legacy and enterprise relational        |
-| MongoDB    | `Koan.Data.Connector.MongoDB`   | Document storage                        |
-| Redis      | `Koan.Data.Connector.Redis`     | Caching, vector search                  |
-| JSON       | `Koan.Data.Connector.Json`      | File-based storage                      |
-
-Consult each adapter’s README for capability flags (bulk operations, vectors, transactions, etc.).
-
----
-
-## Configuration & Environment
+Or configure the application default:
 
 ```json
 {
   "Koan": {
     "Data": {
-      "DefaultProvider": "Sqlite",
-      "Sqlite": {
-        "ConnectionString": "Data Source=app.db"
+      "Sources": {
+        "Default": { "Adapter": "sqlite" }
       },
-      "Postgres": {
-        "ConnectionString": "Host=localhost;Database=myapp"
+      "Sqlite": {
+        "ConnectionString": "Data Source=./data/app.db"
       }
     }
   }
 }
 ```
 
-Environment variables override the same hierarchy:
+## Query and cost honesty
 
-```bash
-export Koan__Data__DefaultProvider=Postgres
-export Koan__Data__Postgres__ConnectionString="Host=prod;Database=app"
+One Entity grammar does not mean every provider has the same physical behavior. Capability facts
+describe whether filtering is native, bounded residual work, or in-memory. Provider-specific tests
+earn provider-specific claims.
+
+Pagination intent belongs to the caller, not the adapter. `Product.All()` requests the complete
+visible set; an adapter does not invent a default limit. `Product.Page(page, size)` and an explicitly
+paged `QueryDefinition` carry an exact page request to the selected provider. Consumer boundaries
+such as Web may apply documented defaults and safety bounds, but they compile that policy into an
+explicit page before Data executes it.
+
+- Use `Get`, `Query`, `FirstPage`/`Page`, `AllStream`, `Save`, and `Remove` as the common vocabulary.
+- Prefer explicit paging when the result can grow; use Entity streams only when the selected adapter
+  advertises `DataCaps.Query.ProviderBoundedPaging`.
+- Inspect `Data<TEntity, string>.Capabilities` before relying on optional bulk, transaction, filter,
+  or isolation behavior.
+- Unsupported guarantees reject explicitly; Koan does not silently claim backend parity.
+
+The low-level `Data<TEntity,TKey>` facade, direct provider instructions, and raw access remain expert
+escape hatches. They do not replace Entity statics in ordinary business code.
+
+## Optional semantics and recovery
+
+Reference optional Data packages only when their business meaning applies:
+
+- `Sylin.Koan.Data.SoftDelete` lets `[SoftDelete]` Entities retain ordinary `Remove()` grammar while hiding rows
+  through one Data axis. `T.WithDeleted()` is a type-targeted recycle-bin scope; `.Restore()` and `.HardDelete()` are
+  the explicit recovery and purge verbs. It supplies no generic HTTP workflow or authorization bypass.
+- `Sylin.Koan.Data.Backup` supplies one DI-owned, single-Entity archive/recovery round trip through Koan Storage.
+  Create requires provider-bounded paging; restore validates the complete archive before its first batched upsert.
+  It does not claim whole-application coordination, encryption, retention, schema migration, or transactional restore.
+
+Both packages compose through the application's existing `AddKoan()` call. See their package-owned README and
+technical contracts for the complete operation surface and limits.
+
+## Testing the contract
+
+Reference `Sylin.Koan.Testing` and add one class per Entity:
+
+```csharp
+public sealed class TodoConformance : EntityConformanceSpecs<Todo>
+{
+    protected override Todo NewValid() => new() { Title = "A valid business example" };
+}
 ```
 
----
+Koan owns the real host, temporary storage, Entity partition, and async-flow host binding. Independent
+conformance classes can use normal xUnit scheduling. Trait/capability batteries skip explicitly when
+they do not apply; a skip is absence of evidence, not provider certification.
 
-## Related Reading
+## Inspect and recover
 
-- [Entity Lifecycle Events](./entity-lifecycle-events.md)
-- [Flow Pillar Reference](../flow/index.md) for ingestion pipelines and semantic augmentation
-- [AI Pillar Reference](../ai/index.md) for embedding generation and retrieval-augmented generation
+- Read startup's data election and composition summary first.
+- Use `/health/ready` for aggregate dependency readiness and `/health/live` for process liveness.
+- Read `/.well-known/Koan/facts` as an operator or `koan://facts` as an MCP client; both project the
+  same redacted schema-1 decisions.
+- Review `koan.lock.json` for referenced-module drift. Runtime facts add the provider actually elected.
+
+## Not in this foundation boundary
+
+- universal provider parity or production certification;
+- schema migrations/upgrades, rollback, or long-term compatibility guarantees;
+- cross-provider or distributed transactions;
+- tenancy, concurrency control, audit, recovery, SLOs, or security posture;
+- vector/AI storage semantics; or
+- an assumption that adding a provider reference changes existing Entity routing safely without an
+  explicit election review.
+
+Those capabilities graduate in later rings with their own evidence.
+
+## Related contracts
+
+- [Entity Semantics Contract](../../architecture/entity-semantics-contract.md)
+- [Adapter diagnostics](adapter-diagnostics.md)
+- [Entity access and streaming](../../guides/data/entity-access-and-streaming.md)
+- [Testing your app](../../guides/testing-your-app.md)
+- [Current capability evidence](../../initiatives/koan-v1/CAPABILITIES.md)

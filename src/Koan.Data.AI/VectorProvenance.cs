@@ -10,9 +10,10 @@ namespace Koan.Data.AI;
 /// Before AI-0036 every <c>SaveWithVector</c> call site passed <c>null</c> metadata, so the
 /// producing model — known to the worker, the sync hook, and the migrator — was dropped at the
 /// store boundary. A subsequent model change then silently created a mixed-space index (vectors
-/// from different models are not comparable). This builder is the single choke point all three
-/// write paths route through. The store persists the result as ordinary filterable metadata and
-/// never interprets it (the keys live in <see cref="VectorProvenanceKeys"/>, store-side).
+/// from different models are not comparable). <c>EmbeddingWriter</c> is now the single lifecycle-to-
+/// vector write boundary and calls this builder for the provenance dictionary. The store persists
+/// the result as ordinary filterable metadata and never interprets it (the keys live in
+/// <see cref="VectorProvenanceKeys"/>, store-side).
 /// </remarks>
 public static class VectorProvenance
 {

@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 
 namespace Koan.AI.EndToEnd.Tests;
 

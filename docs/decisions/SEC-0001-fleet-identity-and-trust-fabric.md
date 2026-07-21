@@ -5,7 +5,13 @@
 **Deciders**: Enterprise Architect
 **Scope**: Define Koan's inbound token/credential validation and a unified **fleet identity/trust fabric** — one verifiable security-context envelope that travels across HTTP, MCP, Messaging, and Jobs, with a capability-graded bootstrap (zero-config dev → shared key → enrolled fleet), a resource-side authorization seam, and near-real-time revocation. Establishes the DX surface, the trust-anchor ladder, the token contract, the authorization placement rule, and the revocation mechanism.
 **Provenance**: Informed by a platform investigation (current auth surface) + two prior-art research workflows (established playbook: SPIFFE/SPIRE, HashiCorp Vault, Kubernetes, Dapr/service-mesh, cloud workload identity; frontier scan: PASETO, Biscuit/macaroons, IETF Transaction Tokens, OpenID CAEP/Shared Signals, Sigstore), each adversarially fact-checked. Corrections from that fact-check are honored inline (see §19).
-**Related**: extends/supersedes **DEC-0053** (service-to-service auth) · amends **WEB-0043** (BFF/cookie-first becomes an explicit *posture*, not the only one) · **WEB-0051** (interactive provider election does not apply to non-interactive bearer) · **WEB-0049** (role attribution / claims transformation) · **WEB-0047** (capability authorization) · builds on **ARCH-0084** (capability model + provider election) · **ARCH-0086** (`KoanModule` bootstrap + `Report`) · **ARCH-0079** (integration tests as canon) · **ARCH-0075 / ARCH-0078** (cache topology + coherence channel — reused as the revocation transport) · **JOBS-0005** (ledger-as-truth + distributed tier — reused as durable backing + the cross-hop carrier) · `Koan.Messaging.IMessageBus` · `[KoanDiscoverable]` + `KoanRegistry` (auto-registration) · the Koan redesign initiative ("fewer but more meaningful parts").
+**Related**: extends/supersedes **DEC-0053** (service-to-service auth) · amends **WEB-0043** (BFF/cookie-first becomes an explicit *posture*, not the only one) · **WEB-0051** (interactive provider election does not apply to non-interactive bearer) · **WEB-0049** (role attribution / claims transformation) · **WEB-0047** (capability authorization) · builds on **ARCH-0084** (capability model + provider election) · **ARCH-0086** (`KoanModule` bootstrap + `Report`) · **ARCH-0079** (integration tests as canon) · **ARCH-0113** (Communication internal routes) · **JOBS-0005** (ledger-as-truth + distributed tier — reused as durable backing + the cross-hop carrier) · `[KoanDiscoverable]` + `KoanRegistry` (auto-registration) · the Koan redesign initiative ("fewer but more meaningful parts").
+
+> **R07-12 amendment (2026-07-15).** Security must own revocation meaning and its durable
+> recovery model. It may register a closed internal framework-broadcast contract with
+> Communication for every-node carriage, but must not reuse Cache's invalidation contract or
+> coordinator. Communication adapters remain replaceable infrastructure; the security pillar
+> remains the correctness owner.
 
 ---
 
@@ -37,7 +43,7 @@ So Koan claims a microservices/fleet story (DEC-0053, the MCP pillar, the Jobs d
 5. **Whoever can verify must not be able to forge.** Asymmetric by default: the verifier holds a public key and cannot mint. (The shared-secret rung is a deliberate, scoped exception — §7.)
 6. **One envelope, four channels.** The security context is channel-agnostic — it rides an HTTP header, an MCP request, a bus envelope, or a job record, validated by one core.
 7. **Authentication in the token; authorization at the resource.** Coarse identity/roles travel; fine-grained, fast-changing, revocable decisions resolve where the resource lives.
-8. **Reuse the broadcast plane we already built.** Revocation rides the existing cache-coherence channel; durable state rides the existing Jobs ledger. The hard part is already shipped.
+8. **Reuse the broadcast plane we already built.** Revocation uses a Security-owned internal contract over Communication's every-node route; durable state uses the existing Jobs ledger or equivalent store. Cache is not part of the security boundary.
 9. **Hold the line.** This is a *workload/fleet* trust fabric, not a public IdP, not a mandatory mesh, not a mandatory policy engine. Exotic tiers (hardware attestation, offline attenuation) are optional and graded, never the floor.
 
 ---
@@ -169,7 +175,7 @@ and is **forwarded byte-for-byte** across HTTP, MCP, `IMessageBus`, and the Jobs
 
 **Steal the shape, not the topology.** The TraTs spec mandates a single logical Transaction Token Service per domain — a centralization/SPOF that contradicts Koan's ledger-as-distributed-truth. Decision: take the envelope shape and reuse claim names (`sub`, `aud`, `txn`, `purp`, `tctx`) for legibility; let **per-node minting + the Jobs ledger** replace the central TTS.
 
-The trio that composes the fabric: **freeze intent (TraTs) + make it unforgeable (§6.1 version-pinning) + take it back over the plane we already run (§9 CAEP-over-coherence).** No off-the-shelf product gives this whole; Koan can, cheaply, because the broadcast plane already exists.
+The trio that composes the fabric: **freeze intent (TraTs) + make it unforgeable (§6.1 version-pinning) + take it back over the plane we already run (§9 internal broadcast).** No off-the-shelf product gives this whole; Koan can, cheaply, because the carriage plane already exists.
 
 ---
 
@@ -186,7 +192,7 @@ Honoring the fact-check: the boundary is token **lifetime and breadth**, not "ne
 - **Tier 1 — ABAC PDP adapter.** Lead with **Cerbos** (readable YAML, opinionated, stateless) for DX, **Cedar** where formal-analyzability / AWS matters. **Do not expose Rego as the primary surface** — its learning curve is the antithesis of "simple for teams."
 - **Tier 2 — ReBAC adapter** (sharing/hierarchy / "who-can-see-X"): **OpenFGA** (DX) or **SpiceDB** (full Zanzibar incl. consistency tokens). Surface staleness/zookie semantics explicitly.
 
-**An external PDP is opt-in, never mandatory** (a network PDP on every request is a SPOF + tail-latency amplifier and violates "everything just works"). **Default fail-closed** (deny on PDP error); **decision-cache with explicit invalidation riding the existing coherence channel.** Declarative, identity-keyed policy (`trustDomain/app-id`, `defaultAction: deny`) fits the `[JobGate]`-style attribute ethos (Dapr ACL pattern).
+**An external PDP is opt-in, never mandatory** (a network PDP on every request is a SPOF + tail-latency amplifier and violates "everything just works"). **Default fail-closed** (deny on PDP error); **decision-cache with Security-owned invalidation riding the internal every-node broadcast route.** Declarative, identity-keyed policy (`trustDomain/app-id`, `defaultAction: deny`) fits the `[JobGate]`-style attribute ethos (Dapr ACL pattern).
 
 ---
 
@@ -197,11 +203,11 @@ Honoring the fact-check: the boundary is token **lifetime and breadth**, not "ne
 **Strong guarantee — CAEP-shaped, over infrastructure we already own (reuse, do not rebuild):**
 
 1. **Primary — per-subject `epoch`.** Each principal carries a tiny `epoch`; the KSVID embeds the subject's epoch at mint. On a security event ("log out everywhere," role change, compromise), **bump `epoch`**. Verifiers reject any KSVID whose embedded `epoch` < the subject's current epoch.
-   - **Mechanism:** the bump publishes a subject-keyed event (the CAEP vocabulary — `session-revoked` / `token-claims-change`, keyed by a complex `sub_id`) as an `Evict` over the **existing `ICacheCoherenceChannel`** (origin-filtered, echo-suppressed — the same fan-out the cache pillar already uses) → every node updates a tiny in-memory `subject→epoch` map → the next request for that subject is denied. **Reuse `CoherenceCoordinator`, not a parallel mechanism.**
-   - **Properties:** O(#subjects) state (one row each), not O(#tokens); sub-second in-cluster; eventual cross-region; durably backed by the **Jobs distributed ledger**, which replays missed events on reconnect (CAEP's stream-resync, for free).
+   - **Mechanism:** Security persists the new epoch, then publishes a closed, subject-keyed internal broadcast (using the CAEP vocabulary — `session-revoked` / `token-claims-change`, keyed by a complex `sub_id`) over Communication's every-node route. Every node refreshes its tiny in-memory `subject→epoch` map before the next authorization decision. Security owns the contract, replay/catch-up, and fail-safe posture; Communication owns carriage and provider election.
+   - **Properties:** O(#subjects) state (one row each), not O(#tokens); sub-second in-cluster when the elected provider is healthy; eventual cross-region; durably backed by the **Jobs distributed ledger** or a future Security-owned ledger integration. Broadcast is an acceleration signal, never the source of truth.
 2. **Secondary — per-`jti` deny-list** for "kill *this* session/token now," with **TTL = the token's remaining life** so it self-evicts and never grows unbounded.
 
-**Steal the CAEP *vocabulary*, not the *transport*.** Do **not** implement the SSF Stream Management API / push-poll negotiation / cross-org transmitter-receiver trust — that is enterprise-IdP machinery and the elegance trap. Koan's coherence channel **is** the transport.
+**Steal the CAEP *vocabulary*, not the *transport*.** Do **not** implement the SSF Stream Management API / push-poll negotiation / cross-org transmitter-receiver trust — that is enterprise-IdP machinery and the elegance trap. Koan's internal Communication broadcast route is the replaceable carriage; Security remains responsible for revocation correctness.
 
 **Why not OCSP/CRL — with the fact-check's precision:** we reject **per-request synchronous status checks (OCSP-shaped)** and **unbounded, slowly-synced lists (classic CRL)** — *not* "revocation lists in general." Our `epoch` + pub/sub model **is** a bounded, push-propagated revocation list — precisely the surviving pattern (Let's Encrypt deprecated OCSP but moved *to* CRLs, for privacy). We get the list's correctness with no round-trip and no staleness. **Token introspection (RFC 7662)** is offered only as opt-in for explicitly opaque/reference-token scopes.
 
@@ -229,7 +235,7 @@ Captured for completeness; independent of the fabric and should be fixed immedia
 
 **New parts:** the **inbound KSVID/JWT validator** (DEC-0053's missing half); the **in-process / fleet issuer** (Dapr-Sentry analog); **node-attestation plugins** (k8s-SA / cloud-IID / TPM / join-code); the **version-pinned envelope + `cnf` sender-constraint core**; the **RFC 8693 exchange primitive**; the **`IAuthorize` seam**.
 
-**Reused (the leverage — the hard parts are already built and proven):** `IMessageBus` + `ICacheCoherenceChannel` / `CoherenceCoordinator` (revocation fan-out); the **Jobs distributed ledger** (durable epoch/deny backing + the cross-hop carrier); the **capability model** (attestor/PDP/sender-constraint rungs are self-detected capabilities); **self-reporting boot** (every node states how it attested + its trust domain); `KoanAutoRegistrar` / `KoanModule` (Reference = Intent enrollment); the existing **cookie BFF** (`Koan.cookie`) and DEC-0053's outbound `DelegatingHandler` (which now gains its inbound counterpart and an asymmetric key).
+**Reused (the leverage — the hard parts are already built and proven):** Communication's internal every-node route (revocation carriage, not correctness); the **Jobs distributed ledger** or equivalent durable store (epoch/deny backing); the **capability model** (attestor/PDP/sender-constraint rungs are self-detected capabilities); **self-reporting boot** (every node states how it attested + its trust domain); `KoanAutoRegistrar` / `KoanModule` (Reference = Intent enrollment); the existing **cookie BFF** (`Koan.cookie`) and DEC-0053's outbound `DelegatingHandler` (which now gains its inbound counterpart and an asymmetric key).
 
 **Anti-goals (decided):**
 1. **Not a public IdP / OAuth authorization server for end users** — this is a *workload/fleet* fabric; human SSO stays in the cookie BFF + external IdP. The fleet issuer issues only *internal, short-lived service identities*; **federation is outbound** (OIDC discovery), not "run an OAuth server for the world."
@@ -269,7 +275,7 @@ Explicitly **deferred**, not part of the floor — each is a future capability r
 - Closes the inbound auth gap that blocks real fleet/microservice work; a Koan service can finally verify another's token.
 - One envelope across HTTP/MCP/Messaging/Jobs — a *consolidation* that nets negative conceptual surface.
 - Zero-config dev that is safe by construction (fail-closed in prod); each tier up is one line.
-- Revocation and durable backing reuse already-shipped, already-proven machinery (coherence channel + jobs ledger) — the "great" part is nearly free.
+- Revocation carriage and durable backing reuse already-shipped machinery (Communication broadcasts + jobs ledger) while Security owns the correctness contract.
 - Removes a live forgery footgun (deterministic dev key).
 
 **Negative / costs**
@@ -304,7 +310,7 @@ Explicitly **deferred**, not part of the floor — each is a future capability r
 | 0 | **Tactical return-URL fix** (§10) + shared helper + Logout twin | **S** | Independent; ship now. |
 | 1 | **Kill the deterministic-key footgun** → asymmetric signing (ES256), per-process key | **S–M** | Also the dev-token fix; precondition for everything. |
 | 2 | **Inbound validator at the edge** (standard JOSE/JWT) + **`IAuthorize` seam** wired into `EntityController<T>`/bus/jobs | **M** | Closes DEC-0053's gap; authz parity is near-free (keys on `ClaimTypes.Role`). |
-| 3 | **Epoch-over-coherence revocation** (`Identity.Revoke`, `subject→epoch` map, `ICacheCoherenceChannel` fan-out, ledger backing) | **M** | Proves the "great" part cheaply on existing infra. |
+| 3 | **Epoch revocation over internal broadcasts** (`Identity.Revoke`, `subject→epoch` map, Security-owned contract, ledger backing) | **M** | Reuses every-node carriage without coupling Security to Cache. |
 | 4 | **DX rungs**: zero-config dev identity (+ fail-closed prod boot guard, boot-report posture) and **Rung-1 shared key** | **M** | The consumer surface of §4. |
 | 5 | **Fleet issuer + attestors** (k8s-SA / cloud-IID / join-code) + `koan enroll` | **L** | Rung 2. |
 | 6 | **Version-pinned internal envelope + `cnf` sender-constraint + RFC 8693 exchange + TraTs work envelope** | **L** | The cross-hop fabric (§6.1, §7). |

@@ -31,6 +31,53 @@ public interface IOrchestrationAwareServiceDiscovery
     OrchestrationMode CurrentMode { get; }
 }
 
+/// <summary>
+/// Connection hints for different orchestration modes.
+/// Allows adapters to specify preferred hostnames and ports for each mode.
+/// </summary>
+public record OrchestrationConnectionHints
+{
+    /// <summary>
+    /// Connection string for a dependency reachable from the local host.
+    /// Default: localhost:{port}
+    /// </summary>
+    public string? Local { get; init; }
+
+    /// <summary>
+    /// Connection string for Docker Compose mode (app and dependencies in containers)
+    /// Default: {serviceName}:{port}
+    /// </summary>
+    public string? DockerCompose { get; init; }
+
+    /// <summary>
+    /// Connection string for Kubernetes mode (app pod with service-based dependencies)
+    /// Default: {serviceName}.default.svc.cluster.local:{port}
+    /// </summary>
+    public string? Kubernetes { get; init; }
+
+    /// <summary>
+    /// Connection string for Aspire AppHost mode (Aspire-managed endpoints)
+    /// Default: null (Aspire will provide via service discovery)
+    /// </summary>
+    public string? AspireManaged { get; init; }
+
+    /// <summary>
+    /// Connection string for standalone mode (external dependencies)
+    /// Default: null (must be explicitly configured)
+    /// </summary>
+    public string? External { get; init; }
+
+    /// <summary>
+    /// Default port for the service (used in fallback scenarios)
+    /// </summary>
+    public int DefaultPort { get; init; }
+
+    /// <summary>
+    /// Service name used for container/service discovery (defaults to serviceName parameter)
+    /// </summary>
+    public string? ServiceName { get; init; }
+}
+
 
 /// <summary>
 /// Configuration for service discovery with health checking capabilities.

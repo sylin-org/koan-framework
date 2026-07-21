@@ -1,10 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Description>Web layer for Koan Media: upload endpoints, variant routing, and storage-backed streaming helpers for media entities.</Description>
+    <Description>Recipe-driven HTTP rendering and Entity-backed media serving for Koan.</Description>
     <PackageTags>$(CommonPackageTags);media;web;storage;upload;variants</PackageTags>
   </PropertyGroup>
   <ItemGroup>
@@ -12,7 +11,12 @@
     <ProjectReference Include="..\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Media.Core\Koan.Media.Core.csproj" />
     <ProjectReference Include="..\Koan.Storage\Koan.Storage.csproj" />
-    <!-- M11: transform cache rides Koan.Cache (was IMemoryCache-backed) -->
-    <ProjectReference Include="..\Koan.Cache\Koan.Cache.csproj" />
+    <ProjectReference Include="..\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
+    <!-- Explicit: MediaEntitySource<T> resolves via Data<T>.Get so contributed request predicates + tenancy apply
+         to media serving. Declaring the dependency the moat rests on rather than inheriting it transitively. -->
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <!-- AddKoanControllersFrom + Koan.Web.Extensions live here (was reached
+         transitively through Koan.Media.Core before its Koan.Web ref was cut). -->
+    <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
   </ItemGroup>
 </Project>

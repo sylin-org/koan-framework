@@ -5,11 +5,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Authorization;
+using Koan.Web.Authorization;
 using Koan.Web.Extensions.Authorization;
 using Koan.Web.Extensions.Capabilities;
 using Koan.Web.Hooks;
 using Xunit;
-using AuthorizeRequest = Koan.Web.Extensions.Authorization.AuthorizeRequest;
 
 namespace Koan.Web.Extensions.Tests;
 
@@ -33,7 +33,7 @@ public sealed class PolicyAuthorizationProviderTests
     }
 
     private static readonly ClaimsPrincipal User = new(new ClaimsIdentity("test"));
-    private const string Action = CapabilityActions.SoftDelete.Delete;
+    private const string Action = CapabilityActions.Audit.Snapshot;
 
     private static IAuthorize Seam(CapabilityAuthorizationOptions caps, Func<string, bool>? authz = null)
     {
@@ -60,8 +60,8 @@ public sealed class PolicyAuthorizationProviderTests
     public async Task Mapped_default_policy_is_evaluated()
     {
         var caps = new CapabilityAuthorizationOptions();
-        caps.Defaults.SoftDelete.Delete = "can-delete";
-        (await Allowed(Seam(caps, p => p == "can-delete"), Action)).Should().BeTrue();
+        caps.Defaults.Audit.Snapshot = "can-snapshot";
+        (await Allowed(Seam(caps, p => p == "can-snapshot"), Action)).Should().BeTrue();
         (await Allowed(Seam(caps, _ => false), Action)).Should().BeFalse();
     }
 
@@ -69,9 +69,9 @@ public sealed class PolicyAuthorizationProviderTests
     public async Task Entity_mapping_overrides_defaults()
     {
         var caps = new CapabilityAuthorizationOptions();
-        caps.Defaults.SoftDelete.Delete = "default-policy";
+        caps.Defaults.Audit.Snapshot = "default-policy";
         caps.Entities["Widget"] = new CapabilityPolicy();
-        caps.Entities["Widget"].SoftDelete.Delete = "widget-policy";
+        caps.Entities["Widget"].Audit.Snapshot = "widget-policy";
         (await Allowed(Seam(caps, p => p == "widget-policy"), Action)).Should().BeTrue();
     }
 
@@ -79,7 +79,7 @@ public sealed class PolicyAuthorizationProviderTests
     public async Task Empty_entity_mapping_falls_back_to_defaults()
     {
         var caps = new CapabilityAuthorizationOptions();
-        caps.Defaults.SoftDelete.Delete = "default-policy";
+        caps.Defaults.Audit.Snapshot = "default-policy";
         caps.Entities["Widget"] = new CapabilityPolicy();
         (await Allowed(Seam(caps, p => p == "default-policy"), Action)).Should().BeTrue();
     }

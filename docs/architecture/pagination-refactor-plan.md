@@ -1,4 +1,19 @@
+---
+type: ARCH
+domain: data
+audience: [architects, maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
 # Pagination & Data Stack Refactoring Plan
+
+> **Historical plan.** This document records an earlier pagination refactor and is not the current
+> Entity streaming contract. Provider-bounded `AllStream`/`QueryStream` execution is defined by
+> [DATA-0107](../decisions/DATA-0107-provider-bounded-entity-streams.md); its supported-adapter and
+> fail-closed boundaries supersede statements below that streaming was removed.
 
 ## Purpose
 

@@ -10,7 +10,7 @@ This directory contains **configuration**, **options**, and **module registratio
 
 **File**: `OptionsExtensions.cs`
 **Pattern**: Static extension methods for IServiceCollection
-**When to Use**: Registering options in KoanAutoRegistrar or anywhere you need typed configuration
+**When to Use**: Registering options in `KoanModule.Register` or anywhere you need typed configuration
 
 #### What It Provides
 
@@ -18,21 +18,18 @@ This directory contains **configuration**, **options**, and **module registratio
 - ✅ Automatic validation setup
 - ✅ Post-configuration support
 - ✅ Consistent patterns across framework
-- ✅ Less boilerplate in auto-registrars
+- ✅ Less boilerplate in modules
 
 #### Quick Example
 
 ```csharp
 using Koan.Core.Modules;
 
-// In your KoanAutoRegistrar
-public void Register(IServiceCollection services, IConfiguration configuration)
+// In your KoanModule
+public override void Register(IServiceCollection services)
 {
     // Basic registration
-    services.AddKoanOptions<RedisOptions>(
-        configuration,
-        "Koan:Data:Redis"
-    );
+    services.AddKoanOptions<RedisOptions>("Koan:Redis");
 
     // With validation
     services.AddKoanOptionsWithValidation<PostgresOptions>(
@@ -65,7 +62,7 @@ ConfigureKoanOptions<TOptions>(Action<TOptions> configure)
 
 #### Common Use Cases
 
-✅ KoanAutoRegistrar implementations
+✅ `KoanModule.Register` implementations
 ✅ Options configuration in connectors
 ✅ Layered configuration (appsettings → env vars → code)
 ✅ Options validation patterns
@@ -89,7 +86,7 @@ Framework pillars self-register via `KoanPillarManifest` attributes and are disc
 ## 📚 Related
 
 - **ADR**: [ARCH-0068 - Refactoring Strategy](../../../docs/decisions/ARCH-0068-refactoring-strategy-static-vs-di.md)
-- **Examples**: See all `KoanAutoRegistrar` classes in `src/Connectors/**/Initialization/`
+- **Examples**: See the domain-named `*Module` classes in `src/Connectors/**/Initialization/`
 - **Pattern**: [Reference = Intent](../../../docs/decisions/ARCH-0001-reference-equals-intent.md)
 
 ---
@@ -98,7 +95,7 @@ Framework pillars self-register via `KoanPillarManifest` attributes and are disc
 
 | Scenario | Use This |
 |----------|----------|
-| Register options in auto-registrar | `services.AddKoanOptions<T>()` |
+| Register options in a module | `services.AddKoanOptions<T>()` |
 | Options with validation rules | `services.AddKoanOptionsWithValidation<T>()` |
 | Modify options after registration | `services.ConfigureKoanOptions<T>()` |
 | Custom options registration | Use `IOptions<T>` pattern directly |

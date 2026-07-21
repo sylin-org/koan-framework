@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Koan.Tenancy.Web</AssemblyName>
+    <RootNamespace>Koan.Tenancy.Web</RootNamespace>
+    <Description>Reference-mounted tenant registry and membership administration for Koan: a bundled operator UI and API with separated exposure/authority controls, idempotent seat grants, and mutation audit.</Description>
+    <PackageTags>$(CommonPackageTags);tenancy;multi-tenant;operator;console;membership;admin</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The console projects Koan.Tenancy through Koan.Web. Membership.IdentityId is a string subject key, so
+         Identity integration stays optional and the core layering remains clean. -->
+    <ProjectReference Include="..\Koan.Web\Koan.Web.csproj"
+                      />
+    <ProjectReference Include="..\Koan.Tenancy\Koan.Tenancy.csproj"
+                      />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="wwwroot\**\*.*" LogicalName="Koan.Tenancy.Web.wwwroot.%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Koan.Tenancy.Web.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

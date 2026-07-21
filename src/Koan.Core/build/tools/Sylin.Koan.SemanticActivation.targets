@@ -1,0 +1,210 @@
+<Project>
+  <!--
+    R09-08 · One standard dependency graph for source and package activation intent.
+
+    Ordinary ProjectReference/PackageReference structure is the declaration. Source callers query
+    KoanDescribeActivationNode; packed projects publish the same recursively described closure as a
+    buildTransitive asset. Contracts projects remain naturally inert because they contain no KoanModule
+    and, by mandate, do not depend on functional implementations.
+  -->
+  <PropertyGroup>
+    <KoanSemanticActivationTargetsImported>true</KoanSemanticActivationTargetsImported>
+    <!-- Every Koan-built package describes itself and its ordinary Koan dependency closure. -->
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);KoanPackActivationGraph</TargetsForTfmSpecificContentInPackage>
+    <_KoanActivationPropsFile>$(IntermediateOutputPath)$(PackageId).activation.props</_KoanActivationPropsFile>
+  </PropertyGroup>
+
+  <UsingTask TaskName="WriteKoanActivationProps"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Edges ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <PackageId ParameterType="System.String" Required="true" />
+      <OutputPath ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.Collections.Generic" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Security" />
+      <Using Namespace="System.Text" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        Func<string, bool> validIdentity = value =>
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length > 256) return false;
+            foreach (var ch in value)
+            {
+                if (char.IsLetterOrDigit(ch) || ch == '.' || ch == '-' || ch == '_') continue;
+                return false;
+            }
+            return true;
+        };
+        if (!validIdentity(PackageId))
+        {
+            Log.LogError("Koan activation requires a stable PackageId (or the SDK AssemblyName fallback) before packing.");
+            return false;
+        }
+
+        var parsed = new List<KeyValuePair<string, string>>();
+        foreach (var item in Edges ?? Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+        {
+            var parts = (item.ItemSpec ?? string.Empty).Split(new[] { '|' }, StringSplitOptions.None);
+            if (parts.Length != 2 || !validIdentity(parts[0]) || !validIdentity(parts[1]))
+            {
+                Log.LogError("Koan activation dependency is malformed. Rebuild the declaring package from its ordinary references.");
+                return false;
+            }
+            if (string.Equals(parts[0], parts[1], StringComparison.OrdinalIgnoreCase))
+            {
+            Log.LogError("Koan activation package '{0}' depends on itself. Remove the self-edge.", parts[0]);
+                return false;
+            }
+            parsed.Add(new KeyValuePair<string, string>(parts[0], parts[1]));
+        }
+
+        var ordered = parsed
+            .GroupBy(edge => edge.Key + "|" + edge.Value, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .OrderBy(edge => edge.Key, StringComparer.Ordinal)
+            .ThenBy(edge => edge.Value, StringComparer.Ordinal)
+            .ToArray();
+
+        var adjacency = ordered
+            .GroupBy(edge => edge.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(edge => edge.Value).ToArray(),
+                StringComparer.OrdinalIgnoreCase);
+        var visiting = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        Func<string, bool> visit = null;
+        visit = node =>
+        {
+            if (visiting.Contains(node)) return false;
+            if (!visited.Add(node)) return true;
+            visiting.Add(node);
+            if (adjacency.TryGetValue(node, out var children))
+            {
+                foreach (var child in children)
+                {
+                    if (!visit(child)) return false;
+                }
+            }
+            visiting.Remove(node);
+            return true;
+        };
+        foreach (var node in adjacency.Keys)
+        {
+            if (visit(node)) continue;
+            Log.LogError("Koan activation dependencies contain a cycle involving '{0}'. Remove one project or package reference.", node);
+            return false;
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine("<Project>");
+        sb.AppendLine("  <ItemGroup>");
+        sb.Append("    <KoanActivationNode Include=\"")
+            .Append(SecurityElement.Escape(PackageId))
+            .AppendLine("\" />");
+        foreach (var edge in ordered)
+        {
+            var value = SecurityElement.Escape(edge.Key + "|" + edge.Value);
+            sb.Append("    <KoanActivationEdge Include=\"").Append(value).AppendLine("\" />");
+        }
+        sb.AppendLine("  </ItemGroup>");
+        sb.AppendLine("</Project>");
+
+        var content = sb.ToString();
+        Directory.CreateDirectory(Path.GetDirectoryName(OutputPath));
+        var existing = File.Exists(OutputPath) ? File.ReadAllText(OutputPath) : null;
+        if (!string.Equals(existing, content, StringComparison.Ordinal)) File.WriteAllText(OutputPath, content);
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <!--
+    Returns exactly one Root for this project plus all recursive Dependency records. Every ordinary
+    ProjectReference that also participates in Koan's build contract is a dependency edge. Package
+    dependencies arrive through their generated buildTransitive KoanActivationNode items.
+  -->
+  <Target Name="KoanDescribeActivationIdentity"
+          Returns="@(_KoanActivationIdentityResult)">
+    <ItemGroup>
+      <_KoanActivationIdentityResult Include="$(PackageId)"
+                                     Condition="'$(PackageId)' != ''">
+        <Kind>Root</Kind>
+        <RawIdentity>$(MSBuildProjectName)</RawIdentity>
+        <CanonicalIdentity>$(PackageId)</CanonicalIdentity>
+      </_KoanActivationIdentityResult>
+    </ItemGroup>
+  </Target>
+
+  <Target Name="KoanDescribeActivationNode"
+          Returns="@(_KoanActivationDescribeResult)">
+    <ItemGroup>
+      <_KoanActivationProject Include="@(ProjectReference)"
+                              Condition="'%(ProjectReference.ReferenceOutputAssembly)' != 'false' and '%(ProjectReference.OutputItemType)' != 'Analyzer'" />
+      <_KoanActivationPackageDependency Include="@(KoanActivationNode)"
+                                        Condition="'%(Identity)' != '$(PackageId)'" />
+    </ItemGroup>
+
+    <MSBuild Projects="@(_KoanActivationProject)"
+             Targets="KoanDescribeActivationIdentity"
+             BuildInParallel="true"
+             SkipNonexistentTargets="true"
+             Condition="'@(_KoanActivationProject)' != ''">
+      <Output TaskParameter="TargetOutputs" ItemName="_KoanActivationChildRoot" />
+    </MSBuild>
+
+    <MSBuild Projects="@(_KoanActivationProject)"
+             Targets="KoanDescribeActivationNode"
+             BuildInParallel="true"
+             SkipNonexistentTargets="true"
+             Condition="'@(_KoanActivationProject)' != ''">
+      <Output TaskParameter="TargetOutputs" ItemName="_KoanActivationChildRecord" />
+    </MSBuild>
+
+    <ItemGroup>
+      <_KoanActivationNestedDependency Include="@(_KoanActivationChildRecord)"
+                                       Condition="'%(_KoanActivationChildRecord.Kind)' == 'Dependency'" />
+
+      <_KoanActivationOwnDependency Include="@(_KoanActivationChildRoot->'$(PackageId)|%(CanonicalIdentity)')">
+        <Kind>Dependency</Kind>
+      </_KoanActivationOwnDependency>
+      <_KoanActivationOwnPackageDependency Include="@(_KoanActivationPackageDependency->'$(PackageId)|%(Identity)')">
+        <Kind>Dependency</Kind>
+      </_KoanActivationOwnPackageDependency>
+      <_KoanActivationImportedDependency Include="@(KoanActivationEdge)">
+        <Kind>Dependency</Kind>
+      </_KoanActivationImportedDependency>
+
+      <_KoanActivationDescribeResult Include="$(PackageId)"
+                                     Condition="'$(PackageId)' != ''">
+        <Kind>Root</Kind>
+        <RawIdentity>$(MSBuildProjectName)</RawIdentity>
+        <CanonicalIdentity>$(PackageId)</CanonicalIdentity>
+      </_KoanActivationDescribeResult>
+      <_KoanActivationDescribeResult Include="@(_KoanActivationOwnDependency);@(_KoanActivationOwnPackageDependency);@(_KoanActivationNestedDependency);@(_KoanActivationImportedDependency)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="KoanPackActivationGraph">
+    <CallTarget Targets="KoanDescribeActivationNode">
+      <Output TaskParameter="TargetOutputs" ItemName="_KoanActivationPackRecord" />
+    </CallTarget>
+    <ItemGroup>
+      <_KoanActivationPackDependency Include="@(_KoanActivationPackRecord)"
+                                     Condition="'%(_KoanActivationPackRecord.Kind)' == 'Dependency'" />
+    </ItemGroup>
+    <WriteKoanActivationProps Edges="@(_KoanActivationPackDependency)"
+                              PackageId="$(PackageId)"
+                              OutputPath="$(_KoanActivationPropsFile)" />
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(_KoanActivationPropsFile)">
+        <PackagePath>buildTransitive/$(PackageId).props</PackagePath>
+      </TfmSpecificPackageFile>
+      <FileWrites Include="$(_KoanActivationPropsFile)" />
+    </ItemGroup>
+  </Target>
+</Project>

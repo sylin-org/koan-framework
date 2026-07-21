@@ -2,14 +2,14 @@ namespace Koan.Core;
 
 /// <summary>
 /// Opt-out marker for <see cref="ServiceCollectionScanExtensions.AddAllOf{TService}(Microsoft.Extensions.DependencyInjection.IServiceCollection, System.Reflection.Assembly[])"/>.
-/// Apply to a concrete class that <i>implements</i> a many-impls contract (<c>IScheduledTask</c>,
-/// <c>IPackageSource</c>, …) but should <b>not</b> be DI-instantiated as part of the scan.
+/// Apply to a concrete class that <i>implements</i> a many-impls contract (<c>IPackageSource</c>,
+/// <c>IDownloadProxy</c>, …) but should <b>not</b> be DI-instantiated as part of the scan.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Typical use: a parameterized task that an upstream coordinator instantiates with per-instance
+/// Typical use: a parameterized source that an upstream coordinator instantiates with per-instance
 /// arguments (a Source row's slug + cron, a tenant id, etc.). Those ctors take primitives DI can't
-/// resolve, so a blanket <c>AddAllOf&lt;IScheduledTask&gt;()</c> would pick the class up and fail
+/// resolve, so a blanket <c>AddAllOf&lt;IPackageSource&gt;()</c> would pick the class up and fail
 /// at service-provider validation. Mark such classes to keep the scan honest.
 /// </para>
 /// <para>

@@ -1,6 +1,6 @@
 # AI-0013: MCP HTTP+SSE Transport Deployment Plan
 
-**Status:** Active
+**Status:** Superseded (transport surface) by [AI-0037](AI-0037-mcp-streamable-http-transport.md) — the HTTP+SSE `/sse`+`/rpc` pair described here is now the **deprecated legacy transport** (opt-in `Koan:Mcp:EnableLegacySseTransport`), re-expressed as a thin byte-faithful shim over the unified Streamable HTTP core. The modern default is Streamable HTTP. The auth/deployment guidance here still applies to the legacy edge.
 **Decision Date:** 2025-09-24
 **Effective Date:** 2025-09-24
 **Review Date:** 2025-10-15

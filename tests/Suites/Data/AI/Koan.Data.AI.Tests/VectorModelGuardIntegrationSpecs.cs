@@ -16,16 +16,17 @@ namespace Koan.Data.AI.Tests;
 /// establish → same-model no-op → second-model throw → Reset (migration) → new model accepted.
 /// </summary>
 /// <remarks>
-/// Uses a dedicated <see cref="W4GuardEntity"/> type so the guard's process-static confirmation
-/// cache and the registry key (both keyed on <c>typeof(TEntity).Name</c>) are isolated from every
-/// other spec. This is the only host-based class in the suite, so it never races other tests on
-/// the process-global <c>AppHost.Current</c>.
+/// Uses a dedicated <see cref="W4GuardEntity"/> type so its registry key (derived from
+/// <c>typeof(TEntity).Name</c>) is isolated from every other spec. Host-based Data.AI specs share a
+/// non-parallel collection because their static Entity calls intentionally exercise the
+/// process-default <c>AppHost.Current</c> binding.
 /// </remarks>
+[Collection(nameof(DataAiHostLifecycleCollection))]
 public sealed class VectorModelGuardIntegrationSpecs : IAsyncLifetime
 {
     private IntegrationHost? _host;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _host = await KoanIntegrationHost.Configure()
             .WithSetting("Koan:Environment", "Test")
@@ -39,7 +40,7 @@ public sealed class VectorModelGuardIntegrationSpecs : IAsyncLifetime
             .StartAsync();
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_host is not null) await _host.DisposeAsync();
     }

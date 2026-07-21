@@ -12,7 +12,6 @@ using Koan.AI.Connector.LMStudio;
 using Koan.AI.Connector.LMStudio.Options;
 using Koan.AI.Contracts.Models;
 using Koan.Core.Adapters;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -61,7 +60,7 @@ public class LMStudioAdapterSpec
 
         var adapter = CreateAdapter(handler, new LMStudioOptions
         {
-            BaseUrl = "http://localhost:1234",
+            Endpoints = ["http://localhost:1234"],
             DefaultModel = "phi3:mini",
             ApiKey = "secret"
         });
@@ -206,7 +205,7 @@ public class LMStudioAdapterSpec
 
         var adapter = CreateAdapter(handler, new LMStudioOptions
         {
-            BaseUrl = "http://localhost:1234",
+            Endpoints = ["http://localhost:1234"],
             DefaultModel = "missing-model"
         });
 
@@ -219,15 +218,14 @@ public class LMStudioAdapterSpec
     private static LMStudioAdapter CreateAdapter(RecordingHandler handler, LMStudioOptions? options = null)
     {
         var http = new HttpClient(handler);
-        var config = new ConfigurationBuilder().AddInMemoryCollection().Build();
         var readiness = new AdaptersReadinessOptions { DefaultTimeout = TimeSpan.FromSeconds(1) };
         var effectiveOptions = options ?? new LMStudioOptions
         {
-            BaseUrl = "http://localhost:1234",
+            Endpoints = ["http://localhost:1234"],
             DefaultModel = "phi3:mini"
         };
 
-        return new LMStudioAdapter(http, NullLogger<LMStudioAdapter>.Instance, config, readiness, effectiveOptions);
+        return new LMStudioAdapter(http, NullLogger<LMStudioAdapter>.Instance, readiness, effectiveOptions);
     }
 
     private static HttpResponseMessage JsonResponse(string json, HttpStatusCode statusCode = HttpStatusCode.OK)

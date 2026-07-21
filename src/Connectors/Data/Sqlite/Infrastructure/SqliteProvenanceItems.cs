@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Globalization;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Data.Connector.Sqlite;
 
@@ -11,8 +10,11 @@ internal static class SqliteProvenanceItems
 
     private static readonly IReadOnlyCollection<string> ConnectionConsumers = new[]
     {
+        "Koan.Data.Core.AdapterConnectionResolver",
         "Koan.Data.Connector.Sqlite.SqliteOptionsConfigurator",
-        "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
+        "Koan.Data.Connector.Sqlite.SqliteAdapterFactory",
+        "Koan.Data.Connector.Sqlite.SqliteConnectionLifecycle",
+        "Koan.Data.Connector.Sqlite.SqliteHealthContributor"
     };
 
     private static readonly IReadOnlyCollection<string> NamingConsumers = new[]
@@ -20,15 +22,10 @@ internal static class SqliteProvenanceItems
         "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
     };
 
-    private static readonly IReadOnlyCollection<string> PagingConsumers = new[]
-    {
-        "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
-    };
-
     internal static readonly ProvenanceItem ConnectionString = new(
         Constants.Configuration.Keys.ConnectionString,
         "SQLite Connection String",
-        "SQLite connection string used by the adapter; defaults to discovery when set to auto.",
+        "Effective Default-source candidate used by SQLite; auto resolves at runtime through discovery and the local fallback.",
         MustSanitize: true,
         DefaultValue: Defaults.ConnectionString,
         DefaultConsumers: ConnectionConsumers);
@@ -53,13 +50,6 @@ internal static class SqliteProvenanceItems
         "Indicates whether the adapter supports Create/EnsureCreated semantics.",
         DefaultValue: BoolString(true),
         DefaultConsumers: NamingConsumers);
-
-    internal static readonly ProvenanceItem DefaultPageSize = new(
-        Constants.Configuration.Keys.DefaultPageSize,
-        "Default Page Size",
-        "Default number of rows returned when paging through results.",
-        DefaultValue: Defaults.DefaultPageSize.ToString(CultureInfo.InvariantCulture),
-        DefaultConsumers: PagingConsumers);
 
     private static string BoolString(bool value) => value ? "true" : "false";
 }

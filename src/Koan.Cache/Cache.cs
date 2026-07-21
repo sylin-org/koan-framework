@@ -4,7 +4,6 @@ using System.Threading;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Scope;
-using Koan.Cache.Stores;
 using Koan.Core.Hosting.App;
 
 namespace Koan.Cache;
@@ -13,7 +12,7 @@ public static class Cache
 {
     public static ICacheClient Client
         => (ICacheClient)(AppHost.Current?.GetService(typeof(ICacheClient))
-            ?? throw new InvalidOperationException("ICacheClient is not available. Ensure services.AddKoanCache() has been invoked."));
+            ?? throw new InvalidOperationException("ICacheClient is unavailable. Reference Sylin.Koan.Cache and call AddKoan()."));
 
     public static ICacheEntryBuilder<T> WithJson<T>(string key)
         => Client.CreateEntry<T>(new CacheKey(key)).WithContentKind(CacheContentKind.Json);
@@ -29,9 +28,9 @@ public static class Cache
 
     public static CacheScopeHandle BeginScope(string scopeId, string? region = null)
     {
-        if (AppHost.Current?.GetService(typeof(ICacheClient)) is not CacheClient client)
+        if (AppHost.Current?.GetService(typeof(ICacheClient)) is not ICacheClient client)
         {
-            throw new InvalidOperationException("Cache scope cannot be created because CacheClient is not registered.");
+            throw new InvalidOperationException("Cache scope is unavailable. Reference Sylin.Koan.Cache and call AddKoan().");
         }
 
         return client.BeginScope(scopeId, region);

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
+using Koan.Core;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 
@@ -11,9 +12,8 @@ namespace Koan.Data.Connector.Json;
 [ProviderPriority(0)]
 public sealed class JsonAdapterFactory : IDataAdapterFactory
 {
-    public string Provider => "json";
-
-    public bool CanHandle(string provider) => string.Equals(provider, "json", StringComparison.OrdinalIgnoreCase);
+    public string Provider => Infrastructure.Constants.Provider.Name;
+    public bool IsAutomaticFloor => true;
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,
@@ -29,10 +29,11 @@ public sealed class JsonAdapterFactory : IDataAdapterFactory
         var directoryPath = AdapterConnectionResolver.GetSourceSetting(
             config,
             sourceRegistry,
-            "json",
+            Infrastructure.Constants.Provider.Name,
             source,
             "DirectoryPath",
-            baseOpts.DirectoryPath);
+            baseOpts.DirectoryPath,
+            this);
 
         // Create source-specific options
         var sourceOpts = new JsonDataOptions
@@ -40,7 +41,11 @@ public sealed class JsonAdapterFactory : IDataAdapterFactory
             DirectoryPath = directoryPath
         };
 
-        return new JsonRepository<TEntity, TKey>(Microsoft.Extensions.Options.Options.Create(sourceOpts));
+        return new JsonRepository<TEntity, TKey>(
+            Microsoft.Extensions.Options.Options.Create(sourceOpts),
+            sp.GetRequiredService<Koan.Data.Core.Semantics.DataSegmentationPlan>(),
+            this,
+            sp);
     }
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)

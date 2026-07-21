@@ -1,7 +1,7 @@
 using System;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using AwesomeAssertions;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -24,9 +24,7 @@ public sealed class KoanBearerSchemeTests
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddSingleton<IOptions<TrustIssuerOptions>>(Options.Create(new TrustIssuerOptions()));
-        services.AddSingleton<IIssuer, SharedKeyIssuer>();
-        services.AddAuthentication().AddKoanBearer();
+        new TrustModule().Register(services);
         return services.BuildServiceProvider();
     }
 
@@ -38,8 +36,8 @@ public sealed class KoanBearerSchemeTests
             .Get(KoanBearerDefaults.AuthenticationScheme);
 
         opts.TokenValidationParameters.Should().NotBeNull();
-        opts.TokenValidationParameters.IssuerSigningKey.Should().NotBeNull();
-        opts.TokenValidationParameters.ValidAlgorithms.Should().Contain("HS256");
+        opts.TokenValidationParameters.IssuerSigningKeys.Should().NotBeEmpty();
+        opts.TokenValidationParameters.ValidAlgorithms.Should().ContainSingle().Which.Should().Be("ES256");
         opts.MapInboundClaims.Should().BeFalse();
     }
 
@@ -56,10 +54,10 @@ public sealed class KoanBearerSchemeTests
         var good = issuer.Issue(new TrustClaims { Subject = "alice", Roles = new[] { "admin" } });
         handler.ValidateToken(good, tvp, out _); // does not throw
 
-        // "Foreign" now means a DIFFERENT secret — two issuers sharing the same key validate each other by design.
-        var foreign = new SharedKeyIssuer(Options.Create(new TrustIssuerOptions { Key = "a-different-secret" }), NullLogger<SharedKeyIssuer>.Instance)
+        var foreign = new EcdsaIssuer(new EphemeralIssuerKeyStore(), Options.Create(new TrustIssuerOptions()), NullLogger<EcdsaIssuer>.Instance)
             .Issue(new TrustClaims { Subject = "mallory" });
         Action validateForeign = () => handler.ValidateToken(foreign, tvp, out _);
         validateForeign.Should().Throw<SecurityTokenException>();
     }
+
 }

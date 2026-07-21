@@ -1,13 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Koan.Security.Trust</AssemblyName>
     <RootNamespace>Koan.Security.Trust</RootNamespace>
-    <Description>SEC-0001 fleet identity and trust fabric: the asymmetric issuer, inbound token verifier, ambient Identity, IAuthorize seam, and fail-closed trust-mode boot guard. Lower-level pillar consumed by Koan.Web.Auth (one-way dependency).</Description>
+    <Description>ES256 workload-token issuance and bearer verification with ambient request identity, automatic AddKoan activation, and a replaceable signing-key lifecycle.</Description>
     <PackageTags>$(CommonPackageTags);security;identity;trust;auth;token</PackageTags>
   </PropertyGroup>
   <ItemGroup>
@@ -19,9 +18,9 @@
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.18.0" />
-    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.18.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.8" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">

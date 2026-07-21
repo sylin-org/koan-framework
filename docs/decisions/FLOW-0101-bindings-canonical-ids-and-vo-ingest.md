@@ -2,10 +2,14 @@
 id: FLOW-0101
 slug: bindings-canonical-ids-and-vo-ingest
 domain: flow
-status: accepted
+status: Retired
 date: 2025-08-31
 title: Flow bindings, canonical ID resolution, and independent value-object ingest
 ---
+
+# FLOW-0101 - Flow bindings, canonical ID resolution, and independent value-object ingest
+
+> **Status: Retired.** Describes the original Flow pillar generation, superseded by the Koan.Canon rebuild.
 
 ## Context
 

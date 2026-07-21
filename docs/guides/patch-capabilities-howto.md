@@ -5,7 +5,7 @@ title: "Patch Capabilities How-To"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2025-11-09
-framework_version: v0.6.3
+framework_version: v0.20.0
 validation:
   date_last_tested: 2025-11-09
   status: verified
@@ -1278,29 +1278,6 @@ public class TodosController : EntityController<Todo>
 ---
 
 ## 10. Advanced Patterns
-
-### Pattern: Conditional patch with ETags (when available)
-
-```csharp
-// Future pattern (ETags coming in v0.7.x)
-[HttpPatch("{id}")]
-public async Task<IActionResult> PatchWithETag(
-    [FromRoute] string id,
-    [FromBody] JsonElement body,
-    [FromHeader(Name = "If-Match")] string? etag)
-{
-    if (etag != null)
-    {
-        var current = await Todo.Get(id);
-        if (current?.ETag != etag)
-        {
-            return StatusCode(412, new { error = "Precondition failed" });
-        }
-    }
-
-    return await base.Patch(id, body);
-}
-```
 
 ### Pattern: Batch patch operations
 

@@ -1,49 +1,37 @@
-Koan.AI.Connector.LMStudio - Technical reference
+# Sylin.Koan.AI.Connector.LMStudio — technical contract
 
-> **Contract**  
-> Inputs: Koan AI chat/stream/embedding contracts, discovery metadata, orchestration hints.  
-> Outputs: OpenAI-compatible HTTP requests, Koan AI responses, readiness metadata, health metrics.  
-> Error Modes: HTTP failures, serialization errors, readiness timeouts, missing models/auth.  
-> Criteria: Adapter registered via Koan auto-registrar, readiness policy respected, orchestration metadata published.
+## Responsibility
 
-## Options
+This package owns LM Studio's OpenAI-compatible wire protocol and provider-specific health validation.
+`Sylin.Koan.Core` owns discovery order; `Sylin.Koan.AI` compiles the provider topology and owns source routing.
 
-- `ConnectionString` (default `auto`) enables host/container discovery.
-- `BaseUrl` fallback when discovery fails (defaults to `http://localhost:1234`).
-- `ApiKey` optional Bearer credential (`LMSTUDIO_API_KEY` env alias).
-- `DefaultModel` used when callers omit `Model`; readiness degrades if absent server-side.
-- `RequestTimeoutSeconds` per-request timeout (defaults to 120s).
-- `AutoDiscoveryEnabled`, `Weight`, `Labels` surface router metadata for discovered members.
-- `Readiness` (policy/timeout/gating) aligns with `AdaptersReadinessOptions` defaults.
+The provider contributes id `lmstudio`. Its adapter is a DI-owned singleton, and its memoized per-endpoint HTTP
+clients are disposed with the host. LM Studio is declared as an external service, so orchestration and inspection do
+not promise a container Koan cannot responsibly provision.
 
-## Behavior
+## Configuration and election
 
-- Normalizes base URL to omit trailing `/v1` before issuing relative calls.
-- `ChatAsync` posts OpenAI `messages` payloads and merges vendor options onto the root object.
-- `StreamAsync` enables SSE, parsing `data:` frames until `[DONE]` and yielding `AiChatChunk` deltas.
-- `EmbedAsync` forwards multi-input embedding requests and returns vectors with dimension hints.
-- `ListModelsAsync` proxies `/v1/models` to expose adapter model descriptors.
-- Readiness pipeline hits `/v1/models` then verifies configured `DefaultModel`; failure downgrades to `Degraded`.
-- Health checks record response time, available model count, and exposes base URL to boot report metadata.
+- Options bind only from `Koan:Ai:LMStudio`.
+- `Endpoints` declares an ordered mesh; `ConnectionStrings:LMStudio` declares one endpoint.
+- Declaring both is a startup error.
+- Explicit placement is authoritative even when automatic discovery is disabled.
+- With no explicit placement, the shared Core discovery pipeline evaluates composed candidates, conventional
+  container topology, Docker host gateway, local loopback, and Aspire binding.
+- Health validation calls `GET /v1/models`, attaches `ApiKey` as a Bearer token, and can require `DefaultModel`.
 
-## Discovery & orchestration
+The activator publishes one `lmstudio` source with deterministic `lmstudio::member-N` members. Chat and Embedding
+capabilities remain routable even when no default model is configured; the request must then name its model.
 
-- Discovery adapter checks (in order): `LMSTUDIO_API_BASE_URL`, `Koan_AI_LMSTUDIO_URLS`, explicit config, host-first loopback, container endpoints, Aspire AppHost service bindings.
-- Health validation verifies `/v1/models` responds 2xx and optionally confirms `requiredModel` presence.
-- Auto-registrar wires `LMStudioOptions`, discovery adapter, readiness evaluators, and orchestrator metadata.
-- Orchestration evaluator contributes container descriptors (image, port 1234, health endpoint `/health`).
+## Protocol and readiness
 
-## Edge cases
+- Chat posts `/v1/chat/completions`; streaming parses SSE frames through `[DONE]`.
+- Embeddings post `/v1/embeddings`; model listing and readiness use `/v1/models`.
+- Trailing `/v1` in an endpoint is normalized before relative protocol calls.
+- Request timeout comes from `RequestTimeoutSeconds`.
+- Readiness verifies endpoint reachability and the configured default model. Missing default model availability is
+  degraded rather than falsely reported ready.
 
-- Missing default model keeps adapter in `Degraded`; router still allows explicit model selection.
-- Streaming cancel triggers `OperationCanceledException`; partial tokens already yielded remain valid.
-- LM Studio desktop with dynamic ports: set `LMSTUDIO_API_BASE_URL` explicitly to avoid probe failure.
-- Auth-enabled servers returning 401 propagate via `HttpRequestException`; ensure key present before readiness.
-- Multi-instance discovery: each URL obtains labels/weights from options; duplicates merged by registry.
+## Boundaries
 
-## References
-
-- ADR: ../../../../docs/decisions/AI-0016-lm-studio-adapter.md
-- AI registry ADR: ../../../../docs/decisions/AI-0008-adapters-and-registry.md
-- OpenAI surface ADR: ../../../../docs/decisions/AI-0005-protocol-surfaces.md
-- Secrets ADR: ../../../../docs/decisions/AI-0004-secrets-provider.md
+The package does not start LM Studio, load a model, manufacture an API key, guarantee OpenAI compatibility beyond
+the operations implemented here, retry failed inference, or make an unavailable automatic candidate fatal.

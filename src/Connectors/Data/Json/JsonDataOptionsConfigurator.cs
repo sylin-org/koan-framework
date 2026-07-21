@@ -26,13 +26,5 @@ internal sealed class JsonDataOptionsConfigurator : IConfigureOptions<JsonDataOp
         });
         if (!string.IsNullOrWhiteSpace(dir))
             options.DirectoryPath = dir!;
-
-        // Optional paging guardrails
-        var dps = Koan.Core.Configuration.ReadFirst(_config, new[]
-        {
-            $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.DefaultPageSize}",
-            $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.DefaultPageSize}"
-        });
-        if (int.TryParse(dps, out var dpsVal) && dpsVal > 0) options.DefaultPageSize = dpsVal;
     }
 }

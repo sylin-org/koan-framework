@@ -88,7 +88,7 @@ Rung 0/1 is **symmetric** (HS256, shared secret) — the accepted "whoever holds
 | Increment | Was | Now |
 |---|---|---|
 | 2c | `DevIssuer` — ES256, per-process ephemeral | `SharedKeyIssuer` — HS256, default shared secret |
-| 2e | `KoanDevIdentityMiddleware` auto-signs-in as `dev`/`admin` | default-anonymous; acts only on explicit `?_as=` |
+| 2e | automatic development identity originally lived in middleware | default-anonymous; `DevIdentityContributor` acts only on explicit `?_as=` through Web's ordered context lifecycle |
 | 2g | fail-closed on `DevEphemeral` in Production | fail-closed on the **default-insecure key** outside Development |
 | 2h | TestProvider demoted to opt-in everywhere | zero-config in Development; opt-in elsewhere |
 

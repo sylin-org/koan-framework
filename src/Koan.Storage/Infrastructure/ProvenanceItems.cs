@@ -22,15 +22,4 @@ internal static class StorageProvenanceItems
         "Named storage profile used when callers omit an explicit profile.",
         DefaultConsumers: StorageConsumers);
 
-    internal static readonly ProvenanceItem FallbackMode = new(
-        $"{StorageConstants.Constants.Configuration.Section}:{StorageConstants.Constants.Configuration.Keys.FallbackMode}",
-        "Storage Fallback Mode",
-        "Strategy applied when no storage profile is supplied and no default is defined.",
-        DefaultConsumers: StorageConsumers);
-
-    internal static readonly ProvenanceItem ValidateOnStart = new(
-        $"{StorageConstants.Constants.Configuration.Section}:{StorageConstants.Constants.Configuration.Keys.ValidateOnStart}",
-        "Validate Storage Profiles On Start",
-        "Controls whether storage profiles are validated for structure and provider compatibility during startup.",
-        DefaultConsumers: StorageConsumers);
 }

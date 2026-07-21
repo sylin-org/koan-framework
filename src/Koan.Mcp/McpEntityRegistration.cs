@@ -12,9 +12,7 @@ public sealed class McpEntityRegistration
         McpEntityAttribute attribute,
         EntityEndpointDescriptor descriptor,
         IReadOnlyList<McpToolDefinition> tools,
-        string displayName,
-        McpTransportMode enabledTransports,
-        bool? requireAuthentication)
+        string displayName)
     {
         EntityType = entityType ?? throw new ArgumentNullException(nameof(entityType));
         KeyType = keyType ?? throw new ArgumentNullException(nameof(keyType));
@@ -22,8 +20,6 @@ public sealed class McpEntityRegistration
         Descriptor = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
         Tools = tools ?? throw new ArgumentNullException(nameof(tools));
         DisplayName = displayName ?? throw new ArgumentNullException(nameof(displayName));
-        EnabledTransports = enabledTransports;
-        RequireAuthentication = requireAuthentication;
     }
 
     public Type EntityType { get; }
@@ -38,11 +34,4 @@ public sealed class McpEntityRegistration
 
     public string DisplayName { get; }
 
-    public McpTransportMode EnabledTransports { get; }
-
-    public bool EnableStdio => EnabledTransports.HasFlag(McpTransportMode.Stdio);
-
-    public bool EnableHttpSse => EnabledTransports.HasFlag(McpTransportMode.HttpSse);
-
-    public bool? RequireAuthentication { get; }
 }

@@ -4,16 +4,16 @@ domain: core
 title: "Framework Utilities Guide"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-06-05
-framework_version: v0.6.3
+last_updated: 2026-07-17
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-03-26
+  date_last_tested: 2026-07-17
   status: verified
-  scope: all-examples-tested-except-background-jobs-section
+  scope: module declaration verified by downstream generated/trim-shaped packaging proof; other sections retain prior evidence
 related_guides:
   - entity-capabilities-howto.md
   - data-modeling.md
-  - building-apis.md
+  - ../reference/web/index.md
   - performance.md
 ---
 
@@ -192,13 +192,14 @@ internal sealed class PostgresDiscoveryAdapter : ServiceDiscoveryAdapterBase
 
 **Location:** `Koan.Core` (`KoanModule`; host `Koan.Core.Hosting.Modules.KoanModuleHost`)
 
-The boot-time module primitive (ARCH-0086). Extend it to author one self-describing unit instead of
-hand-writing the `IKoanInitializer` + `IKoanAutoRegistrar` pair. It **implements** `IKoanAutoRegistrar`, so
-the existing source-generated discovery (`KoanRegistry`) and topological ordering (`RegistrarOrdering` via
-`[Before]`/`[After]`) apply unchanged.
+The boot-time module primitive (ARCH-0086/ARCH-0115). Framework and capability-package authors use one
+ordinary module for registration, typed structural contribution, startup, provenance, and safe composition
+evidence. The generator derives its stable identity from the standard NuGet `PackageId` (falling back to
+`AssemblyName`), emits the construction metadata, and the host retains one instance for the complete lifecycle.
+An implementation assembly contains at most one concrete `KoanModule`.
 
 #### Members
-- `string Id` (abstract) — canonical module id, e.g. `"data.postgres"`; surfaces as `ModuleName`.
+- `string Id` — derived and host-bound; module authors do not declare or override it.
 - `string? Version` (virtual) — defaults to the declaring assembly version.
 - `void Register(IServiceCollection services)` (virtual) — register DI services. Replaces `Initialize`.
 - `Task Start(IServiceProvider sp, CancellationToken ct)` (virtual) — one-time startup work, DI available,
@@ -207,14 +208,15 @@ the existing source-generated discovery (`KoanRegistry`) and topological orderin
 - `void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)` (virtual) — publish
   provenance. Named `Report` (not `Describe`) to disambiguate from per-provider capabilities
   (`IDescribesCapabilities.Describe`, ARCH-0084).
+- `void ReportComposition(KoanCompositionBuilder composition, IServiceProvider services)` (virtual) —
+  optionally project already-resolved safe decisions from this active retained module. Do not perform
+  provider election, structural contribution, or application work here.
 
 #### Usage Example
 
 ```csharp
 public sealed class MyPillarModule : KoanModule
 {
-    public override string Id => "my.pillar";
-
     public override void Register(IServiceCollection services)
         => services.AddSingleton<IMyService, MyService>();
 
@@ -223,14 +225,32 @@ public sealed class MyPillarModule : KoanModule
         // one-time startup work, DI available, ordered by [Before]/[After]
         return Task.CompletedTask;
     }
+
+    public override void ReportComposition(
+        KoanCompositionBuilder composition,
+        IServiceProvider services)
+    {
+        var plan = services.GetRequiredService<MyPillarPlan>();
+        composition.AddObservation(
+            "koan.my-pillar.plan.selected",
+            "my-pillar:plan",
+            $"Koan selected '{plan.Posture}' for MyPillar.",
+            plan.Reason,
+            Id);
+    }
 }
 ```
 
 #### When to Use
-New boot-time modules (a pillar, connector, or app-level wiring). Recurring periodic/pokable work stays on
-the `IKoanBackgroundService` family — `Start` models one-time ordered startup only. Code that registers
-services (e.g. recipes) or must run before the container is built belongs in `Register`, not `Start` (which
-receives an already-built `IServiceProvider`).
+New framework or capability-package modules. Recurring periodic/pokable work stays on the
+`IKoanBackgroundService` family — `Start` models one-time ordered startup only. Code that registers
+services belongs in `Register`, not `Start`. `ReportComposition` is a fail-soft projection of canonical
+plans/receipts; never create a separate discoverable reporter or place configuration values, credentials,
+ambient context values, or business payloads in it. Application developers normally need only `AddKoan()`.
+
+Cross-module contracts belong in an isolated `*.Core`, `*.Abstractions`, or `*.Contracts` assembly with
+no `KoanModule`. Reference that contracts assembly when only its API is needed; reference the functional
+assembly when the capability should participate. No Koan-specific project-reference metadata is required.
 
 ### [KoanDiscoverable] + KoanRegistry.GetDiscoveredImplementors
 
@@ -269,7 +289,7 @@ hand-rolling an `AppDomain` assembly scan. Used by `IKoanAuthEventContributor` /
 
 **Purpose**: Read a configuration value **with source attribution** — returns not just the value but
 where it came from (appsettings, environment variable, LaunchKit, etc.). This is the preferred
-method inside `IKoanAutoRegistrar.Describe()` to report settings with their origin.
+method inside `KoanModule.Report(...)` to report settings with their origin.
 
 #### Return type: `ConfigurationValue<T>`
 
@@ -333,8 +353,8 @@ public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnv
 ```
 
 #### When to Use
-- Inside `IKoanAutoRegistrar.Describe()` to show where settings came from in the boot report
-- Connector auto-registrars reporting their resolved configuration
+- Inside `KoanModule.Report(...)` to show where settings came from in the boot report
+- Connector modules reporting their resolved configuration
 - Any diagnostic context where traceability of config values matters
 - Use plain `Configuration.Read<T>()` when you only need the resolved value
 
@@ -376,11 +396,11 @@ public static IServiceCollection ConfigureKoanOptions<TOptions>(
 #### Usage Example
 
 ```csharp
-// In connector auto-registrar
+// In the connector's KoanModule
 public void Register(IServiceCollection services, IConfiguration configuration)
 {
     // Basic registration
-    services.AddKoanOptions<RedisOptions>(configuration, "Koan:Data:Redis");
+    services.AddKoanOptions<RedisOptions>("Koan:Redis");
 
     // With validation
     services.AddKoanOptionsWithValidation<PostgresOptions>(configuration, "Koan:Data:Postgres")
@@ -395,7 +415,7 @@ public void Register(IServiceCollection services, IConfiguration configuration)
 ```
 
 #### When to Use
-- KoanAutoRegistrar implementations
+- `KoanModule.Register` implementations
 - Options configuration in any Koan component
 - Layered configuration scenarios (appsettings → environment → code)
 
@@ -519,7 +539,7 @@ builder.AddDevCors();           // CORS for local development
 
 var app = builder.Build();
 app.ConfigureSamplePipeline();  // Standard middleware setup
-app.Run();
+await app.RunAsync();
 ```
 
 #### When to Use
@@ -554,8 +574,8 @@ var todo = await Todo.Get(id);
 todo.Title = "Buy organic milk";
 await todo.Save();
 
-// Delete
-await todo.Delete();
+// Remove
+await todo.Remove();
 ```
 
 #### When to Use
@@ -614,14 +634,14 @@ using (EntityContext.Partition("tenant/7")) { /* throws ArgumentException — wo
 
 ## Background Jobs
 
-**Location**: `src/Koan.Jobs` (+ optional `src/Koan.Jobs.Transport.Messaging`)
+**Location**: `src/Koan.Jobs` (internal wake carriage is supplied by `Koan.Communication`)
 **Pattern**: Entity-first pillar, auto-discovered (`[KoanDiscoverable]` / `KoanModule`)
 **ADR**: [JOBS-0005](../decisions/JOBS-0005-job-orchestrator-rebuild.md) · **Authoring guide**: [Background Jobs How-To](jobs-howto.md)
 
 **Purpose**: Durable, edge + level-triggered background work with a single orchestrator concern and a
 ledger-as-truth model. A job is a normal `Entity<T>` carrying its own behavior — no queues, workers, or
 repositories to wire. The same job code runs unchanged across tiers; the infrastructure you reference
-(a data adapter, multiple nodes, a message bus) decides durability and scale, never correctness.
+(a durable data adapter, multiple nodes, a Communication connector) decides durability and scale, never correctness.
 
 #### Entry points
 
@@ -647,7 +667,7 @@ await mailbatch.Submit();                  // batch (IEnumerable<T>)
 | `[JobChain(a,b,c)]` | linear pipeline (auto-advance, one ledger entry per stage) |
 | `[JobIdempotent(keys)]` | collapse concurrent / duplicate submits |
 | `[JobGate(member)]` | shared resource gate for cooperative backoff; `member` is a property **or** an async resolver method `Task<string?>(IServiceProvider, CancellationToken)` for runtime-derived keys (§18) |
-| `[JobPersistence(Auto\|InMemory\|DataStore)]` | per-type durability routing (`RoutingJobLedger`) |
+| `[JobPersistence(Auto\|InMemory\|DataStore)]` | per-type durability intent; `DataStore` rejects when no durable provider can honor it |
 | `[ParallelSafe]` | opt out of per-entity serialization (default: jobs for one entity run one at a time) |
 | `JobContext` verbs | `Reschedule(after\|until)` (defer, no retry consumed), `Backoff(after, key)` (cross-node gate), `ContinueWith` / `StopChain`, `Progress` |
 
@@ -660,20 +680,21 @@ Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
 
 #### Capability ladder
 
-`in-memory → durable → distributed → +bus` — constant at-least-once + idempotent contract across all of them.
+`in-memory → durable → distributed → +Communication wake` — constant at-least-once + idempotent contract across all of them.
 
-- **In-memory** (no data adapter): fast, ephemeral; `InMemoryJobLedger`.
-- **Durable** (any data adapter — SQLite/Postgres/Mongo/SQL Server): `DataJobLedger` over `Entity<JobRecord>`;
+- **In-memory** (no durable data adapter): fast and explicitly ephemeral.
+- **Durable** (SQLite/Postgres/Mongo/SQL Server or another durable Data provider): a Data-backed ledger over `Entity<JobRecord>`;
   transactional outbox (a `Submit` inside an ambient transaction enqueues on commit) and **retention** are automatic —
   the sweep purges Completed/Cancelled past `ArchiveAfter` (7d) and Failed/Dead past `FailedAfter` (30d), with an
   optional per-work-type count cap (`RetainPerWorkType`). On a TTL-capable store (Mongo) a native TTL index on the
   per-outcome `ExpireAt` (`[Index(Ttl)]` / `DataCaps.Retention.TtlIndex`) expires terminal rows continuously between
   sweeps; the sweep stays the universal backstop (§20.4). Ledger reads are pushed down (indexed claim/dashboard queries).
-- **Distributed** (several nodes on one store): competing consumers claim **contention-free** — on adapters that
-  support an atomic conditional claim (SQLite/Postgres/SqlServer/Mongo), the default `Optimistic` strategy marks
-  `Running` via a compare-and-set, so each ready job runs on **exactly one** node (no duplicate executions); `Ticket`
-  is the leaderless-election alternative. Resource gates are honored cross-node. (JOBS-0005 §20.3)
-- **+bus** (`Koan.Jobs.Transport.Messaging`): cross-node push-dispatch — a submit wakes every node immediately
+- **Distributed** (several nodes on one store): competing consumers use the adapter's conditional compare-and-set
+  capability automatically. SQLite/Postgres/SqlServer/Mongo admit only one claimant per ready ledger row; adapters
+  without that capability retain the honest optimistic at-least-once fallback. Resource gates are honored cross-node.
+  (JOBS-0005 §20.3)
+- **+Communication connector**: cross-node wake — a submit emits one bounded hint to
+  the elected worker group; no Jobs-specific transport package or application bus API
   instead of waiting out the poll interval. Latency upgrade only; the ledger stays the truth.
 
 > Scheduling is initiator-driven: a `Schedule` re-submits a fresh job on its cadence (interval / cron via Cronos /
@@ -684,8 +705,8 @@ Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
 > (`JobPerRowWarnThreshold`) when a work-type's active set looks like job-per-row. See the how-to §8.1.
 
 > Observability: active counts come from the indexed ledger; opt into `JobsOptions.MetricsEnabled` for a
-> node-sharded `JobMetric` throughput rollup that **survives retention** — read it with
-> `JobMetric.Summary(workType, from, to)`. See the how-to §10. (JOBS-0005 §20.2)
+> node-sharded throughput rollup that **survives retention** — read it with
+> `JobMetrics.Summary(workType, from, to)`. See the how-to §10. (JOBS-0005 §20.2)
 
 ---
 
@@ -741,9 +762,9 @@ public class MongoRepository<T>
 **Location**: `src/Koan.Core/Provenance/ProvenanceModuleWriter.cs` and
 `src/Koan.Core/Hosting/Bootstrap/ProvenanceModuleExtensions.cs`
 **Pattern**: Fluent writer + extension methods
-**Used in**: `IKoanAutoRegistrar.Describe(ProvenanceModuleWriter module, ...)`
+**Used in**: `KoanModule.Report(ProvenanceModuleWriter module, ...)`
 
-`ProvenanceModuleWriter` is the object passed to `Describe()` for every `IKoanAutoRegistrar`. Use it
+`ProvenanceModuleWriter` is the object passed to `Report()` for every active `KoanModule`. Use it
 to contribute structured metadata to the framework boot report.
 
 #### Full API
@@ -792,8 +813,8 @@ public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnv
 ```
 
 #### When to Use
-- In every `IKoanAutoRegistrar.Describe()` implementation
-- Connector auto-registrars reporting resolved configuration
+- In every `KoanModule.Report(...)` implementation that has configuration to explain
+- Connector modules reporting resolved configuration
 - Any module that wants to appear in the Koan boot report or ZenGarden topology
 
 ---
@@ -869,11 +890,11 @@ See [ARCH-0068: Refactoring Strategy](../decisions/ARCH-0068-refactoring-strateg
 5. Update CLAUDE.md if it affects AI assistant guidance
 6. Add unit tests in appropriate test suite
 
-**Questions?**
-Refer to [REFACTORING-LEDGER.md](../refactoring/REFACTORING-LEDGER.md) for planned utilities or propose new ones via ADR.
+When a new utility would establish durable framework law, record that law in an ADR. Do not use an
+implementation ledger as current API guidance.
 
 ---
 
 **Last Updated**: 2026-03-26
 **Maintained By**: Koan Framework Core Team
-**Related**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md), [Refactoring Ledger](../refactoring/REFACTORING-LEDGER.md)
+**Related**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md)

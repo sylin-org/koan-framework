@@ -2,9 +2,8 @@
   <!--
     ARCH-0085: package versions are computed by Nerdbank.GitVersioning from each package's
     version.json (operator-owned major.minor) + git commit height (automatic patch). nbgv sets
-    Version / AssemblyVersion / FileVersion directly — there is no version.props import and no
-    KoanPackageKind-based <Version> resolution any more (the old two-tier scheme, ARCH-0082, is
-    superseded). $(KoanPackageKind) survives only as informational metadata on the csprojs.
+    Version / AssemblyVersion / FileVersion directly. The old two-tier package-kind scheme from
+    ARCH-0082 is superseded and its non-behavioral metadata has been deleted.
 
     See docs/decisions/ARCH-0085-versioning-compatibility-and-automation.md.
   -->
@@ -13,4 +12,21 @@
        compatibility ranges at pack time. See build/compat-ranges.targets. -->
   <Import Project="$(MSBuildThisFileDirectory)build/compat-ranges.targets"
           Condition="Exists('$(MSBuildThisFileDirectory)build/compat-ranges.targets')" />
+
+  <!--
+    The public NuGet path receives Koan's composition target through Core's buildTransitive asset.
+    ProjectReference does not import package build assets, so executable source applications opt
+    into the same target through the repository-level UseKoanSource policy. Keeping this bridge
+    outside applications preserves package-shaped project files and one source-build behavior.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)src/Koan.Core/build/Sylin.Koan.Core.targets"
+          Condition="'$(UseKoanSource)' == 'true' and '$(OutputType)' == 'Exe' and Exists('$(MSBuildThisFileDirectory)src/Koan.Core/build/Sylin.Koan.Core.targets')" />
+
+  <!--
+    R09-02: source projects and packed bundles describe activation intent through one shared graph.
+    Core's primary target imports this file for package consumers; this repository import gives every
+    ProjectReference node the same query target without asking application or module authors for wiring.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)src/Koan.Core/build/tools/Sylin.Koan.SemanticActivation.targets"
+          Condition="'$(KoanSemanticActivationTargetsImported)' != 'true' and Exists('$(MSBuildThisFileDirectory)src/Koan.Core/build/tools/Sylin.Koan.SemanticActivation.targets')" />
 </Project>

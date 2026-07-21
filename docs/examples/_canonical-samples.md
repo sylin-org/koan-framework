@@ -36,8 +36,8 @@ var loaded = await Todo.Get(todo.Id);
 loaded.Completed = true;
 await loaded.Save();
 
-// Delete
-await loaded.Delete();
+// Remove
+await loaded.Remove();
 ```
 
 ## Controller (EntityController)

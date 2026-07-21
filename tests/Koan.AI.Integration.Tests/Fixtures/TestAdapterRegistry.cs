@@ -11,21 +11,13 @@ namespace Koan.AI.Integration.Tests.Fixtures;
 internal sealed class TestAdapterRegistry : IAiAdapterRegistry
 {
     private readonly object _gate = new();
-    private readonly List<AiAdapterRegistration> _registrations = [];
+    private readonly List<IAiAdapter> _adapters = [];
 
     public IReadOnlyList<IAiAdapter> All
     {
         get
         {
-            lock (_gate) { return _registrations.Select(r => r.Adapter).ToArray(); }
-        }
-    }
-
-    public IReadOnlyList<AiAdapterRegistration> Registrations
-    {
-        get
-        {
-            lock (_gate) { return _registrations.ToArray(); }
+            lock (_gate) { return _adapters.ToArray(); }
         }
     }
 
@@ -35,17 +27,11 @@ internal sealed class TestAdapterRegistry : IAiAdapterRegistry
 
         lock (_gate)
         {
-            if (_registrations.Any(r =>
-                    string.Equals(r.Adapter.Id, adapter.Id, StringComparison.OrdinalIgnoreCase)))
+            if (_adapters.Any(candidate =>
+                    string.Equals(candidate.Id, adapter.Id, StringComparison.OrdinalIgnoreCase)))
                 return;
 
-            _registrations.Add(new AiAdapterRegistration
-            {
-                Adapter = adapter,
-                Priority = 0,
-                Weight = 1,
-                RegisteredAt = DateTimeOffset.UtcNow
-            });
+            _adapters.Add(adapter);
         }
     }
 
@@ -54,8 +40,8 @@ internal sealed class TestAdapterRegistry : IAiAdapterRegistry
         if (string.IsNullOrWhiteSpace(id)) return false;
         lock (_gate)
         {
-            return _registrations.RemoveAll(r =>
-                string.Equals(r.Adapter.Id, id, StringComparison.OrdinalIgnoreCase)) > 0;
+            return _adapters.RemoveAll(adapter =>
+                string.Equals(adapter.Id, id, StringComparison.OrdinalIgnoreCase)) > 0;
         }
     }
 
@@ -64,9 +50,8 @@ internal sealed class TestAdapterRegistry : IAiAdapterRegistry
         if (string.IsNullOrWhiteSpace(id)) return null;
         lock (_gate)
         {
-            return _registrations
-                .FirstOrDefault(r => string.Equals(r.Adapter.Id, id, StringComparison.OrdinalIgnoreCase))
-                ?.Adapter;
+            return _adapters
+                .FirstOrDefault(adapter => string.Equals(adapter.Id, id, StringComparison.OrdinalIgnoreCase));
         }
     }
 }

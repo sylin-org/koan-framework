@@ -8,7 +8,7 @@ using Koan.Data.Core.Configuration;
 using Koan.Data.Core.Model;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
-using Koan.Data.Vector.Abstractions.Configuration;
+using Koan.Data.Vector.Naming;
 
 namespace Koan.Tests.Data.Core.Specs.Naming;
 

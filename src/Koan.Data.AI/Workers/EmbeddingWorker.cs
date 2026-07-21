@@ -1,7 +1,6 @@
-using Koan.AI;
+using Koan.Core.Context;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
-using Koan.Data.Vector;
 using Koan.Data.AI.Telemetry;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -18,8 +17,19 @@ namespace Koan.Data.AI.Workers;
 public class EmbeddingWorker(
     ILogger<EmbeddingWorker> logger,
     IOptions<EmbeddingWorkerOptions> options,
-    EmbeddingTelemetry? telemetry = null) : BackgroundService
+    EmbeddingTelemetry? telemetry,
+    KoanContextCarrierRegistry contextCarriers) : BackgroundService
 {
+    /// <summary>Compatibility constructor for the public 0.17.0 infrastructure shape.</summary>
+    [Obsolete("Direct EmbeddingWorker construction is compatibility-only; let AddKoan compose Core context.")]
+    public EmbeddingWorker(
+        ILogger<EmbeddingWorker> logger,
+        IOptions<EmbeddingWorkerOptions> options,
+        EmbeddingTelemetry? telemetry = null)
+        : this(logger, options, telemetry, new KoanContextCarrierRegistry([]))
+    {
+    }
+
     // Rate limiting: track embeddings generated per minute
     private readonly ConcurrentQueue<DateTimeOffset> _recentEmbeddings = new();
     private readonly SemaphoreSlim _rateLimitSemaphore = new(1, 1);
@@ -124,12 +134,11 @@ public class EmbeddingWorker(
     {
         var batchStopwatch = Stopwatch.StartNew();
 
-        // Query for pending jobs, ordered by priority (high first) then creation time (FIFO)
+        // Query for pending jobs in durable FIFO order.
         var pendingJobs = (await EmbedJob<TEntity>.Query(
             j => j.Status == EmbedJobStatus.Pending,
             ct))
-            .OrderByDescending(j => j.Priority)
-            .ThenBy(j => j.CreatedAt)
+            .OrderBy(j => j.CreatedAt)
             .Take(options.Value.BatchSize)
             .ToList();
 
@@ -208,9 +217,16 @@ public class EmbeddingWorker(
         where TEntity : class, IEntity<string>
     {
         var stopwatch = Stopwatch.StartNew();
+        EmbeddingContent? content = null;
 
         try
         {
+            // Restore durable service context (tenant + registered carrier axes) captured at enqueue so this global
+            // worker reads/writes the entity, vector, and state in the scope they belong to. Request-only Web filters
+            // are intentionally not carried into jobs. An unrestorable carrier throws here and the job is
+            // retried/dead-lettered, never silently mis-scoped.
+            using var _ambient = contextCarriers.Restore(job.AmbientCarrier, ContextIngressTrust.HostTrusted);
+
             // Load the entity to get fresh data
             var entity = await Data<TEntity, string>.Get(job.EntityId, ct);
             if (entity == null)
@@ -220,87 +236,47 @@ public class EmbeddingWorker(
 
             // Verify content signature hasn't changed
             var metadata = EmbeddingMetadata.Resolve<TEntity>();
-            var currentSignature = metadata.ComputeSignature(entity);
+            content = EmbeddingWriter.Describe(entity, metadata);
 
-            if (currentSignature != job.ContentSignature)
+            if (content.Value.Signature != job.ContentSignature)
             {
                 logger.LogWarning(
-                    "Content signature changed for entity {EntityId} - regenerating embedding text",
+                    "Content signature changed for entity {EntityId}; indexing the current Entity state",
                     job.EntityId);
 
-                // Update job with new content
-                job.EmbeddingText = metadata.BuildEmbeddingText(entity);
-                job.ContentSignature = currentSignature;
+                job.ContentSignature = content.Value.Signature;
 
                 // Record cache invalidation
                 telemetry?.RecordCacheInvalidation(typeof(TEntity).Name, "content_changed");
             }
 
             // Estimate tokens for cost tracking
-            var estimatedTokens = EmbeddingMetadata.EstimateTokens(job.EmbeddingText);
+            var estimatedTokens = EmbeddingMetadata.EstimateTokens(content.Value.Text);
 
-            // Generate embedding with source routing
-            float[] embedding;
-            using (metadata.Source != null || metadata.Model != null
-                ? Client.Scope(all: metadata.Source)
-                : null)
-            {
-                embedding = await Client.Embed(job.EmbeddingText, ct);
-            }
-
-            stopwatch.Stop();
+            var write = await EmbeddingWriter.Write(
+                entity,
+                metadata,
+                content.Value,
+                ct: ct).ConfigureAwait(false);
 
             // Estimate cost
             var estimatedCost = EmbeddingCostEstimator.EstimateCost(
-                metadata.Model ?? job.Model,
-                metadata.Source?.Split('-').FirstOrDefault(), // Extract provider from source like "openai-prod"
+                write.Model,
+                write.Source?.Split('-').FirstOrDefault(), // Extract provider from source like "openai-prod"
                 estimatedTokens);
+
+            stopwatch.Stop();
 
             // Record telemetry
             telemetry?.RecordEmbeddingGeneration(
                 entityType: typeof(TEntity).Name,
-                model: metadata.Model ?? job.Model,
-                provider: metadata.Source?.Split('-').FirstOrDefault(),
-                source: metadata.Source,
-                latencyMs: stopwatch.Elapsed.TotalMilliseconds,
+                model: write.Model,
+                provider: write.Source?.Split('-').FirstOrDefault(),
+                source: write.Source,
+                latencyMs: write.ProviderLatency.TotalMilliseconds,
                 tokens: estimatedTokens,
                 estimatedCost: estimatedCost,
                 success: true);
-
-            // W4 (AI-0036 P2): fail loud before writing if this model would make the index mixed-space.
-            await VectorModelGuard.GuardWrite<TEntity>(metadata.Model ?? job.Model, ct: ct);
-
-            // Store in vector database — stamp the producing model/source (provenance, AI-0036 W1) plus
-            // the entity's filterable facets under their CLR property names (AI-0036 D1), so metadata
-            // filters (incl. the Chain lambda DX) work by construction.
-            var provenance = VectorProvenance.Build(
-                metadata.Model ?? job.Model, metadata.Source, metadata.Version,
-                merge: VectorFilterableMetadata.Extract(entity));
-            await VectorData<TEntity>.SaveWithVector(entity, embedding, provenance, ct);
-
-            // Update embedding state
-            var stateId = EmbeddingState<TEntity>.MakeId(job.EntityId);
-            var state = await EmbeddingState<TEntity>.Get(stateId, ct);
-
-            if (state == null)
-            {
-                state = new EmbeddingState<TEntity>
-                {
-                    Id = stateId,
-                    EntityId = job.EntityId,
-                    ContentSignature = currentSignature,
-                    LastEmbeddedAt = DateTimeOffset.UtcNow,
-                    Model = job.Model
-                };
-            }
-            else
-            {
-                state.ContentSignature = currentSignature;
-                state.LastEmbeddedAt = DateTimeOffset.UtcNow;
-                state.Model = job.Model;
-            }
-
-            await state.Save(ct);
         }
         catch (Exception ex)
         {
@@ -308,11 +284,13 @@ public class EmbeddingWorker(
 
             // Record failure telemetry
             var metadata = EmbeddingMetadata.Resolve<TEntity>();
-            var estimatedTokens = EmbeddingMetadata.EstimateTokens(job.EmbeddingText);
+            var estimatedTokens = content is { } prepared
+                ? EmbeddingMetadata.EstimateTokens(prepared.Text)
+                : 0;
 
             telemetry?.RecordEmbeddingGeneration(
                 entityType: typeof(TEntity).Name,
-                model: metadata.Model ?? job.Model,
+                model: metadata.Model,
                 provider: metadata.Source?.Split('-').FirstOrDefault(),
                 source: metadata.Source,
                 latencyMs: stopwatch.Elapsed.TotalMilliseconds,

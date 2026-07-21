@@ -1,0 +1,145 @@
+using System.Linq;
+using AwesomeAssertions;
+using Koan.Core.Composition;
+using Xunit;
+
+namespace Koan.Core.Tests;
+
+/// <summary>
+/// P1.1 — schema serialization + the build-time/C# schema-consistency guard. Pins that the build
+/// target's hand-written JSON (see build/Sylin.Koan.Core.targets) round-trips through the single
+/// serialization authority, so the two emitters cannot silently diverge.
+/// </summary>
+public class KoanLockfileSpec
+{
+    private static readonly KoanLockApp App = new("S5.Recs", "0.17", "net10.0");
+
+    [Fact]
+    public void Round_trips_a_full_lockfile()
+    {
+        var original = new KoanLockfile(
+            KoanLockfile.CurrentSchema, App,
+            Modules: new[] { new KoanLockModule("Koan.Core", "0.17"), new KoanLockModule("Koan.Data.Core", "0.17") },
+            DirectReferences: new[]
+            {
+                new KoanLockReference("package", "Sylin.Koan.App"),
+                new KoanLockReference("package", "Sylin.Koan.Data.Connector.Postgres"),
+            },
+            Elections: new System.Collections.Generic.Dictionary<string, KoanLockElection>
+            {
+                ["data:default"] = new("postgres", "reference-priority", 14),
+            },
+            Capabilities: new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IReadOnlyList<string>>
+            {
+                ["data:postgres"] = new[] { "query.linq", "write.bulkUpsert" },
+            },
+            ConfigKeys: new[] { "Koan:Data:Postgres:ConnectionString" },
+            Entities: new[] { new KoanLockEntity("Anime", new[] { "Embedding" }) });
+
+        var json = KoanLockfileSerializer.Serialize(original);
+        var back = KoanLockfileSerializer.Deserialize(json);
+
+        back.Should().NotBeNull();
+        back!.Schema.Should().Be(KoanLockfile.CurrentSchema);
+        back.App.Should().Be(App);
+        back.Modules.Should().HaveCount(2);
+        back.DirectReferences.Should().HaveCount(2);
+        back.Elections!["data:default"].Adapter.Should().Be("postgres");
+        back.Capabilities!["data:postgres"].Should().Contain("write.bulkUpsert");
+        back.ConfigKeys.Should().ContainSingle().Which.Should().Be("Koan:Data:Postgres:ConnectionString");
+        back.Entities!.Single().Traits.Should().Contain("Embedding");
+    }
+
+    [Fact]
+    public void Omits_runtime_sections_for_a_build_time_lockfile()
+    {
+        // The build-time file carries app + modules + direct references; runtime sections stay absent.
+        var buildTime = new KoanLockfile(
+            KoanLockfile.CurrentSchema,
+            App,
+            new[] { new KoanLockModule("Koan.Core", "0.17") },
+            DirectReferences: new[] { new KoanLockReference("project", "Koan.Data.Core") });
+
+        var json = KoanLockfileSerializer.Serialize(buildTime);
+
+        json.Should().Contain("\"schema\": 2").And.Contain("\"modules\"")
+            .And.Contain("\"directReferences\"");
+        json.Should().NotContain("elections").And.NotContain("capabilities")
+            .And.NotContain("configKeys").And.NotContain("entities");
+    }
+
+    [Fact]
+    public void Build_target_json_shape_round_trips_through_the_serializer()
+    {
+        // GOLDEN: the exact shape build/Sylin.Koan.Core.targets hand-writes. If the target's schema
+        // drifts from the C# model, this deserialization breaks — the cross-emitter consistency guard.
+        const string golden = """
+            {
+              "schema": 2,
+              "app": {
+                "name": "S0.ConsoleJsonRepo",
+                "koan": "0.17",
+                "tfm": "net10.0"
+              },
+              "modules": [
+                {
+                  "id": "Koan.Core",
+                  "version": "0.17"
+                },
+                {
+                  "id": "Koan.Data.Core",
+                  "version": "0.17"
+                }
+              ],
+              "directReferences": [
+                {
+                  "kind": "project",
+                  "id": "Koan.Core"
+                }
+              ]
+            }
+            """;
+
+        var parsed = KoanLockfileSerializer.Deserialize(golden);
+
+        parsed.Should().NotBeNull();
+        parsed!.Schema.Should().Be(KoanLockfile.CurrentSchema);
+        parsed.App.Should().Be(new KoanLockApp("S0.ConsoleJsonRepo", "0.17", "net10.0"));
+        parsed.Modules.Select(m => m.Id).Should().Equal("Koan.Core", "Koan.Data.Core");
+        parsed.DirectReferences.Should().ContainSingle().Which.Id.Should().Be("Koan.Core");
+        parsed.Elections.Should().BeNull();
+    }
+
+    [Fact]
+    public void MajorMinor_normalizes_versions_and_passes_non_versions_through()
+    {
+        KoanCompositionSnapshot.MajorMinor("0.17.43.0").Should().Be("0.17");
+        KoanCompositionSnapshot.MajorMinor("0.17.43-g1a2b3c").Should().Be("0.17");
+        KoanCompositionSnapshot.MajorMinor("1.2.3+build").Should().Be("1.2");
+        KoanCompositionSnapshot.MajorMinor("unknown").Should().Be("unknown");
+        KoanCompositionSnapshot.MajorMinor(null).Should().Be("unknown");
+    }
+
+    [Fact]
+    public void Runtime_module_roster_excludes_the_application_assembly()
+    {
+        var applicationAssembly = typeof(KoanLockfileSpec).Assembly;
+
+        var modules = KoanCompositionSnapshot.GetLoadedKoanModules(applicationAssembly);
+
+        modules.Select(module => module.Id).Should()
+            .Contain("Koan.Core")
+            .And.NotContain(applicationAssembly.GetName().Name!);
+    }
+
+    [Fact]
+    public void Runtime_lockfile_uses_assembly_identity_not_friendly_product_name()
+    {
+        var applicationAssembly = typeof(KoanLockfileSpec).Assembly;
+
+        var name = KoanCompositionSnapshot.ResolveApplicationName(applicationAssembly, "Friendly Product Name");
+
+        name.Should().Be(applicationAssembly.GetName().Name)
+            .And.NotBe("Friendly Product Name");
+    }
+}

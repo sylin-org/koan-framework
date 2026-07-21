@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Koan.Core.Adapters;
-using Koan.Core.Adapters.Configuration;
+using Koan.Data.Adapters.Configuration;
 
 namespace Koan.Data.Vector.Connector.Qdrant;
 
@@ -9,7 +9,7 @@ public sealed class QdrantOptions : IAdapterOptions
     [Required]
     public string ConnectionString { get; set; } = "auto"; // DX-first: auto-detect by default
 
-    public string Endpoint { get; set; } = "http://localhost:6333";
+    public string Endpoint { get; set; } = Infrastructure.Constants.DefaultEndpoint;
 
     /// <summary>Optional Qdrant Cloud / TLS-protected deployment API key. Sent as <c>api-key</c> header.</summary>
     public string? ApiKey { get; set; } = null;
@@ -28,12 +28,10 @@ public sealed class QdrantOptions : IAdapterOptions
     public string Distance { get; set; } = "Cosine";
 
     /// <summary>
-    /// Embedding dimension at collection-creation time. Defaults to 1536 — the size of OpenAI's
-    /// ada-002 / text-embedding-3-small, the most common production embedding. Users with
-    /// different embedding models override; the first Upsert also auto-discovers when this
-    /// is left at null.
+    /// Optional embedding dimension for explicit collection pre-creation. Ordinary writes derive it from the
+    /// first embedding instead of guessing a model.
     /// </summary>
-    public int? Dimension { get; set; } = 1536;
+    public int? Dimension { get; set; }
 
     public int DefaultTimeoutSeconds { get; set; } = 100;
 
@@ -89,18 +87,6 @@ public sealed class QdrantOptions : IAdapterOptions
     /// </para>
     /// </summary>
     public QuantizationOptions? Quantization { get; set; } = new QuantizationOptions();
-
-    // Query configuration for vector similarity search. MaxTopK is a vector-search domain
-    // concept (cost of nearest-neighbour scoring), not a row-page cap; it stays.
-    public int DefaultTopK { get; set; } = 10;
-    public int MaxTopK { get; set; } = 200;
-
-    // IAdapterOptions implementation — default-only fallback aliased to DefaultTopK.
-    public int DefaultPageSize
-    {
-        get => DefaultTopK;
-        set => DefaultTopK = value;
-    }
 
     public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();
 }

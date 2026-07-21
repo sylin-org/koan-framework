@@ -1,6 +1,8 @@
 # FLOW-0070: Flow Command Bus (Fire-and-Forget, Targetable, Model-Free)
 
-**Status:** Proposed 2025-09-03
+> **Status: Retired.** Describes the original Flow pillar generation, superseded by the Koan.Canon rebuild.
+
+**Status:** Retired
 
 ## Context
 

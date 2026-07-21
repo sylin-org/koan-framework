@@ -34,9 +34,11 @@ the write and read sides of the AI surface.
 This DDR defines the two contracts on the seam between the embedding lifecycle (`Koan.Data.AI`) and
 the model-agnostic store (`Koan.Data.Vector`), plus the orchestration layers that read through it:
 
-- **Write side — provenance is metadata the lifecycle owner stamps.** Every write path
-  (`EmbeddingWorker`, the synchronous embed hook, the `EmbeddingMigrator`) routes through a single
-  `VectorProvenance` helper that stamps the producing `model`/`source`/`provider`/`version` into the
+- **Write side — provenance is metadata the lifecycle owner stamps.** Every write intent
+  (`EmbeddingWorker`, the synchronous embed hook, the `EmbeddingMigrator`) routes through one
+  `EmbeddingWriter`; it resolves provider/model, guards the vector space, builds `VectorProvenance`,
+  performs a vector-only write, and confirms `EmbeddingState`. The helper stamps the producing
+  `model`/`source`/`provider`/`version` into the
   vector record under a reserved `__embedding.*` namespace. Provenance is co-located with the vector
   and queryable like any other metadata, so a model mismatch is catchable — the W4 guard throws at the
   write that would otherwise create a **mixed-space index** (vectors from different models are not
@@ -60,7 +62,7 @@ intent on the read side, but both were lost crossing the `Vector<T>` boundary. T
 | # | Site | What it knows | What it persists |
 |---|------|---------------|------------------|
 | **W1** | [EmbeddingWorker.cs:271](../../src/Koan.Data.AI/Workers/EmbeddingWorker.cs#L271) | `metadata.Model ?? job.Model`, `metadata.Source` — used at 254-268 for cost + telemetry | `null` metadata |
-| **W2** | [Koan.Data.AI/Initialization/KoanAutoRegistrar.cs:475](../../src/Koan.Data.AI/Initialization/KoanAutoRegistrar.cs#L475) | synchronous embed hook; same lifecycle metadata in scope | `null` metadata |
+| **W2** | [DataAiModule.cs](../../src/Koan.Data.AI/Initialization/DataAiModule.cs) | Entity Lifecycle embedding hook; same lifecycle metadata in scope | `null` metadata |
 | **W3** | [EmbeddingMigrator.cs:250](../../src/Koan.Data.AI/Migration/EmbeddingMigrator.cs#L250) | `targetModel`/`targetSource`/`targetProvider` — the migration *is* a model change; written to `EmbeddingState.Model` at 264 | `null` metadata |
 
 The provenance survived only in **out-of-band sidecars** (`EmbeddingState<T>` keyed by entity id;
@@ -80,7 +82,7 @@ query path, and neither let the store or a migration audit answer "which model i
 |---|-------------|----------|-------|--------------|
 | **R1** | `Chain.Retrieve<T>` — [ChainExecutor.cs:196](../../src/Koan.AI.Orchestration/ChainExecutor.cs#L196), [:480](../../src/Koan.AI.Orchestration/ChainExecutor.cs#L480) | `topK` | `alpha`, `rerank` (**both advertised** at [ChainBuilder.cs:51](../../src/Koan.AI.Orchestration/ChainBuilder.cs#L51)), `text`, `filter` | **silent** — DX accepts knobs it ignores |
 | **R2** | agent `{type}_search` — [EntityToolGenerator.cs:389](../../src/Koan.AI.Agents/EntityToolGenerator.cs#L389) | `text`, `topK` | `alpha`, `filter` | **missing capability** — no slot exposed |
-| **R3** | RAG pillar — [RagRetrievalPipeline.cs:65](../../src/Koan.Rag/Retrieval/RagRetrievalPipeline.cs#L65) | `text`, `alpha`, `topK` | `filter` | **missing capability** — no filter param |
+| **R3** | RAG pillar — `RagRetrievalPipeline.cs:65` _(Koan.Rag migrated to agyo-tools 2026-06 as `Sylin.Agyo.Rag`; see [08-agyo-reorganization](../assessment/08-agyo-reorganization.md))_ | `text`, `alpha`, `topK` | `filter` | **missing capability** — no filter param |
 
 - **R4 — no shared contract.** Three forwarders, three different subsets, **`filter` lost by all
   three**. The store's read surface (fail-loud and filter-capable) had no single typed options object
@@ -106,9 +108,10 @@ __embedding.provider  e.g. "openai"
 __embedding.version   the [Embedding] schema version (already tracked in EmbeddingState)
 ```
 
-Single choke point: a `VectorProvenance` helper builds this dictionary from the resolved
-`EmbeddingMetadata`/`job`/migrator target, and all three write sites (W1/W2/W3) route through it
-instead of passing `null`. The store does not parse these keys; they are ordinary filterable
+Single choke point: `EmbeddingWriter` accepts the resolved `EmbeddingMetadata` plus any explicit
+migrator target and uses `VectorProvenance` to build this dictionary. Lifecycle, worker, and migrator
+retain their distinct intent but cannot independently reproduce routing, guard, provenance, vector
+persistence, or state confirmation. The store does not parse these keys; they are ordinary filterable
 metadata. **W4** then becomes cheap: a model-mismatch guard and a "models present in index"
 diagnostic read this back; the guard is **fail-loud only at the genuine boundary** (query model ≠
 indexed model for the same logical field) and otherwise silent.
@@ -159,8 +162,8 @@ parser, same operator-aware capabilities. No new filter dialect.
 ## 4. Change ledger
 
 **Write (provenance):**
-- `Koan.Data.Vector` (or `Koan.Data.AI` if kept lifecycle-side): `VectorProvenance.Build(metadata, job?)` → `IReadOnlyDictionary<string,object>`; reserved `__embedding.*` key constants.
-- W1 `EmbeddingWorker.cs:271`, W2 `KoanAutoRegistrar.cs:475`, W3 `EmbeddingMigrator.cs:250` — replace `null` with provenance dict (merged with any caller metadata).
+- `Koan.Data.Vector` owns the reserved `__embedding.*` key constants; `Koan.Data.AI` owns provenance construction because it owns lifecycle model/source intent.
+- W1 `EmbeddingWorker`, W2 `DataAiModule`, and W3 `EmbeddingMigrator` call one internal `EmbeddingWriter`; only that writer selects the embedding source/model and crosses the vector persistence seam.
 - W4: model-mismatch guard + "models in index" diagnostic on the vector read/health path.
 
 **Read (forwarding):**
@@ -179,8 +182,8 @@ parser, same operator-aware capabilities. No new filter dialect.
 
 ## 6. Capabilities
 
-- **P0 — no silent drops.** Provenance is threaded through all three write sites via the single
-  `VectorProvenance` helper — no write passes `null` — and `Chain.Retrieve<T>` forwards
+- **P0 — no silent drops.** Provenance is threaded through the one `EmbeddingWriter` used by all three
+  write intents — no lifecycle path passes `null` — and `Chain.Retrieve<T>` forwards
   `step.Alpha`/`step.Rerank`. `Alpha` is `double?` (null = pure-vector; set = hybrid with
   `text = query`, matching `Search`'s own `double? alpha` and the RAG pillar's hybrid call); `Rerank`
   is honoured by the rerank pass. Default `Retrieve<T>(q)` is unchanged — nothing the layer already
@@ -246,16 +249,22 @@ overload and above all six repositories.
   one partition and relying on a filter is a Koan anti-pattern. *(The entity-web `QueryFilterComposer.AndAll`
   remains the right tool for hook-contributed predicates within a partition, but is not a tenancy boundary.)*
 - **D3 — W4 guards at the write boundary, backed by a model registry.** A durable per-collection
-  model registry (`VectorModelRegistry<TEntity>`, keyed per `(entity, partition)`, O(1), never stale)
-  records the producing model on each `SaveWithVector`. `GuardWrite` runs immediately before each
-  write (`EmbeddingWorker`, `KoanAutoRegistrar`) and throws `VectorModelMismatchException` when a write
+  model registry (`VectorModelRegistry<TEntity>`, keyed per `(entity, partition)`, O(1), read for every
+  attempted write)
+  records the producing model on each vector write. `GuardWrite` runs in `EmbeddingWriter` immediately
+  before persistence and throws `VectorModelMismatchException` when a write
   would introduce a second model into a single-model index — fired at the genuine boundary (the write
-  that would corrupt the index), and only against the durable registry it just read, never on stale
-  data. An index that is legitimately multi-model is tolerated with a WARN; `Evaluate`/`Inspect`
+  that would corrupt the index), and only against the durable registry it just read. No process cache
+  may bypass that read. An index that is legitimately multi-model is tolerated with a WARN; `Evaluate`/`Inspect`
   surface "models in index" as warn-only health, and `EmbeddingMigrator.Reset` clears the registry for
   a by-design model transition. Guarding at write time is strictly stronger than a read-time check —
-  a guarded single-model index can never mismatch a same-model query — and avoids the layering problem
+  completed serialized writes cannot introduce a known second model — and avoids the layering problem
   that `Koan.Data.Vector` cannot resolve the query model.
+
+  This registry check is not an atomic compare-and-set across simultaneous first writers. Providers
+  need a conditional-write or transaction capability before Koan can claim exclusion for concurrent
+  different-model writes; the guard currently protects completed-write sequences and reports the
+  durable state it observed.
 
 ### 9.2 Filter semantics & capability contract
 
@@ -314,7 +323,7 @@ comments reference them as anchors; the labels are descriptive groupings, not a 
   the agent `{type}_search`/`{type}_query` tools expose a JSON-DSL `filter` (parsed via the schemaless
   reader) + `alpha`. No-filter calls behave exactly as before at all three entry points.
 - **P2 — W4 mixed-space guard.** `VectorModelGuard.GuardWrite`, backed by the durable
-  `VectorModelRegistry<TEntity>` (per `(entity, partition)`), runs before each `SaveWithVector` and
+  `VectorModelRegistry<TEntity>` (per `(entity, partition)`), runs inside `EmbeddingWriter` before each vector write and
   throws `VectorModelMismatchException` when a write would introduce a second model into a single-model
   index; an already-multi-model index is tolerated with a WARN, and `EmbeddingMigrator.Reset` clears
   the registry for a by-design transition. `Evaluate`/`Inspect` surface "models in index" as warn-only

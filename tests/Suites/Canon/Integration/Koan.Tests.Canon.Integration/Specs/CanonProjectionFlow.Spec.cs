@@ -1,13 +1,7 @@
-﻿namespace Koan.Tests.Canon.Integration.Specs;
+namespace Koan.Tests.Canon.Integration.Specs;
 
 public sealed class CanonProjectionFlowSpec
 {
-    private const string ServicesKey = "services";
-    private const string RuntimeKey = "runtime";
-    private const string HarnessKey = "harness";
-    private const string InitialResultKey = "result:initial";
-    private const string UpdatedResultKey = "result:updated";
-
     private readonly ITestOutputHelper _output;
 
     public CanonProjectionFlowSpec(ITestOutputHelper output)
@@ -16,85 +10,76 @@ public sealed class CanonProjectionFlowSpec
     }
 
     [Fact]
-    public Task Projection_pipeline_materializes_views_and_policy_state()
-        => TestPipeline.For<CanonProjectionFlowSpec>(_output, nameof(Projection_pipeline_materializes_views_and_policy_state))
-            .UsingServiceProvider(ServicesKey, ConfigureServices)
-            .Arrange(ctx =>
-            {
-                using var scope = ctx.CreateServiceScope(ServicesKey);
-                ctx.SetItem(RuntimeKey, scope.ServiceProvider.GetRequiredService<ICanonRuntime>());
-                ctx.SetItem(HarnessKey, scope.ServiceProvider.GetRequiredService<ProjectionHarness>());
-            })
-            .Act(async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<ICanonRuntime>(RuntimeKey);
+    public async Task Projection_pipeline_materializes_views_and_policy_state()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        ConfigureServices(services);
+        await using var sp = services.BuildServiceProvider();
 
-                var options = CanonizationOptions.Default
-                    .WithOrigin("crm")
-                    .WithStageBehavior(CanonStageBehavior.Immediate)
-                    .WithTag("tracking", "enabled");
-                var initial = new CustomerCanon
-                {
-                    Email = "ann@example.com",
-                    Dummy = "alpha",
-                    DisplayName = "Ann Lee"
-                };
-                var initialResult = await runtime.Canonize(initial, options, ctx.Cancellation).ConfigureAwait(false);
-                ctx.SetItem(InitialResultKey, initialResult);
+        ICanonRuntime runtime;
+        ProjectionHarness harness;
+        using (var scope = sp.CreateScope())
+        {
+            runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
+            harness = scope.ServiceProvider.GetRequiredService<ProjectionHarness>();
+        }
 
-                var updated = new CustomerCanon
-                {
-                    Email = "ann@example.com",
-                    Dummy = "alpha",
-                    DisplayName = "Annabelle Lee"
-                };
-                var updatedResult = await runtime.Canonize(updated, options, ctx.Cancellation).ConfigureAwait(false);
-                ctx.SetItem(UpdatedResultKey, updatedResult);
-            })
-            .Assert(ctx =>
-            {
-                var harness = ctx.GetRequiredItem<ProjectionHarness>(HarnessKey);
-                var initial = ctx.GetRequiredItem<CanonizationResult<CustomerCanon>>(InitialResultKey);
-                var updated = ctx.GetRequiredItem<CanonizationResult<CustomerCanon>>(UpdatedResultKey);
+        var options = CanonizationOptions.Default
+            .WithOrigin("crm")
+            .WithStageBehavior(CanonStageBehavior.Immediate)
+            .WithTag("tracking", "enabled");
+        var initialEntity = new CustomerCanon
+        {
+            Email = "ann@example.com",
+            Dummy = "alpha",
+            DisplayName = "Ann Lee"
+        };
+        var initial = await runtime.Canonize(initialEntity, options, CancellationToken.None);
 
-                initial.Canonical.Id.Should().NotBeNullOrWhiteSpace();
-                updated.Canonical.Id.Should().Be(initial.Canonical.Id);
+        var updatedEntity = new CustomerCanon
+        {
+            Email = "ann@example.com",
+            Dummy = "alpha",
+            DisplayName = "Annabelle Lee"
+        };
+        var updated = await runtime.Canonize(updatedEntity, options, CancellationToken.None);
 
-                harness.Canonical.Should().ContainSingle();
-                var canonical = harness.Canonical.Single();
+        initial.Canonical.Id.Should().NotBeNullOrWhiteSpace();
+        updated.Canonical.Id.Should().Be(initial.Canonical.Id);
 
-                canonical.Id.Should().Be(updated.Canonical.Id);
-                canonical.DisplayName.Should().Be("ANNABELLE LEE");
-                canonical.Metadata.Origin.Should().Be("crm");
-                canonical.Metadata.Tags.Should().ContainKey("tracking").WhoseValue.Should().Be("enabled");
-                canonical.Metadata.Policies.Should().ContainKey("Name.First:SourceOfTruth").WhoseValue.Outcome.Should().Be("incoming");
-                canonical.Metadata.PropertyFootprints.Should().ContainKey("Name.First");
-                harness.Indices.Should().Contain(index => index.Key == "Email=ann@example.com");
-                harness.Indices.Should().Contain(index => index.Key == "Dummy=alpha");
-                harness.Indices.Should().Contain(index => index.Key.Contains("Email=ann@example.com|Dummy=alpha", StringComparison.OrdinalIgnoreCase));
-                harness.Views.Should().ContainKey(ProjectionHarness.CanonicalViewKey(canonical.Id));
-                var canonicalView = harness.Views[ProjectionHarness.CanonicalViewKey(canonical.Id)];
-                canonicalView.ViewName.Should().Be("canonical");
-                canonicalView.DisplayName.Should().Be("ANNABELLE LEE");
-                canonicalView.Metadata.Tags.Should().ContainKey("tracking");
+        harness.Canonical.Should().ContainSingle();
+        var canonical = harness.Canonical.Single();
 
-                harness.Lineage.Should().ContainSingle();
-                var lineageView = harness.Lineage.Single();
-                lineageView.ReferenceId.Should().Be(canonical.Id);
-                lineageView.ViewName.Should().Be("lineage");
-                lineageView.Sources.Should().ContainKey("crm").WhoseValue.Should().Be("CRM");
+        canonical.Id.Should().Be(updated.Canonical.Id);
+        canonical.DisplayName.Should().Be("ANNABELLE LEE");
+        canonical.Metadata.Origin.Should().Be("crm");
+        canonical.Metadata.Tags.Should().ContainKey("tracking").WhoseValue.Should().Be("enabled");
+        canonical.Metadata.Policies.Should().ContainKey("Name.First:SourceOfTruth").WhoseValue.Outcome.Should().Be("incoming");
+        canonical.Metadata.PropertyFootprints.Should().ContainKey("Name.First");
+        harness.Indices.Should().Contain(index => index.Key == "Email=ann@example.com");
+        harness.Indices.Should().Contain(index => index.Key == "Dummy=alpha");
+        harness.Indices.Should().Contain(index => index.Key.Contains("Email=ann@example.com|Dummy=alpha", StringComparison.OrdinalIgnoreCase));
+        harness.Views.Should().ContainKey(ProjectionHarness.CanonicalViewKey(canonical.Id));
+        var canonicalView = harness.Views[ProjectionHarness.CanonicalViewKey(canonical.Id)];
+        canonicalView.ViewName.Should().Be("canonical");
+        canonicalView.DisplayName.Should().Be("ANNABELLE LEE");
+        canonicalView.Metadata.Tags.Should().ContainKey("tracking");
 
-                harness.PolicyStates.Should().ContainSingle();
-                var policy = harness.PolicyStates.Single();
-                policy.ReferenceId.Should().Be(canonical.Id);
-                policy.Policies.Should().ContainKey("Name.First:SourceOfTruth").WhoseValue.Should().Be("incoming");
-                policy.PropertyFootprints.Should().ContainKey("Name.First");
+        harness.Lineage.Should().ContainSingle();
+        var lineageView = harness.Lineage.Single();
+        lineageView.ReferenceId.Should().Be(canonical.Id);
+        lineageView.ViewName.Should().Be("lineage");
+        lineageView.Sources.Should().ContainKey("crm").WhoseValue.Should().Be("CRM");
 
-                return ValueTask.CompletedTask;
-            })
-            .Run();
+        harness.PolicyStates.Should().ContainSingle();
+        var policy = harness.PolicyStates.Single();
+        policy.ReferenceId.Should().Be(canonical.Id);
+        policy.Policies.Should().ContainKey("Name.First:SourceOfTruth").WhoseValue.Should().Be("incoming");
+        policy.PropertyFootprints.Should().ContainKey("Name.First");
+    }
 
-    private static void ConfigureServices(TestContext ctx, IServiceCollection services)
+    private static void ConfigureServices(IServiceCollection services)
     {
         services.AddLogging();
         services.AddSingleton<ProjectionHarness>();
@@ -107,7 +92,6 @@ public sealed class CanonProjectionFlowSpec
             var builder = new CanonRuntimeBuilder();
             builder.UsePersistence(harness);
             builder.UseAuditSink(audit);
-            builder.SetRecordCapacity(64);
             builder.ConfigureDefaultOptions(options => options with { SkipDistribution = true });
             builder.ConfigurePipeline<CustomerCanon>(pipeline =>
             {
@@ -251,6 +235,25 @@ public sealed class CanonProjectionFlowSpec
             }
         }
 
+        public Task<TModel?> GetCanonicalAsync<TModel>(string canonicalId, CancellationToken cancellationToken)
+            where TModel : CanonEntity<TModel>, new()
+        {
+            lock (_gate)
+            {
+                if (typeof(TModel) == typeof(CustomerCanon))
+                {
+                    var snapshot = _canonical.LastOrDefault(existing =>
+                        string.Equals(existing.Id, canonicalId, StringComparison.OrdinalIgnoreCase));
+                    if (snapshot is not null)
+                    {
+                        return Task.FromResult<TModel?>((TModel)(object)snapshot.ToEntity());
+                    }
+                }
+
+                return Task.FromResult<TModel?>(null);
+            }
+        }
+
         public Task<TModel> PersistCanonicalAsync<TModel>(TModel entity, CancellationToken cancellationToken)
             where TModel : CanonEntity<TModel>, new()
         {
@@ -366,6 +369,8 @@ public sealed class CanonProjectionFlowSpec
         internal sealed class CustomerSnapshot
         {
             public required string Id { get; init; }
+            public required string Email { get; init; }
+            public required string Dummy { get; init; }
             public required string DisplayName { get; init; }
             public required CanonMetadata Metadata { get; init; }
 
@@ -373,8 +378,20 @@ public sealed class CanonProjectionFlowSpec
                 => new()
                 {
                     Id = customer.Id,
+                    Email = customer.Email,
+                    Dummy = customer.Dummy,
                     DisplayName = customer.DisplayName ?? "",
                     Metadata = customer.Metadata.Clone()
+                };
+
+            public CustomerCanon ToEntity()
+                => new()
+                {
+                    Id = Id,
+                    Email = Email,
+                    Dummy = Dummy,
+                    DisplayName = DisplayName,
+                    Metadata = Metadata.Clone()
                 };
         }
 

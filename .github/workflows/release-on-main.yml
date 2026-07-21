@@ -1,182 +1,61 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# Auto-release on merge to main (ARCH-0082, versioning per ARCH-0085)
-#
-# Required reading before debugging or re-running manually:
-#   docs/workbooks/nuget-publishing.md  (Failure -> recovery section)
-#   docs/workbooks/versioning.md        (how per-package versions are computed)
-# ─────────────────────────────────────────────────────────────────────────────
-# What this does, in order, on every push to main:
-#   1. Builds the full solution (refuses to release a broken build).
-#   2. Packs every packable csproj under src/ with -p:PublicRelease=true.
-#      Nerdbank.GitVersioning (via each package's version.json + pathFilters)
-#      stamps each package with its own version (patch = git height of the
-#      package folder since its major.minor last changed). --skip-duplicate
-#      makes every push idempotent; packages whose version did not change are
-#      silently skipped by nuget.org.
-#   3. Creates a date-based release tag (release/YYYY-MM-DD[-N]).
-#   4. Pushes all nupkg and snupkg to nuget.org.
-#
-# What you do:
-#   - Open a PR dev -> main, merge it. That is it.
-#
-# To skip publishing for a specific merge: include "[skip release]" in the
-# merge commit subject. The job conditional short-circuits the entire job.
-#
-# Required secret: NUGET_API_KEY (Settings -> Secrets and variables -> Actions).
-# If absent, the tag still lands but packages are NOT pushed -- the workflow
-# warns instead of failing so the release record is preserved.
-# ─────────────────────────────────────────────────────────────────────────────
-
-name: Release on main
+name: Release packages
 
 on:
   push:
     branches: [main]
 
-# Single release in flight at a time; serialize subsequent merges.
-concurrency:
-  group: release-main
-  cancel-in-progress: false
-
 permissions:
-  contents: write   # needed to push the release tag
+  contents: read
 
 jobs:
   release:
-    if: "!contains(github.event.head_commit.message, '[skip release]')"
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout (full history for Nerdbank.GitVersioning)
-        uses: actions/checkout@v4
+      - name: Check out main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6.0.2
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v5.2.0
         with:
-          dotnet-version: '10.x'
+          global-json-file: global.json
 
-      - name: Configure git for the release tag
+      - name: Require project-local versions
+        run: dotnet run --project tools/Koan.Packaging -- inventory --output artifacts/package-inventory.json
+
+      - name: Pack
         shell: pwsh
         run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          dotnet build src/Koan.Core.Registry.Generators/Koan.Core.Registry.Generators.csproj --configuration Release --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Embedded generator build failed.' }
 
-      - name: Restore + build the solution (Release, PublicRelease)
-        shell: pwsh
-        run: |
-          dotnet build Koan.sln -c Release --nologo "-p:NuGetAudit=false" "-p:PublicRelease=true"
-          if ($LASTEXITCODE -ne 0) { throw "Build failed -- refusing to release a broken main." }
+          dotnet pack Koan.sln --configuration Release --artifacts-path artifacts/packages --property:PublicRelease=true --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Solution pack failed.' }
 
-      - name: Pack all packable projects (PublicRelease=true)
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path artifacts/nuget -Force | Out-Null
-
-          $csprojs = @(Get-ChildItem -Path src -Recurse -Filter *.csproj)
-          Write-Host "Packing $($csprojs.Count) candidate project(s) ..."
-          $failed = @()
-
-          foreach ($c in $csprojs) {
-            # Explicit restore handles projects not included in Koan.sln.
-            dotnet restore $c.FullName --nologo "-p:NuGetAudit=false" 2>&1 | Out-Null
-            dotnet pack $c.FullName -c Release --nologo `
-              "-p:PublicRelease=true" `
-              "-p:NuGetAudit=false" `
-              -o artifacts/nuget
-            if ($LASTEXITCODE -ne 0) {
-              $failed += $c.Name
-              # Non-zero is normal for IsPackable=false projects and analyzer/generator
-              # quirks (NU5017/NU5019). Warn and continue -- we check the artifact count below.
-              Write-Host "::warning::Pack returned non-zero for $($c.Name). Continuing."
-            }
-          }
-
-          $produced = @(Get-ChildItem artifacts/nuget/*.nupkg -File)
-          Write-Host "Pack summary: $($produced.Count) nupkg(s) produced; $($failed.Count) project(s) returned non-zero."
-          if ($produced.Count -eq 0) { throw "Zero packages produced -- check per-pack errors above." }
-
-      - name: Compute date-based release tag
-        id: tag
-        shell: pwsh
-        run: |
-          $base = "release/$(Get-Date -Format 'yyyy-MM-dd')"
-          $tag  = $base
-          $n    = 1
-          while (git tag --list $tag) {
-            $n++
-            $tag = "$base-$n"
-          }
-          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          Write-Host "Release tag: $tag"
-
-      - name: Create and push release tag
-        shell: pwsh
-        run: |
-          git tag -a "${{ steps.tag.outputs.tag }}" -m "Release ${{ steps.tag.outputs.tag }}"
-          git push origin "${{ steps.tag.outputs.tag }}"
+          dotnet pack templates/Sylin.Koan.Templates.csproj --configuration Release --artifacts-path artifacts/packages --property:PublicRelease=true --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Template pack failed.' }
 
       - name: Publish to NuGet
+        shell: pwsh
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        shell: pwsh
         run: |
-          if ([string]::IsNullOrEmpty($env:NUGET_API_KEY)) {
-            Write-Host "::warning::NUGET_API_KEY is empty."
-            Write-Host "::warning::Tag ${{ steps.tag.outputs.tag }} is up; packages NOT published."
-            Write-Host "::warning::Set NUGET_API_KEY and re-run, or push manually from artifacts/nuget/."
-            exit 0
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
+            throw 'Repository secret NUGET_API_KEY is required.'
           }
 
-          $packages = @(Get-ChildItem artifacts/nuget/*.nupkg  -File)
-          $symbols  = @(Get-ChildItem artifacts/nuget/*.snupkg -File -ErrorAction SilentlyContinue)
-          Write-Host "Publishing $($packages.Count) package(s) + $($symbols.Count) symbol(s) to nuget.org ..."
-          $failed = @()
+          $packages = @(Get-ChildItem artifacts/packages -Recurse -Filter *.nupkg -File)
+          if ($packages.Count -eq 0) {
+            throw 'Pack produced no NuGet packages.'
+          }
 
-          foreach ($pkg in $packages) {
-            Write-Host "  -> $($pkg.Name)"
-            dotnet nuget push $pkg.FullName `
+          foreach ($package in $packages) {
+            dotnet nuget push $package.FullName `
               --source https://api.nuget.org/v3/index.json `
               --api-key $env:NUGET_API_KEY `
               --skip-duplicate
             if ($LASTEXITCODE -ne 0) {
-              $failed += $pkg.Name
-              Write-Host "::warning::Failed to publish $($pkg.Name) -- continuing with remaining packages."
+              throw "NuGet push failed for $($package.Name)."
             }
           }
-
-          foreach ($sym in $symbols) {
-            Write-Host "  -> $($sym.Name) (symbols)"
-            dotnet nuget push $sym.FullName `
-              --source https://api.nuget.org/v3/index.json `
-              --api-key $env:NUGET_API_KEY `
-              --skip-duplicate
-            if ($LASTEXITCODE -ne 0) {
-              # Symbol push failure is not fatal -- main package is up; symbols can be retried.
-              Write-Host "::warning::Failed to publish symbols $($sym.Name) -- main package is published; symbols can be retried."
-            }
-          }
-
-          if ($failed.Count -gt 0) {
-            throw "$($failed.Count) main package(s) failed to publish: $($failed -join ', ')"
-          }
-
-      - name: Summary
-        if: always()
-        shell: pwsh
-        run: |
-          $tag  = '${{ steps.tag.outputs.tag }}'
-          $pkgs = (Get-ChildItem artifacts/nuget/*.nupkg -File -ErrorAction SilentlyContinue).Count
-
-          $summary = @"
-          # Release on main
-
-          | Step | Result |
-          | --- | --- |
-          | Build | OK |
-          | Release tag | $tag |
-          | Packages produced | $pkgs |
-          "@
-          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append

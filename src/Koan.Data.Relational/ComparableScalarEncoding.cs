@@ -1,4 +1,6 @@
 using System.Globalization;
+using Koan.Data.Core;
+using Koan.Data.Core.Semantics;
 using Newtonsoft.Json;
 
 namespace Koan.Data.Relational;
@@ -63,7 +65,9 @@ public static class ComparableScalarEncoding
 
     /// <summary>Registers the canonical converters onto an adapter's <see cref="JsonSerializerSettings"/>
     /// (used for both serialize and deserialize), leaving the naming strategy and other settings intact.</summary>
-    public static JsonSerializerSettings Apply(JsonSerializerSettings settings)
+    public static JsonSerializerSettings Apply(
+        JsonSerializerSettings settings,
+        IEnumerable<DataSegmentationField>? segmentationFields = null)
     {
         // Stop Newtonsoft from pre-parsing ISO strings to DateTime BEFORE our converters run. Its default
         // (DateParseHandling.DateTime) would (a) make DateTimeOffset round-trip depend on the ambient
@@ -75,6 +79,15 @@ public static class ComparableScalarEncoding
         settings.Converters.Add(_timeSpan);
         settings.Converters.Add(_dateOnly);
         settings.Converters.Add(_timeOnly);
+
+        // Serialize-stage managed-field hook (DATA-0105 §3b, Seam 2). Wrap the adapter's existing contract
+        // resolver in the shared ManagedFieldJsonInjector (Koan.Data.Core, ARCH-0103 §9 — lifted here so the JSON-text
+        // KeyValueStore family stamps the same managed keys), preserving its naming strategy (CamelCase on SqlServer;
+        // PascalCase default on SQLite/PG). When no module registers a managed field, the resolver is a pure
+        // pass-through, so real-property serialization stays byte-identical. One shared wiring point for the
+        // whole relational trio (all three call Apply).
+        var naming = (settings.ContractResolver as Newtonsoft.Json.Serialization.DefaultContractResolver)?.NamingStrategy;
+        settings.ContractResolver = new ManagedFieldJsonInjector(segmentationFields) { NamingStrategy = naming };
         return settings;
     }
 

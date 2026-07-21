@@ -4,7 +4,6 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
@@ -12,7 +11,7 @@ using Koan.AI.Contracts.Options;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Context;
 using Koan.Core;
-using Koan.Core.AI;
+using Koan.Core.Hosting.App;
 
 namespace Koan.AI;
 
@@ -24,8 +23,10 @@ namespace Koan.AI;
 /// </summary>
 public static class Client
 {
+    private const string ClientOperation = "AI client";
+    private const string AdapterSelectionOperation = "AI adapter selection";
+
     private static readonly AsyncLocal<IAiPipeline?> _override = new();
-    private static Func<IServiceProvider, IAiPipeline>? _resolver;
 
     /// <summary>
     /// Override the AI pipeline for the current async context (useful for testing).
@@ -214,13 +215,15 @@ public static class Client
     /// </summary>
     public static async Task<float[]> Embed(string text, EmbedOptions options, CancellationToken ct = default)
     {
+        using var _source = options.Source is not null ? Scope(embed: options.Source) : null;
         var response = await Resolve().Embed(new AiEmbeddingsRequest
-        {
-            Input = new() { text },
-            Model = options.Model,
-            OverrideUrl = options.OverrideUrl,
-            OverrideProvider = options.OverrideProvider,
-        }, ct);
+            {
+                Input = new() { text },
+                Model = options.Model,
+                OverrideUrl = options.OverrideUrl,
+                OverrideProvider = options.OverrideProvider,
+            }, ct)
+            .ConfigureAwait(false);
         return response.Vectors.FirstOrDefault() ?? [];
     }
 
@@ -1430,33 +1433,10 @@ public static class Client
     // ========================================================================
 
     public static bool IsAvailable
-    {
-        get
-        {
-            if (_override.Value is IAiPipeline) return true;
-            var sp = Koan.Core.Hosting.App.AppHost.Current;
-            if (sp is null) return false;
-            var ia = sp.GetService<IAiPipeline>();
-            if (ia is not null) return true;
-            var scopeFactory = sp.GetService<IServiceScopeFactory>();
-            if (scopeFactory is null) return false;
-            using var scope = scopeFactory.CreateScope();
-            return scope.ServiceProvider.GetService<IAiPipeline>() is not null;
-        }
-    }
+        => _override.Value is not null || TryResolveCurrent() is not null;
 
     public static IAiPipeline? TryResolve()
-    {
-        if (_override.Value is IAiPipeline o) return o;
-        var sp = Koan.Core.Hosting.App.AppHost.Current;
-        if (sp is null) return null;
-        var ia = sp.GetService<IAiPipeline>();
-        if (ia is not null) return ia;
-        var scopeFactory = sp.GetService<IServiceScopeFactory>();
-        if (scopeFactory is null) return null;
-        using var scope = scopeFactory.CreateScope();
-        return scope.ServiceProvider.GetService<IAiPipeline>();
-    }
+        => _override.Value ?? TryResolveCurrent();
 
     // ========================================================================
     // Internal — Pipeline & Chat
@@ -1466,11 +1446,22 @@ public static class Client
     private static IAiPipeline Resolve()
     {
         if (_override.Value is IAiPipeline o) return o;
-        var sp = Koan.Core.Hosting.App.AppHost.Current
-            ?? throw new InvalidOperationException(
-                "AI not configured; call services.AddKoan() or AddAi() and ensure AppHost.Current is set during startup.");
-        _resolver ??= CreateResolver(sp);
-        return _resolver(sp);
+        return AppHost.GetRequiredService<IAiPipeline>(ClientOperation);
+    }
+
+    private static IAiPipeline? TryResolveCurrent()
+    {
+        var services = AppHost.Current;
+        if (services is null) return null;
+
+        try
+        {
+            return services.GetService(typeof(IAiPipeline)) as IAiPipeline;
+        }
+        catch (ObjectDisposedException)
+        {
+            return null;
+        }
     }
 
     private static AiChatRequest BuildChatRequest(string message, ChatOptions? options)
@@ -1560,13 +1551,7 @@ public static class Client
     private static TAdapter FindAdapter<TAdapter>(string capability, string? sourceOverride = null)
         where TAdapter : class, IAiAdapter
     {
-        var sp = Koan.Core.Hosting.App.AppHost.Current
-            ?? throw new InvalidOperationException(
-                "AI not configured; call services.AddKoan() or AddAi() and ensure AppHost.Current is set during startup.");
-
-        var registry = sp.GetService<IAiAdapterRegistry>()
-            ?? throw new InvalidOperationException(
-                $"IAiAdapterRegistry not registered. Ensure AI is configured via AddKoan() or AddAi().");
+        var registry = AppHost.GetRequiredService<IAiAdapterRegistry>(AdapterSelectionOperation);
 
         var (source, _) = AiCategoryScope.ResolveMerged(capability, sourceOverride);
 
@@ -1716,21 +1701,6 @@ public static class Client
     // ========================================================================
     // Internal — Infrastructure
     // ========================================================================
-
-    private static Func<IServiceProvider, IAiPipeline> CreateResolver(IServiceProvider sp)
-    {
-        return (svc) =>
-        {
-            var scopeFactory = svc.GetService<IServiceScopeFactory>();
-            if (scopeFactory is null)
-                throw new InvalidOperationException("ServiceScopeFactory missing; invalid DI container state.");
-            var ia = svc.GetService<IAiPipeline>();
-            if (ia is not null) return ia;
-            using var scope = scopeFactory.CreateScope();
-            ia = scope.ServiceProvider.GetService<IAiPipeline>();
-            return ia ?? throw new InvalidOperationException("IAiPipeline not registered; call AddKoan() or AddAi().");
-        };
-    }
 
     private sealed class Reset : IDisposable
     {

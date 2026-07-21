@@ -21,7 +21,7 @@ internal sealed class HealthContributorsBridge : IHostedService
         foreach (var c in _registry.All)
         {
             // Run checks synchronously for predictable readiness updates
-            var unsub = _agg.Subscribe(c.Name, args => { RunContributorSync(c, cancellationToken); });
+            var unsub = _agg.Subscribe(c.Name, args => { RunContributorSync(c, args.CancellationToken); });
             _subscriptions.Add(unsub);
         }
         // Fallback: listen to broadcast events to run all contributors when no specific targeting is used
@@ -47,42 +47,7 @@ internal sealed class HealthContributorsBridge : IHostedService
         foreach (var c in _registry.All)
         {
             // Synchronous to ensure snapshot reflects latest results when requested
-            RunContributorSync(c, CancellationToken.None);
-        }
-    }
-
-    private async Task RunContributor(IHealthContributor c, CancellationToken ct)
-    {
-        try
-        {
-            var report = await c.Check(ct);
-            var status = report.State switch
-            {
-                HealthState.Healthy => HealthStatus.Healthy,
-                HealthState.Degraded => HealthStatus.Degraded,
-                HealthState.Unhealthy => HealthStatus.Unhealthy,
-                _ => HealthStatus.Unknown
-            };
-
-            IReadOnlyDictionary<string, string>? facts = null;
-            if (report.Data is not null && report.Data.Count > 0)
-            {
-                var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var kv in report.Data)
-                {
-                    if (kv.Value is null) continue;
-                    dict[kv.Key] = kv.Value?.ToString() ?? "";
-                }
-                facts = dict;
-            }
-
-            var enriched = facts is null ? new Dictionary<string, string>() : new Dictionary<string, string>(facts);
-            enriched["critical"] = c.IsCritical ? "true" : "false";
-            _agg.Push(c.Name, status, report.Description, ttl: null, facts: enriched);
-        }
-        catch
-        {
-            _agg.Push(c.Name, HealthStatus.Unhealthy, "exception during health check");
+            RunContributorSync(c, e.CancellationToken);
         }
     }
 
@@ -114,6 +79,10 @@ internal sealed class HealthContributorsBridge : IHostedService
             var enriched = facts is null ? new Dictionary<string, string>() : new Dictionary<string, string>(facts);
             enriched["critical"] = c.IsCritical ? "true" : "false";
             _agg.Push(c.Name, status, report.Description, ttl: null, facts: enriched);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Host/request cancellation is not a component-health failure.
         }
         catch
         {

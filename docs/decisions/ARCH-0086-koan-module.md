@@ -1,5 +1,9 @@
 # ARCH-0086: KoanModule — the unified boot-time module primitive
 
+> **Superseded in part by [ARCH-0116](ARCH-0116-one-module-lifecycle.md) (2026-07-17).** The
+> compatibility bridge and indefinite dual-lifecycle conclusion below no longer apply. `KoanModule`
+> is now the only bootstrap primitive.
+
 **Status**: Accepted (2026-06-02) — additive-base approach + keep `[Before]/[After]` ordering, both signed off by the Enterprise Architect. **Settled (2026-06-03):** stages (a)–(d) complete; the `KoanModule` + ordered `Start` + `Report` surface is landed and proven, the auth off-registry split-brain is healed, and the `IKoanInitializer`-only fragmentation is folded. Remaining registrar→`KoanModule` conversions are opportunistic (see the ledger).
 **Date**: 2026-06-02
 **Deciders**: Enterprise Architect

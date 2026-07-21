@@ -1,8 +1,11 @@
-﻿using Koan.Data.Core.Model;
+using Koan.Data.Core.Model;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
+using Koan.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.Tests.Data.Core.Specs.Vector;
 
@@ -18,84 +21,192 @@ public sealed class VectorAdapterResolutionSpec
     [Fact]
     public async Task Uses_vector_attribute_before_defaults()
     {
-        await TestPipeline.For<VectorAdapterResolutionSpec>(_output, nameof(Uses_vector_attribute_before_defaults))
-            .UsingServiceProvider(key: "services", configure: static (_, services) =>
-            {
-                services.AddKoanDataCore();
-                services.AddKoanDataVector();
-                services.AddSingleton<IDataService, DataService>();
-                services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("foo"));
-                services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("bar"));
-                services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("json"));
-            })
-            .Assert(ctx =>
-            {
-                var provider = ctx.GetRequiredItem<ServiceProviderFixture>("services").Services;
-                var vector = provider.GetRequiredService<IVectorService>();
-                var repo = vector.TryGetRepository<EntityWithVectorAdapter, string>();
-                repo.Should().NotBeNull();
-                (repo as FakeVectorRepo<EntityWithVectorAdapter, string>)!.ProviderName.Should().Be("foo");
-                return ValueTask.CompletedTask;
-            })
-            .Run();
+        var services = NewServices();
+        services.AddKoanDataCore();
+        services.AddKoanDataVector();
+        services.AddSingleton<IDataService, DataService>();
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("foo"));
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("bar"));
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("json"));
+        await using var sp = services.BuildServiceProvider();
+
+        var vector = sp.GetRequiredService<IVectorService>();
+        var repo = vector.TryGetRepository<EntityWithVectorAdapter, string>();
+        repo.Should().NotBeNull();
+        // TryGetRepository wraps the adapter in the data-axis isolation decorator (GAP C 0.3); unwrap to inspect the
+        // selected provider.
+        (((IDecoratedVectorRepository)repo!).InnerRepository as FakeVectorRepo<EntityWithVectorAdapter, string>)!
+            .ProviderName.Should().Be("foo");
     }
 
     [Fact]
     public async Task Uses_default_provider_when_attribute_missing()
     {
-        await TestPipeline.For<VectorAdapterResolutionSpec>(_output, nameof(Uses_default_provider_when_attribute_missing))
-            .UsingServiceProvider(key: "services", configure: static (_, services) =>
+        var services = NewServices();
+        var cfg = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                var cfg = new ConfigurationBuilder()
-                    .AddInMemoryCollection(new Dictionary<string, string?>
-                    {
-                        ["Koan:Data:VectorDefaults:DefaultProvider"] = "bar"
-                    })
-                    .Build();
+                ["Koan:Data:VectorDefaults:DefaultProvider"] = "bar"
+            })
+            .Build();
 
-                services.AddSingleton<IConfiguration>(cfg);
-                services.AddKoanDataCore();
-                services.AddKoanDataVector();
-                services.AddSingleton<IDataService, DataService>();
-                services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("foo"));
-                services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("bar"));
-                services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("json"));
-            })
-            .Assert(ctx =>
-            {
-                var provider = ctx.GetRequiredItem<ServiceProviderFixture>("services").Services;
-                var vector = provider.GetRequiredService<IVectorService>();
-                var repo = vector.TryGetRepository<EntityWithSourceOnly, string>();
-                repo.Should().NotBeNull();
-                (repo as FakeVectorRepo<EntityWithSourceOnly, string>)!.ProviderName.Should().Be("bar");
-                return ValueTask.CompletedTask;
-            })
-            .Run();
+        services.AddSingleton<IConfiguration>(cfg);
+        services.AddKoanDataCore();
+        services.AddKoanDataVector();
+        services.AddSingleton<IDataService, DataService>();
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("foo"));
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("bar"));
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("json"));
+        await using var sp = services.BuildServiceProvider();
+
+        var vector = sp.GetRequiredService<IVectorService>();
+        var repo = vector.TryGetRepository<EntityWithSourceOnly, string>();
+        repo.Should().NotBeNull();
+        (((IDecoratedVectorRepository)repo!).InnerRepository as FakeVectorRepo<EntityWithSourceOnly, string>)!
+            .ProviderName.Should().Be("bar");
     }
 
     [Fact]
     public async Task Falls_back_to_source_provider_when_no_defaults()
     {
-        await TestPipeline.For<VectorAdapterResolutionSpec>(_output, nameof(Falls_back_to_source_provider_when_no_defaults))
-            .UsingServiceProvider(key: "services", configure: static (_, services) =>
+        var services = NewServices();
+        services.AddKoanDataCore();
+        services.AddKoanDataVector();
+        services.AddSingleton<IDataService, DataService>();
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("foo"));
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("bar"));
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("json"));
+        await using var sp = services.BuildServiceProvider();
+
+        var vector = sp.GetRequiredService<IVectorService>();
+        var repo = vector.TryGetRepository<EntityWithSourceOnly, string>();
+        repo.Should().NotBeNull();
+        (((IDecoratedVectorRepository)repo!).InnerRepository as FakeVectorRepo<EntityWithSourceOnly, string>)!
+            .ProviderName.Should().Be("json");
+    }
+
+    [Fact]
+    public async Task Preferred_record_provider_hint_falls_through_to_vector_automatic_policy()
+    {
+        // Record-provider correlation is advisory for the distinct vector role. When the record provider has no vector
+        // counterpart, the vector pillar may continue through its own automatic policy. Registered low-then-high so
+        // DI order differs from the vector catalog's deterministic priority order.
+        var services = NewServices();
+        services.AddKoanDataCore();
+        services.AddKoanDataVector();
+        services.AddSingleton<IDataService, DataService>();
+        services.AddSingleton<IVectorAdapterFactory>(new LowPriorityVectorFactory());   // registered first
+        services.AddSingleton<IVectorAdapterFactory>(new HighPriorityVectorFactory());  // higher [ProviderPriority]
+        await using var sp = services.BuildServiceProvider();
+
+        var repo = sp.GetRequiredService<IVectorService>().TryGetRepository<EntityWithUnmatchedSource, string>();
+        repo.Should().NotBeNull();
+        (((IDecoratedVectorRepository)repo!).InnerRepository as FakeVectorRepo<EntityWithUnmatchedSource, string>)!
+            .ProviderName.Should().Be("high");
+    }
+
+    [Fact]
+    public void Vector_query_contract_owns_the_default_top_k()
+    {
+        var options = new VectorQueryOptions([1f]);
+
+        options.TopK.Should().Be(VectorQueryOptions.DefaultTopK);
+        options.TopK.Should().Be(10);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Vector_query_contract_rejects_non_positive_top_k(int topK)
+    {
+        var act = () => new VectorQueryOptions([1f], TopK: topK);
+        var baseline = new VectorQueryOptions([1f]);
+        var cloneAct = () => baseline with { TopK = topK };
+
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .WithParameterName(nameof(VectorQueryOptions.TopK));
+        cloneAct.Should().Throw<ArgumentOutOfRangeException>()
+            .WithParameterName(nameof(VectorQueryOptions.TopK));
+    }
+
+    [Fact]
+    public async Task Vector_pipeline_preserves_the_callers_explicit_top_k()
+    {
+        var services = NewServices();
+        services.AddKoanDataCore();
+        services.AddKoanDataVector();
+        services.AddSingleton<IDataService, DataService>();
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("json"));
+        await using var provider = services.BuildServiceProvider();
+
+        var repository = provider.GetRequiredService<IVectorService>()
+            .TryGetRepository<EntityWithSourceOnly, string>();
+        await repository!.Search(new VectorQueryOptions([1f], TopK: 250));
+
+        var inner = (FakeVectorRepo<EntityWithSourceOnly, string>)
+            ((IDecoratedVectorRepository)repository).InnerRepository;
+        inner.LastTopK.Should().Be(250);
+    }
+
+    [Fact]
+    public async Task Explicit_vector_attribute_never_falls_through_to_an_unrelated_provider()
+    {
+        var services = NewServices();
+        services.AddKoanDataCore();
+        services.AddKoanDataVector();
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("available"));
+        await using var provider = services.BuildServiceProvider();
+
+        var act = () => provider.GetRequiredService<IVectorService>()
+            .TryGetRepository<EntityWithMissingVectorAdapter, string>();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*requires vector provider 'missing'*will not substitute an unrelated provider*");
+    }
+
+    [Fact]
+    public async Task Configured_vector_default_never_falls_through_to_an_unrelated_provider()
+    {
+        var services = NewServices();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                services.AddKoanDataCore();
-                services.AddKoanDataVector();
-                services.AddSingleton<IDataService, DataService>();
-                services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("foo"));
-                services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("bar"));
-                services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("json"));
+                ["Koan:Data:VectorDefaults:DefaultProvider"] = "missing"
             })
-            .Assert(ctx =>
-            {
-                var provider = ctx.GetRequiredItem<ServiceProviderFixture>("services").Services;
-                var vector = provider.GetRequiredService<IVectorService>();
-                var repo = vector.TryGetRepository<EntityWithSourceOnly, string>();
-                repo.Should().NotBeNull();
-                (repo as FakeVectorRepo<EntityWithSourceOnly, string>)!.ProviderName.Should().Be("json");
-                return ValueTask.CompletedTask;
-            })
-            .Run();
+            .Build();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddKoanDataCore();
+        services.AddKoanDataVector();
+        services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("available"));
+        await using var provider = services.BuildServiceProvider();
+
+        var act = () => provider.GetRequiredService<IVectorService>()
+            .TryGetRepository<EntityWithSourceOnly, string>();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*requires vector provider 'missing'*will not substitute an unrelated provider*");
+    }
+
+    // Mirrors the bespoke ServiceProviderFixture base wiring (logging + a no-op application lifetime)
+    // that previously sat under .UsingServiceProvider(...), so the inlined provider matches it exactly.
+    private static ServiceCollection NewServices()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging(builder =>
+        {
+            builder.AddConsole();
+            builder.SetMinimumLevel(LogLevel.Debug);
+        });
+        services.AddSingleton<IHostApplicationLifetime, NoopHostApplicationLifetime>();
+        return services;
+    }
+
+    private sealed class NoopHostApplicationLifetime : IHostApplicationLifetime
+    {
+        public CancellationToken ApplicationStarted => CancellationToken.None;
+        public CancellationToken ApplicationStopping => CancellationToken.None;
+        public CancellationToken ApplicationStopped => CancellationToken.None;
+        public void StopApplication() { }
     }
 
     private sealed class FakeVectorRepo<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>
@@ -108,6 +219,7 @@ public sealed class VectorAdapterResolutionSpec
         }
 
         public string ProviderName { get; }
+        public int? LastTopK { get; private set; }
 
         public Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
             => Task.CompletedTask;
@@ -122,7 +234,10 @@ public sealed class VectorAdapterResolutionSpec
             => Task.FromResult(0);
 
         public Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
-            => Task.FromResult(new VectorQueryResult<TKey>(Array.Empty<VectorMatch<TKey>>(), null));
+        {
+            LastTopK = options.TopK;
+            return Task.FromResult(new VectorQueryResult<TKey>(Array.Empty<VectorMatch<TKey>>(), null));
+        }
     }
 
     private sealed class FakeVectorFactory : IVectorAdapterFactory
@@ -136,9 +251,7 @@ public sealed class VectorAdapterResolutionSpec
 
         public string Provider => _provider;
 
-        public bool CanHandle(string candidate) => string.Equals(candidate, _provider, StringComparison.OrdinalIgnoreCase);
-
-        public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
+        public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
             where TEntity : class, IEntity<TKey>
             where TKey : notnull
             => new FakeVectorRepo<TEntity, TKey>(_provider);
@@ -151,6 +264,35 @@ public sealed class VectorAdapterResolutionSpec
             };
     }
 
+    // Two DISTINCT factory types with DISTINCT [ProviderPriority] for the priority-ranked-fallback regression
+    // (ARCH-0103 §4.1). Registered low-then-high so DI order disagrees with priority order.
+    [ProviderPriority(5)]
+    private sealed class LowPriorityVectorFactory : IVectorAdapterFactory
+    {
+        public string Provider => "low";
+        public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
+            where TEntity : class, IEntity<TKey> where TKey : notnull => new FakeVectorRepo<TEntity, TKey>("low");
+        public Koan.Data.Abstractions.Naming.StorageNamingCapability GetNamingCapability(IServiceProvider services)
+            => new() { Style = Koan.Data.Abstractions.Naming.StorageNamingStyle.EntityType, PartitionSeparator = '#' };
+    }
+
+    [ProviderPriority(50)]
+    private sealed class HighPriorityVectorFactory : IVectorAdapterFactory
+    {
+        public string Provider => "high";
+        public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
+            where TEntity : class, IEntity<TKey> where TKey : notnull => new FakeVectorRepo<TEntity, TKey>("high");
+        public Koan.Data.Abstractions.Naming.StorageNamingCapability GetNamingCapability(IServiceProvider services)
+            => new() { Style = Koan.Data.Abstractions.Naming.StorageNamingStyle.EntityType, PartitionSeparator = '#' };
+    }
+
+    [SourceAdapter("nomatch")]
+    private sealed class EntityWithUnmatchedSource : Entity<EntityWithUnmatchedSource, string>
+    {
+        [Identifier]
+        public override string Id { get; set; } = default!;
+    }
+
     [SourceAdapter("json")]
     private sealed class EntityWithSourceOnly : Entity<EntityWithSourceOnly, string>
     {
@@ -161,6 +303,13 @@ public sealed class VectorAdapterResolutionSpec
     [VectorAdapter("foo")]
     [SourceAdapter("json")]
     private sealed class EntityWithVectorAdapter : Entity<EntityWithVectorAdapter, string>
+    {
+        [Identifier]
+        public override string Id { get; set; } = default!;
+    }
+
+    [VectorAdapter("missing")]
+    private sealed class EntityWithMissingVectorAdapter : Entity<EntityWithMissingVectorAdapter, string>
     {
         [Identifier]
         public override string Id { get; set; } = default!;

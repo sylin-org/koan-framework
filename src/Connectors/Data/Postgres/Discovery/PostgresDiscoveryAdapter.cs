@@ -26,26 +26,16 @@ internal sealed class PostgresDiscoveryAdapter : ServiceDiscoveryAdapterBase
     /// <summary>PostgreSQL-specific health validation using connection test</summary>
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        try
-        {
-            // Build connection string from discovered URL and context parameters
-            var connectionString = BuildPostgresConnectionString(serviceUrl, context.Parameters);
+        // The shared base owns timeout/failure/success narration and redaction.
+        var connectionString = BuildPostgresConnectionString(serviceUrl, context.Parameters);
 
-            using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync(cancellationToken);
+        using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
 
-            // Simple query to test connectivity
-            using var command = new NpgsqlCommand("SELECT 1", connection);
-            await command.ExecuteScalarAsync(cancellationToken);
+        using var command = new NpgsqlCommand("SELECT 1", connection);
+        await command.ExecuteScalarAsync(cancellationToken);
 
-            _logger.LogDebug("PostgreSQL health check passed for {Url}", serviceUrl);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug("PostgreSQL health check failed for {Url}: {Error}", serviceUrl, ex.Message);
-            return false;
-        }
+        return true;
     }
 
     /// <summary>PostgreSQL adapter reads its own configuration sections</summary>
@@ -68,7 +58,7 @@ internal sealed class PostgresDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return postgresUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                          .Select(url => new DiscoveryCandidate(url.Trim(), "environment-postgres-urls", 0));
+                          .Select(url => new DiscoveryCandidate(url.Trim(), "environment-postgres-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>PostgreSQL-specific connection string construction</summary>
@@ -111,7 +101,7 @@ internal sealed class PostgresDiscoveryAdapter : ServiceDiscoveryAdapterBase
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Failed to build PostgreSQL connection string from {BaseUrl}: {Error}", baseUrl, ex.Message);
+            ReportNormalizationFailure(baseUrl, ex);
             return baseUrl; // Return original URL if parsing fails
         }
     }

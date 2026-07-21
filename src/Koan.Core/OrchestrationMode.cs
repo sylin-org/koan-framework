@@ -14,14 +14,6 @@ public enum OrchestrationMode
     Standalone,
 
     /// <summary>
-    /// Self-orchestration - host application spawns dependency containers
-    /// Network: localhost endpoints for spawned containers (host networking)
-    /// Context: Development host machine with Docker available
-    /// Detection: !InContainer and IsDevelopment and DockerAvailable
-    /// </summary>
-    SelfOrchestrating,
-
-    /// <summary>
     /// Docker Compose orchestration - app and dependencies in container network
     /// Network: service name endpoints (postgres:5432, redis:6379)
     /// Context: App running in container alongside dependency containers

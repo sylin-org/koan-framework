@@ -79,7 +79,7 @@ public static class FilterPushdownCoordinator
         if (query.HasPagination && !adapter.PaginationHandled)
         {
             var pageSize = query.EffectivePageSize();
-            var skip = Math.Max(query.EffectivePage() - 1, 0) * pageSize;
+            var skip = query.EffectiveOffset();
             page = items.Skip(skip).Take(pageSize).ToList();
         }
 

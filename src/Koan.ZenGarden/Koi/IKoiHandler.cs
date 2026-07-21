@@ -4,7 +4,7 @@ namespace Koan.ZenGarden.Koi;
 /// Background topology handler that observes the local mDNS landscape via Koi.
 /// Publishes an immutable snapshot and fires events on topology changes.
 /// </summary>
-public interface IKoiHandler : IDisposable
+internal interface IKoiHandler : IDisposable
 {
     /// <summary>Current handler lifecycle state.</summary>
     KoiHandlerState State { get; }

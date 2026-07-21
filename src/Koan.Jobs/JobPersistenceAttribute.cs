@@ -10,14 +10,14 @@ public enum JobPersistenceMode
     /// <summary>Force ephemeral: jobs stay in the in-memory ledger even when a durable adapter exists
     /// (high-churn, fire-and-forget work you don't want cluttering the durable store).</summary>
     InMemory = 1,
-    /// <summary>Force durable: jobs persist via the data layer; boot warns if no durable adapter is present.</summary>
+    /// <summary>Force durable: jobs persist via the data layer; host composition fails if no durable adapter is present.</summary>
     DataStore = 2,
 }
 
 /// <summary>
 /// Declares the durability tier for a work-type's jobs. <c>[JobPersistence(JobPersistenceMode.InMemory)]</c> keeps
-/// them ephemeral; <c>JobPersistenceMode.DataStore</c> forces durable. <see cref="Provider"/> mirrors Koan's
-/// <c>[DataAdapter("name")]</c> string-provider convention to pin a specific store (reserved — honored in a later phase).
+/// them ephemeral; <c>JobPersistenceMode.DataStore</c> requires a durable Data adapter and rejects host composition
+/// when that guarantee cannot be met.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = true, AllowMultiple = false)]
 public sealed class JobPersistenceAttribute : Attribute
@@ -25,7 +25,4 @@ public sealed class JobPersistenceAttribute : Attribute
     public JobPersistenceAttribute(JobPersistenceMode mode = JobPersistenceMode.Auto) => Mode = mode;
 
     public JobPersistenceMode Mode { get; }
-
-    /// <summary>Reserved: pin a specific data provider (mirrors <c>[DataAdapter("name")]</c>). Honored in a later phase.</summary>
-    public string? Provider { get; set; }
 }

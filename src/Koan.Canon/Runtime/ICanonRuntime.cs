@@ -1,0 +1,22 @@
+using Koan.Canon;
+
+namespace Koan.Canon;
+
+/// <summary>
+/// Entry point for canonization operations.
+/// </summary>
+public interface ICanonRuntime
+{
+    /// <summary>
+    /// Executes the canonization pipeline for the provided entity.
+    /// </summary>
+    Task<CanonizationResult<T>> Canonize<T>(T entity, CanonizationOptions? options = null, CancellationToken cancellationToken = default)
+        where T : CanonEntity<T>, new();
+
+    /// <summary>
+    /// Rebuilds materialized views for a canonical identifier.
+    /// </summary>
+    Task RebuildViews<T>(string canonicalId, string[]? views = null, CancellationToken cancellationToken = default)
+        where T : CanonEntity<T>, new();
+
+}

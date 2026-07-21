@@ -194,9 +194,10 @@ The six "unfinished migration" clusters from 02 §6, plus reviewer-refined items
 6. **Capability stragglers**: migrate the AI pillar's three capability mechanisms to ARCH-0084
    tokens (design-needed — the largest un-migrated surface); replace Storage's bespoke 4-bool
    record with capability tokens; close adapter parity drift (Postgres declares BulkUpsert it
-   already implements; Couchbase gets ConditionalReplace/FastRemove or an ADR note; Redis stops
-   advertising `FilterSupport.Full` for scan-all, or gains cursor paging + native TTL — or is
-   demoted to cache/coherence duty only).
+   already implements; Couchbase gets ConditionalReplace/FastRemove or an ADR note; Redis keeps
+   `FilterSupport.Full` (correct for an in-memory-eval adapter) and gains native TTL — **resolved by
+   DATA-0101**: the "stop advertising Full" framing was a misread of the operator-level capability
+   model (ARCH-0084); the real concern is scan cost, which `FilterSupport` deliberately does not encode).
 7. **Data naming + Entity surface**: finish DATA-0086 (one naming pipeline, ~16 types → ~5);
    retire the partition-string overload matrix in favor of `EntityContext.Partition()` scoping
    (it is verified sugar over one path — the cut is surface, not behavior); fix the

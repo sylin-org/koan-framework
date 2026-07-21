@@ -1,299 +1,217 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
-using Koan.Data.Abstractions.Filtering;
-using Koan.Data.Abstractions.Sorting;
-using Koan.Data.Core.Sorting;
+using Koan.Data.Abstractions.Naming;
+using Koan.Data.Core;
+using Koan.Data.Core.KeyValue;
+using Koan.Data.Core.Semantics;
 using StackExchange.Redis;
-using System.Collections.Frozen;
-using Newtonsoft.Json;
+using System.Reflection;
+using Newtonsoft.Json.Linq;
 
 namespace Koan.Data.Connector.Redis;
 
 /// <summary>
-/// Redis key/value store. A "Full floor" adapter under the unified query contract (DATA-XXXX):
-/// it scans the keyspace, materializes entities, and evaluates the entire <see cref="Filter"/>
-/// via <see cref="InMemoryFilterEvaluator"/> (declares <see cref="FilterSupport.Full"/>).
+/// Redis key/value adapter, built on the <see cref="KeyValueStore{TEntity,TKey}"/> family base (ARCH-0103 §9, the
+/// JSON-text family). It inherits all three AODB modes: <b>Shared</b> (the managed discriminator is injected into /
+/// extracted from the stored JSON value via the shared <see cref="ManagedFieldJsonInjector"/> — the same write-stamp the
+/// relational trio and the Json adapter use — and the base's hybrid evaluator filters on it), <b>Container</b> (a
+/// distinct keyspace per ambient partition, already encoded in the key prefix by <c>AdapterNaming</c>), and
+/// <b>Database</b> (a distinct Redis logical database per routed source, resolved by <see cref="RedisAdapterFactory"/>).
+///
+/// <para>The backend keeps its Redis-native enrichments: native key TTL — a single-property <c>[Index(Ttl = true)]</c>
+/// timestamp expires its key via an atomic <c>SET … PX</c> (<see cref="DataCaps.Retention"/>.TtlIndex, mirroring Mongo's
+/// <c>expireAfterSeconds = 0</c>; DATA-0101) — and non-blocking fast remove (<c>UNLINK</c>). Like the in-memory
+/// reference it scans the keyspace and evaluates the filter in memory, so it declares <c>full filter support</c>
+/// as operator-correctness (not pushdown efficiency).</para>
 /// </summary>
-internal sealed class RedisRepository<TEntity, TKey> :
-    IDataRepository<TEntity, TKey>,
-    IQueryRepository<TEntity, TKey>,
-    IDescribesCapabilities,
-    Abstractions.Instructions.IInstructionExecutor<TEntity>
+internal sealed class RedisRepository<TEntity, TKey> : KeyValueStore<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
-    private readonly IOptions<RedisOptions> _options;
     private readonly IConnectionMultiplexer _muxer;
-    private readonly ILogger? _logger;
+    private readonly int _database;
+    private readonly IReadOnlyList<DataSegmentationField> _segmentationFields;
 
-    public RedisRepository(IOptions<RedisOptions> options, IConnectionMultiplexer muxer, ILoggerFactory? lf)
-    { _options = options; _muxer = muxer; _logger = lf?.CreateLogger("Koan.Data.Connector.Redis"); }
+    public RedisRepository(IConnectionMultiplexer muxer, int database, DataSegmentationPlan segmentation)
+    {
+        _muxer = muxer;
+        _database = database;
+        _segmentationFields = segmentation.For(typeof(TEntity)).Fields;
+    }
 
-    public void Describe(ICapabilities caps) => caps
-        .Add(DataCaps.Query.Linq)            // predicate filtering in-memory
-        .Add(DataCaps.Write.FastRemove)
-        .Add(DataCaps.Query.Filter, FilterSupport.Full);
+    // Database mode: the routed source selects the Redis logical database (a distinct physical keyspace on the shared
+    // connection). Default source ⇒ the configured base index (0 unless overridden) ⇒ byte-identical key layout.
+    private IDatabase Db() => _muxer.GetDatabase(_database);
 
+    // Container mode: AdapterNaming composes the partition into the keyspace (e.g. "widgets#alpha"), so a per-partition
+    // keyspace is a distinct physical key set — no extra work here.
     private string Keyspace()
     {
         var sp = Koan.Core.Hosting.App.AppHost.Current;
         if (sp is not null)
-        {
             return Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(sp);
-        }
-        return typeof(TEntity).Name;
+        return StorageNameResolver.Resolve(typeof(TEntity),
+            new StorageNameResolver.Convention(StorageNamingStyle.EntityType, "_", NameCasing.AsIs));
     }
 
-    private IDatabase Db() => _muxer.GetDatabase(_options.Value.Database);
+    private RedisKey KeyOf(TKey id) => $"{Keyspace()}:{id}";
 
-    public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
+    // ==================== Backend primitives ====================
+
+    protected override async Task<KvRecord<TEntity>?> ReadAsync(TKey id, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var key = $"{Keyspace()}:{id}";
-        var v = await Db().StringGetAsync(key);
-        if (v.IsNullOrEmpty) return null;
-    return JsonConvert.DeserializeObject<TEntity>(v!);
+        var v = await Db().StringGetAsync(KeyOf(id)).ConfigureAwait(false);
+        return v.IsNullOrEmpty ? null : Deserialize(v!);
     }
 
-    public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
+    protected override async Task<IReadOnlyList<KvRecord<TEntity>>> ScanAsync(CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
-        if (idList.Count == 0)
-        {
-            return [];
-        }
-
-        var keyspace = Keyspace();
-        var keys = idList.Select(id => (RedisKey)$"{keyspace}:{id}").ToArray();
-        var values = await Db().StringGetAsync(keys);
-
-        var results = new TEntity?[idList.Count];
-        for (var i = 0; i < values.Length; i++)
-        {
-            results[i] = values[i].IsNullOrEmpty ? null : JsonConvert.DeserializeObject<TEntity>(values[i]!);
-        }
-
-        return results;
-    }
-
-    public async Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var (all, _) = await ScanAll(page: 1, size: int.MaxValue, ct);
-        IEnumerable<TEntity> items = all;
-        if (query.Filter is not null)
-            items = items.Where(InMemoryFilterEvaluator.Compile<TEntity>(query.Filter));
-
-        var filtered = items as IReadOnlyList<TEntity> ?? items.ToList();
-        var totalCount = (long)filtered.Count;
-
-        var sortHandled = RepositoryQueryResult<TEntity>.NoSortHandled;
-        IEnumerable<TEntity> ordered = filtered;
-        if (query.HasSort)
-        {
-            ordered = InMemorySorter.Apply(filtered, query.Sort);
-            sortHandled = query.Sort.ToFrozenSet();
-        }
-
-        var paginationHandled = false;
-        if (query.HasPagination)
-        {
-            var skip = (query.EffectivePage() - 1) * query.EffectivePageSize();
-            ordered = ordered.Skip(skip).Take(query.EffectivePageSize());
-            paginationHandled = true;
-        }
-
-        var list = ordered as IReadOnlyList<TEntity> ?? ordered.ToList();
-        return new RepositoryQueryResult<TEntity>
-        {
-            Items = list,
-            TotalCount = totalCount,
-            IsEstimate = false,
-            SortHandled = sortHandled,
-            PaginationHandled = paginationHandled,
-        };
-    }
-
-    public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var (all, total) = await ScanAll(page: 1, size: int.MaxValue, ct);
-        if (query.Filter is null) return CountResult.Exact(total);
-        var count = all.LongCount(InMemoryFilterEvaluator.Compile<TEntity>(query.Filter));
-        return CountResult.Exact(count);
-    }
-
-    public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var key = $"{Keyspace()}:{model.Id}";
-    var json = JsonConvert.SerializeObject(model);
-        await Db().StringSetAsync(key, json);
-        return model;
-    }
-
-    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var key = $"{Keyspace()}:{id}";
-        return await Db().KeyDeleteAsync(key);
-    }
-
-    public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-    var arr = models as TEntity[] ?? models.ToArray();
-    var entries = arr.Select(e => new KeyValuePair<RedisKey, RedisValue>($"{Keyspace()}:{e.Id}", Newtonsoft.Json.JsonConvert.SerializeObject(e))).ToArray();
-        await Db().StringSetAsync(entries);
-        return arr.Length;
-    }
-
-    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var keys = ids.Select(id => (RedisKey)$"{Keyspace()}:{id}").ToArray();
-        return (int)await Db().KeyDeleteAsync(keys);
-    }
-
-    public async Task<int> DeleteAll(CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var (items, _) = await ScanAll(page: 1, size: int.MaxValue, ct);
-        var keys = items.Select(e => (RedisKey)$"{Keyspace()}:{e.Id}").ToArray();
-        if (keys.Length == 0) return 0;
-        return (int)await Db().KeyDeleteAsync(keys);
-    }
-
-    public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var (items, _) = await ScanAll(page: 1, size: int.MaxValue, ct);
-        var keys = items.Select(e => (RedisKey)$"{Keyspace()}:{e.Id}").ToArray();
-        if (keys.Length == 0) return 0;
-
-        // Resolve Optimized strategy based on provider capabilities
-        var effectiveStrategy = strategy == RemoveStrategy.Optimized
-            ? RemoveStrategy.Fast // this adapter declares write.fastRemove
-            : strategy;
-
-        if (effectiveStrategy == RemoveStrategy.Fast)
-        {
-            // Fast path: UNLINK (async deletion, non-blocking, Redis 4.0+)
-            // Deletes keys in background thread, returns immediately
-            var db = Db();
-            var count = 0L;
-            foreach (var key in keys)
-            {
-                var result = await db.ExecuteAsync("UNLINK", key);
-                count += (long)result;
-            }
-            return count;
-        }
-
-        // Safe path: DEL (synchronous deletion)
-        // Note: Redis doesn't have hooks, so both paths are similar
-        return await Db().KeyDeleteAsync(keys);
-    }
-
-    public IBatchSet<TEntity, TKey> CreateBatch() => new RedisBatch(this);
-
-    public Task<TResult> ExecuteAsync<TResult>(Abstractions.Instructions.Instruction instruction, CancellationToken ct = default)
-    {
-        switch (instruction.Name)
-        {
-            case Abstractions.Instructions.DataInstructions.EnsureCreated:
-                // Nothing to create for Redis; consider connection + ping
-                return Task.FromResult((TResult)(object)true);
-            case Abstractions.Instructions.DataInstructions.Clear:
-                return (Task<TResult>)(object)DeleteAll(ct);
-            default:
-                throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Redis adapter for {typeof(TEntity).Name}.");
-        }
-    }
-
-    private async Task<(List<TEntity> items, int total)> ScanAll(int page, int size, CancellationToken ct)
-    {
-        // SCAN through the keyspace; StackExchange.Redis: server.Keys is enumerative and can be expensive
         var db = Db();
-        var server = _muxer.GetEndPoints().Select(ep => _muxer.GetServer(ep)).FirstOrDefault(s => s.IsConnected);
-        if (server is null)
-        {
-            // Fallback: no server available (e.g., cloud); approximate by key pattern without counts
-            var pattern = $"{Keyspace()}:*";
-            var keys = new List<RedisKey>();
-            var iter = db.ExecuteAsync("SCAN", 0, "MATCH", pattern, "COUNT", 1000);
-            // Best-effort: stop after first page since SCAN via Execute is not strongly typed here
-            // Consumers should supply filters to avoid huge scans.
-            foreach (var k in db.Multiplexer.GetServers().SelectMany(s => s.Keys(db.Database, pattern: pattern)).Take(page * size))
-            {
-                keys.Add(k);
-                if (keys.Count >= page * size) break;
-            }
-            var pageKeys = keys.Skip((page - 1) * size).Take(size).ToArray();
-            var vals = await db.StringGetAsync(pageKeys);
-            var list = new List<TEntity>(pageKeys.Length);
-            foreach (var v in vals)
-            {
-                if (v.IsNull) continue;
-                var e = JsonConvert.DeserializeObject<TEntity>(v!);
-                if (e is not null) list.Add(e);
-            }
-            return (list, keys.Count);
-        }
-        else
-        {
-            var pattern = $"{Keyspace()}:*";
-            var allKeys = server.Keys(db.Database, pattern: pattern, pageSize: 1000).Take(page * size).ToArray();
-            var pageKeys = allKeys.Skip((page - 1) * size).Take(size).ToArray();
-            var vals = await db.StringGetAsync(pageKeys);
-            var list = new List<TEntity>(pageKeys.Length);
-            foreach (var v in vals)
-            {
-                if (v.IsNull) continue;
-                var e = JsonConvert.DeserializeObject<TEntity>(v!);
-                if (e is not null) list.Add(e);
-            }
-            return (list, allKeys.Length);
-        }
+        var pattern = $"{Keyspace()}:*";
+        var keys = ScanKeys(db, pattern);
+        if (keys.Length == 0) return [];
+
+        var values = await db.StringGetAsync(keys).ConfigureAwait(false);
+        var list = new List<KvRecord<TEntity>>(values.Length);
+        foreach (var v in values)
+            if (!v.IsNullOrEmpty) list.Add(Deserialize(v!));
+        return list;
     }
 
-    private sealed class RedisBatch : IBatchSet<TEntity, TKey>
+    protected override async Task<IReadOnlyList<KvRecord<TEntity>>> ScanBoundedAsync(int maxCandidates, CancellationToken ct)
     {
-        private readonly RedisRepository<TEntity, TKey> _repo;
-        private readonly List<TEntity> _adds = new();
-        private readonly List<TEntity> _updates = new();
-        private readonly List<TKey> _deletes = new();
-        private readonly List<(TKey id, Action<TEntity> mutate)> _mutations = new();
+        ct.ThrowIfCancellationRequested();
+        var db = Db();
+        var pattern = $"{Keyspace()}:*";
+        var keys = ScanKeys(db, pattern, maxCandidates);
+        if (keys.Length == 0) return [];
 
-        public RedisBatch(RedisRepository<TEntity, TKey> repo) => _repo = repo;
-
-        public IBatchSet<TEntity, TKey> Add(TEntity entity) { _adds.Add(entity); return this; }
-        public IBatchSet<TEntity, TKey> Update(TEntity entity) { _updates.Add(entity); return this; }
-        public IBatchSet<TEntity, TKey> Delete(TKey id) { _deletes.Add(id); return this; }
-        public IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate) { _mutations.Add((id, mutate)); return this; }
-        public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
-
-        public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (options?.RequireAtomic == true)
-                throw new NotSupportedException("Redis adapter does not support atomic batch transactions for entity operations.");
-            // Apply mutations
-            foreach (var (id, mutate) in _mutations)
-            {
-                ct.ThrowIfCancellationRequested();
-                var cur = await _repo.Get(id, ct);
-                if (cur is not null) { mutate(cur); _updates.Add(cur); }
-            }
-            var addCount = 0; var updCount = 0; var delCount = 0;
-            if (_adds.Count != 0) { addCount = await _repo.UpsertMany(_adds, ct); }
-            if (_updates.Count != 0) { updCount = await _repo.UpsertMany(_updates, ct); }
-            if (_deletes.Count != 0) { delCount = await _repo.DeleteMany(_deletes, ct); }
-            return new BatchResult(addCount, updCount, delCount);
-        }
+        var values = await db.StringGetAsync(keys).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
+        var list = new List<KvRecord<TEntity>>(values.Length);
+        foreach (var value in values)
+            if (!value.IsNullOrEmpty) list.Add(Deserialize(value!));
+        return list;
     }
+
+    protected override async Task WriteAsync(TKey id, KvRecord<TEntity> record, CancellationToken ct)
+        => await WriteWithTtlAsync(Db(), KeyOf(id), Serialize(record), record.Entity).ConfigureAwait(false);
+
+    protected override async Task<bool> RemoveAsync(TKey id, CancellationToken ct)
+        => await Db().KeyDeleteAsync(KeyOf(id)).ConfigureAwait(false);
+
+    // Bulk write: one atomic MSET for non-TTL types (the common case); per-key SET PX when the type carries a TTL index
+    // (MSET cannot express per-key expiry). Restores the native fast path the base's per-row default would lose.
+    protected override async Task WriteManyAsync(IReadOnlyList<KvRecord<TEntity>> records, CancellationToken ct)
+    {
+        if (records.Count == 0) return;
+        var db = Db();
+        if (TtlProperty is null)
+        {
+            var entries = records
+                .Select(r => new KeyValuePair<RedisKey, RedisValue>(KeyOf(r.Entity.Id), Serialize(r)))
+                .ToArray();
+            await db.StringSetAsync(entries).ConfigureAwait(false);   // MSET
+            return;
+        }
+        foreach (var r in records)
+            await WriteWithTtlAsync(db, KeyOf(r.Entity.Id), Serialize(r), r.Entity).ConfigureAwait(false);
+    }
+
+    // Bulk remove: one pipelined DEL over all keys.
+    protected override async Task<int> RemoveManyAsync(IReadOnlyList<TKey> ids, CancellationToken ct)
+    {
+        if (ids.Count == 0) return 0;
+        var keys = ids.Select(KeyOf).ToArray();
+        return (int)await Db().KeyDeleteAsync(keys).ConfigureAwait(false);
+    }
+
+    protected override async Task<int> ClearAsync(CancellationToken ct)
+    {
+        var db = Db();
+        var keys = ScanKeys(db, $"{Keyspace()}:*");
+        if (keys.Length == 0) return 0;
+        // FastRemove: UNLINK reclaims the keys on a background thread (non-blocking, Redis 4.0+).
+        var count = 0L;
+        foreach (var key in keys)
+            count += (long)await db.ExecuteAsync("UNLINK", key).ConfigureAwait(false);
+        return (int)count;
+    }
+
+    // The native enrichments the family base does not own.
+    protected override void DescribeBackend(ICapabilities caps) => caps
+        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Scan, true))
+        .Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Retention.TtlIndex);   // native key TTL via [Index(Ttl = true)] → SET PX (DATA-0101)
+
+    // ==================== Serialization (the JSON-text envelope through the shared injector) ====================
+
+    private static string Serialize(KvRecord<TEntity> record)
+    {
+        var jo = JObject.FromObject(record.Entity);
+        ManagedFieldJsonInjector.InjectManaged(jo, record.Managed);   // off/host-context ⇒ no key added ⇒ byte-identical
+        return jo.ToString(Newtonsoft.Json.Formatting.None);
+    }
+
+    private KvRecord<TEntity> Deserialize(string json)
+    {
+        var jo = JObject.Parse(json);
+        var managed = ManagedFieldJsonInjector.ExtractManaged(jo, typeof(TEntity), _segmentationFields);   // null off-axis
+        var entity = jo.ToObject<TEntity>()!;
+        return new KvRecord<TEntity>(entity, managed);
+    }
+
+    // ==================== Redis-native key TTL (DATA-0101) ====================
+
+    private static readonly PropertyInfo? TtlProperty = ResolveTtlProperty();
+
+    private static PropertyInfo? ResolveTtlProperty()
+    {
+        foreach (var idx in Koan.Data.Core.IndexMetadata.GetIndexes(typeof(TEntity)))
+            if (idx.Ttl && idx.Properties.Count == 1)
+                return idx.Properties[0];
+        return null;
+    }
+
+    private static DateTime? ReadExpiry(TEntity model)
+        => TtlProperty!.GetValue(model) switch
+        {
+            DateTimeOffset dto => dto.UtcDateTime,
+            DateTime dt => dt.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : dt.ToUniversalTime(),
+            _ => null
+        };
+
+    // Atomic single-key write honoring TTL. `SET … PX` is one round-trip — no SET-then-EXPIRE crash-leak window. A
+    // future [Index(Ttl)] instant becomes the key's expiry; a past instant removes the key (already expired); a
+    // null/absent value (or a non-TTL type) writes a persistent key, and SET clears any prior TTL (DATA-0101).
+    private static async Task WriteWithTtlAsync(IDatabase db, RedisKey key, RedisValue json, TEntity model)
+    {
+        if (TtlProperty is null || ReadExpiry(model) is not { } expireAt)
+        {
+            await db.StringSetAsync(key, json).ConfigureAwait(false);
+            return;
+        }
+
+        var ttl = expireAt - DateTime.UtcNow;
+        if (ttl > TimeSpan.Zero)
+            await db.StringSetAsync(key, json, ttl).ConfigureAwait(false);  // atomic SET PX
+        else
+            await db.KeyDeleteAsync(key).ConfigureAwait(false);             // already expired → no live key
+    }
+
+    // ==================== Keyspace scan ====================
+
+    private RedisKey[] ScanKeys(IDatabase db, string pattern, int? maxCandidates = null)
+    {
+        var server = _muxer.GetEndPoints().Select(ep => _muxer.GetServer(ep)).FirstOrDefault(s => s.IsConnected);
+        if (server is not null)
+            return Limit(server.Keys(db.Database, pattern: pattern, pageSize: 1000), maxCandidates);
+
+        // Fallback when no server handle is available (e.g. some managed clouds): best-effort across known servers.
+        return Limit(_muxer.GetServers().SelectMany(s => s.Keys(db.Database, pattern: pattern)), maxCandidates);
+    }
+
+    private static RedisKey[] Limit(IEnumerable<RedisKey> keys, int? maxCandidates)
+        => (maxCandidates is > 0 ? keys.Take(maxCandidates.Value) : keys).ToArray();
 }

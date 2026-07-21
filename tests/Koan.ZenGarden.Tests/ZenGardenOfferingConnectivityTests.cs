@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using AwesomeAssertions;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using Koan.ZenGarden.Extensions;
 using Koan.ZenGarden.Models;
 using Koan.ZenGarden.Tests.Support;
@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Koan.ZenGarden.Tests;
 
@@ -27,15 +26,13 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
     [Fact]
     public async Task MongoDb_resolution_through_zen_garden_connects_when_offering_exists()
     {
-        if (!EnsureGardenAvailable())
-        {
-            return;
-        }
+        EnsureGardenAvailable();
 
         var candidates = await FindOfferingCandidates("mongodb");
         if (candidates.Count == 0)
         {
             _output.WriteLine("No mongodb offering found in the garden; skipping mongo connectivity probe.");
+            Assert.Skip("No mongodb offering is available in the garden.");
             return;
         }
 
@@ -55,15 +52,13 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
     [Fact]
     public async Task Ollama_resolution_through_zen_garden_connects_when_offering_exists()
     {
-        if (!EnsureGardenAvailable())
-        {
-            return;
-        }
+        EnsureGardenAvailable();
 
         var candidates = await FindOfferingCandidates("ollama");
         if (candidates.Count == 0)
         {
             _output.WriteLine("No ollama offering found in the garden; skipping ollama connectivity probe.");
+            Assert.Skip("No ollama offering is available in the garden.");
             return;
         }
 
@@ -80,11 +75,11 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
         await AssertOllamaTags(endpoint!);
     }
 
-    private bool EnsureGardenAvailable()
+    private void EnsureGardenAvailable()
     {
         if (_fixture.IsAvailable)
         {
-            return true;
+            return;
         }
 
         var reason = string.IsNullOrWhiteSpace(_fixture.UnavailableReason)
@@ -99,7 +94,7 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
 
         _output.WriteLine(message);
         _output.WriteLine("Set KOAN_TESTS_ZENGARDEN_REQUIRED=1 to make this a hard failure.");
-        return false;
+        Assert.Skip(message);
     }
 
     private async Task<IReadOnlyList<ZenGardenToolSnapshot>> FindOfferingCandidates(string offering)
@@ -109,7 +104,7 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
             ToolType = ZenGardenToolType.Offering
         });
 
-        var query = Core.ToolFqid.Parse(offering);
+        var query = ToolFqid.Parse(offering);
 
         return all
             .Where(tool => query.MatchesSnapshot(tool.ToolFqid, tool.OfferingType, tool.Aliases))
@@ -132,7 +127,7 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddKoanZenGarden(configure: options =>
+        services.AddZenGardenRuntime(configure: options =>
         {
             options.Endpoint = _fixture.Endpoint;
             options.EnableDiscovery = true;

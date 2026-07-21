@@ -1,0 +1,271 @@
+---
+type: ARCH
+domain: framework
+audience: [architects, maintainers]
+status: archived
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation: 2026-07-19
+---
+
+# SnapVault — Product Spec & Greenfield Harvest Map
+
+> **Historical build plan, not current product truth.** It preserves the June 2026 greenfield decisions and completed
+> work narrative. The supported application now uses an explicit operator-to-known-person gallery grant; the former
+> token invitation/acceptance and “atomic/signed erasure proof” claims were removed during the V1 Identity × Tenancy
+> honesty pass. Read [`samples/applications/SnapVault/README.md`](../../samples/applications/SnapVault/README.md), its
+> current controllers/services, and the executable SnapVault suite for the supported surface.
+
+- Status: **Draft for review** (2026-06-26)
+- Scope: `samples/applications/SnapVault`. This is the **spec-first** artifact for the greenfield backend rebuild: it says *what SnapVault is meant to offer*, realigns the surface around "fewer, more meaningful parts," and is the **harvest map** for porting the genuine domain out of the legacy backend.
+- Companions: [snapvault-ui-api-contract.md](./snapvault-ui-api-contract.md) (the functional acceptance gate — what the SPA calls) · [snapvault-koan-modernization.md](./snapvault-koan-modernization.md) (the original in-place ADR, **superseded** by this greenfield approach; its strip/build/keep table is folded in below).
+- Evidence: every claim here is cited to `file:line` in the current tree, gathered by a 6-agent understand-pass (workflow `wf_2024d47f-292`) and re-verified by hand on the load-bearing points (the verify-empirically discipline caught the critic itself being wrong about `Count.Fast`).
+- Applies: `koan-design-principles` ("fewer but more meaningful parts"), `break-and-rebuild-preferred` (one clean core, delete the legacy at swap — *not* a second permanent impl), `koan-ergonomics-first`, `no-stopgaps`, `contributor-pipelines-never-bespoke`.
+
+---
+
+## 0. How to use this document
+
+Two acceptance gates bound the rebuild. Nothing else is canon:
+
+1. **The flagship isolation spec** — `tests/Suites/Samples/Koan.Samples.SnapVault.Tests/SnapVaultTenancyFlagshipSpec.cs` (real `AddKoan()`, no Docker). It ports to the new entities verbatim and must stay green.
+2. **The UI API contract** — [snapvault-ui-api-contract.md](./snapvault-ui-api-contract.md). The new backend must honor every endpoint/shape the SPA actually calls, *minus* the deliberate changes called out there (progress transport SignalR→SSE; optionally the media URLs).
+
+The greenfield discipline: **port the domain verbatim, build the structure from scratch.** "From scratch" applies to the file/service/controller shape — never to re-deriving the hard-won domain algorithms in §3, which copy across.
+
+---
+
+## 1. What SnapVault is (product intent)
+
+SnapVault is a **multi-tenant photo library for photography studios**. A studio uploads photos; SnapVault auto-organizes them into events (albums), runs AI vision analysis to caption + tag + extract structured facts per photo, makes the whole library searchable by natural language, and lets the studio curate ordered collections. Each studio's library is invisible to every other studio.
+
+The core domain objects and the flows over them:
+
+| Object | What it is |
+|---|---|
+| **Event** | An album (wedding, conference, or an auto-created per-day bucket). Groups photos. |
+| **PhotoAsset** | The aggregate root — one stored original photo + EXIF + AI analysis + embedding + processing state. |
+| **AnalysisStyle** | A photography-style profile (Portrait, Food, Gaming…) that retunes the AI vision prompt. Platform-shared reference data. |
+| **AiAnalysis** | The structured result of analyzing a photo: summary, tags, a key→value *facts* map, and per-item lock state. Embedded on the photo. |
+| **Collection** | A user-curated, ordered, many-to-many grouping of photos (drag-to-reorder). |
+
+The user-facing flows:
+
+1. **Upload & ingest** — drop a batch of files (or "auto-organize"); each photo is staged, EXIF-extracted, filed into an event (a per-day album if none chosen), AI-analyzed under a chosen or auto-detected style, embedded for search, and its progress streamed live.
+2. **Browse** — a virtualized, sorted/filtered grid (all photos / favorites / an event / a collection), with a lightbox that shows the full image + the AI facts panel and supports keyboard navigation consistent with the current ordered set.
+3. **Analyze & refine** — pick an analysis style; **reroll** the AI analysis while **locking** the summary or individual facts you like; lock-all / unlock-all.
+4. **Search** — natural-language search with an alpha slider (lexical ↔ semantic), degrading to keyword search if the vector store is unavailable.
+5. **Curate** — favorite / rate (0–5); add/remove photos to ordered collections; bulk favorite/delete; discovery groupings ("smart collections").
+6. **Operate** — storage/tier stats, reindex, cache clear, metadata export, destructive wipe.
+
+---
+
+## 2. The realignment — "fewer, more meaningful parts"
+
+The single biggest finding of the understand-pass is **directional**: the legacy backend's surface is far larger than what the product needs, because it grew endpoints the UI never calls and hand-rolled plumbing the framework now owns.
+
+**Thesis: the new backend exposes only what the UI contract calls (plus the deliberate additions), built on Koan primitives. Everything else is dropped.**
+
+Two reductions deliver almost all of "fewer, more meaningful parts":
+
+### 2a. Drop the orphan surface
+Backend routes with **zero UI callers** (critic re-verified by grepping all of `wwwroot/`):
+- The **entire `AdminController`** (`/api/admin/embedding/*`, 6 routes) — backed by the to-be-dropped `EmbeddingMonitoringService`.
+- `POST /api/Photos/search`, `GET /api/Photos/favorites`, `GET /api/Photos/range`, `GET /api/Photos/{id}/adjacent`, `PUT /api/Photos/{id}/favorite` — the UI reaches search/navigation through the **session window** (`POST /api/photosets/query`), not these.
+- `GET /api/Events/timeline`, `/by-tier/{tier}`, `POST /api/Events/{id}/archive` — the Timeline UI renders from already-loaded `/api/events` data and makes no call (verified `timeline.js`).
+- `GET /api/analysis-styles/system`, `/user`.
+- The whole **`EntityController<T>` inherited surface** (`POST query`, `GET new`, `bulk` upsert/delete, `DELETE all`/`by-query`, `PATCH`) on Photos/Events/AnalysisStyles — present by inheritance, unused by the SPA.
+
+> **DECIDED (2026-06-26):** drop **all** orphans **and** smart collections. The new backend exposes only the currently-UI-called endpoints — no Discovery panel, no orphan routes. Smallest meaningful surface.
+
+### 2b. Replace the bespoke plumbing with Koan (the strip/build crosswalk)
+Every replacement below was **re-verified present in `src/` today** unless noted.
+
+| Bespoke (drop) | Koan replacement (verified in `src/`) |
+|---|---|
+| 4 derivative entity types (`PhotoGallery/Thumbnail/Masonry/Retina`) + 3 `*MediaId` FK fields + `MaterializeAsync` pre-gen + the `BaseType` reflection hack + bespoke `MediaController` | `[MediaRecipe("…")]` named transforms served on-demand by the framework `Koan.Media.Web` controller at `GET /media/{id}/{recipe}`. The maintained sample declares gallery, masonry, and retina recipes; derivations persist on first render through the selected source. |
+| 3-strategy `JObject` AI parser (`ParseAiResponse`/`TryParseJson`/`ExtractJsonByBalancedBraces`, ~155 lines) | Typed structured output. **Nuance:** `Client.Chat<T>` exists (`src/Koan.AI/Client.cs:126,147`) but takes `Prompt`/`variables` — there is **no typed + image overload**; the vision call stays untyped `Chat(prompt, ChatOptions{Image})` (`PhotoProcessingService.cs:644`) and the result is `Deserialize<AiAnalysis>`'d. The parser dies; the **normalization** (§3) must be re-kept by hand. |
+| `ProcessingJob` batch-tracker + `UpdateJobProgress` hand-sync | The Koan.Jobs **ledger** as source of truth + `ctx.Progress(fraction,msg)` (`src/Koan.Jobs/JobContext.cs:62`, `JobRecord.cs:97-98`) behind a thin read-only `BatchStatus` facade. **Nuance:** `JobQuery` keys on `WorkType/WorkId/Status` — filtering by the domain `BatchJobId` is the facade's job over returned records. |
+| `PhotoProcessingHub` (SignalR) + scattered `EmitProgress` | `Koan.Web.Sse` — a controller endpoint streaming progress **from the ledger** via `Sse.Stream(...)`. Progress is reported once, durably, via `ctx.Progress`; `PhotoProgressEvent`/`JobCompletionEvent` remain the SSE payloads. |
+| `PhotoSetService` page-math (double-pagination, in-memory `Skip/Take`) + `BuildSortExpression` + `GetPhotoRange`/`GetStats` + `BulkDelete`/`BulkFavorite` N+1 loops | `EntityController<T>` `POST /query`, `QueryDefinition.WithSort/WithPagination` + `QueryWithCount`/`Page` (`src/Koan.Web/Endpoints/EntityEndpointService.cs:1011`), `Count.Fast`/`Count.Exact` (`src/Koan.Data.Core/Model/Entity.cs:154` — **present**, the critic was wrong), batch `Get(ids)` + `list.Save()` + `RemoveAll(RemoveStrategy.Fast)` (`src/Koan.Data.Abstractions/RemoveStrategy.cs`). |
+| In-memory `eventId` post-filter + per-match reload loop in `SemanticSearch` | `Filter.Eq("eventId", …)` **push-down** to `Vector<PhotoAsset>.Search(filter:)` + `eventId`/tags as metadata on `SaveWithVector` (`src/Koan.Data.Vector/Vector.cs:67,216`). **Nuance:** `ScopedVectorRepository` fail-closes with `VectorFilterUnsupportedException` if the elected adapter lacks `VectorCaps.Filters`; the kept keyword fallback covers no-vector, not capable-but-no-filter. |
+| `EmbeddingMonitoringService` (~240 lines) | `EmbeddingTelemetry` (Meter API, `src/Koan.Data.AI/Telemetry/EmbeddingTelemetry.cs:23`) + a thin `IHealthContributor`. **Nuance:** the framework ships `EmbeddingHealthCheck : IHealthCheck`, not an embedding-flavored `IHealthContributor` — the sample authors a small one. |
+| `EntityLifecycleConfiguration` static cascade + raw-string FK nav + the `Program.cs` seeding/config/registration ceremony | `[Parent(typeof(Event))]` / `[Parent(typeof(AnalysisStyle))]` + `Relatives`; cascade via `BeforeRemove` **lifecycle events** (already the mechanism in use); a `SnapVaultModule : KoanModule` owning seeding/config/registration → `Program.cs ≈ AddKoan().AsWebApi()`. |
+
+**Net shape:** ~9 entity types → ~6 (drop the 4 derivatives + legacy `ProcessingJob`); ~6 plumbing DTOs gone; the reflection hack / JObject parser / SignalR hub / page-math / monitor service all gone. The hand-written code that remains is the §3 domain core — all of it genuinely SnapVault's product.
+
+---
+
+## 3. The kept domain core (port **verbatim** — the crown jewels)
+
+These are the "meaningful parts." Each ports as-is; the **subtleties** are hard-won correctness a naive rewrite silently loses. Two cross-cutting invariants bind several of them:
+
+> **INV-1 (lowercase facts everywhere):** every AI fact key is stored lowercased (parse-time `PhotoProcessingService.cs:495`, toggle-time `PhotosController.cs:563`). Reroll-with-holds, lock-all/unlock-all, and the facts UI all assume direct lowercase dictionary access.
+>
+> **INV-2 (UTC discipline):** EXIF capture date is force-stamped `DateTimeKind.Utc`; the daily-event lookup uses a **half-open UTC day range** (`>= dayStart && < dayStart.AddDays(1)`), *never* `.Date ==` (which makes the Mongo translator emit `$dateTrunc`, unsupported on older servers). Both are portability fixes, not incidental.
+
+| Capability | Source | Port-verbatim subtlety |
+|---|---|---|
+| **EXIF extraction** (camera/lens/exposure, capture-date, GPS DMS→decimal) | `PhotoProcessingService.cs:343-416` | ISO arrives as `ushort[]` (read `[0]` after length guard); GPS lat/lon are `Rational[3]` folded `deg + min/60 + sec/3600` (length==3 guard else 0); `DateTimeOriginal` is unspecified-kind → force `SpecifyKind(Utc)` (INV-2); EXIF failure is swallowed (a no-EXIF photo still ingests); the staging stream must be buffered seekable (re-read from position 0 for dimensions, EXIF, full-res upload). |
+| **The 15 analysis styles** (style library + prompt parameters) | `Initialization/AnalysisStyleSeeder.cs:57-618` | The `FocusInstructions` prose + the exact field-key triples (Mandatory/Emphasis/Deemphasized) **are** the tuned product and encode the cross-style disambiguation rules. `EmphasisFields` strings like `"composition details"` are matched **verbatim** by `GetEnhancedExamples` (`AnalysisPromptFactory.cs:212-235`). Restore idempotency via `TemplateVersion`-aware upsert (the existence guard is currently commented out), not blind skip. |
+| **Smart two-stage classification** (classify→analyze, cached) | `PhotoProcessingService.cs:718-782`, branch `:627-633` | Candidate set filtered to `!IsSmartStyle && IsActive && IsSystemStyle` (smart never classifies to itself; user styles excluded); fuzzy ordered match (`Name.Contains` OR `Id ==`, fallback lowest-Priority); result cached on `InferredStyleId`, honored only if the cached style is still active and not smart. Dropping the cache doubles vision calls. |
+| **Reroll-with-holds** (lock summary/facts, regenerate the rest) | `PhotoProcessingService.cs:897-1000`; locks on `AiAnalysis.cs:28-29,43-44` | Ordering is load-bearing: **buffer** locked summary+facts *before* `GenerateDetailedDescription` (it wholesale-replaces `AiAnalysis`); after regen, restore Summary+SummaryLocked, write each buffered fact back into the **new** Facts dict, rebuild `LockedFactKeys`. Depends entirely on INV-1. |
+| **Hybrid/alpha semantic search + keyword fallback** | `PhotoProcessingService.cs:275-341`; embedding text `AiAnalysis.cs:69-92` | `alpha` is the semantic↔lexical dial (do not hardcode); two independent fallbacks (a `Vector.IsAvailable` pre-check + a catch-all) → `FallbackKeywordSearch` over `OriginalFileName`+`AutoTags`+`MoodDescription`; `ToEmbeddingText` format (tags, summary, fact values joined `, `) determines what search matches. **Adapt:** push the `eventId` filter down (§2b) instead of post-filtering after topK. |
+| **Daily-auto-event from EXIF** | `PhotoProcessingService.cs:788-828`, invoked `:102-109` | Get-or-create by **half-open UTC day range** (INV-2, the `$dateTrunc` trap); album name `"MMMM d, yyyy"`; `CapturedAt ?? UploadedAt` fallback files EXIF-less photos sensibly. |
+| ~~**Smart collections**~~ **(DROPPED — D2)** | `PhotosController.cs:800-945` | **Not ported.** Per D2 the Discovery panel is dropped (UI never called it). Bucket predicates preserved here only as historical reference if it's ever revived. |
+| **Index navigation** (position-in-context for the lightbox) | `PhotosController.cs:57-180` + shared `BuildPhotoQuery :186-259` | The UI calls only `GET /api/photos/{id}/index` (contract #4) + the session window (#5) — the standalone `/adjacent` and `/range` endpoints are **dropped** (orphans, D2). INV-3 still holds: the index lookup and the session window **must derive from the same ordered list** or navigation desyncs. Search context = relevance order un-resorted; collection context = curated `PhotoIds` order, sort params ignored. **Adapt** into a service over `QueryWithCount`/`Page`; the `BuildPhotoQuery` context dispatch survives. |
+| **Collection ordered membership** (curated many-to-many) | `Collection.cs:13-85`; `CollectionsController.cs:261-374` | `PhotoIds` index == display position (reorder = RemoveAt+Insert). Order-preserving load: iterate `PhotoIds`, pull from a dict, **drop nulls** (deleted-but-referenced). `AddPhotos` verifies existence, dedups, enforces `MaxPhotosPerCollection` counting only genuinely-new ids. Remove/Delete never delete photos. Dead-id cleanup on photo-deletion moves to a `BeforeRemove` lifecycle event. |
+| **AI vision orchestration** (`GenerateDetailedDescription` + the prompt factory) | `PhotoProcessingService.cs:582-679`; `AnalysisPromptFactory.cs:48-235` + `FactFieldDefinition.cs` | The prompt-factory engine ports verbatim: `FullPromptOverride` escape hatch; base-mandatory + style-promoted fields with `GetEnhancedExamples` swaps and trailing-comma trim; commented optional example lines are deliberate model hints; `SubstituteVariables` (`{{width}}/{{height}}/{{aspectRatio:F2}}/{{camera}}/{{orientation}}` via aspect thresholds). Style resolution priority: explicit→last-used→base, each must be active. Uses the **gallery** derivative for the vision call. Whole method non-fatal (a failed analysis must not fail ingest). `[MediaAnalysis]` is a **non-goal** — the factory is too rich for the attribute. |
+| **JSON-response normalization** (the part that survives the parser's deletion) | `PhotoProcessingService.cs:421-576` | Even though `Client.Chat<T>` obviates the *parsing*, keep: tags trimmed/empty-dropped/deduped case-insensitively; **every fact key lowercased** (INV-1); fact arrays trimmed/deduped/joined `, ` into one string; total-failure yields `AiAnalysis.CreateError(...)` (tags=`["error"]`), never null/throw. |
+
+**Already-modern, keep as-is (don't re-port from scratch):** `PhotoProcessingJob` (tenant-carrying `[JobAction]` Ingest/Reanalyze, ARCH-0100 carrier), `UploadStaging` (`StorageEntity<T>` staged blob), the `[Embedding(Policy=AllStrings, Async=true, Exclude=[EventId,InferredStyleId])]` + `float[]` vector wiring on `PhotoAsset`, and the Phase-0 tenancy model.
+
+---
+
+## 4. The entity model (target)
+
+**Keep (domain core, 6 stored + 2 embedded):** `PhotoAsset` (`MediaEntity<T>`, the single stored original), `Event`, `Collection`, `AnalysisStyle` (`[HostScoped]`), `PhotoSetSession` (volatile browsing cursor); `PhotoProcessingJob` (`IKoanJob<T>`), `UploadStaging` (`StorageEntity<T>`); embedded value objects `AiAnalysis`, `GpsCoordinates`.
+
+**Add relationship metadata:** `[Parent(typeof(Event))]` on `PhotoAsset.EventId`, `[Parent(typeof(AnalysisStyle))]` on `PhotoAsset.InferredStyleId` (additive → `Relatives`; no save-time FK enforcement, verified).
+
+**Drop (plumbing):** `PhotoGallery`, `PhotoThumbnail`, `PhotoMasonryThumbnail`, `PhotoRetinaThumbnail` (→ recipes); the 3 `*MediaId` FK fields on `PhotoAsset`; `ProcessingJob` (legacy batch tracker — **naming trap:** distinct from `PhotoProcessingJob`); `DetailedDescription` (legacy free-text, superseded by `AiAnalysis`); and the DTO cluster `PhotoIndexResponse`/`PhotoRangeResponse`/`PhotoMetadata`/`PhotoStats`/`PhotoSetQueryRequest`/`PhotoSetQueryResponse`.
+
+**Merge:** `PhotoSetDefinition` (wire DTO) is a byte-twin of `PhotoSetSession`'s query fields — collapse to one shape.
+
+**Tenancy posture:** exactly one `[HostScoped]` entity (`AnalysisStyle`, platform-shared). Everything else carries no tenant field and is auto-isolated by the invisible `__koan_tenant` discriminator. (Known Phase-1 limitation, documented on `AnalysisStyle.cs:12-21`: because the *whole* entity is host-scoped, user-created custom styles are also platform-visible — a later phase splits the system seed from per-tenant styles.)
+
+---
+
+## 5. Tenancy — the on-ramp (the key finding for "add tenant affordances")
+
+The understand-pass confirmed, by hand: **Koan ships the isolation *mechanism* but not the request→tenant *binding*.**
+- `ITenantResolver` is a **seam only** — its own doc says *"Concrete resolvers land in a later slice"* (`src/Koan.Tenancy/ITenantResolver.cs:6`). **No concrete resolver and no per-request middleware ship** (the only reference is the boot pre-flight `services.GetServices<ITenantResolver>().Any()`).
+- **Dev (Open posture):** a dev tenant auto-seeds; an unset ambient scope falls back to it — "no day-one 403." So the app today runs single-tenant-by-default.
+- **Production (Closed):** tenancy active with no resolver **refuses to boot** (fail-fast).
+- The flagship spec drives tenants **programmatically** (`Tenant.Use(StudioA)`); the SPA sends **no tenant carrier** (`api.js` adds no header/cookie/param; no studio-picker UI).
+
+**Implication:** a UI studio-picker needs a backend that turns a request into an ambient tenant. See Decision **D1**.
+
+> **UPDATE (2026-06-27): the request→tenant binding now SHIPS in the framework — this section's "no concrete resolver / no middleware" finding is superseded.** SEC-0007 P4 added **`Koan.Identity.Tenancy`**: the four tenant-resolution carriers (claim / header `X-Koan-Tenant` / subdomain `{code}.host` / path `/t/{code}`, the latter two resolving a `TenantRecord.Code`) + an `AfterAuthentication` `IKoanWebPipelineContributor` middleware that **membership-authorizes** the candidate against `Membership` and wraps the request in `Tenant.Use(...)` (and projects `Membership.Roles`). So the rebuild does **not** build a sample-side resolver — it **references `Koan.Identity` + `Koan.Identity.Tenancy`**, and the studio-picker just sets a carrier (a header, or a `/t/{code}` path). Building it this way also makes the rebuild the **SEC-0007 P5 identity dogfood**.
+
+---
+
+## 6. Cross-cutting surfaces (uncovered by the maps; needed for the rebuild)
+
+- **Data provider:** Mongo (`appsettings.json` → `Koan:Data:Mongo:Database = SnapVault`). The flagship test uses `inmemory`. INV-2's `$dateTrunc` avoidance matters because prod is Mongo.
+- **Storage profiles:** `cold`=photos, `warm`=gallery, `hot-cdn`=thumbnails — these map 1:1 to the derivative entities being dropped. When `[MediaRecipe]` replaces them, the profile config collapses to the original (`cold`) + the recipe cache; **revisit on the media phase.**
+- **Dead config:** `Koan:Ai:AnalysisStyles` (7 styles, `promptTemplate`/`systemContext` shape) in `appsettings.json` is **read by no code** — the 15 styles are hard-coded in `AnalysisStyleSeeder.cs` with a different shape (`FocusInstructions` + field triples). **Delete it** (the seeder is the source of truth).
+- **Auth:** none. No `UseAuthentication`/`UseAuthorization`, no `[Authorize]`. Fully anonymous → ambient tenant resolves to the dev default. Ties into D1.
+- **CORS:** `AllowAnyOrigin + AnyMethod + AnyHeader` with a "credentials for SignalR" comment that is actually incompatible with `AllowAnyOrigin`. Revisit for the SSE migration.
+- **Static hosting:** `UseStaticFiles` + `MapFallbackToFile("index.html")` serves the SPA; `window.open()` downloads/exports depend on these resolving server-side; `DownloadPhoto` 302s to `/storage/{Key}`. Preserve.
+- **ZenGarden:** Reference = Intent through the descriptor-backed module; `AddKoan()` is the complete activation path. Module-specific activation in `Program.cs` is unsupported. The model-advisor diagnostic logging moves into `SnapVaultModule.Start`.
+
+---
+
+## 7. Open decisions (the forks — recommendations inline)
+
+- **D1 — Tenant on-ramp. DELIVERED in the framework (2026-06-27, SEC-0007 P4 — `Koan.Identity.Tenancy`).** The first-class tenant-resolution module envisioned here was built as part of SEC-0007: composable carriers (claim / header / subdomain `{code}.host` / path `/t/{code}`) implementing the ARCH-0099 `ITenantResolver` seam + an `AfterAuthentication` middleware that wraps each request in `Tenant.Use(...)`, **membership-authorizes** the candidate against `Membership`, projects `Membership.Roles`, and honors the dev-open/prod-closed posture. **The rebuild consumes it** (reference `Koan.Identity` + `Koan.Identity.Tenancy`) — no sample-side resolver. The UI studio-picker sets a carrier (recommend the `X-Koan-Tenant` header or a `/t/{code}` path). This makes SnapVault the SEC-0007 P5 dogfood of the durable person + membership model. *(Deferred framework piece, not blocking: DNS-verified custom-domain routing.)*
+- **D2 — Surface policy. DECIDED (2026-06-26): drop ALL orphans AND smart collections.** The new backend exposes only the currently-UI-called endpoints (the contract doc). Gone: the whole `AdminController`; `/Photos/search`·`/favorites`·`/range`·`/adjacent`·`PUT favorite`; Events `timeline`·`by-tier`·`archive`; styles `system`·`user`; the smart-collections Discovery endpoint; and the unused inherited `EntityController<T>` verbs. Smallest meaningful surface.
+- **D3 — Media URLs.** The UI calls `/api/media/photos/{id}/{gallery|original}` + `/api/media/{masonry|retina}-thumbnails/{id}`; the framework recipe controller serves `/media/{id}/{recipe}`. **Recommended:** update the 4 UI call sites (`grid.js`, `lightbox.js`, `ImagePreloader.js`) to the recipe URLs — a small, contained UI edit bundled with the tenant-affordance work — rather than maintaining a compatibility alias.
+- **D4 — Progress transport.** SignalR → SSE (already confirmed). The UI's `processMonitor.js` moves from a SignalR hub to an `EventSource` on a per-batch stream endpoint; payload shapes (`PhotoProgressEvent`/`JobCompletionEvent`) are preserved.
+- **D5 — Error/pagination contract.** Standardize on one error envelope (the legacy uses `{Error}`/`{Message}`/bare inconsistently) and back the UI's two list shapes (bare array + `X-Total-Count`; the session envelope) with `EntityController` query + the session endpoint. Honor the consumed shapes (see the contract doc) exactly.
+
+---
+
+## 8. Build shape (greenfield, always-green)
+
+The legacy backend stays runnable as the reference until the new surface is coherent, then is deleted in one swap. Suggested sequence (each step compiles green; the flagship spec is the gate; TDD where it pays):
+
+1. **Skeleton** — `SnapVaultModule : KoanModule`, the kept entities (with `[Parent]`), `Program.cs ≈ AddKoan().AsWebApi()`, config trimmed (delete dead styles config), the flagship spec pointed at the new entities.
+2. **Tenancy on-ramp** (D1) — reference `Koan.Identity` + `Koan.Identity.Tenancy` (the framework's carriers + the `AfterAuthentication` membership-authorizing middleware ship it, SEC-0007 P4); add the UI studio-picker that sets a carrier (the `X-Koan-Tenant` header or a `/t/{code}` path). No sample-side resolver. This is also the SEC-0007 P5 identity dogfood.
+3. **Media recipes** (D3) — `[MediaRecipe]` set + `IMediaSource`; UI media URLs repointed; derivative types deleted.
+4. **Jobs/progress** (D4) — ledger + `ctx.Progress`; SSE stream; SignalR + hub deleted. **DELIVERED.** Upload progress is a **read-projection of the durable jobs ledger** (`Progress/UploadProgressProjection.cs`): the batch is "the `PhotoProcessingJob`s sharing a `BatchJobId`" (`JobRecord.CorrelationId` is the trace id, not a settable batch key), joined to each one's ledger row (work-item = identity; ledger = lifecycle + `ctx.Progress`). `Controllers/UploadProgressController.cs` (`GET /api/photos/progress/{batchId}`) returns `Sse.Stream(...)` — one `EventSource`, `PhotoProgress`/`JobCompleted` frames, then close. No hub, no groups, no push, no separate batch tracker; `processMonitor.js` is native `EventSource`, the SignalR CDN `<script>` is gone. `SnapVaultUploadProgressSpec` drives the real ledger (submit → `ledger.Progress` → `Cancel`) to prove the projection. **Framework-lift candidate (not built):** a reusable `Koan.Web.Sse × Koan.Jobs` "watch a batch of jobs as SSE" primitive becomes justified only after a second consumer; an efficient version also needs a ledger batch query.
+5. **Domain services** — port §3 verbatim into thin services (ingest pipeline, search, navigation, collections); the UI-faced endpoints only. (Smart-collections dropped per D2.) **Sub-phased: 5a (ingest + AI pipeline) · 5b (studio read surface #1–#7) · 5c (studio mutation surface) · 5d (maintenance: stats + wipe) · 5e (fail-closed flip + operator/guest subject middleware + guest-write floor + operator floor + guest-row wipe fold) · 5f (guest surface) — ALL DELIVERED. STEP 5 COMPLETE.** 5c ported the write endpoints as thin actions over the entity: photos #9–#19 (favorite/rate/bulk favorite+delete/download/regenerate-ai(+analysis, reroll-with-holds)/fact+summary locks, INV-1 lowercase keys); `EventsController`/`CollectionsController`/`AnalysisStylesController` (`EntityController<T>` with `[Pagination(Mode=Off)]` so the SPA gets the full bare array — the default `On/50` would truncate); collections rename/add(capped, "limit")/remove. Both §9.7 5c tripwires discharged (write-verb seal incl. the newly-found `Patch` bypass; delete-time media-derivation eviction + collection pruning via the structural `PhotoAsset.AfterRemove` hook). Reviewed (4 lenses + adversarial verify); `SnapVaultMutationSpec` (5 facts) guards the tripwires + guards (rate clamp, INV-1, cap-"limit", 405 seal). **5f DELIVERED** (backend + specs green; the studio-SPA UI polish is start.bat-smoke-test-and-iterate): the guest lifecycle is now HTTP (`GalleryController` — operator `invite` returns the guest link, guest `accept` binds the token to the signed-in person, verified-email ownership enforced); `GalleryInviteService` honors `GuestRole` (viewer → `["view"]`, proofer → `["view","select","comment"]`); the `event` context is unified onto the #5 windowed grid (`PhotoSetService`/`PhotoSetDefinition`/`PhotoSetSession`) and the SPA by-event call repointed (no more 50-row truncation, access-scoped for guests); the invited-guest proofing page (`wwwroot/guest.html` + `js/guest.js`) accepts-on-open then shows the event's photos with select/rate, each mark riding the 5e guest-write floor; a studio "🔗 Share" affordance per event issues the invite. **Smoke-test follow-ons (need the running app): the studio client-selections view UI (the `GET /api/proofing/selections/{eventId}` endpoint exists), the studio-picker carrier + guest login link (the dev-trust operator + TestProvider cover dev), and any guest-page CSS polish.** **Step 6 DONE (see §8-6 + §9.7). Step 7 DONE (see §8-7 + the Measurement) — the greenfield arc is COMPLETE.** 5d (`MaintenanceController` = `GET stats` + `POST wipe-repository` NDJSON) computes stats from the entities' own `Size` (originals=cold, render cache=warm, hot=0 — honest to the greenfield's collapsed tiers) and wipes the tenant's photos(+blobs)/events/collections/jobs/sessions/renders (skips the deleted derivative types; the settings SPA was trimmed to stats+wipe). Reviewed; fixes: collections-before-photos (kills the per-photo hook save-storm), the `>0` progress guard, and a real-blob round-trip test (`Head` proves `photo.Delete`). Minor known-gap (deferrable to 5d-later): `Event.PhotoCount` is refreshed on ingest but not decremented on delete — stale-high until the next ingest self-heals it (matches legacy).
+6. **AI & vector cleanup — DONE (step 6; reviewed by code + security agents, 0 CRITICAL/HIGH/MEDIUM).** The empirical seam-map materially narrowed the planned scope — most of it was already handled by the framework, and only one item was a real bug.
+   - **Ingest blob-key collision (§9.7) — the one real, testable bug — FIXED.** `ProcessUpload` now keys each blob by a fresh `StringId` + the original extension (unique per photo) instead of the raw upload filename; the display name is stripped to `Path.GetFileName` and kept on `OriginalFileName`; original-blob reclamation moved into the structural `PhotoAsset.AfterRemove` hook (the wipe dropped its bespoke `photo.Delete`). Guarded by `SnapVaultBlobKeySpec` (same-named uploads → distinct blobs → own bytes → sibling-safe partial delete — fails against pre-fix code on 3 independent assertions).
+   - **Vector `eventId` push-down — DONE.** `SemanticSearch` pushes `EventId` as a metadata-facet filter (`{["EventId"]=id}`) instead of an in-memory post-filter (better recall); the SEC-0008 access scope is ANDed separately by `ScopedVectorRepository` (`Filter.All(caller, scope)`) so it can only narrow, never widen; the keyword fallback still honors `eventId`. **Production-only: inert in the unit harness** (no embedding provider → the vector branch throws → keyword fallback), so it is start.bat-smoke-verify-pending like the UI items.
+   - **Media coupling — DONE in 5a:** the vision bytes are re-sourced by rendering the `gallery` recipe in-process (`photo.OpenRead().AsMedia().Apply(PhotoRecipes.Gallery()).WriteToAsync(buf)`) since the `PhotoGallery` derivative entity is gone.
+   - **Re-derived NON-issues (nothing to fix — verified, not deferred).** The "embedding-save consolidation" the 5a review flagged is already handled by the framework: `Upload` doesn't persist (no hook), only 2 embed-content saves fire (durability + AI, both architecturally required), the enum-only `Completed` save is signature-skipped, and the deterministic per-entity `EmbedJob` id + content-signature gate + the worker's fresh-entity re-read coalesce to a single embed that self-heals to the final content — forcing exactly-one would need a suppression scope that doesn't exist and would break the durability ordering (save-before-fallible-AI). `ParseAiResponse`'s JObject parse is deliberately lenient (3 fallback strategies for misbehaving LLM output) — retyping is churn with a real robustness cost. `EmbeddingTelemetry` already exists and is emitted by the framework `EmbeddingWorker`; the legacy `EmbeddingMonitoringService` is already gone (it lived in `_legacy`, referenced only by the legacy `AdminController`).
+7. **Swap & measure — DONE.** The parked `_legacy/` backend (15 files) was DELETED and the csproj `<Compile Remove="_legacy\**">` exclusion removed; the sample builds green and the suite is **33/33, 0 skips** (flagship green). No greenfield code referenced `_legacy` (verified) and every non-orphan legacy endpoint has a greenfield home (the D2 orphans were intentionally dropped). **Blob leg re-homed + provider-swappable:** the flagship blob leg was already un-parked in 5a; step 7 made the `cold` profile explicit (`Provider: local`, dev → `./storage`) and added `appsettings.Production.json` binding the *same* `cold` profile to `S3` (BucketPrefix/Region/UseSsl in config; Endpoint/AccessKey/SecretKey via env — never committed) — the multi-provider-transparency moat demonstrated by config alone (README storage section reconciled to match).
+
+   **Measurement (before → after).** The greenfield is a *complete rebuild that ADDED major scope* (the studio↔client guest lifecycle — 4 entities + 4 services; SEC-0008 fail-closed access; SSE progress) yet still shrank and simplified the core:
+   | Dimension | Legacy | Greenfield | Δ |
+   |---|---|---|---|
+   | Comparable backend (Controllers + Services + Config) | 4,914 LOC / 15 files | 2,887 LOC / 23 files | **−41% LOC** (despite +guest lifecycle) |
+   | Bespoke plumbing eliminated to **zero** | AdminController 134 + MediaController 154 + EmbeddingMonitoringService 239 + EntityLifecycleConfiguration 77 = **604 LOC** | 0 | framework-absorbed |
+   | Media-derivative entity types | 4 (`PhotoGallery`/`Thumbnail`/`Masonry`/`Retina`) + 3 `*MediaId` FKs + a reflection `BaseType` hack | 0 → **3 one-line `[MediaRecipe]`** | −4 types |
+   | 3rd-party NuGet packages | 4 (ImageSharp ×2 + **MetadataExtractor** + **SignalR.Client**) | 2 (ImageSharp ×2) | **−2** (EXIF → ImageSharp `ExifProfile`; progress → SSE) |
+   | Framework capability refs (Reference = Intent) | 17 ProjectRefs | **22** ProjectRefs | +5 current net capability references after package coalescence; request-scoped gallery visibility is now supplied by Web rather than a separate Data Access package |
+
+   The thesis in one line: **−2 bespoke NuGet dependencies and −604 LOC of hand-rolled plumbing (media controller, monitor service, cascade config, derivative fan-out) dissolved into +10 framework project references** — Reference = Intent replacing bespoke code, while the app gained an entire guest lifecycle + fail-closed security + SSE. **Remaining follow-on (needs the running app): acceptance #3 UI smoke-test against the new backend** (studio client-selections view, studio-picker carrier, guest login link, guest-page CSS, and the production-only vector eventId push-down).
+
+---
+
+## Acceptance criteria
+
+1. Backend **builds green**; in `Koan.sln`; CI guards it.
+2. **Flagship tenancy spec green** (record + job + vector + blob + `[HostScoped]`), real `AddKoan()`, no Docker.
+3. **UI works against the new backend** — every endpoint/realtime in the contract doc honored (minus the D3/D4 deliberate changes, for which the UI gets matching affordances).
+4. The hand-written code that remains is exactly the §3 domain core + the §5 tenant on-ramp.
+5. `Program.cs ≈ AddKoan().AsWebApi()` + `SnapVaultModule`; no derivative entity types, reflection hack, bespoke queue/hub/JSON-parser/page-math/monitor service.
+6. **A measured before/after recorded — DONE** (§8-7 Measurement: −41% comparable-backend LOC, −604 LOC bespoke plumbing → 0, −4 derivative entity types, −2 NuGet packages, +10 Reference=Intent framework refs).
+
+> **Status (greenfield arc COMPLETE):** #1 build-green ✅ · #2 flagship spec green ✅ (suite 33/33, 0 skips) · #4 hand-written code = §3 domain + §5/§9 lifecycle ✅ (`_legacy` deleted) · #5 `Program.cs ≈ AddKoan().AsWebApi()` + `SnapVaultModule`, no derivative types / reflection hack / bespoke queue / hub / page-math / monitor ✅ (the 3-strategy JSON parse was deliberately KEPT — lenient by design for LLM output) · #6 measured ✅.
+>
+> **#3 (UI works end-to-end) — SUBSTANTIALLY VALIDATED (2026-07-01, `start.bat` against real Mongo/Weaviate/Ollama).** The SPA loads; every SPA-called API endpoint returns correctly; the full ingest → **qwen2.5vl vision** → **nomic-embed-text embedding** → **Weaviate** → **semantically-ranked search** pipeline works end-to-end (uploads produce accurate AI tags/summaries; "blue circle" ranks blue-circle.jpg #1). The live run earned its keep — it surfaced **4 real bugs the ARCH-0079 in-memory suite structurally cannot catch**, all fixed + reviewed + pushed: (a) ZG discovery short-circuit → health-checked contributor (`3dbaa14c`); (b) async embedding not ambient-aware → `EmbedJob : IAmbientExempt` + ARCH-0100 carrier (`1c9d9413`); (c) embed used the vision DefaultModel → pass `EmbedOptions{Model}` (`1c9d9413`); (d) concurrent-upload duplicate daily events + AI model wiring (`cd4fa7c7`). **Still browser-visual-only (not yet clicked through):** studio client-selections view, studio-picker carrier UX, guest login link, guest-page CSS polish.
+
+---
+
+## 9. The studio↔client lifecycle (scope expansion — 2026-06-27)
+
+After the skeleton (step 1) landed green, a delight pass ([snapvault-delight-research.md](./snapvault-delight-research.md)) + a user directive reframed SnapVault from a studio-only photo CRUD into a **studio↔client lifecycle**. This section records the consequences for the build shape. It is an *expansion* of §2–§8, not a replacement — the harvest plan still holds; this adds the client/guest surface on top.
+
+**User decisions (2026-06-27):** (a) build the lifecycle **as the spine now** (fold into steps 2 & 5, not a later follow-on); (b) the invited-guest v1 scope is a **proofing gallery** (favorite/rate/select picks + optional comments; the studio sees the selections); (c) persist the delight research (done — the companion doc).
+
+### 9.1 The flagship arc (lead with this)
+> **Invite** a client to their event set → they accept into a **durable, portable identity** (invite-binds-to-identity, no email-merge takeover) → **fail-closed scoped access to only that set** (the proofing gallery) → at engagement end, **atomic deprovision + a signed erasure certificate**.
+
+This is the SEC-0007 P5 identity dogfood made visible. Five differentiators, priority order: ① invite-gated proofing galleries ② verifiable client-erasure certificate ③ per-client isolation as structural impossibility ④ honest hybrid search (vector+lexical+OCR+floor) ⑤ reroll-with-locks as explainable AI.
+
+### 9.2 Personas (new third persona)
+- **Studio operator / staff** — the existing tenant member; uploads, organizes, full library.
+- **Invited client/guest** — a durable *person* granted scoped read+proof access to **one set**, never the studio's library. NOT a tenant member.
+
+### 9.3 Architecture: guest access = a capability grant, NOT a second tenant axis
+The market-research synthesis suggested "per-client sub-isolation" as a nested tenant axis. **Rejected** — a client doesn't *own* a library; the studio does and grants a view. Correct, cheaper, on-moat shape:
+- **Studio = tenant** — the shipped fail-closed isolation (the invisible `__koan_tenant` discriminator). Unchanged.
+- **Guest = identity + a grant to a set** — SEC-0004 **gate·constrain·project**: the grant *is* the read-path filter, fail-closed; a guest's queries are constrained to their granted set, cross-set/cross-client get-by-id returns null by construction. No new framework axis; rides shipped seams (`Koan.Identity` + `Koan.Identity.Tenancy` + the SEC-0004 floor).
+
+### 9.4 Entity additions (sketch — detailed shape is the step-2/5 seam-map's job)
+- **Shareable set** — reuse `Collection` (curated ordered) and/or `Event` as the unit a studio shares; add a lightweight "shared" marker + the grant binding rather than a new container type.
+- **Gallery invite** — email → set → guest role; **binds to the canonical person on accept** (reuse the `Koan.Identity` invite-binds-to-identity primitive; do NOT hand-roll). Pending-until-accepted.
+- **Guest access grant** — identity → set → permissions `{view, download?, select}`. Realized via the SEC-0004 grant model (AgentGrant-style, resource = the set), enforced on the read path.
+- **Proof selection** — `(guestIdentityId, setId, photoId)` with pick/rating + optional comment; the studio reads the aggregated client selections. Guest favorites/picks are attributed to the **guest**, distinct from the studio's own `IsFavorite`/`Rating` on `PhotoAsset`.
+
+> Port-verbatim invariants INV-1/INV-2 are unaffected. New entities are GUIDv7 `Entity<T>`; the grant + selection writes are tenant-carried (the studio tenant) and guest-attributed.
+
+### 9.5 Build-step consequences
+- **Step 2 (identity/tenancy on-ramp) — expanded.** In addition to the studio carrier (`X-Koan-Tenant` / `/t/{code}`): reference `Koan.Identity` + `Koan.Identity.Tenancy`; wire **gallery invite → accept → identity-bound guest grant**; wire **atomic deprovision + erasure certificate** ("delete client & prove it"). The flagship spec gains a leg: a guest sees only their set; a cross-set read fails closed; deprovision purges set photos + derivatives + embeddings + facts + the grant and emits the certificate.
+- **Step 5 (domain services) — expanded.** Add the **guest-scoped proofing endpoints** (list my set, view photo, favorite/rate/select, comment) constrained by the grant, and the **studio-side "client selections" view**. Reroll-with-locks gains the explainable reason + sub-scores surface here.
+- **Step 6 (AI/vector) — unchanged scope**, plus the OCR lexical lane + relevance-floor honest empty state for hybrid search.
+- **NEW: guest UI.** The existing SPA has no guest/share surface; a minimal guest gallery view (+ a studio share/invite affordance + a selections view) is net-new frontend. The §6 "SPA rewrite out of scope" clause is **lifted for the guest surface only** (the studio SPA is still harvested, not rewritten).
+
+### 9.6 Acceptance additions
+7. **Lifecycle flagship green** — invite→accept→scoped guest access; cross-set read fails closed; deprovision purges + certifies (real `AddKoan()`, no Docker).
+8. **Proofing works end-to-end** — an invited guest selects picks; the studio sees them; the guest never sees another set.
+9. **No bespoke axis logic** — guest isolation rides the SEC-0004 grant + read-path predicate + the shipped tenant isolation; the invite rides `Koan.Identity` invite-binds-to-identity. (Contributor-pipelines-never-bespoke.)
+
+### 9.7 Step-5 enforcement tripwires (from the step-2 adversarial review)
+The step-2 review confirmed the durable grant model sound (including erasure revoking pending invites). R11-05 later
+coalesced the spread model-decorated subject implementation into the Web request chokepoint: multi-studio correctness
+now comes from one link selecting one validated grant, whose tenant and Entity predicate wrap the request.
+- **Guest proofing WRITE floor — current.** `ProofingController.SetMark` requires the validated gallery context, loads the photo through that context (cross-set/cross-studio id → 404), derives event/studio from the trusted photo and grant, checks `GalleryGrant.Allows(...)`, and clamps ratings. `ProofingService.SetSelectionAsync` re-anchors trusted scope fields on every write. `SnapVaultWebContextSecuritySpec` proves the positive and cross-event HTTP paths; lifecycle specs retain permission and closure coverage.
+- **Request-context discipline — current.** `SnapVaultContextContributor` is one scoped `IWebContextContributor` at order 200. It treats `event` as evidence, validates the exact active `GalleryGrant` for the current principal, selects that grant's `StudioTenantId`, contributes `PhotoAsset.EventId == eventId`, and rejects invalid/revoked guest links before endpoints. A multi-studio guest therefore enters exactly the studio named by the validated link—never an aggregate subject snapshot. `[OperatorOnly]` keeps gallery guests off the studio management surface while allowing normal tenant-bound operators.
+- **The READ floor is automatic for Web requests.** Web projects the contributed predicate into Data's canonical `ReadScopeFold`, so raw `Entity.Query`, key reads, vector search, and Entity-backed media inherit it without `[AccessScoped]` decoration or manual ambient calls. Jobs do not carry arbitrary request predicates; durable work must establish or re-resolve its own business context.
+- **Media-derivation eviction (from the step-3b review) — DONE IN 5c.** The delete path evicts renders for the deleted source through the structural `PhotoAsset.AfterRemove` hook: query `MediaDerivation` by `SourceMediaId`, delete blob + record, then prune dead collection ids. This is **cleanup, not correctness**: a leftover render is unreachable because `MediaEntitySource.OpenAsync` gates the deleted source before derivative lookup. R07-17 deliberately ships no context-free generic sweep; targeted deletion is the safe current lifecycle boundary. Proven by `SnapVaultMutationSpec.Delete_evicts_renders_and_prunes_collections`.
+- **Progress-error sanitization (from the step-4 review)** — when the rebuilt ingest pipeline (step 5) starts throwing real failures, `UploadProgressProjection` currently forwards `JobRecord.LastError` verbatim to the SSE wire (`PhotoProgressEvent.Error` / `JobCompletionEvent.Errors`). It goes only to the operator who owns the batch (own-tenant data, not a cross-boundary leak — the endpoint inherits the tenancy posture, see `UploadProgressController`), but map it to a **user-safe message** at the projection rather than leaking raw exception text (paths/hostnames) into a browser. Cleanup/hardening, not an isolation hole.
+- **Seal the raw `EntityController` write verbs (from the 5b review) — DONE IN 5c.** `PhotosController` now overrides **every** raw write/mutate/delete verb to `405`: `Upsert`, `UpsertMany`, `Patch`, `Delete`, `DeleteMany`, `DeleteByQuery`, `DeleteAll`. The 5c review turned up **`Patch` as a live bypass the 5b note missed** — a raw `PATCH /api/photos/{id}` could rewrite `EventId`, i.e. move a photo across the SEC-0008 access axis; sealing it closes that. Reads stay open (the `GET` list/by-id and the `POST /query` are access-scoped like any read — the seal is write-only by design). Photos enter only via `/upload`, leave only via the custom bulk-delete (#12). Proven by `SnapVaultMutationSpec.Raw_write_verbs_are_sealed`.
+- **SPA error-body surfacing (from the 5c review) — DONE IN 5c.** The §3 collection-cap contract (the `400` error text must contain the word "limit", which `dragDropManager.js` greps) was **inert**: `wwwroot/js/api.js` threw a bare `HTTP <status>` line and discarded the JSON body, so the "collection full" toast was dead code. `api.js` now surfaces `body.error` on every non-2xx (all verbs + the upload xhr), which makes the cap grep — and every server error toast — actually work. No consumer depended on the old status-line format.
+- **Unify event-click browse with the #5 windowing (from the 5b review) — DONE IN 5f.** `PhotoSetDefinition`/`PhotoSetSession`/`PhotoSetService` gained an `"event"` context (query by `EventId`, globally sorted + windowed like the grid, access-scoped so a guest's event browse is confined for free), and the SPA `filterPhotosByEvent` was repointed onto `POST /api/photosets/query` (context `event`) — no more silent 50-row truncation. Proven by `SnapVaultPhotoSetSpec.Event_context_windows_one_event`.
+- **Original-blob keying collision (from the 5d review) — DONE IN STEP 6.** 5a ingest stored the original via `PhotoAsset.Upload(stream, fileName)`, so the blob key was the (sanitized) upload **filename**, not uniquified. Two same-named uploads in a tenant (routine in a photo library — `IMG_0001.jpg`) collided on the key: the second overwrote the first's bytes and **both records then served the same image** — a real correctness bug (also corrupting `Download` + gallery serving). It also made a *partial* delete's blob-eviction unsafe (a surviving same-named photo may share the blob). **Fixed at the ingest call-site** (not the framework — `MediaEntity.Upload` is deliberately name-keyed; `Store` was rejected because it also dedups at the *entity* level, and the same bytes in two events must be two rows): `ProcessUpload` keys the blob by a fresh `StringId` + the original extension, unique per photo. With keys now unique, original-blob reclamation became **safe on every delete path**, so it moved into the structural `PhotoAsset.AfterRemove` hook (leg 0, guarded on non-empty `Key`), and the 5d **wipe** dropped its bespoke `photo.Delete` to rely on it — one structural home instead of a per-caller step. Proven by `SnapVaultBlobKeySpec` (distinct keys · own bytes · sibling-safe partial delete). Reviewers confirmed no path assumes `Key == fileName` and no cross-tenant blob delete is possible (the ambient tenant prefix matches the write path).
+- **Wipe the studio's [HostScoped] guest-lifecycle rows (from the 5d review) — DO IN 5e.** `MaintenanceController.WipeRepository` clears the tenant's photos/events/collections/jobs/sessions/renders but NOT the `[HostScoped]` `GalleryGrant` / `GalleryInvite` / `ProofSelection` rows (keyed by `StudioTenantId`). They orphan **inert** — their events/photos are gone so SEC-0008 already yields nothing (no leak) — but they misrepresent tenant state. Clearing them needs the operator's resolved tenant id (`Query(x => x.StudioTenantId == tid)` → `Remove`), which 5e's operator subject/tenant middleware provides; fold it into the wipe there (the `SnapVaultDeprovisioningService` already does the per-client version). `ClientErasureCertificate` is `IAmbientExempt` and intentionally global — correctly never wiped.

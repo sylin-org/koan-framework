@@ -16,6 +16,12 @@ title: Recipe-based media pipeline, format-preserving transforms, and overlay co
 
 ---
 
+> **Current implementation (R07-17, 2026-07-16).** Named recipes, configuration overrides, the canonical
+> pipeline, HTTP rendering, negotiation, derivative write-through, and inspection are implemented. Signed and
+> content-addressed routes, BlurHash, automatic prewarming, and a warm endpoint are not. The inert `Eager`
+> declaration was deleted in R07-17. Invalid recipes now fail host startup and the materialized catalog enters
+> shared runtime facts. See the [Media reference](../reference/media/index.md) for the supported surface.
+
 | **Contract**         | **Details**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Inputs**           | Source media bytes (any decoder-supported format), named recipe registry (code attributes + appsettings), URL request `{id}[@{hash}][/{seed}][?params]`, request `Accept` header, signing key for ad-hoc URLs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -648,10 +654,13 @@ Decode pool saturation returns 503 with `Retry-After`.
 ### 14. Operational hooks
 
 - `POST /api/admin/media/{id}/warm` — pre-generates all named recipes for one media row. Idempotent; cached variants are no-ops.
-- `[MediaRecipe("poster", Eager = true)]` — recipe pre-warms at upload time. Default is lazy (generate-on-first-request).
+- Automatic recipe prewarming is not implemented. Applications may explicitly run the pipeline or
+  `MaterializeAsync` in their own upload/job workflow when that cost belongs to the business process.
 - Variant cache invalidation is implicit — recipe fingerprint changes (code edit, config patch) rotate the cache key. Orphaned bytes are reaped by the existing variant GC sweep.
 
-> **Implementation status (Koan.Media.Web 0.11.2).** The variant cache shipped as `IMediaOutputCache`, consulted by `MediaController` before the pipeline and populated write-through after, keyed on `(id, recipeFingerprint)` as designed. It is **opt-in** via `Koan:Media:Web:OutputCache` (`Enabled` + `Path`); the default is a no-op. The default backing is filesystem (one file per render), not Koan.Storage. **No GC sweep is implemented** — invalidation-by-fingerprint means stale entries are never served, but orphans are reclaimed manually (delete the cache directory). The `warm` endpoint and `Eager` pre-warm above remain unimplemented. See [Media reference → OutputCache](../reference/media/index.md#koanmediaweboutputcache-mediaoutputcacheoptions).
+> **Historical implementation note (Koan.Media.Web 0.11.2).** The variant cache then shipped as
+> `IMediaOutputCache`. MEDIA-0007/0008 replaced that family with source-owned derivative read/write. R07-17
+> removed the unimplemented warm/prewarm declaration and the unsafe generic sweep surface.
 
 ---
 

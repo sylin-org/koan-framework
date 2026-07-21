@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>Compose (docker-compose) exporter for Koan DevHost orchestration.</Description>
+    <PackageTags>$(CommonPackageTags);orchestration;compose;docker;renderer</PackageTags>
+    <AssemblyName>Koan.Orchestration.Renderers.Connector.Compose</AssemblyName>
+    <RootNamespace>Koan.Orchestration.Renderers.Connector.Compose</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+  <ProjectReference Include="..\..\..\src\Koan.Core\Koan.Core.csproj" />
+  <ProjectReference Include="..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

@@ -20,8 +20,8 @@ namespace Koan.Data.VectorAdapterSurface.Qdrant.Tests;
 /// mapping.
 ///
 /// <para>
-/// Operational defaults: <see cref="QdrantOptions.Dimension"/> defaults to 1536 (OpenAI ada-002
-/// / text-embedding-3-small size). <see cref="QdrantOptions.WaitForResult"/> is true, which
+/// <see cref="QdrantOptions.Dimension"/> is only needed when a test pre-creates a collection;
+/// otherwise the adapter derives it from the first embedding. <see cref="QdrantOptions.WaitForResult"/> is true, which
 /// means writes block until visible to subsequent reads — that's what gives this adapter its
 /// <see cref="SupportsDeleteImmediatelyVisibleToSearch"/> = true claim.
 /// </para>
@@ -45,6 +45,7 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
     public bool SupportsBulkOperations       => true;
     public bool SupportsFlush                => true;  // adapter overrides: drops the collection
     public bool SupportsExportAll            => true;  // /points/scroll pagination
+    public bool SupportsIndexStats           => false; // QdrantVectorRepository exposes no count instruction
     public bool SupportsHybridSearch         => false;
     public bool SupportsMetadataFilters      => true;  // must/should/must_not via QdrantFilterTranslator
     public bool SupportsContinuationToken    => false; // search doesn't paginate (scroll is a separate endpoint)
@@ -54,7 +55,7 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
     public bool SupportsDeleteImmediatelyVisibleToSearch => true;
     public bool SupportsScoreNormalization   => true;  // cosine
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (_initialized) return;
         _initialized = true;
@@ -76,7 +77,7 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
             // deterministic CI behavior. Qdrant follows semver rigorously so REST surface is
             // stable across 1.x. Using the image-constructor overload (the parameterless
             // ContainerBuilder() is now CS0618-obsolete in Testcontainers 4.11+).
-            _qdrant = new ContainerBuilder("qdrant/qdrant:v1.10.0")
+            _qdrant = new ContainerBuilder("qdrant/qdrant:v1.18.3")
                 .WithPortBinding(6333, true)
                 .WithPortBinding(6334, true)
                 // /readyz returns 200 once the node has loaded collections and is accepting
@@ -99,7 +100,7 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _adminHttp?.Dispose();
         if (_sp is not null) await _sp.DisposeAsync();
@@ -162,7 +163,7 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddLogging();
         services.AddHttpClient("qdrant", c => c.BaseAddress = new Uri(_endpoint));
-        services.AddKoanDataVector();
+        services.AddVectorAdapterTestRuntime();
 
         services.AddOptions<QdrantOptions>().Configure(o =>
         {
@@ -185,7 +186,7 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddLogging();
         services.AddHttpClient("qdrant", c => c.BaseAddress = new Uri(_endpoint));
-        services.AddKoanDataVector();
+        services.AddVectorAdapterTestRuntime();
 
         services.AddOptions<QdrantOptions>().Configure(o => ApplyMatrixDefaults(o, _endpoint, EmbeddingDimension));
         services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();

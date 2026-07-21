@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 using Koan.AI.Contracts.Shared;
 using Koan.AI.Eval;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 

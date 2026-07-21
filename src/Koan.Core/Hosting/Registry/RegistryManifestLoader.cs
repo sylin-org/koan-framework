@@ -5,16 +5,18 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Core.BackgroundServices;
 using Koan.Core.Hosting.Registry;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Core.Semantics;
+using Koan.Core.Semantics.Contributions;
+using Koan.Core.Infrastructure;
 
 namespace Koan.Core.Hosting.Bootstrap;
 
 /// <summary>
 /// Runtime fallback that reflects loaded assemblies to populate the registry when source-generated
-/// manifests are missing. Ensures adapters and initializers still light up even when the
-/// compile-time generator didn't run (e.g. downstream consumer assemblies that pull Koan in via
-/// NuGet, where the analyzer isn't shipped). Every assembly is scanned — Koan-named or not — so a
-/// consumer can define its own <see cref="IKoanAutoRegistrar"/> and have it discovered without an
-/// explicit <c>Initialize()</c> call.
+/// manifests are missing. Ensures modules and generated catalogs still light up when the compile-time
+/// generator could not run. Core ships that generator transitively; this reflection path is a degraded
+/// runtime fallback. Every assembly is scanned, so consumer-defined <see cref="KoanModule"/> types follow
+/// the same reference-driven activation contract.
 /// </summary>
 /// <remarks>
 /// Well-known framework prefixes are skipped via <see cref="ShouldSkipAssembly"/> as a cheap
@@ -25,8 +27,7 @@ namespace Koan.Core.Hosting.Bootstrap;
 /// </remarks>
 internal static class RegistryManifestLoader
 {
-    private static readonly Type InitializerInterface = typeof(IKoanInitializer);
-    private static readonly Type AutoRegistrarInterface = typeof(IKoanAutoRegistrar);
+    private static readonly Type ModuleType = typeof(KoanModule);
     private static readonly Type BackgroundServiceInterface = typeof(IKoanBackgroundService);
     private static readonly Type PokableInterface = typeof(IKoanPokableService);
     private static readonly Type PeriodicInterface = typeof(IKoanPeriodicService);
@@ -75,12 +76,22 @@ internal static class RegistryManifestLoader
 
         if (types.Length == 0) return;
 
-        var initializers = new List<Type>();
-        var autoRegistrars = new List<Type>();
         var backgroundServices = new List<KoanRegistry.BackgroundServiceDescriptor>();
         var discoveryAdapters = new List<KoanRegistry.ServiceDiscoveryAdapterDescriptor>();
         // [KoanDiscoverable] implementers, accumulated per marked-interface contract (ARCH-0086).
         var discoverables = new Dictionary<Type, List<Type>>();
+
+        var moduleIdentity = assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(attribute => string.Equals(
+                attribute.Key,
+                Constants.Composition.ModuleIdentityMetadataName,
+                StringComparison.Ordinal))
+            ?.Value;
+        if (string.IsNullOrWhiteSpace(moduleIdentity))
+        {
+            moduleIdentity = assembly.GetName().Name;
+        }
 
         foreach (var type in types)
         {
@@ -88,13 +99,15 @@ internal static class RegistryManifestLoader
             {
                 if (type is null || type.IsAbstract || type.IsGenericTypeDefinition) continue;
 
-                if (InitializerInterface.IsAssignableFrom(type))
+                var isSemanticModule = ModuleType.IsAssignableFrom(type);
+                if (isSemanticModule && !string.IsNullOrWhiteSpace(moduleIdentity))
                 {
-                    initializers.Add(type);
-                    if (AutoRegistrarInterface.IsAssignableFrom(type))
-                    {
-                        autoRegistrars.Add(type);
-                    }
+                    KoanRegistry.RegisterSemanticModule(
+                        moduleIdentity,
+                        type,
+                        () => (KoanModule)(Activator.CreateInstance(type)
+                            ?? throw new InvalidOperationException($"Koan could not construct semantic module '{type.FullName}'.")),
+                        BuildSemanticContributionBindings(type));
                 }
 
                 if (DiscoveryAdapterInterface.IsAssignableFrom(type))
@@ -127,16 +140,6 @@ internal static class RegistryManifestLoader
             }
         }
 
-        if (initializers.Count > 0)
-        {
-            KoanRegistry.RegisterInitializers(initializers);
-        }
-
-        if (autoRegistrars.Count > 0)
-        {
-            KoanRegistry.RegisterAutoRegistrars(autoRegistrars);
-        }
-
         if (backgroundServices.Count > 0)
         {
             KoanRegistry.RegisterBackgroundServices(backgroundServices);
@@ -152,6 +155,37 @@ internal static class RegistryManifestLoader
             KoanRegistry.RegisterDiscoveredImplementors(pair.Key, pair.Value);
         }
     }
+
+    internal static SemanticContributionBinding[] BuildSemanticContributionBindings(Type moduleType)
+    {
+        ArgumentNullException.ThrowIfNull(moduleType);
+
+        return moduleType.GetInterfaces()
+            .Where(static contract =>
+                contract.IsGenericType
+                && contract.GetGenericTypeDefinition() == typeof(IContributeTo<>))
+            .Select(static contract => contract.GetGenericArguments()[0])
+            .Distinct()
+            .OrderBy(static targetType => targetType.AssemblyQualifiedName, StringComparer.Ordinal)
+            .Select(CreateSemanticContributionBinding)
+            .ToArray();
+    }
+
+    private static SemanticContributionBinding CreateSemanticContributionBinding(Type targetType)
+    {
+        var factory = typeof(RegistryManifestLoader)
+            .GetMethod(
+                nameof(CreateSemanticContributionBindingCore),
+                BindingFlags.NonPublic | BindingFlags.Static)!
+            .MakeGenericMethod(targetType);
+        return (SemanticContributionBinding)factory.Invoke(null, null)!;
+    }
+
+    private static SemanticContributionBinding CreateSemanticContributionBindingCore<TTarget>() =>
+        new(
+            typeof(TTarget),
+            static (module, target) =>
+                ((IContributeTo<TTarget>)module).Contribute((TTarget)target));
 
     private static KoanRegistry.BackgroundServiceDescriptor BuildBackgroundDescriptor(Type type)
     {

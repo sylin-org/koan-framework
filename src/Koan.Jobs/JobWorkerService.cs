@@ -16,19 +16,19 @@ internal sealed class JobWorkerService : BackgroundService
     private readonly JobScheduler _scheduler;
     private readonly IJobLedger _ledger;
     private readonly JobTypeRegistry _registry;
-    private readonly IJobTransport _transport;
+    private readonly JobWakeCoordinator _wake;
     private readonly JobsOptions _options;
     private readonly TimeProvider _clock;
     private readonly ILogger<JobWorkerService> _logger;
 
     public JobWorkerService(JobOrchestrator orchestrator, JobScheduler scheduler, IJobLedger ledger,
-        JobTypeRegistry registry, IJobTransport transport, IOptions<JobsOptions> options, TimeProvider clock, ILogger<JobWorkerService> logger)
+        JobTypeRegistry registry, JobWakeCoordinator wake, IOptions<JobsOptions> options, TimeProvider clock, ILogger<JobWorkerService> logger)
     {
         _orchestrator = orchestrator;
         _scheduler = scheduler;
         _ledger = ledger;
         _registry = registry;
-        _transport = transport;
+        _wake = wake;
         _options = options.Value;
         _clock = clock;
         _logger = logger;
@@ -39,8 +39,8 @@ internal sealed class JobWorkerService : BackgroundService
         if (_options.Mode == JobMode.Inline || !_options.EnableWorker) return;
 
         var scheduled = _registry.All.Sum(b => b.ScheduledActions(_options).Count());
-        _logger.LogInformation("[Koan.Jobs] ledger={Ledger} · {Types} job types · {Scheduled} scheduled · claim={Claim}",
-            _ledger.GetType().Name, _registry.Count, scheduled, _options.ClaimStrategy);
+        _logger.LogInformation("[Koan.Jobs] ledger={Ledger} · {Types} job types · {Scheduled} scheduled",
+            _ledger.GetType().Name, _registry.Count, scheduled);
 
         try
         {
@@ -52,6 +52,7 @@ internal sealed class JobWorkerService : BackgroundService
         var lastReap = _clock.GetUtcNow();
         var lastArchive = _clock.GetUtcNow();
         var lastFlush = _clock.GetUtcNow();
+        var iterationFailed = false;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -74,12 +75,32 @@ internal sealed class JobWorkerService : BackgroundService
                 }
                 await _scheduler.TriggerDueAsync(stoppingToken);   // recurring initiator: submit due scheduled actions
                 await _orchestrator.DrainAsync(stoppingToken);
+
+                if (iterationFailed)
+                {
+                    _logger.LogInformation("Job worker recovered after a failed iteration");
+                    iterationFailed = false;
+                }
             }
             catch (OperationCanceledException) { break; }
-            catch (Exception ex) { _logger.LogError(ex, "Job worker iteration failed"); }
+            catch (Exception ex)
+            {
+                if (!iterationFailed)
+                    _logger.LogError(ex, "Job worker iteration failed; retrying at the configured poll interval");
+                else
+                    _logger.LogDebug(ex, "Job worker iteration remains unavailable");
+                iterationFailed = true;
+            }
 
-            // Push-dispatch: wake immediately on a submit signal, else fall back to the poll interval.
-            try { await _transport.WaitForWork(_options.PollInterval, stoppingToken); }
+            // A healthy worker wakes immediately on a submit signal. After a failure, bypass pending wake signals so
+            // an unavailable ledger cannot create a hot retry loop; the health contributor remains the durable signal.
+            try
+            {
+                if (iterationFailed)
+                    await Task.Delay(_options.PollInterval, stoppingToken);
+                else
+                    await _wake.WaitForWork(_options.PollInterval, stoppingToken);
+            }
             catch (OperationCanceledException) { break; }
         }
 

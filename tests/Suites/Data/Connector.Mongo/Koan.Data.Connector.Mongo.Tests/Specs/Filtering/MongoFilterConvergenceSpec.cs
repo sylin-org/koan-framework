@@ -1,6 +1,4 @@
-using System;
 using Koan.Data.AdapterSurface.TestKit;
-using Koan.Data.Connector.Mongo.Tests.Support;
 
 namespace Koan.Data.Connector.Mongo.Tests.Specs.Filtering;
 
@@ -11,26 +9,14 @@ namespace Koan.Data.Connector.Mongo.Tests.Specs.Filtering;
 /// DATA-0098 identity/enum encoding fixes end-to-end against a live store and guards the document
 /// translator against future drift.
 /// </summary>
-public sealed class MongoFilterConvergenceSpec
+public sealed class MongoFilterConvergenceSpec(MongoFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<MongoFixture>(fixture, output)
 {
-    private readonly ITestOutputHelper _output;
-    public MongoFilterConvergenceSpec(ITestOutputHelper output) => _output = output;
-
     [Fact(DisplayName = "Mongo: every filter converges with the in-memory oracle")]
     public async Task Adapter_converges_with_oracle_across_the_corpus()
     {
-        var databaseName = $"koan_tests_{Guid.NewGuid():N}";
-
-        await TestPipeline
-            .For<MongoFilterConvergenceSpec>(_output, nameof(Adapter_converges_with_oracle_across_the_corpus))
-            .RequireDocker()
-            .UsingMongoContainer(database: databaseName)
-            .Using<MongoConnectorFixture>("fixture", static ctx => MongoConnectorFixture.Create(ctx))
-            .Assert(async ctx =>
-            {
-                ctx.GetRequiredItem<MongoConnectorFixture>("fixture").BindHost();
-                await FilterConvergence.AssertConvergesAsync();
-            })
-            .Run();
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        await FilterConvergence.AssertConvergesAsync();
     }
 }

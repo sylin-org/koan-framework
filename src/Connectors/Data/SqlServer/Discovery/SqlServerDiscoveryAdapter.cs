@@ -26,26 +26,15 @@ internal sealed class SqlServerDiscoveryAdapter : ServiceDiscoveryAdapterBase
     /// <summary>SQL Server-specific health validation using connection test</summary>
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        try
-        {
-            // Build connection string from discovered URL and context parameters
-            var connectionString = BuildSqlServerConnectionString(serviceUrl, context.Parameters);
+        var connectionString = BuildSqlServerConnectionString(serviceUrl, context.Parameters);
 
-            using var connection = new SqlConnection(connectionString);
-            await connection.OpenAsync(cancellationToken);
+        using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
 
-            // Simple query to test connectivity
-            using var command = new SqlCommand("SELECT 1", connection);
-            await command.ExecuteScalarAsync(cancellationToken);
+        using var command = new SqlCommand("SELECT 1", connection);
+        await command.ExecuteScalarAsync(cancellationToken);
 
-            _logger.LogDebug("SQL Server health check passed for {Url}", serviceUrl);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug("SQL Server health check failed for {Url}: {Error}", serviceUrl, ex.Message);
-            return false;
-        }
+        return true;
     }
 
     /// <summary>SQL Server adapter reads its own configuration sections</summary>
@@ -68,7 +57,7 @@ internal sealed class SqlServerDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return sqlServerUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                           .Select(url => new DiscoveryCandidate(url.Trim(), "environment-sqlserver-urls", 0));
+                           .Select(url => new DiscoveryCandidate(url.Trim(), "environment-sqlserver-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>SQL Server-specific connection string parameter application</summary>
@@ -110,7 +99,7 @@ internal sealed class SqlServerDiscoveryAdapter : ServiceDiscoveryAdapterBase
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Failed to build SQL Server connection string from {BaseUrl}: {Error}", baseUrl, ex.Message);
+            ReportNormalizationFailure(baseUrl, ex);
             return baseUrl; // Return original URL if parsing fails
         }
     }

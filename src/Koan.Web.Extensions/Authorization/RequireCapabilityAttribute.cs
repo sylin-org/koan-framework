@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Web.Hooks;
 
+using Koan.Web.Authorization;
+
 namespace Koan.Web.Extensions.Authorization;
 
 /// <summary>

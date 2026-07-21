@@ -1,178 +1,142 @@
 # Koan Framework
 
-**Model your domain as entities. Reference your intents. Koan composes the rest — storage, web,
-AI, jobs, caching — and tells you exactly what it did.**
+Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applications: the “Ruby on
+Rails for agentic .NET.” It is designed to move from V0 to V1 in meaningful small steps—application
+code states business intent while the framework owns composition, backend negotiation, lifecycle,
+and explanation.
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![.NET](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/download)
+> **Status:** Koan 0.20 is the preview line. Its supported foundation and extensions are explicit;
+> other available packages remain verified, demonstrated, experimental, specified, or unassessed. Public-feed
+> publication follows the final package-only proof. Until then, run the checkout directly and use the
+> [generated product surface](docs/reference/product-surface.md) as the maturity authority.
 
-Koan is a .NET 10 meta-framework for **agentic, data-driven web applications** — think
-*Rails for .NET*, built for the era where AI capability is part of the domain model and a lot of
-your code is written with coding agents. One grammar — `Entity<T>` — covers CRUD, REST, vector
-search, background jobs, caching, embeddings, and agent (MCP) tools.
+## Reach a meaningful result
 
-> **Status: pre-1.0, consolidation phase** (version via [NBGV](version.json), currently 0.17.x).
-> The core — entity/data pillar, web, cache, jobs, vector — is settled and integration-tested;
-> several outer pillars are experimental and being consolidated or cut. We audit ourselves:
-> see the [framework assessment](docs/assessment/00-overview.md) and the per-pillar
-> [maturity model](docs/assessment/03-maturity-model.md) for exactly what is settled and what
-> isn't. **Until 1.0, build from source** — published packages (`Sylin.Koan.*` on NuGet) lag the
-> repo.
+Today, run the executable first-use contract from source:
 
----
-
-## 60 seconds to a running app
-
-```bash
+```powershell
 git clone https://github.com/sylin-org/koan-framework
 cd koan-framework
-dotnet run --project samples/S1.Web
-# → browse http://localhost:5044  ·  curl http://localhost:5044/api/health
+dotnet run --project samples/FirstUse
 ```
 
-You'll see the framework introduce itself before the first request — what got discovered, which
-adapters won, what capabilities they negotiated:
+In another shell, create a business request and inspect what composed it:
 
-```text
-┌─ [KOAN] Application ─────────────────────────────
-│  Name: S1.Web · Environment: Development
-│  Registry: initializers, auto-registrars, background services
-│  Inventory: Koan.Core, Koan.Data.Core, Koan.Web, Koan.Data.Connector.Sqlite, …
-└──────────────────────────────────────────────────
-[K:PHASE] warmup→registry→data→services→ready
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/approvals `
+  -ContentType application/json -Body '{"subject":"Approve supplier invoice"}'
+Invoke-RestMethod http://localhost:5000/api/approvals
+Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
 ```
-*(abridged — run it to see the real thing)*
 
-That boot report is the framework's character in one screen: **the app explains itself.**
+Use the URL printed by the application if it differs. The complete walkthrough is in
+[`samples/FirstUse`](samples/FirstUse/README.md).
 
-## The whole framework in three beats
+After the first 0.20 wave is visible on NuGet, the canonical entry becomes the ordinary template path:
 
-### 1 · Model an entity → get an application
+```powershell
+dotnet new install Sylin.Koan.Templates
+dotnet new koan-web -o TodoApi
+cd TodoApi
+dotnet run
+```
+
+That template creates a `Todo` application and exposes `/api/todos`; its complete result is in
+[the template guide](templates/README.md). Candidate package evidence is not public-feed availability.
+
+## The application grammar
+
+The normal web host is four lines:
 
 ```csharp
-// Program.cs — complete. Nothing else to wire.
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
 var app = builder.Build();
-app.Run();
+await app.RunAsync();
 ```
+
+A model and its HTTP surface remain business-shaped:
 
 ```csharp
 public sealed class Todo : Entity<Todo>
 {
     public string Title { get; set; } = "";
-    public bool IsCompleted { get; set; }
+    public bool Done { get; set; }
 }
 
-[Route("api/[controller]")]
-public sealed class TodoController : EntityController<Todo> { }
+[Route("api/todos")]
+public sealed class TodosController : EntityController<Todo>;
 ```
 
-That's a full REST API: GET/POST/DELETE with pagination and querying, GUID v7 ids generated on
-first read, `/api/health`, structured logging, and zero-config SQLite (`./data/app.db`). Schema
-is created automatically in development. JSON defaults: camelCase, nulls omitted
-(Newtonsoft.Json — chosen for predictable polymorphic serialization).
-
-Working with entities is direct — no repositories, no DbContext:
+That expression gains Entity persistence, query, paging, controller conventions, health, structured
+startup reporting, and runtime facts from referenced capabilities. There is no application repository,
+`DbContext`, schema bootstrap, controller CRUD plumbing, or framework service-registration list.
 
 ```csharp
-var todo = await Todo.Get(id);                       // null if missing
-var open = await Todo.Query(t => !t.IsCompleted);    // pushed down to the store
-await new Todo { Title = "Try Koan" }.Save();
+var todo = await new Todo { Title = "Ship the meaningful step" }.Save();
+var same = await Todo.Get(todo.Id);
+var open = await Todo.Query(item => !item.Done);
 await todo.Remove();
-await foreach (var t in Todo.AllStream(batchSize: 1000)) { /* streams, no materialization */ }
 ```
 
-### 2 · Reference an intent → gain a capability
+## Grow by intent
 
-Adding a package **is** the configuration. Each line below is one package reference and (at
-most) one attribute:
+References make capabilities available. `AddKoan()` compiles their modules once; the relevant pillar
+elects providers and reports the result. Adding a capability should add business vocabulary, not
+infrastructure ceremony.
+
+Examples:
+
+- `[Cacheable]` adds Entity cache semantics.
+- `IKoanJob<T>` makes an Entity durable work with progress and schedules.
+- `[Embedding]` adds semantic indexing and search when AI/vector providers are present.
+- `[McpEntity]` projects a governed Entity surface to agents.
+- Entity Events and Transport are local-first; adding an eligible connector can transparently extend
+  Transport reach without changing the application terminal. Events remain local to the process.
 
 ```csharp
-// dotnet add package Sylin.Koan.Data.Connector.Postgres  → same entities, Postgres storage
-// dotnet add package Sylin.Koan.Cache                    → transparent L1/L2 caching:
-[Cacheable(300)]
-public sealed class Todo : Entity<Todo> { /* … */ }
-
-// dotnet add package Sylin.Koan.Messaging.Connector.RabbitMq → cross-process events:
-await new TodoCompleted { TodoId = todo.Id }.Send();
-
-// dotnet add package Sylin.Koan.Jobs → durable background work, jobs are entities too:
-public sealed class ImportJob : Entity<ImportJob>, IKoanJob<ImportJob>
-{
-    public string Source { get; set; } = "";
-    public static async Task Execute(ImportJob job, JobContext ctx, CancellationToken ct)
-    { /* runs on the ledger: at-least-once, retries, scheduling, progress */ }
-}
-
-// dotnet add package Sylin.Koan.Data.AI (+ an Ollama + vector connector)
-// → entities become semantically searchable:
-[Embedding(Properties = new[] { nameof(Title) })]
-public sealed class Todo : Entity<Todo> { /* embeddings maintained in the background */ }
-
-var related = await SemanticSearch<Todo>("groceries and meal planning");
-// using static Koan.Data.AI.EntityEmbeddingExtensions;
-
-// dotnet add package Sylin.Koan.Mcp → entities become agent tools over HTTP/SSE:
-[McpEntity]
-public sealed class Todo : Entity<Todo> { /* agents can now query and mutate Todos */ }
+await order.Events.Raise<OrderApproved>(ct); // something happened to this order
+await order.Transport.Send(ct);              // distribute an isolated copy of its current state
 ```
 
-Backends differ, and Koan refuses to pretend otherwise: every adapter declares its capabilities,
-the framework negotiates them, and an unsupported operation **fails loudly** instead of silently
-degrading.
+The same terminals lift pointwise over Entity collections and lazy streams. Backend differences are
+negotiated, not hidden: configured intent either resolves to an eligible provider or fails with a
+corrective explanation.
 
-```csharp
-if (Data<Todo, string>.Capabilities.Has(DataCaps.Query.Linq))
-{
-    // this query runs inside the database, not in memory
-}
-```
+## Inspect what happened
 
-### 3 · The app explains itself
+When Koan is working well, the same resolved composition is visible through:
 
-Beyond the boot report: capability sets are queryable at runtime, well-known endpoints describe
-the running service, health contributors aggregate readiness, and `[McpEntity]` exposes your
-domain to agents through the same endpoint service the REST controllers use. The framework's
-discovery isn't reflection magic at runtime — it's a **Roslyn source-generated registry**
-compiled into your assemblies: deterministic, ordered, AOT-friendly.
+- the startup report;
+- `/health/live` and `/health/ready`;
+- `/.well-known/Koan/facts` for operators and reviewers;
+- `koan://facts`, `koan://entities`, and `koan://self` for MCP clients; and
+- `koan.lock.json` for referenced-module drift.
 
-## What's distinctive (and actually shipped)
+These are projections of runtime decisions, not separate configuration authorities.
 
-- **One grammar everywhere** — the same `Entity<T>` is your table row, your REST resource, your
-  cache entry, your job, your embedding source, and your agent tool.
-- **Capability-graded multi-provider** — SQLite, Postgres, SQL Server, MongoDB, Couchbase,
-  Redis, JSON-file storage; Weaviate, Qdrant, Milvus, Elasticsearch, OpenSearch vectors — behind
-  one API that *negotiates* features (pushdown, bulk ops, CAS, TTL) rather than faking parity. A
-  cross-adapter convergence oracle tests that every adapter agrees with the reference semantics.
-- **Background jobs as entities** ([JOBS-0005](docs/decisions/JOBS-0005-jobs-pillar-rebuild.md))
-  — a capability ladder from in-memory to durable-ledger to distributed competing consumers,
-  with cron/`@boot` scheduling, idempotency, chains, and contention-free claims.
-- **Transparent entity caching** — `[Cacheable]` L1/L2 with cross-node coherence and a
-  principled fresh-or-null contract (stale reads are opt-in, never a surprise).
-- **AI as a property of your data** — `[Embedding]` keeps vectors in sync in the background;
-  semantic search is a query, not a subsystem you build.
-- **Decision-first engineering** — 280+ ADRs, integration-tests-as-canon, and a self-assessment
-  you can read. The architecture is auditable, not asserted.
+## Choose Koan when
 
-## Learn it
+Choose Koan when the application is naturally Entity-centric, you value conventions over repeated
+plumbing, and you want data, jobs, communication, web, and agent surfaces to compose through one
+inspectable runtime.
 
-| Path | Where |
-|---|---|
-| **First 15 minutes** | [Getting started](docs/getting-started/overview.md) — the golden path, concept by concept |
-| **Run real apps** | [samples/](samples/README.md) — the ladder: S0 console → S1 CRUD → S10 multi-provider → S14 jobs/benchmarks, then the dogfood flagships |
-| **Do a task** | [Guides](docs/guides/README.md) — APIs, data modeling, auth, AI, media, jobs |
-| **Understand why** | [Architecture principles](docs/architecture/principles.md) · [ADRs](docs/decisions/index.md) |
-| **Check what's solid** | [Framework assessment & maturity model](docs/assessment/00-overview.md) |
-| **When stuck** | [Troubleshooting](docs/support/troubleshooting.md) |
+Do not choose it when you need a stable 1.0 compatibility promise today, require a publicly certified
+package-only install, need an unsupported provider guarantee, or want direct control of every ORM,
+transport, and hosting mechanism. Koan rejects false backend parity; package existence is not a support
+claim.
 
-Requirements: **.NET 10 SDK**. Docker/Podman only for container-backed samples and integration
-tests. Coding agents: start at [CLAUDE.md](CLAUDE.md) and `.claude/skills/`.
+## Read next
 
-## Contributing
+- [Quickstart](docs/getting-started/quickstart.md)
+- [Golden path](docs/getting-started/overview.md)
+- [Graduated samples](samples/README.md)
+- [Product constitution](docs/architecture/product-constitution.md)
+- [Entity semantics contract](docs/architecture/entity-semantics-contract.md)
+- [Current capability and package surface](docs/reference/product-surface.md)
+- [Current package-quality assessment](docs/reference/package-quality.md)
+- [Troubleshooting](docs/support/troubleshooting.md)
+- [Agent-readable product map](llms.txt)
 
-Single-maintainer project in active consolidation ("fewer but more meaningful parts").
-Issues and discussions welcome; PRs should follow the ADR-first workflow and keep the green
-ratchet green (`scripts/green-ratchet.ps1`). See [docs/engineering](docs/engineering/index.md).
-
-Licensed under [Apache 2.0](LICENSE).
+Architecture decision records are retained as dated decisions. For current product behavior, prefer
+the pages above, executable samples, generated product surface, and source/tests.

@@ -1,116 +1,113 @@
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
+using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Relationships;
+using Koan.Data.Core.Selection;
 
-namespace Koan.Data.Core.Extensions;
+namespace Koan.Data.Core;
 
-/// <summary>
-/// Extension methods for batch relationship loading and streaming operations.
-/// Provides clean syntax for enriching entities with their relationships.
-/// </summary>
+/// <summary>Adds pointwise direct-relationship enrichment to finite and asynchronous Entity sources.</summary>
 public static class RelationshipExtensions
 {
     /// <summary>
-    /// Enriches a collection of entities with their relationships.
-    /// Processes all entities in the collection - pure transformation, no batching concerns.
+    /// Loads one direct relationship graph for every Entity in the supplied finite source, preserving
+    /// source order and multiplicity. Child edges use strict bounded-query negotiation.
+    /// </summary>
+    public static Task<IReadOnlyList<RelationshipGraph<TEntity>>> Relatives<TEntity, TKey>(
+        this IEnumerable<Entity<TEntity, TKey>> entities,
+        CancellationToken ct = default)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+        => entities.Relatives(RelationshipQueryPolicy.Strict, ct);
+
+    /// <summary>
+    /// Loads one direct relationship graph for every Entity in the supplied finite source using the
+    /// explicit child-edge execution policy, preserving source order and multiplicity.
     /// </summary>
     public static async Task<IReadOnlyList<RelationshipGraph<TEntity>>> Relatives<TEntity, TKey>(
-        this IEnumerable<TEntity> entities,
+        this IEnumerable<Entity<TEntity, TKey>> entities,
+        RelationshipQueryPolicy policy,
         CancellationToken ct = default)
-        where TEntity : Entity<TEntity, TKey>, IEntity<TKey>
+        where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var entityList = entities.ToList();
-        if (entityList.Count == 0) return new List<RelationshipGraph<TEntity>>().AsReadOnly();
+        ArgumentNullException.ThrowIfNull(entities);
+        ArgumentNullException.ThrowIfNull(policy);
 
-        var metadata = entityList[0].GetRelationshipService();
-        var batchLoader = new BatchRelationshipLoader();
-
-        // Batch load parents
-        var parentMap = await batchLoader.LoadParentsBatch<TEntity, TKey>(entityList, metadata, ct);
-        // Batch load children
-        var childMap = await batchLoader.LoadChildrenBatch<TEntity, TKey>(entityList, metadata, ct);
-
+        var source = EntityCardinality.Many(AsTyped<TEntity, TKey>(entities), ct);
         var results = new List<RelationshipGraph<TEntity>>();
-        foreach (var entity in entityList)
+        await foreach (var graph in ResolveLoader().Load<TEntity, TKey>(source, policy, ct).ConfigureAwait(false))
         {
-            var graph = new RelationshipGraph<TEntity>
-            {
-                Entity = entity,
-                Parents = new Dictionary<string, object?>(),
-                Children = new Dictionary<string, Dictionary<string, IReadOnlyList<object>>>()
-            };
-            foreach (var ((propertyName, parentType), parentDict) in parentMap)
-            {
-                var id = typeof(TEntity).GetProperty(propertyName)?.GetValue(entity);
-                if (id != null && parentDict.TryGetValue(id, out var parent))
-                {
-                    graph.Parents[propertyName] = parent;
-                }
-            }
-            foreach (var ((referenceProperty, childType), childDict) in childMap)
-            {
-                var id = entity.Id;
-                if (childDict.TryGetValue(id, out var children))
-                {
-                    var typeName = childType.Name;
-                    if (!graph.Children.ContainsKey(typeName))
-                        graph.Children[typeName] = new Dictionary<string, IReadOnlyList<object>>();
-                    graph.Children[typeName][referenceProperty] = children;
-                }
-            }
             results.Add(graph);
         }
-        return results.AsReadOnly();
+
+        return results;
     }
 
     /// <summary>
-    /// Enriches a stream of entities with their relationships.
-    /// Processes each entity as it arrives in the stream - pure transformation, no batching.
+    /// Lazily loads one direct relationship graph for every Entity yielded by the source. The input is
+    /// consumed once, output is source-ordered, and child edges use strict bounded-query negotiation.
     /// </summary>
-    public static async IAsyncEnumerable<RelationshipGraph<TEntity>> Relatives<TEntity, TKey>(
-        this IAsyncEnumerable<TEntity> entities,
-        [EnumeratorCancellation] CancellationToken ct = default)
-        where TEntity : Entity<TEntity, TKey>, IEntity<TKey>
-        where TKey : notnull
-    {
-        var batch = new List<TEntity>();
-        const int batchSize = 100;
-        await foreach (var entity in entities.WithCancellation(ct))
-        {
-            batch.Add(entity);
-            if (batch.Count >= batchSize)
-            {
-                var enrichedBatch = await RelationshipExtensions.Relatives<TEntity, TKey>(batch, ct);
-                foreach (var enriched in enrichedBatch)
-                    yield return enriched;
-                batch.Clear();
-            }
-        }
-        if (batch.Count > 0)
-        {
-            var enrichedBatch = await RelationshipExtensions.Relatives<TEntity, TKey>(batch, ct);
-            foreach (var enriched in enrichedBatch)
-                yield return enriched;
-        }
-    }
-
-    /// <summary>
-    /// Enriches a single entity with its relationships.
-    /// Convenience method for individual entity enrichment.
-    /// </summary>
-    public static async Task<RelationshipGraph<TEntity>> Relatives<TEntity, TKey>(
-        this TEntity entity,
+    public static IAsyncEnumerable<RelationshipGraph<TEntity>> Relatives<TEntity, TKey>(
+        this IAsyncEnumerable<Entity<TEntity, TKey>> entities,
         CancellationToken ct = default)
-        where TEntity : Entity<TEntity, TKey>, IEntity<TKey>
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+        => entities.Relatives(RelationshipQueryPolicy.Strict, ct);
+
+    /// <summary>
+    /// Lazily loads one direct relationship graph for every Entity yielded by the source using the
+    /// explicit child-edge execution policy. Work is bounded to one internal source batch at a time.
+    /// </summary>
+    public static IAsyncEnumerable<RelationshipGraph<TEntity>> Relatives<TEntity, TKey>(
+        this IAsyncEnumerable<Entity<TEntity, TKey>> entities,
+        RelationshipQueryPolicy policy,
+        CancellationToken ct = default)
+        where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        return await entity.GetRelatives(ct);
+        ArgumentNullException.ThrowIfNull(entities);
+        ArgumentNullException.ThrowIfNull(policy);
+
+        var source = EntityCardinality.Stream(AsTyped<TEntity, TKey>(entities, ct), ct);
+        return ResolveLoader().Load<TEntity, TKey>(source, policy, ct);
     }
 
+    private static IEnumerable<TEntity> AsTyped<TEntity, TKey>(IEnumerable<Entity<TEntity, TKey>> entities)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        foreach (var entity in entities)
+        {
+            yield return entity is TEntity typed
+                ? typed
+                : throw InvalidReceiver<TEntity, TKey>(entity);
+        }
+    }
+
+    private static async IAsyncEnumerable<TEntity> AsTyped<TEntity, TKey>(
+        IAsyncEnumerable<Entity<TEntity, TKey>> entities,
+        [EnumeratorCancellation] CancellationToken ct)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        await foreach (var entity in entities.WithCancellation(ct).ConfigureAwait(false))
+        {
+            yield return entity is TEntity typed
+                ? typed
+                : throw InvalidReceiver<TEntity, TKey>(entity);
+        }
+    }
+
+    private static InvalidOperationException InvalidReceiver<TEntity, TKey>(Entity<TEntity, TKey>? entity)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+        => new(
+            entity is null
+                ? $"The Entity relationship source yielded null for {typeof(TEntity).Name}."
+                : $"The Entity relationship source yielded {entity.GetType().Name}, but its declared model is {typeof(TEntity).Name}.");
+
+    private static RelationshipGraphLoader ResolveLoader()
+        => AppHost.GetRequiredService<RelationshipGraphLoader>("relationship graph loading");
 }

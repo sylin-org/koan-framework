@@ -1,4 +1,14 @@
-﻿# Koan Framework API Documentation
+﻿---
+type: REF
+domain: framework
+title: "Generated API documentation"
+audience: [developers, maintainers]
+status: current
+last_updated: 2026-07-19
+framework_version: v0.20.0
+---
+
+# Koan Framework API documentation
 
 The Koan API reference is generated automatically from the source code. Run the docs build script to refresh metadata and regenerate this site:
 

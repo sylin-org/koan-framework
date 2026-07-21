@@ -2,6 +2,8 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <!-- Shared abstract specs and fixtures execute through the concrete vector-adapter suites. -->
+    <IsTestProject>false</IsTestProject>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
@@ -14,11 +16,21 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+    <!-- ARCH-0103 §6 — the vector AODB conformance kit boots a real AddKoan() host with tenancy + a Database-mode
+         axis (VectorAodbConformanceSpecsBase). -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Tenancy\Koan.Tenancy.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AwesomeAssertions" Version="9.4.0" />
-    <PackageReference Include="xunit" Version="2.9.3" />
-    <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
+    <!-- ARCH-0094 Phase 1: the capability-driven Conformance Gate, LINK-compiled (not project-referenced) so the
+         record testkit's discoverable conformance axis is never dragged into the vector adapter hosts. -->
+    <Compile Include="..\..\..\_shared\CapabilityConformanceGate.cs" Link="Support\CapabilityConformanceGate.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
+    <PackageReference Include="xunit.v3.assert" />
   </ItemGroup>
 </Project>

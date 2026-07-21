@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Koan.Data.Vector.Connector.SqliteVec</AssemblyName>
+    <RootNamespace>Koan.Data.Vector.Connector.SqliteVec</RootNamespace>
+    <Description>Durable in-process vector adapter for Koan over sqlite-vec (asg017 vec0 v0.1.9) as a loadable SQLite extension. It can share SQLite's local database while k-NN runs in-process with no server. Native vec0 binaries for win-x64/linux-x64/linux-arm64 ship embedded and extract on first use.</Description>
+    <PackageTags>$(CommonPackageTags);data;vector;sqlite;sqlite-vec;knn;embedded;inproc;durable</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Core\Koan.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <!-- Transitive-override for NU1903 (GHSA-2m69-gcr7-jv3q): pin the native SQLite binary to the patched
+         3.50.3; Microsoft.Data.Sqlite's managed SQLitePCLRaw.core stays 2.1.11. -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
+    <!-- Vector metadata + stored-vector JSON use Newtonsoft (framework canon) — System.Text.Json's
+         reflection serializer is disabled under NativeAOT, so it threw in the single-binary floor. -->
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- vec0 v0.1.9 native loadable extension, embedded per floor RID and self-extracted at load. -->
+    <EmbeddedResource Include="runtimes\win-x64\native\vec0.dll"><LogicalName>vec0.win-x64</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="runtimes\linux-x64\native\vec0.so"><LogicalName>vec0.linux-x64</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="runtimes\linux-arm64\native\vec0.so"><LogicalName>vec0.linux-arm64</LogicalName></EmbeddedResource>
+  </ItemGroup>
+</Project>

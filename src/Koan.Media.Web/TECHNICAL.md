@@ -1,76 +1,50 @@
-# Koan.Media.Web - Technical Reference
+# Sylin.Koan.Media.Web — technical contract
 
-Generic media bytes controller for ASP.NET Core applications.
+## Composition
 
-## Contract
+Reference activates controller discovery and compiles one source choice. Exactly one concrete `MediaEntity<T>` is the
+automatic default. An already registered `IMediaSource` dominates discovery; `AddMediaSource<T>()` replaces the
+automatic choice regardless of module order. Zero or several candidates without an override fail host startup with a
+corrective error. `MediaController` consumes the Core recipe registry, the selected source, Web options, and optional
+overlay/font services.
 
-- Inputs: HTTP HEAD/GET requests to a route mapped by your derived controller, with optional Range, If-None-Match, If-Modified-Since headers.
-- Outputs: 200/206/304/416 responses with correct headers; stream body for 200/206.
-- Entities: Any `StorageEntity<TEntity>`-derived model (e.g., `ProfileMedia`).
-- Success criteria: Accurate content-type, robust range slicing, conditional caching, and opt-in Cache-Control.
+## Request flow
 
-## Features
+1. resolve a named recipe or producible format shortcut;
+2. parse and validate allowlisted query mutators;
+3. reject output-edge violations;
+4. resolve the source through `IMediaSource.OpenAsync`;
+5. negotiate an allowed, producible response format;
+6. attempt the source's optional derivative lookup;
+7. execute the pipeline on a miss and attempt a best-effort derivative write; and
+8. emit ETag, cache, negotiation, and `X-Koan-Media-*` diagnostic headers.
 
-- HEAD and GET with consistent metadata (ETag, Last-Modified when available).
-- Byte ranges: standard and suffix; emits `Accept-Ranges` and `Content-Range` on 206/416.
-- Conditional requests: `If-None-Match` (ETag) and `If-Modified-Since` (time).
-- Content type resolution from stat or file extension.
-- Cache-Control via `MediaContentOptions`.
+The default `MediaEntitySource<TEntity>` performs step 4 through `Entity<TEntity,string>.Get`, preserving active
+Entity read axes. Its derivative records are framework-owned `MediaDerivation` entities stored separately from
+the source Entity.
 
-## Options (MediaContentOptions)
+Discovery uses Koan's already compiled assembly closure once during composition. Request execution performs no type
+scan or source election. Startup reporting states the candidate/default posture.
 
-- `EnableCacheControl` (bool, default true)
-- `Public` (bool, default true)
-- `MaxAge` (TimeSpan, default 5 minutes)
+## Options
 
-Example registration:
+`Koan:Media:Web` currently consumes:
 
-```csharp
-services.Configure<MediaContentOptions>(o =>
-{
-    o.EnableCacheControl = true;
-    o.Public = true;
-    o.MaxAge = TimeSpan.FromMinutes(60);
-});
-```
+- `MaxOutputEdge` (4096);
+- `MaxSourceMegapixels` (100);
+- `MaxFrameCount` (600);
+- `StrictUnknownParams` (`false`);
+- `AllowAdHoc` (`true`); and
+- `DefaultCacheControl` (`public, max-age=3600, stale-while-revalidate=86400`).
 
-## Headers
+## Lifecycle boundary
 
-- Requests: `Range`, `If-None-Match`, `If-Modified-Since`.
-- Responses: `ETag`, `Last-Modified`, `Accept-Ranges`, `Content-Range`, optional `Cache-Control`.
-- Centralized constants: `HttpHeaderNames` in this project.
+Derivative identity is source id plus recipe fingerprint. Writes are idempotent and best-effort. No generic
+orphan sweep is shipped: a context-free background probe cannot safely decide source existence for every
+tenant/request-context-scoped source. Applications that own deletion currently perform targeted cleanup. A future
+framework lifecycle service must centralize source identity and context before replacing that explicit path.
 
-## Edge cases
+## Unsupported
 
-- Invalid/unsatisfiable range → 416 with `Content-Range: bytes */<length>`.
-- Suffix ranges: `bytes=-N` handled properly.
-- Time precision: `Last-Modified` normalized to seconds for comparability.
-- Provider-dependent ETag: Local provider emits a lightweight ETag derived from last-write ticks and length.
-
-## Usage
-
-- Derive a controller: `public sealed class MediaController : MediaContentController<ProfileMedia> { }`
-- Keep I/O in models using `StorageEntity` statics (e.g., `OpenRead`, `Head`).
-- Route using ASP.NET Core attribute routing on the derived controller.
-
-## Extensibility
-
-- Override content-type resolution if needed.
-- Replace or extend caching policy via DI options.
-- Swap storage providers; ETag/metadata flow through `Head`.
-
-## Security
-
-- Authorize your derived controller as required (attributes/filters).
-- Validate access to keys/paths in your domain layer before streaming.
-
-## Operations
-
-- CDN: Safe to cache with `ETag`/`Last-Modified` and explicit `Cache-Control`.
-- Range-friendly for resumable downloads.
-
-## References
-
-- Docs: `docs/reference/media.md`
-- Decisions: `docs/decisions/WEB-0035-entitycontroller-transformers.md`, `docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`, `docs/decisions/ARCH-0042-per-project-companion-docs.md`
-- Engineering guardrails: `docs/engineering/index.md`
+No prewarm endpoint, scheduled render worker, automatic multi-source routing, signed route, content-addressed
+route, configurable route prefix, or automatic orphan reclamation is claimed.

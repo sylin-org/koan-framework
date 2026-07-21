@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Globalization;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Data.Connector.Mongo;
 
@@ -11,22 +10,15 @@ internal static class MongoProvenanceItems
 
     internal static readonly string[] ConnectionStringKeys =
     {
-        ConfigurationConstants.FullKey(ConfigurationConstants.Keys.ConnectionString),
-        ConfigurationConstants.Sources.DefaultMongoConnectionString,
-        "ConnectionStrings:Mongo",
-        "ConnectionStrings:Default"
+        Constants.Configuration.ConnectionString,
+        Constants.Configuration.DefaultSourceConnectionString,
+        Constants.Configuration.StandardConnectionString
     };
 
     internal static readonly string[] DatabaseKeys =
     {
-        ConfigurationConstants.FullKey(ConfigurationConstants.Keys.Database),
-        ConfigurationConstants.DataFallback.Database
-    };
-
-    internal static readonly string[] DefaultPageSizeKeys =
-    {
-        ConfigurationConstants.FullKey(ConfigurationConstants.Keys.DefaultPageSize),
-        ConfigurationConstants.Sources.DefaultMongoDefaultPageSize
+        Constants.Configuration.Database,
+        Constants.Configuration.DefaultSourceDatabase
     };
 
     private static readonly IReadOnlyCollection<string> ConnectionConsumers = new[]
@@ -68,13 +60,6 @@ internal static class MongoProvenanceItems
         "Ensure Created Supported",
         "Indicates whether the Mongo adapter can create missing schema artifacts automatically.",
         DefaultValue: BoolString(true),
-        DefaultConsumers: PagingConsumers);
-
-    internal static readonly ProvenanceItem DefaultPageSize = new(
-        DefaultPageSizeKeys[0],
-        "Default Page Size",
-        "Default batch size used when paging Mongo queries.",
-        DefaultValue: Defaults.DefaultPageSize.ToString(CultureInfo.InvariantCulture),
         DefaultConsumers: PagingConsumers);
 
     private static string BoolString(bool value) => value ? "true" : "false";

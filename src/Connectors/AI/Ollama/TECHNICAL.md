@@ -1,60 +1,39 @@
-Koan.AI.Connector.Ollama - Technical reference
+# Sylin.Koan.AI.Connector.Ollama — technical contract
 
-Contract
+## Responsibility
 
-- Implements Koan.AI.Contracts against a local/remote Ollama runtime.
-- Inputs: Prompt/Message contracts, tool-call specs, embedding requests.
-- Outputs: Text/JSON responses, streaming tokens, embedding vectors.
+This package owns Ollama protocol translation and its thin activation description. `Sylin.Koan.Core` owns endpoint
+discovery order and health qualification; `Sylin.Koan.AI` owns provider-plan compilation, source construction,
+routing, and registry publication.
 
-Options
+Referencing the package contributes one provider id, `ollama`, to the host's immutable AI provider plan. The adapter
+is a DI-owned singleton and is disposed with the host. Per-endpoint HTTP clients are memoized and disposed by that
+singleton.
 
-- BaseUrl (http://localhost:11434 by default), Model id, Timeout, Retries, TLS options.
-- HTTP client policy (retries/backoff), MaxConcurrentRequests, Stream buffer size.
+## Configuration and election
 
-Behavior
+- Options bind only from `Koan:Ai:Ollama`.
+- `Endpoints` declares an ordered mesh; `ConnectionStrings:Ollama` declares one endpoint.
+- Declaring both is invalid.
+- Explicit endpoints win over automatic discovery and do not require discovery to be enabled.
+- With no explicit placement, Core discovery evaluates the composed host plan, conventional container topology,
+  Docker host gateway, local loopback, and Aspire bindings through one shared election pipeline.
+- Discovery health checks `GET /api/tags`.
 
-- Uses Ollama HTTP API for generate/chat/embeddings; supports streaming when requested.
-- Doesn’t own auth; if Ollama is exposed remotely, secure via network policies.
+The activator publishes one source named `ollama`. Its members are named `ollama::member-N`, use the shared
+`Fallback` policy, and advertise Chat and Embedding with `DefaultModel`. Source routing—not adapter registration—owns
+endpoint election.
 
-Examples
+## Protocol behavior
 
-- Minimal chat (non-streaming)
+- Chat and streaming use Ollama's generate API and preserve cancellation.
+- Embeddings use the Ollama embedding API.
+- `AiPromptOptions.Think` is sent as Ollama's top-level `think` value.
+- Standard prompt controls map into Ollama's options object; `VendorOptions` are provider-specific passthrough values.
+- `MaxConcurrentRequests` bounds concurrent calls for this adapter when greater than zero.
 
-  - Request: POST /ai/chat
-    {
-    "model": "qwen3:4b",
-    "messages": [{ "role": "user", "content": "Explain quantum entanglement briefly." }]
-    }
-  - Adapter → Ollama: { model, prompt, stream:false, options:{ temperature, top_p, num_predict, stop } }
+## Boundaries
 
-- Reasoning (think)
-
-  - Request: POST /ai/chat with options.think true/false
-  - Adapter → Ollama: adds top-level "think": true|false
-
-- Vendor options passthrough
-  - Request options may include unknown fields (e.g., "mirostat":2)
-  - Adapter merges them into Ollama "options" bag; caller keys win on conflict.
-
-Error modes
-
-- Connection refused/timeouts, model not found, invalid parameters, rate limiting.
-- Partial streams on network interruption; surface OperationCanceled on cancellation.
-
-Edge cases
-
-- Large prompts exceeding Ollama limits; model not pulled; cold-start latency on first call.
-- Tool-call JSON adherence; reject unsupported tool schemas.
-
-Security
-
-- Treat prompts/outputs as sensitive; redact logs; disable verbose logging by default.
-- When exposed over network, require TLS and IP allow-lists.
-
-References
-
-- ./README.md
-- ../Koan.AI/TECHNICAL.md
-- ../Koan.AI.Contracts/TECHNICAL.md
-- Docs (root): /docs/engineering/index.md
-
+Koan does not promise delivery through a missing runtime, model availability, model compatibility with every declared
+operation, TLS termination, authentication, retries, or automatic model installation. Those concerns must be
+provided by the deployment or invoked explicitly through supported model-management operations.

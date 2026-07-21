@@ -1,18 +1,13 @@
-using System;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Koan.Data.Abstractions;
-using Koan.Data.Abstractions.Naming;
-using Koan.Data.Vector.Abstractions;
-using Koan.Orchestration;
-using Koan.Orchestration.Attributes;
+using Koan.Core;
+using Koan.Core.Services;
+using Koan.Data.SearchEngine;
 
 namespace Koan.Data.Connector.ElasticSearch;
 
-[ProviderPriority(20)]
-[KoanService(ServiceKind.Vector, shortCode: "elasticsearch", name: "Elasticsearch",
+[ProviderPriority(Infrastructure.Constants.Provider.Priority)]
+[KoanService(ServiceKind.Vector, shortCode: Infrastructure.Constants.Provider.Id, name: "Elasticsearch",
     ContainerImage = "docker.elastic.co/elasticsearch/elasticsearch",
-    DefaultTag = "8.13.4",
+    DefaultTag = "9.4.3",
     DefaultPorts = new[] { 9200 },
     Capabilities = new[] { "protocol=http", "vector-search=true", "filters=true" },
     Env = new[]
@@ -21,42 +16,15 @@ namespace Koan.Data.Connector.ElasticSearch;
         "xpack.security.enabled=false",
         "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     },
-    Volumes = new[] { "./Data/elasticsearch:/usr/share/elasticsearch/data" },
+    Volumes = new[] { "./Data/elasticsearch-9.4:/usr/share/elasticsearch/data" },
     AppEnv = new[] { "Koan__Data__ElasticSearch__Endpoint=http://{serviceId}:{port}" },
     HealthEndpoint = "/_cluster/health",
     HealthIntervalSeconds = 5,
     HealthTimeoutSeconds = 2,
     HealthRetries = 12,
-    Scheme = "http", Host = "elasticsearch", EndpointPort = 9200, UriPattern = "http://{host}:{port}",
+    Scheme = "http", Host = Infrastructure.Constants.Provider.Id, EndpointPort = 9200, UriPattern = "http://{host}:{port}",
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 9200, LocalPattern = "http://{host}:{port}")]
-public sealed class ElasticSearchVectorAdapterFactory : IVectorAdapterFactory
+public sealed class ElasticSearchVectorAdapterFactory : SearchEngineVectorAdapterFactory<ElasticSearchOptions>
 {
-    public string Provider => "elasticsearch";
-
-    public bool CanHandle(string provider)
-        => string.Equals(provider, "elasticsearch", StringComparison.OrdinalIgnoreCase) ||
-           string.Equals(provider, "elastic", StringComparison.OrdinalIgnoreCase);
-
-    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-    {
-        var httpFactory = (IHttpClientFactory?)sp.GetService(typeof(IHttpClientFactory))
-            ?? throw new InvalidOperationException("IHttpClientFactory not registered; call services.AddHttpClient().");
-        var options = (IOptions<ElasticSearchOptions>?)sp.GetService(typeof(IOptions<ElasticSearchOptions>))
-            ?? throw new InvalidOperationException("ElasticSearchOptions not configured; bind Koan:Data:ElasticSearch.");
-        return new ElasticSearchVectorRepository<TEntity, TKey>(httpFactory, options, sp);
-    }
-
-    // Elasticsearch index names are lowercase; the partition uses '-'. (Names are EntityType, so the
-    // name separator is irrelevant; the optional IndexPrefix is applied by the repository.)
-    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
-        => new()
-        {
-            Style = StorageNamingStyle.EntityType,
-            Casing = NameCasing.Lower,
-            PartitionSeparator = '-',
-            Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = true, AllowedExtraChars = "-._" },
-        };
+    protected override SearchEngineConnectorDescriptor Descriptor => Infrastructure.Constants.Descriptor;
 }
-

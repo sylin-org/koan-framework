@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Content-only `dotnet new` template pack: ships the koan-web and koan-console templates.
+       It compiles nothing — the project files under koan-web/ and koan-console/ are template
+       SOURCES, copied verbatim by the templating engine. Isolated from the repo-root build
+       props (see Directory.Build.props in this folder); versions with the framework via NBGV. -->
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <PackageId>Sylin.Koan.Templates</PackageId>
+    <Title>Koan project templates</Title>
+    <Authors>Sylin Labs</Authors>
+    <Description>`dotnet new` templates for the Koan Framework: koan-web (minimal Entity + EntityController web API) and koan-console (Entity CRUD console app), both over Sqlite and ready to run.</Description>
+    <PackageTags>koan;dotnet;framework;dotnet-new;templates;project-template</PackageTags>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/sylin-org/Koan-framework</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/sylin-org/Koan-framework.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <!-- NU5128: content-only package has no lib/ or dependencies — expected for a template pack. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="koan-web\**\*;koan-console\**\*"
+             Exclude="**\bin\**;**\obj\**" />
+    <Compile Remove="**\*" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="TECHNICAL.md" Pack="true" PackagePath="\" />
+    <!-- This content-only pack intentionally does not import the root build policy. Keep the
+         canonical mascot explicit here; there is still one source asset for the repository. -->
+    <None Include="..\icon.png" Pack="true" PackagePath="\" Link="icon.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Nerdbank.GitVersioning" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,20 +12,27 @@ using Koan.Data.Abstractions.Naming;
 using Koan.Core.Capabilities;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
-using Koan.Data.Vector.Abstractions.Configuration;
+using Koan.Data.Vector.Naming;
 using Koan.Data.Vector.Abstractions.Schema;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Koan.Data.Vector.Connector.Weaviate;
 
-internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities, IInstructionExecutor<TEntity>
+internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities, IInstructionExecutor<TEntity>, IOverlayNamingAware
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
+    // ARCH-0102 §5: GraphQL (Weaviate's query language) RESERVES a leading "__", so the framework rewrites
+    // overlay field names "__x" -> "koan_x" at write-stamp AND read-filter from this single declaration —
+    // letter-leading, GraphQL-legal, and in the reserved "koan_" namespace. Applied by ScopedVectorRepository.
+    public OverlayNamingRule? OverlayNaming { get; } = new("koan_");
+
     private readonly HttpClient _http;
     private readonly WeaviateOptions _options;
     private readonly IServiceProvider _sp;
+    private readonly WeaviateVectorAdapterFactory _factory;
+    private readonly string _source;
     private readonly ILogger<WeaviateVectorRepository<TEntity, TKey>>? _logger;
     private readonly VectorSchemaDescriptor _schemaDescriptor;
     private volatile bool _schemaEnsured;
@@ -35,11 +43,18 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         .Add(VectorCaps.Hybrid).Add(VectorCaps.NativeContinuation).Add(VectorCaps.DynamicCollections);
 
 
-    public WeaviateVectorRepository(IHttpClientFactory httpFactory, IOptions<WeaviateOptions> options, IServiceProvider sp)
+    public WeaviateVectorRepository(
+        IHttpClientFactory httpFactory,
+        IOptions<WeaviateOptions> options,
+        IServiceProvider sp,
+        WeaviateVectorAdapterFactory factory,
+        string source)
     {
-        _http = httpFactory.CreateClient("weaviate");
+        _http = httpFactory.CreateClient(Infrastructure.Constants.HttpClientName);
         _options = options.Value;
         _sp = sp;
+        _factory = factory;
+        _source = source;
         _logger = (ILogger<WeaviateVectorRepository<TEntity, TKey>>?)sp.GetService(typeof(ILogger<WeaviateVectorRepository<TEntity, TKey>>));
         var registry = (VectorSchemaRegistry?)sp.GetService(typeof(VectorSchemaRegistry));
         _schemaDescriptor = registry?.Get<TEntity, TKey>() ?? VectorSchemaDescriptor.CreateFallback(typeof(TEntity));
@@ -54,25 +69,55 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         {
             // DATA-0086: vector naming routes to WeaviateVectorAdapterFactory.ResolveStorage,
             // which owns its own cache and applies partition composition.
-            return VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
+            return SanitizeClassName(VectorAdapterNaming.GetOrCompute<TEntity>(_sp, _factory, _source));
         }
+    }
+
+    // Normalize the resolved name to the EXACT class identifier Weaviate stores, so write-name == read-name ==
+    // schema-name stays bijective (FC-6). Two adjustments, both byte-identical for the common case (a top-level
+    // entity whose name already starts with the upper-cased root namespace and has no illegal chars):
+    //   1. GraphQL class names allow only [_0-9A-Za-z]. .NET surfaces a '+' in Type.FullName for NESTED entity
+    //      types that the framework name resolver leaves intact (it folds only '.'), so a nested entity reaches
+    //      Weaviate with a '+' and is rejected (422 'not a valid class name'). Fold any non-word char to '_'.
+    //      This addresses the same nested-type '+' gap Couchbase fixed adapter-locally (FormatIdentifier) — but
+    //      it is a bare char fold, NOT Couchbase's lossy-collision hash: an entity 'A+B' (nested) and a distinct
+    //      'A.B' (namespaced, already folded to 'A_B' by the resolver) would both land on 'A_B'. That collision
+    //      is out of scope for the canonical Koan entity set (no such coexisting pair exists); if one ever could,
+    //      adopt Couchbase's append-ShortHash-on-lossy-fold pattern here.
+    //   2. Weaviate AUTO-CAPITALIZES the first letter of a class name on creation, and GraphQL is case-sensitive.
+    //      Any name whose anchor starts lowercase — the Database-mode source fold's lowercase leading particle
+    //      ("alpha_…"), OR a lowercase root namespace on a top-level entity — is stored as "Alpha_…"/"Myapp_…"
+    //      but a read computing the lowercase form queries a non-existent class and silently returns nothing (a
+    //      cross-source isolation read would falsely look empty). Upper-case the first char to match what Weaviate
+    //      stores. CAVEAT (injectivity): because Weaviate first-char-folds, two Database-mode sources differing
+    //      ONLY in first-char case ("alpha" vs "Alpha") collapse to one physical class — the framework's
+    //      source-fold injectivity guard cannot see this fold (the Weaviate naming policy is case-preserving), so
+    //      Database-mode sources MUST be first-char-canonical (conventionally lowercase) to stay isolated.
+    private static string SanitizeClassName(string name)
+    {
+        static bool IsLegal(char c)
+            => (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
+
+        var firstNeedsUpper = name.Length > 0 && name[0] is >= 'a' and <= 'z';
+        var hasIllegal = false;
+        for (var i = 0; i < name.Length && !hasIllegal; i++) hasIllegal = !IsLegal(name[i]);
+        if (!firstNeedsUpper && !hasIllegal) return name;
+
+        var sb = new StringBuilder(name.Length);
+        for (var i = 0; i < name.Length; i++)
+        {
+            var c = IsLegal(name[i]) ? name[i] : '_';
+            sb.Append(i == 0 ? char.ToUpperInvariant(c) : c);
+        }
+        return sb.ToString();
     }
 
     private async Task EnsureSchema(CancellationToken ct)
     {
         if (_schemaEnsured) return;
-
-        // For backward compatibility, use configured dimension if no dimension discovered yet
-        var effectiveDimension = _discoveredDimension > 0 ? _discoveredDimension : _options.Dimension;
-        await EnsureSchema(effectiveDimension, ct);
-    }
-
-    private async Task EnsureSchema(int dimension, CancellationToken ct)
-    {
-        if (_schemaEnsured) return;
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.index.ensureCreated");
         var cls = ClassName;
-        _logger?.LogDebug("Weaviate: ensure schema base={Base} class={Class} (resolved from {EntityType}) dimension={Dimension}", _http.BaseAddress, cls, typeof(TEntity).Name, dimension);
+        _logger?.LogDebug("Weaviate: ensure schema base={Base} class={Class} (resolved from {EntityType})", _http.BaseAddress, cls, typeof(TEntity).Name);
         // Probe class
         var probe = await _http.GetAsync($"/v1/schema/{Uri.EscapeDataString(cls)}", ct);
         _logger?.LogDebug("Weaviate: GET /v1/schema/{Class} -> {Status}", cls, (int)probe.StatusCode);
@@ -183,12 +228,9 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             _logger?.LogInformation("Weaviate: discovered embedding dimension {Dimension} from first vector for class {Class}", _discoveredDimension, ClassName);
         }
         else if (_discoveredDimension > 0 && embedding.Length > 0 && _discoveredDimension != embedding.Length)
-        {
-            _logger?.LogWarning("Weaviate: dimension conflict detected! Previously discovered {PreviousDimension}, current embedding {CurrentDimension} for class {Class}. Updating discovery.", _discoveredDimension, embedding.Length, ClassName);
-            _discoveredDimension = embedding.Length;
-            // Reset schema to be recreated with new dimensions
-            _schemaEnsured = false;
-        }
+            throw new ArgumentException(
+                $"Embedding dimension {embedding.Length} does not match the established Weaviate dimension {_discoveredDimension}.",
+                nameof(embedding));
 
         await EnsureSchema(ct);
         ValidateEmbedding(embedding);
@@ -518,8 +560,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
         await EnsureSchema(ct);
         ValidateEmbedding(options.Query);
-        var topK = options.TopK ?? _options.DefaultTopK;
-        if (topK > _options.MaxTopK) topK = _options.MaxTopK;
+        var topK = options.TopK;
 
         // Build optional filters using shared AST + dedicated translator
         string whereClause = WeaviateFilterTranslator.TranslateWhereClause(options.Filter);
@@ -558,10 +599,15 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         var args = string.IsNullOrEmpty(whereClause)
             ? $"({searchClause}, limit: {topK}{afterClause})"
             : $"({searchClause}, limit: {topK}, where: {whereClause}{afterClause})";
+        // Request the stored metadata properties so each match carries them back (provenance round-trip,
+        // parity with PGVector). The ensured-property set is the source of truth for what was written.
+        var metaFields = _ensuredProps.TryGetValue(ClassName, out var ensured) && !ensured.IsEmpty
+            ? " " + string.Join(" ", ensured.Keys)
+            : "";
         var gql = new
         {
-            // Request docId alongside _additional so we can map back to original ids
-            query = $"query {{ Get {{ {ClassName} {args} {{ docId _additional {{ id distance }} }} }} }}"
+            // Request docId + metadata props alongside _additional so we can map back to original ids.
+            query = $"query {{ Get {{ {ClassName} {args} {{ docId{metaFields} _additional {{ id distance }} }} }} }}"
         };
         var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
         var resp = await _http.PostAsync("/v1/graphql", req, ct);
@@ -796,13 +842,11 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
     private void ValidateEmbedding(float[] embedding)
     {
-        // Use discovered dimension if available, otherwise fall back to configured dimension
-        var expectedDimension = _discoveredDimension > 0 ? _discoveredDimension : _options.Dimension;
+        var expectedDimension = _discoveredDimension;
 
         if (expectedDimension > 0 && embedding.Length != expectedDimension)
         {
-            var source = _discoveredDimension > 0 ? "discovered" : "configured";
-            throw new ArgumentException($"Embedding dimension {embedding.Length} does not match {source} {expectedDimension}.");
+            throw new ArgumentException($"Embedding dimension {embedding.Length} does not match established dimension {expectedDimension}.");
         }
     }
 
@@ -914,7 +958,26 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
                 TKey id = (TKey)Convert.ChangeType(idStr, typeof(TKey));
                 var score = 1.0 - distance;
-                list.Add(new VectorMatch<TKey>(id, score, null));
+
+                // Surface the returned object properties (except _additional) as match metadata so callers
+                // can read stored fields / provenance — parity with the PGVector adapter.
+                Dictionary<string, object>? metadata = null;
+                foreach (var p in item.Properties())
+                {
+                    if (string.Equals(p.Name, "_additional", StringComparison.Ordinal)) continue;
+                    object? value = p.Value switch
+                    {
+                        JValue jv => jv.Value,
+                        JArray ja => ja.Select(t => (t as JValue)?.Value ?? t.ToString()).ToArray(),
+                        _ => p.Value.ToString()
+                    };
+                    if (value is not null)
+                    {
+                        metadata ??= new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                        metadata[p.Name] = value;
+                    }
+                }
+                list.Add(new VectorMatch<TKey>(id, score, metadata));
 
                 if (uuid != null)
                 {

@@ -12,11 +12,11 @@ namespace Koan.Web.Auth.Connector.Test.Controllers;
 
 public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> opts, DevTokenStore store, IHostEnvironment env, ILogger<AuthorizeController> logger) : ControllerBase
 {
-  [HttpGet]
-    public IActionResult Authorize([FromQuery] string response_type, [FromQuery] string client_id, [FromQuery] string redirect_uri, [FromQuery] string? scope, [FromQuery] string? state, [FromQuery] string? code_challenge, [FromQuery] string? code_challenge_method, [FromQuery] string? prompt)
+  [HttpGet(Constants.Routes.Authorize)]
+    public IActionResult Authorize([FromQuery] string response_type, [FromQuery] string client_id, [FromQuery] string redirect_uri, [FromQuery] string? scope, [FromQuery] string? state, [FromQuery] string? code_challenge, [FromQuery] string? code_challenge_method, [FromQuery] string? prompt, [FromQuery] string? nonce)
     {
         var o = opts.Value;
-        if (!(env.IsDevelopment() || o.Enabled)) return NotFound();
+        if (!o.IsActive(env)) return NotFound();
         if (string.IsNullOrWhiteSpace(response_type) || !string.Equals(response_type, "code", StringComparison.OrdinalIgnoreCase)) return BadRequest("response_type must be 'code'");
         if (string.IsNullOrWhiteSpace(client_id) || string.IsNullOrWhiteSpace(redirect_uri)) return BadRequest("client_id and redirect_uri are required");
         if (!string.Equals(client_id, o.ClientId, StringComparison.Ordinal)) return Unauthorized();
@@ -32,7 +32,7 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
   if (forceLogin || !Request.Cookies.TryGetValue(Constants.CookieUser, out var userCookie) || string.IsNullOrWhiteSpace(userCookie))
         {
       // Serve a dedicated static HTML to keep SoC clean
-            var url = o.RouteBase.TrimEnd('/') + "/login.html";
+            const string url = Constants.Routes.Login;
             var queryParams = new Dictionary<string, string?>();
             queryParams["client_id"] = client_id;
             queryParams["redirect_uri"] = redirect_uri;
@@ -40,6 +40,7 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
             if (!string.IsNullOrWhiteSpace(state)) queryParams["state"] = state;
             if (!string.IsNullOrWhiteSpace(code_challenge)) queryParams["code_challenge"] = code_challenge;
             if (!string.IsNullOrWhiteSpace(code_challenge_method)) queryParams["code_challenge_method"] = code_challenge_method;
+            if (!string.IsNullOrWhiteSpace(nonce)) queryParams["nonce"] = nonce;
             var loginUrl = QueryHelpers.AddQueryString(url, queryParams);
             return Redirect(loginUrl);
         }
@@ -82,8 +83,9 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
       // Accepted when AllowedRedirectUris is empty:
       // - Any absolute URL whose path is exactly "/auth/test/callback" (host/port agnostic)
       // - The relative path "/auth/test/callback"
+      // Accept any provider callback shape /auth/{id}/callback (covers test + test-oidc); dev-only convenience.
       var path = redirect.AbsolutePath;
-      if (string.Equals(path, "/auth/test/callback", StringComparison.Ordinal))
+      if (path.StartsWith("/auth/", StringComparison.Ordinal) && path.EndsWith("/callback", StringComparison.Ordinal))
       {
         isAllowed = true;
       }
@@ -99,7 +101,8 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
     var parts = decoded.Split('|');
     var profile = new UserProfile(parts.ElementAtOrDefault(0) ?? "dev", parts.ElementAtOrDefault(1) ?? "dev@example.com", null);
     var (roles, perms, extraClaims) = ParseExtras(o);
-    var code = store.IssueCode(profile, TimeSpan.FromMinutes(5), code_challenge, roles, perms, extraClaims);
+    var isOpenId = !string.IsNullOrWhiteSpace(scope) && scope.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains("openid", StringComparer.OrdinalIgnoreCase);
+    var code = store.IssueCode(profile, TimeSpan.FromMinutes(5), code_challenge, roles, perms, extraClaims, nonce, isOpenId);
     var uri = new UriBuilder(redirect);
     var existingQuery = QueryHelpers.ParseQuery(uri.Query);
     var newQuery = existingQuery.ToDictionary(kvp => kvp.Key, kvp => (string?)kvp.Value.ToString());

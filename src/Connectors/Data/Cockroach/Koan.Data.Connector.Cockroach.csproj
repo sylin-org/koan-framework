@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Koan.Data.Connector.Cockroach</AssemblyName>
+    <RootNamespace>Koan.Data.Connector.Cockroach</RootNamespace>
+    <Description>CockroachDB provider for Koan relational data: a thin pg-wire delta over the Postgres connector (Npgsql + Dapper) with guardrails and governance.</Description>
+    <PackageTags>$(CommonPackageTags);data;cockroach;cockroachdb;relational;sql;dapper</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Data.Relational\Koan.Data.Relational.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Data.Relational.Npgsql\Koan.Data.Relational.Npgsql.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
+  </ItemGroup>
+</Project>

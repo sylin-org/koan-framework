@@ -12,7 +12,7 @@ namespace Koan.Web.Auth.Tests;
 
 /// <summary>
 /// Behavior tests for the WEB-0066 flow handler pipeline. The dispatcher's job is to fan
-/// every event out to every handler in Priority order, soft-fail on per-handler exceptions, and
+/// every event out to every handler in Priority order, fail closed on security-bearing exceptions, and
 /// honor ResponseHandled / Reject short-circuit signals.
 /// </summary>
 public sealed class AuthFlowDispatcherTests
@@ -69,7 +69,7 @@ public sealed class AuthFlowDispatcherTests
     }
 
     [Fact]
-    public async Task DispatchChallenge_handler_exception_is_swallowed_and_pipeline_continues()
+    public async Task DispatchChallenge_handler_exception_propagates_and_stops_pipeline()
     {
         var trace = new List<string>();
         var dispatcher = NewDispatcher(
@@ -77,33 +77,32 @@ public sealed class AuthFlowDispatcherTests
             new RecordingHandler("after", priority: 0, trace));
 
         var ctx = NewChallengeCtx();
-        await dispatcher.DispatchChallenge(ctx, CancellationToken.None);
+        var act = () => dispatcher.DispatchChallenge(ctx, CancellationToken.None);
 
-        trace.Should().Equal("after");
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        trace.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task LegacyAuthContributorAdapter_projects_old_contributors_into_the_new_pipeline()
+    public async Task DispatchSignIn_handler_exception_propagates_and_stops_pipeline()
     {
         var trace = new List<string>();
-        var legacy = new RecordingLegacyContributor("legacy", priority: 0, trace);
-        var modern = new RecordingHandler("modern", priority: -10, trace);
-
-        var dispatcher = new AuthFlowDispatcher(
-            new IKoanAuthFlowHandler[] { modern },
-            new IKoanAuthEventContributor[] { legacy },
-            NullLogger<AuthFlowDispatcher>.Instance);
-
+        var dispatcher = NewDispatcher(
+            new ThrowingHandler("thrower", priority: -1000),
+            new RecordingHandler("after", priority: 0, trace));
+        var http = NewHttpContext();
         var ctx = new AuthSignInContext
         {
             Provider = "test",
             Identity = new System.Security.Claims.ClaimsIdentity("test"),
-            Services = NewHttpContext().RequestServices,
-            HttpContext = NewHttpContext(),
+            Services = http.RequestServices,
+            HttpContext = http,
         };
-        await dispatcher.DispatchSignIn(ctx, CancellationToken.None);
 
-        trace.Should().Equal("modern", "legacy");
+        var act = () => dispatcher.DispatchSignIn(ctx, CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        trace.Should().BeEmpty();
     }
 
     [Fact]
@@ -199,7 +198,7 @@ public sealed class AuthFlowDispatcherTests
     // ─── helpers ──────────────────────────────────────────────────────────────
 
     private static AuthFlowDispatcher NewDispatcher(params IKoanAuthFlowHandler[] handlers)
-        => new(handlers, Array.Empty<IKoanAuthEventContributor>(), NullLogger<AuthFlowDispatcher>.Instance);
+        => new(handlers, NullLogger<AuthFlowDispatcher>.Instance);
 
     private static AuthChallengeContext NewChallengeCtx()
     {
@@ -267,15 +266,8 @@ public sealed class AuthFlowDispatcherTests
         public int Priority { get; }
         public Task OnChallenge(AuthChallengeContext ctx, CancellationToken ct)
             => throw new InvalidOperationException($"{_name} blew up");
-    }
-
-    private sealed class RecordingLegacyContributor : IKoanAuthEventContributor
-    {
-        private readonly string _name;
-        private readonly List<string> _trace;
-        public RecordingLegacyContributor(string name, int priority, List<string> trace) { _name = name; Priority = priority; _trace = trace; }
-        public int Priority { get; }
-        public Task OnSignIn(AuthSignInContext ctx, CancellationToken ct) { _trace.Add(_name); return Task.CompletedTask; }
+        public Task OnSignIn(AuthSignInContext ctx, CancellationToken ct)
+            => throw new InvalidOperationException($"{_name} blew up");
     }
 
     private sealed class TestOptionsMonitor<T> : IOptionsMonitor<T>

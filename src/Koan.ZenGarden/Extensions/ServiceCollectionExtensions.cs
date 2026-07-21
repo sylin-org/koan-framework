@@ -1,7 +1,7 @@
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Koan.Core.Modules;
 using Koan.ZenGarden.AI;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using Koan.ZenGarden.Initialization;
 using Koan.ZenGarden.Koi;
 using Koan.ZenGarden.Persistence;
@@ -14,9 +14,9 @@ using Microsoft.Extensions.Options;
 
 namespace Koan.ZenGarden.Extensions;
 
-public static class ServiceCollectionExtensions
+internal static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddKoanZenGarden(
+    internal static IServiceCollection AddZenGardenRuntime(
         this IServiceCollection services,
         IConfiguration? configuration = null,
         Action<ZenGardenOptions>? configure = null)
@@ -35,6 +35,9 @@ public static class ServiceCollectionExtensions
                 services.PostConfigure(configure);
             }
         }
+
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IValidateOptions<ZenGardenOptions>, ZenGardenOptionsValidator>());
 
         services.TryAddSingleton<IKoiHandler>(sp =>
         {

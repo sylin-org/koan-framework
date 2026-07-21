@@ -4,8 +4,8 @@ domain: engineering
 title: "Koan Engineering Guardrails"
 audience: [developers, maintainers, ai-agents]
 status: current
-last_updated: 2025-09-29
-framework_version: v0.2.18+
+last_updated: 2026-07-14
+framework_version: v0.20.0
 validation:
   date_last_tested: 2025-09-29
   status: verified
@@ -17,7 +17,7 @@ validation:
 ## Contract
 
 - **Scope**: Day-to-day guardrails for contributors working inside the Koan repository.
-- **Inputs**: Existing modules, ADRs, scripts (`apply-version.ps1`, `scripts/validate-packages.ps1`), and framework conventions.
+- **Inputs**: Existing modules, ADRs, evaluated package inventory, focused validation, and framework conventions.
 - **Outputs**: Code and docs that comply with controller-first web APIs, entity-first data patterns, packaging standards, and documentation posture.
 - **Failure modes**: Inline endpoints, repository abstractions over entities, scattered magic literals, missing README/TECHNICAL companions, or drifting NuGet metadata.
 - **Success criteria**: Features land with controllers, entity statics, centralized constants/options, validated packaging metadata, and updated companion docs.
@@ -30,7 +30,8 @@ validation:
 - [Configuration provenance descriptors](provenance-configuration-descriptors.md)
 - [Architecture principles](../architecture/principles.md)
 - [Documentation posture (ARCH-0041)](../decisions/ARCH-0041-docs-posture-instructions-over-tutorials.md)
-- [Script-owned versioning (BUILD-0072)](../decisions/BUILD-0072-script-owned-versioning.md)
+- [Main-boundary package releases (ARCH-0110)](../decisions/ARCH-0110-main-release-boundary.md)
+- [Runtime facts](runtime-facts.md)
 
 ## Prime Guardrails
 
@@ -51,10 +52,11 @@ validation:
 
 ## Packaging Checklist
 
-- Update `version.json`; run `apply-version.ps1` instead of editing `<Version>` nodes.
+- Give every packable project a local `version.json`; NBGV owns patch and assembly/package stamping.
 - Ensure `<Description>`, `<PackageTags>`, and `<GenerateDocumentationFile>true</GenerateDocumentationFile>` are set.
 - Write or update per-project `README.md` with controller/entity examples.
-- Execute `scripts/validate-packages.ps1` locally and wire it into CI jobs touching packaging.
+- Run `dotnet run --project tools/Koan.Packaging -- inventory` and focused tests for the affected
+  package owner. Pull requests to `main` validate; the resulting `main` commit publishes.
 - Dotnet tools set `<PackAsTool>true</PackAsTool>` and document install commands; analyzers ship assets under `analyzers/dotnet/cs`.
 
 See the [NuGet packaging policy](packaging.md) for detailed expectations and follow-ups.
@@ -69,12 +71,13 @@ See the [NuGet packaging policy](packaging.md) for detailed expectations and fol
 
 1. **Trace existing surfaces**: Search the repo/samples before introducing new helpers.
 2. **Document decisions**: Add ADRs for structural changes; update `docs/engineering/**` and module-level companion docs.
-3. **Validate**: Run unit or integration tests applicable to touched components plus the docs build (`scripts/build-docs.ps1 -Strict`).
-4. **Package lint**: Execute `scripts/validate-packages.ps1` to confirm metadata compliance before PRs.
+3. **Validate**: Run unit or integration tests applicable to touched components; reserve full certification for milestones.
+4. **Package lint**: Run package inventory when package identity or metadata changes.
 
 ## Edge Cases & Escalation
 
-- **Large data operations**: Prefer `Entity.AllStream(...)` or explicit paging; flag data guides when new patterns arise.
+- **Large data operations**: Prefer capability-qualified `Entity.AllStream(...)` or explicit paging;
+  InMemory, JSON, and Redis currently reject streams.
 - **Provider capabilities**: Guard fallbacks when `Data<TEntity, TKey>.Capabilities` lacks LINQ pushdown.
 - **Environment detection**: Use `KoanEnv` for environment checks; avoid raw `IHostEnvironment` or env vars.
 - **Configuration overrides**: Introduce typed Options with validation; do not branch on raw configuration keys inside business logic.

@@ -1,0 +1,4 @@
+<Project>
+  <!-- Intentionally EMPTY: stops inheritance of the repo-root Directory.Build.targets for the
+       content-only template pack. See Directory.Build.props in this folder for the rationale. -->
+</Project>

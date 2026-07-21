@@ -13,8 +13,6 @@ public enum JobStatus
     Queued = 1,
     /// <summary>Claimed by a worker (lease held), handler executing.</summary>
     Running = 2,
-    /// <summary>Waiting on a declared dependency (reserved; not used in the v1 in-memory tier).</summary>
-    Blocked = 3,
     /// <summary>Terminal — handler succeeded (and no further chain stage).</summary>
     Completed = 4,
     /// <summary>Terminal — handler failed after exhausting retries (chain may continue per OnFailure).</summary>

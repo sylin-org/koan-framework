@@ -1,5 +1,10 @@
 # DATA-0083: Fast Remove Strategy
 
+> **R07-05 amendment (2026-07-15):** `Safe` and `Optimized` preserve configured per-entity
+> `Lifecycle`; only explicit `Fast` bypasses it. Provider optimization remains available when no
+> remove handlers are composed. Historical examples below using BeforeDelete/AfterDelete terminology
+> should be read as BeforeRemove/AfterRemove.
+
 **Status:** Accepted
 **Date:** 2025-10-04
 **Scope:** Koan.Data.Core, Koan.Data.Abstractions, All Data Adapters

@@ -1,64 +1,41 @@
-﻿# Koan.Media.Abstractions
+# Sylin.Koan.Media.Abstractions
 
-## Contract
+Inert contracts for Koan media recipes and pipelines: immutable transformation policy, media metadata, registry and
+pipeline interfaces, step vocabulary, output shapes, and the storage-backed `IMediaObject` contract.
 
-- **Purpose**: Define media contracts, transforms, and task models shared across Koan media pipelines.
-- **Primary inputs**: `MediaAsset`, `MediaVariant`, and pipeline task definitions consumed by storage and web modules.
-- **Outputs**: Serializable DTOs for persistence, events emitted through messaging adapters, and helper extensions for variant resolution.
-- **Failure modes**: Unregistered media tasks, missing variant identifiers, or incompatible serialization when persisting custom metadata.
-- **Success criteria**: Media modules share a consistent shape, variant naming stays predictable, and downstream services can compose media tasks without duplication.
+## Install
 
-## Quick start
-
-```csharp
-using Koan.Media.Abstractions;
-
-public static class MediaVariants
-{
-    public static MediaVariant HdMp4(string assetId) => new()
-    {
-        VariantId = "video:hd",
-        SourceAssetId = assetId,
-        ContentType = "video/mp4",
-        Transforms = { MediaTransform.For("encode", new { profile = "h264_hd" }) }
-    };
-}
-
-public async Task<MediaAsset> CreateMediaAsync(string title)
-{
-    var asset = new MediaAsset
-    {
-        Title = title,
-        Variants = { MediaVariants.HdMp4(Guid.NewGuid().ToString()) }
-    };
-    return await MediaAssetExtensions.ValidateAsync(asset);
-}
+```powershell
+dotnet add package Sylin.Koan.Media.Abstractions
 ```
 
-- Use the core models to describe variants and transforms; downstream modules (storage, web) will respect the shared schema.
-- Leverage helper extensions for validation and canonical naming.
+Applications normally reference `Sylin.Koan.Media.Core` or `Sylin.Koan.Media.Web` and receive this package
+transitively. Reference it directly for a recipe library, source/projection contract, or alternate pipeline engine
+that must not activate Koan's media runtime.
 
-## Configuration
+## Smallest meaningful use
 
-- Pair with `Koan.Storage` providers to persist media assets.
-- Register default variants in your module’s auto-registrar to keep variant IDs consistent across environments.
-- Use `MediaTask` descriptors to configure pipeline workers (encoding, thumbnailing, etc.).
+```csharp
+using Koan.Media.Abstractions.Recipes;
 
-## Edge cases
+var card = MediaRecipe.New()
+    .AutoOrient()
+    .Resize(width: 320)
+    .EncodeAs("jpeg", Quality.Web)
+    .Build();
+```
 
-- Unsupported content types: provide fallback transforms or mark variants as optional to avoid failing the entire asset.
-- Large metadata payloads: ensure custom metadata remains serializable through Koan storage adapters.
-- Concurrent updates: apply optimistic concurrency using the asset’s version fields.
-- Cross-service access: share variant IDs as constants to avoid drift between producers and consumers.
+The result is immutable transformation intent. A functional pipeline such as `Sylin.Koan.Media.Core` performs the
+decode and encode. `[MediaRecipe]` marks static recipe factories for a runtime registry to discover.
 
-## Related packages
+## Guarantees and boundaries
 
-- `Koan.Media.Core` – runtime orchestration consuming these abstractions.
-- `Koan.Media.Web` – HTTP APIs that rely on the contracts defined here.
-- `Koan.Storage` – storage routing used for persisting assets.
+- Referencing this package registers no module, recipe registry, image engine, storage service, controller, or route.
+- Recipe construction and fingerprinting are deterministic; execution and encoder availability belong to a runtime.
+- `IMediaPipeline` expresses lazy processing and streaming terminals but does not promise bounded decoded pixel state.
+- `IMediaObject` describes media lineage over Storage contracts; Entity upload/dedup/read behavior belongs to
+  `Sylin.Koan.Media.Core` as `Koan.Media.MediaEntity<TEntity>`.
+- Storage placement, tenancy/access gates, derivative persistence, request limits, and HTTP negotiation belong to
+  their owning functional packages.
 
-## Reference
-
-- `MediaAsset` – root entity describing media items.
-- `MediaVariant` – variant metadata structure.
-- `MediaTask` – pipeline work item descriptor.
+See [TECHNICAL.md](./TECHNICAL.md) for recipe and pipeline invariants.

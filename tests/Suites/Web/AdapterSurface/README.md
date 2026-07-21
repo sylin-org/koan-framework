@@ -30,8 +30,8 @@ Each adapter declares what it supports via `IAdapterCapabilities` on its factory
 | **InMemory** | **42 / 6 / 0** | No container required. Partition routing + cross-partition transfer fully validated here. |
 | **Json** | **42 / 6 / 0** | File-based, temp directory. Partition + transfer fully validated. |
 | **Sqlite** | **25 / 23 / 0** | File-based. Partition + transfer opted out: `ensureCreated` under `EntityContext.With(partition: X)` doesn't produce the partition-suffixed table at the framework level. |
-| **Mongo** | **25 / 23 / 0** | Testcontainer `mongo:7`. Surface specs all green; partition/transfer opted out pending the framework partition-routing fix. The original `?sort=-Sightings.LastChangedAt` bug stays validated end-to-end here. |
-| **Postgres** | **25 / 23 / 0** | Testcontainer `postgres:16-alpine`. Same partition/transfer opt-out as Sqlite. |
+| **Mongo** | **25 / 23 / 0** | Testcontainer `mongo:8.3.4`. Surface specs all green; partition/transfer opted out pending the framework partition-routing fix. The original `?sort=-Sightings.LastChangedAt` bug stays validated end-to-end here. |
+| **Postgres** | **25 / 23 / 0** | Testcontainer `postgres:18.4-alpine`. Same partition/transfer opt-out as Sqlite. |
 | **Redis** | **25 / 23 / 0** | Testcontainer Redis. Most partition ops work but bulk-upsert and collection-read with `?set=` leak across to default; opted out to keep the matrix honest. |
 | **SqlServer** | **25 / 23 / 0** | Testcontainer MsSql. Same partition/transfer opt-out as Sqlite/Postgres. |
 | **Couchbase** | **0 / 48 / 0** | Whole suite cleanly skipped: `Testcontainers.Couchbase` exposes KV and management on separate random host ports, but Koan's `CouchbaseClusterProvider` derives the management URL from the single KV connection string. Set `Koan_TESTS_COUCHBASE=...` to run against an externally provisioned cluster. |
@@ -63,7 +63,7 @@ This expansion was a productive net negative — it found more framework issues 
 
 1. **Mongo's `Skip(0).Limit(int.MaxValue)`** (shared `QueryExtensions.ApplyPaging`) silently dropped result sets. Fixed by skipping pagination application entirely when no pagination is requested.
 2. **`Data<T,K>.QueryWithCount` pagination-flag semantics** — when the orchestrator paginates in memory after refetching unpaginated (the sort-not-pushed-down fallback path), it now sets `RepositoryHandledPagination = true`. The flag's downstream contract with `EntityEndpointService` is "Items is already a page; don't paginate again." Previously the orchestrator only set this flag true when the *repository* handled pagination, causing the web layer to paginate-again the already-paginated window — yielding empty results for `page > 1` on every adapter that couldn't push sort down.
-3. **Postgres + SqlServer `KoanAutoRegistrar` missing `services.AddRelationalOrchestration()`** — Sqlite's auto-registrar had it but the other two relational adapters didn't, so `IRelationalSchemaOrchestrator` was unresolvable when the connector tried to provision tables under `WebApplicationFactory`-style hosting. Fixed both.
+3. **Relational schema ownership** — `Koan.Data.Relational` now owns the schema orchestrator once. Concrete providers supply route-local policy and no longer register adapter-specific orchestration bridges.
 4. **DDL executors had fire-and-forget async** — `MsSqlDdlExecutor`, `PgDdlExecutor`, and `SqliteDdlExecutor` all used `ExecuteScalarAsync()` / `ExecuteNonQueryAsync()` without awaiting. `TableExists` always returned `true` because `Task<object?>` is itself not null, so `CreateTable` never ran and every adapter spec failed with "no such table" / "Invalid object name". Converted all DDL ops to their sync equivalents (DDL is bounded and synchronous by nature). This single fix unblocked Postgres, SqlServer, and Sqlite simultaneously.
 
 ## Framework follow-ups raised by the matrix (not yet fixed)

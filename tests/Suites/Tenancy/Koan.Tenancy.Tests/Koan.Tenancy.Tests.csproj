@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- ARCH-0091: xUnit v3 runs as a self-executing test assembly (VSTest-compatible mode keeps `dotnet test`). -->
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\src\Koan.Testing.Containers\Koan.Testing.Containers.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Tenancy\Koan.Tenancy.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Connectors\Data\Json\Koan.Data.Connector.Json.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Cache\Koan.Cache.csproj" />
+    <!-- ARCH-0101 §4: the tenant × soft-delete two-axis composition proof (Reference = Intent activates soft-delete). -->
+    <ProjectReference Include="..\..\..\..\src\Koan.Data.SoftDelete\Koan.Data.SoftDelete.csproj" />
+    <!-- STOR-0011: the storage blob-key tenant-isolation proof (Local provider, no Docker). -->
+    <ProjectReference Include="..\..\..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Storage.Abstractions\Koan.Storage.Abstractions.csproj" />
+    <!-- STOR-0011: the MediaEntity surface (OpenRead override) isolation proof — the surface SnapVault's PhotoAsset uses. -->
+    <ProjectReference Include="..\..\..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
+    <!-- GAP C 0.3: the vector tenant-isolation proof (InMemory adapter, no Docker). -->
+    <ProjectReference Include="..\..\..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Connectors\Data\Vector\InMemory\Koan.Data.Vector.Connector.InMemory.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ARCH-0103 P2: the deliberately non-isolating fake adapter shared by the fail-closed safety-net suites. -->
+    <Compile Include="..\..\_shared\NonIsolatingFakeAdapter.cs" Link="Support\NonIsolatingFakeAdapter.cs" />
+  </ItemGroup>
+</Project>

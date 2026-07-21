@@ -10,6 +10,7 @@ PostgreSQL provider for Koan relational data with safe defaults and pushdowns.
 - Connection + health checks with minimal options
 - JSON projection, filter, and paging pushdowns where supported
 - Schema helpers (create table/index) via Koan.Data.Relational
+- Provider-bounded Entity streams through `DataCaps.Query.ProviderBoundedPaging`
 
 ## Install
 
@@ -25,22 +26,34 @@ dotnet add package Sylin.Koan.Data.Connector.Postgres
 ## Usage - safe snippets
 
 - Use first-class model statics from your entities:
-  - `Order.FirstPage(50, ct)` / `Order.Page(cursor, ct)`
+  - `Order.FirstPage(50, ct)` / `Order.Page(2, 50, ct)`
   - `Order.Query(o => o.CustomerId == id, ct)`
   - `await foreach (var o in Order.QueryStream(o => o.Total > 100, ct)) { ... }`
 
 ```csharp
-// Stream a filtered set (backpressure friendly)
+// Stream a filtered set through consumer-paced provider pages
 await foreach (var o in Order.QueryStream(o => o.IsActive, ct))
 {
-		// process
+    // process
 }
 ```
+
+## Streaming boundary
+
+`AllStream` and `QueryStream` request one numbered PostgreSQL page at a time. `batchSize` caps the
+Koan-visible candidate page; it does not claim a bound for opaque provider-driver buffers. Streaming
+accepts only DATA-0107's first proved user-sort floor: top-level, non-nullable `bool`, `byte`, `sbyte`,
+`short`, `ushort`, or `int`. Other user sorts reject before provider I/O. Data.Core separately appends
+the usual string Entity identifier as an opaque provider-stable tie-break, not a cross-provider
+collation promise.
+
+These streams do not provide snapshot consistency, mutation-safe traversal, resumability, or a public
+cursor. Concurrent writes can therefore cause skips or duplicates during offset-based traversal.
 
 See TECHNICAL.md for options and pushdown coverage.
 
 ## References
 
-- Paging/Streaming decision: `~/decisions/DATA-0061-data-access-pagination-and-streaming.md`
-- Data access reference: `~/reference/data-access.md`
+- [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
 

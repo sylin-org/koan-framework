@@ -4,7 +4,7 @@ namespace Koan.ZenGarden.Koi;
 /// Immutable point-in-time view of the topology as observed by the Koi handler.
 /// Published atomically via reference swap; safe to read without locks.
 /// </summary>
-public sealed record KoiTopologySnapshot
+internal sealed record KoiTopologySnapshot
 {
     public static readonly KoiTopologySnapshot Empty = new()
     {

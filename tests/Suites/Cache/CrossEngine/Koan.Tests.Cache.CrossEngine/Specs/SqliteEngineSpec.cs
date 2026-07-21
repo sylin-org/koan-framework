@@ -25,8 +25,6 @@ public sealed class SqliteEngineSpec : CrossEngineCacheBehaviorSpecBase, IDispos
     protected override IEnumerable<(string Key, string Value)> ExtraSettings()
     {
         yield return ("Koan:Cache:Adapters:Sqlite:DatabasePath", _databasePath);
-        // Keep the sweeper idle in tests — deterministic lifecycle.
-        yield return ("Koan:Cache:Adapters:Sqlite:SweepIntervalSeconds", "3600");
     }
 
     public void Dispose()

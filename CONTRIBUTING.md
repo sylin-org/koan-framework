@@ -1,52 +1,53 @@
 # Contributing to Koan
 
-Thanks for helping build Koan. This repo favors small, focused PRs with good tests and docs. Start here:
+Koan’s public promise is simple: application code reads as the business, while referenced capabilities own
+composition, safe defaults, infrastructure negotiation, runtime explanation, and corrective failure. Contributions
+should make that promise smaller, clearer, or more dependable.
 
-- Read the support docs at `docs/support/` (architecture, adapters, testing, releases, migration).
-- Follow the ADR process for meaningful technical decisions (see `docs/decisions`).
-- Keep entities POCO and provider-agnostic; push provider specifics into adapters.
+## Before changing code
 
-Quick checklist:
+1. Read `CLAUDE.md` and the current initiative handoff when your change belongs to an active work item.
+2. Map the complete concern before implementation: public contract, owning module, closest existing pattern,
+   configuration, runtime facts, health, failure correction, tests, and documentation.
+3. Prefer standard .NET hosting, DI, options, health checks, and logging. Add Koan-specific vocabulary only when it
+   expresses business intent or removes repeated application ceremony.
+4. Put cross-module contracts in genuinely independent abstractions. Keep provider mechanics in connectors and
+   policy in the functional owner.
 
-- Tests: add/adjust unit tests; keep runtime deps minimal.
-- Docs: update guides when behavior changes; add examples when useful.
-- API surface: prefer additive; mark breaking changes clearly and justify in ADR.
+The [engineering workbooks](docs/engineering/README.md) cover repeatable repository tasks. Start with
+[test authoring](docs/engineering/test-authoring.md), [adding a connector](docs/engineering/adding-a-connector.md),
+or [package versioning](docs/engineering/versioning.md) when those match your change.
 
-## Local setup
+## Prove the affected promise
 
-- .NET 10 SDK
-- Run: `dotnet build` then `dotnet test` (solution or project-level).
+Use the .NET 10 SDK. Build the smallest affected project and run focused tests that exercise the changed contract.
+Broaden only when a dependency or shared seam justifies it. A full solution/release ratchet is certification work,
+not the default inner loop.
 
-## Code style
+For public examples, include the package reference, host code, configuration, runtime prerequisite, inspection path,
+and expected corrective failure. Run the repository’s relevant lint/example checks before proposing the change.
 
-- C#: modern features OK; be explicit with nullability.
-- Keep public APIs small; use internal helpers.
-- Avoid magic strings; prefer enums or constants.
+## Keep one public story
 
-## Review criteria
+- Current guidance starts at the 0.20 preview, `AddKoan()`, the four-line host, and `Entity<T>`.
+- The [generated product surface](docs/reference/product-surface.md) owns support maturity and package lines.
+- Link to one canonical explanation instead of copying another current guide.
+- Keep ADRs, initiatives, assessments, and superseded plans as dated evidence—not required user instructions.
+- Update package companions, templates, samples, skills, or feedback guidance when your public change affects them.
 
-- Correctness, clarity, and tests.
-- Backwards compatibility (when possible).
-- Docs: updated appropriately.
+## Review and safety
 
-## Security
+Reviewers look for correctness, a small public surface, explicit application responsibilities, actionable failures,
+focused evidence, and documentation that tells the same story as the code. Never commit credentials or private
+application material. Use parameterized provider APIs and preserve nullable-reference correctness.
 
-- Don’t include credentials in tests/samples.
-- Parameterize SQL; avoid string interpolation in adapters.
+## DCO and licenses
 
-## DCO sign-off
+Every commit requires a Developer Certificate of Origin sign-off:
 
-This project uses the Developer Certificate of Origin (DCO). Add a Signed-off-by line to each commit:
-
+```text
 Signed-off-by: Your Name <your.email@example.com>
+```
 
-You can use `git commit -s` to add it automatically. See the `DCO` file for the certificate text.
-
-## License notes
-
-- Code is Apache-2.0 licensed (`LICENSE`).
-- Documentation is CC BY 4.0 (`docs/LICENSE-DOCS.md`).
-
-## Where to go next
-
-- `docs/support/README.md` - overview and deep dives.
+Use `git commit -s` to add it automatically; the full certificate is in `DCO`. Code is Apache-2.0 licensed and
+documentation uses [CC BY 4.0](docs/LICENSE-DOCS.md).

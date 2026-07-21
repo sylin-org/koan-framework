@@ -27,83 +27,61 @@ public sealed class VectorDataIntegrationSpec
         _output = output ?? throw new ArgumentNullException(nameof(output));
     }
 
-    private static string EnsurePartition(TestContext ctx)
-    {
-        const string Key = "partition";
-        if (!ctx.TryGetItem<string>(Key, out var partition))
-        {
-            partition = $"integration-{ctx.ExecutionId:n}";
-            ctx.SetItem(Key, partition);
-        }
-
-        return partition;
-    }
-
     /// <summary>
     /// Integration Test #1: Full workflow - Entity save + Vector save in transaction.
     /// </summary>
     [Fact]
     public async Task Complete_workflow_entity_and_vector_save_in_transaction()
     {
-        await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(Complete_workflow_entity_and_vector_save_in_transaction))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"integration-{Guid.CreateVersion7():n}";
+
+        var article = new ArticleEntity
+        {
+            Title = "Vector Integration Test",
+            Content = "This is a comprehensive test of the full vector workflow."
+        };
+
+        var embedding = GenerateTestEmbedding(1536);
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            using (EntityContext.Transaction("e2e-test"))
             {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = ctx.GetRequiredItem<string>("partition");
+                // Save entity
+                await article.Save();
 
-                var article = new ArticleEntity
-                {
-                    Title = "Vector Integration Test",
-                    Content = "This is a comprehensive test of the full vector workflow."
-                };
+                // Save vector
+                await Vector<ArticleEntity>.Save(article.Id, embedding);
 
-                var embedding = GenerateTestEmbedding(1536);
+                // Verify nothing persisted yet
+                var entityCount = await ArticleEntity.Count;
+                entityCount.Should().Be(0, "entity should not be persisted during transaction");
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    using (EntityContext.Transaction("e2e-test"))
-                    {
-                        // Save entity
-                        await article.Save();
+                var fakeRepo = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
+                fakeRepo.VectorCount.Should().Be(0, "vector should not be persisted during transaction");
 
-                        // Save vector
-                        await Vector<ArticleEntity>.Save(article.Id, embedding);
+                // Commit
+                await EntityContext.Commit();
+            }
 
-                        // Verify nothing persisted yet
-                        var entityCount = await ArticleEntity.Count;
-                        entityCount.Should().Be(0, "entity should not be persisted during transaction");
+            // Verify both persisted
+            var finalEntityCount = await ArticleEntity.Count;
+            finalEntityCount.Should().Be(1, "entity should be persisted after commit");
 
-                        var fakeRepo = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
-                        fakeRepo.VectorCount.Should().Be(0, "vector should not be persisted during transaction");
+            var savedArticle = await ArticleEntity.Get(article.Id);
+            savedArticle.Should().NotBeNull();
+            savedArticle!.Title.Should().Be("Vector Integration Test");
 
-                        // Commit
-                        await EntityContext.Commit();
-                    }
+            var fakeRepoAfterCommit = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
+            fakeRepoAfterCommit.VectorCount.Should().Be(1, "vector should be persisted after commit");
+            fakeRepoAfterCommit.ContainsVector(article.Id).Should().BeTrue();
 
-                    // Verify both persisted
-                    var finalEntityCount = await ArticleEntity.Count;
-                    finalEntityCount.Should().Be(1, "entity should be persisted after commit");
-
-                    var savedArticle = await ArticleEntity.Get(article.Id);
-                    savedArticle.Should().NotBeNull();
-                    savedArticle!.Title.Should().Be("Vector Integration Test");
-
-                    var fakeRepoAfterCommit = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
-                    fakeRepoAfterCommit.VectorCount.Should().Be(1, "vector should be persisted after commit");
-                    fakeRepoAfterCommit.ContainsVector(article.Id).Should().BeTrue();
-
-                    var retrievedVector = fakeRepoAfterCommit.GetVector(article.Id);
-                    retrievedVector.Should().NotBeNull();
-                    retrievedVector.Should().HaveCount(1536);
-                }
-            })
-            .Run();
+            var retrievedVector = fakeRepoAfterCommit.GetVector(article.Id);
+            retrievedVector.Should().NotBeNull();
+            retrievedVector.Should().HaveCount(1536);
+        }
     }
 
     /// <summary>
@@ -112,41 +90,31 @@ public sealed class VectorDataIntegrationSpec
     [Fact]
     public async Task SaveWithVector_saves_entity_and_vector_atomically()
     {
-        await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(SaveWithVector_saves_entity_and_vector_atomically))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
-            {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = ctx.GetRequiredItem<string>("partition");
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
 
-                var article = new ArticleEntity
-                {
-                    Title = "SaveWithVector Test",
-                    Content = "Testing the convenience method"
-                };
+        var partition = $"integration-{Guid.CreateVersion7():n}";
 
-                var embedding = GenerateTestEmbedding(1536);
+        var article = new ArticleEntity
+        {
+            Title = "SaveWithVector Test",
+            Content = "Testing the convenience method"
+        };
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    // Single call saves both
-                    await VectorData<ArticleEntity>.SaveWithVector(article, embedding, null);
+        var embedding = GenerateTestEmbedding(1536);
 
-                    // Verify both saved
-                    var savedArticle = await ArticleEntity.Get(article.Id);
-                    savedArticle.Should().NotBeNull();
-                    savedArticle!.Title.Should().Be("SaveWithVector Test");
+        using (var _ = EntityContext.Partition(partition))
+        {
+            // Single call saves both
+            await VectorData<ArticleEntity>.SaveWithVector(article, embedding, null);
 
-                    var fakeRepo = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
-                    fakeRepo.ContainsVector(article.Id).Should().BeTrue();
-                }
-            })
-            .Run();
+            // Verify both saved
+            var savedArticle = await ArticleEntity.Get(article.Id);
+            savedArticle.Should().NotBeNull();
+            savedArticle!.Title.Should().Be("SaveWithVector Test");
+
+            var fakeRepo = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
+            fakeRepo.ContainsVector(article.Id).Should().BeTrue();
+        }
     }
 
     /// <summary>
@@ -155,56 +123,46 @@ public sealed class VectorDataIntegrationSpec
     [Fact]
     public async Task Transaction_saves_multiple_entities_with_vectors_atomically()
     {
-        await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(Transaction_saves_multiple_entities_with_vectors_atomically))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"integration-{Guid.CreateVersion7():n}";
+
+        var article1 = new ArticleEntity { Title = "Article 1", Content = "Content 1" };
+        var article2 = new ArticleEntity { Title = "Article 2", Content = "Content 2" };
+        var article3 = new ArticleEntity { Title = "Article 3", Content = "Content 3" };
+
+        var embedding1 = GenerateTestEmbedding(1536);
+        var embedding2 = GenerateTestEmbedding(1536);
+        var embedding3 = GenerateTestEmbedding(1536);
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            using (EntityContext.Transaction("multi-entity-tx"))
             {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = ctx.GetRequiredItem<string>("partition");
+                await article1.Save();
+                await Vector<ArticleEntity>.Save(article1.Id, embedding1);
 
-                var article1 = new ArticleEntity { Title = "Article 1", Content = "Content 1" };
-                var article2 = new ArticleEntity { Title = "Article 2", Content = "Content 2" };
-                var article3 = new ArticleEntity { Title = "Article 3", Content = "Content 3" };
+                await article2.Save();
+                await Vector<ArticleEntity>.Save(article2.Id, embedding2);
 
-                var embedding1 = GenerateTestEmbedding(1536);
-                var embedding2 = GenerateTestEmbedding(1536);
-                var embedding3 = GenerateTestEmbedding(1536);
+                await article3.Save();
+                await Vector<ArticleEntity>.Save(article3.Id, embedding3);
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    using (EntityContext.Transaction("multi-entity-tx"))
-                    {
-                        await article1.Save();
-                        await Vector<ArticleEntity>.Save(article1.Id, embedding1);
+                await EntityContext.Commit();
+            }
 
-                        await article2.Save();
-                        await Vector<ArticleEntity>.Save(article2.Id, embedding2);
+            // Verify all entities saved
+            var entityCount = await ArticleEntity.Count;
+            entityCount.Should().Be(3, "all entities should be persisted");
 
-                        await article3.Save();
-                        await Vector<ArticleEntity>.Save(article3.Id, embedding3);
+            // Verify all vectors saved
+            var fakeRepo = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
+            fakeRepo.VectorCount.Should().Be(3, "all vectors should be persisted");
 
-                        await EntityContext.Commit();
-                    }
-
-                    // Verify all entities saved
-                    var entityCount = await ArticleEntity.Count;
-                    entityCount.Should().Be(3, "all entities should be persisted");
-
-                    // Verify all vectors saved
-                    var fakeRepo = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
-                    fakeRepo.VectorCount.Should().Be(3, "all vectors should be persisted");
-
-                    fakeRepo.ContainsVector(article1.Id).Should().BeTrue();
-                    fakeRepo.ContainsVector(article2.Id).Should().BeTrue();
-                    fakeRepo.ContainsVector(article3.Id).Should().BeTrue();
-                }
-            })
-            .Run();
+            fakeRepo.ContainsVector(article1.Id).Should().BeTrue();
+            fakeRepo.ContainsVector(article2.Id).Should().BeTrue();
+            fakeRepo.ContainsVector(article3.Id).Should().BeTrue();
+        }
     }
 
     /// <summary>
@@ -213,46 +171,36 @@ public sealed class VectorDataIntegrationSpec
     [Fact]
     public async Task Transaction_rollback_discards_entity_and_vector()
     {
-        await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(Transaction_rollback_discards_entity_and_vector))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"integration-{Guid.CreateVersion7():n}";
+
+        var article = new ArticleEntity
+        {
+            Title = "Rollback Test",
+            Content = "This should be rolled back"
+        };
+
+        var embedding = GenerateTestEmbedding(1536);
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            using (EntityContext.Transaction("rollback-tx"))
             {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = ctx.GetRequiredItem<string>("partition");
+                await article.Save();
+                await Vector<ArticleEntity>.Save(article.Id, embedding);
 
-                var article = new ArticleEntity
-                {
-                    Title = "Rollback Test",
-                    Content = "This should be rolled back"
-                };
+                // Rollback
+                await EntityContext.Rollback();
+            }
 
-                var embedding = GenerateTestEmbedding(1536);
+            // Verify nothing persisted
+            var entityCount = await ArticleEntity.Count;
+            entityCount.Should().Be(0, "entity should be rolled back");
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    using (EntityContext.Transaction("rollback-tx"))
-                    {
-                        await article.Save();
-                        await Vector<ArticleEntity>.Save(article.Id, embedding);
-
-                        // Rollback
-                        await EntityContext.Rollback();
-                    }
-
-                    // Verify nothing persisted
-                    var entityCount = await ArticleEntity.Count;
-                    entityCount.Should().Be(0, "entity should be rolled back");
-
-                    var fakeRepo = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
-                    fakeRepo.VectorCount.Should().Be(0, "vector should be rolled back");
-                }
-            })
-            .Run();
+            var fakeRepo = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
+            fakeRepo.VectorCount.Should().Be(0, "vector should be rolled back");
+        }
     }
 
     /// <summary>
@@ -280,50 +228,40 @@ public sealed class VectorDataIntegrationSpec
     [Fact]
     public async Task Vector_search_returns_semantically_similar_results()
     {
-        await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(Vector_search_returns_semantically_similar_results))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
-            {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = ctx.GetRequiredItem<string>("partition");
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
 
-                var article1 = new ArticleEntity { Title = "Article 1" };
-                var article2 = new ArticleEntity { Title = "Article 2" };
-                var article3 = new ArticleEntity { Title = "Article 3" };
+        var partition = $"integration-{Guid.CreateVersion7():n}";
 
-                // Use same embedding for article1 and article2 (should be similar)
-                var sharedEmbedding = GenerateTestEmbedding(1536, seed: 42);
-                var differentEmbedding = GenerateTestEmbedding(1536, seed: 999);
+        var article1 = new ArticleEntity { Title = "Article 1" };
+        var article2 = new ArticleEntity { Title = "Article 2" };
+        var article3 = new ArticleEntity { Title = "Article 3" };
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    await article1.Save();
-                    await Vector<ArticleEntity>.Save(article1.Id, sharedEmbedding);
+        // Use same embedding for article1 and article2 (should be similar)
+        var sharedEmbedding = GenerateTestEmbedding(1536, seed: 42);
+        var differentEmbedding = GenerateTestEmbedding(1536, seed: 999);
 
-                    await article2.Save();
-                    await Vector<ArticleEntity>.Save(article2.Id, sharedEmbedding);
+        using (var _ = EntityContext.Partition(partition))
+        {
+            await article1.Save();
+            await Vector<ArticleEntity>.Save(article1.Id, sharedEmbedding);
 
-                    await article3.Save();
-                    await Vector<ArticleEntity>.Save(article3.Id, differentEmbedding);
+            await article2.Save();
+            await Vector<ArticleEntity>.Save(article2.Id, sharedEmbedding);
 
-                    // Search with shared embedding
-                    var results = await Vector<ArticleEntity>.Search(sharedEmbedding, topK: 3);
+            await article3.Save();
+            await Vector<ArticleEntity>.Save(article3.Id, differentEmbedding);
 
-                    results.Should().NotBeNull();
-                    results.Matches.Count.Should().BeGreaterThanOrEqualTo(2);
+            // Search with shared embedding
+            var results = await Vector<ArticleEntity>.Search(sharedEmbedding, topK: 3);
 
-                    // article1 and article2 should have higher similarity
-                    var topTwo = results.Matches.Take(2).ToList();
-                    topTwo.Should().Contain(m => m.Id == article1.Id);
-                    topTwo.Should().Contain(m => m.Id == article2.Id);
-                }
-            })
-            .Run();
+            results.Should().NotBeNull();
+            results.Matches.Count.Should().BeGreaterThanOrEqualTo(2);
+
+            // article1 and article2 should have higher similarity
+            var topTwo = results.Matches.Take(2).ToList();
+            topTwo.Should().Contain(m => m.Id == article1.Id);
+            topTwo.Should().Contain(m => m.Id == article2.Id);
+        }
     }
 
     /// <summary>
@@ -332,46 +270,36 @@ public sealed class VectorDataIntegrationSpec
     [Fact]
     public async Task Delete_entity_and_vector_together()
     {
-        await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(Delete_entity_and_vector_together))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
-            {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = ctx.GetRequiredItem<string>("partition");
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
 
-                var article = new ArticleEntity { Title = "To Be Deleted" };
-                var embedding = GenerateTestEmbedding(1536);
+        var partition = $"integration-{Guid.CreateVersion7():n}";
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    // Create entity and vector
-                    await article.Save();
-                    await Vector<ArticleEntity>.Save(article.Id, embedding);
+        var article = new ArticleEntity { Title = "To Be Deleted" };
+        var embedding = GenerateTestEmbedding(1536);
 
-                    // Verify created
-                    var savedArticle = await ArticleEntity.Get(article.Id);
-                    savedArticle.Should().NotBeNull();
+        using (var _ = EntityContext.Partition(partition))
+        {
+            // Create entity and vector
+            await article.Save();
+            await Vector<ArticleEntity>.Save(article.Id, embedding);
 
-                    var fakeRepo = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
-                    fakeRepo.ContainsVector(article.Id).Should().BeTrue();
+            // Verify created
+            var savedArticle = await ArticleEntity.Get(article.Id);
+            savedArticle.Should().NotBeNull();
 
-                    // Delete both
-                    await article.Delete();
-                    await Vector<ArticleEntity>.Delete(article.Id);
+            var fakeRepo = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
+            fakeRepo.ContainsVector(article.Id).Should().BeTrue();
 
-                    // Verify deleted
-                    var deletedArticle = await ArticleEntity.Get(article.Id);
-                    deletedArticle.Should().BeNull("entity should be deleted");
+            // Delete both
+            await article.Remove();
+            await Vector<ArticleEntity>.Delete(article.Id);
 
-                    fakeRepo.ContainsVector(article.Id).Should().BeFalse("vector should be deleted");
-                }
-            })
-            .Run();
+            // Verify deleted
+            var deletedArticle = await ArticleEntity.Get(article.Id);
+            deletedArticle.Should().BeNull("entity should be deleted");
+
+            fakeRepo.ContainsVector(article.Id).Should().BeFalse("vector should be deleted");
+        }
     }
 
     /// <summary>
@@ -380,49 +308,39 @@ public sealed class VectorDataIntegrationSpec
     [Fact]
     public async Task Update_entity_and_vector_together()
     {
-        await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(Update_entity_and_vector_together))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
-            {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = ctx.GetRequiredItem<string>("partition");
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
 
-                var article = new ArticleEntity { Title = "Original Title", Content = "Original content" };
-                var originalEmbedding = GenerateTestEmbedding(1536, seed: 1);
+        var partition = $"integration-{Guid.CreateVersion7():n}";
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    // Create
-                    await article.Save();
-                    await Vector<ArticleEntity>.Save(article.Id, originalEmbedding);
+        var article = new ArticleEntity { Title = "Original Title", Content = "Original content" };
+        var originalEmbedding = GenerateTestEmbedding(1536, seed: 1);
 
-                    // Update
-                    article.Title = "Updated Title";
-                    article.Content = "Updated content";
-                    var updatedEmbedding = GenerateTestEmbedding(1536, seed: 2);
+        using (var _ = EntityContext.Partition(partition))
+        {
+            // Create
+            await article.Save();
+            await Vector<ArticleEntity>.Save(article.Id, originalEmbedding);
 
-                    await article.Save();
-                    await Vector<ArticleEntity>.Save(article.Id, updatedEmbedding);
+            // Update
+            article.Title = "Updated Title";
+            article.Content = "Updated content";
+            var updatedEmbedding = GenerateTestEmbedding(1536, seed: 2);
 
-                    // Verify updates
-                    var savedArticle = await ArticleEntity.Get(article.Id);
-                    savedArticle.Should().NotBeNull();
-                    savedArticle!.Title.Should().Be("Updated Title");
+            await article.Save();
+            await Vector<ArticleEntity>.Save(article.Id, updatedEmbedding);
 
-                    var fakeRepo = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
-                    var currentVector = fakeRepo.GetVector(article.Id);
-                    currentVector.Should().NotBeNull();
+            // Verify updates
+            var savedArticle = await ArticleEntity.Get(article.Id);
+            savedArticle.Should().NotBeNull();
+            savedArticle!.Title.Should().Be("Updated Title");
 
-                    // Vector should be updated (different from original)
-                    currentVector.Should().NotBeEquivalentTo(originalEmbedding, "vector should be updated");
-                }
-            })
-            .Run();
+            var fakeRepo = runtime.VectorService.GetFakeRepository<ArticleEntity, string>();
+            var currentVector = fakeRepo.GetVector(article.Id);
+            currentVector.Should().NotBeNull();
+
+            // Vector should be updated (different from original)
+            currentVector.Should().NotBeEquivalentTo(originalEmbedding, "vector should be updated");
+        }
     }
 
     #region Helper Methods

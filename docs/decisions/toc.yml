@@ -4,17 +4,21 @@
   items:
     - name: AAAA-0000 ADR authoring template
       href: AAAA-0000-template.md
+- name: Cross-Repo Canon (STACK)
+  items:
+    - name: STACK-0001 The Sylin stack — layering, contracts, and trust topology
+      href: STACK-0001-sylin-stack-canon.md
 - name: ADR Series
   items:
-  - name: ADR-0050 Data access semantics - streaming and paging APIs
+    - name: ADR-0050 Data access semantics - streaming and paging APIs
       href: ADR-0050-data-access-pagination-and-streaming.md
-  - name: ADR-0051 Vector hybrid search integration
+    - name: ADR-0051 Vector hybrid search integration
       href: ADR-0051-vector-hybrid-search.md
-  - name: ADR-0052 Adaptive sliding window vector pagination
+    - name: ADR-0052 Adaptive sliding window vector pagination
       href: ADR-0052-adaptive-sliding-window-vector-pagination.md
-  - name: ADR-0053 Vector search native continuation with adapter push-down
+    - name: ADR-0053 Vector search native continuation with adapter push-down
       href: ADR-0053-vector-search-native-continuation.md
-  - name: ADR-0054 Entity-backed search profile management (superseded)
+    - name: ADR-0054 Entity-backed search profile management (superseded)
       href: ADR-0054-entity-backed-search-profile-management.md
     - name: ADR-0055 Tag-centric semantic search rebuild
       href: ADR-0055-tag-centric-semantic-search.md
@@ -54,6 +58,8 @@
       href: AI-0014-ai-modernization-sources-capabilities-fallback.md
     - name: AI-0014 MCP code mode
       href: AI-0014-mcp-code-mode.md
+    - name: AI-0037 MCP Streamable HTTP transport
+      href: AI-0037-mcp-streamable-http-transport.md
     - name: AI-0015 Canonical source member architecture
       href: AI-0015-canonical-source-member-architecture.md
     - name: AI-0016 LM Studio adapter for Koan AI
@@ -110,8 +116,6 @@
       href: ARCH-0052-core-ids-and-json-merge-policy.md
     - name: ARCH-0053 Flow pillar – entity-first and auto-registrar
       href: ARCH-0053-Koan-flow-pillar-entity-first-and-auto-registrar.md
-    - name: S16-0001 PantryPal entity-first refactor
-      href: S16-0001-pantrypal-entity-first-refactor.md
     - name: ARCH-0054 Framework positioning – container native
       href: ARCH-0054-framework-positioning-container-native.md
     - name: ARCH-0055 Koan Aspire integration approval
@@ -148,6 +152,36 @@
       href: ARCH-0073-code-modernization-sweep.md
     - name: ARCH-0074 Framework gap analysis and incremental plan
       href: ARCH-0074-framework-gap-analysis-and-incremental-plan.md
+    - name: ARCH-0105 Koan product constitution and proposal decision test
+      href: ARCH-0105-product-constitution.md
+    - name: ARCH-0106 Entity language admission, facets, and responsibility boundaries
+      href: ARCH-0106-entity-semantics-contract.md
+    - name: ARCH-0107 Host-scoped KoanLog ownership
+      href: ARCH-0107-host-scoped-koanlog.md
+    - name: ARCH-0108 Corrective host-context failures
+      href: ARCH-0108-corrective-host-context-failures.md
+    - name: ARCH-0109 Bootstrap evidence partitioned by composition cost
+      href: ARCH-0109-bounded-bootstrap-test-lanes.md
+    - name: ARCH-0110 Main-boundary independently versioned package releases
+      href: ARCH-0110-main-release-boundary.md
+    - name: ARCH-0111 One host-owned runtime fact envelope
+      href: ARCH-0111-unified-runtime-facts.md
+    - name: ARCH-0112 Capability-aware bounded relationship negotiation
+      href: ARCH-0112-bounded-relationship-negotiation.md
+    - name: ARCH-0113 Entity capability lifting and the Communication boundary
+      href: ARCH-0113-entity-capability-communication.md
+    - name: ARCH-0114 Layered capability activation
+      href: ARCH-0114-layered-capability-activation.md
+    - name: ARCH-0115 Semantic Application Model and typed contribution compilation
+      href: ARCH-0115-semantic-contribution-compilation.md
+    - name: ARCH-0116 One module lifecycle
+      href: ARCH-0116-one-module-lifecycle.md
+    - name: ARCH-0117 Safe connector telemetry by construction
+      href: ARCH-0117-safe-connector-telemetry.md
+    - name: ARCH-0118 Evidence-derived product surface
+      href: ARCH-0118-evidence-derived-product-surface.md
+    - name: ARCH-0119 One console host lifecycle
+      href: ARCH-0119-one-console-host-lifecycle.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries
@@ -254,6 +288,10 @@
       href: DATA-0088-adapter-auto-configuration-resolver-pipeline.md
     - name: DATA-0089 Zen Garden connection intent minimum URI shape
       href: DATA-0089-zengarden-connection-intent-minimum-uri-shape.md
+    - name: DATA-0107 Provider-bounded Entity streams
+      href: DATA-0107-provider-bounded-entity-streams.md
+    - name: DATA-0108 Integrity-first Entity backup and recovery
+      href: DATA-0108-integrity-first-entity-backup.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
@@ -294,6 +332,8 @@
       href: WEB-0063-admin-dashboard-roadmap.md
     - name: WEB-0064 Koan.Context monitoring remediation
       href: WEB-0064-koan-context-monitoring-remediation.md
+    - name: WEB-0072 MCP Explorer Console and Capability Access Map
+      href: WEB-0072-mcp-explorer-console-and-access-map.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus
@@ -366,7 +406,7 @@
       href: MEDIA-0004-recipe-pipeline.md
 - name: Build (BUILD)
   items:
-    - name: BUILD-0072 Script-owned versioning
+    - name: BUILD-0072 Script-owned versioning (superseded)
       href: BUILD-0072-script-owned-versioning.md
 - name: Operations (OPS)
   items:

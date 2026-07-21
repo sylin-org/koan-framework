@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Couchbase;
 using Couchbase.Core.Configuration.Server;
+using Couchbase.Core.IO.Authentication.Authenticators;
 using Couchbase.KeyValue;
 using Koan.Core;
 using Koan.Core.Orchestration;
@@ -28,61 +29,47 @@ internal sealed class CouchbaseDiscoveryAdapter : ServiceDiscoveryAdapterBase
     /// <summary>Couchbase-specific health validation using cluster test</summary>
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        try
+        var connectionString = NormalizeCouchbaseConnectionString(serviceUrl);
+
+        var options = new ClusterOptions
         {
-            var connectionString = NormalizeCouchbaseConnectionString(serviceUrl);
+            ConnectionString = connectionString
+        };
 
-            // Configure cluster options for health check
-            var options = new ClusterOptions()
+        var username = "Administrator";
+        var password = "password";
+        if (context.Parameters != null)
+        {
+            if (context.Parameters.TryGetValue("username", out var configuredUsername) &&
+                context.Parameters.TryGetValue("password", out var configuredPassword))
             {
-                ConnectionString = connectionString
-            };
-
-            // Apply authentication if provided in context
-            if (context.Parameters != null)
-            {
-                if (context.Parameters.TryGetValue("username", out var username) &&
-                    context.Parameters.TryGetValue("password", out var password))
-                {
-                    options.UserName = username.ToString();
-                    options.Password = password.ToString();
-                }
-            }
-
-            // Set default credentials if none provided
-            if (string.IsNullOrEmpty(options.UserName))
-            {
-                options.UserName = "Administrator";
-                options.Password = "password";
-            }
-
-            using var cluster = await Cluster.ConnectAsync(options);
-
-            // Simple health check - try to get bucket info
-            var bucketName = context.Parameters?.TryGetValue("bucket", out var bucket) == true
-                ? bucket.ToString() ?? "Koan"
-                : "Koan";
-
-            try
-            {
-                var testBucket = await cluster.BucketAsync(bucketName);
-                await testBucket.WaitUntilReadyAsync(TimeSpan.FromSeconds(5));
-
-                _logger.LogDebug("Couchbase health check passed for {Url}", serviceUrl);
-                return true;
-            }
-            catch
-            {
-                // If bucket doesn't exist or isn't ready, just check cluster connection
-                var buckets = await cluster.Buckets.GetAllBucketsAsync();
-                _logger.LogDebug("Couchbase cluster health check passed for {Url} (bucket not accessible)", serviceUrl);
-                return true;
+                username = configuredUsername.ToString() ?? username;
+                password = configuredPassword.ToString() ?? password;
             }
         }
-        catch (Exception ex)
+
+        options.WithAuthenticator(new PasswordAuthenticator(
+            username,
+            password,
+            connectionString.StartsWith("couchbases://", StringComparison.OrdinalIgnoreCase)));
+
+        using var cluster = await Cluster.ConnectAsync(options);
+
+        var bucketName = context.Parameters?.TryGetValue("bucket", out var bucket) == true
+            ? bucket.ToString() ?? "Koan"
+            : "Koan";
+
+        try
         {
-            _logger.LogDebug("Couchbase health check failed for {Url}: {Error}", serviceUrl, ex.Message);
-            return false;
+            var testBucket = await cluster.BucketAsync(bucketName);
+            await testBucket.WaitUntilReadyAsync(TimeSpan.FromSeconds(5));
+            return true;
+        }
+        catch
+        {
+            // A missing bucket does not make the connected cluster unavailable.
+            await cluster.Buckets.GetAllBucketsAsync();
+            return true;
         }
     }
 
@@ -92,20 +79,20 @@ internal sealed class CouchbaseDiscoveryAdapter : ServiceDiscoveryAdapterBase
         // Check Couchbase-specific configuration paths
         return _configuration.GetConnectionString("Couchbase") ??
                _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
-               _configuration[Infrastructure.Constants.Configuration.Keys.AltConnectionString];
+               _configuration[Infrastructure.Constants.Configuration.Keys.DefaultSourceConnectionString];
     }
 
     /// <summary>Couchbase-specific environment variable handling</summary>
     protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
     {
-        var couchbaseUrls = Environment.GetEnvironmentVariable("COUCHBASE_URLS") ??
-                           Environment.GetEnvironmentVariable("CB_URLS");
+        var couchbaseUrls = Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.CouchbaseUrls) ??
+                           Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.CouchbaseAliasUrls);
 
         if (string.IsNullOrWhiteSpace(couchbaseUrls))
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return couchbaseUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                           .Select(url => new DiscoveryCandidate(url.Trim(), "environment-couchbase-urls", 0));
+                           .Select(url => new DiscoveryCandidate(url.Trim(), "environment-couchbase-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>Couchbase-specific connection string normalization</summary>
@@ -144,7 +131,7 @@ internal sealed class CouchbaseDiscoveryAdapter : ServiceDiscoveryAdapterBase
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Failed to normalize Couchbase connection string from {Value}: {Error}", value, ex.Message);
+            ReportNormalizationFailure(value, ex);
             return value; // Return original value if normalization fails
         }
     }

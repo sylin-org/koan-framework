@@ -1,0 +1,93 @@
+/* WEB-0072 — MCP Explorer console. Vendored (no CDN); reproduces the Koan test-provider visual signature:
+   slate-950 page, slate-900 panels, purple->pink gradient brand, gradient card. */
+:root {
+  --bg: #020617;
+  --panel: #0f172a;
+  --border: #1e293b;
+  --border2: #334155;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --dim: #64748b;
+  --purple: #9333ea;
+  --purple-h: #7e22ce;
+  --pink: #ec4899;
+  --grad: linear-gradient(90deg, #a855f7, #ec4899);
+  --grad-text: linear-gradient(90deg, #c084fc, #f472b6);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.kx-container { max-width: 64rem; margin: 0 auto; padding: 0 1.25rem; width: 100%; }
+.kx-header { background: var(--panel); border-bottom: 1px solid var(--border); }
+.kx-header-bar { display: flex; align-items: center; justify-content: space-between; height: 4rem; }
+.kx-brand { display: flex; align-items: center; gap: 0.75rem; }
+.kx-logo {
+  width: 2rem; height: 2rem; border-radius: 0.5rem; background: var(--grad);
+  display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.kx-logo svg { width: 1.1rem; height: 1.1rem; }
+.kx-wordmark {
+  margin: 0; font-size: 1.125rem; font-weight: 700;
+  background: var(--grad-text); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.kx-identity { color: var(--muted); font-size: 0.8rem; text-align: right; }
+.kx-main { flex: 1; padding: 1.5rem 1.25rem 3rem; }
+.kx-footer { border-top: 1px solid var(--border); padding: 1.5rem; text-align: center; font-size: 0.8rem; color: var(--dim); }
+.kx-loading { color: var(--muted); padding: 2rem 0; }
+
+.kx-card {
+  background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+  border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; margin-bottom: 1rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.kx-entity-name { font-size: 1.05rem; font-weight: 700; margin: 0 0 0.25rem; }
+.kx-entity-desc { color: var(--muted); margin: 0 0 0.75rem; }
+.kx-section-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dim); margin: 1.75rem 0 0.5rem; }
+
+.kx-tool { border: 1px solid var(--border); border-radius: 0.625rem; padding: 0.75rem 1rem; margin: 0.5rem 0; background: rgba(15, 23, 42, 0.5); }
+.kx-tool-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; cursor: pointer; }
+.kx-tool-name { font-weight: 600; font-family: ui-monospace, SFMono-Regular, "Cascadia Code", monospace; }
+.kx-badge { font-size: 0.68rem; padding: 0.1rem 0.45rem; border-radius: 0.35rem; border: 1px solid var(--border2); color: var(--muted); white-space: nowrap; }
+.kx-badge.mut { color: #fca5a5; border-color: #7f1d1d; }
+
+.kx-door { border-style: dashed; opacity: 0.9; }
+.kx-door-needs { color: #fbbf24; font-size: 0.8rem; white-space: nowrap; }
+
+.kx-form { margin-top: 0.75rem; display: none; }
+.kx-form.open { display: block; }
+.kx-field { margin: 0.5rem 0; }
+.kx-field label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.2rem; }
+.kx-field .req { color: var(--pink); }
+input, select, textarea {
+  width: 100%; background: var(--panel); color: var(--text);
+  border: 1px solid var(--border2); border-radius: 0.5rem; padding: 0.5rem 0.625rem; font: inherit;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.4); }
+input[type="checkbox"] { width: auto; }
+textarea { resize: vertical; font-family: ui-monospace, monospace; }
+
+.kx-btn { background: var(--purple); color: #fff; border: none; border-radius: 0.5rem; padding: 0.5rem 0.9rem; font: inherit; font-weight: 600; cursor: pointer; }
+.kx-btn:hover { background: var(--purple-h); }
+.kx-btn:disabled { opacity: 0.6; cursor: default; }
+.kx-btn.ghost { background: #1e293b; }
+.kx-btn.ghost:hover { background: #334155; }
+
+.kx-result { margin-top: 0.75rem; border-radius: 0.5rem; padding: 0.75rem; font-family: ui-monospace, monospace; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; background: #020617; border: 1px solid var(--border); display: none; }
+.kx-result.ok { border-color: #14532d; }
+.kx-result.err { border-color: #7f1d1d; color: #fca5a5; }
+
+.kx-anon { background: rgba(147, 51, 234, 0.08); border: 1px solid var(--border2); border-radius: 0.625rem; padding: 0.75rem 1rem; color: var(--muted); margin-bottom: 1rem; }
+
+.kx-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.kx-table th { text-align: left; color: var(--dim); font-weight: 600; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); }
+.kx-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.kx-table tr:last-child td { border-bottom: none; }

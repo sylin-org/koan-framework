@@ -1,6 +1,8 @@
 ﻿# FLOW-0110: Direct Seeding of Flow Transport Envelopes (Bypass FlowActions)
 
-Status: Proposed
+> **Status: Retired.** Describes the original Flow pillar generation, superseded by the Koan.Canon rebuild.
+
+Status: Retired
 
 ## Context
 

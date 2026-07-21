@@ -11,7 +11,9 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
     private readonly IOptionsMonitor<MongoOptions> _options;
     private readonly ILogger<MongoClientProvider>? _logger;
     private readonly SemaphoreSlim _sync = new(1, 1);
+    private readonly object _initializationGate = new();
     private readonly ReadinessStateManager _stateManager = new();
+    private Task? _initialization;
     private MongoClient? _client;
     private IMongoDatabase? _database;
     private string? _databaseName;
@@ -48,10 +50,16 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
 
     public ReadinessStateManager StateManager => _stateManager;
 
-    public Task<bool> IsReadyAsync(CancellationToken ct = default) => Task.FromResult(_stateManager.IsReady);
+    public async Task<bool> IsReadyAsync(CancellationToken ct = default)
+    {
+        await EnsureInitialized(ct).ConfigureAwait(false);
+        return _stateManager.IsReady;
+    }
 
     public async Task WaitForReadiness(TimeSpan? timeout = null, CancellationToken ct = default)
     {
+        await EnsureInitialized(ct).ConfigureAwait(false);
+
         if (_stateManager.IsReady)
         {
             return;
@@ -95,7 +103,26 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
         }
     }
 
-    public async Task InitializeAsync(CancellationToken ct = default)
+    public Task InitializeAsync(CancellationToken ct = default) => EnsureInitialized(ct);
+
+    private Task EnsureInitialized(CancellationToken ct)
+    {
+        if (_stateManager.IsReady)
+        {
+            return Task.CompletedTask;
+        }
+
+        Task initialization;
+        lock (_initializationGate)
+        {
+            _initialization ??= InitializeCoreAsync(CancellationToken.None);
+            initialization = _initialization;
+        }
+
+        return initialization.WaitAsync(ct);
+    }
+
+    private async Task InitializeCoreAsync(CancellationToken ct)
     {
         _stateManager.TransitionTo(AdapterReadinessState.Initializing);
         try
@@ -160,6 +187,7 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
         _client = null;
         _database = null;
         _databaseName = null;
+        _initialization = null;
         _sync.Dispose();
 
         return ValueTask.CompletedTask;

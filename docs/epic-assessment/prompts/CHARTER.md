@@ -44,10 +44,12 @@ capacitated is the one most harmed by fictional docs and silent failures.
 2. **Coupling form**: "works alone, lights up together." Reference implementation:
    `KOAN/src/Connectors/Data/Mongo/MongoOptionsConfigurator.cs:74-93` (autonomous fallback).
    Never add a hard sibling dependency to anything mainline.
-3. **Frozen constants**: the HKDF domain-separation byte strings in
-   `KOI/crates/koi-crypto/src/unlock_slots.rs` (`b"pond-unlock-slot-totp-v1"`,
-   `b"pond-fido2-storage-key-v1"`) are immutable v1 values. Renaming them destroys existing
-   vaults. They are allowlisted from any vocabulary cleanup.
+3. **Frozen constants**: the HKDF domain-separation byte strings are one immutable
+   `b"koi-…-v1"` namespace — `b"koi-unlock-slot-totp-v1"` (`KOI/crates/koi-crypto/src/unlock_slots.rs`),
+   `b"koi-promote-v1"`, `b"koi-seal-group-v1"` (`key_agreement.rs`). Each is a frozen v1
+   value: a new algorithm gets a new versioned label, never a rename/reuse. They were renamed
+   once from the original `pond-*` strings in the pre-1.0 greenfield window (no production vault
+   existed); frozen at `koi-*` from here.
 4. **The Koi TLS proxy is outside all contracts** until it has data-plane tests and a
    truthful `status()`. Do not build anything on it; do not delete it either.
 5. **The garden mesh (UDP 7184, `stone_chirp`/`tools_beacon`) is Zen Garden-internal** —
@@ -62,6 +64,10 @@ capacitated is the one most harmed by fictional docs and silent failures.
 
 ## Session protocol
 
+0. **Claim your work.** Open [PROGRESS.md](PROGRESS.md). Confirm your prompt's prerequisites
+   are actually `done` (verify in the repos, not just the table — it can lag). Set your row
+   to `in-progress` with today's date and your model id. If a prereq is not truly green,
+   stop and pick a runnable prompt instead (the Readiness section lists them).
 1. **Research first.** Read the prompt's Context block, then the cited files at the cited
    lines. Re-verify every load-bearing claim before acting on it — the repos move; line
    numbers drift; treat citations as starting points, not gospel.
@@ -77,6 +83,11 @@ capacitated is the one most harmed by fictional docs and silent failures.
    a test that fails if it regresses, a status endpoint that tells the truth, a CI step. Then
    update the repo's `docs/SURFACES.md` row (created by E02): surface, exercising solution,
    last-exercised date (today), guard.
+6a. **Close your row.** Update [PROGRESS.md](PROGRESS.md): set status (`done`/`blocked`/
+    `postponed`), link commit SHAs (repo-prefixed if cross-repo), one-line note. If you hit
+    a contradiction between the prompt and the repos, add a Divergence-log entry. If you
+    produced operator follow-up (a baseline, a manual verification), append an operator-gate
+    section with copy-paste commands.
 6. **Document.** Update the docs your change makes stale, in the repo you changed. Every
    code claim you write into docs must be verified against the code in the same session
    ("if it's in the docs, it compiles/runs").
@@ -87,8 +98,9 @@ capacitated is the one most harmed by fictional docs and silent failures.
 
 End every session with a summary containing: what changed (files + one line each), what was
 verified and HOW (commands + results), guards left behind, SURFACES.md rows updated,
-deviations from DEFAULT (with justification), and anything discovered that contradicts this
-charter or the prompt's Context block (report it — do not silently work around it).
+**your PROGRESS.md row closed (with commit SHAs)**, deviations from DEFAULT (with
+justification), and anything discovered that contradicts this charter or the prompt's
+Context block (report it — do not silently work around it).
 
 ## When blocked
 

@@ -1,0 +1,122 @@
+using System.Text.Json;
+using Koan.Data.Core;
+using Koan.Web.Auth.Server.Options;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+
+namespace Koan.Web.Auth.Server.Protocol;
+
+/// <summary>
+/// SEC-0006 D5 — Dynamic Client Registration (RFC 7591). Open by default (Claude Desktop has no pre-shared
+/// client_id) but zero-trust: every registered client is forced <b>public</b> (no secret, PKCE-required),
+/// constrained to <b>loopback</b> redirect URIs, rate-limited per source + globally, and TTL-expired. The
+/// <c>client_name</c> is stored untrusted (displayed escaped + "unverified" on consent).
+/// </summary>
+internal static class DcrEndpoint
+{
+    internal static async Task Register(HttpContext ctx)
+    {
+        var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
+        var now = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
+        var limiter = ctx.RequestServices.GetRequiredService<FixedWindowRateLimiter>();
+
+        if (!options.AllowDynamicRegistration)
+        {
+            await Error(ctx, StatusCodes.Status403Forbidden, "access_denied", "Dynamic client registration is disabled.");
+            return;
+        }
+
+        // D5 — rate-limit the open endpoint per source IP and globally.
+        var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var window = TimeSpan.FromMinutes(1);
+        if (!limiter.TryAcquire("dcr:ip:" + ip, options.RegistrationRateLimitPerMinute, window, now)
+            || !limiter.TryAcquire("dcr:global", options.RegistrationRateLimitGlobalPerMinute, window, now))
+        {
+            await Error(ctx, StatusCodes.Status429TooManyRequests, "temporarily_unavailable", "Too many registration requests.");
+            return;
+        }
+
+        JsonElement body;
+        try
+        {
+            body = await ctx.Request.ReadFromJsonAsync<JsonElement>(ctx.RequestAborted);
+        }
+        catch (JsonException)
+        {
+            await Error(ctx, StatusCodes.Status400BadRequest, "invalid_client_metadata", "Request body must be JSON.");
+            return;
+        }
+
+        var redirectUris = ReadStringArray(body, "redirect_uris");
+        if (redirectUris.Count == 0)
+        {
+            await Error(ctx, StatusCodes.Status400BadRequest, "invalid_redirect_uri", "At least one redirect_uri is required.");
+            return;
+        }
+        // D5 — bound the redirect set (anti-DoS: an unbounded list makes every /authorize a long linear scan).
+        if (redirectUris.Count > 10 || redirectUris.Any(u => u.Length > 512))
+        {
+            await Error(ctx, StatusCodes.Status400BadRequest, "invalid_redirect_uri", "Too many or over-long redirect URIs.");
+            return;
+        }
+        // D5 — a dynamic client may NEVER register a non-loopback redirect.
+        if (redirectUris.Any(u => !LoopbackRedirect.IsLoopback(u)))
+        {
+            await Error(ctx, StatusCodes.Status400BadRequest, "invalid_redirect_uri", "Dynamic clients may only register loopback redirect URIs (RFC 8252).");
+            return;
+        }
+
+        var clientName = SanitizeName(body.TryGetProperty("client_name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null);
+
+        var client = new OAuthClient
+        {
+            Id = "dcr_" + OpaqueToken.New(16),
+            ClientName = clientName, // untrusted display-only
+            RedirectUris = redirectUris,
+            IsDynamic = true,
+            CreatedUtc = now,
+            ExpiresUtc = now + options.DynamicClientLifetime,
+        };
+        await client.Save(ctx.RequestAborted);
+
+        ctx.Response.StatusCode = StatusCodes.Status201Created;
+        ctx.Response.Headers.CacheControl = "no-store";
+        // Public client — client_secret / client_secret_expires_at are omitted (RFC 7591 §3.2.1: only with a secret).
+        await ctx.Response.WriteAsJsonAsync(new
+        {
+            client_id = client.Id,
+            client_id_issued_at = now.ToUnixTimeSeconds(),
+            client_name = client.ClientName,
+            redirect_uris = client.RedirectUris,
+            token_endpoint_auth_method = "none",
+            grant_types = new[] { "authorization_code" },
+            response_types = new[] { "code" },
+        }, cancellationToken: ctx.RequestAborted);
+    }
+
+    // Untrusted display name → strip control chars and truncate, so a hostile client_name can't smuggle control
+    // sequences or unbounded length to the (escaping) consent page.
+    private static string SanitizeName(string? name)
+    {
+        if (string.IsNullOrEmpty(name)) return "";
+        var cleaned = new string(name.Where(c => !char.IsControl(c)).ToArray());
+        return cleaned.Length > 128 ? cleaned[..128] : cleaned;
+    }
+
+    private static List<string> ReadStringArray(JsonElement body, string property)
+    {
+        var list = new List<string>();
+        if (body.ValueKind == JsonValueKind.Object && body.TryGetProperty(property, out var arr) && arr.ValueKind == JsonValueKind.Array)
+            foreach (var item in arr.EnumerateArray())
+                if (item.ValueKind == JsonValueKind.String && item.GetString() is { Length: > 0 } s)
+                    list.Add(s);
+        return list;
+    }
+
+    private static Task Error(HttpContext ctx, int status, string error, string description)
+    {
+        ctx.Response.StatusCode = status;
+        return ctx.Response.WriteAsJsonAsync(new { error, error_description = description }, cancellationToken: ctx.RequestAborted);
+    }
+}

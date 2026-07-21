@@ -1,0 +1,220 @@
+{
+  "schema": 2,
+  "app": {
+    "name": "SnapVault",
+    "koan": "0.20",
+    "tfm": "net10.0"
+  },
+  "modules": [
+    {
+      "id": "Koan.AI",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.AI.Contracts",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Cache.Abstractions",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Communication",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Core",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Data.AI",
+      "version": "0.19"
+    },
+    {
+      "id": "Koan.Data.Abstractions",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Data.Connector.Sqlite",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Data.Core",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Data.Relational",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Data.Relational.Abstractions",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Data.Vector",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Data.Vector.Abstractions",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Identity",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Identity.Tenancy",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Jobs",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Media.Abstractions",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Media.Core",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Media.Web",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Security.Trust",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Storage",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Storage.Abstractions",
+      "version": "0.18"
+    },
+    {
+      "id": "Koan.Storage.Connector.Local",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Tenancy",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Web",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Web.Auth",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Web.Auth.Abstractions",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Web.Auth.Connector.Test",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Web.Extensions",
+      "version": "0.20"
+    },
+    {
+      "id": "Koan.Web.Sse",
+      "version": "0.20"
+    }
+  ],
+  "directReferences": [
+    {
+      "kind": "project",
+      "id": "Koan.AI"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Core"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.AI"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Connector.Sqlite"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Core"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Vector"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Vector.Abstractions"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Identity"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Identity.Tenancy"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Jobs"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Media.Abstractions"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Media.Core"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Media.Web"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Storage"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Storage.Abstractions"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Storage.Connector.Local"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Tenancy"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Web"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Web.Auth"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Web.Auth.Connector.Test"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Web.Extensions"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Web.Sse"
+    }
+  ]
+}

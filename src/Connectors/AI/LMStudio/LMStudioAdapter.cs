@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -7,32 +8,27 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.Core.Adapters;
-using Koan.Core.AI;
-using Koan.Orchestration;
-using Koan.Orchestration.Attributes;
-using Koan.Orchestration.Models;
+using Koan.AI.Contracts;
 using Koan.AI.Connector.LMStudio.Options;
 using Koan.AI.Connector.LMStudio.Infrastructure;
 
 namespace Koan.AI.Connector.LMStudio;
 
-[AiAdapterDescriptor(priority: 12, Weight = 2)]
 internal sealed class LMStudioAdapter :
     IChatAdapter,
     IEmbedAdapter,
     IAdapterReadiness,
     IAdapterReadinessConfiguration,
-    IAsyncAdapterInitializer
+    IAsyncAdapterInitializer,
+    IDisposable
 {
     private readonly HttpClient _http;
     private readonly ILogger _logger;
-    private readonly IConfiguration _configuration;
     private readonly LMStudioOptions _options;
     private readonly string _defaultModel;
     private readonly AdapterReadinessConfiguration _readiness;
@@ -40,7 +36,9 @@ internal sealed class LMStudioAdapter :
     private readonly ReadinessStateManager _stateManager = new();
     private readonly object _initGate = new();
     private Task? _initializationTask;
-    private UnifiedServiceMetadata? _orchestrationContext;
+    private readonly ConcurrentDictionary<string, HttpClient> _endpointClients =
+        new(StringComparer.OrdinalIgnoreCase);
+    private int _disposed;
 
     private string AdapterId => Constants.Adapter.Type;
     public string DisplayName => "LM Studio AI Provider";
@@ -63,15 +61,13 @@ internal sealed class LMStudioAdapter :
     public LMStudioAdapter(
         HttpClient http,
         ILogger<LMStudioAdapter> logger,
-        IConfiguration configuration,
         AdaptersReadinessOptions? readinessDefaults = null,
         LMStudioOptions? resolvedOptions = null)
     {
         _http = http;
         _logger = logger;
-        _configuration = configuration;
         _readinessDefaults = readinessDefaults ?? new AdaptersReadinessOptions();
-        _options = resolvedOptions ?? _configuration.GetSection(Constants.Section).Get<LMStudioOptions>() ?? new LMStudioOptions();
+        _options = resolvedOptions ?? new LMStudioOptions();
         _readiness = (AdapterReadinessConfiguration)(_options.Readiness ?? new AdapterReadinessConfiguration());
 
         if (_readiness.Timeout <= TimeSpan.Zero)
@@ -314,23 +310,6 @@ internal sealed class LMStudioAdapter :
         }
     }
 
-    [OrchestrationAware]
-    public async Task InitializeWithOrchestration(UnifiedServiceMetadata orchestrationContext, CancellationToken cancellationToken = default)
-    {
-        _orchestrationContext = orchestrationContext;
-        ApplyConfiguredBaseAddress();
-
-        _ = EnsureInitializationStarted();
-        try
-        {
-            await WaitForReadiness(ReadinessTimeout, cancellationToken);
-        }
-        catch (AdapterNotReadyException ex)
-        {
-            _logger.LogWarning(ex, "[{AdapterId}] LM Studio adapter not ready after orchestration initialization (state={State})", AdapterId, ReadinessState);
-        }
-    }
-
     private Task EnsureInitializationStarted()
     {
         var task = _initializationTask;
@@ -418,14 +397,23 @@ internal sealed class LMStudioAdapter :
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
             var timeoutSeconds = _options.RequestTimeoutSeconds > 0 ? _options.RequestTimeoutSeconds : 120;
-            return new HttpClient
+            var endpoint = NormalizeBase(connectionString);
+            return _endpointClients.GetOrAdd(endpoint, value => new HttpClient
             {
-                BaseAddress = new Uri(NormalizeBase(connectionString)),
+                BaseAddress = new Uri(value),
                 Timeout = TimeSpan.FromSeconds(timeoutSeconds)
-            };
+            });
         }
 
         return _http;
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        foreach (var client in _endpointClients.Values) client.Dispose();
+        _endpointClients.Clear();
+        _http.Dispose();
     }
 
     private void ApplyConfiguredBaseAddress()
@@ -450,25 +438,19 @@ internal sealed class LMStudioAdapter :
 
     private string? ResolveConfiguredBaseUrl()
     {
-        if (!string.IsNullOrWhiteSpace(_options.ConnectionString) &&
-            !string.Equals(_options.ConnectionString, "auto", StringComparison.OrdinalIgnoreCase))
-        {
-            return NormalizeBase(_options.ConnectionString);
-        }
+        var endpoint = _options.Endpoints
+            .FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
+        return string.IsNullOrWhiteSpace(endpoint) ? null : NormalizeBase(endpoint);
+    }
 
-        if (!string.IsNullOrWhiteSpace(_options.BaseUrl))
+    internal void SetDefaultEndpoint(Uri? endpoint)
+    {
+        if (endpoint is null) return;
+        var normalized = new Uri(NormalizeBase(endpoint.ToString()), UriKind.Absolute);
+        if (_http.BaseAddress is null || !_http.BaseAddress.Equals(normalized))
         {
-            return NormalizeBase(_options.BaseUrl);
+            _http.BaseAddress = normalized;
         }
-
-        var legacy = _configuration.GetConnectionString(AdapterId);
-        if (!string.IsNullOrWhiteSpace(legacy) &&
-            !string.Equals(legacy, "auto", StringComparison.OrdinalIgnoreCase))
-        {
-            return NormalizeBase(legacy);
-        }
-
-        return null;
     }
 
     private string NormalizeBase(string baseUrl)
@@ -576,11 +558,6 @@ internal sealed class LMStudioAdapter :
     private void AttachAuth(HttpRequestMessage request)
     {
         var key = _options.ApiKey;
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            key = Environment.GetEnvironmentVariable(Constants.Discovery.EnvKey);
-        }
-
         if (!string.IsNullOrWhiteSpace(key))
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);

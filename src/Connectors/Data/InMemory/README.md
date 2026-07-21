@@ -1,133 +1,88 @@
-# Koan.Data.Connector.InMemory
+# Sylin.Koan.Data.Connector.InMemory
 
-Thread-safe in-memory data adapter for Koan Framework.
+Use this connector for fast, process-local Entity persistence in tests, conformance suites, and
+explicitly ephemeral development workflows.
 
-## Features
+## Choose it when
 
-- **Zero Configuration**: Auto-registers as fallback adapter (priority: -100)
-- **Full LINQ Support**: Complete LINQ-to-Objects query capabilities
-- **Thread-Safe**: Concurrent dictionary-based storage
-- **Partition-Aware**: Respects `EntityContext.With(partition: "tenant-id")`
-- **Framework Integration**: All cross-cutting concerns work automatically
-  - ✅ [Timestamp] auto-update
-  - ✅ Entity events (OnBeforeSave, OnAfterLoad)
-  - ✅ Schema validation
-  - ✅ GUID v7 auto-generation
-  - ✅ Audit trails
+- losing all data at process exit is acceptable;
+- a test needs a real `AddKoan()` provider without files, containers, or remote services; or
+- provider-neutral behavior needs a deterministic in-memory oracle.
 
-## Usage
+Do not choose it for durable application state, cross-process sharing, or production recovery.
 
-### Basic Usage
+## Install
+
+```powershell
+dotnet add package Sylin.Koan.Data.Connector.InMemory
+```
+
+The direct package reference expresses intent to use the ephemeral provider. Keep the application's ordinary Koan
+bootstrap; there is no provider-specific registration:
 
 ```csharp
-// No configuration needed - just reference the package
-// InMemory adapter auto-registers as fallback
+builder.Services.AddKoan();
+```
 
-public class Todo : Entity<Todo> {
+## Meaningful result
+
+Define an Entity and use its normal persistence verbs:
+
+```csharp
+public sealed class Todo : Entity<Todo>
+{
     public string Title { get; set; } = "";
-    [Timestamp] public DateTimeOffset LastModified { get; set; }
 }
 
-var todo = new Todo { Title = "Buy milk" };
-await todo.Save();  // Uses InMemory adapter automatically
-
-var all = await Todo.All();  // LINQ queries work
-var found = await Todo.Query(t => t.Title.Contains("milk"));
+var saved = await new Todo { Title = "Prove the rule" }.Save();
+var same = await Todo.Get(saved.Id);
 ```
 
-### Multi-Tenant / Partition Support
+The saved value is available to every repository in the same Koan host and disappears when that host exits. No files,
+container, or remote service are created.
 
-```csharp
-// Isolate data by partition
-using (EntityContext.With(partition: "tenant-123")) {
-    var todo = new Todo { Title = "Tenant 123 data" };
-    await todo.Save();  // Stored in "tenant-123" partition
-}
+## Selection
 
-using (EntityContext.With(partition: "tenant-456")) {
-    var todos = await Todo.All();  // Only sees "tenant-456" data
-}
-```
+The provider identity is `inmemory` (`memory` is also recognized). It is a direct provider with priority `-100`, not
+an automatic fallback. A direct InMemory reference wins over a merely bundle-provided automatic floor. If several Data
+connectors are referenced directly, Koan applies the normal deterministic selection rules; pin the intended provider
+when application durability must not change as references grow:
 
-### Testing Scenarios
-
-```csharp
-[Fact]
-public async Task TestEntityBehavior() {
-    // InMemory adapter is perfect for unit tests
-    var entity = new MyEntity { Name = "Test" };
-    await entity.Save();
-
-    // All framework features work identically to production adapters
-    entity.LastModified.Should().BeAfter(DateTimeOffset.MinValue);  // [Timestamp] works
-
-    var loaded = await MyEntity.Get(entity.Id);
-    loaded.Should().NotBeNull();
+```json
+{
+  "Koan": {
+    "Data": {
+      "Sources": {
+        "Default": { "Adapter": "inmemory" }
+      }
+    }
+  }
 }
 ```
 
-## Capabilities
+## Current capability boundary
 
-- **Query**: `QueryCapabilities.Linq`
-- **Write**: `WriteCapabilities.BulkUpsert | BulkDelete | AtomicBatch`
+- process-local concurrent storage keyed by source, Entity type, and partition;
+- in-memory filter execution;
+- bulk upsert and bulk delete;
+- atomic batch behavior within the in-memory store; and
+- shared/container/database isolation modes through the common key-value family.
 
-## Architecture
+The connector does not advertise `DataCaps.Query.ProviderBoundedPaging`. `AllStream` and
+`QueryStream` reject correctively with `QueryStreamRejectedException` before yielding because paging
+an already resident full-source dictionary is not a provider-bounded stream.
 
-### Thread-Safe Storage
+Use `All`/`Query` for deliberately small test sets, or `FirstPage`/`Page` when a bounded result returned
+to test code is sufficient. Numbered pages do not create an unbounded-data performance guarantee.
 
-Data is stored in `ConcurrentDictionary<TKey, TEntity>` per (entity type, partition) tuple:
+These are connector-specific claims, not a promise that remote providers behave identically. The
+current connector suite passes 56/56.
 
-```
-InMemoryDataStore (Singleton)
-├─ Store<Todo, "default">: ConcurrentDictionary<string, Todo>
-├─ Store<Todo, "tenant-123">: ConcurrentDictionary<string, Todo>
-├─ Store<User, "default">: ConcurrentDictionary<string, User>
-└─ ...
-```
+For application conformance, prefer `Sylin.Koan.Testing`; it owns host isolation, partitions, and the
+capability-aware battery. See [`TECHNICAL.md`](TECHNICAL.md) for the exact storage and negotiation
+contract.
 
-### Lifetime
+## References
 
-- **InMemoryDataStore**: Singleton - data persists across repository instances
-- **InMemoryRepository**: Scoped per entity type + partition
-- Data cleared on application restart (ephemeral by design)
-
-## Priority
-
-**Priority: -100 (Lowest)**
-
-InMemory adapter acts as a fallback when no other adapter is configured. Real adapters (PostgreSQL, MongoDB, etc.) will override it.
-
-```csharp
-// Explicit InMemory usage
-services.AddKoan()
-    .UseInMemoryStorage();  // If extension method exists
-
-// Or let it auto-register as fallback
-services.AddKoan();  // InMemory used if no other adapter configured
-```
-
-## When to Use
-
-✅ **Good For:**
-- Unit testing (fast, no database required)
-- Development/prototyping
-- Ephemeral caching scenarios
-- Learning Koan Framework patterns
-
-❌ **Not Good For:**
-- Production data persistence (data lost on restart)
-- Cross-process data sharing
-- Large datasets (all data in memory)
-
-## Performance
-
-- **Get**: O(1) - ConcurrentDictionary lookup
-- **Query (LINQ)**: O(n) - LINQ-to-Objects
-- **Upsert**: O(1) - ConcurrentDictionary update
-- **Batch**: Atomic within memory (no transaction overhead)
-
-## See Also
-
-- [DATA-0081 ADR](../../../../docs/decisions/DATA-0081-inmemory-adapter.md) - Architecture decision record
-- [Koan.Data.Core](../../../Koan.Data.Core/) - Core data abstractions
-- [Entity<T> Pattern](../../../Koan.Data.Core/Model/Entity.cs) - Entity base class
+- [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)

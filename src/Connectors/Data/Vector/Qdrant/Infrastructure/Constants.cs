@@ -4,6 +4,7 @@ internal static class Constants
 {
     public const string Section = "Koan:Data:Qdrant";
     public const string HttpClientName = "qdrant";
+    public const string DefaultEndpoint = "http://localhost:6333";
 
     // Qdrant REST defaults to port 6333. gRPC lives on 6334 but we use REST.
     public const int DefaultPort = 6333;
@@ -24,7 +25,6 @@ internal static class Constants
         internal static class Keys
         {
             public const string ConnectionString = Section + ":ConnectionString";
-            public const string AltConnectionString = "Koan:Data:ConnectionString";
             public const string Endpoint = Section + ":Endpoint";
             public const string ApiKey = Section + ":ApiKey";
             public const string Collection = Section + ":Collection";
@@ -44,5 +44,10 @@ internal static class Constants
             public const string OnDisk = Section + ":OnDisk";
             public const string DisableAutoDetection = Section + ":DisableAutoDetection";
         }
+    }
+
+    internal static class Logging
+    {
+        public const string Health = "data.qdrant.health";
     }
 }

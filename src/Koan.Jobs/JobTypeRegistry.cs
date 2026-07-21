@@ -8,7 +8,7 @@ namespace Koan.Jobs;
 /// AppDomain scan. Types that implement <see cref="IKoanJob"/> but not the self-generic <c>IKoanJob&lt;TSelf&gt;</c>
 /// shape are skipped.
 /// </summary>
-public sealed class JobTypeRegistry
+internal sealed class JobTypeRegistry
 {
     private readonly Dictionary<string, JobTypeBinding> _byType;
 

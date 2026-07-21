@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -38,7 +38,7 @@ public class CodeModeTodoParitySpec : IClassFixture<TestPipelineFixture>
 
         var result = await CallTool("koan.code.execute", new { code, entryFunction = (string?)null, correlationId = "test-parity-1" });
         result.Type.Should().Be(JTokenType.Object);
-        var textProp = result["text"];
+        var textProp = result["content"]?[0]?["text"];
         string? text = textProp?.Type switch
         {
             JTokenType.String => textProp!.Value<string>(),
@@ -53,7 +53,7 @@ public class CodeModeTodoParitySpec : IClassFixture<TestPipelineFixture>
 
         // Act: fetch same entity via REST controller (EntityController<Todo>)
         var http = _fx.CreateClient();
-    var restEntityStr = await http.GetString($"/api/todos/{id}");
+    var restEntityStr = await http.GetStringAsync($"/api/todos/{id}");
     var restEntity = JToken.Parse(restEntityStr);
 
         // Assert parity
@@ -72,7 +72,7 @@ public class CodeModeTodoParitySpec : IClassFixture<TestPipelineFixture>
     // collection() returns a paging object with an 'items' array; assert inserted entity present.
     var listCode = @"function run() { const col = SDK.Entities.Todo.collection(); SDK.Out.answer(JSON.stringify(col)); }";
     var listResult = await CallTool("koan.code.execute", new { code = listCode, correlationId = "test-list-2" });
-    var listTextProp = listResult["text"];
+    var listTextProp = listResult["content"]?[0]?["text"];
     string? listText = listTextProp?.Type switch
     {
         JTokenType.String => listTextProp!.Value<string>(),
@@ -94,7 +94,7 @@ public class CodeModeTodoParitySpec : IClassFixture<TestPipelineFixture>
     {
         var code = @"function run() { try { const fetched = SDK.Entities.Todo.getById('does-not-exist-12345'); if (!fetched) { SDK.Out.answer(JSON.stringify({ mode: 'null' })); } else { SDK.Out.answer(JSON.stringify({ mode: 'object', hasId: !!(fetched.id || fetched.Id) })); } } catch (e) { SDK.Out.answer(JSON.stringify({ mode: 'error', error: '' + e })); } }";
         var result = await CallTool("koan.code.execute", new { code, correlationId = "test-missing-1" });
-        var textProp = result["text"];        
+        var textProp = result["content"]?[0]?["text"];        
         string? text = textProp?.Type switch
         {
             JTokenType.String => textProp!.Value<string>(),
@@ -124,7 +124,7 @@ public class CodeModeTodoParitySpec : IClassFixture<TestPipelineFixture>
         var resultObj = await _fx.InvokeRpc("tools/call", Guid.NewGuid().ToString("n"), "koan.code.execute.nope", json);
         var normalized = JsonConvert.SerializeObject(resultObj, JsonOpts);
         var token = JToken.Parse(normalized);
-        // Expect an error surface; depending on RPC layer this may appear under 'error' or absence of 'text'.
-        (token["error"] != null || token["text"] == null).Should().BeTrue("Expected error or absence of text for invalid tool invocation.");
+        // Expect an error surface
+        (token["isError"]?.Value<bool>() == true || token["meta"]?["errorCode"] != null).Should().BeTrue("Expected error for invalid tool invocation.");
     }
 }

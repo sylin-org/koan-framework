@@ -4,6 +4,7 @@ using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Koan.Web.Extensions.Capabilities;
 using Koan.Web.Hooks;
+using Koan.Web.Authorization;
 
 namespace Koan.Web.Extensions.Authorization;
 
@@ -77,12 +78,6 @@ public sealed class PolicyAuthorizationProvider : IAuthorizationProvider
         CapabilityActions.Moderation.Approve => policy.Moderation.Approve,
         CapabilityActions.Moderation.Reject => policy.Moderation.Reject,
         CapabilityActions.Moderation.Return => policy.Moderation.Return,
-
-        CapabilityActions.SoftDelete.ListDeleted => policy.SoftDelete.ListDeleted,
-        CapabilityActions.SoftDelete.Delete => policy.SoftDelete.Delete,
-        CapabilityActions.SoftDelete.DeleteMany => policy.SoftDelete.DeleteMany,
-        CapabilityActions.SoftDelete.Restore => policy.SoftDelete.Restore,
-        CapabilityActions.SoftDelete.RestoreMany => policy.SoftDelete.RestoreMany,
 
         CapabilityActions.Audit.Snapshot => policy.Audit.Snapshot,
         CapabilityActions.Audit.List => policy.Audit.List,

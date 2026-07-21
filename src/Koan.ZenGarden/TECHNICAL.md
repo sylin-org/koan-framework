@@ -1,17 +1,18 @@
-# Koan.ZenGarden Technical Reference
+# Sylin.Koan.ZenGarden technical reference
 
 ## Scope
 
-This project is a greenfield tools-domain runtime client for Zen Garden.
+This package is Koan's tools-domain runtime client for Zen Garden. The independently consumable wire and intent
+boundary lives in `Sylin.Koan.ZenGarden.Contracts`.
 
 ## Decision
 
-`Koan.ZenGarden` adopts a typed event model with a non-blocking wishful capability workflow:
+The runtime adopts a typed event model with a non-blocking wishful capability workflow:
 
-- canonical primitive: `ZenGarden.On<TEvent>(...)`
-- ergonomic wrappers remain: `ZenGarden.Offering.On(...)`, `ZenGarden.Storage.On(...)`, `ZenGarden.Capability.On(...)`
+- application primitives: `ZenGarden.Offering`, `ZenGarden.Storage`, and `ZenGarden.Capability`
+- durable subscriptions use the standard hosted-service lifecycle after the host has started
 - capability requests are scheduled wishfully and never block startup
-- capability orchestration is centralized in `IZenGardenInitializationProvider.ResolveAsync(intent)`
+- capability orchestration is centralized in `IZenGardenInitializationProvider.Resolve(intent)`
 - capability fulfillment is reported incrementally (`PartiallyFulfilled`) and finally (`Fulfilled`) from tools SSE updates
 
 It uses discovery-first Moss endpoint binding:
@@ -26,8 +27,9 @@ It does not use `/api/v1/services` as a primary catalog source.
 
 ## Module Boot
 
-- Auto-registration: `Initialization/KoanAutoRegistrar.cs` implements `IKoanAutoRegistrar`.
-- DI entrypoint: `AddKoanZenGarden(...)` in `Extensions/ServiceCollectionExtensions.cs`.
+- Activation: generated descriptor metadata retains one `Initialization/ZenGardenModule.cs` instance when the application directly references `Koan.ZenGarden`.
+- DI entrypoint: the application calls `AddKoan()`; the retained module owns runtime registration and contributes one typed discovery source.
+- Structural composition: Core freezes the source plan once after the outermost `AddKoan(...)` declaration; live topology is queried per operation.
 - Runtime resolution: static `ZenGarden` facade resolves `IZenGardenClient` from `AppHost.Current`.
 
 ## Protocols
@@ -57,8 +59,8 @@ Endpoints used by the Koi handler:
 
 - `GET /healthz` (liveness probe)
 - `GET /v1/status` (version + capability status)
-- `GET /v1/mdns/browse?type=_moss._tcp&idle_for=3` (initial snapshot)
-- `GET /v1/mdns/events?type=_moss._tcp&idle_for=0` (continuous stream)
+- `GET /v1/mdns/discover?type=_moss._tcp&idle_for=3` (initial snapshot)
+- `GET /v1/mdns/subscribe?type=_moss._tcp&idle_for=0` (continuous stream)
 
 Optional lantern discovery uses the same endpoints with `type=_lantern._tcp`.
 The SSE streams follow Koi's event format: `data: {"found": {...}}`,
@@ -210,21 +212,21 @@ Rules:
 
 - Minimum form must always be accepted.
 - Capability items are untyped by default; typed selectors are optional.
-- Zen Garden resolution is first attempt for `zen-garden://...`, then connector autonomous discovery fallback.
+- Explicit `zen-garden://...` resolution is required: resolve and pass adapter health policy, or fail correctively without autonomous fallback.
 - Offering-only intents (`zen-garden://mongodb`) resolve `offering:mongodb` first and fall back to ready instance candidates (`offering:mongodb:<instance>`) when needed.
 
 ## Initialization Provider
 
-`Koan.ZenGarden` registers `IZenGardenInitializationProvider` and consumes connector-provided
-`IZenGardenOfferingBinding` metadata from `Koan.ZenGarden.Core`.
+`Koan.ZenGarden` registers `IZenGardenInitializationProvider`. Its compiled discovery source receives the
+selected adapter's canonical service name and stable aliases, eliminating connector-specific binding metadata.
 
 Provider responsibilities:
 
 - parse and normalize Zen Garden intent URIs (`zen-garden://...`)
-- map adapter default offering bindings
+- try canonical service selectors in adapter-declared order
 - resolve ready offering projections through tools snapshot API
 - return connection metadata (`uris`, `protocol`, `host`, `port`, capabilities)
-- when `ResolveAsync(intent)` includes capability requirements:
+- when `Resolve(intent)` includes capability requirements:
   - evaluate missing capabilities against current snapshot
   - schedule wishful ensures non-blocking (with scheduling throttle)
   - return resolved endpoint immediately so startup can proceed
@@ -234,38 +236,33 @@ Boundary:
 - `Koan.ZenGarden` owns capability orchestration and fulfillment tracking.
 - Adapter modules provide intent and consume resolved state; they do not invoke capability ensure directly.
 
-Implemented adapter bindings:
-
-- Mongo connector: `mongo` / `mongodb` -> offering `mongodb`
-- Ollama connector: `ollama` -> offering `ollama`
+The source is adapter-neutral. For example, Mongo declares `mongo` plus alias `mongodb`; the source tries
+those selectors while Mongo retains connection normalization and health ownership.
 
 ## Adapter Integration
 
 Mongo (`MongoOptionsConfigurator`):
 
 - explicit native connection strings remain pass-through
-- explicit `zen-garden://...` is resolved first, then autonomous Mongo discovery fallback
-- `auto` / empty uses Zen Garden first (`mongodb` binding), then autonomous Mongo discovery fallback
-- optional overrides:
-  - `Koan:Data:Mongo:ZenGarden:Offering`
-  - `Koan:Data:Mongo:ZenGarden:Instance`
-  - `Koan:Data:Mongo:ZenGarden:Capabilities`
+- explicit `zen-garden://...` uses the required shared discovery path and fails if it cannot be honored
+- `auto` / empty uses the compiled Zen Garden source as one health-checked candidate, then autonomous Mongo fallback
 
 Ollama (`OllamaAdapterContributor`):
 
-- `Koan:Ai:Ollama:ConnectionString` supports `zen-garden://...` or direct URL
-- `Koan:Ai:Ollama:Urls[*]` also accepts Zen Garden intents per entry
-- auto path (or unresolved explicit intent) runs Zen Garden first, then legacy host/container/local probes
-- required capability hints forwarded to Zen Garden:
-  - `Koan:Ai:Ollama:RequiredCapabilities`
-  - `Koan:Ai:Ollama:RequiredModels`
-  - `Koan:Ai:Ollama:ZenGarden:Capabilities`
-- contributor passes capability-bearing intent to initialization provider
-- provider performs centralized wish scheduling when capabilities are missing and contributor continues registration
+- `ConnectionStrings:Ollama` accepts one native HTTP endpoint or one `zen-garden://...` required intent
+- `Koan:Ai:Ollama:Endpoints[*]` accepts an ordered native HTTP/HTTPS mesh
+- explicit connection string and endpoint mesh are mutually exclusive
+- automatic discovery receives Zen Garden candidates through Core's compiled discovery plan, then conventional
+  container/host/local candidates; Ollama health-checks the elected endpoint
+- unresolved explicit Zen Garden intent fails and is not replaced by an automatic candidate
+- `DefaultModel` plus `RequiredCapabilities` use `DiscoveryContext.RequiredCapabilities`; the Zen Garden source turns
+  them into a capability-bearing offering intent
+- the initialization provider schedules a wish when capabilities are missing and returns without waiting for
+  fulfillment
 
 ## Centralized Orchestration Flow
 
-`ResolveAsync(intent-with-capabilities)` runtime sequence:
+`Resolve(intent-with-capabilities)` runtime sequence:
 
 1. Resolve offering candidate (`ready=true`) by selector/instance/alias.
 2. Compare requested capabilities with current projection.
@@ -309,10 +306,6 @@ using var storageSub = ZenGarden.Storage.On("default", async (evt, ct) => { });
 
 var wish = await ZenGarden.Capability.Wish("ollama", ["modelv1", "modelv2"]);
 using var wishSub = ZenGarden.Capability.On(wish, async (evt, ct) => { });
-
-using var typed = ZenGarden.On<ZenGardenAvailabilityEvent>(
-    ZenGardenSubscription.ForOffering("mongodb"),
-    async (evt, ct) => { });
 ```
 
 Catalog access:

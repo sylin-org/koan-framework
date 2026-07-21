@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Koan · MCP Explorer</title>
+  <link rel="stylesheet" href="{{base}}/explorer/explorer.css" />
+  <script>window.KOAN_MCP_BASE = "{{base}}";</script>
+</head>
+<body>
+  <header class="kx-header">
+    <div class="kx-container kx-header-bar">
+      <div class="kx-brand" title="MCP Explorer">
+        <div class="kx-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="6" cy="6" r="2.3" /><circle cx="18" cy="9" r="2.3" /><circle cx="9" cy="18" r="2.3" />
+            <path d="M8 7l7.6 1.3M8 8.1l1 7.8" />
+          </svg>
+        </div>
+        <h1 class="kx-wordmark">Koan · MCP Explorer</h1>
+      </div>
+      <div id="kx-identity" class="kx-identity"></div>
+    </div>
+  </header>
+  <main class="kx-container kx-main">
+    <div id="kx-app" class="kx-loading">Loading the surface…</div>
+  </main>
+  <footer class="kx-footer">Powered by Koan · MCP Explorer</footer>
+  <script src="{{base}}/explorer/app.js"></script>
+</body>
+</html>

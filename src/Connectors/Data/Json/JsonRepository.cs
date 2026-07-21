@@ -1,332 +1,245 @@
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
-using Koan.Data.Abstractions.Sorting;
-using Koan.Data.Core.Sorting;
+using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Abstractions.Naming;
+using Koan.Data.Core;
+using Koan.Data.Core.KeyValue;
+using Koan.Data.Core.Semantics;
 using System.Collections.Concurrent;
-using System.Collections.Frozen;
 
 namespace Koan.Data.Connector.Json;
 
-// Self-registration hook so the adapter is available with AddKoanDataCore()
-
 /// <summary>
-/// In-memory dictionary with JSON file persistence per aggregate. A "Full floor" adapter under
-/// the unified query contract (DATA-XXXX): declares <see cref="FilterSupport.Full"/> and
-/// evaluates the entire <see cref="Filter"/> via <see cref="InMemoryFilterEvaluator"/>.
+/// JSON file-backed key-value adapter — an in-memory dictionary with per-aggregate JSON file persistence, built on the
+/// <see cref="KeyValueStore{TEntity,TKey}"/> family base (ARCH-0103 §9, the JSON-text family). It inherits all three
+/// AODB modes: <b>Shared</b> (the managed discriminator is injected into / extracted from the persisted JSON via the
+/// shared <see cref="ManagedFieldJsonInjector"/> — the same write-stamp the relational trio uses — and the base's hybrid
+/// evaluator filters on it), <b>Container</b> (a distinct JSON file per ambient partition), and <b>Database</b> (a
+/// distinct directory per routed source, resolved by <see cref="JsonAdapterFactory"/>). This adapter supplies only the
+/// backend primitives over its on-disk stores; every contract (write-stamp, cross-scope guard, managed-aware read,
+/// batch, instructions) lives in the base.
 /// </summary>
-internal sealed class JsonRepository<TEntity, TKey> :
-    IDataRepository<TEntity, TKey>,
-    IQueryRepository<TEntity, TKey>,
-    IDescribesCapabilities,
-    Abstractions.Instructions.IInstructionExecutor<TEntity>
+internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
+    // CamelCase entity body (byte-compatible with the pre-rebuild on-disk form); the managed __-keys ride alongside it
+    // via the shared injector, written with their literal storage names (leading '_' is a camel-case fixed point).
     private readonly JsonSerializerSettings _json = new()
     {
-        ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver(),
+        ContractResolver = new CamelCasePropertyNamesContractResolver(),
         Formatting = Formatting.None,
-        NullValueHandling = NullValueHandling.Include
+        NullValueHandling = NullValueHandling.Include,
     };
+    private readonly JsonSerializer _serializer;
+    private readonly IReadOnlyList<DataSegmentationField> _segmentationFields;
     private readonly string _baseDir;
-    // Maintain per-physical-name stores and file paths so different sets are isolated
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<TKey, TEntity>> _stores = new();
+    private readonly INamingProvider _naming;
+    private readonly IServiceProvider _services;
+    // Per-physical-name (partition) stores + file paths so different partitions are isolated within this source's dir.
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<TKey, KvRecord<TEntity>>> _stores = new();
     private readonly ConcurrentDictionary<string, string> _files = new();
+    // One write-gate per physical file: the singleton repository serves every request, so concurrent writes to the same
+    // partition would otherwise race File.WriteAllTextAsync to the same path (a sharing-violation IOException). The
+    // in-memory store stays the read source of truth; this just serializes the write-through snapshots per file.
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _writeGates = new();
 
-    // JSON adapter does not have native bulk APIs; honor semantics via fallbacks without advertising native bulk.
-    public void Describe(ICapabilities caps) => caps
-        .Add(DataCaps.Query.Linq) // supports LINQ predicate
-        .Add(DataCaps.Query.Filter, FilterSupport.Full);
-
-    public JsonRepository(IOptions<JsonDataOptions> options)
+    internal JsonRepository(
+        IOptions<JsonDataOptions> options,
+        DataSegmentationPlan segmentation,
+        INamingProvider naming,
+        IServiceProvider services)
     {
-        _options = options;
         _baseDir = options.Value.DirectoryPath;
         Directory.CreateDirectory(_baseDir);
+        _serializer = JsonSerializer.Create(_json);
+        _segmentationFields = segmentation.For(typeof(TEntity)).Fields;
+        _naming = naming;
+        _services = services;
     }
 
-    private readonly IOptions<JsonDataOptions> _options;
+    // ==================== Backend primitives ====================
 
-    public Task<TEntity?> Get(TKey id, CancellationToken ct = default)
+    protected override Task<KvRecord<TEntity>?> ReadAsync(TKey id, CancellationToken ct)
     {
-        var store = ResolveStore();
-        return Task.FromResult(store.TryGetValue(id, out var value) ? value : null);
+        var (_, store) = Resolve();
+        return Task.FromResult(store.TryGetValue(id, out var r) ? r : (KvRecord<TEntity>?)null);
     }
 
-    public Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
+    protected override Task<IReadOnlyList<KvRecord<TEntity>>> ScanAsync(CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var store = ResolveStore();
-        var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
-        var results = new TEntity?[idList.Count];
-
-        for (var i = 0; i < idList.Count; i++)
-        {
-            results[i] = store.TryGetValue(idList[i], out var entity) ? entity : null;
-        }
-
-        return Task.FromResult((IReadOnlyList<TEntity?>)results);
+        var (_, store) = Resolve();
+        return Task.FromResult((IReadOnlyList<KvRecord<TEntity>>)store.Values.ToList());
     }
 
-    public Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
+    protected override Task<IReadOnlyList<KvRecord<TEntity>>> ScanBoundedAsync(int maxCandidates, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var store = ResolveStore();
-        IEnumerable<TEntity> items = store.Values;
-        if (query.Filter is not null)
-            items = items.Where(InMemoryFilterEvaluator.Compile<TEntity>(query.Filter));
-
-        var filtered = items as IReadOnlyList<TEntity> ?? items.ToList();
-        var totalCount = (long)filtered.Count;
-
-        var sortHandled = RepositoryQueryResult<TEntity>.NoSortHandled;
-        IEnumerable<TEntity> ordered;
-        if (query.HasSort)
-        {
-            ordered = InMemorySorter.Apply(filtered, query.Sort);
-            sortHandled = query.Sort.ToFrozenSet();
-        }
-        else
-        {
-            // Match the relational adapters (SqlServer/SQLite ORDER BY Id, Postgres ORDER BY ctid): an
-            // unsorted query falls back to a stable Id order so results — and any pagination over them —
-            // are deterministic instead of ConcurrentDictionary enumeration order. With GUID v7 ids this
-            // is also insertion order.
-            ordered = filtered.OrderBy(static e => e.Id, Comparer<TKey>.Default);
-        }
-
-        var paginationHandled = false;
-        if (query.HasPagination)
-        {
-            var skip = (query.EffectivePage() - 1) * query.EffectivePageSize();
-            ordered = ordered.Skip(skip).Take(query.EffectivePageSize());
-            paginationHandled = true;
-        }
-
-        var list = ordered as IReadOnlyList<TEntity> ?? ordered.ToList();
-        return Task.FromResult(new RepositoryQueryResult<TEntity>
-        {
-            Items = list,
-            TotalCount = totalCount,
-            IsEstimate = false,
-            SortHandled = sortHandled,
-            PaginationHandled = paginationHandled,
-        });
+        var (_, store) = Resolve();
+        return Task.FromResult((IReadOnlyList<KvRecord<TEntity>>)store.Values.Take(maxCandidates).ToList());
     }
 
-    public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
+    protected override async Task WriteAsync(TKey id, KvRecord<TEntity> record, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        IEnumerable<TEntity> items = ResolveStore().Values;
-        if (query.Filter is not null)
-            items = items.Where(InMemoryFilterEvaluator.Compile<TEntity>(query.Filter));
-        return Task.FromResult(new CountResult(items.LongCount(), false));
+        var (name, store) = Resolve();
+        store[id] = record;
+        await PersistAsync(name, store, ct).ConfigureAwait(false);
     }
 
-    public Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
+    protected override async Task<bool> RemoveAsync(TKey id, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var (name, store) = ResolveNameAndStore();
-        store[model.Id] = model;
-        Persist(name, store);
-        return Task.FromResult(model);
-    }
-
-    public Task<bool> Delete(TKey id, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var (name, store) = ResolveNameAndStore();
+        var (name, store) = Resolve();
         var ok = store.TryRemove(id, out _);
-        if (ok) Persist(name, store);
-        return Task.FromResult(ok);
+        if (ok) await PersistAsync(name, store, ct).ConfigureAwait(false);
+        return ok;
     }
 
-    public Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
+    // Bulk write/remove collapse to ONE file persist (the base default would persist per row — O(N²) file rewrites).
+    protected override async Task WriteManyAsync(IReadOnlyList<KvRecord<TEntity>> records, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var (name, store) = ResolveNameAndStore();
+        if (records.Count == 0) return;
+        var (name, store) = Resolve();
+        foreach (var r in records) store[r.Entity.Id] = r;
+        await PersistAsync(name, store, ct).ConfigureAwait(false);
+    }
+
+    protected override async Task<int> RemoveManyAsync(IReadOnlyList<TKey> ids, CancellationToken ct)
+    {
+        if (ids.Count == 0) return 0;
+        var (name, store) = Resolve();
         var count = 0;
-        foreach (var m in models)
-        {
-            store[m.Id] = m; count++;
-            ct.ThrowIfCancellationRequested();
-        }
-        if (count > 0) Persist(name, store);
-        return Task.FromResult(count);
+        foreach (var id in ids) if (store.TryRemove(id, out _)) count++;
+        if (count > 0) await PersistAsync(name, store, ct).ConfigureAwait(false);
+        return count;
     }
 
-    public Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
+    protected override async Task<int> ClearAsync(CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var (name, store) = ResolveNameAndStore();
-        var count = 0;
-        foreach (var id in ids)
-        {
-            if (store.TryRemove(id, out _)) count++;
-            ct.ThrowIfCancellationRequested();
-        }
-        if (count > 0) Persist(name, store);
-        return Task.FromResult(count);
-    }
-
-    public Task<int> DeleteAll(CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var (name, store) = ResolveNameAndStore();
-        var deleted = store.Count;
+        var (name, store) = Resolve();
+        var count = store.Count;
         store.Clear();
-        Persist(name, store);
-        return Task.FromResult(deleted);
+        await PersistAsync(name, store, ct).ConfigureAwait(false);   // an empty store persists as "[]"
+        return count;
     }
 
-    public Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
+    // JSON is a file floor — no native bulk / atomic APIs to announce. The family caps (LINQ, Full filter, RowScoped)
+    // come from the base's Describe.
+    protected override void DescribeBackend(ICapabilities caps) => caps
+        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Scan, true));
+
+    // ==================== Instructions ====================
+
+    public override async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(instruction);
         ct.ThrowIfCancellationRequested();
-        var (name, store) = ResolveNameAndStore();
-        var deleted = store.Count;
-        store.Clear();
-        Persist(name, store);
-        // No fast path available - dictionary clear is already instant
-        // Optimized, Fast, and Safe all use same implementation
-        return Task.FromResult((long)deleted);
-    }
-
-    public IBatchSet<TEntity, TKey> CreateBatch() => new JsonBatch(this);
-
-    // Instruction execution for fast-path operations (e.g., clear all)
-    public Task<TResult> ExecuteAsync<TResult>(Abstractions.Instructions.Instruction instruction, CancellationToken ct = default)
-    {
-        switch (instruction.Name)
+        if (instruction.Name == DataInstructions.EnsureCreated)
         {
-            case Abstractions.Instructions.DataInstructions.EnsureCreated:
-                {
-                    Directory.CreateDirectory(_baseDir);
-                    // Touch the set file to ensure presence
-                    var name = ComputePhysicalName();
-                    var path = _files.GetOrAdd(name, n => Path.Combine(_baseDir, SanitizeFileName(n) + ".json"));
-                    if (!File.Exists(path)) File.WriteAllTextAsync(path, "[]");
-                    object result = true;
-                    return Task.FromResult((TResult)result);
-                }
-            case Abstractions.Instructions.DataInstructions.Clear:
-                {
-                    var (name, store) = ResolveNameAndStore();
-                    var deleted = store.Count;
-                    store.Clear();
-                    Persist(name, store);
-                    object result = deleted;
-                    return Task.FromResult((TResult)result);
-                }
-            default:
-                throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by JSON adapter for {typeof(TEntity).Name}.");
+            // Prepare the source directory + touch the current partition's set file so presence checks see "[]".
+            Directory.CreateDirectory(_baseDir);
+            var (name, store) = Resolve();
+            await PersistAsync(name, store, ct).ConfigureAwait(false);
+            return (TResult)(object)true;
         }
+        return await base.ExecuteAsync<TResult>(instruction, ct).ConfigureAwait(false);
     }
 
-    private void LoadFromDisk(string path, ConcurrentDictionary<TKey, TEntity> store)
-    {
-        if (!File.Exists(path)) return;
-        try
-        {
-            var json = File.ReadAllText(path);
-            var list = JsonConvert.DeserializeObject<List<TEntity>>(json, _json) ?? [];
-            foreach (var item in list) store[item.Id] = item;
-        }
-        catch { /* ignore corrupted files in early dev */ }
-    }
+    // ==================== On-disk store resolution + serialization ====================
 
-    private void Persist(string physicalName, ConcurrentDictionary<TKey, TEntity> store)
-    {
-        var path = _files.GetOrAdd(physicalName, n => Path.Combine(_baseDir, SanitizeFileName(n) + ".json"));
-        var list = store.Values.ToList();
-    var json = JsonConvert.SerializeObject(list, _json);
-        File.WriteAllTextAsync(path, json);
-    }
-
-    private ConcurrentDictionary<TKey, TEntity> ResolveStore()
+    private (string name, ConcurrentDictionary<TKey, KvRecord<TEntity>> store) Resolve()
     {
         var name = ComputePhysicalName();
-        return _stores.GetOrAdd(name, n =>
+        var store = _stores.GetOrAdd(name, n =>
         {
-            var s = new ConcurrentDictionary<TKey, TEntity>();
+            var s = new ConcurrentDictionary<TKey, KvRecord<TEntity>>();
             var path = Path.Combine(_baseDir, SanitizeFileName(n) + ".json");
             _files[n] = path;
             LoadFromDisk(path, s);
             return s;
         });
+        return (name, store);
     }
 
-    private (string name, ConcurrentDictionary<TKey, TEntity> store) ResolveNameAndStore()
+    private void LoadFromDisk(string path, ConcurrentDictionary<TKey, KvRecord<TEntity>> store)
     {
-        var name = ComputePhysicalName();
-        var store = ResolveStore();
-        return (name, store);
+        if (!File.Exists(path)) return;
+        try
+        {
+            var json = File.ReadAllText(path);
+            var arr = JArray.Parse(json);
+            foreach (var token in arr)
+            {
+                if (token is not JObject jo) continue;
+                // Extract the managed __-keys back into the envelope's sidecar (null off-axis), then deserialize the
+                // entity (it ignores the unknown __-keys, exactly as the relational read does).
+                var managed = ManagedFieldJsonInjector.ExtractManaged(jo, typeof(TEntity), _segmentationFields);
+                var entity = jo.ToObject<TEntity>(_serializer);
+                if (entity is null) continue;
+                store[entity.Id] = new KvRecord<TEntity>(entity, managed);
+            }
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException(
+                $"Koan JSON could not read '{path}' because it does not contain a valid entity store. " +
+                "Restore the file from a known-good copy or remove it deliberately; corrupt storage is never treated as empty.",
+                ex);
+        }
+    }
+
+    private async Task PersistAsync(
+        string physicalName,
+        ConcurrentDictionary<TKey, KvRecord<TEntity>> store,
+        CancellationToken ct)
+    {
+        var path = _files.GetOrAdd(physicalName, n => Path.Combine(_baseDir, SanitizeFileName(n) + ".json"));
+        var gate = _writeGates.GetOrAdd(physicalName, static _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var arr = new JArray();
+            foreach (var rec in store.Values)
+            {
+                var jo = JObject.FromObject(rec.Entity, _serializer);
+                // Stamp the record's own managed values onto the JSON (write-stamp); a null/empty sidecar adds nothing,
+                // so the off-axis bytes stay identical to a plain entity array.
+                ManagedFieldJsonInjector.InjectManaged(jo, rec.Managed);
+                arr.Add(jo);
+            }
+            // Keep the last complete store intact if serialization, cancellation, or process failure interrupts a write.
+            // The temporary file lives beside the target so the final rename stays on one volume.
+            var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
+            try
+            {
+                await File.WriteAllTextAsync(temporaryPath, arr.ToString(Formatting.None), ct).ConfigureAwait(false);
+                File.Move(temporaryPath, path, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
+            }
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     private static string SanitizeFileName(string physicalName)
         => physicalName.Replace(':', '.');
 
-    private static string ComputePhysicalName()
-    {
-        var sp = Koan.Core.Hosting.App.AppHost.Current;
-        if (sp is not null)
-        {
-            // Delegate to adapter naming (factory owns the cache and partition composition).
-            return Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(sp);
-        }
-        return typeof(TEntity).Name;
-    }
-
-    private sealed class JsonBatch : IBatchSet<TEntity, TKey>
-    {
-        private readonly JsonRepository<TEntity, TKey> _repo;
-        private readonly List<TEntity> _adds = new();
-        private readonly List<TEntity> _updates = new();
-        private readonly List<TKey> _deletes = new();
-        private readonly List<(TKey id, Action<TEntity> mutate)> _mutations = new();
-
-        public JsonBatch(JsonRepository<TEntity, TKey> repo) => _repo = repo;
-
-        public IBatchSet<TEntity, TKey> Add(TEntity entity) { _adds.Add(entity); return this; }
-        public IBatchSet<TEntity, TKey> Update(TEntity entity) { _updates.Add(entity); return this; }
-        public IBatchSet<TEntity, TKey> Delete(TKey id) { _deletes.Add(id); return this; }
-        public IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate) { _mutations.Add((id, mutate)); return this; }
-        public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
-
-        public Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
-        {
-            ct.ThrowIfCancellationRequested();
-            // If strict atomic batches are required, JSON adapter cannot guarantee; follow contract and signal not supported
-            if (options?.RequireAtomic == true)
-                throw new NotSupportedException("JSON adapter does not support atomic batch transactions.");
-
-            // apply in-memory mutations before persisting
-            if (_mutations.Count != 0)
-            {
-                foreach (var (id, mutate) in _mutations)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    var curStore = _repo.ResolveStore();
-                    if (curStore.TryGetValue(id, out var current))
-                    {
-                        mutate(current);
-                        _updates.Add(current);
-                    }
-                }
-            }
-            var (name, store) = _repo.ResolveNameAndStore();
-            foreach (var e in _adds) { store[e.Id] = e; ct.ThrowIfCancellationRequested(); }
-            foreach (var e in _updates) { store[e.Id] = e; ct.ThrowIfCancellationRequested(); }
-            var del = 0; foreach (var id in _deletes) { if (store.TryRemove(id, out _)) del++; ct.ThrowIfCancellationRequested(); }
-            _repo.Persist(name, store);
-            return Task.FromResult(new BatchResult(_adds.Count, _updates.Count, del));
-        }
-    }
-
-    // Adapter stays simple; no auto-ID here by design.
-
-    // No identifier generation here; RepositoryFacade ensures IDs cross-cutting.
+    private string ComputePhysicalName()
+        => _naming.ResolveStorage(
+            typeof(TEntity),
+            EntityContext.Current?.Partition,
+            _services);
 }

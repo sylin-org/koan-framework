@@ -1,11 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Description>Core cache module for Koan: fluent builders, policy registry, singleflight coordination, instrumentation, and DI extensions.</Description>
+    <Description>Koan Cache: transparent Entity caching, policy and topology negotiation, bounded explicit eviction, coherence, health, and inspection.</Description>
     <PackageTags>$(CommonPackageTags);cache;redis;memory;policies</PackageTags>
   </PropertyGroup>
   <ItemGroup>
@@ -13,18 +12,19 @@
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
-    <!-- Analyzer-only reference (KOAN0001): flags bare TryAddEnumerable on cache interfaces. -->
-    <ProjectReference Include="..\Koan.Cache.Analyzers\Koan.Cache.Analyzers.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Koan.Communication\Koan.Communication.csproj"
+                      />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="10.0.8" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyModel" />
+    <!-- HealthChecks (IHealthCheck + services.AddHealthChecks()) for CacheHealthCheck. Previously
+         free-rode on Microsoft.AspNetCore.App leaked via Koan.Core's OTel packages; explicit now (ARCH-0088). -->
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" />
+    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 </Project>

@@ -1,10 +1,8 @@
-# Koan.AI.Prompt
+# Sylin.Koan.AI.Prompt
 
-Uri-inspired prompt primitives for Koan: parse, create, version, and store prompts with variable extraction, few-shot examples, output schema, and A/B testing support.
-
-- Target framework: net10.0
-- License: Apache-2.0
-- Version: 0.6.3
+Optional Entity-backed storage for named, versioned Koan AI prompts. The in-memory `Prompt` value belongs to
+`Sylin.Koan.AI.Contracts` and is available through the normal AI runtime; reference this package only when prompts
+must be edited or selected from persisted application data.
 
 ## Install
 
@@ -12,83 +10,38 @@ Uri-inspired prompt primitives for Koan: parse, create, version, and store promp
 dotnet add package Sylin.Koan.AI.Prompt
 ```
 
-## Quick Start
+The package brings Koan Data because `PromptEntry` is an Entity. Add one Data provider appropriate to the application.
+
+## Smallest meaningful use
 
 ```csharp
-// Build a prompt
-var prompt = Prompt.Create()
-    .System("You are a technical writer.")
-    .Instruct("Summarise the following article in {{tone}} tone.")
-    .Constrain("Maximum 200 words.")
-    .OutputAs<SummaryOutput>()         // JSON schema from type
-    .Example("long article...", "Short summary.")
-    .Default("tone", "professional");
+using Koan.AI.Prompt;
+using Koan.Data.Core;
 
-// Resolve with variables
-var resolved = prompt.Resolve(new { tone = "casual" });
+await new PromptEntry
+{
+    Name = "order-summary",
+    Version = 1,
+    Status = PromptStatus.Active,
+    Content = "Summarize order {orderId} in one sentence."
+}.Save();
 
-// Send to AI
-var result = await Client.ChatAsync(resolved.SystemPrompt, resolved.UserMessage, ct);
+var prompt = await PromptCatalog.Load("order-summary");
+var answer = await Client.Chat(prompt, new { orderId = order.Id });
 ```
 
-## `Prompt` API
+`PromptCatalog.Load(name)` returns the highest active version. `PromptCatalog.Load(name, version)` returns that exact
+version, including draft or retired entries, so deliberate rollback and review tools can inspect historical content.
 
-```csharp
-// Fluent builder
-Prompt.Create()
-    .System(string systemPrompt)
-    .Instruct(string template)             // Supports {{variable}} interpolation
-    .Constrain(string constraint)
-    .OutputAs<TOutput>()                   // Extract JSON schema from type
-    .OutputAs(OutputSpec spec)             // Or provide explicit spec
-    .Example(string input, string output)  // Few-shot example
-    .Default(string variable, string value)// Default variable value
-    .Meta(string key, string value)        // Arbitrary metadata
+## Guarantees and boundaries
 
-// Loading from storage
-Prompt.Load("my-prompt")                   // Latest version
-Prompt.Load("my-prompt", version: "v3")    // Specific version
-Prompt.Load("my-prompt", PromptStrategy.AbTest(["v2", "v3"])) // A/B test
+- Names are ordinary application data; Koan does not create, seed, or reserve them.
+- A missing active or exact version throws `PromptNotFoundException` with the requested identity.
+- Duplicate Entities with the same name/version fail correctively instead of selecting an arbitrary record.
+- This package stores content, constraints, lifecycle state, authorship, notes, and tags through normal Entity
+  semantics. The selected Data provider owns durability, concurrency, and transaction guarantees.
+- Koan does not provide random A/B assignment, canary stickiness, prompt approval workflow, encryption, or a prompt
+  administration UI in this package.
+- Referencing `Sylin.Koan.AI` alone does not activate Data or this catalog.
 
-// Instance methods
-prompt.Resolve(object variables)           // → string (resolved template)
-prompt.UnresolvedVariables()               // → string[] (missing variables)
-prompt.With(string variable, string value) // → new Prompt (immutable update)
-```
-
-## Variable Interpolation
-
-Templates use `{{variable}}` syntax:
-
-```csharp
-var prompt = Prompt.Create()
-    .Instruct("Translate the following to {{language}}: {{text}}");
-
-var resolved = prompt.Resolve(new { language = "French", text = "Hello world" });
-// → "Translate the following to French: Hello world"
-```
-
-## Prompt Storage
-
-`PromptEntry` is a standard `Entity<PromptEntry>` — prompts are versioned and stored in the configured data backend automatically:
-
-```csharp
-// Store
-await new PromptEntry { Name = "my-prompt", Version = "v1", Template = "..." }.Save();
-
-// Retrieve
-var entry = await Prompt.Load("my-prompt");
-```
-
-## Loading Strategies
-
-| Strategy | Behaviour |
-|----------|-----------|
-| Latest (default) | Always loads the most recent version |
-| `PromptStrategy.Pinned("v3")` | Always loads a specific version |
-| `PromptStrategy.AbTest(["v2","v3"])` | Randomly selects between versions |
-| `PromptStrategy.Canary("v4", weight: 0.1)` | Routes 10% traffic to canary version |
-
-## Reference
-
-- **Related**: `Koan.AI` (pipeline facade), `Koan.AI.Orchestration` (chain composition), `Koan.AI.Training` (training datasets)
+See [TECHNICAL.md](./TECHNICAL.md) for ownership and lookup behavior.

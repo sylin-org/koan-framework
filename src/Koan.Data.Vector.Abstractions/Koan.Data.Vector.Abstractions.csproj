@@ -1,18 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Kernel</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Description>Koan vector contracts (providers depend on this package only)</Description>
-    <PackageTags>$(CommonPackageTags);data;vector;abstractions;contracts</PackageTags>
+    <Description>Provider-neutral Koan vector contracts for search repositories, adapter factories, schemas, queries, matches, capabilities, and export shapes.</Description>
+    <PackageTags>$(CommonPackageTags);data;vector;abstractions;contracts;search;schema</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
-    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
   </ItemGroup>
 </Project>

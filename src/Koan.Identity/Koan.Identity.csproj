@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Koan.Identity</AssemblyName>
+    <RootNamespace>Koan.Identity</RootNamespace>
+    <Description>SEC-0007 — the durable person (Identity) and the sign-in → identity reconciliation seam. Implements Koan.Web.Auth's IUserStore / IExternalIdentityStore with Entity&lt;&gt;-backed durable stores, upserts an Identity from claims on every sign-in, and gives Membership.IdentityId a real backing entity. Reference = Intent.</Description>
+    <PackageTags>$(CommonPackageTags);identity;person;user;auth;reconciliation</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <!-- Identity's current access explainer/JIT grant surface composes with the authorization floor owned by Web.
+         This direct edge was previously hidden transitively behind functional Web Auth. -->
+    <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
+    <!-- SEC-0007 D6: durable Identity consumes only inert auth vocabulary. When functional Web Auth is also
+         referenced, its discovered lifecycle pipeline composes with Identity without activating Web Auth here. -->
+    <ProjectReference Include="..\Koan.Web.Auth.Abstractions\Koan.Web.Auth.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Koan.Identity.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

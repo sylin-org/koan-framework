@@ -6,10 +6,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Adapters;
-using Koan.Core.Adapters.Configuration;
+using Koan.Data.Adapters.Configuration;
 using Koan.Core.Infrastructure;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Data.Relational.Orchestration;
 
 namespace Koan.Data.Connector.Postgres;
 
@@ -43,11 +44,10 @@ internal sealed class PostgresOptionsConfigurator : AdapterOptionsConfigurator<P
 
     protected override void ConfigureProviderSpecific(PostgresOptions options)
     {
-        Logger?.LogInformation("PostgreSQL Orchestration-Aware Configuration Started");
-        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
-            KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
-        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}'",
-            options.ConnectionString);
+        LogConfiguration(LogLevel.Debug, "initial",
+            ("environment", KoanEnv.EnvironmentName),
+            ("orchestrationMode", KoanEnv.OrchestrationMode),
+            ("connection", options.ConnectionString));
 
         // PostgreSQL-specific configuration
         var databaseName = ReadProviderConfiguration(options.SearchPath ?? "public",
@@ -71,35 +71,30 @@ internal sealed class PostgresOptionsConfigurator : AdapterOptionsConfigurator<P
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            Logger?.LogInformation("Using explicit connection string from configuration");
+            LogConfiguration(LogLevel.Information, "explicit");
             options.ConnectionString = explicitConnectionString;
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            Logger?.LogInformation("Auto-detection mode - using autonomous service discovery");
-            options.ConnectionString = ResolveAutonomousConnection(databaseName, username, password, Logger);
+            LogConfiguration(LogLevel.Information, "auto");
+            options.ConnectionString = ResolveAutonomousConnection(databaseName, username, password);
         }
         else
         {
-            Logger?.LogInformation("Using pre-configured connection string");
+            LogConfiguration(LogLevel.Information, "preconfigured");
         }
 
         // Configure other PostgreSQL-specific options
-        options.DefaultPageSize = ReadProviderConfiguration(
-            options.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-
         var ddlStr = ReadProviderConfiguration(options.DdlPolicy.ToString(),
             Infrastructure.Constants.Configuration.Keys.DdlPolicy,
             Infrastructure.Constants.Configuration.Keys.AltDdlPolicy);
-        if (!string.IsNullOrWhiteSpace(ddlStr) && Enum.TryParse<SchemaDdlPolicy>(ddlStr, true, out var ddl)) options.DdlPolicy = ddl;
+        if (!string.IsNullOrWhiteSpace(ddlStr) && Enum.TryParse<RelationalDdlPolicy>(ddlStr, true, out var ddl)) options.DdlPolicy = ddl;
 
         var smStr = ReadProviderConfiguration(options.SchemaMatching.ToString(),
             Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
             Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
-        if (!string.IsNullOrWhiteSpace(smStr) && Enum.TryParse<SchemaMatchingMode>(smStr, true, out var sm)) options.SchemaMatching = sm;
+        if (!string.IsNullOrWhiteSpace(smStr) && Enum.TryParse<RelationalSchemaMatchingMode>(smStr, true, out var sm)) options.SchemaMatching = sm;
 
         options.AllowProductionDdl = Koan.Core.Configuration.Read(
             Configuration,
@@ -109,29 +104,27 @@ internal sealed class PostgresOptionsConfigurator : AdapterOptionsConfigurator<P
         options.SearchPath = ReadProviderConfiguration(options.SearchPath ?? "public",
             Infrastructure.Constants.Configuration.Keys.SearchPath);
 
-        Logger?.LogInformation("Final PostgreSQL Configuration");
-        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
-        Logger?.LogInformation("Database: {Database}", databaseName);
-        Logger?.LogInformation("PostgreSQL Orchestration-Aware Configuration Complete");
+        LogConfiguration(LogLevel.Information, "final",
+            ("connection", options.ConnectionString),
+            ("database", databaseName));
     }
 
     private string ResolveAutonomousConnection(
         string? databaseName,
         string? username,
-        string? password,
-        ILogger? logger)
+        string? password)
     {
         try
         {
             if (IsAutoDetectionDisabled())
             {
-                logger?.LogInformation("Auto-detection disabled via configuration - using localhost");
+                LogDiscovery(LogLevel.Information, "disabled", ("fallback", "localhost"));
                 return BuildPostgresConnectionString("localhost", 5432, databaseName, username, password);
             }
 
             if (_discoveryCoordinator == null)
             {
-                logger?.LogWarning("Service discovery coordinator not available, falling back to localhost");
+                LogDiscovery(LogLevel.Warning, "coordinator-missing", ("fallback", "localhost"));
                 return BuildPostgresConnectionString("localhost", 5432, databaseName, username, password);
             }
 
@@ -156,18 +149,18 @@ internal sealed class PostgresOptionsConfigurator : AdapterOptionsConfigurator<P
 
             if (result.IsSuccessful)
             {
-                logger?.LogInformation("PostgreSQL discovered via autonomous discovery: {ServiceUrl}", result.ServiceUrl);
+                LogDiscovery(LogLevel.Information, "success", ("url", result.ServiceUrl));
                 return result.ServiceUrl;
             }
             else
             {
-                logger?.LogWarning("Autonomous PostgreSQL discovery failed, falling back to localhost");
+                LogDiscovery(LogLevel.Warning, "fallback", ("reason", result.ErrorMessage), ("fallback", "localhost"));
                 return BuildPostgresConnectionString("localhost", 5432, databaseName, username, password);
             }
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Error in autonomous PostgreSQL discovery, falling back to localhost");
+            LogDiscovery(LogLevel.Error, "exception", ("error", ex), ("fallback", "localhost"));
             return BuildPostgresConnectionString("localhost", 5432, databaseName, username, password);
         }
     }

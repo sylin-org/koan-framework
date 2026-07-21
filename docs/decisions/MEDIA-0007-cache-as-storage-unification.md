@@ -1,7 +1,14 @@
 # MEDIA-0007: Cache-as-Storage Unification
 
-**Status**: Accepted
+**Status**: Amended by [R07-17](../initiatives/koan-v1/work-items/r07/R07-17-media-recipe-truthfulness.md)
 **Date**: 2026-05-31
+
+> **Current implementation (2026-07-16).** The durable write-through decision remains, but the implementation
+> does not use the source Entity type/profile described below. `MediaEntitySource<TEntity>` stores separate
+> framework-owned `MediaDerivation` records. The proposed generic sweep was removed in R07-17: the default
+> implementation never reclaimed anything, and a context-free source probe is unsafe across tenant/access axes.
+> Source-owning applications currently perform targeted cleanup. Treat the body below as the original decision
+> record; the [Media reference](../reference/media/index.md) is the current product contract.
 
 Extends MEDIA-0005 (recipe pipeline contract). Orthogonal to MEDIA-0006 (storage-entity media model) but builds on the lineage fields it formalizes.
 

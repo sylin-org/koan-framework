@@ -1,6 +1,8 @@
 # JOBS-0001: Jobs Pillar — Entity-First Task Management
 
-**Status**: Accepted
+> **Status: Superseded by JOBS-0005.** The Job Orchestrator rebuild is a greenfield replacement that discards the original `Koan.Jobs.Core` module described here.
+
+**Status**: Superseded by JOBS-0005
 **Date**: 2026-03-25
 **Deciders**: Enterprise Architect
 **Scope**: New pillar — Koan.Jobs.Core, Koan.Scheduling integration
@@ -11,8 +13,8 @@
 ## Context
 
 Long-running task management is a common need across Koan applications. The design was documented
-in `docs/design/KOAN-JOBS-PROPOSAL.md` (approved 2025-10-03) with a detailed 8-week implementation
-plan in `docs/design/jobs/IMPLEMENTATION-PLAN.md`. This ADR formalizes the proposal as an accepted
+in `docs/archive/design/KOAN-JOBS-PROPOSAL.md` (approved 2025-10-03) with a detailed 8-week implementation
+plan in `docs/archive/design/jobs/IMPLEMENTATION-PLAN.md`. This ADR formalizes the proposal as an accepted
 architectural decision.
 
 ## Decision
@@ -42,7 +44,7 @@ Adopt the Jobs pillar as described in KOAN-JOBS-PROPOSAL v3.0. Core tenets:
 
 ### Implementation Plan
 
-6 milestones over 8 weeks — see `docs/design/jobs/IMPLEMENTATION-PLAN.md`.
+6 milestones over 8 weeks — see `docs/archive/design/jobs/IMPLEMENTATION-PLAN.md`.
 
 ## Consequences
 
@@ -57,7 +59,7 @@ Adopt the Jobs pillar as described in KOAN-JOBS-PROPOSAL v3.0. Core tenets:
 
 ## References
 
-- [KOAN-JOBS-PROPOSAL](../design/KOAN-JOBS-PROPOSAL.md) — Full design document (v3.0)
-- [Implementation Plan](../design/jobs/IMPLEMENTATION-PLAN.md) — 6-milestone roadmap
-- [Architectural Decisions](../design/jobs/ARCHITECTURAL-DECISIONS.md) — 12 approved ADRs
+- [KOAN-JOBS-PROPOSAL](../archive/design/KOAN-JOBS-PROPOSAL.md) — Full design document (v3.0)
+- [Implementation Plan](../archive/design/jobs/IMPLEMENTATION-PLAN.md) — 6-milestone roadmap
+- [Architectural Decisions](../archive/design/jobs/ARCHITECTURAL-DECISIONS.md) — 12 approved ADRs
 - ARCH-0074: Framework Gap Analysis (Phase 4 tracks execution)

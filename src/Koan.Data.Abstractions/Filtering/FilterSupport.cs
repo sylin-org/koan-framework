@@ -13,6 +13,13 @@ public sealed record FilterSupport(
     bool NestedPaths = true,
     bool IgnoreCase = false)
 {
+    /// <summary>
+    /// Whether the provider can faithfully negate a supported subtree, including rows where a
+    /// referenced field is null or absent. Providers with three-valued or missing-key semantics
+    /// must opt out so the shared splitter leaves the complete <c>Not</c> node residual.
+    /// </summary>
+    public bool SupportsNegation { get; init; } = true;
+
     /// <summary>Can the provider push the operator on a field of the given kind?</summary>
     public bool CanPush(FilterOperator op, bool collectionField)
         => (collectionField ? CollectionOperators : ScalarOperators).Contains(op);
@@ -21,8 +28,15 @@ public sealed record FilterSupport(
     private static readonly IReadOnlySet<FilterOperator> EveryOp =
         new HashSet<FilterOperator>((FilterOperator[])Enum.GetValues(typeof(FilterOperator)));
 
-    /// <summary>Pushes nothing — any non-empty filter becomes a residual and therefore a hard error.</summary>
-    public static FilterSupport None { get; } = new(NoOps, NoOps, NestedPaths: false, IgnoreCase: false);
+    /// <summary>
+    /// Pushes nothing, so every non-empty filter becomes residual work. Entity materialized queries
+    /// may evaluate that residual in memory; provider-bounded Entity streams may evaluate it
+    /// pointwise over bounded candidate pages; consumers that cannot safely realize residuals reject.
+    /// </summary>
+    public static FilterSupport None { get; } = new(NoOps, NoOps, NestedPaths: false, IgnoreCase: false)
+    {
+        SupportsNegation = false
+    };
 
     /// <summary>Pushes every operator (e.g. in-memory / oracle adapters that evaluate the AST directly).</summary>
     public static FilterSupport Full { get; } = new(EveryOp, EveryOp, NestedPaths: true, IgnoreCase: true);

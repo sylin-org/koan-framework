@@ -39,7 +39,7 @@ public sealed class ElasticSearchTestFactory : IVectorAdapterTestFactory
     public bool SupportsDynamicCollections   => true;
     public bool SupportsScoreNormalization   => false;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (_initialized) return;
         _initialized = true;
@@ -58,7 +58,7 @@ public sealed class ElasticSearchTestFactory : IVectorAdapterTestFactory
         {
 #pragma warning disable CS0618 // Testcontainers parameterless ContainerBuilder ctor deprecated; still functional.
             _container = new ContainerBuilder()
-                .WithImage("docker.elastic.co/elasticsearch/elasticsearch:8.13.4")
+                .WithImage("docker.elastic.co/elasticsearch/elasticsearch:9.4.3")
                 .WithEnvironment("discovery.type", "single-node")
                 .WithEnvironment("xpack.security.enabled", "false")
                 .WithEnvironment("ES_JAVA_OPTS", "-Xms512m -Xmx512m")
@@ -84,7 +84,7 @@ public sealed class ElasticSearchTestFactory : IVectorAdapterTestFactory
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _adminHttp?.Dispose();
         if (_sp is not null) await _sp.DisposeAsync();
@@ -131,7 +131,7 @@ public sealed class ElasticSearchTestFactory : IVectorAdapterTestFactory
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddLogging();
         services.AddHttpClient("elasticsearch", c => c.BaseAddress = new Uri(_endpoint));
-        services.AddKoanDataVector();
+        services.AddVectorAdapterTestRuntime();
 
         services.AddOptions<ElasticSearchOptions>().Configure(o =>
         {

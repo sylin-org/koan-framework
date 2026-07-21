@@ -4,7 +4,7 @@ namespace Koan.ZenGarden.Koi;
 /// A Moss Stone discovered via Koi's mDNS-to-HTTP bridge.
 /// Immutable value object — mapped from a Koi SSE <c>resolved</c> event.
 /// </summary>
-public sealed record DiscoveredStone
+internal sealed record DiscoveredStone
 {
     /// <summary>mDNS instance name or TXT <c>stone_name</c>.</summary>
     public required string StoneName { get; init; }

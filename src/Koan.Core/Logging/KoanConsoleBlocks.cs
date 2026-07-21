@@ -5,6 +5,8 @@ using System.Text;
 using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Observability.Health;
+using Koan.Core.Diagnostics;
+using Koan.Core.Infrastructure;
 
 namespace Koan.Core.Logging;
 
@@ -19,10 +21,14 @@ internal static class KoanConsoleBlocks
         IReadOnlyList<(string Name, string Version)> modules,
         string runtimeVersion,
         RegistrySummarySnapshot? registry,
-        HealthSnapshot? health)
+        HealthSnapshot? health,
+        int registeredProbes = 0,
+        string? compositionLine = null,
+        KoanFactEnvelope? runtimeFacts = null)
     {
         var identity = snapshot.Application;
         var uniqueModules = DeduplicateModules(modules);
+        var factView = KoanStartupFactView.Compile(runtimeFacts);
 
         var builder = new KoanConsoleBlockBuilder(KoanLogStage.Boot, "Application", DefaultWidth, "[KOAN]")
             .AddLine(FormatKeyValue("Name", identity.Name))
@@ -57,10 +63,72 @@ internal static class KoanConsoleBlocks
         {
             builder.AddLine("");
             builder.AddLine(FormatSectionDivider("Registry"));
-            builder.AddLine(FormatKeyValue("Initializers", FormatInitializerSummary(registry.Value)));
-            builder.AddLine(FormatKeyValue("AutoReg", registry.Value.AutoRegistrars.ToString()));
+            builder.AddLine(FormatKeyValue("Modules", FormatModuleSummary(registry.Value)));
             builder.AddLine(FormatKeyValue("Background", FormatBackgroundSummary(registry.Value)));
             builder.AddLine(FormatKeyValue("Adapters", registry.Value.ServiceDiscoveryAdapters.ToString()));
+
+            // P1.1 composition lockfile verdict: "composition: <n> modules · lockfile ok|DRIFT(<keys>)".
+            if (!string.IsNullOrWhiteSpace(compositionLine))
+            {
+                builder.AddLine(FormatKeyValue("Composition", compositionLine!));
+            }
+
+            // MODULES-FAILED block (Track F · fail-fast.json): in lenient boot a broken module no longer
+            // vanishes — it is rendered here so the operator can see it in the boot report.
+            var factFailures = factView.ModuleFailures;
+            var failures = registry.Value.ModuleFailures;
+            if (factFailures.Length > 0 || failures is { Count: > 0 })
+            {
+                builder.AddLine("");
+                builder.AddLine(FormatSectionDivider("MODULES-FAILED"));
+                if (factFailures.Length > 0)
+                {
+                    foreach (var failure in factFailures)
+                    {
+                        builder.AddLine(FormatKeyValue(failure.Subject, failure.Summary));
+                        if (!string.IsNullOrWhiteSpace(failure.Correction))
+                            builder.AddLine(FormatKeyValue("Correction", failure.Correction!));
+                    }
+                }
+                else
+                {
+                    foreach (var failure in failures)
+                    {
+                        builder.AddLine(FormatKeyValue(failure.Module, $"[{failure.Phase}] {failure.Error}"));
+                    }
+                }
+            }
+        }
+
+        var elections = factView.Decisions;
+        if (elections.Length > 0)
+        {
+            builder.AddLine("");
+            builder.AddLine(FormatSectionDivider("Decisions"));
+            foreach (var election in elections)
+                builder.AddLine(FormatKeyValue(election.Subject, election.Summary));
+        }
+
+        var guarantees = factView.Guarantees;
+        if (guarantees.Length > 0)
+        {
+            builder.AddLine("");
+            builder.AddLine(FormatSectionDivider("Guarantees"));
+            foreach (var guarantee in guarantees)
+                builder.AddLine(FormatKeyValue(guarantee.Subject, guarantee.Summary));
+        }
+
+        var diagnosticIssues = factView.Diagnostics;
+        if (diagnosticIssues.Length > 0)
+        {
+            builder.AddLine("");
+            builder.AddLine(FormatSectionDivider("Diagnostics"));
+            foreach (var issue in diagnosticIssues)
+            {
+                builder.AddLine(FormatKeyValue(issue.Subject, issue.Summary));
+                if (!string.IsNullOrWhiteSpace(issue.Correction))
+                    builder.AddLine(FormatKeyValue("Correction", issue.Correction!));
+            }
         }
 
         if (uniqueModules.Count > 0)
@@ -81,7 +149,7 @@ internal static class KoanConsoleBlocks
             .AddLine(FormatKeyValue("Process", $"Started {snapshot.ProcessStart:o}"))
             .AddLine(FormatKeyValue("Uptime", FormatUptime(snapshot.ProcessStart)))
             .AddLine(FormatKeyValue("Machine", Environment.MachineName))
-            .AddLine(FormatKeyValue("Health", FormatInventoryHealth(health)));
+            .AddLine(FormatKeyValue("Health", FormatInventoryHealth(health, registeredProbes)));
 
         return builder.Build();
     }
@@ -166,14 +234,14 @@ internal static class KoanConsoleBlocks
         return string.Join(" → ", segments.Select(s => $"{s.Label}({FormatDuration(s.Duration)})"));
     }
 
-    private static string FormatInitializerSummary(RegistrySummarySnapshot summary)
+    private static string FormatModuleSummary(RegistrySummarySnapshot summary)
     {
         var builder = new StringBuilder();
-        builder.Append(summary.Initializers);
+        builder.Append(summary.Modules);
 
-        if (summary.Initializers > 0 && summary.InitializerBreakdown.Count > 0)
+        if (summary.Modules > 0 && summary.ModuleBreakdown.Count > 0)
         {
-            var ordered = summary.InitializerBreakdown
+            var ordered = summary.ModuleBreakdown
                 .OrderByDescending(item => item.Count)
                 .ThenBy(item => item.Namespace, StringComparer.OrdinalIgnoreCase)
                 .Take(4)
@@ -187,9 +255,9 @@ internal static class KoanConsoleBlocks
             {
                 builder.Append(" (");
                 builder.Append(string.Join(", ", breakdown));
-                if (summary.InitializerBreakdown.Count > breakdown.Length)
+                if (summary.ModuleBreakdown.Count > breakdown.Length)
                 {
-                    builder.Append($", +{summary.InitializerBreakdown.Count - breakdown.Length}");
+                    builder.Append($", +{summary.ModuleBreakdown.Count - breakdown.Length}");
                 }
                 builder.Append(')');
             }
@@ -239,11 +307,18 @@ internal static class KoanConsoleBlocks
         return string.Join(' ', segments);
     }
 
-    private static string FormatInventoryHealth(HealthSnapshot? health)
+    private static string FormatInventoryHealth(HealthSnapshot? health, int registeredProbes)
     {
-        if (health is null)
+        // Boot-report race (H9): this block renders synchronously during host startup, BEFORE
+        // StartupProbeService's background task has pushed any samples. An empty snapshot at this instant
+        // is not a verdict — printing overall=Unknown (or a fabricated overall=Healthy from the empty
+        // aggregate) would be a race. Report "pending" when probes are registered but have not reported
+        // yet, and "none registered" when there is genuinely nothing to probe.
+        if (health is null || health.Components.Count == 0)
         {
-            return "probes=0 overall=Unknown";
+            return registeredProbes > 0
+                ? $"probes pending (registered={registeredProbes})"
+                : "probes=0 (none registered)";
         }
 
         var total = health.Components.Count;

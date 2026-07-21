@@ -2,10 +2,14 @@
 id: FLOW-0103
 slug: flow-dx-toolkit-controllers-monitor-adapter
 domain: flow
-status: accepted
+status: Retired
 date: 2025-09-01
 title: Flow DX toolkit - FlowEntityController, mutable OnProjected monitor, adapter metadata, and actions (OOB via AutoRegistrar)
 ---
+
+# FLOW-0103 - Flow DX toolkit
+
+> **Status: Retired.** Describes the original Flow pillar generation, superseded by the Koan.Canon rebuild.
 
 ## Context
 

@@ -52,6 +52,12 @@ internal sealed class CacheEntryBuilder<T> : ICacheEntryBuilder<T>
         return this;
     }
 
+    public ICacheEntryBuilder<T> WithTier(CacheTier tier)
+    {
+        _options = _options with { Tier = tier };
+        return this;
+    }
+
     public ICacheEntryBuilder<T> WithTags(params string[] tags)
     {
         _options = _options.WithTags(tags);
@@ -67,12 +73,6 @@ internal sealed class CacheEntryBuilder<T> : ICacheEntryBuilder<T>
     public ICacheEntryBuilder<T> BroadcastInvalidation(bool value = true)
     {
         _options = _options with { ForceCoherenceBroadcast = value };
-        return this;
-    }
-
-    public ICacheEntryBuilder<T> WithConsistency(CacheConsistencyMode mode)
-    {
-        _options = _options with { Consistency = mode };
         return this;
     }
 

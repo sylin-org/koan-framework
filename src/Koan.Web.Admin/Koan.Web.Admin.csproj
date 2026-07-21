@@ -1,15 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Web dashboard surface for Koan Admin: prefix-aware routing, diagnostics APIs, and LaunchKit scaffolding.</Description>
-    <PackageTags>$(CommonPackageTags);admin;dashboard;diagnostics;launchkit</PackageTags>
+    <Description>Development-only, read-only dashboard for sanitized Koan runtime, health, and provenance insight.</Description>
+    <PackageTags>$(CommonPackageTags);admin;dashboard;diagnostics;development;provenance</PackageTags>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Koan.Admin\Koan.Admin.csproj" />
-    <ProjectReference Include="..\Koan.ServiceMesh.Abstractions\Koan.ServiceMesh.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
   </ItemGroup>
   <ItemGroup>

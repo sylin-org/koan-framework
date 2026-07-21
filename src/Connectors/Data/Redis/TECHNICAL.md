@@ -2,18 +2,32 @@
 uid: reference.modules.Koan.data.redis
 title: Koan.Data.Connector.Redis - Technical Reference
 description: Redis adapter for Koan data.
-since: 0.2.x
 packages: [Sylin.Koan.Data.Connector.Redis]
 source: src/Koan.Data.Connector.Redis/
 ---
 
 ## Contract
 
-- Key-value/document patterns; limited query semantics; paging where meaningful.
+- Key-value/document patterns with limited query semantics and caller-visible numbered paging.
+- The adapter does not declare `DataCaps.Query.ProviderBoundedPaging`; its current scan path cannot
+  prove that a requested page is applied before the keyspace is traversed.
+
+## Streaming boundary
+
+- `AllStream` and `QueryStream` fail correctively with `QueryStreamRejectedException` before yielding;
+  there is no complete-result materializing fallback.
+- Use `All`/`Query` only for known-small sets. Use `FirstPage`/`Page` to limit the result returned to
+  application code, without inferring a provider-side scan bound.
+- A later incremental Redis implementation must earn a separate capability claim through shared
+  conformance before these Entity streams become available.
 
 ## Configuration
 
-- Endpoints, SSL, timeouts, naming and TTL policies.
+- The transitive `Sylin.Koan.Redis` backend owns endpoints, SSL, timeouts, discovery, orchestration, and host-lifetime
+  connection pooling. `ConnectionStrings:Redis` configures the common endpoint.
+- A named Data source may select its own endpoint and logical database. The shared backend reuses one connection
+  multiplexer per distinct endpoint; the default DI multiplexer is also consumed by Cache Redis when present.
+- Referencing this Data adapter activates the Redis backend. Referencing Cache Redis alone does not activate Data.
 
 ## Key conventions
 
@@ -32,11 +46,13 @@ source: src/Koan.Data.Connector.Redis/
 
 ## Operations
 
-- Health: `PING` round-trip for readiness; simple get/set smoke checks.
+- Health: an available Redis package stays non-critical until it wins default election or a runtime operation selects
+  one of its sources. Active sources receive a `PING` round-trip through the same pooled endpoint used by Entity work.
 - Metrics: connection pool size, operation latency, error rates.
 - Logs: key patterns only (no raw values); redact sensitive data.
 
 ## References
 
-- DATA-0061 paging/streaming: `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
+- [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
 

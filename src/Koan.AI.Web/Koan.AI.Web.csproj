@@ -1,10 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Koan AI Web: optional AI controllers/endpoints (chat, embeddings, health) for ASP.NET Core without coupling Koan.Web to AI.</Description>
+    <Description>Provider-neutral HTTP projection for Koan AI chat, embeddings, model inventory, and capability inspection.</Description>
     <PackageTags>$(CommonPackageTags);web;aspnetcore;controllers;ai;chat;embeddings</PackageTags>
   </PropertyGroup>
   <ItemGroup>
@@ -16,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\Koan.Web.Sse\Koan.Web.Sse.csproj" />
   </ItemGroup>
 </Project>

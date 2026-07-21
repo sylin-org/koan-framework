@@ -1,5 +1,9 @@
 # ARCH-0070: Attribute-Driven AI Embeddings & Semantic Search
 
+> **R07-05 implementation amendment (2026-07-15):** automatic embedding maintenance now composes a
+> host-owned `Entity<T>.Lifecycle.AfterUpsert` handler. References below to `Entity.Events`, the old
+> executor, or source locations are historical; the entity-first behavior remains implemented.
+
 **Status:** ✅ **ACCEPTED** - Fully Implemented
 **Date:** 2025-01-05 (Proposed) / 2025-11-05 (Accepted)
 **Feasibility:** ✅ **HIGHLY FEASIBLE** - Infrastructure 90% complete

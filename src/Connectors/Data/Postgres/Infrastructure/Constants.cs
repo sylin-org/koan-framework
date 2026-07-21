@@ -14,9 +14,6 @@ public static class Constants
             public const string ConnectionStringsPostgres = "ConnectionStrings:Postgres";
             public const string ConnectionStringsDefault = "ConnectionStrings:Default";
 
-            public const string DefaultPageSize = Section + ":DefaultPageSize";
-            public const string AltDefaultPageSize = AltSection + ":DefaultPageSize";
-
             public const string DdlPolicy = Section + ":DdlPolicy";
             public const string AltDdlPolicy = AltSection + ":DdlPolicy";
             public const string SchemaMatchingMode = Section + ":SchemaMatchingMode";

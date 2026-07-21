@@ -1,5 +1,5 @@
-using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
+using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
 
@@ -12,9 +12,10 @@ namespace Koan.Data.Core;
 /// </summary>
 public static class AggregateExtensions
 {
+    private const string DataOperation = "aggregate data access";
+
     private static IDataService DataService()
-        => Koan.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
-            ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddKoan() and greenfield boot (AppHost.Current + IAppRuntime).");
+        => AppHost.GetRequiredService<IDataService>(DataOperation);
 
     // Instance-level convenience: model.Upsert() (generic key)
     /// <summary>
@@ -121,11 +122,14 @@ public static class AggregateExtensions
         return resultProp?.GetValue(task);
     }
 
-    // Non-generic instance Delete() using Identifier attribute (or Id) with cached metadata
+    // Explicit runtime compatibility path for callers that truly do not know the entity type.
+    // Deliberately not an extension: arbitrary objects must not advertise persistence verbs.
     /// <summary>
-    /// Runtime Delete for unknown entity types; uses Identifier metadata or Id to locate the key.
+    /// Runtime compatibility path for deleting an entity whose type is unknown at compile time.
+    /// Typed application code should call <c>entity.Remove()</c> instead.
     /// </summary>
-    public static async Task<bool> Delete(this object model, CancellationToken ct = default)
+    [Obsolete("Use entity.Remove() for typed Entity code. Runtime-only callers may temporarily use AggregateExtensions.Delete(model) until they adopt a typed boundary.")]
+    public static async Task<bool> Delete(object model, CancellationToken ct = default)
     {
         if (model is null) throw new System.ArgumentNullException(nameof(model));
         var type = model.GetType();

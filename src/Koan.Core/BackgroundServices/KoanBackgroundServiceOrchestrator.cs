@@ -70,9 +70,6 @@ public class KoanBackgroundServiceOrchestrator : BackgroundService, IHealthContr
 
         try
         {
-            // Initialize service locator
-            ServiceLocator.SetProvider(_serviceProvider);
-
             // Discover all background services
             var backgroundServices = _serviceProvider.GetServices<IKoanBackgroundService>().ToList();
             _logger.LogKoanServices($"discovered {backgroundServices.Count} background services");
@@ -270,6 +267,44 @@ public class KoanBackgroundServiceOrchestrator : BackgroundService, IHealthContr
 
         return Task.FromResult(HealthReport.Healthy(
             $"Background services: {runningCount}/{totalCount} running"));
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await base.StopAsync(cancellationToken).ConfigureAwait(false);
+
+        var contexts = _runningServices.ToArray();
+        if (contexts.Length == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.WhenAll(contexts.Select(context => context.Task))
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The host's shutdown deadline bounds graceful child cleanup.
+        }
+        catch (OperationCanceledException) when (contexts.All(context => context.CancellationTokenSource.IsCancellationRequested))
+        {
+            // Child cancellation is the expected cooperative shutdown path.
+        }
+        catch (Exception)
+        {
+            // Faulted children are reported individually below without turning host shutdown into a second failure.
+        }
+
+        foreach (var context in contexts.Where(context => context.Task.IsFaulted))
+        {
+            _logger.LogError(
+                context.Task.Exception,
+                "Background service failed during shutdown: {ServiceName}",
+                context.Service.Name);
+        }
     }
 
     public override void Dispose()

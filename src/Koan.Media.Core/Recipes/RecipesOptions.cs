@@ -8,7 +8,8 @@ namespace Koan.Media.Core.Recipes;
 /// </summary>
 public sealed class RecipesOptions
 {
-    public const string SectionPath = "Koan:Media:Recipes";
+    public const string RootSectionPath = "Koan:Media";
+    public const string SectionPath = RootSectionPath + ":Recipes";
 
     public Dictionary<string, ConfiguredRecipe> Recipes { get; set; } = new();
 }
@@ -19,7 +20,6 @@ public sealed class ConfiguredRecipe
     public int Version { get; set; } = 1;
     public List<ConfiguredStep> Steps { get; set; } = new();
     public List<string> Mutators { get; set; } = new();
-    public bool Eager { get; set; }
 }
 
 /// <summary>

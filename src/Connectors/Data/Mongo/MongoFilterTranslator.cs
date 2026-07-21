@@ -26,7 +26,7 @@ namespace Koan.Data.Connector.Mongo;
 /// EnumRepresentationConvention), DateTime, Decimal, etc. The translator never re-derives a value's
 /// BSON form, so write↔query encoding cannot drift per type. Collection (List&lt;string&gt;) ELEMENT
 /// values are emitted as their native CLR type (the array element serializer is carved out — see
-/// MongoOptimizationAutoRegistrar).
+/// MongoDriverConfiguration).
 /// </summary>
 internal sealed class MongoFilterTranslator<TEntity>
 {
@@ -83,7 +83,9 @@ internal sealed class MongoFilterTranslator<TEntity>
     private FilterDefinition<TEntity> BuildField(FieldFilter f, ResolvedField field)
     {
         var b = Builders<TEntity>.Filter;
-        var name = MapPath(f.Field);
+        // Bind caller casing once at the shared resolver; storage translation always consumes the
+        // canonical CLR member path so every adapter applies the same field semantics.
+        var name = MapPath(field.CanonicalPath ?? f.Field);
         var op = f.Operator;
 
         if (op == FilterOperator.Exists)

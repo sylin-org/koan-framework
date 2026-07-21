@@ -7,17 +7,13 @@ namespace Koan.Cache.Abstractions.Primitives;
 public sealed record CacheReadOptions(
     string? Region,
     string? ScopeId,
-    CacheConsistencyMode Consistency,
     System.TimeSpan? AllowStaleFor)
 {
     /// <summary>
-    /// Default read options: no region/scope, <see cref="CacheConsistencyMode.Strict"/> consistency,
-    /// no stale window. Per ARCH-0078, default reads are "fresh or null" — SWR is an explicit
-    /// per-call opt-in via <see cref="AllowStaleFor"/>.
+    /// Default read options are fresh-or-miss with no stale-serving window.
     /// </summary>
     public static CacheReadOptions Default { get; } = new(
         Region: null,
         ScopeId: null,
-        Consistency: CacheConsistencyMode.Strict,
         AllowStaleFor: null);
 }

@@ -4,12 +4,12 @@ domain: data
 title: "Data Modeling Playbook"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-11-09
-framework_version: v0.6.3
+last_updated: 2026-07-19
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2025-11-09
-  status: verified
-  scope: all-examples-tested
+  date_last_tested: 2026-07-19
+  status: reviewed
+  scope: Entity, Jobs, and Communication terminology plus canonical links
 related_guides:
   - entity-capabilities-howto.md
   - canon-capabilities-howto.md
@@ -24,13 +24,14 @@ related_guides:
 - **Inputs**: A Koan application with `builder.Services.AddKoan()`, at least one data adapter, and baseline knowledge of entities and dependency injection.
 - **Outputs**: An entity-first domain model with encapsulated rules, safe relationships, and streaming/vector patterns ready for downstream systems.
 - **Error Modes**: Capability mismatches, missing lifecycle opt-ins when `ProtectAll()` is active, or unbounded materialization in interactive endpoints.
-- **Success Criteria**: Entities expose clear static helpers, business invariants live with the model, and Flow/AI/Messaging integrations avoid custom repositories.
+- **Success Criteria**: Entities expose clear static helpers, business invariants live with the model, and AI/Communication integrations avoid custom repositories.
 
 ### Edge Cases
 
 - **Multiple adapters** – set defaults via configuration and scope specialty stores with `[DataAdapter]`.
 - **Lifecycle gatekeeping** – treat cancellations as first-class outcomes and convert them into domain-specific errors.
-- **Background workloads** – always pass `CancellationToken` through `AllStream`/`QueryStream` calls.
+- **Background workloads** – use `AllStream`/`QueryStream` only with
+  `DataCaps.Query.ProviderBoundedPaging`, and always pass a `CancellationToken`.
 - **Vector migrations** – align embedding dimensions with the configured provider before backfilling historical data.
 - **Bulk writes** – verify adapter capabilities before assuming transactional or batched semantics.
 
@@ -39,9 +40,9 @@ related_guides:
 ## How to Use This Playbook
 
 - 📌 Reference hub: [Data Pillar Reference](../reference/data/index.md)
-- 🔁 Lifecycle matrix: [Entity Lifecycle Events](../reference/data/entity-lifecycle-events.md)
-- 🌊 Orchestration partner: [Flow Pillar Reference](../reference/flow/index.md)
-- 📮 Delivery surface: [API Delivery Playbook](./building-apis.md)
+- 🔁 Lifecycle matrix: [Entity Lifecycle](../reference/data/entity-lifecycle.md)
+- 🧠 Capability partner: [Entity Capabilities](entity-capabilities-howto.md)
+- 📮 Delivery surface: [Web reference](../reference/web/index.md)
 
 Treat each section as a readiness checklist before shipping a model.
 
@@ -49,7 +50,7 @@ Treat each section as a readiness checklist before shipping a model.
 
 ## 1. Define the Aggregate Boundary
 
-1. Model required fields first; Koan supplies identifiers and timestamps automatically.
+1. Model required fields first; Koan supplies identifiers automatically. For created/updated timestamps, declare `DateTimeOffset` properties marked `[Timestamp]` (creation stamp) or `[Timestamp(OnSave = true)]` (updated on every save).
 2. Add defaults to avoid null checks inside controllers.
 3. Publish starter query helpers on the entity itself.
 
@@ -59,8 +60,11 @@ public class Todo : Entity<Todo>
     public string Title { get; set; } = "";
     public bool IsCompleted { get; set; }
 
-    public static Task<Todo[]> Recent(int days = 7, CancellationToken ct = default) =>
-        Query().Where(t => t.Created > DateTimeOffset.UtcNow.AddDays(-days)).ToArrayAsync(ct);
+    [Timestamp]
+    public DateTimeOffset Created { get; set; }
+
+    public static Task<IReadOnlyList<Todo>> Recent(int days = 7, CancellationToken ct = default) =>
+        Query(t => t.Created > DateTimeOffset.UtcNow.AddDays(-days), ct);
 }
 ```
 
@@ -68,22 +72,31 @@ public class Todo : Entity<Todo>
 
 ## 2. Capture Relationships Early
 
-- Store foreign keys as strings for provider neutrality.
-- Offer navigation helpers on both sides so higher layers never reach for repositories.
-- Wrap common lookups inside static methods.
+- Declare foreign keys with `[Parent]`; use the Entity navigation surface rather than repositories.
+- Use `GetParent<T>()` or `GetChildren<T>()` for one explicit edge.
+- Use `Relatives()` only when the business result needs every declared direct edge. The same operation
+  accepts one Entity, a finite selection, or a provider-bounded Entity stream.
 
 ```csharp
 public class Order : Entity<Order>
 {
+    [Parent(typeof(User))]
     public string UserId { get; set; } = "";
-    public Task<User?> GetUser(CancellationToken ct = default) => User.Get(UserId, ct);
+
+    [Timestamp]
+    public DateTimeOffset Created { get; set; }
+
 }
 
 public class User : Entity<User>
 {
-    public Task<Order[]> GetRecentOrders(CancellationToken ct = default) =>
-        Order.Query().Where(o => o.UserId == Id && o.Created > DateTimeOffset.UtcNow.AddDays(-30)).ToArrayAsync(ct);
+    public Task<IReadOnlyList<Order>> GetRecentOrders(CancellationToken ct = default) =>
+        Order.Query(o => o.UserId == Id && o.Created > DateTimeOffset.UtcNow.AddDays(-30), ct);
 }
+
+var user = await order.GetParent<User>(ct) ?? throw new InvalidOperationException("Order has no user.");
+var recent = await user.GetChildren<Order>(ct);
+var graphs = await recent.Relatives(ct);
 ```
 
 ---
@@ -134,32 +147,28 @@ public class Product : Entity<Product>
 
 ## 5. Apply Lifecycle Policies
 
-- Start each lifecycle module with `ProtectAll()` and opt-in only the properties you intend to mutate.
-- Use `BeforeUpsert`/`BeforeDelete` for guardrails, `AfterLoad` for hydration.
-- Keep hook classes static to avoid double registration.
+- Compose persistence policy inside `AddKoan(() => ...)`; the plan belongs to that host.
+- Use `BeforeUpsert`/`BeforeRemove` for guardrails and return `ctx.Proceed()` or `ctx.Cancel(...)`.
+- Call `Protect(...)` or `ProtectAll()` in the relevant before-handler when later handlers must not
+  mutate those values. Use `AfterLoad` only for small, deterministic hydration.
 
 ```csharp
-public static class ProductLifecycle
-{
-    public static void Configure(EntityLifecycleBuilder<Product> pipeline)
+builder.Services.AddKoan(() =>
+    Product.Lifecycle.BeforeUpsert(ctx =>
     {
-        pipeline.ProtectAll()
-                .Allow(p => p.Price, p => p.Description)
-                .BeforeUpsert(async (ctx, next) =>
-                {
-                    if (ctx.Entity.Price < 0) throw new InvalidOperationException("Price cannot be negative.");
-                    await next();
-                });
-    }
-}
+        ctx.Protect(nameof(Product.Id));
+        return ctx.Current.Price < 0
+            ? ctx.Cancel("Price cannot be negative.", "product.negative_price")
+            : ctx.Proceed();
+    }));
 ```
 
 ---
 
 ## 6. Design for Scale from Day One
 
-- Prefer `FirstPage`/`Page` or streaming helpers for high-volume reads.
-- Document batch sizes for Flow pipelines and background jobs.
+- Prefer explicit `FirstPage`/`Page`; use streaming helpers only on a qualified adapter.
+- Document provider page sizes separately from pipeline concurrency and job windows.
 - Declare vector annotations early if semantic search or AI is on the roadmap.
 
 ---
@@ -167,7 +176,7 @@ public static class ProductLifecycle
 ## 7. Wire Configuration and Capabilities
 
 - Declare the default adapter in configuration and scope overrides with `[DataAdapter("alias")]`.
-- Inspect `EntityCaps<T>` or `Data<T, string>.Capabilities` before enabling transactions, vectors, or sharding.
+- Inspect `Data<T, string>.Capabilities` (a `CapabilitySet`) before enabling transactions, vectors, or sharding.
 - Capture environment-specific overrides in deployment manifests or `launchSettings.json`.
 
 ---
@@ -179,14 +188,14 @@ Use this checklist before exposing the model:
 - [ ] Static helpers cover expected CRUD and query shapes.
 - [ ] Lifecycle hooks guard critical invariants and emit meaningful error codes.
 - [ ] Relationships expose navigation helpers or dedicated query methods.
-- [ ] Paging/streaming helpers support high-volume reads.
-- [ ] Downstream pillars (Flow, Messaging, AI) know which helpers to call.
+- [ ] Paging is explicit, and any stream is backed by `ProviderBoundedPaging`.
+- [ ] Downstream capabilities (Web, Jobs, Communication, AI) know which Entity operations to call.
 
 ---
 
 ## Pattern Recipes
 
-Leverage these recipes as living examples. Full walkthroughs live in the [Entity Pattern Recipe Catalog](../examples/entity-pattern-recipes.md).
+Use these stages as a progression. Each adds one business capability without changing the Entity grammar.
 
 ### Stage 1 – CRUD Backbone
 
@@ -199,60 +208,42 @@ public class InventoryItem : Entity<InventoryItem>
     public string Sku { get; set; } = "";
     public int Quantity { get; set; }
 
-    public static Task<InventoryItem?> BySku(string sku, CancellationToken ct = default) =>
-        Query().Where(i => i.Sku == sku).FirstOrDefaultAsync(ct);
+    public static async Task<InventoryItem?> BySku(string sku, CancellationToken ct = default) =>
+        (await Query(i => i.Sku == sku, ct)).FirstOrDefault();
 }
 ```
 
-### Stage 2 – Event-Driven Messaging
+### Stage 2 – Entity communication
 
-- Pair domain updates with events using the same entity patterns.
-- Flow handlers subscribe to create/update hooks to broadcast changes.
+- Name a business occurrence and raise it from the application operation that owns that decision.
+- Let the Communication ring choose local or connector-backed delivery without changing the Entity terminal.
 
 ```csharp
-public class PriceChanged : Entity<PriceChanged>
-{
-    public string ProductId { get; set; } = "";
-    public decimal OldPrice { get; set; }
-    public decimal NewPrice { get; set; }
-}
+public sealed record PriceChanged(decimal OldPrice, decimal NewPrice);
 
-public static class ProductEvents
-{
-    public static void Configure(FlowPipeline pipeline) =>
-        pipeline.OnUpdate<Product>(async (updated, previous) =>
-        {
-            if (updated.Price == previous.Price) return UpdateResult.Continue();
-
-            await new PriceChanged
-            {
-                ProductId = updated.Id,
-                OldPrice = previous.Price,
-                NewPrice = updated.Price
-            }.Send();
-
-            return UpdateResult.Continue();
-        });
-}
+var previousPrice = product.Price;
+product.Price = newPrice;
+await product.Save(ct);
+await product.Events.Raise(new PriceChanged(previousPrice, newPrice), ct);
 ```
 
 ### Stage 3 – AI-Enriched Domain
 
 - Store embeddings alongside domain data.
-- Generate vectors during writes or in Flow background jobs.
+- Generate vectors during writes or from a durable `IKoanJob<T>` when the work should be retried.
 
 ```csharp
 [DataAdapter("weaviate")]
+[Embedding(Template = "{Description}")]
 public class ProductSearch : Entity<ProductSearch>
 {
     public string ProductId { get; set; } = "";
     public string Description { get; set; } = "";
 
-    [VectorField]
     public float[] DescriptionEmbedding { get; set; } = [];
 
-    public static Task<ProductSearch[]> SimilarTo(string query, CancellationToken ct = default) =>
-        Vector<ProductSearch>.SearchAsync(query, ct);
+    public static Task<VectorQueryResult<string>> SimilarTo(float[] queryVector, CancellationToken ct = default) =>
+        Vector<ProductSearch>.Search(queryVector, ct: ct);
 }
 ```
 
@@ -285,8 +276,8 @@ public class KnowledgeArticle : Entity<KnowledgeArticle>
         await Save();
     }
 
-    public static Task<KnowledgeArticle[]> Active(CancellationToken ct = default) =>
-        Query().Where(a => !a.IsDeleted).ToArrayAsync(ct);
+    public static Task<IReadOnlyList<KnowledgeArticle>> Active(CancellationToken ct = default) =>
+        Query(a => !a.IsDeleted, ct);
 }
 ```
 
@@ -328,13 +319,6 @@ public class Product : Entity<Product>
 
 ## Next Steps
 
-- Automate enrichment with the [Semantic Pipelines Playbook](./semantic-pipelines.md).
-- Publish APIs with the [API Delivery Playbook](./building-apis.md).
+- Automate enrichment with the [AI & Vector How-To](./ai-vector-howto.md).
+- Publish APIs with the [Web reference](../reference/web/index.md).
 - Expose diagnostics and runbooks inside the [Koan Troubleshooting Hub](../support/troubleshooting.md).
-
----
-
-## Validation
-
-- Last reviewed: 2025-09-28
-- Verified against Koan v0.6.2 sample services.

@@ -1,207 +1,142 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Koan.Admin.Contracts;
-using Koan.Admin.Services;
 using Koan.Core;
-using Koan.ServiceMesh.Abstractions;
+using Koan.Core.Modules.Pillars;
+using Koan.Core.Observability.Health;
+using Koan.Core.Provenance;
 using Koan.Web.Admin.Contracts;
 using Koan.Web.Admin.Infrastructure;
-using Microsoft.AspNetCore.Authorization;
+using Koan.Web.Admin.Options;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Web.Admin.Controllers;
 
 [ApiController]
-[Authorize]
 [ServiceFilter(typeof(KoanAdminAuthorizationFilter))]
-[Route(KoanAdminRouteConvention.ApiPlaceholder)]
+[Route(KoanAdminRouteConvention.RootPlaceholder)]
 [ApiExplorerSettings(GroupName = "KoanAdmin")]
-public sealed class KoanAdminStatusController : ControllerBase
+public sealed class KoanAdminStatusController(
+    IOptions<KoanAdminOptions> options,
+    IHostEnvironment environment,
+    IHealthAggregator? healthAggregator = null) : ControllerBase
 {
     private const string SecretMask = "********";
-    private readonly IKoanAdminFeatureManager _features;
-    private readonly IKoanAdminManifestService _manifest;
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<KoanAdminStatusController> _logger;
-
-    public KoanAdminStatusController(
-        IKoanAdminFeatureManager features,
-        IKoanAdminManifestService manifest,
-        IServiceProvider serviceProvider,
-        ILogger<KoanAdminStatusController> logger)
-    {
-        _features = features;
-        _manifest = manifest;
-        _serviceProvider = serviceProvider;
-        _logger = logger;
-    }
 
     [HttpGet("status")]
-    public async Task<ActionResult<KoanAdminStatusResponse>> GetStatus([FromQuery] bool? sanitized, CancellationToken cancellationToken)
+    public ActionResult<KoanAdminStatusResponse> GetStatus(CancellationToken cancellationToken)
     {
-        var snapshot = _features.Current;
-        if (!snapshot.Enabled || !snapshot.WebEnabled)
+        if (!IsActive())
         {
             return NotFound();
         }
 
-        var sanitizedRequested = sanitized ?? false;
-        var runtimeLocked = KoanEnv.IsProduction && !KoanEnv.AllowMagicInProduction;
-        var effectiveSanitized = runtimeLocked || sanitizedRequested;
-        var runtimeLockReason = runtimeLocked
-            ? "Production hosts require sanitized runtime details. Set Koan:AllowMagicInProduction=true to view raw diagnostics."
-            : null;
+        cancellationToken.ThrowIfCancellationRequested();
+        var provenance = KoanEnv.Provenance ?? ProvenanceRegistry.Instance.CurrentSnapshot;
+        var modules = provenance.Pillars
+            .SelectMany(pillar => pillar.Modules.Select(module => MapModule(pillar.Label, module)))
+            .OrderBy(module => module.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
-        var manifest = await _manifest.Build(cancellationToken);
-        var summary = manifest.ToSummary();
-        var health = manifest.Health;
-
-        var styles = KoanAdminModuleStyleResolver.ResolveAll(manifest.Modules);
-        var styleLookup = styles.ToDictionary(style => style.ModuleName, StringComparer.OrdinalIgnoreCase);
-
-        var modules = manifest.Modules
-            .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(m =>
-            {
-                var style = styleLookup.TryGetValue(m.Name, out var resolvedStyle)
-                    ? resolvedStyle
-                    : KoanAdminModuleStyleResolver.Resolve(m);
-
-                var settings = m.Settings
-                    .Select(s => new KoanAdminModuleSurfaceSetting(
-                        s.Key,
-                        string.IsNullOrWhiteSpace(s.Label) ? s.Key : s.Label,
-                        s.Description ?? "",
-                        s.Secret ? SecretMask : s.Value,
-                        s.Secret,
-                        s.Source,
-                        s.SourceKey,
-                        s.Consumers.Count == 0 ? [] : s.Consumers.ToArray()))
-                    .ToList();
-                var notes = m.Notes.ToList();
-                var tools = m.Tools
-                    .Select(t => new KoanAdminModuleSurfaceTool(t.Name, t.Route, t.Description, t.Capability))
-                    .ToList();
-                return new KoanAdminModuleSurface(
-                    m.Name,
-                    m.Version,
-                    m.Description,
-                    m.IsStub,
-                    settings,
-                    notes,
-                    style.Pillar,
-                    style.PillarClass,
-                    style.ModuleClass,
-                    style.Icon,
-                    style.ColorHex,
-                    style.ColorRgb,
-                    tools);
-            })
-            .ToList();
-
-        var startupNotes = modules
-            .SelectMany(m => m.Notes.Select(note => new KoanAdminStartupNote(m.Name, note)))
-            .ToList();
-
-        var configuration = BuildConfigurationSummaries(modules);
-        var runtime = KoanAdminRuntimeSurfaceFactory.Capture(effectiveSanitized, runtimeLocked, runtimeLockReason);
-
-        var response = new KoanAdminStatusResponse(KoanEnv.CurrentSnapshot, snapshot, runtime, summary, health, modules, configuration, startupNotes);
-        return Ok(response);
-    }
-
-    [HttpGet("manifest")]
-    public async Task<ActionResult<KoanAdminManifest>> GetManifest(CancellationToken cancellationToken)
-    {
-        var snapshot = _features.Current;
-        if (!snapshot.Enabled || !snapshot.WebEnabled)
-        {
-            return NotFound();
-        }
-
-        if (!snapshot.ManifestExposed)
-        {
-            return Forbid();
-        }
-
-        var manifest = await _manifest.Build(cancellationToken);
-        return Ok(manifest);
+        return Ok(new KoanAdminStatusResponse(
+            DateTimeOffset.UtcNow,
+            KoanEnv.CurrentSnapshot,
+            KoanAdminPathUtility.BuildMap(options.Value.PathPrefix),
+            KoanAdminRuntimeSurfaceFactory.Capture(),
+            BuildHealth(),
+            modules));
     }
 
     [HttpGet("health")]
-    public async Task<ActionResult<KoanAdminHealthDocument>> GetHealth(CancellationToken cancellationToken)
+    public ActionResult<KoanAdminHealthDocument> GetHealth(CancellationToken cancellationToken)
     {
-        var snapshot = _features.Current;
-        if (!snapshot.Enabled || !snapshot.WebEnabled)
+        if (!IsActive())
         {
             return NotFound();
         }
 
-        var health = await _manifest.GetHealth(cancellationToken);
-        return Ok(health);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Ok(BuildHealth());
     }
 
-    [HttpGet("service-mesh")]
-    [Produces("application/json")]
-    public async Task<ActionResult<KoanAdminServiceMeshSurface>> GetServiceMesh(CancellationToken cancellationToken)
-    {
-        var snapshot = _features.Current;
-        if (!snapshot.Enabled || !snapshot.WebEnabled)
-        {
-            return NotFound();
-        }
+    private bool IsActive() => environment.IsDevelopment() && options.Value.Enabled;
 
-        // Check if service mesh is registered
-        var serviceMesh = _serviceProvider.GetService<IKoanServiceMesh>();
-        if (serviceMesh == null)
+    private KoanAdminHealthDocument BuildHealth()
+    {
+        if (healthAggregator is null)
         {
-            return Ok(KoanAdminServiceMeshSurface.Empty);
+            return KoanAdminHealthDocument.Empty;
         }
 
         try
         {
-            var surface = await KoanAdminServiceMeshSurfaceFactory.Capture(
-                serviceMesh,
-                _serviceProvider,
-                cancellationToken
-            );
+            var snapshot = healthAggregator.GetSnapshot();
+            var components = snapshot.Components
+                .Select(component => new KoanAdminHealthComponent(
+                    component.Component,
+                    component.Status,
+                    component.Message,
+                    component.TimestampUtc,
+                    component.Facts ?? new Dictionary<string, string>()))
+                .ToArray();
 
-            return Ok(surface);
+            return new KoanAdminHealthDocument(snapshot.Overall, components, snapshot.ComputedAtUtc);
         }
-        catch (Exception ex)
+        catch
         {
-            _logger.LogError(ex, "Failed to capture service mesh surface");
-            return StatusCode(500, KoanAdminServiceMeshSurface.Empty);
+            return KoanAdminHealthDocument.Empty;
         }
     }
 
-    private static KoanAdminConfigurationSummary BuildConfigurationSummaries(IReadOnlyList<KoanAdminModuleSurface> modules)
+    private static KoanAdminModuleSurface MapModule(string pillarLabel, ProvenanceModule module)
     {
-        if (modules.Count == 0)
+        var pillar = KoanPillarCatalog.TryMatchByModuleName(module.Name, out var descriptor)
+            ? (descriptor.Label, descriptor.ColorHex, descriptor.Icon)
+            : (pillarLabel, "#64748b", "🧩");
+
+        var settings = module.Settings
+            .Select(setting => new KoanAdminModuleSurfaceSetting(
+                setting.Key,
+                string.IsNullOrWhiteSpace(setting.Label) ? setting.Key : setting.Label,
+                setting.Description ?? "",
+                setting.IsSecret ? SecretMask : setting.Value ?? "",
+                setting.IsSecret,
+                ConvertSource(setting.Source),
+                setting.SourceKey ?? "",
+                setting.Consumers.Count == 0 ? [] : setting.Consumers.ToArray()))
+            .ToArray();
+
+        var notes = module.Notes.Select(note => note.Message).ToList();
+        if (!string.IsNullOrWhiteSpace(module.Status))
         {
-            return KoanAdminConfigurationSummary.Empty;
+            notes.Insert(0, string.IsNullOrWhiteSpace(module.StatusDetail)
+                ? module.Status!
+                : $"{module.Status}: {module.StatusDetail}");
         }
 
-        var summaries = modules
-            .GroupBy(module => (module.Pillar, module.PillarClass, module.Icon, module.ColorHex, module.ColorRgb))
-            .Select(group => new KoanAdminPillarSummary(
-                group.Key.Pillar,
-                group.Key.PillarClass,
-                group.Key.Icon,
-                group.Key.ColorHex,
-                group.Key.ColorRgb,
-                group.Count(),
-                group.Sum(m => m.Settings.Count),
-                group.Sum(m => m.Notes.Count)))
-            .OrderByDescending(summary => summary.ModuleCount)
-            .ThenBy(summary => summary.Pillar, StringComparer.Ordinal)
-            .ToList();
+        var tools = module.Tools
+            .Select(tool => new KoanAdminModuleSurfaceTool(tool.Name, tool.Route, tool.Description, tool.Capability))
+            .ToArray();
 
-        return new KoanAdminConfigurationSummary(summaries);
+        return new KoanAdminModuleSurface(
+            module.Name,
+            module.Version,
+            string.IsNullOrWhiteSpace(module.Description) ? pillarLabel : module.Description,
+            pillar.Item1,
+            pillar.Item2,
+            pillar.Item3,
+            settings,
+            notes,
+            tools);
     }
+
+    private static KoanAdminSettingSource ConvertSource(ProvenanceSettingSource source)
+        => source switch
+        {
+            ProvenanceSettingSource.Auto => KoanAdminSettingSource.Auto,
+            ProvenanceSettingSource.AppSettings => KoanAdminSettingSource.AppSettings,
+            ProvenanceSettingSource.Environment => KoanAdminSettingSource.Environment,
+            ProvenanceSettingSource.Custom => KoanAdminSettingSource.Custom,
+            ProvenanceSettingSource.Unknown => KoanAdminSettingSource.Unknown,
+            _ => KoanAdminSettingSource.Custom
+        };
 }

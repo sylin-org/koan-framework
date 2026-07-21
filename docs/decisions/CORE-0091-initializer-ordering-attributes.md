@@ -1,5 +1,9 @@
 # CORE-0091: Initializer ordering via `[Before]` / `[After]` attributes
 
+> **Superseded by [ARCH-0116](ARCH-0116-one-module-lifecycle.md) (2026-07-17).** `[Before]` and
+> `[After]` remain, but they now order `KoanModule` types through `ModuleOrdering`; the initializer
+> interfaces, registries, and registrar-specific language described below were removed.
+
 Status: Accepted
 Date: 2026-05-24
 

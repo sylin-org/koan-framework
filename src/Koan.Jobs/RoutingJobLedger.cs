@@ -11,7 +11,7 @@ namespace Koan.Jobs;
 /// mirrored to both ledgers so a cooperative backoff set by a durable job is honored by an in-memory job and
 /// vice versa. This keeps the orchestrator entirely storage-agnostic — it still sees one <see cref="IJobLedger"/>.
 /// </remarks>
-public sealed class RoutingJobLedger : IJobLedger
+internal sealed class RoutingJobLedger : IJobLedger
 {
     private readonly IJobLedger _inMemory;
     private readonly IJobLedger _durable;
@@ -46,9 +46,10 @@ public sealed class RoutingJobLedger : IJobLedger
 
     // Disjoint job sets: claiming durable-then-volatile never double-claims; gates are mirrored so each honors all.
     public async Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
-        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)
-        => await _durable.ClaimNext(owner, now, leaseUntil, saturatedLanes, ct)
-           ?? await _inMemory.ClaimNext(owner, now, leaseUntil, saturatedLanes, ct);
+        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,
+        IReadOnlyDictionary<string, PoolDispatchContext>? pools = null)
+        => await _durable.ClaimNext(owner, now, leaseUntil, saturatedLanes, ct, pools)
+           ?? await _inMemory.ClaimNext(owner, now, leaseUntil, saturatedLanes, ct, pools);
 
     public Task Update(JobRecord record, CancellationToken ct) => For(record.WorkType).Update(record, ct);
 
@@ -97,6 +98,18 @@ public sealed class RoutingJobLedger : IJobLedger
 
     public Task<long> CountActive(string workType, CancellationToken ct)
         => For(workType).CountActive(workType, ct);
+
+    // Merge the two tiers' snapshots: sum the counts, take the max oldest-age.
+    public async Task<JobsHealthSnapshot> HealthSnapshot(DateTimeOffset now, CancellationToken ct)
+    {
+        var d = await _durable.HealthSnapshot(now, ct);
+        var m = await _inMemory.HealthSnapshot(now, ct);
+        return new JobsHealthSnapshot(
+            d.Queued + m.Queued,
+            d.Running + m.Running,
+            d.ReclaimBacklog + m.ReclaimBacklog,
+            d.OldestQueuedAge >= m.OldestQueuedAge ? d.OldestQueuedAge : m.OldestQueuedAge);
+    }
 
     private static IReadOnlyList<JobRecord> Concat(IReadOnlyList<JobRecord> a, IReadOnlyList<JobRecord> b)
     {

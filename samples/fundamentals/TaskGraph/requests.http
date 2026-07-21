@@ -1,0 +1,25 @@
+@baseUrl = http://localhost:5000
+
+### Health
+GET {{baseUrl}}/api/health
+
+### Replace the demo data with one deterministic business story
+POST {{baseUrl}}/api/todos/reset-demo
+
+### One entity: its two parents and two child items
+GET {{baseUrl}}/api/todos/todo-proposal/context
+
+### A finite set: the same operation preserves source order
+GET {{baseUrl}}/api/todos/relationships/set?limit=3
+
+### An async stream: bounded by the HTTP demonstration
+GET {{baseUrl}}/api/todos/relationships/stream?limit=3
+
+### Ordinary CRUD remains available from EntityController<T>
+GET {{baseUrl}}/api/todos?page=1&size=10
+
+### Category is transparently cacheable
+GET {{baseUrl}}/api/categories/category-work
+
+### Inspect the decisions Koan made
+GET {{baseUrl}}/.well-known/Koan/facts

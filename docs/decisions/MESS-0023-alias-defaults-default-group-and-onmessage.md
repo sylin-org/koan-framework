@@ -2,12 +2,14 @@
 id: MESS-0023
 slug: MESS-0023-alias-defaults-default-group-and-onmessage
 domain: MESS
-status: Accepted
+status: Retired
 date: 2025-08-17
 title: Alias defaults, default group, auto-subscribe, and OnMessage sugar
 ---
  
 # ADR 0023: Alias defaults, default group, auto-subscribe, and OnMessage sugar
+
+> **Status: Retired.** Describes a prior messaging generation; the inbox/alias/provisioning features no longer exist in code.
  
 
 Context

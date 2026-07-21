@@ -17,7 +17,7 @@ using Koan.Data.Abstractions;
 using Koan.Core.Capabilities;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
-using Koan.Data.Vector.Abstractions.Configuration;
+using Koan.Data.Vector.Naming;
 
 namespace Koan.Data.Vector.Connector.Qdrant;
 
@@ -26,7 +26,7 @@ namespace Koan.Data.Vector.Connector.Qdrant;
 ///
 /// <para>
 /// Qdrant constrains point ids to UUID or unsigned-64 only. For Koan's typical
-/// <see cref="Entity{T}"/> default — string keys that are GUID v7 values — this is a no-op:
+/// <c>Entity&lt;T&gt;</c> default — string keys that are GUID v7 values — this is a no-op:
 /// the string parses as a Guid and goes through verbatim. Arbitrary string keys (e.g. "v1",
 /// "alpha-1") get projected via UUIDv5 from a fixed namespace; the original string is always
 /// preserved in <c>payload.&lt;IdField&gt;</c> so search results round-trip the caller's id.
@@ -48,17 +48,23 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
     private readonly HttpClient _http;
     private readonly QdrantOptions _options;
     private readonly IServiceProvider _services;
+    private readonly QdrantVectorAdapterFactory _factory;
+    private readonly string _source;
     private readonly ILogger<QdrantVectorRepository<TEntity, TKey>>? _logger;
     private readonly ConcurrentDictionary<string, byte> _ensuredCollections = new(StringComparer.Ordinal);
 
     public QdrantVectorRepository(
         IHttpClientFactory httpFactory,
         IOptions<QdrantOptions> options,
-        IServiceProvider services)
+        IServiceProvider services,
+        QdrantVectorAdapterFactory factory,
+        string source)
     {
         _http = httpFactory.CreateClient(Infrastructure.Constants.HttpClientName);
         _options = options.Value;
         _services = services;
+        _factory = factory;
+        _source = source;
         _logger = (ILogger<QdrantVectorRepository<TEntity, TKey>>?)services.GetService(typeof(ILogger<QdrantVectorRepository<TEntity, TKey>>));
         ConfigureHttpClient();
     }
@@ -80,7 +86,7 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
         {
             throw new InvalidOperationException(
                 "Qdrant vector dimension is unknown. Configure Koan:Data:Qdrant:Dimension " +
-                "(defaults to 1536 when unset) or call Upsert first to seed it.");
+                "when pre-creating a collection, or write a vector first so its dimension is known.");
         }
         await EnsureCollection(dimension, ct);
     }
@@ -238,7 +244,7 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
         using var _ = QdrantTelemetry.Activity.StartActivity("vector.search");
         await EnsureCollection(options.Query.Length, ct);
 
-        var topK = Math.Max(1, options.TopK ?? _options.DefaultTopK);
+        var topK = options.TopK;
         var filter = QdrantFilterTranslator.Translate(options.Filter, _options.MetadataField);
 
         // Qdrant search body. `vector` can be a bare array (single unnamed vector slot) or an
@@ -363,8 +369,20 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
     // Collection management
     // ─────────────────────────────────────────────────────────────────────────────
 
+    // A BLANK CollectionName (not just null) means "no override" — use the framework's storage naming. The
+    // QdrantOptionsConfigurator binds an absent config key to "" (not null), so `?? ` alone would treat "" as a pinned
+    // empty name and produce "/collections/" → 404. IsNullOrWhiteSpace catches both the null and the "" path.
     private string CollectionName
-        => _options.CollectionName ?? VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services);
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_options.CollectionName))
+                return VectorAdapterNaming.GetOrCompute<TEntity>(_services, _factory, _source);
+            // A pinned CollectionName bypasses the partition+source name-fold — warn once if that defeats active isolation.
+            VectorAdapterNaming.WarnIfPinnedNameDefeatsIsolation<TEntity>(_options.CollectionName!, "CollectionName");
+            return _options.CollectionName!;
+        }
+    }
 
     private async Task EnsureCollectionInitialized(CancellationToken ct)
     {

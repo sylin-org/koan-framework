@@ -9,9 +9,9 @@ public sealed class PostgresJobsFixture : IAsyncLifetime
     private PostgreSqlContainer? _container;
     public IReadOnlyDictionary<string, string?> Settings { get; private set; } = new Dictionary<string, string?>();
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
-        _container = new PostgreSqlBuilder("postgres:16-alpine")
+        _container = new PostgreSqlBuilder("postgres:18.4-alpine")
             .WithDatabase("koan_jobs")
             .WithUsername("koan")
             .WithPassword("koan")
@@ -31,7 +31,7 @@ public sealed class PostgresJobsFixture : IAsyncLifetime
         };
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_container is not null) await _container.DisposeAsync();
     }

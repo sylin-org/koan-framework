@@ -23,11 +23,11 @@ namespace Koan.Tests.Cache.CrossEngine.Specs;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Koan-canonical wiring:</b> the spec calls <c>services.AddKoan()</c> (reflective
-/// discovery) — never <c>AddKoanCache()</c> or <c>new SomeAutoRegistrar().Initialize(...)</c>.
+/// <b>Koan-canonical wiring:</b> the spec calls <c>services.AddKoan()</c> — never
+/// pillar-specific registration or manual module invocation.
 /// The test project references both <c>Koan.Cache</c> (Memory default) AND
-/// <c>Koan.Cache.Adapter.Sqlite</c>; both adapters' <c>KoanAutoRegistrar</c>s are picked up
-/// by reflection. <c>Koan:Cache:LocalProvider</c> tells the topology resolver which one wins.
+/// <c>Koan.Cache.Adapter.Sqlite</c>; their compiled modules are activated from ordinary references.
+/// <c>Koan:Cache:LocalProvider</c> tells the topology resolver which one wins.
 /// </para>
 /// <para>
 /// What this proves: the cache pillar's surface (<c>ICacheClient.CreateEntry&lt;T&gt;(key)</c>,
@@ -67,19 +67,19 @@ public abstract class CrossEngineCacheBehaviorSpecBase : IAsyncDisposable
             builder = builder.WithSetting(key, value);
 
         _host = await builder
-            // Reference = Intent: AddKoan() does reflective auto-registrar discovery across
-            // every referenced Koan.* assembly. No AddKoanCache, no manual registrar init.
+            // Reference = Intent: AddKoan() activates compiled modules from referenced Koan packages.
+            // No pillar-specific registration and no manual module invocation.
             .ConfigureServices(services => services.AddKoan())
             .StartAsync(ct);
 
-        // Sanity (public API only): the adapter's auto-registrar must have fired — i.e.,
-        // Reference = Intent worked, the store is present in the registry. Without this, a
+        // Sanity (public API only): the adapter module must have activated — i.e., Reference = Intent
+        // worked and the store is present in standard DI. Without this, a
         // future refactor that breaks adapter discovery would silently degrade both subclasses
         // to whatever the default is, and the behavioral tests would still pass.
-        var registry = _host.Services.GetRequiredService<ICacheStoreRegistry>();
-        registry.FindByName(LocalProvider).Should().NotBeNull(
+        var stores = _host.Services.GetServices<ICacheStore>();
+        stores.Should().Contain(store => string.Equals(store.Name, LocalProvider, StringComparison.OrdinalIgnoreCase),
             $"adapter '{LocalProvider}' must be discovered via Reference = Intent. Either the package " +
-            $"reference is missing from the test csproj or the adapter's KoanAutoRegistrar isn't firing.");
+            $"reference is missing from the test csproj or the adapter module did not activate.");
 
         return _host.Services.GetRequiredService<ICacheClient>();
     }

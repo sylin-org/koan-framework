@@ -1,6 +1,9 @@
 using AwesomeAssertions;
 using Koan.Core;
+using Koan.Core.Composition;
+using Koan.Core.Hosting.Modules;
 using Koan.Core.Ordering;
+using Koan.Core.Semantics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
@@ -10,62 +13,59 @@ namespace Koan.Core.Tests.Hosting;
 /// <summary>Conformance specs for the boot-time module primitive (ARCH-0086).</summary>
 public class KoanModuleTests
 {
-    // Shared recorder — modules are re-instantiated by DI for Start(), so they record to a static.
-    private static readonly List<string> StartOrder = new();
-
-    private sealed class ModuleA : KoanModule
+    private sealed class DescriptorBackedModule(string owner, List<string> starts) : KoanModule
     {
-        public override string Id => "test.a";
-        public override void Register(IServiceCollection services) => services.AddSingleton(new Marker("a"));
-        public override Task Start(IServiceProvider services, CancellationToken ct) { StartOrder.Add(Id); return Task.CompletedTask; }
+        public override Task Start(IServiceProvider services, CancellationToken ct)
+        {
+            starts.Add(owner);
+            return Task.CompletedTask;
+        }
     }
 
-    [After(typeof(ModuleA))]
-    private sealed class ModuleB : KoanModule
+    private sealed class FailingSemanticModule : KoanModule
     {
-        public override string Id => "test.b";
-        public override Task Start(IServiceProvider services, CancellationToken ct) { StartOrder.Add(Id); return Task.CompletedTask; }
-    }
-
-    private sealed record Marker(string Name);
-
-    [Fact]
-    public void Bridge_maps_Id_and_Version_onto_IKoanAutoRegistrar()
-    {
-        var module = new ModuleA();
-        var registrar = (IKoanAutoRegistrar)module;
-        registrar.ModuleName.Should().Be("test.a");
-        registrar.ModuleVersion.Should().Be(module.Version);
+        public override void Register(IServiceCollection services) =>
+            throw new InvalidOperationException("planted semantic registration failure");
     }
 
     [Fact]
-    public void Initialize_calls_Register_and_registers_the_module_plus_host()
+    public async Task Host_starts_the_retained_semantic_instance()
     {
-        var services = new ServiceCollection();
-        ((IKoanInitializer)new ModuleA()).Initialize(services);
-
-        // Register() ran:
-        services.Should().Contain(d => d.ServiceType == typeof(Marker));
-        // The module instance is resolvable for the host:
-        services.Should().Contain(d => d.ServiceType == typeof(KoanModule));
-        // The host that runs Start() is registered (as IHostedService):
-        services.Should().Contain(d => d.ServiceType == typeof(IHostedService));
-    }
-
-    [Fact]
-    public async Task Host_runs_Start_on_every_module_in_Before_After_order()
-    {
-        StartOrder.Clear();
-        var services = new ServiceCollection();
-        // Register B before A to prove ordering is by [After], not registration order.
-        ((IKoanInitializer)new ModuleB()).Initialize(services);
-        ((IKoanInitializer)new ModuleA()).Initialize(services);
-
-        using var provider = services.BuildServiceProvider();
-        var host = provider.GetServices<IHostedService>().Single(h => h.GetType().Name == "KoanModuleHost");
+        const string componentId = "Sylin.Koan.DescriptorBacked";
+        var starts = new List<string>();
+        using var reader = new StringReader($"schema|1{Environment.NewLine}reference|package|{componentId}|{componentId}");
+        var manifest = KoanApplicationReferenceManifest.Parse(reader);
+        var descriptor = new SemanticComponentDescriptor(
+            componentId,
+            typeof(DescriptorBackedModule),
+            () => new DescriptorBackedModule("semantic", starts));
+        var runtime = SemanticModuleRuntime.Create(
+            SemanticActivationCompiler.Compile(manifest, [descriptor]));
+        var services = new ServiceCollection().BuildServiceProvider();
+        var host = new KoanModuleHost(services, runtime);
 
         await host.StartAsync(CancellationToken.None);
 
-        StartOrder.Should().Equal("test.a", "test.b"); // A first: B is [After(ModuleA)]
+        starts.Should().Equal("semantic");
+    }
+
+    [Fact]
+    public void Registration_failure_rejects_the_semantic_runtime()
+    {
+        const string componentId = "Sylin.Koan.FailClosed";
+        using var reader = new StringReader(
+            $"schema|1{Environment.NewLine}reference|package|{componentId}|{componentId}");
+        var descriptor = new SemanticComponentDescriptor(
+            componentId,
+            typeof(FailingSemanticModule),
+            static () => new FailingSemanticModule());
+        var runtime = SemanticModuleRuntime.Create(
+            SemanticActivationCompiler.Compile(
+                KoanApplicationReferenceManifest.Parse(reader),
+                [descriptor]));
+        var failure = Assert.Throws<SemanticModuleRuntime.SemanticRuntimeException>(() =>
+            runtime.TryRegister(typeof(FailingSemanticModule), new ServiceCollection()));
+
+        failure.Problem.Reason.Should().Be("module-registration-failed");
     }
 }

@@ -1,55 +1,49 @@
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using Koan.Core.Hosting.App;
+using Koan.Web.AdapterSurface.InMemory.Tests.PredicateHook;
+using Koan.Web.AdapterSurface.InMemory.Tests.RelationshipExpansion;
 using Koan.Web.AdapterSurface.TestKit;
+using Koan.Web.Extensions;
+using Koan.Web.Hooks;
+using Koan.Web.Endpoints;
 
 namespace Koan.Web.AdapterSurface.InMemory.Tests;
 
-public sealed class InMemoryAdapterFactory : WebApplicationFactory<Program>, IAdapterTestFactory
+public sealed class InMemoryAdapterFactory : AdapterTestFactoryBase
 {
-    public bool IsAvailable => true;
-    public string? UnavailableReason => null;
-    public HttpClient Client => CreateClient();
-    public new IServiceProvider Services => base.Services;
+    public override bool IsAvailable => true;
+    protected override string HostEnvironment => "Test";
 
-    public Task InitializeAsync() => Task.CompletedTask;
-    Task IAsyncLifetime.DisposeAsync() => Task.CompletedTask;
-
-    public async Task ResetAsync()
+    // The PredicateHook specs exercise VisibilityWidgetController + VisibilityHook (declared in this
+    // test assembly). The direct host doesn't scan the entry assembly the way the old WAF host did, so
+    // register both explicitly.
+    protected override void ConfigureAdditionalServices(IServiceCollection services)
     {
-        Koan.Core.Hosting.App.AppHost.Current = Services;
-        await Widget.RemoveAll();
+        services.AddKoanControllersFrom<VisibilityWidgetController>();
+        services.AddSingleton<IRequestOptionsHook<VisibilityWidget>, VisibilityHook>();
+
+        // AN-leak: relationship-expansion visibility surface (Maker [parent] / Work [child] with two
+        // divergent edges to the same target). The Work/Maker hooks wall non-public rows so the
+        // governed-expansion specs can prove ?with=all honors each related type's own predicates.
+        services.AddKoanControllersFrom<MakersController>();
+        services.AddKoanControllersFrom<WorksController>();
+        services.AddSingleton<IRequestOptionsHook<Maker>, MakerVisibilityHook>();
+        services.AddSingleton<IRequestOptionsHook<Work>, WorkVisibilityHook>();
+        services.Configure<EntityEndpointOptions>(options => options.RelationshipMaxResults = 2);
     }
 
-    protected override IHost CreateHost(IHostBuilder builder)
+    protected override IEnumerable<KeyValuePair<string, string?>> AdapterConfiguration() => new Dictionary<string, string?>
     {
-        builder.ConfigureWebHost(webBuilder =>
-        {
-            webBuilder.UseContentRoot(AppContext.BaseDirectory);
-            webBuilder.UseTestServer();
-            webBuilder.UseEnvironment("Test");
-            webBuilder.ConfigureAppConfiguration((_, cfg) =>
-            {
-                cfg.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Koan:Environment"] = "Test",
-                    ["Koan:Data:Sources:Default:Adapter"] = "inmemory",
-                    ["Koan:Data:Sources:Default:ConnectionString"] = "memory://adapter-surface",
-                    ["Koan:BackgroundServices:Enabled"] = "false",
-                    ["Logging:LogLevel:Default"] = "Warning",
-                });
-            });
-            webBuilder.ConfigureServices(services =>
-            {
-                Koan.Core.Hosting.App.AppHost.Current = null;
-            });
-        });
+        ["Koan:Environment"] = "Test",
+        ["Koan:Data:Sources:Default:Adapter"] = "inmemory",
+        ["Koan:Data:Sources:Default:ConnectionString"] = "memory://adapter-surface",
+        ["Koan:BackgroundServices:Enabled"] = "false",
+        ["Logging:LogLevel:Default"] = "Warning",
+    };
 
-        var host = builder.Build();
-        host.Start();
-        return host;
+    public override async Task ResetAsync()
+    {
+        AppHost.Current = Services;
+        await Widget.RemoveAll();
     }
 }

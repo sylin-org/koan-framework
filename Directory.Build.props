@@ -1,10 +1,5 @@
 <Project>
-  <!--
-    ARCH-0082: two-tier versioning (kernel lockstep, periphery independent).
-    Version resolution lives in Directory.Build.targets — the import must run
-    AFTER the csproj has set $(KoanPackageKind), and .props imports happen too
-    early. See docs/guides/versioning-workbook.md for operational guidance.
-  -->
+  <!-- ARCH-0085/0110: every packable project owns an independent NBGV version. -->
 
   <PropertyGroup>
     <!-- Generate XML docs for all projects to support API documentation. -->
@@ -29,22 +24,25 @@
     yet at props-evaluation time. MSBuildProjectName is always defined.
   -->
   <PackageId Condition="'$(IsPackable)' != 'false' and '$(PackageId)' == ''">Sylin.$(MSBuildProjectName)</PackageId>
+  <!-- R09-08: the standard package identity is also the module identity. Non-packable projects
+       fall back to the SDK's ordinary project/assembly name; module authors declare no Koan ID. -->
+  <KoanModuleIdentity Condition="'$(PackageId)' != ''">$(PackageId)</KoanModuleIdentity>
+  <KoanModuleIdentity Condition="'$(KoanModuleIdentity)' == ''">$(MSBuildProjectName)</KoanModuleIdentity>
   <!-- Common NuGet package metadata -->
   <Authors>Sylin Labs</Authors>
   <Company>Sylin Labs</Company>
-  <PackageProjectUrl>https://github.com/sylin-labs/Koan-framework</PackageProjectUrl>
-  <RepositoryUrl>https://github.com/sylin-labs/Koan-framework.git</RepositoryUrl>
+  <PackageProjectUrl>https://github.com/sylin-org/Koan-framework</PackageProjectUrl>
+  <RepositoryUrl>https://github.com/sylin-org/Koan-framework.git</RepositoryUrl>
   <RepositoryType>git</RepositoryType>
   <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
   <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   <IncludeSymbols>true</IncludeSymbols>
   <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-  <!-- Prefer a README.md in the project folder; fall back to repo root README.md -->
+  <!-- A package page must be owned by the package. Missing README.md is an R11 repair,
+       never an invitation to publish the framework root README under a different identity. -->
   <PackageReadmeFile Condition="Exists('$(MSBuildProjectDirectory)\README.md')">README.md</PackageReadmeFile>
-  <PackageReadmeFile Condition="'$(PackageReadmeFile)' == '' and Exists('$(MSBuildThisFileDirectory)README.md')">README.md</PackageReadmeFile>
-    <PackageReleaseNotes>See release notes: https://github.com/sylin-labs/Koan-framework/releases</PackageReleaseNotes>
-    <!-- Common tags; projects can append by using $(CommonPackageTags) in their PackageTags -->
-    <CommonPackageTags>Koan;framework;modular;dotnet;aspnetcore;cqrs;ddd;messaging;data;opentelemetry</CommonPackageTags>
+  <!-- Only universally true discovery terms belong here. Capability vocabulary is package-owned. -->
+  <CommonPackageTags>koan;dotnet;framework</CommonPackageTags>
 
   <!-- Baseline language/features across the repo -->
   <ImplicitUsings Condition="'$(ImplicitUsings)' == ''">enable</ImplicitUsings>
@@ -53,37 +51,24 @@
   <LangVersion Condition="'$(LangVersion)' == ''">latestMajor</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+  <CompilerVisibleProperty Include="PackageId" />
+  <CompilerVisibleProperty Include="IsTestProject" />
+  <AssemblyMetadata Include="KoanModuleIdentity" Value="$(KoanModuleIdentity)" />
   <!-- SourceLink for better debugging experience on NuGet -->
-  <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
   <!-- ARCH-0085: Nerdbank.GitVersioning is the single version source — Version / AssemblyVersion /
        FileVersion are computed from each package's version.json (operator-owned major.minor) plus
        git commit height (automatic patch). Replaces build/versions.props + scripts/versioning.
        PrivateAssets=all so it never flows to consumers. -->
-  <PackageReference Include="Nerdbank.GitVersioning" Version="3.9.50" PrivateAssets="all" />
+  <PackageReference Include="Nerdbank.GitVersioning" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
-  <!-- Pack project-level README if present; otherwise include repo README -->
+  <!-- Canonical package presentation: one package-owned README and one repository-owned mascot. -->
   <None Include="$(MSBuildProjectDirectory)\README.md" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildProjectDirectory)\README.md')" />
-  <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Condition="!Exists('$(MSBuildProjectDirectory)\README.md') and Exists('$(MSBuildThisFileDirectory)README.md')" />
-    <!-- If you provide an icon.png at repo root, it will be packed and used automatically -->
-    <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)icon.png')" />
-  <None Include="$(MSBuildThisFileDirectory)resources\image\0_2.jpg" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)resources\image\0_2.jpg')" />
+  <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="/" />
   </ItemGroup>
-  <!-- In-repo Roslyn generators attached as analyzers. See ARCH-0077 (orchestration generator
-       scope-narrowing rationale; deprecation path toward .NET Aspire). -->
+  <!-- In-repo Roslyn generators attached as analyzers. -->
   <ItemGroup>
-    <!--
-      Orchestration manifest generator (legacy ISourceGenerator). Only attach to projects that
-      actually declare [KoanService] / [KoanApp] / [assembly: AuthProviderDescriptor]. Connectors
-      and samples opt in via Directory.Build.props files in their roots; the lone non-connector
-      service that declares [KoanService] (Koan.Service.Translation) sets the property in its csproj.
-      Unrelated framework projects (Koan.Web.Auth, Koan.Core, etc.) no longer pay the analyzer
-      load cost and cannot be blocked by generator-side compile errors.
-    -->
-    <ProjectReference Include="$(MSBuildThisFileDirectory)src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false"
-                      Condition="Exists('$(MSBuildThisFileDirectory)src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj') and '$(KoanRequiresOrchestrationGenerator)' == 'true'" />
     <!--
       Registry generator (modern IIncrementalGenerator). Harmless on projects with no registry
       entries — emits nothing. Still attached broadly because some downstream Koan projects do
@@ -95,10 +80,7 @@
                       ReferenceOutputAssembly="false"
                       Condition="Exists('$(MSBuildThisFileDirectory)src\Koan.Core.Registry.Generators\Koan.Core.Registry.Generators.csproj') and '$(MSBuildProjectName)' != 'Koan.Core.Registry.Generators' and '$(MSBuildProjectName)' != 'Koan.Orchestration.Generators'" />
   </ItemGroup>
-  <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory)icon.png')">
+  <PropertyGroup>
     <PackageIcon>icon.png</PackageIcon>
-  </PropertyGroup>
-  <PropertyGroup Condition="!Exists('$(MSBuildThisFileDirectory)icon.png') and Exists('$(MSBuildThisFileDirectory)resources\\image\\0_2.jpg')">
-    <PackageIcon>0_2.jpg</PackageIcon>
   </PropertyGroup>
 </Project>

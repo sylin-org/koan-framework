@@ -1,0 +1,25 @@
+namespace Koan.Packaging.Models;
+
+internal sealed record PackageProject(
+    string ProjectPath,
+    string ProjectDirectory,
+    string PackageId,
+    string PackageType,
+    IReadOnlyList<string> TargetFrameworks,
+    bool PackAsTool,
+    bool IsRoslynComponent,
+    bool IncludeBuildOutput,
+    bool SuppressDependenciesWhenPacking,
+    bool IncludeSymbols,
+    string? Readme,
+    bool OwnsReadme,
+    string? TechnicalDocumentation,
+    string Description,
+    string PackageTags,
+    IReadOnlyList<string> ProjectReferences,
+    string? PackageIcon = null,
+    string? PackageProjectUrl = null,
+    string? RepositoryUrl = null,
+    string? PackageLicenseExpression = null,
+    string? PackageReleaseNotes = null,
+    string? VersionIntent = null);

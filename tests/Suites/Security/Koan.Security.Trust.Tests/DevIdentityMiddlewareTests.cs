@@ -1,9 +1,7 @@
 using System.Linq;
 using System.Security.Claims;
-using System.Threading.Tasks;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Options;
 using Koan.Security.Trust.Dev;
 using Xunit;
 
@@ -15,53 +13,54 @@ namespace Koan.Security.Trust.Tests;
 /// anonymous; a real principal is never overwritten; <c>Enabled=false</c> is a no-op. (Development-only
 /// insertion via the WEB-0069 contributor.)
 /// </summary>
-public sealed class DevIdentityMiddlewareTests
+public sealed class DevIdentityTests
 {
-    private static async Task<HttpContext> Run(DevIdentityOptions options, string queryString = "", ClaimsPrincipal? existing = null)
+    private static (HttpContext Context, ClaimsPrincipal? Resolved) Run(
+        DevIdentityOptions options,
+        string queryString = "",
+        ClaimsPrincipal? existing = null)
     {
         var ctx = new DefaultHttpContext();
         if (!string.IsNullOrEmpty(queryString)) ctx.Request.QueryString = new QueryString(queryString);
         if (existing is not null) ctx.User = existing;
-        var middleware = new KoanDevIdentityMiddleware(_ => Task.CompletedTask, Options.Create(options));
-        await middleware.InvokeAsync(ctx);
-        return ctx;
+        return (ctx, DevIdentity.Resolve(ctx, options));
     }
 
     [Fact]
-    public async Task Default_request_with_no_persona_stays_anonymous()
+    public void Default_request_with_no_persona_stays_anonymous()
     {
         // SEC-0003 §2.1/§2.3 — no ?_as ⇒ no principal (public by default).
-        var ctx = await Run(new DevIdentityOptions());
-        ctx.User.Identity?.IsAuthenticated.Should().NotBe(true);
+        var result = Run(new DevIdentityOptions());
+        result.Resolved.Should().BeNull();
+        result.Context.User.Identity?.IsAuthenticated.Should().NotBe(true);
     }
 
     [Fact]
-    public async Task Persona_override_sets_subject_and_roles()
+    public void Persona_override_sets_subject_and_roles()
     {
-        var ctx = await Run(new DevIdentityOptions(), "?_as=alice&_roles=reader,editor");
-        ctx.User.FindFirst("sub")!.Value.Should().Be("alice");
-        ctx.User.FindAll(ClaimTypes.Role).Select(c => c.Value).Should().BeEquivalentTo("reader", "editor");
+        var result = Run(new DevIdentityOptions(), "?_as=alice&_roles=reader,editor");
+        result.Resolved!.FindFirst("sub")!.Value.Should().Be("alice");
+        result.Resolved.FindAll(ClaimTypes.Role).Select(c => c.Value).Should().BeEquivalentTo("reader", "editor");
     }
 
     [Fact]
-    public async Task As_anonymous_stays_unauthenticated()
+    public void As_anonymous_stays_unauthenticated()
     {
-        var ctx = await Run(new DevIdentityOptions(), "?_as=anonymous");
-        ctx.User.Identity?.IsAuthenticated.Should().NotBe(true);
+        Run(new DevIdentityOptions(), "?_as=anonymous").Resolved.Should().BeNull();
     }
 
     [Fact]
-    public async Task Already_authenticated_principal_is_not_overwritten()
+    public void Already_authenticated_principal_is_not_overwritten()
     {
         var existing = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim("sub", "real") }, "cookie"));
-        var ctx = await Run(new DevIdentityOptions(), existing: existing);
-        ctx.User.FindFirst("sub")!.Value.Should().Be("real");
+        var result = Run(new DevIdentityOptions(), existing: existing);
+        result.Resolved.Should().BeNull();
+        result.Context.User.FindFirst("sub")!.Value.Should().Be("real");
     }
 
     [Fact]
-    public async Task Disabled_does_not_set_an_identity()
+    public void Disabled_does_not_set_an_identity()
     {
-        var ctx = await Run(new DevIdentityOptions { Enabled = false });
-        ctx.User.Identity?.IsAuthenticated.Should().NotBe(true);
+        Run(new DevIdentityOptions { Enabled = false }).Resolved.Should().BeNull();
     }
 }

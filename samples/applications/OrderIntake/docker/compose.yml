@@ -1,0 +1,31 @@
+name: koan-order-intake
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    environment:
+      POSTGRES_DB: order_intake
+      POSTGRES_USER: koan
+      POSTGRES_PASSWORD: koan_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U koan -d order_intake"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5094:5432"
+
+  mongo:
+    image: mongo:8.3.4
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5093:27017"
+
+  redis:
+    image: redis:8.8.0-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "5095:6379"

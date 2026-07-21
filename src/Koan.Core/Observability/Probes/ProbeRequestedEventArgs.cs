@@ -6,4 +6,5 @@ public sealed class ProbeRequestedEventArgs : EventArgs
     public ProbeReason Reason { get; init; }
     public Guid CorrelationId { get; init; } = Guid.CreateVersion7();
     public DateTimeOffset? NotAfterUtc { get; init; }
+    public CancellationToken CancellationToken { get; init; }
 }

@@ -1,7 +1,6 @@
 using AwesomeAssertions;
 using Koan.ZenGarden.Models;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Koan.ZenGarden.Tests;
 
@@ -19,10 +18,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
     [Fact]
     public async Task Catalog_Offerings_IsReachable_AndNormalizesShape()
     {
-        if (!EnsureGardenAvailable())
-        {
-            return;
-        }
+        EnsureGardenAvailable();
 
         var tools = await _fixture.Client.Catalog(new ZenGardenSubscription
         {
@@ -37,10 +33,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
     [Fact]
     public async Task Catalog_Storage_IsReachable_AndNormalizesShape()
     {
-        if (!EnsureGardenAvailable())
-        {
-            return;
-        }
+        EnsureGardenAvailable();
 
         var tools = await _fixture.Client.Catalog(new ZenGardenSubscription
         {
@@ -55,15 +48,13 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
     [Fact]
     public async Task Subscribe_Offering_EmitsInitialAvailabilityEvent()
     {
-        if (!EnsureGardenAvailable())
-        {
-            return;
-        }
+        EnsureGardenAvailable();
 
         var selected = await SelectOffering();
         if (selected is null)
         {
             _output.WriteLine("No offering available in garden; nothing to validate for offering subscription.");
+            Assert.Skip("No offering is available in the garden for the subscription probe.");
             return;
         }
 
@@ -82,10 +73,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
     [Fact]
     public async Task Subscribe_Offering_WithCapabilityRequirement_EmitsCapabilityEvent()
     {
-        if (!EnsureGardenAvailable())
-        {
-            return;
-        }
+        EnsureGardenAvailable();
 
         var offerings = await _fixture.Client.Catalog(new ZenGardenSubscription
         {
@@ -97,6 +85,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
         if (selected is null)
         {
             _output.WriteLine("No offering with capabilities found; capability event test skipped.");
+            Assert.Skip("No offering with capabilities is available in the garden.");
             return;
         }
 
@@ -118,10 +107,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
     [Fact]
     public async Task Subscribe_Storage_EmitsInitialAvailabilityEvent()
     {
-        if (!EnsureGardenAvailable())
-        {
-            return;
-        }
+        EnsureGardenAvailable();
 
         var storageTools = await _fixture.Client.Catalog(new ZenGardenSubscription
         {
@@ -132,10 +118,11 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
         if (selected is null)
         {
             _output.WriteLine("No seed-bank available in garden; storage subscription test skipped.");
+            Assert.Skip("No seed-bank is available in the garden for the subscription probe.");
             return;
         }
 
-        var seedBankName = Core.ToolFqid.Parse(selected.ToolFqid).ToString();
+        var seedBankName = ToolFqid.Parse(selected.ToolFqid).ToString();
         var firstEvent = await CaptureInitialEvent(
             ZenGardenSubscription.ForStorage(seedBankName),
             TimeSpan.FromSeconds(15));
@@ -182,11 +169,11 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
         return await tcs.Task;
     }
 
-    private bool EnsureGardenAvailable()
+    private void EnsureGardenAvailable()
     {
         if (_fixture.IsAvailable)
         {
-            return true;
+            return;
         }
 
         var reason = string.IsNullOrWhiteSpace(_fixture.UnavailableReason)
@@ -201,7 +188,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
 
         _output.WriteLine(message);
         _output.WriteLine("Set KOAN_TESTS_ZENGARDEN_REQUIRED=1 to make this a hard failure.");
-        return false;
+        Assert.Skip(message);
     }
 
 }

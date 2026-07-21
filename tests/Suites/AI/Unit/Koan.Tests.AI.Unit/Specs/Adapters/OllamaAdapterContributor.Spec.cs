@@ -4,14 +4,13 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
-using Koan.AI;
 using Koan.AI.Contracts.Options;
-using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
+using Koan.AI.Connector.Ollama;
 using Koan.AI.Connector.Ollama.Initialization;
 using Koan.AI.Connector.Ollama.Options;
-using Koan.Core.Adapters;
-using Koan.ZenGarden.Core;
+using Koan.Core.Orchestration;
+using Koan.Core.Orchestration.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -24,188 +23,145 @@ namespace Koan.Tests.AI.Unit.Specs.Adapters;
 public sealed class OllamaAdapterContributorSpec
 {
     [Fact]
-    public async Task ContributeAsync_with_explicit_url_registers_expected_source()
+    public async Task Explicit_endpoint_produces_one_deterministic_source()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Koan:Ai:Ollama:Urls:0"] = "http://localhost:6001",
-            ["Koan:Ai:Ollama:DefaultModel"] = "phi3",
-            ["Koan:Ai:Ollama:Policy"] = "RoundRobin"
-        });
-
-        var sourceRegistry = new RecordingSourceRegistry();
-        var adapterRegistry = new InMemoryAdapterRegistry();
-        using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry);
-
-        var contributor = new OllamaAdapterContributor();
-        await contributor.Contribute(provider, CancellationToken.None);
-
-        sourceRegistry.RegisteredSources.Should().HaveCount(1);
-        var source = sourceRegistry.RegisteredSources.Single();
-
-        source.Name.Should().Be("ollama");
-        source.Policy.Should().Be("RoundRobin");
-        source.Origin.Should().Be("explicit-config");
-        source.IsAutoDiscovered.Should().BeFalse();
-        source.Members.Should().ContainSingle();
-
-        var member = source.Members[0];
-        member.Name.Should().Be("ollama::explicit-1");
-        member.ConnectionString.Should().Be("http://localhost:6001");
-        member.Order.Should().Be(0);
-        member.Origin.Should().Be("config-urls");
-        member.IsAutoDiscovered.Should().BeFalse();
-        member.Capabilities.Should().ContainKey("Chat").WhoseValue.Model.Should().Be("phi3");
-
-        adapterRegistry.All.Should().ContainSingle(adapter => adapter.Id == "ollama");
-    }
-
-    [Fact]
-    public async Task ContributeAsync_with_zen_garden_connection_string_resolves_member()
-    {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            ["Koan:Ai:Ollama:ConnectionString"] = "zen-garden://ollama?cap=llama3.2,nomic-embed-text",
-            ["Koan:Ai:Ollama:DefaultModel"] = "llama3.2"
-        });
-
-        var sourceRegistry = new RecordingSourceRegistry();
-        var adapterRegistry = new InMemoryAdapterRegistry();
-        var zenGardenProvider = new StubZenGardenProvider(_ => new ZenGardenOfferingResolution
-        {
-            ToolFqid = "ollama",
-            Offering = "ollama",
-            Uris = new[] { "http://zen-ollama:11434" },
-            Capabilities = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["model"] = new[] { "llama3.2", "nomic-embed-text" }
-            }
-        });
-
-        using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry, zenGardenProvider);
-
-        var contributor = new OllamaAdapterContributor();
-        await contributor.Contribute(provider, CancellationToken.None);
-
-        var source = sourceRegistry.RegisteredSources.Single();
-        source.Origin.Should().Be("explicit-config");
-        source.IsAutoDiscovered.Should().BeFalse();
-        source.Members.Should().ContainSingle();
-
-        var member = source.Members.Single();
-        member.Name.Should().Be("ollama::connection");
-        member.ConnectionString.Should().Be("http://zen-ollama:11434");
-        member.Origin.Should().Be("config-connection-string");
-        member.Capabilities.Should().ContainKey("Chat").WhoseValue.Model.Should().Be("llama3.2");
-    }
-
-    [Fact]
-    public async Task ContributeAsync_with_unresolved_zen_garden_connection_uses_additional_url_fallback()
-    {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            ["Koan:Ai:Ollama:ConnectionString"] = "zen-garden://ollama",
-            ["Koan:Ai:Ollama:AdditionalUrls:0"] = "http://localhost:6003",
+            ["Koan:Ai:Ollama:Endpoints:0"] = "http://localhost:6001",
             ["Koan:Ai:Ollama:DefaultModel"] = "phi3"
         });
 
-        var sourceRegistry = new RecordingSourceRegistry();
-        var adapterRegistry = new InMemoryAdapterRegistry();
-        var zenGardenProvider = new StubZenGardenProvider(_ => null);
-        using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry, zenGardenProvider);
+        using var provider = BuildServiceProvider(configuration, new RecordingSourceRegistry());
+        var activation = await new OllamaAdapterContributor().Activate(provider, CancellationToken.None);
 
-        var contributor = new OllamaAdapterContributor();
-        await contributor.Contribute(provider, CancellationToken.None);
+        activation.Should().NotBeNull();
+        var source = activation!.Sources.Should().ContainSingle().Subject;
+        source.Name.Should().Be("ollama");
+        source.Policy.Should().Be("Fallback");
+        source.Origin.Should().Be("explicit-config");
+        source.IsAutoDiscovered.Should().BeFalse();
 
-        var source = sourceRegistry.RegisteredSources.Single();
-        source.Origin.Should().Be("auto-discovery");
-        source.Members.Should().Contain(member =>
-            member.ConnectionString == "http://localhost:6003" &&
-            member.Origin == "config-additional-urls");
-        adapterRegistry.All.Should().ContainSingle(adapter => adapter.Id == "ollama");
+        var member = source.Members.Should().ContainSingle().Subject;
+        member.Name.Should().Be("ollama::member-1");
+        member.ConnectionString.Should().Be("http://localhost:6001");
+        member.Order.Should().Be(0);
+        member.Origin.Should().Be("explicit-config");
+        member.IsAutoDiscovered.Should().BeFalse();
+        member.Capabilities.Should().ContainKey("Chat").WhoseValue.Model.Should().Be("phi3");
+        activation.Adapter.Id.Should().Be("ollama");
     }
 
     [Fact]
-    public async Task ContributeAsync_with_missing_required_capabilities_passes_capability_intent_to_provider_and_continues()
+    public async Task Explicit_zen_garden_intent_is_resolved_by_core_discovery()
     {
+        const string intent = "zen-garden://ollama?cap=llama3.2,nomic-embed-text";
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Koan:Ai:Ollama:ConnectionString"] = "zen-garden://ollama?cap=llama3.2,nomic-embed-text"
+            ["ConnectionStrings:Ollama"] = intent,
+            ["Koan:Ai:Ollama:DefaultModel"] = "llama3.2"
         });
+        var discovery = StubDiscoveryCoordinator.Resolving("http://zen-ollama:11434");
 
-        var sourceRegistry = new RecordingSourceRegistry();
-        var adapterRegistry = new InMemoryAdapterRegistry();
-        var zenGardenProvider = new StubZenGardenProvider(_ => new ZenGardenOfferingResolution
-        {
-            ToolFqid = "ollama",
-            Offering = "ollama",
-            Uris = new[] { "http://zen-ollama:11434" },
-            Capabilities = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["model"] = new[] { "llama3.2" }
-            }
-        });
+        using var provider = BuildServiceProvider(configuration, new RecordingSourceRegistry(), discovery);
+        var activation = await new OllamaAdapterContributor().Activate(provider, CancellationToken.None);
 
-        using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry, zenGardenProvider);
-
-        var contributor = new OllamaAdapterContributor();
-        await contributor.Contribute(provider, CancellationToken.None);
-
-        sourceRegistry.RegisteredSources.Should().ContainSingle();
-        zenGardenProvider.ResolveRequests.Should().ContainSingle();
-        zenGardenProvider.ResolveRequests[0].Capabilities.Should().Contain(["llama3.2", "nomic-embed-text"]);
+        var source = activation!.Sources.Should().ContainSingle().Subject;
+        source.Origin.Should().Be("explicit-config");
+        var member = source.Members.Should().ContainSingle().Subject;
+        member.Name.Should().Be("ollama::member-1");
+        member.ConnectionString.Should().Be("http://zen-ollama:11434");
+        member.Origin.Should().Be("explicit-config");
+        discovery.ResolveRequests.Should().ContainSingle().Which.Should().Be(intent);
     }
 
     [Fact]
-    public async Task ContributeAsync_bails_when_source_already_registered()
+    public async Task Unresolved_explicit_zen_garden_intent_fails_without_fallback()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Koan:Ai:Ollama:Urls:0"] = "http://localhost:6005"
+            ["ConnectionStrings:Ollama"] = "zen-garden://ollama",
+            ["Koan:Ai:Ollama:DefaultModel"] = "phi3"
         });
+        var sourceRegistry = new RecordingSourceRegistry();
+        using var provider = BuildServiceProvider(
+            configuration,
+            sourceRegistry,
+            StubDiscoveryCoordinator.Failing());
 
+        var activate = async () =>
+            await new OllamaAdapterContributor().Activate(provider, CancellationToken.None);
+
+        await activate.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Ollama explicit Zen Garden intent*could not be satisfied*")
+            .WithMessage("*Koan.ZenGarden*automatic discovery*native Ollama HTTP endpoint*");
+        sourceRegistry.RegisteredSources.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Capability_bearing_intent_is_passed_unchanged_to_discovery()
+    {
+        const string intent = "zen-garden://ollama?cap=llama3.2,nomic-embed-text";
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:Ollama"] = intent
+        });
+        var discovery = StubDiscoveryCoordinator.Resolving("http://zen-ollama:11434");
+        using var provider = BuildServiceProvider(configuration, new RecordingSourceRegistry(), discovery);
+
+        var activation = await new OllamaAdapterContributor().Activate(provider, CancellationToken.None);
+
+        activation!.Sources.Should().ContainSingle();
+        discovery.ResolveRequests.Should().ContainSingle().Which.Should().Be(intent);
+    }
+
+    [Fact]
+    public async Task Existing_source_is_reused_without_publishing_a_second_source()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Koan:Ai:Ollama:Endpoints:0"] = "http://localhost:6005"
+        });
         var sourceRegistry = new RecordingSourceRegistry();
         sourceRegistry.MarkExisting("ollama");
-        var adapterRegistry = new InMemoryAdapterRegistry();
-        using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry);
+        using var provider = BuildServiceProvider(configuration, sourceRegistry);
 
-        var contributor = new OllamaAdapterContributor();
-        await contributor.Contribute(provider, CancellationToken.None);
+        var activation = await new OllamaAdapterContributor().Activate(provider, CancellationToken.None);
 
-        sourceRegistry.RegisteredSources.Should().BeEmpty();
-        adapterRegistry.All.Should().ContainSingle(adapter => adapter.Id == "ollama");
+        activation!.Sources.Should().BeEmpty();
+        activation.Adapter.Id.Should().Be("ollama");
     }
 
-    private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)
-        => new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+    private static IConfiguration BuildConfiguration(Dictionary<string, string?> values) =>
+        new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 
     private static ServiceProvider BuildServiceProvider(
         IConfiguration configuration,
         RecordingSourceRegistry sourceRegistry,
-        IAiAdapterRegistry adapterRegistry,
-        IZenGardenInitializationProvider? zenGardenProvider = null,
+        IServiceDiscoveryCoordinator? discovery = null,
         AiOptions? aiOptions = null,
-        OllamaOptions? ollamaOptions = null,
-        AdaptersReadinessOptions? readiness = null)
+        OllamaOptions? ollamaOptions = null)
     {
+        var resolvedOptions = ollamaOptions
+            ?? configuration.GetSection("Koan:Ai:Ollama").Get<OllamaOptions>()
+            ?? new OllamaOptions();
         var services = new ServiceCollection();
         services.AddSingleton(configuration);
         services.AddSingleton<IAiSourceRegistry>(sourceRegistry);
-        services.AddSingleton<IAiAdapterRegistry>(adapterRegistry);
         services.AddSingleton<IOptions<AiOptions>>(Options.Create(aiOptions ?? new AiOptions
         {
             AutoDiscoveryEnabled = true,
             AllowDiscoveryInNonDev = true
         }));
-        services.AddSingleton<IOptionsMonitor<OllamaOptions>>(new TestOptionsMonitor<OllamaOptions>(ollamaOptions ?? new OllamaOptions()));
-        services.AddSingleton<IOptions<AdaptersReadinessOptions>>(Options.Create(readiness ?? new AdaptersReadinessOptions()));
-        services.AddSingleton<ILogger<OllamaAdapterContributor>>(NullLogger<OllamaAdapterContributor>.Instance);
+        services.AddSingleton<IOptionsMonitor<OllamaOptions>>(
+            new TestOptionsMonitor<OllamaOptions>(resolvedOptions));
+        services.AddSingleton<ILogger<OllamaAdapterContributor>>(
+            NullLogger<OllamaAdapterContributor>.Instance);
+        services.AddSingleton(new OllamaAdapter(
+            new HttpClient(),
+            NullLogger<OllamaAdapter>.Instance,
+            resolvedOptions));
 
-        if (zenGardenProvider is not null)
-        {
-            services.AddSingleton(zenGardenProvider);
-        }
-
+        if (discovery is not null) services.AddSingleton(discovery);
         return services.BuildServiceProvider();
     }
 
@@ -221,8 +177,8 @@ public sealed class OllamaAdapterContributorSpec
             RegisteredSources.Add(source);
         }
 
-        public AiSourceDefinition? GetSource(string name)
-            => _sources.TryGetValue(name, out var source) ? source : null;
+        public AiSourceDefinition? GetSource(string name) =>
+            _sources.TryGetValue(name, out var source) ? source : null;
 
         public bool TryGetSource(string name, out AiSourceDefinition? source)
         {
@@ -230,19 +186,14 @@ public sealed class OllamaAdapterContributorSpec
             return source is not null;
         }
 
-        public IReadOnlyCollection<string> GetSourceNames()
-            => _sources.Keys.ToArray();
+        public IReadOnlyCollection<string> GetSourceNames() => _sources.Keys.ToArray();
+        public IReadOnlyCollection<AiSourceDefinition> GetAllSources() => _sources.Values.ToArray();
+        public bool HasSource(string name) => _sources.ContainsKey(name);
 
-        public IReadOnlyCollection<AiSourceDefinition> GetAllSources()
-            => _sources.Values.ToArray();
-
-        public bool HasSource(string name)
-            => _sources.ContainsKey(name);
-
-        public IReadOnlyCollection<AiSourceDefinition> GetSourcesWithCapability(string capabilityName)
-            => _sources.Values
-                .Where(source => source.Capabilities.ContainsKey(capabilityName) ||
-                                  source.Members.Any(member => member.Capabilities?.ContainsKey(capabilityName) == true))
+        public IReadOnlyCollection<AiSourceDefinition> GetSourcesWithCapability(string capabilityName) =>
+            _sources.Values
+                .Where(source => source.Capabilities.ContainsKey(capabilityName)
+                    || source.Members.Any(member => member.Capabilities?.ContainsKey(capabilityName) == true))
                 .ToArray();
 
         public void MarkExisting(string name)
@@ -251,76 +202,54 @@ public sealed class OllamaAdapterContributorSpec
             {
                 Name = name,
                 Provider = "ollama",
-                Members = new List<AiMemberDefinition>(),
+                Members = [],
                 Capabilities = new Dictionary<string, AiCapabilityConfig>()
             };
         }
     }
 
-    private sealed class StubZenGardenProvider : IZenGardenInitializationProvider
+    private sealed class StubDiscoveryCoordinator : IServiceDiscoveryCoordinator
     {
-        private readonly Func<ZenGardenConnectionIntent, ZenGardenOfferingResolution?> _resolver;
-        public List<ZenGardenConnectionIntent> ResolveRequests { get; } = new();
-        public List<ZenGardenConnectionIntent> WishRequests { get; } = new();
+        private readonly AdapterDiscoveryResult _resolution;
 
-        public StubZenGardenProvider(Func<ZenGardenConnectionIntent, ZenGardenOfferingResolution?> resolver)
-        {
-            _resolver = resolver;
-        }
+        private StubDiscoveryCoordinator(AdapterDiscoveryResult resolution) => _resolution = resolution;
 
-        public bool TryGetDefaultOffering(string adapterId, out string offering)
-        {
-            offering = "ollama";
-            return string.Equals(adapterId, "ollama", StringComparison.OrdinalIgnoreCase);
-        }
+        public List<string> ResolveRequests { get; } = [];
 
-        public ValueTask<ZenGardenOfferingResolution?> Resolve(
-            ZenGardenConnectionIntent intent,
+        public static StubDiscoveryCoordinator Resolving(string endpoint) =>
+            new(AdapterDiscoveryResult.Success("ollama", endpoint, "zen-garden"));
+
+        public static StubDiscoveryCoordinator Failing() =>
+            new(AdapterDiscoveryResult.Failed("ollama", "not available"));
+
+        public Task<AdapterDiscoveryResult> DiscoverService(
+            string serviceName,
+            DiscoveryContext? context = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(AdapterDiscoveryResult.Failed(serviceName, "not discovered"));
+
+        public Task<AdapterDiscoveryResult> ResolveServiceIntent(
+            string serviceName,
+            string intent,
+            DiscoveryContext? context = null,
             CancellationToken cancellationToken = default)
         {
             ResolveRequests.Add(intent);
-            return ValueTask.FromResult(_resolver(intent));
+            return Task.FromResult(_resolution);
         }
 
-        public ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilities(
-            ZenGardenConnectionIntent intent,
-            CancellationToken cancellationToken = default)
-        {
-            WishRequests.Add(intent);
-            return ValueTask.FromResult<ZenGardenCapabilityWishReceipt?>(new ZenGardenCapabilityWishReceipt
-            {
-                RequestId = Guid.NewGuid().ToString("N"),
-                ToolFqid = "ollama",
-                OfferingSelector = intent.ToOfferingSelector(),
-                Requested = intent.Capabilities,
-                Missing = intent.Capabilities,
-                IsFulfilled = false,
-                Status = "requested",
-                CreatedAt = DateTimeOffset.UtcNow
-            });
-        }
+        public IServiceDiscoveryAdapter[] GetRegisteredAdapters() => [];
     }
 
-    private sealed class TestOptionsMonitor<T> : IOptionsMonitor<T>
+    private sealed class TestOptionsMonitor<T>(T current) : IOptionsMonitor<T>
     {
-        private T _current;
-
-        public TestOptionsMonitor(T current)
-        {
-            _current = current;
-        }
-
-        public T CurrentValue => _current;
-
-        public T Get(string? name) => _current;
-
-        public IDisposable OnChange(Action<T, string> listener) => new NoopDisposable();
+        public T CurrentValue { get; } = current;
+        public T Get(string? name) => CurrentValue;
+        public IDisposable OnChange(Action<T, string?> listener) => new NoopDisposable();
 
         private sealed class NoopDisposable : IDisposable
         {
-            public void Dispose()
-            {
-            }
+            public void Dispose() { }
         }
     }
 }

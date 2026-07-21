@@ -1,68 +1,61 @@
-# Koan Framework Samples
+# Koan samples
 
-**The samples are the curriculum**: each rung teaches a bounded set of concepts; the flagships
-are dogfood applications that drive framework evolution (aspirational reading, not tutorials).
+Samples are Koan's public curriculum. Names describe the business result; numbers appear only where
+order has meaning inside a cumulative journey.
 
-> Status below is truthful as of 2026-06: ✅ = in `Koan.sln`, builds, CI-protected ·
-> 🛠 dogfood = large real app, maintained but not a tutorial · ⚠ = on disk but currently broken
-> or not in the solution (being consolidated; see `docs/assessment/`). The old
-> [CATALOG.md](CATALOG.md) is superseded by this page pending regeneration.
+These applications teach the Koan 0.20 preview. A sample proves behavior, not package maturity; check
+the [generated product surface](../docs/reference/product-surface.md) before treating a capability as
+supported.
 
-## The learning ladder (do these in order)
+On Windows, every listed sample also starts through the `start.bat` in its own root. The launcher uses
+the same standard `dotnet run` path, works from any caller directory, and forwards optional application
+arguments. The tables retain the portable cross-platform command as the execution contract.
 
-| Rung | Sample | Teaches | Time | Status |
-|---|---|---|---|---|
-| 1 | **S0.ConsoleJsonRepo** | Minimal bootstrap; entity statics in a console app | 5 min | ✅ |
-| 2 | **S1.Web** | REST CRUD via `EntityController<T>`, relationships (`[Parent]`), pagination, `[Cacheable]` | 30 min | ✅ |
-| 3 | **S10.DevPortal** | Live multi-provider switching (Mongo ⇄ Postgres ⇄ SQLite), capability detection, bulk ops | 20 min | ✅ |
-| 4 | **S14.AdapterBench** | Cross-adapter benchmarking; **entity-first background jobs** (`IKoanJob<T>`, progress, durable ledger) | 20 min | ✅ |
+## Start here
 
-After the ladder, pick by interest:
-
-| Sample | What it is | Status |
+| Sample | Meaningful result | Start |
 |---|---|---|
-| **S5.Recs** | AI recommendation engine: Mongo + Weaviate + Ollama, `[Embedding]` pipeline, partitioned imports, auth, scheduling | ✅ 🛠 dogfood |
-| **S16.PantryPal** (API + MCP host) | Vision AI meal planning; `[McpEntity]` agent tools over HTTP/SSE; MCP Code Mode | ✅ 🛠 dogfood |
-| **S18.Prism** | Personal knowledge intelligence; exercises the AI pillar end-to-end | ✅ 🛠 dogfood (spec-led; no README yet) |
-| **S8.Canon** (Api + Shared) | Canon runtime pipelines (`CanonEntity<T>`, pipeline contributors) | ✅ (root project excluded; use Api) |
-| **g1c1.GardenCoop** (guides/) | Narrative chapter-style guide; the only NativeAOT-publish dogfood | ✅ |
-| **S3.Mq.Sample** | RabbitMQ messaging skeleton | ✅ builds, minimal — being rebuilt as a proper messaging rung |
-| **S7.Meridian** | Document-intelligence flagship (16k LOC) | ⚠ builds (recently restored) but outside `Koan.sln` |
-| **S6.SnapVault** | Photo manager (media + storage + AI) | ⚠ broken (dependency pin); consolidation candidate |
-| **S8.PolyglotShop** | ServiceMesh showcase | ⚠ broken (references retired experimental pillars) |
+| [FirstUse](FirstUse/README.md) | Persist and approve one request; inspect the resulting API, facts, and governed agent tool | `dotnet run --project samples/FirstUse` |
+| [GoldenJourney](GoldenJourney/README.md) | Grow that same application through a rule, durable job, and agent recommendation | `dotnet run --project samples/GoldenJourney` |
 
-Known gaps the consolidation is addressing: no dedicated **messaging**, **jobs**, or **cache**
-tutorial rungs yet (today they're embedded in S3/S14/S1); several ghost directories from
-archived samples are pending deletion. Don't trust directory listings — trust this table and
-`Koan.sln`.
+## Fundamentals
 
-## Running a sample
+Use these when you want one concern in isolation.
 
-```bash
-# Anything in Koan.sln:
-dotnet run --project samples/S1.Web
+| Sample | Meaningful result | Concepts | Start |
+|---|---|---|---|
+| [LocalChecklist](fundamentals/LocalChecklist/README.md) | Save a checklist, complete one item, and reload open work | console host, Entity statics, JSON | `dotnet run --project samples/fundamentals/LocalChecklist` |
+| [TaskGraph](fundamentals/TaskGraph/README.md) | Resolve one task graph over scalar, set, and stream cardinalities | EntityController, Parent, Relatives, Cache | `dotnet run --project samples/fundamentals/TaskGraph` |
 
-# Samples with container dependencies ship a start.bat (preferred over docker compose by hand):
-cd samples/S5.Recs && ./start.bat
-```
+## Capability journeys
 
-Each sample prints a **boot report** at startup — discovered modules, adapter elections, boot
-phases. Read it; it is the framework's self-description and your first debugging surface.
+[GardenCoop](journeys/GardenCoop/README.md) is one application that grows in meaningful small steps:
 
-## Sample principles
+1. [Garden Journal](journeys/GardenCoop/01-GardenJournal/README.md) turns dry readings into watering reminders.
+2. [Local Discovery](journeys/GardenCoop/02-LocalDiscovery/README.md) keeps that complete application and adds local semantic produce search.
 
-1. **Domain-focused** — real applications, not FooService demos
-2. **Entity-first** — `Entity<T>` patterns; no manual repositories
-3. **Reference = Intent** — capabilities arrive by package reference; Program.cs stays minimal
-   (the canonical form is 4 lines — extra incantations in older samples are being removed)
-4. **In the solution = alive** — every kept sample lives in `Koan.sln` and rides CI; anything
-   outside the solution is rotting by definition
-5. **Concept-budgeted** — each README states what new concepts the sample introduces
+Each chapter is independently runnable. Every later chapter must preserve the earlier business result,
+then add one visible capability.
 
-## Contributing a sample
+## Complete applications
 
-Follow S5.Recs' README style (tutorial narrative, *why* over *what*), one-command run
-(`start.bat`), entity-first patterns only, and add the project to `Koan.sln` in the same PR.
+| Sample | Meaningful result | Concepts | Start |
+|---|---|---|---|
+| [DevPortal](applications/DevPortal/README.md) | Approve local articles, publish them through named provider channels, and render entity-backed share cards | named sources, Entity transfer, OpenGraph | `dotnet run --project samples/applications/DevPortal` |
+| [OrderIntake](applications/OrderIntake/README.md) | Run bounded order intake through one named source and keep a verified durable receipt | named sources, Entity batch work, Jobs, readiness | `dotnet run --project samples/applications/OrderIntake` |
+| [SnapVault](applications/SnapVault/README.md) | Upload a photo into a local studio, durably organize and serve it, then share its event without exposing the vault | Entity media, Jobs, tenancy, access, optional AI/vector | `dotnet run --project samples/applications/SnapVault` |
+| [CustomerCanon](applications/CustomerCanon/README.md) | Turn messy customer arrivals into one durable trusted customer, or reject them with reasons | CanonEntity, discovered contributors, generated Canon API, JSON | `dotnet run --project samples/applications/CustomerCanon` |
 
-- Port allocations: `docs/decisions/OPS-0014-samples-port-allocation.md`
-- Archive policy & history: [archive/ARCHIVED.md](archive/ARCHIVED.md)
+Other application directories are active graduation work, not current curriculum. Presence in the tree
+is not a support claim.
+
+The recommendation experience graduated into the standalone
+[Usagi Picks](https://github.com/lbotinelly/usagipicks) product repository. It remains useful Koan application
+evidence, but is no longer bundled sample source or part of this solution.
+
+## Graduation contract
+
+A public sample must have one business sentence, a standard .NET command to a meaningful result, focused
+executable evidence, and documentation that agrees with its source, provider requirements, facts, and
+deployment shape. Business intent must dominate the application code; mechanics belong at framework
+chokepoints. Private dogfood identities and unsupported performance or deployment claims do not belong here.

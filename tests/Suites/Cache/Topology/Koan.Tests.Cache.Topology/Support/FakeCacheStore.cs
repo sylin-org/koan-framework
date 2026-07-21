@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using Koan.Cache.Abstractions.Primitives;
+using Koan.Cache.Abstractions.Capabilities;
 using Koan.Cache.Abstractions.Stores;
+using Koan.Core.Capabilities;
 
 namespace Koan.Tests.Cache.Topology.Support;
 
@@ -14,21 +16,19 @@ internal class FakeCacheStore : ICacheStore
     private readonly ConcurrentDictionary<string, Entry> _entries = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _tagIndex = new(StringComparer.OrdinalIgnoreCase);
 
-    public FakeCacheStore(string name, CacheStorePlacement placement, CacheStoreCapabilities? capabilities = null)
+    public FakeCacheStore(string name, CacheStorePlacement placement)
     {
         Name = name;
         Placement = placement;
-        Capabilities = capabilities ?? new CacheStoreCapabilities(
-            SupportsTags: true,
-            SupportsSlidingTtl: false,
-            SupportsStaleWhileRevalidate: false,
-            SupportsBinary: true,
-            SupportsPersistence: false);
     }
 
     public string Name { get; }
     public CacheStorePlacement Placement { get; }
-    public CacheStoreCapabilities Capabilities { get; }
+    public void Describe(ICapabilities caps)
+        => caps.Add(CacheCaps.Tags)
+            .Add(CacheCaps.SlidingExpiration)
+            .Add(CacheCaps.BoundedStaleServing)
+            .Add(CacheCaps.BinaryPayload);
 
     public int FetchCount;
     public int SetCount;

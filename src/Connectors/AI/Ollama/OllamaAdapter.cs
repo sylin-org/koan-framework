@@ -1,29 +1,31 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
-using Koan.Core.Adapters;
-using Koan.Core.AI;
+using Koan.AI.Contracts;
 using Koan.AI.Connector.Ollama.Options;
 
 namespace Koan.AI.Connector.Ollama;
 
-internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
+internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IDisposable
 {
     private readonly HttpClient _http;
     private readonly ILogger<OllamaAdapter> _logger;
     private readonly OllamaOptions _options;
     private readonly string _defaultModel;
     private readonly SemaphoreSlim? _concurrencyLimiter;
+    private readonly ConcurrentDictionary<string, HttpClient> _endpointClients =
+        new(StringComparer.OrdinalIgnoreCase);
+    private int _disposed;
 
     public string Id => "ollama";
     public string Name => "Ollama AI Provider";
@@ -48,14 +50,17 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
     public OllamaAdapter(
         HttpClient http,
         ILogger<OllamaAdapter> logger,
-        IConfiguration configuration,
-        AdaptersReadinessOptions? readinessDefaults = null,
         OllamaOptions? resolvedOptions = null)
     {
         _http = http ?? throw new ArgumentNullException(nameof(http));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _options = resolvedOptions ?? new OllamaOptions();
-        _defaultModel = _options.DefaultModel ?? "llama3.2";
+        _defaultModel = _options.DefaultModel;
+        if (_options.Endpoints.FirstOrDefault() is { Length: > 0 } endpoint
+            && Uri.TryCreate(endpoint, UriKind.Absolute, out var configuredEndpoint))
+        {
+            SetDefaultEndpoint(configuredEndpoint);
+        }
 
         if (_options.MaxConcurrentRequests > 0 && _options.MaxConcurrentRequests < int.MaxValue)
         {
@@ -67,6 +72,11 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
     }
 
     public bool CanServe(AiChatRequest request) => true;
+
+    internal void SetDefaultEndpoint(Uri? endpoint)
+    {
+        if (endpoint is not null) _http.BaseAddress = endpoint;
+    }
 
     public async Task<AiChatResponse> Chat(AiChatRequest request, CancellationToken ct = default)
     {
@@ -257,10 +267,24 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
     {
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
-            return new HttpClient { BaseAddress = new Uri(connectionString), Timeout = Timeout.InfiniteTimeSpan };
+            var endpoint = new Uri(connectionString).ToString().TrimEnd('/');
+            return _endpointClients.GetOrAdd(endpoint, static value => new HttpClient
+            {
+                BaseAddress = new Uri(value),
+                Timeout = Timeout.InfiniteTimeSpan
+            });
         }
 
         return _http;
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        foreach (var client in _endpointClients.Values) client.Dispose();
+        _endpointClients.Clear();
+        _http.Dispose();
+        _concurrencyLimiter?.Dispose();
     }
 
     private async Task<SemaphoreReleaser?> AcquireConcurrencySlot(CancellationToken ct)

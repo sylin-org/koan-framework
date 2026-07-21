@@ -141,7 +141,9 @@ Direct/Cqrs/Backup are unconsumed or single-consumer, untested, pre-renovation.
 **Verdict: best-covered area; uniform anatomy; drift at the edges.** All follow one canonical
 shape through one capability model. Gaps: Postgres ships `UpsertMany` but doesn't declare
 BulkUpsert; Couchbase missed the CAS/FastRemove/TTL waves; Redis declares `FilterSupport.Full`
-honored by full-keyspace SCAN + client-side filter (dangerous at scale); ES/OS are misfiled vector
+honored by full-keyspace SCAN + client-side filter (cost at scale — but `Full` is *correct* for an
+in-memory-eval adapter under ARCH-0084; resolved DATA-0101: keep `Full`, document the scan cost, add
+native TTL); ES/OS are misfiled vector
 adapters and ~80% twins; byte-identical `SchemaDdlPolicy`/`SchemaMatchingMode` enums copy-pasted
 across the relational trio; every adapter wires services twice (manual `XRegistration` +
 `KoanAutoRegistrar`); SqliteRepository.cs is a 1,732-line monolith.

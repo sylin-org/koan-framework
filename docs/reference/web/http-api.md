@@ -4,10 +4,10 @@ domain: web
 title: "Web HTTP API"
 audience: [developers, architects]
 status: current
-last_updated: 2025-10-09
-framework_version: v0.6.3
+last_updated: 2026-07-15
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2025-10-09
+  date_last_tested: 2026-07-15
   status: verified
   scope: docs/reference/web/http-api.md
 ---
@@ -40,6 +40,22 @@ public class ProductsController : EntityController<Product> { }
 - Automatic CRUD: GET/POST/PUT/PATCH/DELETE
 - Pagination: Controlled via attributes and safety bounds
 - Filters/sort: JSON filter language and defaults
+
+## Query a collection
+
+`filter` is URL-encoded JSON; `q` is a separate free-text search slot. For example:
+
+```bash
+curl --get \
+  --data-urlencode 'filter={"status":"Pending"}' \
+  http://localhost:5000/api/products
+```
+
+Koan parses this into one filter tree. Each adapter receives only the nodes it declares it can
+execute; Koan evaluates any remainder before sorting and pagination. This gives the HTTP contract the
+same result semantics across query-capable adapters without claiming that every provider pushes the
+same work down or has the same cost. Malformed filters, unknown fields, and unsupported input return
+`400 Bad Request`; they are never treated as an unfiltered request.
 
 ## Transformers (WEB-0035)
 

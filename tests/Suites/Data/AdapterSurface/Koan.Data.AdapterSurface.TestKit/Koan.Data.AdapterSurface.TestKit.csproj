@@ -2,6 +2,8 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <!-- Shared abstract specs and fixtures execute through the concrete adapter suites. -->
+    <IsTestProject>false</IsTestProject>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
@@ -12,9 +14,19 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <!-- ARCH-0103 P5: the conformance ledger base (AodbConformanceSpecsBase) boots real engine fixtures. -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Containers\Koan.Testing.Containers.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AwesomeAssertions" Version="9.4.0" />
+    <!-- ARCH-0094 Phase 1: the capability-driven Conformance Gate, LINK-compiled (not project-referenced) so the
+         two planes share its source, not an assembly — this testkit's discoverable conformance axis stays unshared. -->
+    <Compile Include="..\..\..\_shared\CapabilityConformanceGate.cs" Link="Support\CapabilityConformanceGate.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
+    <PackageReference Include="xunit.v3.assert" />
   </ItemGroup>
 </Project>

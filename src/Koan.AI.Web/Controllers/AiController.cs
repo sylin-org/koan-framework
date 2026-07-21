@@ -7,7 +7,7 @@ using Koan.AI.Contracts;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Routing;
-using Koan.Web.Sse.Mvc;
+using Koan.Web.Sse;
 
 namespace Koan.AI.Web.Controllers;
 
@@ -24,18 +24,28 @@ public sealed class AiController : ControllerBase
     public IActionResult Health()
     {
         var total = _registry.All.Count;
-        var state = total > 0 ? "Healthy" : "Unhealthy";
-        return Ok(new { state, adapters = total });
+        var state = total > 0 ? "Ready" : "Inactive";
+        var message = total > 0
+            ? $"{total} AI provider adapter(s) available."
+            : "The AI HTTP projection is active, but no provider adapter is available.";
+        return Ok(new { state, adapters = total, message });
     }
 
     [HttpGet(Constants.Routes.Adapters)]
     public IActionResult Adapters()
-        => Ok(_registry.All.Select(a => new { a.Id, a.Name, a.Type }));
+        => Ok(_registry.All.Select(a => new
+        {
+            a.Id,
+            a.Name,
+            a.Type,
+            Capabilities = a.Capabilities.OrderBy(capability => capability)
+        }));
 
     [HttpGet(Constants.Routes.Models)]
     public async Task<IActionResult> Models(CancellationToken ct)
     {
         var results = new List<AiModelDescriptor>();
+        var failures = new List<object>();
         foreach (var a in _registry.All)
         {
             try
@@ -43,9 +53,16 @@ public sealed class AiController : ControllerBase
                 var list = await a.ListModels(ct);
                 results.AddRange(list);
             }
-            catch { /* ignore unavailable adapter */ }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                failures.Add(new
+                {
+                    adapterId = a.Id,
+                    error = exception.Message
+                });
+            }
         }
-        return Ok(results);
+        return Ok(new { models = results, failures });
     }
 
     [HttpGet(Constants.Routes.Capabilities)]
@@ -55,9 +72,7 @@ public sealed class AiController : ControllerBase
         {
             a.Id,
             a.Type,
-            Chat = a is IChatAdapter,
-            Embed = a is IEmbedAdapter,
-            Ocr = a is IOcrAdapter,
+            Capabilities = a.Capabilities.OrderBy(capability => capability),
             ModelManagement = a.ModelManager is not null
         });
         return Ok(caps);
@@ -102,7 +117,7 @@ public sealed class AiController : ControllerBase
 
     [HttpPost(Constants.Routes.ChatStream)]
     public IActionResult ChatStream([FromBody] AiChatRequest request, CancellationToken ct)
-        => SseActionResult.StreamText(StreamDeltas(request, ct));
+        => Sse.Stream(StreamDeltas(request, ct));
 
     private async IAsyncEnumerable<string> StreamDeltas(
         AiChatRequest request,

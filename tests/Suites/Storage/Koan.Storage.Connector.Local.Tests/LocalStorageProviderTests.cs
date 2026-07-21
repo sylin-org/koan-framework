@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Koan.Storage.Abstractions;
+using Koan.Storage.Abstractions.Capabilities;
 using Koan.Storage.Connector.Local;
 using Koan.Storage.Connector.Local.Infrastructure;
 using Microsoft.Extensions.Options;
@@ -24,8 +25,7 @@ public class LocalStorageProviderTests : IDisposable
         Directory.CreateDirectory(_testBasePath);
 
         _options = new LocalStorageOptions { BasePath = _testBasePath };
-        var optionsMonitor = new TestOptionsMonitor<LocalStorageOptions>(_options);
-        _provider = new LocalStorageProvider(optionsMonitor);
+        _provider = new LocalStorageProvider(Microsoft.Extensions.Options.Options.Create(_options));
     }
 
     public void Dispose()
@@ -165,12 +165,20 @@ public class LocalStorageProviderTests : IDisposable
             .WithMessage("*Path traversal*");
     }
 
-    [Fact(DisplayName = "SECURITY-003: Should block invalid characters in key")]
-    public async Task Should_Block_Invalid_Characters()
+    [Theory(DisplayName = "SECURITY-003: Should block portable invalid characters in key")]
+    [InlineData("<")]
+    [InlineData(">")]
+    [InlineData(":")]
+    [InlineData("\"")]
+    [InlineData("|")]
+    [InlineData("?")]
+    [InlineData("*")]
+    [InlineData("\u0001")]
+    public async Task Should_Block_Invalid_Characters(string invalidCharacter)
     {
         // Arrange
         const string container = "secure-container";
-        const string invalidKey = "file<>|?.txt"; // Windows invalid chars
+        var invalidKey = $"file{invalidCharacter}.txt";
 
         // Act
         Func<Task> act = async () =>
@@ -201,6 +209,17 @@ public class LocalStorageProviderTests : IDisposable
 
         // Assert
         exists.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "SECURITY-005: Should block container traversal during listing")]
+    public async Task Should_Block_Container_Traversal_During_Listing()
+    {
+        var list = async () => await ((IListOperations)_provider)
+            .ListObjects("../../outside")
+            .ToListAsync();
+
+        await list.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Path traversal*");
     }
 
     #endregion
@@ -279,13 +298,13 @@ public class LocalStorageProviderTests : IDisposable
         }
 
         // Act - Read bytes 5-10 (inclusive)
-        var (stream, length) = await _provider.OpenReadRange(container, key, from: 5, to: 10);
+        var (rangeStream, length) = await _provider.OpenReadRange(container, key, from: 5, to: 10);
 
         // Assert
         length.Should().Be(6); // 6 bytes: positions 5,6,7,8,9,10
 
-        await using (stream)
-        using (var reader = new StreamReader(stream))
+        await using (rangeStream)
+        using (var reader = new StreamReader(rangeStream))
         {
             var rangeContent = await reader.ReadToEndAsync();
             rangeContent.Should().Be("56789A");
@@ -306,11 +325,11 @@ public class LocalStorageProviderTests : IDisposable
         }
 
         // Act - Read first 5 bytes
-        var (stream, length) = await _provider.OpenReadRange(container, key, from: 0, to: 4);
+        var (rangeStream, length) = await _provider.OpenReadRange(container, key, from: 0, to: 4);
 
         // Assert
-        await using (stream)
-        using (var reader = new StreamReader(stream))
+        await using (rangeStream)
+        using (var reader = new StreamReader(rangeStream))
         {
             var rangeContent = await reader.ReadToEndAsync();
             rangeContent.Should().Be("Hello");
@@ -331,11 +350,11 @@ public class LocalStorageProviderTests : IDisposable
         }
 
         // Act - Read from byte 7 to end
-        var (stream, length) = await _provider.OpenReadRange(container, key, from: 7, to: null);
+        var (rangeStream, length) = await _provider.OpenReadRange(container, key, from: 7, to: null);
 
         // Assert
-        await using (stream)
-        using (var reader = new StreamReader(stream))
+        await using (rangeStream)
+        using (var reader = new StreamReader(rangeStream))
         {
             var rangeContent = await reader.ReadToEndAsync();
             rangeContent.Should().Be("World!");
@@ -550,29 +569,16 @@ public class LocalStorageProviderTests : IDisposable
     public void Should_Report_Capabilities()
     {
         // Assert
-        var caps = _provider.Capabilities;
-        caps.SupportsSeek.Should().BeTrue("local storage supports seeking");
-        caps.SupportsRangeReads.Should().BeTrue("local storage supports range reads");
-        caps.SupportsPresignedUrls.Should().BeFalse("local storage doesn't support presigned URLs");
-        caps.SupportsServerSideCopy.Should().BeTrue("local storage supports server-side copy");
+        var caps = StorageCaps.Describe(_provider, _provider.Name);
+        caps.Has(StorageCaps.SequentialRead).Should().BeTrue();
+        caps.Has(StorageCaps.Seek).Should().BeTrue();
+        caps.Has(StorageCaps.PresignedRead).Should().BeFalse();
+        caps.Has(StorageCaps.PresignedWrite).Should().BeFalse();
+        caps.Has(StorageCaps.ServerSideCopy).Should().BeTrue();
+        caps.Has(StorageCaps.Stat).Should().BeTrue();
+        caps.Has(StorageCaps.List).Should().BeTrue();
+        _provider.Placement.Should().Be(StorageProviderPlacement.Local);
     }
 
     #endregion
-}
-
-/// <summary>
-/// Test implementation of IOptionsMonitor for testing
-/// </summary>
-internal class TestOptionsMonitor<T> : IOptionsMonitor<T>
-{
-    private readonly T _value;
-
-    public TestOptionsMonitor(T value)
-    {
-        _value = value;
-    }
-
-    public T CurrentValue => _value;
-    public T Get(string? name) => _value;
-    public IDisposable? OnChange(Action<T, string?> listener) => null;
 }

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Microsoft.AspNetCore.JsonPatch;
 using Koan.Web.Attributes;
 using Koan.Data.Abstractions.Instructions;
 
@@ -22,6 +21,9 @@ public sealed class EntityCollectionRequest
     public int AbsoluteMaxRecords { get; init; }
     public string? Accept { get; init; }
     public string? BasePath { get; init; }
+    // SEC-0004 (§C): opt the collection response into the per-row `access` sidecar (REST ?access=true). Default
+    // false keeps the bare array for existing consumers.
+    public bool IncludeAccess { get; init; }
     public IReadOnlyDictionary<string, string?> QueryParameters { get; init; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 }
 
@@ -55,6 +57,8 @@ public sealed class EntityUpsertRequest<TEntity> where TEntity : class
     public required TEntity Model { get; init; }
     public string? Set { get; init; }
     public string? Accept { get; init; }
+    // AN11: rehearse the mutation — run the hook/validation pipeline + project the delta, commit nothing.
+    public bool DryRun { get; init; }
 }
 
 public sealed class EntityUpsertManyRequest<TEntity> where TEntity : class
@@ -62,6 +66,7 @@ public sealed class EntityUpsertManyRequest<TEntity> where TEntity : class
     public required EntityRequestContext Context { get; init; }
     public required IReadOnlyCollection<TEntity> Models { get; init; }
     public string? Set { get; init; }
+    public bool DryRun { get; init; }
 }
 
 public sealed class EntityDeleteRequest<TKey>
@@ -70,6 +75,7 @@ public sealed class EntityDeleteRequest<TKey>
     public required TKey Id { get; init; }
     public string? Set { get; init; }
     public string? Accept { get; init; }
+    public bool DryRun { get; init; }
 }
 
 public sealed class EntityDeleteManyRequest<TKey>
@@ -77,6 +83,7 @@ public sealed class EntityDeleteManyRequest<TKey>
     public required EntityRequestContext Context { get; init; }
     public required IReadOnlyCollection<TKey> Ids { get; init; }
     public string? Set { get; init; }
+    public bool DryRun { get; init; }
 }
 
 public sealed class EntityDeleteByQueryRequest
@@ -84,12 +91,21 @@ public sealed class EntityDeleteByQueryRequest
     public required EntityRequestContext Context { get; init; }
     public required string Query { get; init; }
     public string? Set { get; init; }
+    public bool DryRun { get; init; }
 }
 
 public sealed class EntityDeleteAllRequest
 {
     public required EntityRequestContext Context { get; init; }
     public string? Set { get; init; }
+    public bool DryRun { get; init; }
+}
+
+public enum EntityPatchKind
+{
+    JsonPatch6902,
+    MergePatch7386,
+    PartialJson
 }
 
 public sealed class EntityPatchRequest<TEntity, TKey> where TEntity : class
@@ -98,10 +114,9 @@ public sealed class EntityPatchRequest<TEntity, TKey> where TEntity : class
     public required TKey Id { get; init; }
     // Generalized patch support
     public object? Patch { get; init; }
-    public PatchKind Kind { get; init; }
+    public EntityPatchKind Kind { get; init; }
     public string? Set { get; init; }
     public string? Accept { get; init; }
+    public bool DryRun { get; init; }
 }
-
-
 

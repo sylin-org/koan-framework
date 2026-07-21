@@ -74,11 +74,12 @@ internal sealed class ApplicationIdentityDocumentTransformer : IOpenApiDocumentT
         if (services is not null)
         {
             KoanEnv.TryInitialize(services);
+            if (services.GetService(typeof(ApplicationIdentitySnapshot)) is ApplicationIdentitySnapshot identity)
+            {
+                return identity;
+            }
         }
 
-        var identity = AppHost.Identity;
-        return identity != ApplicationIdentitySnapshot.Empty
-            ? identity
-            : KoanEnv.CurrentSnapshot.Application;
+        return AppHost.Identity;
     }
 }

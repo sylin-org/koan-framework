@@ -1,6 +1,7 @@
 using System;
 using System.Security.Claims;
 using Koan.Web.Hooks;
+using Koan.Web.Authorization;
 
 namespace Koan.Web.Extensions.Authorization;
 

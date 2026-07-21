@@ -7,9 +7,8 @@ using Koan.Web.Auth.Flow;
 namespace Koan.Web.Auth.Hosting;
 
 /// <summary>
-/// Fires <c>OnBootstrap</c> on every registered <see cref="IKoanAuthFlowHandler"/> (including
-/// legacy <see cref="IKoanAuthEventContributor"/> instances projected through
-/// <c>LegacyAuthContributorAdapter</c>) once during host startup. The dispatcher is resolved
+/// Fires <c>OnBootstrap</c> on every registered <see cref="IKoanAuthFlowHandler"/> once during
+/// host startup. The dispatcher is resolved
 /// from a fresh service scope (it and its handler dependencies are scoped) so the singleton
 /// hosted service never holds a captive scoped reference. Failures inside a single handler are
 /// logged by the dispatcher and do not prevent the host from coming up; a wholesale dispatch

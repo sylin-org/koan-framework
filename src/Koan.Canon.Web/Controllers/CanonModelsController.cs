@@ -1,9 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using Koan.Canon.Domain.Annotations;
-using Koan.Canon.Domain.Metadata;
-using Koan.Canon.Domain.Runtime;
+using Koan.Canon;
 using Koan.Canon.Web.Catalog;
 using Koan.Canon.Web.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
@@ -18,12 +16,12 @@ namespace Koan.Canon.Web.Controllers;
 public sealed class CanonModelsController : ControllerBase
 {
     private readonly ICanonModelCatalog _catalog;
-    private readonly CanonRuntimeConfiguration _configuration;
+    private readonly ICanonPipelineCatalog _pipelines;
 
-    public CanonModelsController(ICanonModelCatalog catalog, CanonRuntimeConfiguration configuration)
+    public CanonModelsController(ICanonModelCatalog catalog, ICanonPipelineCatalog pipelines)
     {
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _pipelines = pipelines ?? throw new ArgumentNullException(nameof(pipelines));
     }
 
     [HttpGet]
@@ -56,7 +54,6 @@ public sealed class CanonModelsController : ControllerBase
             descriptor.DisplayName,
             descriptor.Route,
             descriptor.ModelType.FullName ?? descriptor.ModelType.Name,
-            descriptor.IsValueObject,
             metadata?.HasSteps ?? false,
             metadata?.Phases ?? [],
             aggregationMetadata.AggregationKeyNames,
@@ -75,20 +72,18 @@ public sealed class CanonModelsController : ControllerBase
             descriptor.Slug,
             descriptor.DisplayName,
             descriptor.Route,
-            descriptor.IsValueObject,
             metadata?.HasSteps ?? false,
             aggregationMetadata.AggregationKeyNames,
             metadata?.AuditEnabled ?? aggregationMetadata.AuditEnabled);
     }
 
     private CanonPipelineMetadata? ResolveMetadata(Type modelType)
-        => _configuration.PipelineMetadata.TryGetValue(modelType, out var metadata) ? metadata : null;
+        => _pipelines.TryGetMetadata(modelType, out var metadata) ? metadata : null;
 
     public sealed record CanonModelSummary(
         string Slug,
         string DisplayName,
         string Route,
-        bool IsValueObject,
         bool HasPipeline,
         IReadOnlyList<string> AggregationKeys,
         bool AuditEnabled);
@@ -98,7 +93,6 @@ public sealed class CanonModelsController : ControllerBase
         string DisplayName,
         string Route,
         string Type,
-        bool IsValueObject,
         bool HasPipeline,
         IReadOnlyList<CanonPipelinePhase> Phases,
         IReadOnlyList<string> AggregationKeys,

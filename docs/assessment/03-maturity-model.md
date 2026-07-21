@@ -33,7 +33,7 @@ a statement about *this* framework's standards, not a generic CMM.
 | **Vector core + Weaviate, Qdrant, ES, OS** | **L3−** | Residual-is-error invariant, uniform 25-spec matrix. Residue: 3 naming conventions, Abstractions→Core layering violation, zero-adopter VectorWorkflow sub-surface, OS matrix status stale. |
 | **Web nucleus** (Web + Extensions) | **L3−** | EntityController→EndpointService→hooks spine, AdapterSurface ×8 integration matrix. Residue: Type.GetType shims, namespace/type-name collisions, Koan.Web→Scheduling reference, Extensions misnamed. |
 | **Security.Trust** | **L3** | Best-engineered small project; ADR-section citations per file; unit + E2E via KoanIntegrationHost. Residue: docs claim ES256 ahead of implementation (deferred-by-design, but stated). |
-| **Mcp** | **L3−** | Consumed (S16 + tests + fixtures), ADR-backed. Residue: duplicate ICodeExecutor interfaces, dual registrars. |
+| **Mcp** | **L3** | Ready-with-caveats. Standardized E2E transport schemas (NewLineDelimited, SSE direct-rpc), dynamic assembly scanner resolved, validated against S19 read-only sample. Mutation tooling disabled by design. |
 
 ### L2 — Functional, pre-canon (live strata the renovation hasn't reached)
 

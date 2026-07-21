@@ -1,7 +1,5 @@
-﻿using Koan.Testing;
 using Koan.Mcp.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
 using Koan.Mcp.Options;
 using Microsoft.AspNetCore.Builder;
@@ -12,6 +10,7 @@ using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Core; // for AddKoan extension
+using Microsoft.Extensions.Hosting;
 
 namespace Koan.Samples.McpCodeMode.Tests;
 
@@ -19,19 +18,25 @@ namespace Koan.Samples.McpCodeMode.Tests;
 /// Specialized fixture with deterministic CodeMode quota configuration.
 /// MaxSdkCalls=2, RequireAnswer=true to enforce both error paths predictably.
 /// </summary>
-public class StrictQuotaTestPipelineFixture : KoanTestPipelineFixtureBase
+public class StrictQuotaTestPipelineFixture : TestHostFixtureBase
 {
     public StrictQuotaTestPipelineFixture() : base(typeof(Program)) { }
 
     protected override void ConfigureTestServices(IServiceCollection services)
     {
-    services.AddKoanCore();
-    services.AddKoanWeb();
-    services.AddKoanMcp();
+        services.AddKoan().AsProxiedApi();
+        services.AddKoanWeb();
+
+        var stdioService = services.FirstOrDefault(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(Koan.Mcp.Hosting.StdioTransport));
+        if (stdioService != null)
+        {
+            services.Remove(stdioService);
+        }
+
         services.Configure<McpServerOptions>(o =>
         {
             o.Exposure = McpExposureMode.Full;
-            o.EnableHttpSseTransport = false; // keep deterministic
+            o.EnableStreamableHttpTransport = false; // keep deterministic
         });
         services.Configure<CodeModeOptions>(o =>
         {
@@ -47,7 +52,6 @@ public class StrictQuotaTestPipelineFixture : KoanTestPipelineFixtureBase
         app.UseRouting();
         app.UseEndpoints(e =>
         {
-            e.MapKoanMcpEndpoints();
             e.MapControllers();
         });
     }

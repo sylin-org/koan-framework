@@ -1,29 +1,56 @@
-using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
-using Koan.Core;
 using Koan.Core.Observability.Health;
+using Koan.Data.Core;
+using Koan.Data.Core.Diagnostics;
+using Koan.Data.Core.Routing;
+using Koan.Data.Abstractions;
 
 namespace Koan.Data.Connector.Sqlite;
 
-internal sealed class SqliteHealthContributor(IOptions<SqliteOptions> options) : IHealthContributor
+/// <summary>Reports readiness for the SQLite sources that actually participate in this application.</summary>
+internal sealed class SqliteHealthContributor : DataAdapterHealthContributorBase
 {
-    public string Name => "data:sqlite";
-    public bool IsCritical => true;
-    public async Task<HealthReport> Check(CancellationToken ct = default)
+    private const string ProviderName = "sqlite";
+    private readonly IConfiguration _configuration;
+    private readonly DataSourceRegistry _sourceRegistry;
+    private readonly IOptions<SqliteOptions> _options;
+    private readonly SqliteConnectionLifecycle _connections;
+    private readonly IAdapterFactory _sourceOwner;
+
+    public SqliteHealthContributor(
+        IServiceProvider services,
+        IConfiguration configuration,
+        DataSourceRegistry sourceRegistry,
+        IDataDiagnostics diagnostics,
+        IOptions<SqliteOptions> options,
+        SqliteConnectionLifecycle connections,
+        DataProviderCatalog providers,
+        DataDefaultProviderPlan defaultProvider)
+        : base(ProviderName, services, diagnostics, defaultProvider)
     {
-        try
-        {
-            await using var conn = new SqliteConnection(options.Value.ConnectionString);
-            await conn.OpenAsync(ct);
-            // trivial probe
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "PRAGMA user_version;";
-            _ = await cmd.ExecuteScalarAsync(ct);
-            return new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Healthy, null, null, null);
-        }
-        catch (Exception ex)
-        {
-            return new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Unhealthy, ex.Message, null, null);
-        }
+        _configuration = configuration;
+        _sourceRegistry = sourceRegistry;
+        _options = options;
+        _connections = connections;
+        _sourceOwner = providers.Find(ProviderName)
+            ?? throw new InvalidOperationException("The SQLite provider is absent from the host Data catalog.");
+    }
+
+    protected override async Task ProbeSource(string source, CancellationToken ct)
+    {
+        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
+            _configuration,
+            _sourceRegistry,
+            ProviderName,
+            source,
+            _options.Value.ConnectionString,
+            _sourceOwner);
+
+        await using var connection = _connections.Create(connectionString, source);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version;";
+        _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
     }
 }

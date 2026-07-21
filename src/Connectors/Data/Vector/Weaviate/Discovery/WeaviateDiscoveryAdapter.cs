@@ -26,44 +26,24 @@ internal sealed class WeaviateDiscoveryAdapter : ServiceDiscoveryAdapterBase
     /// <summary>Weaviate-specific health validation using HTTP health checks</summary>
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        try
-        {
-            using var httpClient = new HttpClient { Timeout = context.HealthCheckTimeout };
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(context.HealthCheckTimeout);
+        using var httpClient = new HttpClient { Timeout = context.HealthCheckTimeout };
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(context.HealthCheckTimeout);
 
             // Prefer well-known readiness endpoint (no version prefix in some Weaviate releases)
-            var readyUrl = new Uri(new Uri(serviceUrl), "/.well-known/ready").ToString();
-            var response = await httpClient.GetAsync(readyUrl, cts.Token);
-            if (response.IsSuccessStatusCode)
-            {
-                _logger.LogDebug("Weaviate health check passed using /.well-known/ready for {Url}", serviceUrl);
-                return true;
-            }
+        var readyUrl = new Uri(new Uri(serviceUrl), "/.well-known/ready").ToString();
+        var response = await httpClient.GetAsync(readyUrl, cts.Token);
+        if (response.IsSuccessStatusCode) return true;
 
             // Fallback for deployments exposing readiness under /v1
-            var readyV1Url = new Uri(new Uri(serviceUrl), "/v1/.well-known/ready").ToString();
-            var responseV1 = await httpClient.GetAsync(readyV1Url, cts.Token);
-            if (responseV1.IsSuccessStatusCode)
-            {
-                _logger.LogDebug("Weaviate health check passed using /v1/.well-known/ready for {Url}", serviceUrl);
-                return true;
-            }
+        var readyV1Url = new Uri(new Uri(serviceUrl), "/v1/.well-known/ready").ToString();
+        var responseV1 = await httpClient.GetAsync(readyV1Url, cts.Token);
+        if (responseV1.IsSuccessStatusCode) return true;
 
             // Final fallback to meta endpoint (standard Weaviate health endpoint)
-            var metaUrl = new Uri(new Uri(serviceUrl), "/v1/meta").ToString();
-            var metaResponse = await httpClient.GetAsync(metaUrl, cts.Token);
-            var isHealthy = metaResponse.IsSuccessStatusCode;
-
-            _logger.LogDebug("Weaviate health check {Result} using /v1/meta for {Url}",
-                isHealthy ? "passed" : "failed", serviceUrl);
-            return isHealthy;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug("Weaviate health check failed for {Url}: {Error}", serviceUrl, ex.Message);
-            return false;
-        }
+        var metaUrl = new Uri(new Uri(serviceUrl), "/v1/meta").ToString();
+        var metaResponse = await httpClient.GetAsync(metaUrl, cts.Token);
+        return metaResponse.IsSuccessStatusCode;
     }
 
     /// <summary>Weaviate adapter reads its own configuration sections</summary>
@@ -101,7 +81,7 @@ internal sealed class WeaviateDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return Enumerable.Empty<DiscoveryCandidate>();
 
         return weaviateUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                          .Select(url => new DiscoveryCandidate(url.Trim(), "environment-weaviate-urls", 0));
+                          .Select(url => new DiscoveryCandidate(url.Trim(), "environment-weaviate-urls", DiscoveryCandidatePriority.Environment));
     }
 
     /// <summary>Weaviate adapter handles Aspire service discovery for Weaviate</summary>

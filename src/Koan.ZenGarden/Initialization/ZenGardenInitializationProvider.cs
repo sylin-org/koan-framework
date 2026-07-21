@@ -1,4 +1,4 @@
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 using Koan.ZenGarden.Models;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -9,40 +9,15 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
 {
     private readonly IZenGardenClient _client;
     private readonly ILogger<ZenGardenInitializationProvider> _logger;
-    private readonly IReadOnlyDictionary<string, string> _offeringByAdapter;
     private readonly ConcurrentDictionary<string, DateTimeOffset> _wishScheduleCache = new(StringComparer.OrdinalIgnoreCase);
 
     public ZenGardenInitializationProvider(
         IZenGardenClient client,
-        IEnumerable<IZenGardenOfferingBinding> bindings,
         ILogger<ZenGardenInitializationProvider> logger)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var binding in bindings ?? [])
-        {
-            if (string.IsNullOrWhiteSpace(binding.AdapterId) || string.IsNullOrWhiteSpace(binding.Offering))
-            {
-                continue;
-            }
-
-            map[binding.AdapterId.Trim().ToLowerInvariant()] = binding.Offering.Trim().ToLowerInvariant();
-        }
-
-        _offeringByAdapter = map;
-    }
-
-    public bool TryGetDefaultOffering(string adapterId, out string offering)
-    {
-        offering = "";
-        if (string.IsNullOrWhiteSpace(adapterId))
-        {
-            return false;
-        }
-
-        return _offeringByAdapter.TryGetValue(adapterId.Trim().ToLowerInvariant(), out offering!);
     }
 
     public async ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilities(
@@ -145,7 +120,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
             return null;
         }
 
-        var query = Core.ToolFqid.Parse(intent.Offering);
+        var query = ToolFqid.Parse(intent.Offering);
 
         var matched = tools
             .Where(tool => tool.Ready)
@@ -175,6 +150,10 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         try
         {
             tools = await _client.Catalog(subscription, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -238,7 +217,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
 
     private static ZenGardenOfferingResolution MapResolution(ZenGardenToolSnapshot snapshot)
     {
-        var parsed = Core.ToolFqid.Parse(snapshot.ToolFqid);
+        var parsed = ToolFqid.Parse(snapshot.ToolFqid);
 
         return new ZenGardenOfferingResolution
         {

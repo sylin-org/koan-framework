@@ -1,73 +1,74 @@
-# Koan.Storage
+# Sylin.Koan.Storage
 
-Storage orchestrator for Koan apps. Simple, profile-based routing with first-class DX to create, read, probe, copy, move, and delete objects across providers.
+Entity-first object-storage runtime for Koan. It compiles logical profiles and referenced providers once, applies
+active segmentation at the service chokepoint, and exposes one readable object lifecycle across local, remote, and
+replicated storage.
 
-## What it does
+## Install
 
-- Routing: Resolves profile → provider+container using options or rules with safe defaults.
-- Orchestration: Streams data and computes SHA-256 for seekable uploads; supports range reads.
-- Capabilities: Leverages provider features like server-side copy; presign when available.
-- DX: Small, async helpers without Async suffix and a model-centric API for clean calls.
+Install a functional provider; it brings this runtime transitively:
 
-## Setup
-
-- Registration: Packages auto-register via the framework pipeline. Call `AppBootstrapper.InitializeModules(services)` once. Providers (e.g., Local) self-register.
-- Core options:
-  - `Koan:Storage:Profiles:<name>` → `{ Provider, Container }`
-  - `Koan:Storage:DefaultProfile` → string (optional)
-  - `Koan:Storage:FallbackMode` → `Disabled | SingleProfileOnly | NamedDefault` (default `SingleProfileOnly`)
-  - `Koan:Storage:ValidateOnStart` → `bool` (default `true`)
-
-Notes
-- Ambient DI: APIs resolve `IStorageService` from `AppHost.Current`. In app host, this is set during startup (built into Koan templates).
-
-## Model‑centric API (recommended)
-
-Bind a model type to a profile (and optionally a default container) and use concise statics/instance ops.
-
-```csharp
-// Bind to profile "hot" (container optional; provider+container resolve via options)
-[Koan.Storage.Infrastructure.StorageBinding("hot")] 
-public sealed class FileA : Koan.Storage.Model.StorageEntity<FileA> { }
-
-[Koan.Storage.Infrastructure.StorageBinding("cold")] 
-public sealed class FileB : Koan.Storage.Model.StorageEntity<FileB> { }
-
-// Create → Read → Copy/Move
-var rec = await FileA.CreateTextFile("name.txt", "hello");
-var text = await FileA.Get(rec.Key).ReadAllText();
-await FileA.Get(rec.Key).CopyTo<FileB>();
-await FileA.Get(rec.Key).MoveTo<FileB>();
-
-// Other instance ops
-var bytes = await FileA.Get(rec.Key).ReadAllBytes();
-var head  = await FileA.Get(rec.Key).Head(); // ObjectStat
+```powershell
+dotnet add package Sylin.Koan.Storage.Connector.Local
 ```
 
-Contract
-- Inputs: `key`, optional `name`, content (`string` / `byte[]` / `Stream` / object for JSON), optional `contentType`.
-- Outputs: `IStorageObject` with metadata (`Id`, `Key`, `Name`, `ContentType`, `Size`, `ContentHash`, `CreatedAt`, `UpdatedAt`, `Provider`, `Container`, `Tags`).
-- Errors: Unknown profile/container → throws; missing key → `null` for `Head`, `false` for `Delete`; invalid range → throws. Hash computed only on seekable streams.
+`AddKoan()` discovers both packages. Configure one profile and the provider's physical settings; there is no
+Storage-specific registration call.
 
-## Service helpers (alternative)
-
-The same primitives are available directly on `IStorageService`.
-
-```csharp
-await storage.CreateTextFile("doc.txt", "hello", profile: "main");
-var text = await storage.ReadAllText("main", "", "doc.txt");
-var stat = await storage.HeadAsync("main", "", "doc.txt");
-await storage.CopyTo("hot", "", "doc.txt", "cold");
+```json
+{
+  "Koan": {
+    "Storage": {
+      "Profiles": {
+        "main": { "Container": "files" }
+      },
+      "Providers": {
+        "Local": { "BasePath": ".koan/storage" }
+      }
+    }
+  }
+}
 ```
 
-## Behavioral notes and edge cases
+## Smallest meaningful use
 
-- Defaults and fallbacks: If profile is omitted, `DefaultProfile` is used when set; with exactly one profile, `SingleProfileOnly` fallback applies.
-- Validation: With `ValidateOnStart=true`, misconfigurations fail fast during app start.
-- Large payloads: Use `ReadRangeAsString` / `ReadRangeAsync` to avoid loading entire content.
-- Capabilities: Local provider supports lightweight stat and server-side copy; presign is unsupported.
+```csharp
+using Koan.Storage;
+using Koan.Storage.Model;
 
-## References
+[StorageBinding("main")]
+public sealed class Document : StorageEntity<Document> { }
 
-- Reference: `docs/reference/storage.md`
-- Decisions: `STOR-0001`, `STOR-0006`, `STOR-0007`, `DATA-0061`, `ARCH-0040`
+var document = await Document.CreateTextFile("terms.txt", "Current terms");
+var text = await document.ReadAllText();
+```
+
+Add another bound Entity type when storage tiering is business intent:
+
+```csharp
+await document.CopyTo<ArchiveDocument>();
+await document.MoveTo<ArchiveDocument>();
+```
+
+Use `IStorageService` directly for multi-model infrastructure workflows, explicit streams, ranges, listing, or
+presigning.
+
+## Guarantees and boundaries
+
+- Exact provider pins win. Without a pin, Storage elects by declared Local/Remote placement, `[ProviderPriority]`,
+  then stable identity. Provider names are never parsed for topology.
+- A sole profile is the implicit default. With several profiles, configure `DefaultProfile` or select a profile in
+  the binding/operation.
+- `Mode: Local` and `Mode: Remote` require that placement. `Mode: Replicated` requires both and fails instead of
+  weakening the guarantee. With no mode, one available placement is used; Local + Remote compose replication.
+- Profiles, provider capabilities, elections, and replication composition compile once per host and feed startup
+  facts. Runtime operations perform direct route lookup.
+- Active segmentation is applied at `IStorageService`, including type-erased calls. Logical Entity keys do not leak
+  their physical segmentation prefix.
+- Same-provider copy is used only when declared; cross-provider transfer streams through the process. Source deletion
+  happens only after the target write succeeds.
+- Whole-object helpers buffer by definition. Provider-specific docs state whether returned streams are truly remote
+  streams or materialized buffers.
+- Entity metadata and bytes are separate resources; Storage does not claim one distributed transaction across them.
+
+See [TECHNICAL.md](./TECHNICAL.md) for plan compilation, identity, capabilities, and resource semantics.

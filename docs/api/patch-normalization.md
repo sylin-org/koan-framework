@@ -5,7 +5,7 @@ title: "PATCH Formats and Normalization"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2025-10-09
-framework_version: v0.6.3
+framework_version: v0.20.0
 validation:
   status: verified
   date_last_tested: 2025-10-09
@@ -70,5 +70,6 @@ See ADR DATA-0077 for the canonical model.
 ## Notes
 
 - Identity (/id) is immutable via PATCH.
-- Large patches should consider streaming via Data layer instructions.
+- For large selections, use explicit paging or an Entity stream whose adapter advertises
+  `DataCaps.Query.ProviderBoundedPaging`; patch normalization does not create a bounded source.
 - Providers may push down patch execution; Koan falls back to in-process applicators/executor when needed.

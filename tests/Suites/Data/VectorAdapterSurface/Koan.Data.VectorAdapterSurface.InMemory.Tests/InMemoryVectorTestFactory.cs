@@ -2,18 +2,21 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Connector.InMemory;
 using Koan.Data.VectorAdapterSurface.TestKit;
 
 namespace Koan.Data.VectorAdapterSurface.InMemory.Tests;
 
 /// <summary>
-/// Test factory for the InMemory cell of the vector matrix. Builds a minimal service provider
-/// with <see cref="InMemoryVectorAdapterFactory"/> registered as the vector adapter; specs drive
-/// <c>Vector&lt;TodoVector&gt;.*</c> through this provider via <c>AppHost.PushScope</c>.
+/// Test factory for the InMemory cell of the vector matrix. Builds a minimal service provider with the
+/// SHIPPING <see cref="InMemoryVectorAdapterFactory"/> (Koan.Data.Vector.Connector.InMemory) registered as
+/// the vector adapter; specs drive <c>Vector&lt;TodoVector&gt;.*</c> through this provider via
+/// <c>AppHost.PushScope</c>. The shipping adapter IS the cross-adapter convergence oracle, so the matrix
+/// validates every native provider against the same code that ships as the in-process vector floor.
 /// </summary>
 public sealed class InMemoryVectorTestFactory : IVectorAdapterTestFactory
 {
-    private readonly InMemoryVectorAdapterFactory _adapter = new();
+    private InMemoryVectorAdapterFactory _adapter = new();
     private ServiceProvider? _sp;
 
     public bool IsAvailable => true;
@@ -48,26 +51,25 @@ public sealed class InMemoryVectorTestFactory : IVectorAdapterTestFactory
     {
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-        services.AddKoanDataVector();
+        services.AddVectorAdapterTestRuntime();
         services.AddSingleton<IVectorAdapterFactory>(_adapter);
         return services.BuildServiceProvider();
     }
 
-    public Task InitializeAsync() { _ = Services; return Task.CompletedTask; }
+    public ValueTask InitializeAsync() { _ = Services; return ValueTask.CompletedTask; }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _sp?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     public Task ResetAsync(CancellationToken ct = default)
     {
-        // InMemory only needs to clear data — the adapter has no schema/index cache to invalidate.
-        // The data matrix InMemoryAdapterFactory pattern of setting AppHost.Current = Services
-        // gives a global fallback for AsyncLocal-flow gaps; we do the same.
+        _sp?.Dispose();
+        _sp = null;
+        _adapter = new InMemoryVectorAdapterFactory();
         Koan.Core.Hosting.App.AppHost.Current = Services;
-        _adapter.ClearAll();
         return Task.CompletedTask;
     }
 }

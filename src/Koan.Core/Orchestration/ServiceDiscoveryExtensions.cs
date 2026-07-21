@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Reflection;
 using System.Linq;
-using Koan.Orchestration.Attributes;
+using Koan.Core.Services;
 
 namespace Koan.Core.Orchestration;
 
@@ -25,7 +25,7 @@ public static class ServiceDiscoveryExtensions
         {
             ServiceName = serviceName,
             DefaultPort = defaultPort,
-            SelfOrchestrated = BuildConnectionString(serviceName, "localhost", defaultPort, databaseName, username, password),
+            Local = BuildConnectionString(serviceName, "localhost", defaultPort, databaseName, username, password),
             DockerCompose = BuildConnectionString(serviceName, serviceName, defaultPort, databaseName, username, password),
             Kubernetes = BuildConnectionString(serviceName, $"{serviceName}.default.svc.cluster.local", defaultPort, databaseName, username, password),
             AspireManaged = null, // Aspire provides via service discovery
@@ -57,7 +57,7 @@ public static class ServiceDiscoveryExtensions
         {
             ServiceName = serviceName,
             DefaultPort = defaultPort,
-            SelfOrchestrated = $"http://localhost:{defaultPort}",
+            Local = $"http://localhost:{defaultPort}",
             DockerCompose = $"http://{serviceName}:{defaultPort}",
             Kubernetes = $"http://{serviceName}.default.svc.cluster.local:{defaultPort}",
             AspireManaged = null, // Aspire provides via service discovery
@@ -115,16 +115,6 @@ public static class ServiceDiscoveryExtensions
     }
 
     /// <summary>
-    /// Create service discovery options for RabbitMQ message broker.
-    /// </summary>
-    public static ServiceDiscoveryOptions ForRabbitMQ(
-        string? username = null,
-        string? password = null)
-    {
-        return ForDatabase("rabbitmq", 5672, username: username, password: password);
-    }
-
-    /// <summary>
     /// Create service discovery options for HashiCorp Vault.
     /// </summary>
     public static ServiceDiscoveryOptions ForVault()
@@ -162,7 +152,7 @@ public static class ServiceDiscoveryExtensions
         {
             ServiceName = serviceName,
             DefaultPort = defaultPort,
-            SelfOrchestrated = BuildConnectionString(serviceName, "localhost", defaultPort, databaseName, username, password),
+            Local = BuildConnectionString(serviceName, "localhost", defaultPort, databaseName, username, password),
             DockerCompose = BuildConnectionString(serviceName, serviceName, defaultPort, databaseName, username, password),
             Kubernetes = BuildConnectionString(serviceName, $"{serviceName}.default.svc.cluster.local", defaultPort, databaseName, username, password),
             AspireManaged = null,

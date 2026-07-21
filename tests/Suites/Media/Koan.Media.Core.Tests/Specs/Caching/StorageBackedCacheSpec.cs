@@ -8,7 +8,7 @@ namespace Koan.Media.Core.Tests.Specs.Caching;
 /// MEDIA-0007 §c: a previously persisted derivation is served from storage
 /// without re-running the recipe pipeline. The new check-then-pipeline-then-
 /// write-through flow is the cache-as-storage replacement for the legacy
-/// <c>IMediaOutputCache</c> probe.
+/// output cache probe.
 /// </summary>
 public sealed class StorageBackedCacheSpec
 {

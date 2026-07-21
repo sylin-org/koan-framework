@@ -1,27 +1,23 @@
-using System;
-using System.Linq;
-using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Core.Configuration;
 
 /// <summary>
-/// Resolves the storage identifier for an entity by routing to the appropriate
-/// adapter factory's <see cref="Abstractions.Naming.INamingProvider.ResolveStorage"/>.
-///
-/// The factory owns its own cache — this is just a lookup helper that finds the
-/// right factory based on entity adapter routing.
+/// Resolves storage identity through the same host-owned typed provider decision used for repository
+/// construction. The provider's naming implementation owns its own final-name memoization.
 /// </summary>
 public static class AdapterNaming
 {
-    public static string GetOrCompute<TEntity, TKey>(IServiceProvider sp)
+    public static string GetOrCompute<TEntity, TKey>(IServiceProvider services)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
-        var (adapter, _) = AdapterResolver.ResolveForEntity<TEntity>(sp, sourceRegistry);
-        var factory = sp.GetServices<IDataAdapterFactory>().FirstOrDefault(f => f.CanHandle(adapter))
-            ?? throw new InvalidOperationException($"No data adapter factory for provider '{adapter}'.");
-        return factory.ResolveStorage(typeof(TEntity), EntityContext.Current?.Partition, sp);
+        var sources = services.GetRequiredService<DataSourceRegistry>();
+        var decision = AdapterResolver.ResolveDecisionForEntity<TEntity>(services, sources);
+        return decision.Factory.ResolveStorage(
+            typeof(TEntity),
+            EntityContext.Current?.Partition,
+            services);
     }
 }

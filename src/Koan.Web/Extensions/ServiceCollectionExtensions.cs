@@ -36,15 +36,7 @@ public static class ServiceCollectionExtensions
         services.AddControllers(o =>
         {
             o.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
-            try
-            {
-                var outputFilterType = Type.GetType("Koan.Web.Transformers.EntityOutputTransformFilter, Koan.Web.Transformers");
-                if (outputFilterType is not null)
-                {
-                    o.Filters.Add(new TypeFilterAttribute(outputFilterType));
-                }
-            }
-            catch { /* optional package */ }
+            o.Filters.Add(new TypeFilterAttribute(typeof(Koan.Web.Transformers.EntityOutputTransformFilter)));
         })
         .AddNewtonsoftJson(j =>
         {

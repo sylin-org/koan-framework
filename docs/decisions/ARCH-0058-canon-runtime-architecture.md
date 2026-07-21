@@ -164,7 +164,7 @@ public interface ICanonPipelineContributor<TModel>
 
 #### Extension Methods for DX
 
-**Decision**: Provide `entity.Canonize(services)` extension methods while retaining `runtime.Canonize(entity)` as primary API.
+**Decision**: Provide `entity.Canonize(services)` extension methods while retaining `runtime.Canonize(entity)` as primary API. An explicit provider selects the ambient Koan host for the complete asynchronous operation.
 
 **Rationale**:
 - Enables entity-centric workflows: `var result = await customer.Canonize(services)`
@@ -173,26 +173,33 @@ public interface ICanonPipelineContributor<TModel>
 
 **Implementation**:
 ```csharp
-public static Task<CanonizationResult<T>> Canonize<T>(this T entity, IServiceProvider services, CanonizationOptions? options = null)
+public static async Task<CanonizationResult<T>> Canonize<T>(this T entity, IServiceProvider services, CanonizationOptions? options = null)
 {
+    using var hostScope = AppHost.PushScope(services);
     var runtime = services.GetRequiredService<ICanonRuntime>();
-    return runtime.Canonize(entity, options);
+    return await runtime.Canonize(entity, options).ConfigureAwait(false);
 }
 ```
 
 ### Persistence Strategy Decisions
 
-#### Default Delegation to Entity Statics
+#### Complete Persistence Boundary with an Entity-Backed Default
 
-**Decision**: `DefaultCanonPersistence` delegates to `entity.Save()` and `stage.Save()` rather than implementing custom DAL.
+**Decision**: `ICanonPersistence` owns canonical read/write, stage write, and aggregation-index
+lookup/upsert. `DefaultCanonPersistence` delegates that complete boundary to Entity statics rather
+than implementing a custom DAL.
 
 **Rationale**:
-- **Provider Transparency**: Leverages Koan's existing multi-provider abstractions
+- **Provider Transparency**: Leverages Koan's existing multi-provider abstractions for both reads and writes
 - **Zero Configuration**: Works with SQL, MongoDB, JSON stores out-of-box
-- **Testability**: Mock `ICanonPersistence` for unit tests, use real providers for integration tests
+- **Testability**: Replace `ICanonPersistence` without a hidden fallback read through Koan Data
 - **Consistency**: Same entity patterns everywhere (no canon-specific data access)
 
-**Custom Persistence**: Teams can implement `ICanonPersistence` for event sourcing, CQRS, or domain-specific requirements.
+**Custom Persistence**: Teams can implement `ICanonPersistence` for event sourcing, CQRS, or
+domain-specific requirements. The custom implementation supplies `GetCanonicalAsync<T>`,
+`PersistCanonicalAsync<T>`, `PersistStageAsync<T>`, `GetIndex`, and `UpsertIndex` as one unit.
+`null` from the canonical read means absent; provider failures propagate. Aggregation and rebuild
+never bypass the configured implementation through `CanonEntity<T>.Get`.
 
 **Alternatives Considered**:
 - Custom repository layer → Rejected to avoid breaking provider transparency
@@ -235,7 +242,7 @@ public static Task<CanonizationResult<T>> Canonize<T>(this T entity, IServicePro
 ### Positive
 
 1. **Minimal Cognitive Load**: Two packages, one contributor interface, unified state model
-2. **Provider Transparency Preserved**: Delegates to `Entity<T>.Save()`, works across all Koan data providers
+2. **Provider Transparency Preserved**: The default delegates canonical reads and writes to Entity/Data and works across Koan data providers
 3. **Testability**: Mock `ICanonPersistence`, inject fake contributors, assert state transitions
 4. **Operational Maturity**: Replay, rebuild, observer APIs are first-class (not placeholders)
 5. **Developer Experience**: `entity.Canonize(services)` reads naturally, minimal boilerplate
@@ -328,7 +335,7 @@ public static Task<CanonizationResult<T>> Canonize<T>(this T entity, IServicePro
 1. **`CanonStatus` → `CanonLifecycle`**: Enum renamed (backward compatible via `[Obsolete]` alias)
 2. **Metadata Structure**: Legacy separate tables consolidated into `CanonMetadata` embedded in entity
 3. **Pipeline Hooks**: Replace orchestrator overrides with `ICanonPipelineContributor<T>` implementations
-4. **Persistence**: Replace custom DAL with `ICanonPersistence` or use `DefaultCanonPersistence`
+4. **Persistence**: Implement the complete `ICanonPersistence` read/write/index contract or use `DefaultCanonPersistence`
 
 ### Migration Path
 
@@ -350,20 +357,20 @@ src/Koan.Canon.Domain/
 ├── Model/              # CanonEntity, CanonState, CanonIndex, CanonStage, CanonValueObject
 ├── Metadata/           # CanonMetadata, CanonLineage, CanonExternalId, CanonSourceAttribution
 ├── Runtime/            # ICanonRuntime, contributors, pipeline, persistence, builders
-└── README.md           # [DELETED - See SPEC-canon-runtime.md]
+├── README.md           # Package entry point and executable shortest path
+└── TECHNICAL.md        # Current runtime, persistence, and host contract
 
 src/Koan.Canon.Web/
 ├── Catalog/            # Model discovery and routing
 ├── Controllers/        # Generic entity controllers, discovery, admin
 ├── Infrastructure/     # Constants, helpers
-├── Initialization/     # Auto-registrar
-└── README.md           # [DELETED - See SPEC-canon-runtime.md]
+└── Initialization/     # Auto-registrar
 
-docs/specifications/
-└── SPEC-canon-runtime.md  # Single source of truth
+docs/archive/specifications/
+└── SPEC-canon-runtime.md  # Historical specification
 
-docs/architecture/
-└── canon-runtime-migration.md  # Milestone tracking (living document)
+docs/reference/canon/
+└── index.md             # Current public capability and support boundary
 
 docs/decisions/
 └── ARCH-0058-canon-runtime-architecture.md  # This ADR
@@ -371,15 +378,15 @@ docs/decisions/
 
 ### Testing Strategy
 
-**Unit Tests** (`tests/Koan.Canon.Domain.Tests/`):
+**Unit Tests** (`tests/Suites/Canon/Unit/Koan.Tests.Canon.Unit/`):
 - Domain model behavior (state transitions, metadata operations)
 - Pipeline execution with mock contributors
 - Persistence delegation verification
 
-**Integration Tests** (`tests/Koan.Canon.Web.Tests/`):
-- Controller request/response flows
-- Option parsing from headers/query
-- Discovery endpoint accuracy
+**Integration Tests** (`tests/Suites/Canon/Integration/Koan.Tests.Canon.Integration/`):
+- Runtime, projection, and park-and-sweep flows
+- Custom persistence across repeated canonicalization and rebuilds
+- Phase ordering and policy-state materialization
 
 **Sample Validation** (`samples/S8.Canon/`):
 - End-to-end canonization workflows
@@ -390,10 +397,12 @@ docs/decisions/
 
 ### Superseded Documents
 - `PROP-canon-overhaul-2.md` - Original proposal (historical reference)
-- All `README.md` and `TECHNICAL.md` files in Canon packages (deleted, superseded by spec)
+- [SPEC-canon-runtime.md](../archive/specifications/SPEC-canon-runtime.md) - Historical specification
 
 ### Active Documentation
-- [SPEC-canon-runtime.md](../specifications/SPEC-canon-runtime.md) - Authoritative specification
+- [Koan.Canon.Domain README](../../src/Koan.Canon.Domain/README.md) - Package entry point
+- [Koan.Canon.Domain technical reference](../../src/Koan.Canon.Domain/TECHNICAL.md) - Package contract
+- [Canon pillar reference](../reference/canon/index.md) - Current public capability and support boundary
 - [canon-runtime-migration.md](../architecture/canon-runtime-migration.md) - Migration tracking
 
 ### Related ADRs
@@ -402,7 +411,7 @@ docs/decisions/
 
 ### Code Locations
 - Implementation: `src/Koan.Canon.Domain/`, `src/Koan.Canon.Web/`
-- Tests: `tests/Koan.Canon.Domain.Tests/`, `tests/Koan.Canon.Web.Tests/`
+- Tests: `tests/Suites/Canon/Unit/`, `tests/Suites/Canon/Integration/`
 - Sample: `samples/S8.Canon/`
 
 ---

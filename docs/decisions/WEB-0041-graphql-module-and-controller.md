@@ -2,12 +2,14 @@
 id: WEB-0041
 slug: WEB-0041-graphql-module-and-controller
 domain: WEB
-status: Accepted
+status: Superseded
 date: 2025-08-19
 title: GraphQL module (Koan.Web.Connector.GraphQl) - controller-hosted schema from IEntity<>, typed filters/sorts, display field
 ---
 
 # ADR 0041: GraphQL module (Koan.Web.Connector.GraphQl) - controller-hosted schema from IEntity<>, typed filters/sorts, display field
+
+> **Connector attic'd 2026-06** — `Koan.Web.Connector.GraphQl` was cut from `dev` (sole consumer was archived sample S4; HotChocolate CVE-treadmill maintenance burden). The code is recoverable at git tag `attic/koan-web-graphql`. This ADR is retained as historical record; the decision is no longer in force.
 
 ## Context
 

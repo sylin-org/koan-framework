@@ -1,0 +1,25 @@
+@baseUrl = http://localhost:5090
+
+### Create three editorial articles and approve two
+POST {{baseUrl}}/api/publication/reset
+
+### Generated EntityController surface over the editorial source
+GET {{baseUrl}}/api/articles
+
+### Zero-infrastructure publication to the local SQLite preview source
+POST {{baseUrl}}/api/publication/preview
+
+### Read the preview source and its negotiated capabilities
+GET {{baseUrl}}/api/publication/preview
+
+### Optional: requires the Mongo service from docker/compose.yml
+POST {{baseUrl}}/api/publication/documents
+
+### Optional: requires the Postgres service from docker/compose.yml
+POST {{baseUrl}}/api/publication/relational
+
+### One canonical operator fact envelope
+GET {{baseUrl}}/.well-known/Koan/facts
+
+### Canonical readiness
+GET {{baseUrl}}/health/ready

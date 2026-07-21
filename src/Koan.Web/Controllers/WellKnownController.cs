@@ -1,12 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Extensions;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Observability;
 using Koan.Core.Observability.Health;
+using Koan.Core.Diagnostics;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Web.Infrastructure;
@@ -24,7 +27,8 @@ public sealed class WellKnownController(
     IOptions<ObservabilityOptions>? obsOptions,
     IConfiguration cfg,
     IServiceProvider sp,
-    Koan.Data.Core.IDataService? data
+    Koan.Data.Core.IDataService? data,
+    IKoanRuntimeFacts runtimeFacts
 ) : ControllerBase
 {
     private bool CanExposeObservability() => env.IsDevelopment() || (webOptions?.Value?.ExposeObservabilitySnapshot == true);
@@ -71,37 +75,15 @@ public sealed class WellKnownController(
         return Ok(payload);
     }
 
-    [HttpGet(KoanWebConstants.Routes.WellKnownScheduling)]
-    public IActionResult Scheduling([FromServices] Koan.Core.Observability.Health.IHealthAggregator aggregator, [FromServices] IOptions<Scheduling.SchedulingOptions>? sched)
+    [HttpGet(KoanWebConstants.Routes.WellKnownFacts)]
+    public IActionResult Facts()
     {
         if (!CanExposeObservability()) return NotFound();
 
-        var snap = aggregator.GetSnapshot();
-        var tasks = snap.Components
-            .Where(c => c.Component.StartsWith("scheduling:task:", StringComparison.OrdinalIgnoreCase))
-            .Select(c => new
-            {
-                id = c.Facts?.TryGetValue("id", out var id) == true ? id : c.Component.Split(':').Last(),
-                state = c.Facts?.TryGetValue("state", out var st) == true ? st : c.Status.ToString().ToLowerInvariant(),
-                critical = c.Facts?.TryGetValue("critical", out var cr) == true && string.Equals(cr, "true", StringComparison.OrdinalIgnoreCase),
-                running = c.Facts?.TryGetValue("running", out var rn) == true ? rn : "0",
-                success = c.Facts?.TryGetValue("success", out var sc) == true ? sc : "0",
-                fail = c.Facts?.TryGetValue("fail", out var fl) == true ? fl : "0",
-                lastError = c.Facts?.TryGetValue("lastError", out var le) == true ? le : null
-            })
-            .OrderBy(t => t.id)
-            .ToArray();
-
-        var payload = new
-        {
-            enabled = sched?.Value?.Enabled ?? false,
-            readinessGate = sched?.Value?.ReadinessGate ?? true,
-            tasks,
-            links = new[] { new { rel = "observability", href = $"/{KoanWebConstants.Routes.WellKnownBase}/{KoanWebConstants.Routes.WellKnownObservability}" } }
-        };
-
         Response.Headers.CacheControl = KoanWebConstants.Policies.NoStore;
-        return Ok(payload);
+        return Content(
+            KoanFactJson.Serialize(runtimeFacts.Current),
+            KoanWebConstants.ContentTypes.ApplicationJson);
     }
 
     [HttpGet("aggregates")]
@@ -120,8 +102,6 @@ public sealed class WellKnownController(
 
         var items = aggregates.Select(x =>
         {
-            var provider = KoanWebHelpers.ResolveProvider(x.Type, sp);
-
             string[] query = [], write = [];
 
             if (data is not null)
@@ -134,8 +114,20 @@ public sealed class WellKnownController(
                     query = caps.All.Where(c => c.Id.StartsWith("query.", StringComparison.Ordinal)).Select(c => c.Id).ToArray();
                     write = caps.All.Where(c => c.Id.StartsWith("write.", StringComparison.Ordinal)).Select(c => c.Id).ToArray();
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    // Degradable diagnostics: one aggregate's capability self-report failed (repo resolution /
+                    // Describe). Report empty tokens for it rather than failing the whole /aggregates endpoint.
+                    // Broad by design — ANY per-aggregate self-report fault must degrade this one item, never
+                    // fail the endpoint (e.g. MakeGenericMethod ArgumentException, or a custom adapter throw).
+                    sp.GetService<ILoggerFactory>()?.CreateLogger<WellKnownController>()
+                        .LogDebug(ex, "Capability self-report failed for {AggregateType}; reporting empty query/write tokens.", x.Type.FullName);
+                }
             }
+
+            // Report the provider observed by Data's canonical runtime path. Diagnostics must never
+            // independently elect a provider or imply that an unavailable decoration succeeded.
+            var provider = KoanWebHelpers.ResolveObservedProvider(x.Type, x.KeyType, sp);
 
             return new
             {
@@ -150,7 +142,11 @@ public sealed class WellKnownController(
         var payload = new
         {
             aggregates = items,
-            links = new[] { new { rel = "observability", href = $"/{KoanWebConstants.Routes.WellKnownBase}/{KoanWebConstants.Routes.WellKnownObservability}" } }
+            links = new[]
+            {
+                new { rel = "observability", href = $"/{KoanWebConstants.Routes.WellKnownBase}/{KoanWebConstants.Routes.WellKnownObservability}" },
+                new { rel = "facts", href = $"/{KoanWebConstants.Routes.WellKnownBase}/{KoanWebConstants.Routes.WellKnownFacts}" }
+            }
         };
         return Ok(payload);
     }

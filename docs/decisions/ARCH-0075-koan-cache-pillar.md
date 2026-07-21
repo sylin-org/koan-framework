@@ -11,6 +11,25 @@ ARCH-0057 (KoanLog facade), ARCH-0071 (partition context provider), ARCH-0074 (f
 
 ---
 
+> **Implementation amendment (R07-12, 2026-07-15):** Cache keeps the Storage/Topology/Policy/Coherence
+> separation, but physical coherence carriage now uses Communication's distinct every-active-node
+> `FrameworkBroadcasts` route. The only implemented wire meaning is peer L1 key eviction with origin
+> filtering and L1-TTL bounded staleness. Redis pub/sub is a layered Communication capability that is
+> dormant unless Redis is the elected L2; RabbitMQ uses ephemeral node queues; the process-local provider
+> is the zero-configuration floor. The speculative public generic channel SPI, multi-channel publication,
+> no-op catch-up/cursors, unmanaged coalescer, separate InMemory package, and legacy Messaging bridge are
+> deleted. The historical design below records the path to the decision but those mechanisms are superseded
+> by this amendment and [ARCH-0113](ARCH-0113-entity-capability-communication.md).
+
+> **Implementation amendment (R07-16, 2026-07-16):** out-of-band Entity eviction is now the
+> module-contributed `entity.Cache.Evict()` terminal, lifted pointwise to finite and async sources.
+> It and the repository decorator consume one Cache-owned policy/template/context/scope plan. Static
+> `EntityType.Cache` remains the policy/tag control plane. The historical item 12 spellings,
+> default-template-only builder, `Uncache`, and generic handle are deleted without aliases. Fixed-size
+> outcomes and typed failure/cancellation preserve the confirmed prefix without claiming atomicity.
+
+---
+
 ## Context
 
 The framework needs a coherent cache primitive. Today's `Koan.Cache.*` projects on `dev` are

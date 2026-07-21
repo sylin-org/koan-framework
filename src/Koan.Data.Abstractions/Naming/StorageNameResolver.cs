@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions.Annotations;
+using System.Linq;
 using System.Reflection;
 
 namespace Koan.Data.Abstractions.Naming;
@@ -28,6 +29,24 @@ public static class StorageNameResolver
         var storageName = entityType.GetCustomAttribute<StorageNameAttribute>();
         if (!string.IsNullOrWhiteSpace(storageName?.Name)) return storageName!.Name!.Trim();
 
+        // 2.5) Closed generic over its type arguments (DATA-0104). A generic-over-entity like
+        // EmbeddingState<Todo> must NOT fall into the style branches below — Type.Name/Type.FullName mangle to
+        // "EmbeddingState`1" (arg dropped -> all closures collide) or the assembly-qualified
+        // "EmbeddingState`1[[Todo, asm, Version=…]]" (illegal/version-fragile identifier). Instead, anchor the
+        // name on the type arguments and append the generic's bare simple name:
+        //   Resolve(G<a1..aN>) = join("--", ai => Resolve(ai)) + "-" + ApplyCase(SimpleName(G))
+        // The recursion gives each argument the adapter's FULL style/casing treatment (so the inner entity's
+        // namespace/hash/casing is honored), "-" joins the spine (single-arg wrapper) and "--" the branch
+        // (sibling args), the entity stays the leftmost anchor, and casing is uniform per convention. Closures
+        // stay distinct (different arg -> different anchor) and the name is legal on every backend. Explicit
+        // [Storage]/[StorageName] above still win (and collapse all closures — intentional, author's choice).
+        if (entityType.IsGenericType && !entityType.IsGenericTypeDefinition)
+        {
+            var anchor = string.Join("--", entityType.GetGenericArguments().Select(a => Resolve(a, defaults)));
+            var wrapper = NamingUtils.ApplyCase(SimpleName(entityType), defaults.Casing);
+            return anchor + "-" + wrapper;
+        }
+
         // 3) Per-entity naming hint or adapter defaults
         var naming = entityType.GetCustomAttribute<StorageNamingAttribute>()?.Style ?? defaults.Style;
         if (naming == StorageNamingStyle.FullNamespace)
@@ -49,6 +68,17 @@ public static class StorageNameResolver
         }
 
         return NamingUtils.ApplyCase(entityType.Name, defaults.Casing);
+    }
+
+    /// <summary>
+    /// The type's simple name with the CLR generic-arity marker (<c>`N</c>) stripped:
+    /// <c>EmbeddingState`1</c> → <c>EmbeddingState</c>. Non-generic names pass through unchanged.
+    /// </summary>
+    private static string SimpleName(Type type)
+    {
+        var name = type.Name;
+        var tick = name.IndexOf('`');
+        return tick >= 0 ? name[..tick] : name;
     }
 
     private static string FullName(Type entityType)

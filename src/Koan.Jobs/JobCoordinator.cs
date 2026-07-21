@@ -1,34 +1,39 @@
 using System.Diagnostics;
+using System.Text.Json;
+using Koan.Core.Context;
 using Koan.Data.Core;
+using Koan.Data.Core.Model;
+using Koan.Jobs.Infrastructure;
+using Koan.Jobs.Semantics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Jobs;
 
 /// <inheritdoc/>
-public sealed class JobCoordinator : IJobCoordinator
+internal sealed class JobCoordinator : IJobCoordinator
 {
-    /// <summary>Stable id of the per-type singleton work-item used by type-level triggers and scheduled ticks.</summary>
-    internal const string SingletonWorkId = "__koan_job_singleton__";
-
     private readonly IJobLedger _ledger;
     private readonly JobTypeRegistry _registry;
     private readonly JobOrchestrator _orchestrator;
-    private readonly IJobTransport _transport;
+    private readonly JobWakeCoordinator _wake;
     private readonly IServiceProvider _services;
     private readonly JobsOptions _options;
     private readonly TimeProvider _clock;
+    private readonly JobsContextPlan _contextPlan;
 
     public JobCoordinator(IJobLedger ledger, JobTypeRegistry registry, JobOrchestrator orchestrator,
-        IJobTransport transport, IServiceProvider services, IOptions<JobsOptions> options, TimeProvider clock)
+        JobWakeCoordinator wake, IServiceProvider services, IOptions<JobsOptions> options, TimeProvider clock,
+        JobsContextPlan contextPlan)
     {
         _ledger = ledger;
         _registry = registry;
         _orchestrator = orchestrator;
-        _transport = transport;
+        _wake = wake;
         _services = services;
         _options = options.Value;
         _clock = clock;
+        _contextPlan = contextPlan;
     }
 
     /// <summary>Resolve a job's gate key at submit. A property-based <c>[JobGate]</c> is read inline; a method-based
@@ -42,64 +47,170 @@ public sealed class JobCoordinator : IJobCoordinator
 
     public async Task<JobHandle> SubmitAsync(object workItem, string action, TimeSpan? after, CancellationToken ct)
     {
-        var binding = _registry.Require(workItem.GetType().FullName!);
-        var policy = binding.ResolvePolicy(action, _options);
-        var workId = binding.GetId(workItem);
-        await binding.Save(workItem, ct);
-
-        var now = _clock.GetUtcNow();
-
-        var coalesceKey = binding.CoalesceKey(workItem, action);
-        if (coalesceKey is not null)
+        ArgumentNullException.ThrowIfNull(workItem);
+        var scope = CaptureSubmission(workItem.GetType());
+        var accepted = await Accept(workItem, action, after, scope, ct).ConfigureAwait(false);
+        if (!accepted.Coalesced)
         {
-            var existing = await _ledger.FindActiveByCoalesceKey(binding.WorkType, coalesceKey, ct);
-            if (existing is not null) return Handle(existing.Id); // collapse concurrent / duplicate submit
+            await Announce(scope.PendingCommit, ct).ConfigureAwait(false);
         }
 
-        var gateKey = await ResolveGateKey(binding, workItem, ct);
-        var rec = JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, Correlation(), gateKey);
-        await _ledger.Append(rec, ct);
-
-        // Transactional outbox: inside an ambient transaction the work-item Save + the ledger Append enlist (TrackSave)
-        // and only become claimable on commit (discarded on rollback). Don't inline-drain or push-notify mid-transaction —
-        // the row isn't visible yet; the worker (or a post-commit drain) picks it up.
-        if (!EntityContext.InTransaction) _transport.Notify();          // wake the worker now (push-dispatch)
-        if (_options.Mode == JobMode.Inline && !EntityContext.InTransaction) await _orchestrator.DrainAsync(ct);
-        return Handle(rec.Id);
+        return accepted.Handle;
     }
 
-    public async Task<int> SubmitManyAsync(IEnumerable<object> workItems, string action, TimeSpan? after, CancellationToken ct)
+    public async Task<JobSubmission> SubmitSourceAsync<T>(
+        IAsyncEnumerable<T> workItems,
+        string action,
+        CancellationToken ct)
+        where T : Entity<T>, IKoanJob<T>
     {
-        var now = _clock.GetUtcNow();
-        var correlation = Correlation();
-        var batch = new List<JobRecord>();
+        ArgumentNullException.ThrowIfNull(workItems);
 
-        foreach (var workItem in workItems)
+        // One immutable operation snapshot for the complete source. Context is captured before the first await and
+        // never rediscovered per item, so a logical submission cannot drift between tenants/subjects mid-stream.
+        var scope = CaptureSubmission(typeof(T));
+        var enumerated = 0L;
+        var submitted = 0L;
+        var coalesced = 0L;
+        var failed = 0L;
+        var pendingWake = 0;
+        var sourceCompleted = false;
+        var enumerating = true;
+        var currentAccepted = false;
+        var wakeInterval = _options.Mode == JobMode.Inline
+            ? 1
+            : Constants.Submission.WakeInterval;
+
+        JobSubmission Snapshot()
+            => new(
+                typeof(T).FullName!,
+                action,
+                enumerated,
+                submitted,
+                coalesced,
+                failed,
+                sourceCompleted,
+                scope.PendingCommit);
+
+        async Task Flush(CancellationToken cancellationToken)
         {
-            var binding = _registry.Require(workItem.GetType().FullName!);
-            var policy = binding.ResolvePolicy(action, _options);
-            var workId = binding.GetId(workItem);
-            await binding.Save(workItem, ct);
+            if (pendingWake == 0)
+            {
+                return;
+            }
 
-            var coalesceKey = binding.CoalesceKey(workItem, action);
-            if (coalesceKey is not null && await _ledger.FindActiveByCoalesceKey(binding.WorkType, coalesceKey, ct) is not null)
-                continue;
-
-            var gateKey = await ResolveGateKey(binding, workItem, ct);
-            batch.Add(JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, correlation, gateKey));
+            await Announce(scope.PendingCommit, cancellationToken).ConfigureAwait(false);
+            pendingWake = 0;
         }
 
-        if (batch.Count > 0) await _ledger.AppendMany(batch, ct);
-        if (batch.Count > 0 && !EntityContext.InTransaction) _transport.Notify();
-        if (_options.Mode == JobMode.Inline && !EntityContext.InTransaction) await _orchestrator.DrainAsync(ct);
-        return batch.Count;
+        void SignalAcceptedPrefix()
+        {
+            if (pendingWake > 0 && !scope.PendingCommit)
+            {
+                _wake.Notify();
+            }
+        }
+
+        try
+        {
+            // Re-establish the terminal's captured logical context for deferred source enumeration and every
+            // work-item save. A source cannot accidentally make one submission drift onto the worker flow's axes.
+            using var contextScope = _contextPlan.RestoreForSubmit(typeof(T), scope.Carrier);
+            await foreach (var workItem in workItems.WithCancellation(ct).ConfigureAwait(false))
+            {
+                enumerating = false;
+                currentAccepted = false;
+                enumerated++;
+
+                var accepted = await Accept(workItem, action, null, scope, ct).ConfigureAwait(false);
+                if (accepted.Coalesced)
+                {
+                    coalesced++;
+                }
+                else
+                {
+                    submitted++;
+                    pendingWake++;
+                }
+
+                currentAccepted = true;
+                if (pendingWake >= wakeInterval)
+                {
+                    await Flush(ct).ConfigureAwait(false);
+                }
+
+                enumerating = true;
+            }
+
+            sourceCompleted = true;
+            await Flush(ct).ConfigureAwait(false);
+            return Snapshot();
+        }
+        catch (JobSubmissionException)
+        {
+            throw;
+        }
+        catch (JobSubmissionCanceledException)
+        {
+            throw;
+        }
+        catch (OperationCanceledException error) when (ct.IsCancellationRequested)
+        {
+            if (!enumerating && !currentAccepted)
+            {
+                failed++;
+            }
+
+            SignalAcceptedPrefix();
+            throw new JobSubmissionCanceledException(
+                $"Job submission for '{typeof(T).Name}' was canceled; the summary reports the confirmed accepted prefix.",
+                Snapshot(),
+                error,
+                ct);
+        }
+        catch (Exception error)
+        {
+            if (!enumerating && !currentAccepted)
+            {
+                failed++;
+            }
+
+            SignalAcceptedPrefix();
+            var failure = enumerating && !sourceCompleted
+                ? JobSubmissionException.FailureKind.SourceFailed
+                : JobSubmissionException.FailureKind.SubmissionFailed;
+            var message = failure == JobSubmissionException.FailureKind.SourceFailed
+                ? $"The job Entity source '{typeof(T).Name}' failed after {submitted + coalesced} confirmed acceptance(s)."
+                : $"Jobs could not accept '{typeof(T).Name}' at source ordinal {Math.Max(0, enumerated - 1)}. " +
+                  "Inspect the inner error and ledger readiness; the summary reports the confirmed prefix only.";
+            throw new JobSubmissionException(failure, message, Snapshot(), error);
+        }
     }
 
     public async Task<JobHandle> TriggerAsync(string workType, string action, CancellationToken ct)
     {
         var binding = _registry.Require(workType);
-        var workItem = await binding.Load(SingletonWorkId, ct) ?? binding.NewSingleton(SingletonWorkId);
-        return await SubmitAsync(workItem, action, null, ct);
+        var policy = binding.ResolvePolicy(action, _options);
+        var now = _clock.GetUtcNow();
+        // The singleton is ephemeral — it must NOT be persisted into the consumer's entity collection. The orchestrator
+        // creates a fresh instance via binding.NewSingleton at execution time (no store round-trip on the hot path).
+        var workItem = binding.NewSingleton(Constants.Work.SingletonId);
+        var carrier = _contextPlan.Capture(binding.ClrType);
+
+        var coalesceKey = JobCoalesce.FoldAmbient(binding.CoalesceKey(workItem, action), carrier);
+        if (coalesceKey is not null)
+        {
+            var existing = await _ledger.FindActiveByCoalesceKey(binding.WorkType, coalesceKey, ct);
+            if (existing is not null) return Handle(existing.Id);
+        }
+
+        var gateKey = await ResolveGateKey(binding, workItem, ct);
+        var rec = JobRecordFactory.Create(binding, policy, workItem, Constants.Work.SingletonId, action, now, null, Correlation(), gateKey, carrier);
+        await _ledger.Append(rec, ct);
+
+        if (!EntityContext.InTransaction) _wake.Notify();
+        if (_options.Mode == JobMode.Inline && !EntityContext.InTransaction) await _orchestrator.DrainAsync(ct);
+        return Handle(rec.Id);
     }
 
     public async Task CancelWorkAsync(string workType, string workId, CancellationToken ct)
@@ -148,4 +259,91 @@ public sealed class JobCoordinator : IJobCoordinator
     });
 
     private static string? Correlation() => Activity.Current?.TraceId.ToString();
+
+    private SubmissionScope CaptureSubmission(Type workType)
+        => new(
+            _clock.GetUtcNow(),
+            Correlation(),
+            _contextPlan.Capture(workType),
+            EntityContext.InTransaction);
+
+    private async Task<AcceptedSubmission> Accept(
+        object workItem,
+        string action,
+        TimeSpan? after,
+        SubmissionScope scope,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(workItem);
+        var binding = _registry.Require(workItem.GetType().FullName!);
+        var policy = binding.ResolvePolicy(action, _options);
+        var workId = binding.GetId(workItem);
+
+        // Coalesce before any Entity save. The captured ambient participates in the key, so distinct logical
+        // contexts cannot collapse onto one another merely because a source changes flow while enumerating.
+        var coalesceKey = JobCoalesce.FoldAmbient(binding.CoalesceKey(workItem, action), scope.Carrier);
+        if (coalesceKey is not null)
+        {
+            var existing = await _ledger.FindActiveByCoalesceKey(binding.WorkType, coalesceKey, ct)
+                .ConfigureAwait(false);
+            if (existing is not null)
+            {
+                return new AcceptedSubmission(Handle(existing.Id), Coalesced: true);
+            }
+        }
+
+        // The work Entity is persisted before the record that points at it. A failed ledger call is not counted as
+        // accepted; retrying the failed item is the corrective path, with declared idempotency when effects demand it.
+        var current = await binding.Load(workId, ct).ConfigureAwait(false);
+        var incomingSnapshot = Snapshot(workItem);
+        if (current is null || incomingSnapshot is null || Snapshot(current) != incomingSnapshot)
+        {
+            await binding.Save(workItem, ct).ConfigureAwait(false);
+        }
+
+        var gateKey = await ResolveGateKey(binding, workItem, ct).ConfigureAwait(false);
+        var record = JobRecordFactory.Create(
+            binding,
+            policy,
+            workItem,
+            workId,
+            action,
+            scope.Now,
+            after,
+            scope.Correlation,
+            gateKey,
+            scope.Carrier);
+        await _ledger.Append(record, ct).ConfigureAwait(false);
+        return new AcceptedSubmission(Handle(record.Id), Coalesced: false);
+    }
+
+    private async Task Announce(bool pendingCommit, CancellationToken ct)
+    {
+        // Transactional outbox: the work-item Save and ledger Append are not visible until commit. The poll remains
+        // the correctness path, so Jobs must not publish a premature hint or inline-drain uncommitted rows.
+        if (pendingCommit)
+        {
+            return;
+        }
+
+        _wake.Notify();
+        if (_options.Mode == JobMode.Inline)
+        {
+            await _orchestrator.DrainAsync(ct).ConfigureAwait(false);
+        }
+    }
+
+    private static string? Snapshot(object workItem)
+    {
+        try { return JsonSerializer.Serialize(workItem, workItem.GetType()); }
+        catch { return null; }
+    }
+
+    private sealed record SubmissionScope(
+        DateTimeOffset Now,
+        string? Correlation,
+        IReadOnlyDictionary<string, string>? Carrier,
+        bool PendingCommit);
+
+    private readonly record struct AcceptedSubmission(JobHandle Handle, bool Coalesced);
 }

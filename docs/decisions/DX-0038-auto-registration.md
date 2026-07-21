@@ -9,6 +9,10 @@ title: Auto-registration and Bootstrap Reporting
  
 # ADR-00xx: Auto-registration and Bootstrap Reporting
 
+> **Superseded by [ARCH-0116](ARCH-0116-one-module-lifecycle.md) (2026-07-17).** Class-name and
+> registrar-interface conventions no longer activate packages. Each implementation assembly owns one
+> domain-named `KoanModule` discovered through its generated descriptor.
+
 ## Context
 We want Koan modules to "just work" when referenced, with minimal host boilerplate and clear visibility at startup. We also want a uniform place for modules to describe their effective settings without leaking secrets.
 

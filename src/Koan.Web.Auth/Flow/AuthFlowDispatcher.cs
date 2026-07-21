@@ -5,17 +5,15 @@ namespace Koan.Web.Auth.Flow;
 
 /// <summary>
 /// Runs <see cref="IKoanAuthFlowHandler"/>s for each lifecycle event in
-/// <see cref="IKoanAuthFlowHandler.Priority"/> order, sequentially. Soft-fails per-handler on
-/// exception (logs and continues); propagates <see cref="OperationCanceledException"/>.
+/// <see cref="IKoanAuthFlowHandler.Priority"/> order, sequentially. Security-bearing flows fail closed:
+/// bootstrap, sign-in, challenge, and access-denied failures propagate; validation rejects the principal.
+/// Sign-out alone remains best-effort because local session removal must not depend on remote cleanup.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Single, shared dispatcher across every flow event. Maintains the same contract the older
-/// <see cref="AuthEventDispatcher"/> implemented for sign-in / sign-out / bootstrap; legacy
-/// <see cref="IKoanAuthEventContributor"/> implementations participate via
-/// <c>LegacyAuthContributorAdapter</c>, which projects each contributor as a flow handler at the
-/// same priority. The legacy <see cref="AuthEventDispatcher"/> remains registered for backwards
-/// compatibility but delegates here.
+/// Single, shared dispatcher across every flow event (sign-in / sign-out / bootstrap /
+/// validate-principal / challenge / access-denied), running each registered
+/// <see cref="IKoanAuthFlowHandler"/> in <see cref="IKoanAuthFlowHandler.Priority"/> order.
 /// </para>
 /// <para>
 /// Short-circuit policy varies per event:
@@ -40,22 +38,11 @@ public sealed class AuthFlowDispatcher
 
     public AuthFlowDispatcher(
         IEnumerable<IKoanAuthFlowHandler> handlers,
-        IEnumerable<IKoanAuthEventContributor> legacyContributors,
         ILogger<AuthFlowDispatcher> logger)
     {
-        // Adapt every legacy IKoanAuthEventContributor into a flow handler at construction time so
-        // the two registration paths converge into a single sorted pipeline. The adapter is cheap
-        // (a single reference), and scoped + scoped means lifetimes line up. Skip any contributor
-        // that's already exposed as a flow handler directly — apps that migrated keep one entry,
-        // not two.
-        var adaptedLegacy = legacyContributors
-            .Where(c => handlers.All(h => !ReferenceEquals(h, c)))
-            .Select(c => (IKoanAuthFlowHandler)new LegacyAuthContributorAdapter(c));
-
         // Stable sort: primary key is Priority; tie-break by full type name so two handlers at the
         // same priority run in deterministic order across processes / restarts.
         _handlers = handlers
-            .Concat(adaptedLegacy)
             .OrderBy(h => h.Priority)
             .ThenBy(h => h.GetType().FullName, StringComparer.Ordinal)
             .ToArray();
@@ -68,16 +55,7 @@ public sealed class AuthFlowDispatcher
     public async Task DispatchBootstrap(AuthBootstrapContext ctx, CancellationToken ct)
     {
         foreach (var h in _handlers)
-        {
-            try { await h.OnBootstrap(ctx, ct); }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "Koan.Web.Auth.Flow: bootstrap handler {Handler} failed; continuing pipeline",
-                    h.GetType().FullName);
-            }
-        }
+            await h.OnBootstrap(ctx, ct);
     }
 
     public async Task DispatchValidatePrincipal(AuthValidatePrincipalContext ctx, CancellationToken ct)
@@ -88,9 +66,11 @@ public sealed class AuthFlowDispatcher
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex,
-                    "Koan.Web.Auth.Flow: validate-principal handler {Handler} failed; continuing pipeline",
+                ctx.Inner.RejectPrincipal();
+                _logger.LogError(ex,
+                    "Koan.Web.Auth.Flow: validate-principal handler {Handler} failed; principal rejected",
                     h.GetType().FullName);
+                return;
             }
         }
     }
@@ -100,14 +80,7 @@ public sealed class AuthFlowDispatcher
         foreach (var h in _handlers)
         {
             if (ctx.RejectReason is not null) break;
-            try { await h.OnSignIn(ctx, ct); }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "Koan.Web.Auth.Flow: sign-in handler {Handler} failed for user {UserId}; continuing pipeline",
-                    h.GetType().FullName, ctx.UserId);
-            }
+            await h.OnSignIn(ctx, ct);
         }
     }
 
@@ -129,30 +102,12 @@ public sealed class AuthFlowDispatcher
     public async Task DispatchChallenge(AuthChallengeContext ctx, CancellationToken ct)
     {
         foreach (var h in _handlers)
-        {
-            try { await h.OnChallenge(ctx, ct); }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "Koan.Web.Auth.Flow: challenge handler {Handler} failed; continuing pipeline",
-                    h.GetType().FullName);
-            }
-        }
+            await h.OnChallenge(ctx, ct);
     }
 
     public async Task DispatchAccessDenied(AuthAccessDeniedContext ctx, CancellationToken ct)
     {
         foreach (var h in _handlers)
-        {
-            try { await h.OnAccessDenied(ctx, ct); }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "Koan.Web.Auth.Flow: access-denied handler {Handler} failed; continuing pipeline",
-                    h.GetType().FullName);
-            }
-        }
+            await h.OnAccessDenied(ctx, ct);
     }
 }

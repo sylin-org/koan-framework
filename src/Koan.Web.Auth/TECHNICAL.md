@@ -1,142 +1,60 @@
-# Koan.Web.Auth - Technical reference
+# Sylin.Koan.Web.Auth — technical contract
 
-Contract
+## Ownership
 
-- Inputs: ASP.NET Core app with MVC; provider configuration via typed Options; cookies or bearer as the primary auth scheme.
-- Outputs: Registered authentication handlers; controller-driven challenge/callback endpoints; enriched ClaimsPrincipal.
-- Error modes: Invalid state/nonce, provider errors, clock skew, misconfigured redirect URIs.
-- Success: Provider challenge redirects and callback executed; user principal established; auth cookies/tokens issued per policy.
+Web Auth owns one host-level authentication plan. Connector modules register immutable `AuthProviderDefinition`
+values; application configuration overlays those defaults; `AuthProviderPlan` compiles availability, eligibility,
+priority, correction, and default election once. The same plan drives scheme seeding, controllers, startup reporting,
+composition facts, and the credential-free `IAuthProviderCatalog` projection.
 
-Architecture and flow
+Cross-module contracts live in inert `Sylin.Koan.Web.Auth.Abstractions`. Optional modules must reference that assembly
+directly instead of depending on functional Web Auth merely to consume a contract.
 
-- Controllers, not inline endpoints: Expose challenge and callback via attribute-routed controllers for testability.
-- Providers are separate modules (e.g., Koan.Web.Auth.Connector.Oidc, Discord, Google). This package supplies shared primitives and policies.
-- Options-centric: Bind provider options from configuration; no magic strings in code-use constants/options.
+## Provider rules
 
-Schemes and cookies
+- A connector definition is inactive until its provider has explicit configuration, unless the definition declares an
+  automatic local provider.
+- Explicit configuration outranks automatic providers; then priority and stable provider ID break ties.
+- `PreferredProviderId` is required intent: unknown, disabled, unavailable, or incomplete targets stop startup.
+- Configuration-only provider IDs are supported because OAuth2/OIDC mechanics belong to Web Auth itself.
+- Required OIDC values: `Authority`, `ClientId`, `ClientSecret`.
+- Required OAuth2 values: `AuthorizationEndpoint`, `TokenEndpoint`, `UserInfoEndpoint`, `ClientId`, `ClientSecret`.
 
-- Default scheme: Prefer Cookie for interactive web apps; use Bearer/JWT for APIs.
-- Challenge scheme: Set per-provider (e.g., "oidc", "Google", "Microsoft", "Discord").
-- Cookie policy: Lax or None+Secure for cross-site redirects; HttpOnly; short-lived auth cookies with sliding expiration per policy.
+Provider callbacks use `/auth/{id}/callback`. Relative endpoints and authorities are reserved for the self-hosted local
+test provider; deployment providers should use absolute HTTPS endpoints.
 
-Configuration
+## Runtime behavior
 
-- Register authentication and MVC in Program.cs and bind options from configuration.
-- Prefer AddControllers(); avoid MapGet/MapPost inline endpoints.
+`AuthModule.Start` resolves the immutable plan and seeds one ASP.NET scheme per eligible provider. OIDC uses
+`OpenIdConnectHandler`; OAuth2 uses `OAuthHandler<OAuthOptions>`. PKCE, state, correlation, OIDC nonce, issuer,
+audience, and signature validation remain owned by maintained ASP.NET handlers.
 
-Example (minimal, production-safe)
-// Program.cs
-// services
-// - Cookie or bearer default scheme
-// - Controllers registered
-// - Provider modules contribute handlers via their own Add\* extensions
+The framework cookie scheme is `Koan.cookie`. Challenge and access-denied responses pass through the discovered
+`IKoanAuthFlowHandler` pipeline. JSON/API requests receive the built-in JSON challenge behavior; interactive requests
+redirect to the elected provider when one exists.
 
-```csharp
-var builder = WebApplication.CreateBuilder(args);
+## Lifecycle failure semantics
 
-builder.Services.AddControllers();
+- bootstrap, sign-in, challenge, and access-denied exceptions propagate;
+- validation exceptions reject the principal and are logged;
+- an explicit sign-in rejection prevents cookie issuance;
+- external identity linkage completes before sign-in and fails closed;
+- sign-out handler failures are logged and local sign-out continues.
 
-builder.Services
-    .AddAuthentication(options =>
-    {
-        options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = "Discord"; // or OIDC/Google per provider
-    })
-    .AddCookie();
+Handlers are scoped, auto-discovered implementations of `IKoanAuthFlowHandler`, ordered by `Priority` and then full
+type name. Implement only the events the module owns; no DI registration is required.
 
-// Provider modules add their handlers in their own startup wiring.
+## Inspectability
 
-builder.Services.Configure<CookiePolicyOptions>(o =>
-{
-    o.MinimumSameSitePolicy = SameSiteMode.Lax;
-});
+Startup logs include total providers, eligible providers, default ID, and election reason. Composition facts expose one
+observation per provider plus the default election receipt. `IAuthProviderCatalog` deliberately excludes credentials.
+The public discovery route returns eligible providers only.
 
-var app = builder.Build();
+## Unsupported and deferred
 
-app.UseCookiePolicy();
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
+- no SAML handler;
+- no automatic secret-vault reference resolution;
+- no built-in provider-token persistence or refresh-token API for calling third-party APIs;
+- no claim that a provider console, callback URI, consent policy, or tenant allow-list can be inferred by Koan.
 
-app.Run();
-```
-
-Callback controller sketch
-
-```csharp
-[ApiController]
-[Route("auth/{provider}")]
-public sealed class AuthController : ControllerBase
-{
-    [HttpGet("challenge")]
-    public IActionResult ChallengeProvider([FromRoute] string provider, [FromQuery] string? returnUrl)
-        => Challenge(new AuthenticationProperties { RedirectUri = Url.Action("Callback", new { provider, returnUrl }) }, provider);
-
-    [HttpGet("callback")]
-    public async Task<IActionResult> Callback([FromRoute] string provider, [FromQuery] string? returnUrl)
-    {
-        var result = await HttpContext.AuthenticateAsync();
-        if (!result.Succeeded) return Forbid();
-        return LocalRedirect(returnUrl ?? "/");
-    }
-}
-```
-
-Options and constants
-
-- Bind provider-specific options under a clear prefix (e.g., Auth:Providers:Discord).
-- Keep stable names (scheme names, header keys, default paths) in a central constants class in the project.
-
-Scopes and claims
-
-- Request only the scopes you need (least privilege). Typical OIDC scopes: openid, profile, email, offline_access.
-- Claims mapping: Normalize common identifiers (sub/oid → NameIdentifier), email, name, roles. Prefer explicit claim type constants.
-
-Token lifetimes and session
-
-- Prefer server-side sessions (cookies) and do not store long-lived tokens in the browser.
-- SaveTokens only when you need to call provider APIs; encrypt at rest and restrict access.
-- Respect provider token lifetimes and refresh cadence; handle refresh failure by re-challenging the user.
-
-PKCE, state, nonce
-
-- Always enable state and nonce; reject callbacks with mismatches.
-- Use PKCE for OAuth/OIDC code flows; enforce on all public clients.
-
-Logout and sign-out
-
-- Support local sign-out (delete auth cookie) and, if applicable, federated sign-out at the provider.
-- Expose sign-out via a controller route; avoid inline endpoints. Validate return URLs.
-
-Multi-tenant and callback URLs
-
-- Ensure RedirectUri/CallbackPath is consistent between app settings and provider console.
-- For multi-tenant providers, encode tenant selection in configuration (e.g., OIDC authority per tenant) and validate issuer.
-
-Edge cases
-
-- Callback path mismatches; fix RedirectUri and Allowed Callback URLs in the provider console.
-- SameSite/cookie issues on cross-site redirects; set Lax/None with Secure when required.
-- Clock skew on token validation; adjust token validation parameters appropriately.
-
-Security
-
-- Always enable state/nonce/PKCE where applicable.
-- Limit scopes to least privilege; validate issuer/audience for OIDC.
-
-Development provider mapping
-
-- In Development, the TestProvider's userinfo may include `roles`, `permissions`, and a `claims` object. The callback maps these into the cookie principal to simulate downstream authorization (e.g., Koan.Web.Auth.Roles). This behavior is confined to dev/test providers.
-
-Operations
-
-- Metrics: count challenges, successful sign-ins, failed callbacks (by reason), and sign-outs.
-- Logging: include correlation IDs spanning challenge→callback; never log tokens or PII.
-- Runbook: on repeated provider errors (invalid_client, invalid_grant), recycle secrets, validate redirect URIs, and check clock skew.
-
-References
-
-- Controllers only (no inline endpoints): `/docs/decisions/WEB-0035-entitycontroller-transformers.md`
-- Config and constants: `/docs/decisions/ARCH-0040-config-and-constants-naming.md`
-- Per-project docs pattern: `/docs/decisions/ARCH-0042-per-project-companion-docs.md`
-
+The embedded authorization server has its own package and contract.

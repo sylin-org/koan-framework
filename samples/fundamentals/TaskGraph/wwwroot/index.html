@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tasks and relationships · Koan</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Koan · S1</p>
+      <h1>Read the business, not the plumbing.</h1>
+      <p class="lede">People own tasks. Categories organize them. Tasks contain actionable items. Koan resolves the same relationship context for one entity, a set, or a stream.</p>
+    </header>
+
+    <section class="actions" aria-label="Run the sample">
+      <button id="reset">1. Reset the story</button>
+      <button id="scalar" disabled>2. One task</button>
+      <button id="set" disabled>3. A finite set</button>
+      <button id="stream" disabled>4. A stream</button>
+    </section>
+
+    <section class="workspace">
+      <article class="result">
+        <div class="result-heading">
+          <div>
+            <p class="eyebrow">Live result</p>
+            <h2 id="result-title">Ready when you are</h2>
+          </div>
+          <span id="status">not run</span>
+        </div>
+        <pre id="output">Reset the deterministic story to begin.</pre>
+      </article>
+
+      <aside>
+        <p class="eyebrow">The application language</p>
+        <pre><code>Todo : Entity&lt;Todo&gt;
+
+[Parent(typeof(User))]
+string UserId { get; set; }
+
+TodoController
+  : EntityController&lt;Todo&gt;
+
+todo.Relatives();
+todos.Relatives();
+Todo.AllStream().Relatives();</code></pre>
+        <p class="aside-note">SQLite persistence, bounded relationship loading, caching, HTTP, startup reporting, and runtime inspection come from referenced capabilities.</p>
+        <a href="/.well-known/Koan/facts" target="_blank" rel="noreferrer">Inspect the runtime facts →</a>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const output = document.querySelector('#output');
+    const title = document.querySelector('#result-title');
+    const status = document.querySelector('#status');
+    const followups = ['scalar', 'set', 'stream'].map(id => document.querySelector(`#${id}`));
+
+    async function show(label, path, options) {
+      title.textContent = label;
+      status.textContent = 'running';
+      status.dataset.state = 'running';
+      try {
+        const response = await fetch(path, options);
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.detail || body.title || response.statusText);
+        output.textContent = JSON.stringify(body, null, 2);
+        status.textContent = `${response.status} ${response.statusText}`;
+        status.dataset.state = 'ok';
+        return body;
+      } catch (error) {
+        output.textContent = error.message;
+        status.textContent = 'request failed';
+        status.dataset.state = 'error';
+        throw error;
+      }
+    }
+
+    document.querySelector('#reset').addEventListener('click', async () => {
+      const story = await show('A deterministic business story', '/api/todos/reset-demo', { method: 'POST' });
+      followups.forEach(button => button.disabled = false);
+      document.querySelector('#scalar').dataset.id = story.representativeTodoId;
+    });
+
+    document.querySelector('#scalar').addEventListener('click', event =>
+      show('One task and its context', `/api/todos/${event.currentTarget.dataset.id}/context`));
+    document.querySelector('#set').addEventListener('click', () =>
+      show('A finite set, source order preserved', '/api/todos/relationships/set?limit=3'));
+    document.querySelector('#stream').addEventListener('click', () =>
+      show('A bounded async stream', '/api/todos/relationships/stream?limit=3'));
+  </script>
+</body>
+</html>

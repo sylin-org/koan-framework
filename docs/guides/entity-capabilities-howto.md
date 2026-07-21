@@ -4,12 +4,11 @@ domain: data
 title: "Entity Capabilities How-To"
 audience: [developers, architects]
 status: current
-last_updated: 2025-11-09
-framework_version: v0.6.3
+last_updated: 2026-07-15
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2025-11-09
-  status: verified
-  scope: All code examples tested against v0.6.3
+  status: not-yet-tested
+  scope: docs/guides/entity-capabilities-howto.md
 related_guides:
   - ai-vector-howto.md
   - canon-capabilities-howto.md
@@ -70,7 +69,7 @@ Before we dive in, let's get your environment ready. Don't worry—Koan is desig
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();  // That's it—Koan handles the rest
 var app = builder.Build();
-app.Run();
+await app.RunAsync();
 ```
 
 Everything below builds on this foundation. Let's go!
@@ -188,6 +187,12 @@ var m = await Mirror.Get(id);    // bare .Get(id), returns Mirror, own collectio
 **What you trade:** siblings are not substitutable. `Mirror` is not a `Package`, so you cannot pass one where the other is expected or query both as one set. That is the only thing class inheritance would have given you, and it is rarely what you actually want for stored entities. If you genuinely need a polymorphic set (query a base type and get mixed concrete rows back), that is single-table inheritance: one shared collection plus a type discriminator, an explicit opt-in, not the default. For the common case (share fields, store separately), sibling CRTP roots are the answer.
 
 **Rule of thumb:** every concrete entity should read `class Foo : Entity<Foo>` or `class Foo : SomeBase<Foo>`. If you ever see `class Foo : SomeConcreteEntity` (inheriting a type that is itself a set), stop: that is the footgun.
+
+Entity property names must also be unique without relying on case. A model with inherited `Id` and a
+second property named `id`, for example, has no portable identity across JSON and providers with
+different case-sensitivity rules. Koan rejects that model on first use, before opening a repository,
+and names the properties to rename. Normal PascalCase properties still accept unambiguous camelCase or
+mixed-case filter input.
 
 **Usage Scenarios**
 
@@ -343,24 +348,28 @@ Console.WriteLine($"Showing {result.Items.Count} of {result.TotalCount} todos");
 
 **Streaming large datasets:**
 
-For datasets too large to fit in memory, use streaming:
+When a result is too large to materialize as one Entity list, use provider-bounded streaming on a
+qualified adapter:
 
 ```csharp
-// Process millions of log entries without loading all into RAM
+// Consumer-paced provider pages on a qualified adapter
 await foreach (var reading in SensorReading.QueryStream(
-    "timestamp > '2024-01-01'",
-    batchSize: 500,  // Fetch 500 at a time
-    ct))
+    reading => reading.Timestamp > cutoff,
+    batchSize: 500,  // At most 500 Koan-visible candidates per provider page
+    ct: ct))
 {
     await ProcessReading(reading, ct);
-    // Each batch is processed then garbage collected
 }
 ```
+
+This requires `ProviderBoundedPaging` (SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB, or
+Couchbase). InMemory, JSON, and Redis reject before query/yield. The batch bounds Koan-visible
+candidates; it does not promise snapshot consistency, mutation safety, or opaque-driver memory.
 
 **Usage Scenarios**
 
 - **Web APIs:** Paginate results for list endpoints (`GET /api/todos?page=2&size=20`)
-- **Reports:** Stream large datasets for CSV exports without memory exhaustion
+- **Reports:** On a qualified adapter, process large datasets without materializing the complete Entity source
 - **Dashboards:** Query with counts for "Showing X of Y" UI controls
 - **Admin tools:** Use string queries for user-built dynamic filters
 
@@ -372,18 +381,19 @@ await foreach (var reading in SensorReading.QueryStream(
 
 **Concepts**
 
-How many todos do you have? Sounds simple, but at scale (millions of rows), full table scans can take 20+ seconds. Koan gives you three counting strategies:
+How many todos do you have? Koan gives you three counting strategies so you can state the accuracy
+you need:
 
-- **Exact:** Full accuracy, may be slower (scans entire table)
-- **Fast:** Lightning-fast estimates using database metadata (5000x speedup on large tables)
-- **Optimized:** Framework chooses the best approach (usually Fast if available)
+- **Exact:** Request an exact result
+- **Fast:** Request an adapter-specific fast path; the result may be an estimate
+- **Optimized:** Let the adapter choose its optimized count path
 
 Think of it like this: counting jelly beans in a jar—you can count each one (Exact) or estimate from the jar's size (Fast).
 
 **When to use each:**
-- Dashboard summaries? **Fast** is perfect (who cares if it's 1,000,042 vs 1,000,000?)
+- Dashboard summaries? **Fast** can fit when an estimate is acceptable and the selected adapter supports it
 - Business-critical inventory check? **Exact** is essential
-- General use? **Optimized** (the default) makes smart choices for you
+- General use? **Optimized** is the default; verify the selected adapter's behavior for your workload
 
 **Recipe**
 
@@ -394,38 +404,31 @@ No new packages. Count strategies are built into Entity<T>.
 **Simple counts:**
 
 ```csharp
-// Default: framework chooses best strategy
-var total = await Todo.Count;  // Usually uses Fast if available
+// Default: pass CountStrategy.Optimized to the selected adapter
+var total = await Todo.Count;
 
 // Explicit exact count (guaranteed accuracy)
 var exact = await Todo.Count.Exact(ct);
 
-// Explicit fast count (metadata estimate)
+// Explicit adapter-specific fast path; the result may be an estimate
 var fast = await Todo.Count.Fast(ct);
 
 // Filtered count
-var completed = await Todo.Count.Where(t => t.Completed, ct);
+var completed = await Todo.Count.Where(t => t.Completed, ct: ct);
 
 // Filtered with explicit strategy
 var urgent = await Todo.Count.Where(
     t => t.Priority > 3,
     CountStrategy.Fast,
-    ct
+    ct: ct
 );
 
 // Count a specific partition
-var archivedCount = await Todo.Count.Partition("archive", ct);
+var archivedCount = await Todo.Count.Partition("archive", ct: ct);
 ```
 
-**Performance comparison (10 million rows):**
-
-| Provider   | Exact Count | Fast Count  | Strategy Used                    |
-|------------|-------------|-------------|----------------------------------|
-| PostgreSQL | ~25 seconds | ~5ms        | `pg_stat_user_tables.n_live_tup` |
-| SQL Server | ~20 seconds | ~1ms        | `sys.dm_db_partition_stats`      |
-| MongoDB    | ~15 seconds | ~10ms       | `estimatedDocumentCount()`       |
-| SQLite     | Full scan   | Same        | No metadata (always exact)       |
-| JSON       | In-memory   | Same        | Dictionary.Count (instant)       |
+Count cost, accuracy, and optimization are adapter-specific. Benchmark the elected adapter and
+dataset rather than relying on cross-provider timings.
 
 **When to use each strategy:**
 
@@ -437,15 +440,15 @@ var totalPages = (await Todo.Count.Fast(ct) + pageSize - 1) / pageSize;
 var stats = new
 {
     Total = await Todo.Count.Fast(ct),
-    Completed = await Todo.Count.Where(t => t.Completed, CountStrategy.Fast, ct),
-    Pending = await Todo.Count.Where(t => !t.Completed, CountStrategy.Fast, ct)
+    Completed = await Todo.Count.Where(t => t.Completed, CountStrategy.Fast, ct: ct),
+    Pending = await Todo.Count.Where(t => !t.Completed, CountStrategy.Fast, ct: ct)
 };
 
 // ✅ Business logic (exact required!)
 var exactInventory = await Product.Count.Where(
     p => p.InStock && p.WarehouseId == warehouseId,
     CountStrategy.Exact,
-    ct
+    ct: ct
 );
 if (exactInventory < reorderThreshold)
     await TriggerRestock(ct);
@@ -472,7 +475,7 @@ Koan also gives you **lifecycle hooks**—think of them as middleware for your e
 
 **Recipe**
 
-Dependencies already covered. Lifecycle API lives in `Koan.Data.Core.Events` (included automatically).
+Dependencies already covered. Lifecycle is part of `Koan.Data.Core`.
 
 **Sample**
 
@@ -502,48 +505,32 @@ await Todo.Batch()
     .SaveAsync(ct);
 ```
 
-**Lifecycle hooks:**
+**Lifecycle policy:**
 
 ```csharp
-public static class TodoLifecycle
-{
-    public static void Configure(EntityLifecycleBuilder<Todo> builder)
+builder.Services.AddKoan(() =>
+    Todo.Lifecycle
+        .BeforeUpsert(ctx =>
     {
-        builder
-            // Protect all properties by default
-            .ProtectAll()
-
-            // Allow specific properties to change
-            .Allow(t => t.Title, t => t.Completed, t => t.DueDate)
-
-            // Validation before save
-            .BeforeUpsert(async (ctx, next) =>
-            {
-                if (string.IsNullOrWhiteSpace(ctx.Entity.Title))
-                    throw new InvalidOperationException("Todo must have a title");
-
-                if (ctx.Entity.Title.Length > 200)
-                    throw new InvalidOperationException("Title too long (max 200 chars)");
-
-                await next();  // Continue to next hook or save
-            })
-
-            // Auto-format after load
-            .AfterLoad(ctx =>
-            {
-                // Trim whitespace
-                if (ctx.Entity.Title != null)
-                    ctx.Entity.Title = ctx.Entity.Title.Trim();
-            });
-    }
-}
+        ctx.Protect(nameof(Todo.Id));
+        if (string.IsNullOrWhiteSpace(ctx.Current.Title))
+            return ctx.Cancel("Todo must have a title");
+        if (ctx.Current.Title.Length > 200)
+            return ctx.Cancel("Title too long (max 200 chars)");
+        return ctx.Proceed();
+    })
+        .AfterLoad(ctx =>
+        {
+            if (ctx.Current.Title != null)
+                ctx.Current.Title = ctx.Current.Title.Trim();
+        }));
 ```
 
 **How hooks work:**
-1. `ProtectAll()` prevents accidental property mutations
-2. `Allow()` whitelists safe-to-change properties
-3. `BeforeUpsert` runs validation before save
-4. `AfterLoad` formats data after fetching from database
+1. `AddKoan(...)` owns the plan for this host; no static reset or registrar is required.
+2. `ctx.Protect(name)` prevents later handlers from mutating the captured value.
+3. `BeforeUpsert` validates before save; `ctx.Cancel(reason)` rejects before persistence.
+4. `AfterLoad` formats the materialized application instance without persisting it.
 
 **Usage Scenarios**
 
@@ -565,9 +552,10 @@ Eventually, you'll need to delete a lot of data—test cleanup, archival, tenant
 
 - **Safe:** Always fires lifecycle hooks (audit trails, cleanup logic)
 - **Fast:** Bypasses hooks for 10-250x performance (TRUNCATE, DROP, etc.)
-- **Optimized:** Framework chooses Fast when safe, Safe when hooks matter
+- **Optimized:** Preserves configured remove Lifecycle; otherwise delegates optimization to the provider
 
-Here's the key insight: **Optimized uses Fast on most providers** (Postgres, SQL Server, MongoDB, SQLite, Redis). If you need audit trails, explicitly choose Safe.
+Here's the key insight: configured remove Lifecycle makes `Optimized` use the safe per-entity path.
+Explicit `Fast` is the only intentional lifecycle bypass.
 
 **Quick decision:**
 - Need audit trail or cleanup logic? → **Safe**
@@ -583,7 +571,7 @@ Same packages as always. Providers with `DataCaps.Write.FastRemove` (Postgres, S
 **Basic removal:**
 
 ```csharp
-// Default: Optimized (usually Fast on capable providers)
+// Default: Optimized (preserves configured remove Lifecycle)
 var count = await Todo.RemoveAll(ct);
 
 // Explicit Safe (always fires hooks)
@@ -647,25 +635,26 @@ public async Task PurgeArchivedLogs(CancellationToken ct)
 }
 ```
 
-**⚠️ Important:** Optimized uses Fast on most providers, **bypassing hooks**. If you have audit logging or cleanup logic in lifecycle hooks, use explicit Safe:
+**Important:** `Fast` explicitly bypasses remove Lifecycle. `Optimized` and `Safe` preserve it when
+handlers are configured:
 
 ```csharp
-public static class OrderLifecycle
-{
-    public static void Configure(EntityLifecycleBuilder<Order> builder) =>
-        builder.BeforeDelete(async (ctx, next) =>
+builder.Services.AddKoan(() =>
+    Order.Lifecycle.BeforeRemove(async ctx =>
         {
             // Log deletion for compliance
-            await AuditLog.RecordDeletion(ctx.Entity.Id, ctx.Entity.CustomerId);
-            await next();
-        });
-}
+            await AuditLog.RecordDeletion(ctx.Current.Id, ctx.Current.CustomerId);
+            return ctx.Proceed();
+        }));
 
-// ❌ Optimized bypasses BeforeDelete hook on Postgres!
+// ✅ Optimized detects the configured remove Lifecycle and preserves it
 await Order.RemoveAll(ct);
 
-// ✅ Safe guarantees hook fires
+// ✅ Safe also guarantees per-entity Lifecycle
 await Order.RemoveAll(RemoveStrategy.Safe, ct);
+
+// ⚠️ Fast is an explicit lifecycle bypass
+await Order.RemoveAll(RemoveStrategy.Fast, ct);
 ```
 
 **Usage Scenarios**
@@ -764,7 +753,7 @@ using (EntityContext.Source("Analytics"))
     var stats = new
     {
         Total = await Todo.Count.Fast(ct),
-        Completed = await Todo.Count.Where(t => t.Completed, ct)
+        Completed = await Todo.Count.Where(t => t.Completed, ct: ct)
     };
 }
 
@@ -946,14 +935,15 @@ if (EntityContext.InTransaction)
 
 Moving data between partitions, sources, or adapters is common: archiving old records, hydrating analytics databases, migrating tenants. Hand-written loops are error-prone and verbose.
 
-Koan's transfer DSL provides declarative, resumable operations:
+Koan's transfer DSL provides declarative copy, move, and mirror operations:
 - **Copy:** Duplicate entities to another context
 - **Move:** Copy then delete from origin (strategies: AfterCopy, Batched, Synced)
-- **Mirror:** Synchronize data (one-way or bidirectional); `[Timestamp]` resolves conflicts
+- **Mirror:** Propagate records one-way or reconcile both sides; `[Timestamp]` resolves bidirectional conflicts
 
 **Recipe**
 
-Latest `Koan.Data.Core` (transfer builders in `Koan.Data.Core.Transfers`). Use `System.ComponentModel.DataAnnotations` for `[Timestamp]` conflict resolution.
+Latest `Koan.Data.Core` (transfer builders in `Koan.Data.Core.Transfers`). Use
+`Koan.Data.Abstractions.Annotations` for `[Timestamp]` conflict resolution.
 
 **Sample**
 
@@ -986,8 +976,8 @@ await Todo.Mirror(mode: MirrorMode.Bidirectional)
     .To(source: "Analytics")
     .Run(ct);
 
-// One-way sync (production → analytics)
-await Todo.Mirror(mode: MirrorMode.OneWay)
+// Push production records to analytics
+await Todo.Mirror(mode: MirrorMode.Push)
     .To(source: "Analytics")
     .Run(ct);
 ```
@@ -1022,10 +1012,9 @@ if (result.HasConflicts)
     foreach (var conflict in result.Conflicts)
     {
         logger.LogWarning(
-            "Conflict on {Id}: Source modified {Source}, Dest modified {Dest}",
+            "Conflict on {Id}: {Reason}",
             conflict.Id,
-            conflict.SourceModified,
-            conflict.DestinationModified
+            conflict.Reason
         );
     }
 }
@@ -1038,7 +1027,13 @@ if (result.HasConflicts)
 - **Analytics:** Mirror transactional data to reporting databases
 - **Migrations:** Transfer data between adapters during provider changes
 
-**Pro tip:** Use `.Audit()` to track progress on large transfers. Each batch emits metrics—hook them into your logging or APM.
+Current transfer builders materialize the selected source before writing the destination in batches.
+`BatchSize(...)` and `.Audit(...)` describe destination write batches; they do not bound source
+materialization or provide checkpoints. If the selection can be large, use a qualified Entity stream
+and an application-owned idempotency/checkpoint design instead.
+
+**Pro tip:** `.Audit()` reports destination write batches and a final summary. It is observability,
+not a checkpoint or resume token.
 
 ---
 
@@ -1046,60 +1041,89 @@ if (result.HasConflicts)
 
 **Concepts**
 
-For massive datasets or long-running operations, combine Entity streaming with Koan Flow (pipelines) or Jobs (scheduled/resumable work).
+For large datasets or long-running operations, use a qualified Entity stream for an explicit
+business operation, or Jobs when the work needs durable execution and retry.
 
 **When to use:**
-- **Flow:** Transform millions of records (generate embeddings, update fields)
+- **Entity stream:** Apply an application-owned, business-named operation with consumer-paced reads
 - **Jobs:** Scheduled nightly transfers, archival, or DR sync
 
 **Recipe**
 
-Add pipeline support:
-```xml
-<PackageReference Include="Koan.Flow" Version="0.6.3" />
-<PackageReference Include="Koan.Jobs.Core" Version="0.6.3" />
+Add only the pillar package that owns the capability you need:
+
+```bash
+dotnet add package Sylin.Koan.AI
+dotnet add package Sylin.Koan.Jobs
 ```
 
 **Sample**
 
-**Flow pipeline (embedding backfill):**
+**Embedding lifecycle for ordinary writes:**
 
 ```csharp
-// Process millions of recommendations without loading all into memory
-await Flow.Pipeline("generate-embeddings")
-    .ForEach(await Recommendation.AllStream(batchSize: 200, ct))
-    .Do(async (rec, ct) =>
-    {
-        // Generate embedding
-        rec.Embedding = await Ai.Embed(rec.Content, ct);
-        await rec.Save(ct);
-    })
-    .RunAsync(ct);
+[Embedding(Async = true)]
+public sealed class Recommendation : Entity<Recommendation>
+{
+    public string Content { get; set; } = "";
+}
+
+await recommendation.Save(ct); // persistence schedules embedding through Entity Lifecycle
 ```
+
+**Explicit finite-set backfill:**
+
+```csharp
+var stale = await Recommendation.Query(
+    recommendation => recommendation.NeedsReindex,
+    ct);
+
+var result = await EmbeddingMigrator.ReEmbed(stale, batchSize: 200, ct: ct);
+if (!result.Success)
+{
+    logger.LogWarning(
+        "Re-indexed {Succeeded}/{Total} recommendations",
+        result.SuccessfulEntities,
+        result.TotalEntities);
+}
+```
+
+`ReEmbed` reports operation outcomes and does not imply collection atomicity or retry. Use
+`ReEmbedAll<T>` for an intentional whole-collection model transition.
 
 **Job for nightly archive:**
 
 ```csharp
-public class ArchiveOldTodosJob : IJob
+public sealed class ArchiveOldTodosJob
+    : Entity<ArchiveOldTodosJob>, IKoanJob<ArchiveOldTodosJob>
 {
-    public async Task ExecuteAsync(JobContext ctx)
-    {
-        var cutoffDate = DateTimeOffset.UtcNow.AddDays(-90);
+    public DateTimeOffset Cutoff { get; init; }
 
-        await Todo.Move()
-            .Where(t => t.Completed && t.CompletedDate < cutoffDate)
+    public static async Task Execute(
+        ArchiveOldTodosJob job,
+        JobContext context,
+        CancellationToken ct)
+    {
+        await Todo.Move(todo => todo.Completed && todo.CompletedDate < job.Cutoff)
             .From(partition: "active")
             .To(partition: "archive")
-            .Run(ctx.CancellationToken);
+            .Run(ct);
+
+        await context.Progress(1, "Archive complete");
     }
 }
+
+await new ArchiveOldTodosJob
+{
+    Cutoff = DateTimeOffset.UtcNow.AddDays(-90)
+}.Job.Submit(ct: ct);
 ```
 
 **Usage Scenarios**
 
-- **AI pipelines:** Generate embeddings for millions of documents
+- **AI lifecycle and migration:** Embed ordinary saves automatically; make explicit backfills observable
 - **Nightly transfers:** Archive old data, sync replicas
-- **Resumable operations:** Long-running migrations with checkpointing
+- **Scheduled workflows:** Run transfers from Jobs; checkpoint and resume policy remains application-owned
 
 ---
 
@@ -1107,7 +1131,8 @@ public class ArchiveOldTodosJob : IJob
 
 **Concepts**
 
-Store embeddings directly on entities and integrate with vector providers (Weaviate, Pinecone, Qdrant). Same Entity<T> patterns you know.
+Store embeddings directly on entities and integrate with shipped vector providers such as Weaviate
+and Qdrant. The same `Entity<T>` patterns apply.
 
 **Recipe**
 
@@ -1128,7 +1153,7 @@ public class MediaItem : Entity<MediaItem>
 
 // Generate and store embedding
 var media = await MediaItem.Get(mediaId, ct);
-media.Embedding = await Ai.Embed($"{media.Title}\n\n{media.Description}", ct);
+media.Embedding = await Koan.AI.Client.Embed($"{media.Title}\n\n{media.Description}", ct);
 await media.Save(ct);
 
 // Semantic search
@@ -1150,8 +1175,11 @@ var similar = await MediaItem.Query("vectorDistance < 0.15", ct);
 ### Symptom: Out of memory during large queries
 
 **Cause:** Loading millions of records with `.All()` or `.Query()`
-**Solution:** Use streaming: `AllStream(batchSize: 500, ct)` or `QueryStream()`
-**Prevention:** Ask: "Could this dataset grow unbounded?" → Use streaming
+**Solution:** On a qualified adapter, use provider-bounded streaming: `AllStream(batchSize: 500, ct)` or `QueryStream()`
+**Prevention:** Ask: "Could this dataset grow unbounded?" Then verify the adapter advertises
+`DataCaps.Query.ProviderBoundedPaging` (runtime id `query.paging.providerBounded`); InMemory, JSON, and
+Redis reject streaming rather than materialize
+an unbounded fallback.
 
 ### Symptom: Slow pagination on large tables
 
@@ -1163,7 +1191,7 @@ var similar = await MediaItem.Query("vectorDistance < 0.15", ct);
 
 **Cause:** Default `Optimized` strategy uses `Fast` on capable providers
 **Solution:** Use explicit `RemoveStrategy.Safe` when hooks required
-**Prevention:** Audit lifecycle hooks—if BeforeDelete does important work, always use Safe
+**Prevention:** Audit lifecycle hooks—if BeforeRemove does important work, always use Safe
 
 ### Symptom: Transaction doesn't rollback across adapters
 
@@ -1191,14 +1219,58 @@ var similar = await MediaItem.Query("vectorDistance < 0.15", ct);
 
 ---
 
+## Write-If-Changed Upserts
+
+**Concept:** By default, `Upsert` always writes to the store and runs `AfterUpsert`, even when the
+incoming data is byte-identical to what is already stored. This is correct for most scenarios. When
+Lifecycle consumers perform expensive follow-up work, an unchanged re-crawl can create needless
+work. `UpsertIfChanged` compares first and enters the normal Upsert/Lifecycle path only when the model
+differs from its stored value.
+
+**Semantics:**
+- The current stored application value and caller's model are compared before Lifecycle.
+- If they are byte-identical, persistence and all Upsert Lifecycle phases are skipped; the method returns `false`.
+- If they differ, the normal canonical `Upsert` runs, including cancellation and all configured handlers.
+- If the entity is new (no prior exists), or if the serialization fails for any reason, the write always proceeds (safe fallback).
+- The method returns `true` when written, `false` when skipped.
+
+**Recipe:**
+
+```csharp
+// opt in -- call instead of Upsert when skipping no-op writes matters
+var written = await Article.UpsertIfChanged(article);
+if (written)
+{
+    // downstream events were fired, cache was invalidated, etc.
+}
+
+// partition-aware variant
+var written = await Article.UpsertIfChanged(article, tenantPartition);
+```
+
+**When to use:**
+- Crawlers or sync pipelines that re-emit every record even when unchanged.
+- Event-driven consumers where `AfterUpsert` triggers expensive fan-out (cache invalidation, notifications, indexing).
+- High-frequency polling loops where most updates are no-ops.
+
+**When NOT to use:**
+- When `AfterUpsert` must always fire regardless of content (e.g., heartbeat updates, explicit re-triggers).
+- When the entity has fields the serializer cannot capture faithfully (custom converters, computed properties set externally). In that case, `Upsert` is the safe default.
+
+**Cost:** `UpsertIfChanged` always loads the prior before deciding whether to enter Lifecycle and write.
+This is one extra read per call. On hot paths that almost always write, prefer `Upsert`.
+
+---
+
 ## Next Steps
 
-You've learned the fundamentals—from simple saves to production-scale streaming and transactions. Here's where to go next:
+You've learned the fundamentals—from simple saves to capability-qualified streaming and transactions.
+Here's where to go next:
 
 **Immediate next actions:**
 1. Try batch retrieval in your next API endpoint (replace loops with `Entity.Get(ids)`)
 2. Add Fast counts to your dashboard (see the 1000x speedup)
-3. Use streaming for your next large dataset export
+3. On a qualified adapter, stream the Entity source for your next large export
 
 **Explore related capabilities:**
 - **Semantic search?** → [AI & Vector How-To](ai-vector-howto.md) (embeddings, hybrid search)
@@ -1206,21 +1278,15 @@ You've learned the fundamentals—from simple saves to production-scale streamin
 - **Partial updates?** → [Patch Capabilities](patch-capabilities-howto.md) (RFC 6902, merge-patch)
 
 **Real-world examples:**
-- `samples/S5.Recs` - Media recommendation engine with vector search
-- `samples/guides/g1c1.GardenCoop` - Multi-tenant task management
-- `samples/S14.AdapterBench` - Performance benchmarks across adapters
+- `samples/journeys/GardenCoop/01-GardenJournal` - sensor binding and watering-reminder automation
+- `samples/journeys/GardenCoop/02-LocalDiscovery` - the same application plus local Entity embedding and vector search
 
 **Keep exploring:**
-- Combine Flow + Jobs with transfers for safe large-scale migrations
+- Combine provider-bounded Entity streams with durable Jobs for large migrations
 - Add lifecycle hooks to enforce business rules
 - Use context routing for multi-tenant isolation
 
 When in doubt, remember: Koan's entity-first patterns keep your code declarative, provider-agnostic, and ready to scale. Start simple, add complexity only when you need it.
 
-Happy building! 🚀
-
----
-
-**Last Validation:** 2025-11-09
-**Framework Version:** v0.6.3
-**Tested Against:** SQLite, PostgreSQL, MongoDB, Redis, InMemory adapters
+**Streaming validation:** SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB, and Couchbase qualify;
+InMemory, JSON, and Redis fail closed before query or yield.

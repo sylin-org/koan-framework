@@ -1,6 +1,7 @@
 using Koan.Core.Hosting.App;
 using Koan.Data.Core.Model;
-using Microsoft.Extensions.DependencyInjection;
+using Koan.Data.Core.Selection;
+using Koan.Jobs.Infrastructure;
 
 namespace Koan.Jobs;
 
@@ -9,9 +10,7 @@ namespace Koan.Jobs;
 internal static class JobAmbient
 {
     public static IJobCoordinator Coordinator =>
-        (AppHost.Current ?? throw new InvalidOperationException(
-            "The Koan host is not initialized; build the host (AddKoan) before submitting jobs."))
-        .GetRequiredService<IJobCoordinator>();
+        AppHost.GetRequiredService<IJobCoordinator>(Constants.Operations.Submit);
 }
 
 /// <summary>Instance job operations for one work-item: <c>model.Job.Submit(action)</c> / <c>.Cancel()</c> / <c>.Status()</c>.</summary>
@@ -37,14 +36,10 @@ public readonly struct JobOps<T> where T : Entity<T>, IKoanJob<T>
         => JobAmbient.Coordinator.StatusAsync(typeof(T).FullName!, _model.Id, ct);
 }
 
-/// <summary>Type-level job subsystem for a work-type: <c>MyModel.Jobs.Submit(list)</c> / <c>.Cancel(id)</c> /
-/// <c>.Status(id)</c> / <c>.Query(...)</c>.</summary>
+/// <summary>Type-level job subsystem for a work-type: <c>MyModel.Jobs.Trigger(action)</c> /
+/// <c>.Cancel(id)</c> / <c>.Status(id)</c> / <c>.Query(...)</c>.</summary>
 public readonly struct JobStatics<T> where T : Entity<T>, IKoanJob<T>
 {
-    /// <summary>Bulk-enqueue one action across many work-items.</summary>
-    public Task<int> Submit(IEnumerable<T> models, string action = "", CancellationToken ct = default)
-        => JobAmbient.Coordinator.SubmitManyAsync(models.Cast<object>(), action, null, ct);
-
     /// <summary>Trigger an action at the type level (no instance) — the on-demand twin of a scheduled tick. Runs
     /// against an auto-provisioned singleton; overlap coalesces when the type declares an idempotency key.</summary>
     public Task<JobHandle> Trigger(string action, CancellationToken ct = default)
@@ -67,7 +62,7 @@ public readonly struct JobStatics<T> where T : Entity<T>, IKoanJob<T>
         => JobAmbient.Coordinator.WhereAsync(new JobQuery(WorkType: typeof(T).FullName!, Status: status), ct);
 }
 
-/// <summary>The <c>.Job</c> (instance) / <c>.Jobs</c> (static) accessors and the batch <c>Submit</c>, delivered via
+/// <summary>The <c>.Job</c> (instance) / <c>.Jobs</c> (static) accessors and pointwise source <c>Submit</c>, delivered via
 /// C# 14 extension members — no source generator, no <c>partial</c> requirement (JOBS-0005 §12.14).</summary>
 public static class JobAccessorExtensions
 {
@@ -85,8 +80,22 @@ public static class JobAccessorExtensions
 
     extension<T>(IEnumerable<T> models) where T : Entity<T>, IKoanJob<T>
     {
-        /// <summary>Bulk-enqueue one action across this collection of work-items.</summary>
-        public Task<int> Submit(string action = "", CancellationToken ct = default)
-            => JobAmbient.Coordinator.SubmitManyAsync(models.Cast<object>(), action, null, ct);
+        /// <summary>
+        /// Submits one action for every Entity in this finite source and returns a fixed-size ledger-acceptance
+        /// summary. Source order and multiplicity are observed; declared idempotency may coalesce an item explicitly.
+        /// </summary>
+        public Task<JobSubmission> Submit(string action = "", CancellationToken ct = default)
+            => JobAmbient.Coordinator.SubmitSourceAsync(EntityCardinality.Many(models, ct), action, ct);
+    }
+
+    extension<T>(IAsyncEnumerable<T> models) where T : Entity<T>, IKoanJob<T>
+    {
+        /// <summary>
+        /// Submits one action for every Entity yielded by this lazy source with sequential backpressure and a
+        /// fixed-size ledger-acceptance summary. Streaming bounds producer memory, not ledger growth; model a
+        /// window as the job for very large sources.
+        /// </summary>
+        public Task<JobSubmission> Submit(string action = "", CancellationToken ct = default)
+            => JobAmbient.Coordinator.SubmitSourceAsync(EntityCardinality.Stream(models, ct), action, ct);
     }
 }

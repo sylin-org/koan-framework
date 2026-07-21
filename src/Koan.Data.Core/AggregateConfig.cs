@@ -17,15 +17,10 @@ public sealed class AggregateConfig<TEntity, TKey>
     {
         Provider = provider;
         Id = id;
-        _repo = new Lazy<IDataRepository<TEntity, TKey>>(() =>
-        {
-            var factories = sp.GetServices<IDataAdapterFactory>();
-            var factory = factories.FirstOrDefault(f => f.CanHandle(provider))
-                          ?? throw new InvalidOperationException($"No data adapter factory for provider '{provider}'");
-
-            var repo = factory.Create<TEntity, TKey>(sp);
-            var manager = sp.GetRequiredService<IAggregateIdentityManager>();
-            return new RepositoryFacade<TEntity, TKey>(repo, manager);
-        }, LazyThreadSafetyMode.ExecutionAndPublication);
+        // Compatibility surface, one execution owner: AggregateConfig no longer constructs a parallel,
+        // decorator-free repository graph. IDataService owns routing, decoration and the outer Data facade.
+        _repo = new Lazy<IDataRepository<TEntity, TKey>>(
+            () => sp.GetRequiredService<IDataService>().GetRepository<TEntity, TKey>(),
+            LazyThreadSafetyMode.ExecutionAndPublication);
     }
 }

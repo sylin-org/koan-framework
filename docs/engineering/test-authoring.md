@@ -1,166 +1,123 @@
-﻿---
+---
 type: ENGINEERING
 domain: engineering
 title: "Test authoring guidance"
 audience: [developers, maintainers]
 status: current
-last_updated: 2025-10-09
-framework_version: v0.6.3
+last_updated: 2026-07-15
+framework_version: v0.20.0
 validation:
-  status: drafted
-  scope: docs/engineering/test-authoring.md
+  status: verified
+  scope: tests/README.md and the three-ring execution policy
 ---
 
 # Test authoring guidance
 
-## Contract
-- **Scope**: Creating or migrating tests into the greenfield Koan testing platform located under `tests/`.
-- **Inputs**: Legacy coverage references (`tests.old`), suites described in [TEST-0002](../decisions/TEST-0002-test-parity-migration-roadmap.md), the shared `Koan.Testing` harness, and module-specific fixtures or seed packs.
-- **Outputs**: Spec projects that adhere to the TestPipeline workflow, live under the correct pillar directory, and register any new fixtures or seed data.
-- **Failure modes**: Suites landing outside the pillar structure, bypassing TestPipeline, duplicating fixtures, or omitting deterministic data and diagnostics.
-- **Success criteria**: Every new spec uses TestPipeline arrange/act/assert semantics, lives in `Suites/<Domain>/<Scope>/`, consumes shared fixtures instead of bespoke helpers, and ships with runnable instructions plus updated coverage status in TEST-0002.
+Koan tests use xUnit v3 directly. The former `TestPipeline`/`TestContext` DSL was removed by
+ARCH-0091; do not copy it from history or add general test-harness primitives to `Koan.Testing`.
+[`tests/README.md`](../../tests/README.md) is the detailed platform contract.
 
-## Pillar-first checklist
+## Choose the smallest truthful proof
 
-1. **Pick the target pillar** – Core → Data → Web → AI → Jobs → Storage → Media → Cache → Canon (follow TEST-0002 ordering before touching phase-two work).
-2. **Trace legacy coverage** – locate the original tests under `tests.old` and copy over only the behaviors the pillar still requires.
-3. **Select suite location** – `tests/Suites/<Pillar>/<Scope>/<ProjectName>/`.
-4. **Reference the harness** – add a project reference to `tests/Shared/Koan.Testing/Koan.Testing.csproj`.
-5. **Describe the suite** – create or update `testsuite.yaml` with lane, scope, module, and short description.
-6. **Implement specs** – build scenarios with `TestPipeline` plus shared fixtures; keep each spec self-validating.
-7. **Seed data** – store deterministic inputs in `tests/SeedPacks/` when scenarios require persisted artifacts.
-8. **Update documentation** – mark progress in [TEST-0002](../decisions/TEST-0002-test-parity-migration-roadmap.md) and add suite links to module README/TECHNICAL companions when relevant.
+- Use a unit test for a pure policy, parser, serializer, or deterministic algorithm.
+- Use `KoanIntegrationHost` when behavior depends on `AddKoan()`, discovery, DI, hosted services,
+  configuration, startup ordering, or an ambient `AppHost`.
+- Use `Koan.Testing.Containers` and the real provider fixture when claiming connector behavior.
+- Use `EntityConformanceSpecs<TEntity>` when an application or adapter should inherit Koan's common
+  entity behavior contract.
 
-## Directory structure
+Reference = Intent is a runtime property. A hand-built service provider cannot prove that a referenced
+module is discovered, ordered, started, and composed correctly.
 
-```
-/tests
-  Shared/Koan.Testing/        # Harness + fixtures
-  SeedPacks/<name>.json       # Deterministic inputs (optional)
-  Suites/
-    <Pillar>/
-      <Scope>/                # e.g., Unit, Integration, Connector.SqlServer
-        <ProjectName>/
-          Specs/<Feature>/    # Group specs by behavior not layer
-          testsuite.yaml
-          GlobalUsings.cs
-```
+## Use three validation rings
 
-- **Scope naming**: Use `Unit`, `Integration`, `Connector.<Provider>`, or domain-specific slices (`Core`, `Api`) to match the parity roadmap.
-- **Project name**: Prefer `Koan.Tests.<Domain>.<Scope>` for consistency. Sample-specific suites follow `S<num>.<Name>` conventions.
+Validation cost must match the decision being made. Do not use release certification as the normal
+development loop.
 
-## Implementing specs
+1. **Change ring — seconds.** Run the directly affected facts and owning project. This is the default
+   after an implementation step.
+2. **Capability ring — bounded minutes.** Run the smallest consumer/provider matrix that proves an
+   architectural or cross-package claim. Name the matrix before running it; unrelated providers do not
+   join merely because they exist in the solution.
+3. **Certification ring — tranche or release boundary.** Run `Koan.sln` and the exact green ratchet only
+   when closing a major work item, preparing a merge/release, or when explicitly requested. Record one
+   red certification result and return to focused diagnosis; do not repeatedly pay the complete gate
+   while developing unrelated repairs.
 
-- **Always use `TestPipeline`**: Arrange via `.UsingServiceProvider()` or fixtures, Act through asynchronous delegates, and assert with the provided context. Avoid inline `new TestContext()` calls.
-- **Pass the suite’s `ITestOutputHelper`** so failures surface contextual logs.
-- **Leverage shared fixtures**: Docker, Redis, Postgres, and Mongo helpers already exist under `tests/Shared/Koan.Testing/Infrastructure`; reuse them rather than spinning new containers manually.
-- **Reset framework caches**: When specs mutate entity metadata (events, adapters, partitions), call the provided hooks (`EntityEventTestHooks.Reset<TEntity, TKey>()`, `TestHooks.ResetDataConfigs()`) during Arrange to prevent cross-test leakage.
-- **Stream and pagination defaults**: Honor data access guardrails—use `Entity<T>.AllStream(...)` or paging helpers in data-heavy specs.
-- **No hard sleeps**: When timing matters, drive time through harness abstractions (e.g., inject clock services or expose purge timestamps) instead of `Task.Delay`.
-- **Validate deterministic outputs**: When the spec relies on generated IDs, capture them from events or metadata before assertions so tests stay stable.
+A larger ring complements the smaller evidence; it does not replace judgment about the current change.
+When certification is red, isolate each reported owner first. Rerun the complete certification only
+after those owners have changed or the certification topology itself has been repaired.
 
-### Sample pattern
+## Place and shape the suite
 
-```csharp
-[Fact]
-public Task Some_behavior()
-    => TestPipeline.For<MySpec>(_output, nameof(Some_behavior))
-        .UsingServiceProvider("services", ConfigureServices)
-        .Arrange(ctx =>
-        {
-            using var scope = ctx.CreateServiceScope("services");
-            ctx.SetItem("runtime", scope.ServiceProvider.GetRequiredService<IMyRuntime>());
-        })
-        .Act(async ctx =>
-        {
-            var runtime = ctx.GetRequiredItem<IMyRuntime>("runtime");
-            var result = await runtime.ExecuteAsync(ctx.Cancellation);
-            ctx.SetItem("result", result);
-        })
-        .Assert(ctx =>
-        {
-            var result = ctx.GetRequiredItem<MyResult>("result");
-            result.Status.Should().Be(MyStatus.Success);
-            return ValueTask.CompletedTask;
-        })
-        .RunAsync();
-```
+1. Put it under `tests/Suites/<Domain>/<Scope>/<ProjectName>/`, mirroring the source module.
+2. Use the repository's xUnit v3 package versions and `<OutputType>Exe</OutputType>`.
+3. Serialize suites that intentionally rely on one process-default Koan host. When facts can nest or
+   overlap hosts, select the owned provider with `AppHost.PushScope` for each complete operation.
+4. Keep behavior-focused specs under `Specs/<Feature>/`.
+5. Reuse seed packs from `tests/SeedPacks` and fixtures from `Koan.Testing.Containers`.
+6. Add the project to `Koan.sln` unless it is an explicitly documented bounded infrastructure lane.
 
-### Resolver + discovery scenarios
-
-- **Contract**
-  - **Inputs**: Discovery target assemblies (for example `Koan.Cache.Adapter.*`), the resolver under test, and a suite that already references the concrete adapter packages.
-  - **Outputs**: Deterministic assertions proving the resolver locates known registrars, rejects unknown adapters, and tolerates mixed casing.
-  - **Failure modes**: Forgetting to reference adapter assemblies (registrars never load), omitting an explicit `typeof(SomeRegistrar)` to trigger JIT loading, or skipping negative-path coverage.
-  - **Success criteria**: Each resolver spec primes assemblies explicitly, verifies happy + error paths, and exercises case-insensitive lookup semantics.
-
-- **Prime discovery explicitly**: Call `_ = typeof(MyAdapterRegistrar);` inside the spec before resolving to make sure trim/linker friendly builds don’t skip static constructors.
-- **Reference every adapter package**: The spec project (`*.csproj`) must include `ProjectReference` entries for each adapter you expect the resolver to discover; otherwise DependencyContext won’t surface them.
-- **Cover the edges**:
-  - Success for each in-box adapter (`memory`, `redis`, etc.).
-  - Case variance (`"MeMoRy"`) to enforce ordinal-insensitive behavior.
-  - Unknown adapter names throwing `InvalidOperationException` with the canonical message.
-- **Keep specs short**: Use the standard `TestPipeline` harness with `.Assert(...)` and return `ValueTask.CompletedTask` so resolver tests run instantly without external fixtures.
+## Canonical integration shape
 
 ```csharp
-[Fact]
-public Task Resolve_returns_redis_registrar()
-    => TestPipeline.For<CacheAdapterResolverSpec>(_output, nameof(Resolve_returns_redis_registrar))
-        .Assert(_ =>
-        {
-            _ = typeof(RedisCacheAdapterRegistrar);
+public sealed class RuntimeFactsSpec
+{
+    [Fact]
+    public async Task Referenced_modules_compose_through_the_real_host()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var host = await KoanIntegrationHost.Configure()
+            .WithEnvironment("Test")
+            .ConfigureServices(services => services.AddKoan())
+            .StartAsync(ct);
 
-            var registrar = CacheAdapterResolver.Resolve("redis");
-            registrar.Should().BeOfType<RedisCacheAdapterRegistrar>();
-            return ValueTask.CompletedTask;
-        })
-        .RunAsync();
+        var runtime = host.Services.GetRequiredService<IKoanRuntimeFacts>();
+        Assert.True(runtime.Current.Complete);
+    }
+}
 ```
 
-## Guardrails for new fixtures
+For a provider suite, derive from `KoanDataSpec<TFixture>` or use the documented class fixture. Skip
+with the fixture's concrete reason when infrastructure is unavailable; never turn missing Docker into
+a false pass.
 
-- Place reusable fixtures under `tests/Shared/Koan.Testing/Fixtures` and expose convenience extensions in `Pipeline/` to keep spec bodies terse.
-- Document required environment variables in the fixture summary and ensure they respect Docker probe fallbacks (see `DockerEnvironment`).
-- Reject fixtures that duplicate framework services—prefer registering actual module services and exercising real pipelines.
+## Reliability rules
 
-### Data core runtime fixture
+- Use `TestContext.Current.CancellationToken` and bounded polling; avoid unbounded waits and hard sleeps.
+- Treat fixture lifetime and ambient host selection as separate concerns. A stopped or failed newer
+  host correctly does not resurrect an earlier process default; scope fixture-owned Entity work to
+  `fixture.Services` instead of assigning `AppHost.Current`.
+- Give every execution an isolated partition, database, port, or temporary root as appropriate.
+- Assert the user-visible contract and the failure message, not private implementation structure.
+- Keep environment-dependent facts explicit. Unknown or unavailable is not success.
+- When a test changes composition or startup behavior, update `docs/SURFACES.md` with its guard.
+- Do not weaken a suite to accommodate a connector. State and test the connector's capability boundary.
 
-- Use `DataCoreRuntimeFixture` (under `tests/Suites/Data/Core/Koan.Tests.Data.Core/Support`) when a suite needs a fully wired `Koan.Data` runtime with file-backed JSON storage, optional SQLite, and temp root isolation.
-- Acquire it via `TestPipeline.For(...).Using<DataCoreRuntimeFixture>(...)`, then call `BindHost()` before asserting behaviors that rely on ambient `AppHost.Current`.
-- Dispose partitions through the provided `UsePartition` lease to guarantee clean teardown and temp directory cleanup.
+## Run it
 
-## Validation workflow
+```powershell
+dotnet test tests/Suites/<Domain>/<Scope>/<ProjectName>/<ProjectName>.csproj -c Release
+# Certification boundary only:
+dotnet test Koan.sln -c Release
+```
 
-1. Run the consolidated solution tests when possible:
+Bootstrap infrastructure has a separate bounded runner because loading its test assembly can start
+expensive fixtures even when facts are filtered:
 
-  ```pwsh
-  dotnet test Koan.sln
-  ```
+```powershell
+./scripts/test-bootstrap.ps1 -Lane All
+```
 
-2. Run the suite locally:
+## Review checklist
 
-   ```pwsh
-   dotnet test tests/Suites/<Pillar>/<Scope>/<ProjectName>/<ProjectName>.csproj
-   ```
+- Does the proof exercise the layer named by the claim?
+- Does it boot real Koan when composition matters?
+- Does it isolate shared state and fail with useful diagnostics?
+- Is external infrastructure either real or explicitly skipped?
+- Is the project discoverable from the solution or its documented bounded runner?
+- Did the public capability or surface ledger change with the behavior?
 
-3. If the suite has integration dependencies (Docker, external services), run with diagnostics enabled:
-
-   ```pwsh
-   dotnet test tests/Suites/<Pillar>/<Scope>/<ProjectName>/<ProjectName>.csproj --logger "trx;LogFileName=TestResults.trx"
-   ```
-
-4. For documentation updates, execute `scripts/build-docs.ps1 -Strict` to keep references valid.
-
-Capture results in commit messages or PR descriptions so reviewers see the validation evidence.
-
-## Reporting progress
-
-- Update the checklist in [TEST-0002](../decisions/TEST-0002-test-parity-migration-roadmap.md) when a suite lands, including PR numbers or known follow-ups.
-- If a task blocks on missing fixtures or ADR decisions, annotate with `[#issue-id blocked: reason]` inside the ADR checklist.
-- Retire legacy projects only after the parity checklist item closes and CI proves the replacement suite passes consistently.
-
-## Related references
-
-- [TEST-0001 Koan testing platform realignment](../decisions/TEST-0001-koan-testing-platform.md)
-- [TEST-0002 Test parity migration roadmap](../decisions/TEST-0002-test-parity-migration-roadmap.md)
-- [ADR directory](../decisions/index.md)
+Related: [ARCH-0079](../decisions/ARCH-0079-integration-tests-as-canon.md),
+[ARCH-0091](../decisions/ARCH-0091-integration-test-harness-redesign.md), and
+[`tests/README.md`](../../tests/README.md).

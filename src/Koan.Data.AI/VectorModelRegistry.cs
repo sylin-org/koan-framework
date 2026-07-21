@@ -4,9 +4,9 @@ namespace Koan.Data.AI;
 
 /// <summary>
 /// Durable, per-(entity, partition) record of which embedding model(s) have produced the vectors in
-/// an index (AI-0036 P2 / W4 follow-up). It is the write-time, O(1), never-stale backing the
+/// an index (AI-0036 P2 / W4 follow-up). It is the durable, O(1) backing the
 /// <see cref="VectorModelGuard"/> hard throw needs: maintained incrementally as vectors are written
-/// (one tiny record per entity+partition), so the guard reads it in O(1) instead of scanning
+/// (one tiny record per entity+partition), so each guard reads it instead of scanning
 /// <see cref="EmbeddingState{TEntity}"/>.
 /// </summary>
 /// <remarks>

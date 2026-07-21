@@ -256,3 +256,92 @@ auto-registration. Order honours `IOrderedHook.Order` as today.
   `[StringQueryable]`-marked properties) once a real downstream case appears.
 - Cover predicate AND-composition, hook+`?filter=` interaction, pagination correctness with
   hooks, and the `Q`-drop-with-warning path in the adapter surface test suite.
+
+## Amendment 2026-06-14: keyed get-by-id honors the same predicates
+
+The original decision scoped composition to the *collection* read paths (`QueryCollection`,
+`QueryCollectionFromBody`). The keyed `GetById` path was left fetching by id with a raw
+`Data<TEntity, TKey>.Get(id)` and never ran `BuildOptions`, so `QueryOptions.Predicates` was empty
+and never applied. That is a **row-level visibility bypass**: a row a hook filters out of every
+listing (multi-tenant scope, published-only, soft-delete) is still returned by id. The first
+real-world hit was a public read-only MCP surface where `get-by-id` returned Suppressed/Draft rows
+the collection tool correctly hid (MCP routes get-by-id through `IEntityEndpointService.GetById`).
+
+**Resolution.** `EntityEndpointService.GetById` now runs `BuildOptions` (so `IRequestOptionsHook`
+contributions populate) and evaluates every contributed predicate against the fetched model
+(`PassesRequestPredicates`). A row that fails any predicate returns the same `NotFound` as a missing
+row — existence is never revealed to a caller the hook excludes. The relationship-expansion branch
+(`?with=all`) is gated before it runs, so it is not a second bypass.
+
+Predicates are evaluated by **compiling the `Expression<Func<TEntity, bool>>` the developer wrote and
+invoking it** against the single in-memory model, rather than lowering to the `Filter` AST the
+collection path pushes down. For a security gate the literal predicate is the ground truth of intent
+and avoids any lowering-divergence between the keyed and collection paths failing *open*. The
+type-mismatch guard mirrors `QueryFilterComposer` so a mistyped predicate fails identically on both
+paths.
+
+**Scope boundary (deliberate).** `IRequestOptionsHook` is a *read-options* hook; this gate applies to
+the read paths (`GetCollection`, `Query`, `GetById`). It does **not** extend to the write paths
+(`Delete`, `Patch`, `Upsert`), which read a row internally before mutating it. Governing *write*
+authorization by read-visibility predicates would be a semantic expansion that surprises apps which
+hide a row from listings yet still allow its owner to mutate it via a separate auth path. Write
+authorization remains the job of `IAuthorizeHook` / `IModelHook`. Apps that intentionally want
+any-status get-by-id simply register no visibility hook (or use an admin context that contributes no
+predicate) — the gate is a no-op when `Predicates` is empty, so non-protected entities are unaffected.
+
+Coverage: `GetByIdVisibilitySpecs` in the adapter-surface InMemory suite (anonymous/owner/admin
+matrix, hidden-never-surfaces, owner-vs-other draft, `?with=all` gating).
+
+### GraphQL connector parity
+
+The GraphQL connector (`Koan.Web.Connector.GraphQl`) hand-rolls its entity resolvers instead of
+routing through `IEntityEndpointService`, and never implemented WEB-0068: its `GetById` did not run
+`BuildOptions` at all, and its collection `GetItems` ran `BuildOptions` but then discarded
+`opts.Predicates` when building the query — so the connector leaked hidden rows on **both** read
+paths. Both are now fixed to mirror `EntityEndpointService`: `GetItems` AND-composes predicates via
+`QueryFilterComposer.AndAll` (exposed to the connector via `InternalsVisibleTo`), and `GetById` runs
+`BuildOptions` then gates with the same `PassesRequestPredicates` logic, returning `null` (GraphQL's
+not-found) for a filtered row.
+
+Status caveat (honesty rule): the GraphQL connector currently has **no integration test project**
+(`unknown since 2026-06-14` — the `Koan.Web.Connector.GraphQl.Tests` / `S4.Web.IntegrationTests`
+references in `InternalsVisibleTo` point at projects that no longer exist). The fix mirrors the
+tested REST/MCP logic, but a GraphQL ARCH-0079 harness is an outstanding follow-up. The durable fix
+is to route the GraphQL resolvers through `IEntityEndpointService` so they stop drifting from the
+canonical read pipeline.
+
+## Amendment 2026-06-19: relationship expansion (`?with=all`) is governed per related type (AN-leak)
+
+The keyed-read amendment gated the *root* row before the expansion branch ran, but the expansion
+itself was still app-authority: `EntityEndpointService` called the raw `Entity<T,K>.Relatives()`
+loaders, which fetch related rows via `Data<TChild,TKey>.All()` and filter by foreign key in-memory
+with **no request predicates**. That is a second row-level visibility bypass — a caller reads a
+*visible* parent, expands with `?with=all` (REST) or `with: "all"` (MCP), and receives related rows a
+direct query of that type would hide. MCP amplifies it: the agent cannot distinguish "forbidden to
+see" from "doesn't exist." The original report (docs/assessment/09 §10) confirmed it first-hand: a
+visible `Maker` expanded out its Draft `Work` children, and a visible `Work` expanded out a hidden
+parent `Maker`.
+
+**Resolution.** A new internal `GovernedRelationshipExpander` (in `Koan.Web`) resolves each edge as a
+*governed* query through the related type's own visibility pipeline. For each relationship it runs the
+related type's `IRequestOptionsHook`s for the same request (principal + headers), AND-composes the
+contributed predicates with the foreign-key filter via `QueryFilterComposer`/`LinqFilterCompiler`, and
+pushes the whole thing down to the adapter — fixing the leak **and** the `All()`+in-memory N-load. An
+edge inherits its resolved query's projection: a child edge that resolves to zero visible rows is
+omitted entirely (no empty-but-present edge that would leak the relationship), and a walled or missing
+parent is omitted. Walled-means-silent — no count, no field name, no existence signal. Both expansion
+entry points are fixed (GetById and the collection `EnrichRelationships`). MCP rides the same
+`IEntityEndpointService`, so the endpoint fix covers every transport — the governance is **not**
+duplicated in the transport.
+
+**Scope boundary (deliberate).** The domain traversal API `Entity<T,K>.GetChildren()/GetParents()/
+Relatives()` stays **app-authority** — service code (no HTTP principal) still sees all
+related rows. Request predicates never leak into `Koan.Data.Core`; the clamp lives entirely at the
+`Koan.Web` endpoint layer, where the request context and each related type's hooks exist.
+
+Coverage: `RelationshipExpansionVisibilitySpecs` in the adapter-surface InMemory suite (T1
+lateral-movement tunnel, T2 divergent edges to the same target with asymmetric disclosure, T-parent
+walled-parent omission, T-app-authority the domain API stays app-authority) and
+`RelationshipVisibilityMcpSpec` (the MCP `get-by-id` `with: "all"` path) — the latter through the new
+reusable `Koan.Mcp.TestKit` harness. Mutation-verified (dropping the predicates reverts the leak and
+fails the specs).

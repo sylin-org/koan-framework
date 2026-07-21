@@ -1,5 +1,6 @@
 using Koan.Jobs;
 using Koan.Jobs.TestKit;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Koan.Jobs.Adapter.Postgres.Tests;
@@ -10,6 +11,6 @@ public sealed class PostgresBehaviors : JobBehaviorSuite, IClassFixture<Postgres
     private readonly PostgresJobsFixture _fx;
     public PostgresBehaviors(PostgresJobsFixture fx) => _fx = fx;
 
-    protected override Task<JobsHarness> CreateHostAsync(Action<JobsOptions>? configure = null)
-        => JobsHarness.StartWithSettingsAsync(_fx.Settings, configure);
+    protected override Task<JobsHarness> CreateHostAsync(Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
+        => JobsHarness.StartWithSettingsAsync(_fx.Settings, configure, configureServices);
 }

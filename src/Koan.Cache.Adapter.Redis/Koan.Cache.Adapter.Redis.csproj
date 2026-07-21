@@ -1,24 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Koan.Cache.Adapter.Redis</AssemblyName>
     <RootNamespace>Koan.Cache.Adapter.Redis</RootNamespace>
-    <Description>Redis-backed L2 cache store for Koan.Cache. Provides distributed cache storage and Redis pub/sub coherence channel via Koan.Data.Connector.Redis's shared IConnectionMultiplexer (ARCH-0080).</Description>
+    <Description>Redis-backed Remote Cache and layered every-node invalidation, using Koan's shared Redis backend without activating Data.</Description>
     <PackageTags>$(CommonPackageTags);cache;adapter;redis;l2;coherence</PackageTags>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Koan.Cache\Koan.Cache.csproj" />
+    <ProjectReference Include="..\Koan.Cache\Koan.Cache.csproj"
+                      />
     <ProjectReference Include="..\Koan.Cache.Abstractions\Koan.Cache.Abstractions.csproj" />
-    <ProjectReference Include="..\Connectors\Data\Redis\Koan.Data.Connector.Redis.csproj" />
-    <!-- Analyzer-only reference (KOAN0001): flags bare TryAddEnumerable on cache interfaces. -->
-    <ProjectReference Include="..\Koan.Cache.Analyzers\Koan.Cache.Analyzers.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
+    <ProjectReference Include="..\Koan.Communication\Koan.Communication.csproj"
+                      />
+    <ProjectReference Include="..\Koan.Redis.Abstractions\Koan.Redis.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Redis\Koan.Redis.csproj" />
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="StackExchange.Redis" />
   </ItemGroup>
 </Project>

@@ -1,296 +1,133 @@
 ---
 type: REFERENCE
 domain: storage
-title: "Storage Pillar Reference"
+title: "Storage reference"
 audience: [developers, architects, ai-agents]
-last_updated: 2025-01-17
-framework_version: v0.6.3
+last_updated: 2026-07-17
+framework_version: v0.20.0
 status: current
 validation:
-  date_last_tested: 2025-01-17
+  date_last_tested: 2026-07-17
   status: verified
-  scope: docs/reference/storage/index.md
+  scope: Storage runtime, contracts, Local/S3 providers, routing tests, and tenant-isolation proof
 ---
 
-# Storage Pillar Reference
+# Storage reference
 
-**Document Type**: REFERENCE
-**Target Audience**: Developers, Architects
-**Last Updated**: 2025-01-17
-**Framework Version**: v0.6.3
+Use Storage when an Entity owns or describes bytes that must live behind a logical profile rather than a vendor API.
+The common path is model-first; `IStorageService` remains the deliberate infrastructure escape hatch.
 
----
+## Start with local storage
 
-## Installation
-
-```bash
-dotnet add package Koan.Storage
-dotnet add package Koan.Web.Storage
+```powershell
+dotnet add package Sylin.Koan.Storage.Connector.Local
 ```
-
-```csharp
-// Program.cs
-builder.Services.AddKoan();
-```
-
-## Storage Objects
-
-### Basic Storage Entity
-
-```csharp
-public class Document : Entity<Document>, IStorageObject
-{
-    public string FileName { get; set; } = "";
-    public string ContentType { get; set; } = "";
-    public long Size { get; set; }
-    public string ContentHash { get; set; } = "";
-    public string ProfileName { get; set; } = "";
-    public string ProviderKey { get; set; } = "";
-    public string BlobKey { get; set; } = "";
-    public string[] Tags { get; set; } = [];
-    public Dictionary<string, string> CustomMetadata { get; set; } = new();
-}
-```
-
-### File Upload
-
-```csharp
-[Route("api/[controller]")]
-public class DocumentsController : StorageController<Document>
-{
-    // Inherits storage operations:
-    // POST /api/documents - upload file
-    // GET /api/documents/{id} - get metadata
-    // GET /api/documents/{id}/content - download file
-    // DELETE /api/documents/{id} - delete file
-}
-```
-
-### Custom Upload Endpoint
-
-```csharp
-[Route("api/[controller]")]
-public class FilesController : ControllerBase
-{
-    private readonly IStorageService _storage;
-
-    [HttpPost("upload")]
-    public async Task<IActionResult> Upload(IFormFile file, [FromQuery] string? profile = null)
-    {
-        var storageObject = new Document
-        {
-            FileName = file.FileName,
-            ContentType = file.ContentType,
-            Size = file.Length,
-            Tags = ["uploaded", "user-content"]
-        };
-
-        using var stream = file.OpenReadStream();
-        var result = await _storage.SaveAsync(storageObject, stream, profile);
-
-        return CreatedAtAction(nameof(Get), new { id = result.Id }, result);
-    }
-
-    [HttpGet("{id}")]
-    public async Task<IActionResult> Get(string id)
-    {
-  var document = await Document.Get(id);
-        return document == null ? NotFound() : Ok(document);
-    }
-
-    [HttpGet("{id}/download")]
-    public async Task<IActionResult> Download(string id)
-    {
-  var document = await Document.Get(id);
-        if (document == null) return NotFound();
-
-        var stream = await _storage.OpenAsync(document);
-        return File(stream, document.ContentType, document.FileName);
-    }
-}
-```
-
-## Storage Helpers
-
-### Create Files
-
-```csharp
-public class FileService
-{
-    private readonly IStorageService _storage;
-
-    // Create text file
-    public async Task<Document> CreateTextFile(string content, string fileName)
-    {
-        var document = await _storage.CreateTextFile(
-            key: $"texts/{fileName}",
-            content: content,
-            contentType: "text/plain"
-        );
-
-        return document;
-    }
-
-    // Create JSON file
-    public async Task<Document> CreateJsonFile(object data, string fileName)
-    {
-        var document = await _storage.CreateJson(
-            key: $"data/{fileName}",
-            value: data,
-            profile: "api-data"
-        );
-
-        return document;
-    }
-
-    // Upload from stream
-    public async Task<Document> UploadFile(Stream stream, string fileName, string contentType)
-    {
-        var document = await _storage.Onboard(
-            key: $"uploads/{fileName}",
-            stream: stream,
-            contentType: contentType
-        );
-
-        return document;
-    }
-}
-```
-
-### Read Files
-
-```csharp
-public class DocumentReader
-{
-    private readonly IStorageService _storage;
-
-    // Read as text
-    public async Task<string> ReadTextFile(string profile, string container, string key)
-    {
-        return await _storage.ReadAllText(profile, container, key);
-    }
-
-    // Read as bytes
-    public async Task<byte[]> ReadBinaryFile(string profile, string container, string key)
-    {
-        return await _storage.ReadAllBytes(profile, container, key);
-    }
-
-    // Read range
-    public async Task<string> ReadPartialFile(string profile, string container, string key, int start, int end)
-    {
-        return await _storage.ReadRangeAsString(profile, container, key, start, end);
-    }
-
-    // Check existence
-    public async Task<bool> FileExists(string profile, string container, string key)
-    {
-        return await _storage.ExistsAsync(profile, container, key);
-    }
-}
-```
-
-## Configuration
-
-### Single Profile (Development)
 
 ```json
 {
   "Koan": {
     "Storage": {
-      "DefaultProfile": "local",
       "Profiles": {
-        "local": {
-          "Provider": "local",
-          "Container": "files",
-          "BasePath": "./storage"
-        }
-      }
-    }
-  }
-}
-```
-
-### Multiple Profiles with Rules
-
-```json
-{
-  "Koan": {
-    "Storage": {
-      "DefaultProfile": "standard",
-      "Profiles": {
-        "standard": {
-          "Provider": "local",
-          "Container": "files",
-          "BasePath": "./storage/standard",
-          "Audit": true
-        },
-        "secure": {
-          "Provider": "local",
-          "Container": "secure",
-          "BasePath": "./storage/secure",
-          "Audit": true,
-          "Encryption": true
-        },
-        "temp": {
-          "Provider": "local",
-          "Container": "temp",
-          "BasePath": "./storage/temp",
-          "Audit": false,
-          "Retention": "7.00:00:00"
-        }
+        "main": { "Container": "files" }
       },
-      "Rules": [
-        {
-          "When": {
-            "TagsAny": ["secure", "confidential"]
-          },
-          "Use": "secure"
-        },
-        {
-          "When": {
-            "TagsAny": ["temp", "cache"]
-          },
-          "Use": "temp"
-        },
-        {
-          "Default": true,
-          "Use": "standard"
-        }
-      ]
+      "Providers": {
+        "Local": { "BasePath": ".koan/storage" }
+      }
     }
   }
 }
 ```
 
-### Environment Variables
+```csharp
+using Koan.Storage;
+using Koan.Storage.Model;
 
-```bash
-# Default profile
-Koan__Storage__DefaultProfile=production
+[StorageBinding("main")]
+public sealed class Document : StorageEntity<Document> { }
 
-# Profile configuration
-Koan__Storage__Profiles__production__Provider=s3
-Koan__Storage__Profiles__production__Container=prod-bucket
-Koan__Storage__Profiles__production__BasePath=files/
+var document = await Document.CreateTextFile("readme.txt", "Hello");
+var text = await document.ReadAllText();
 ```
 
-## Storage Providers
+The application still boots through its existing `builder.Services.AddKoan()` call. The connector reference supplies
+both the provider and Storage runtime; do not add a second registration path.
 
-### Local Provider
+## Entity operations
+
+`StorageEntity<TEntity>` supplies the common lifecycle:
 
 ```csharp
-// Local file system storage
+var binary = await Document.Create("report.pdf", bytes, "application/pdf");
+var streamed = await Document.Onboard("video.mp4", upload, "video/mp4");
+
+await using var full = await streamed.OpenRead();
+var (range, length) = await streamed.OpenReadRange(0, 1023);
+var stat = await streamed.Head();
+var exists = await Document.Head("video.mp4") is not null;
+await streamed.Delete();
+```
+
+Persist the returned Entity with `.Save()` when the application needs a durable metadata row. Blob bytes and Entity
+metadata are separate resources; Koan does not claim one transaction across both.
+
+Tiering remains business-readable when the target is another bound model:
+
+```csharp
+[StorageBinding("archive", "documents")]
+public sealed class ArchivedDocument : StorageEntity<ArchivedDocument> { }
+
+var copy = await document.CopyTo<ArchivedDocument>();
+var moved = await document.MoveTo<ArchivedDocument>();
+```
+
+## Configure profiles
+
+Each profile accepts:
+
+| Setting | Meaning |
+|---|---|
+| `Container` | Required logical backend container/bucket. |
+| `Provider` | Optional exact provider identity. Exact means required. |
+| `Mode` | Optional `Local`, `Remote`, or `Replicated` topology requirement. |
+| `LocalCache` | Cache quota/watermark settings for a replicated route. |
+
+At the Storage root, `DefaultProfile` selects the implicit route when several profiles exist. A sole profile becomes
+the default automatically. With several profiles and no default, explicit bindings and service calls work; an
+unqualified operation fails with the available correction.
+
+Provider settings live under `Koan:Storage:Providers:<Provider>` rather than inside every profile. One provider can
+serve several logical profiles/containers.
+
+## Understand provider election
+
+Storage compiles one route per profile during host composition:
+
+1. An exact `Provider` pin is selected or rejected.
+2. Otherwise `Mode` filters candidates by their declared `StorageProviderPlacement`.
+3. Higher `[ProviderPriority]` wins within a placement; stable identity breaks ties.
+4. `Mode: Replicated` requires both Local and Remote.
+5. With no mode, one placement is used directly; Local + Remote composes the replicated provider.
+
+This decision does not run again for every blob operation. Startup facts and the lockfile project the resulting
+election and unified `StorageCaps` tokens.
+
+## Use S3
+
+```powershell
+dotnet add package Sylin.Koan.Storage.Connector.S3
+```
+
+```json
 {
   "Koan": {
     "Storage": {
       "Profiles": {
-        "local": {
-          "Provider": "local",
-          "Container": "documents",
-          "BasePath": "C:/Storage",
-          "Shard": "hash2", // Directory sharding strategy
-          "AuditEnabled": true
+        "archive": { "Provider": "s3", "Container": "documents" }
+      },
+      "Providers": {
+        "S3": {
+          "Endpoint": "http://localhost:9000",
+          "Region": "us-east-1"
         }
       }
     }
@@ -298,402 +135,38 @@ Koan__Storage__Profiles__production__BasePath=files/
 }
 ```
 
-### Cloud Providers (Future)
+If the functional Zen Garden module is active and bound, S3 can discover a storage replica when `Endpoint` is absent.
+The contracts dependency alone is inert. Presigning specifically requires a Moss endpoint; it is not generic
+client-side S3 signing. Supply credentials with `Koan__Storage__Providers__S3__AccessKey` and
+`Koan__Storage__Providers__S3__SecretKey` or another .NET configuration provider.
+
+## Use the service boundary
+
+Inject `IStorageService` for multi-model workflows:
 
 ```csharp
-// S3-compatible storage
+public sealed class ExportWriter(IStorageService storage)
 {
-  "Koan": {
-    "Storage": {
-      "Profiles": {
-        "s3": {
-          "Provider": "s3",
-          "Container": "my-bucket",
-          "Region": "us-east-1",
-          "AccessKey": "{S3_ACCESS_KEY}",
-          "SecretKey": "{S3_SECRET_KEY}"
-        }
-      }
-    }
-  }
-}
-
-// Azure Blob Storage
-{
-  "Koan": {
-    "Storage": {
-      "Profiles": {
-        "azure": {
-          "Provider": "azure",
-          "Container": "documents",
-          "ConnectionString": "{AZURE_STORAGE_CONNECTION_STRING}"
-        }
-      }
-    }
-  }
+    public Task<StorageObject> Write(string key, Stream content, CancellationToken ct)
+        => storage.Put("exports", "exports", key, content, "application/zip", ct);
 }
 ```
 
-## Pipeline Steps
-
-### Content Validation
-
-```csharp
-public class ContentValidationStep : IStoragePipelineStep
-{
-    public async Task<StoragePipelineOutcome> OnReceiveAsync(StoragePipelineContext context)
-    {
-        // Validate file size
-        if (context.Size > 10 * 1024 * 1024) // 10MB
-        {
-            return StoragePipelineOutcome.Stop("File too large");
-        }
-
-        // Validate content type
-        var allowedTypes = new[] { "image/jpeg", "image/png", "application/pdf", "text/plain" };
-        if (!allowedTypes.Contains(context.ContentType))
-        {
-            return StoragePipelineOutcome.Stop("Invalid content type");
-        }
-
-        return StoragePipelineOutcome.Continue;
-    }
-
-    public async Task<StoragePipelineOutcome> OnCommitAsync(StoragePipelineContext context)
-    {
-        // Additional validation after storage
-        if (context.ContentHash != context.ExpectedHash)
-        {
-            return StoragePipelineOutcome.Quarantine("Hash mismatch detected");
-        }
-
-        return StoragePipelineOutcome.Continue;
-    }
-}
-```
-
-### Virus Scanning
-
-```csharp
-public class VirusScanStep : IStoragePipelineStep
-{
-    private readonly IVirusScanner _scanner;
-
-    public async Task<StoragePipelineOutcome> OnReceiveAsync(StoragePipelineContext context)
-    {
-        // Scan during upload
-        var scanResult = await _scanner.ScanStreamAsync(context.Stream);
-
-        if (scanResult.IsInfected)
-        {
-            return StoragePipelineOutcome.Quarantine($"Virus detected: {scanResult.ThreatName}");
-        }
-
-        return StoragePipelineOutcome.Continue;
-    }
-
-    public Task<StoragePipelineOutcome> OnCommitAsync(StoragePipelineContext context)
-    {
-        // No action needed on commit
-        return Task.FromResult(StoragePipelineOutcome.Continue);
-    }
-}
-```
-
-### Image Processing
-
-```csharp
-public class ImageProcessingStep : IStoragePipelineStep
-{
-    public async Task<StoragePipelineOutcome> OnReceiveAsync(StoragePipelineContext context)
-    {
-        if (!context.ContentType.StartsWith("image/"))
-        {
-            return StoragePipelineOutcome.Continue; // Skip non-images
-        }
-
-        // Generate thumbnail
-        using var image = await Image.LoadAsync(context.Stream);
-        using var thumbnail = image.Clone(x => x.Resize(new ResizeOptions
-        {
-            Size = new Size(200, 200),
-            Mode = ResizeMode.Max
-        }));
-
-        // Store thumbnail with modified metadata
-        var thumbnailKey = $"thumbnails/{Path.GetFileNameWithoutExtension(context.Key)}_thumb.jpg";
-        context.CustomMetadata["ThumbnailKey"] = thumbnailKey;
-
-        return StoragePipelineOutcome.Continue;
-    }
-
-    public Task<StoragePipelineOutcome> OnCommitAsync(StoragePipelineContext context)
-    {
-        return Task.FromResult(StoragePipelineOutcome.Continue);
-    }
-}
-```
-
-## File Transfers
-
-### Cross-Profile Transfers
-
-```csharp
-public class FileArchiveService
-{
-    private readonly IStorageService _storage;
-
-    // Move to cold storage
-    public async Task ArchiveFile(string fileId)
-    {
-  var file = await Document.Get(fileId);
-        if (file == null) return;
-
-        await _storage.MoveTo(
-            sourceProfile: "hot",
-            sourceContainer: "",
-            key: file.BlobKey,
-            targetProfile: "cold"
-        );
-
-        // Update file record
-        file.ProfileName = "cold";
-        await file.Save();
-    }
-
-    // Copy for backup
-    public async Task BackupFile(string fileId)
-    {
-  var file = await Document.Get(fileId);
-        if (file == null) return;
-
-        await _storage.CopyTo(
-            sourceProfile: file.ProfileName,
-            sourceContainer: "",
-            key: file.BlobKey,
-            targetProfile: "backup"
-        );
-    }
-
-    // Transfer with custom logic
-    public async Task TransferFile(string fileId, string targetProfile, bool deleteSource = false)
-    {
-  var file = await Document.Get(fileId);
-        if (file == null) return;
-
-        await _storage.TransferToProfileAsync(
-            sourceProfile: file.ProfileName,
-            sourceContainer: "",
-            key: file.BlobKey,
-            targetProfile: targetProfile,
-            deleteSource: deleteSource
-        );
-
-        if (deleteSource)
-        {
-            file.ProfileName = targetProfile;
-            await file.Save();
-        }
-    }
-}
-```
-
-## Range Requests and Streaming
-
-### Partial Content Support
-
-```csharp
-[HttpGet("{id}/stream")]
-public async Task<IActionResult> StreamFile(string id, [FromHeader] string? range = null)
-{
-  var document = await Document.Get(id);
-    if (document == null) return NotFound();
-
-    if (!string.IsNullOrEmpty(range) && range.StartsWith("bytes="))
-    {
-        // Parse range header: bytes=0-1023
-        var rangeValue = range.Substring(6);
-        var parts = rangeValue.Split('-');
-
-        if (parts.Length == 2 &&
-            int.TryParse(parts[0], out var start) &&
-            int.TryParse(parts[1], out var end))
-        {
-            var partialStream = await _storage.OpenRangeAsync(document, start, end);
-
-            Response.Headers.Add("Accept-Ranges", "bytes");
-            Response.Headers.Add("Content-Range", $"bytes {start}-{end}/{document.Size}");
-
-            return new FileStreamResult(partialStream, document.ContentType)
-            {
-                EnableRangeProcessing = true
-            };
-        }
-    }
-
-    // Full file stream
-    var stream = await _storage.OpenAsync(document);
-    return File(stream, document.ContentType, document.FileName);
-}
-```
-
-## Audit and Monitoring
-
-### Storage Audit
-
-```csharp
-public class StorageAuditSink : IStorageAuditSink
-{
-    private readonly ILogger<StorageAuditSink> _logger;
-
-    public async Task RecordEventAsync(StorageAuditEvent auditEvent)
-    {
-        _logger.LogInformation("Storage event: {EventType} - {ObjectKey} by {UserId}",
-            auditEvent.EventType, auditEvent.ObjectKey, auditEvent.UserId);
-
-        // Store in audit log
-        var log = new StorageAuditLog
-        {
-            EventType = auditEvent.EventType,
-            ObjectKey = auditEvent.ObjectKey,
-            UserId = auditEvent.UserId,
-            Timestamp = auditEvent.Timestamp,
-            Metadata = auditEvent.Metadata
-        };
-
-        await log.Save();
-    }
-}
-
-public class StorageAuditLog : Entity<StorageAuditLog>
-{
-    public string EventType { get; set; } = "";
-    public string ObjectKey { get; set; } = "";
-    public string UserId { get; set; } = "";
-    public DateTimeOffset Timestamp { get; set; }
-    public Dictionary<string, string> Metadata { get; set; } = new();
-}
-```
-
-### Health Monitoring
-
-```csharp
-public class StorageHealthCheck : IHealthContributor
-{
-    public string Name => "Storage";
-    public bool IsCritical => true;
-
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
-    {
-        try
-        {
-            // Test storage operations
-            var testKey = $"health-check-{Guid.NewGuid()}";
-            var testContent = "Health check test";
-
-            // Write test
-            await _storage.CreateTextFile(testKey, testContent);
-
-            // Read test
-            var readContent = await _storage.ReadAllText("default", "", testKey);
-
-            // Cleanup
-            await _storage.TryDelete("default", "", testKey);
-
-            var isHealthy = readContent == testContent;
-            return new HealthReport(Name, isHealthy, isHealthy ? null : "Storage read/write test failed");
-        }
-        catch (Exception ex)
-        {
-            return new HealthReport(Name, false, ex.Message);
-        }
-    }
-}
-```
-
-## Testing
-
-### Storage Testing
-
-```csharp
-[Test]
-public async Task Should_Store_And_Retrieve_File()
-{
-    // Arrange
-    var content = "Test file content";
-    var fileName = "test.txt";
-
-    // Act - Store
-    var document = await _storage.CreateTextFile($"tests/{fileName}", content, "text/plain");
-
-    // Act - Retrieve
-    var retrievedContent = await _storage.ReadAllText(document.ProfileName, "", document.BlobKey);
-
-    // Assert
-    Assert.AreEqual(content, retrievedContent);
-    Assert.AreEqual(fileName, document.FileName);
-    Assert.AreEqual("text/plain", document.ContentType);
-}
-
-[Test]
-public async Task Should_Apply_Storage_Rules()
-{
-    // Arrange
-    var secureDocument = new Document
-    {
-        FileName = "secret.txt",
-        ContentType = "text/plain",
-        Tags = ["secure"]
-    };
-
-    // Act
-    var result = await _storage.SaveAsync(secureDocument, new MemoryStream(Encoding.UTF8.GetBytes("secret")));
-
-    // Assert
-    Assert.AreEqual("secure", result.ProfileName); // Should route to secure profile
-}
-```
-
-## API Reference
-
-### Core Interfaces
-
-```csharp
-public interface IStorageService
-{
-    Task<T> SaveAsync<T>(T storageObject, Stream content, string? profile = null) where T : IStorageObject;
-    Task<Stream> OpenAsync<T>(T storageObject) where T : IStorageObject;
-    Task DeleteAsync<T>(T storageObject) where T : IStorageObject;
-    Task<T> TransferToProfileAsync<T>(T storageObject, string targetProfile) where T : IStorageObject;
-}
-
-public interface IStorageObject
-{
-    string FileName { get; set; }
-    string ContentType { get; set; }
-    long Size { get; set; }
-    string ContentHash { get; set; }
-    string ProfileName { get; set; }
-    string ProviderKey { get; set; }
-    string BlobKey { get; set; }
-    string[] Tags { get; set; }
-    Dictionary<string, string> CustomMetadata { get; set; }
-}
-```
-
-### Pipeline Outcomes
-
-```csharp
-public static class StoragePipelineOutcome
-{
-    public static StoragePipelineResult Continue => new(StoragePipelineAction.Continue);
-    public static StoragePipelineResult Stop(string reason) => new(StoragePipelineAction.Stop, reason);
-    public static StoragePipelineResult Quarantine(string reason) => new(StoragePipelineAction.Quarantine, reason);
-    public static StoragePipelineResult Reroute(string profile) => new(StoragePipelineAction.Reroute, profile);
-}
-```
-
----
-
-**Last Validation**: 2025-01-17 by Framework Specialist
-**Framework Version Tested**: v0.2.18+
+The service exposes put/read/range/delete/exists/stat, cross-profile transfer, presign, and listing. Optional operations
+require the provider's compiled capability; unsupported intent throws the standard capability correction.
+
+## Operational boundaries
+
+- Segmentation is applied at `IStorageService`, covering Entity, Media, raw service, listing, presign, and transfer
+  paths. Tenant values never appear in general composition facts.
+- Cross-provider copy streams through the process. Same-provider copy uses the backend only when declared.
+- Whole-object text/byte helpers buffer. Local range reads buffer the requested range; current S3 full/range reads
+  materialize their response in memory.
+- Local is single-node filesystem storage. S3 inherits service-side durability, consistency, encryption, lifecycle,
+  and availability behavior.
+- Replication is asynchronous local-cache/durable-remote behavior, not a distributed transaction. Required replication
+  refuses to start without both placements.
+- Configuration is a host-composition input; live profile/provider reload is not a supported implicit contract.
+
+For provider-author contracts, reference `Sylin.Koan.Storage.Abstractions` and implement `IStorageProvider`, placement,
+`Describe(ICapabilities)`, and only the optional operation interfaces the provider can honor.

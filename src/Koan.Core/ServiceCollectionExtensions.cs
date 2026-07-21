@@ -14,6 +14,9 @@ using Koan.Core.Observability.Health;
 using Koan.Core.Modules.Pillars;
 using Microsoft.Extensions.Options;
 using Koan.Core.Hosting.App;
+using Koan.Core.Context;
+using Koan.Core.Semantics;
+using Koan.Core.Semantics.Segmentation;
 
 namespace Koan.Core;
 
@@ -23,15 +26,64 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddKoan(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+        return Compose(services, configure: null);
+    }
 
-        services.AddKoanCore();
-        AppBootstrapper.InitializeModules(services);
-        return services;
+    /// <summary>
+    /// Adds Koan and declares host-owned capability behavior in the same composition.
+    /// </summary>
+    /// <remarks>
+    /// The parameterless overload remains the complete zero-configuration bootstrap. Use this
+    /// overload only when the application has business-specific declarations such as
+    /// <c>Order.Lifecycle.BeforeUpsert(...)</c>.
+    /// </remarks>
+    public static IServiceCollection AddKoan(this IServiceCollection services, Action configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        return Compose(services, configure);
+    }
+
+    private static IServiceCollection Compose(IServiceCollection services, Action? configure)
+    {
+        var session = SemanticCompositionSession.GetOrCreate(services);
+        if (session.IsFrozen)
+        {
+            if (configure is null) return services;
+            throw new InvalidOperationException(
+                "This Koan application is already composed. Put business declarations in the initial AddKoan(() => ...) call.");
+        }
+
+        using var lease = session.Enter();
+        try
+        {
+            using var declarationScope = Composition.KoanCompositionScope.Enter(services);
+            if (session.TryConfigureCore()) services.AddKoanCore();
+            AppBootstrapper.InitializeModules(services);
+            configure?.Invoke();
+            lease.Complete();
+            return services;
+        }
+        catch (Exception exception)
+        {
+            session.FailComposition(exception);
+            throw;
+        }
     }
 
     public static IServiceCollection AddKoanCore(this IServiceCollection services)
     {
         CorePillarManifest.EnsureRegistered();
+
+        var segmentation = new SegmentationPlanBuilder();
+        SemanticCompositionSession.GetOrCreate(services).ScheduleContributions<
+            SegmentationContributionTarget,
+            SegmentationPlan>(
+            segmentation.ForOwner,
+            segmentation.Build,
+            static (collection, plan) => collection.Replace(ServiceDescriptor.Singleton(plan)));
+        services.TryAddSingleton(SegmentationPlan.Empty);
 
         // Default logging: simple console with concise output and sane category levels.
         services.AddLogging(logging =>
@@ -62,31 +114,46 @@ public static class ServiceCollectionExtensions
         var identityBuilder = services.AddKoanOptions<ApplicationIdentityOptions>(ApplicationIdentityDefaults.ConfigurationSection);
         identityBuilder.Services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IPostConfigureOptions<ApplicationIdentityOptions>), typeof(ApplicationIdentityPostConfigure)));
         identityBuilder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<ApplicationIdentityOptions>>().Value);
+        identityBuilder.Services.TryAdd(ServiceDescriptor.Singleton(
+            typeof(ApplicationIdentitySnapshot),
+            sp => sp.GetRequiredService<ApplicationIdentityOptions>().ToSnapshot()));
 
-        // Bind KoanLog to the ambient logger factory once the host starts up
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, KoanLogFactoryBridge>());
+        // R07-01: one host-owned registry carries module-owned logical-flow context across durable boundaries.
+        // The ambient KoanContext itself is flow-local and static; carrier instances and their composition stay in DI.
+        services.TryAddSingleton<KoanContextCarrierRegistry>();
+        services.TryAddSingleton<SegmentationContextPlan>();
+
+        // Establish the canonical ambient host before other hosted services start. KoanLog and other
+        // terse framework surfaces resolve host-owned services through this same owner.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AppHostBinderHostedService>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, StartupTimelineHostedService>());
 
-        // Best-effort early initialization when provider is built later
+        // One host-owned explanation snapshot feeds startup, health, operators, and agents.
+        services.TryAddSingleton<Koan.Core.Diagnostics.KoanRuntimeFactStore>();
+        services.TryAddSingleton<Koan.Core.Diagnostics.IKoanRuntimeFacts>(sp =>
+            sp.GetRequiredService<Koan.Core.Diagnostics.KoanRuntimeFactStore>());
+        services.TryAddSingleton<Koan.Core.Diagnostics.IKoanRuntimeFactRecorder>(sp =>
+            sp.GetRequiredService<Koan.Core.Diagnostics.KoanRuntimeFactStore>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, Koan.Core.Diagnostics.KoanFactsHealthContributor>());
 
-        // Legacy health registry removed in greenfield; aggregator is the single source of truth
-        // Health Aggregator (push-first)
-        // Note: Fully qualify Options type to avoid collision with Koan.Core.HealthAggregatorOptions.
+        if (!services.Any(d => d.ServiceType == typeof(Koan.Core.Hosting.Runtime.IAppRuntime)))
+            services.AddSingleton<Koan.Core.Hosting.Runtime.IAppRuntime, Koan.Core.Hosting.Runtime.AppRuntime>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, Koan.Core.Hosting.Runtime.AppRuntimeHostedService>());
+
+        // Health Aggregator (push-first) is the single source of truth for readiness.
         services.AddKoanOptions<Koan.Core.Observability.Health.HealthAggregatorOptions>(Infrastructure.ConfigurationConstants.Health.AggregatorSection);
         services.AddSingleton(sp => sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Koan.Core.Observability.Health.HealthAggregatorOptions>>().Value);
         services.AddSingleton<Koan.Core.Observability.Health.IHealthAggregator, Koan.Core.Observability.Health.HealthAggregator>();
-        // Bridge legacy contributors (registered by adapters) into aggregator
+        // IHealthContributor is the public pull-check seam (implemented by adapters). The registry +
+        // bridge fan those contributors into the push-first aggregator on probe.
         services.AddSingleton<IHealthRegistry, HealthRegistry>();
         services.AddHostedService<HealthContributorsBridge>();
-        services.AddHostedService<HealthProbeScheduler>();
+        // HealthProbeScheduler is a discovered Koan background service; the background-service
+        // orchestrator is its sole execution owner and preserves its pokeable + health aliases.
         // Kick a startup probe so readiness is populated early
         services.AddHostedService<StartupProbeService>();
-        // Hosting runtime: apps depend on greenfield IAppRuntime
-        if (!services.Any(d => d.ServiceType == typeof(Koan.Core.Hosting.Runtime.IAppRuntime)))
-            services.AddSingleton<Koan.Core.Hosting.Runtime.IAppRuntime, Koan.Core.Hosting.Runtime.AppRuntime>();
-
-        // Ensure ambient host is set in generic hosts (web apps do this via startup filter)
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.Extensions.Hosting.IHostedService, Koan.Core.Hosting.App.AppHostBinderHostedService>());
+        Orchestration.ServiceDiscoveryBootstrap.Register(services);
+        BackgroundServices.KoanBackgroundServicesBootstrap.Register(services);
         return services;
     }
 }

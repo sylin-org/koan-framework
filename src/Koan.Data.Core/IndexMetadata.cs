@@ -1,11 +1,19 @@
 using Koan.Data.Abstractions.Annotations;
+using System.Collections.Concurrent;
 using System.Reflection;
 
 namespace Koan.Data.Core;
 
 public static class IndexMetadata
 {
+    // Type-plane memoization (DATA-0105 §3). The index set is a pure function of the entity type; it is read
+    // on every relational schema-ensure and on several adapter write paths, so it is computed once per type.
+    private static readonly ConcurrentDictionary<Type, IReadOnlyList<IndexSpec>> Cache = new();
+
     public static IReadOnlyList<IndexSpec> GetIndexes(Type aggregateType)
+        => Cache.GetOrAdd(aggregateType, static t => Compute(t));
+
+    private static IReadOnlyList<IndexSpec> Compute(Type aggregateType)
     {
         var results = new List<IndexSpec>();
 
@@ -22,24 +30,33 @@ public static class IndexMetadata
             ));
         }
 
-        // Property-level [Index]
+        // Property-level [Index]. Insertion order is tracked explicitly so iteration is deterministic
+        // (a Dictionary's enumeration order is not contractually stable), and an anonymous single-property
+        // index is disambiguated by its attribute POSITION — not a per-call Guid — so the group key is stable
+        // across calls while two [Index] on the same property still stay distinct.
         var props = aggregateType.GetProperties(BindingFlags.Instance | BindingFlags.Public);
+        var order = new List<string>();
         var groups = new Dictionary<string, List<(int order, PropertyInfo prop, IndexAttribute attr)>>();
 
         foreach (var p in props)
         {
             var attrs = p.GetCustomAttributes<IndexAttribute>(inherit: true).ToArray();
-            if (attrs.Length == 0) continue;
-            foreach (var attr in attrs)
+            for (var i = 0; i < attrs.Length; i++)
             {
-                var key = attr.Name ?? attr.Group ?? $"__single__:{p.Name}:{Guid.CreateVersion7():N}";
-                if (!groups.TryGetValue(key, out var list)) groups[key] = list = new();
+                var attr = attrs[i];
+                var key = attr.Name ?? attr.Group ?? $"__single__:{p.Name}:{i}";
+                if (!groups.TryGetValue(key, out var list))
+                {
+                    groups[key] = list = new();
+                    order.Add(key);
+                }
                 list.Add((attr.Order, p, attr));
             }
         }
 
-        foreach (var (key, list) in groups)
+        foreach (var key in order)
         {
+            var list = groups[key];
             // Skip explicit single-field index on Identifier (covered by PK)
             if (list.Count == 1 && idSpec?.Prop is not null && list[0].prop == idSpec.Prop) continue;
 
@@ -70,6 +87,6 @@ public static class IndexMetadata
             results.Add(new IndexSpec(idx.Name, fields, idx.Unique, IsPrimaryKey: false, IsImplicit: false, Ttl: idx.Ttl));
         }
 
-        return results;
+        return results.ToArray();
     }
 }

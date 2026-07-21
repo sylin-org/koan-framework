@@ -1,30 +1,20 @@
 using System;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
+using Koan.Core;
 using Koan.Data.Abstractions.Naming;
-using Koan.Orchestration;
-using Koan.Orchestration.Attributes;
+using Koan.Data.Core;
+using Koan.Redis;
 using StackExchange.Redis;
 
 namespace Koan.Data.Connector.Redis;
 
 [ProviderPriority(5)]
-[KoanService(ServiceKind.Cache, shortCode: "redis", name: "Redis",
-    ContainerImage = "redis",
-    DefaultTag = "7",
-    DefaultPorts = new[] { 6379 },
-    Capabilities = new[] { "protocol=redis" },
-    Volumes = new[] { "./Data/redis:/data" },
-    AppEnv = new[] { "Koan__Data__Redis__Endpoint={scheme}://{host}:{port}" },
-    Scheme = "redis", Host = "redis", EndpointPort = 6379, UriPattern = "redis://{host}:{port}",
-    LocalScheme = "redis", LocalHost = "localhost", LocalPort = 6379, LocalPattern = "redis://{host}:{port}")]
 public sealed class RedisAdapterFactory : IDataAdapterFactory
 {
     public string Provider => "redis";
-
-    public bool CanHandle(string provider) => string.Equals(provider, "redis", StringComparison.OrdinalIgnoreCase);
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,
@@ -32,11 +22,33 @@ public sealed class RedisAdapterFactory : IDataAdapterFactory
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var opts = sp.GetRequiredService<IOptions<RedisOptions>>();
-        var muxer = sp.GetRequiredService<IConnectionMultiplexer>();
-        // Note: Redis connection multiplexer is typically shared; source-specific
-        // connections would require factory-level changes to support multiple IConnectionMultiplexer instances
-        return new RedisRepository<TEntity, TKey>(opts, muxer, sp.GetService<ILoggerFactory>());
+        var route = ResolveRoute(sp, source);
+        return new RedisRepository<TEntity, TKey>(
+            route.Connection,
+            route.Database,
+            sp.GetRequiredService<Koan.Data.Core.Semantics.DataSegmentationPlan>());
+    }
+
+    internal RedisSourceRoute ResolveRoute(IServiceProvider sp, string source)
+    {
+        var baseOpts = sp.GetRequiredService<IOptions<RedisOptions>>().Value;
+        var config = sp.GetRequiredService<IConfiguration>();
+        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
+        var connections = sp.GetRequiredService<IRedisConnectionProvider>();
+
+        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
+            config,
+            sourceRegistry,
+            Provider,
+            source,
+            connections.DefaultConnectionString,
+            this);
+        var database = AdapterConnectionResolver.GetSourceSetting(
+            config, sourceRegistry, Provider, source, "Database", baseOpts.Database, this);
+
+        var connection = connections.GetConnection(connectionString);
+
+        return new RedisSourceRoute(connection, database, source);
     }
 
     // The partition separator must NOT be ':' — Redis key delimiter is ':', and the keyspace scan pattern
@@ -52,4 +64,9 @@ public sealed class RedisAdapterFactory : IDataAdapterFactory
             Partition = PartitionTokenPolicy.Default,
         };
 }
+
+internal sealed record RedisSourceRoute(
+    IConnectionMultiplexer Connection,
+    int Database,
+    string Source);
 

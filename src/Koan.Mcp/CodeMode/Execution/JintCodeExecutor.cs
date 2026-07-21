@@ -63,6 +63,9 @@ public sealed class JintCodeExecutor : Koan.Mcp.CodeExecution.ICodeExecutor
     // Create an execution scope so scoped services (e.g., EndpointToolExecutor, Db contexts) can be resolved safely
     using var scope = _services.CreateScope();
     var scopedProvider = scope.ServiceProvider;
+    // SEC-0004 Phase 3.3: publish the caller's principal onto the scope BEFORE the SDK is resolved, so the entity
+    // proxy threads it into EndpointToolExecutor.Execute (the sandbox runs AS the caller, not anonymously).
+    scopedProvider.GetRequiredService<Koan.Mcp.Execution.McpCallContext>().Principal = request.Principal;
     var bindings = scopedProvider.GetRequiredService<Sdk.KoanSdkBindings>();
 
         try
@@ -246,6 +249,9 @@ public sealed class JintCodeExecutor : Koan.Mcp.CodeExecution.ICodeExecutor
         }
         catch (Exception ex)
         {
+            // F2 burn-down: a non-syntax failure during the validation parse is unexpected — log a diagnostic
+            // instead of folding it silently into a generic "Validation error" string.
+            _logger.LogDebug(ex, "Unexpected error validating MCP code-mode script syntax");
             error = $"Validation error: {ex.Message}";
             return false;
         }

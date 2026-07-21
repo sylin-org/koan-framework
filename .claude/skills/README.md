@@ -1,141 +1,75 @@
-# Koan Framework Agent Skills Catalog
+# Koan agent skills
 
-This directory contains specialized Agent Skills that provide progressive, context-aware guidance for Koan Framework development. Skills load on-demand based on conversation context, delivering exactly the knowledge needed without overwhelming developers.
+These focused guides help coding agents apply Koan's current application language. They are indexes,
+not a second API reference: each skill points to the package/reference owner, a runnable sample, and
+the generated maturity boundary.
 
-## What Are Agent Skills?
+## How to use them
 
-Agent Skills are filesystem-based capability packages that:
-- **Load progressively** - Only activated when relevant to current conversation
-- **Bundle resources** - Include code examples, templates, and anti-patterns without consuming context
-- **Stay focused** - Each skill covers a specific framework domain or workflow
-- **Reference guides** - Point to authoritative how-to guides while providing curated excerpts
+Load the smallest skill that matches the user's business intent. Begin with standard .NET and Koan's
+public Entity language; add framework-specific concepts only when the referenced capability earns
+them. A package being present in the repository does not make its behavior supported—check the
+[product surface](../../docs/reference/product-surface.md).
 
-## Skill Catalog
+Every recommended web host uses the same four lines:
 
-### Tier 1: Core Framework Skills (Foundational)
-
-| Skill | Description | When to Use |
-|-------|-------------|-------------|
-| **koan-entity-first** | Entity<T> patterns, GUID v7 auto-generation, static methods vs manual repositories | Creating entities, data access, CRUD operations, refactoring repositories |
-| **koan-bootstrap** | Auto-registration via KoanAutoRegistrar, minimal Program.cs, "Reference = Intent" pattern | Setting up projects, initialization issues, debugging bootstrap |
-| **koan-multi-provider** | Provider transparency, capability detection, context routing (partition/source/adapter) | Multi-database scenarios, switching providers, capability-aware code |
-| **koan-debugging** | Framework-specific troubleshooting, boot report analysis, common error patterns | Troubleshooting issues, analyzing logs, debugging initialization |
-
-### Tier 2: Pillar-Specific Skills (Domain-Triggered)
-
-| Skill | Description | When to Use |
-|-------|-------------|-------------|
-| **koan-data-modeling** | Aggregate boundaries, relationships, lifecycle hooks, value objects | Designing domain models, complex entities, business logic encapsulation |
-| **koan-api-building** | EntityController<T>, custom routes, payload transformers, auth policies | Building REST APIs, custom endpoints, authentication, API design |
-| **koan-ai-integration** | Chat endpoints, embeddings, RAG, vector search, category routing, entity-aware AI, media analysis | Integrating AI features, semantic search, chat interfaces, embeddings |
-
-### Tier 3: Developer Journey Skills (Progressive Complexity)
-
-| Skill | Description | When to Use |
-|-------|-------------|-------------|
-| **koan-quickstart** | Zero to first Koan app in under 10 minutes (S0 + S1 patterns) | Starting new projects, learning Koan basics, quick prototypes |
-| **koan-relationships** | Entity navigation, batch loading, relationship best practices | Complex data relationships, navigation patterns, performance optimization |
-| **koan-performance** | Streaming, pagination, count strategies, bulk operations | Performance tuning, large datasets, optimization, production readiness |
-
-### Tier 4: Specialized Skills (Advanced Scenarios)
-
-| Skill | Description | When to Use |
-|-------|-------------|-------------|
-| **koan-vector-migration** | Vector export/import, embedding caching, provider migration | Migrating vector databases, caching embeddings, AI provider switches |
-| **koan-mcp-integration** | MCP server patterns, Code Mode integration, tool building | Building MCP servers, Claude integrations, tool development |
-
-## Skill Invocation
-
-### Automatic Triggers
-
-Skills load automatically based on conversation patterns:
-
-- **Entity work** triggers `koan-entity-first`
-- **Project setup** triggers `koan-bootstrap`
-- **API development** triggers `koan-api-building`
-- **Error troubleshooting** triggers `koan-debugging`
-- **AI features** triggers `koan-ai-integration`
-
-### Explicit Invocation
-
-You can explicitly invoke skills using the Skill tool:
-
-```markdown
-User: "I need help with [specific task]"
-Assistant: [Invokes /koan-entity-first skill]
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
+var app = builder.Build();
+await app.RunAsync();
 ```
 
-## Progressive Learning Path
+## Supported 0.20 paths
 
-**Recommended skill progression for new developers:**
+| Skill | Use it for |
+|---|---|
+| [koan-quickstart](koan-quickstart/SKILL.md) | Create the first template application and reach one Entity result. |
+| [koan-entity-first](koan-entity-first/SKILL.md) | Model business state with `Entity<T>` and its canonical verbs. |
+| [koan-bootstrap](koan-bootstrap/SKILL.md) | Understand `AddKoan()`, Reference = Intent, and `KoanModule`. |
+| [koan-debugging](koan-debugging/SKILL.md) | Read startup, health, facts, lock drift, and corrective failures. |
+| [koan-data-modeling](koan-data-modeling/SKILL.md) | Model keys, aggregates, relationships, lifecycle, and value objects. |
+| [koan-caching](koan-caching/SKILL.md) | Apply Entity cache semantics and inspect topology limits. |
+| [koan-jobs](koan-jobs/SKILL.md) | Express durable Entity-owned work, retry, progress, and schedules. |
+| [koan-web](koan-web/SKILL.md) | Project Entities and business actions through ASP.NET Core. |
+| [koan-communication](koan-communication/SKILL.md) | Use Entity Events, Transport, channels, local settlement, and RabbitMQ carriage. |
+| [koan-auth](koan-auth/SKILL.md) | Compose authentication, durable identity, authorization, trust, and tenant-aware identity. |
+| [koan-tenancy](koan-tenancy/SKILL.md) | Apply tenant isolation and host-authorized administration. |
+| [koan-mcp-integration](koan-mcp-integration/SKILL.md) | Project governed Entity/tool surfaces through MCP. |
+| [koan-observability](koan-observability/SKILL.md) | Add one OpenTelemetry pipeline and application health contributions. |
 
-1. **koan-quickstart** (10 min) - First app, basic concepts
-2. **koan-entity-first** (Core foundation) - Master Entity<T> patterns
-3. **koan-api-building** (Expose data) - Build REST APIs
-4. **koan-relationships** (Complex models) - Advanced data modeling
-5. **koan-performance** (Optimization) - Production readiness
-6. **koan-ai-integration** (Semantic features) - Add AI capabilities
-7. **koan-vector-migration** (Advanced AI) - Scale AI infrastructure
+## Available capabilities with narrower maturity
 
-## Skill Structure
+These skills explain real current APIs, but their packages or provider combinations are not part of
+the complete supported 0.20 closure. State the limitation and check the generated claim before
+recommending one for production use.
 
-Each skill contains:
+| Skill | Use it for |
+|---|---|
+| [koan-ai](koan-ai/SKILL.md) | Prompt, model, and AI provider semantics. |
+| [koan-vector](koan-vector/SKILL.md) | Vector indexing/search and provider-specific limits. |
+| [koan-media](koan-media/SKILL.md) | Entity-backed media recipes and HTTP rendering. |
+| [koan-storage](koan-storage/SKILL.md) | Named storage profiles and provider boundaries. |
+| [koan-multi-provider](koan-multi-provider/SKILL.md) | Deliberate provider/source selection without claiming parity. |
+| [koan-performance](koan-performance/SKILL.md) | Paging, streaming, batching, and measured provider-aware tuning. |
 
-```
-skill-name/
-├── SKILL.md                    # Main instructions with YAML frontmatter
-├── examples/                   # Executable code examples
-│   ├── basic-pattern.cs
-│   └── advanced-pattern.cs
-├── templates/                  # Project templates
-│   └── template-file.cs
-├── anti-patterns/              # What NOT to do
-│   └── common-mistakes.md
-└── diagnostics/                # Troubleshooting guides
-    └── checklist.md
-```
+## Deployment boundary
 
-## Benefits Over Monolithic Instructions
+[koan-orchestration](koan-orchestration/SKILL.md) explains the current non-package boundary: ordinary
+.NET, Aspire, Compose, Docker/Podman, Kubernetes, or another platform owns topology. Koan connectors
+consume standard endpoints and configuration; the shelved bespoke CLI/Aspire bridge is not a 0.20
+product surface.
 
-### Context Efficiency
-- **Before:** 1,000+ lines loaded every conversation (monolithic instruction files)
-- **After:** ~100 lines meta + on-demand skills (~200-400 lines each)
-- **Result:** 60-80% context reduction for typical conversations
+## Maintenance contract
 
-### Developer Experience
-- **Progressive disclosure** - See guidance exactly when needed
-- **Just-in-time learning** - No overwhelming pattern dumps
-- **Focused guidance** - Each skill covers one domain deeply
+- Directory name and frontmatter `name` agree.
+- The description is the activation surface.
+- A canonical example is compile-checked where the skill teaches code.
+- Relative links resolve and package IDs use `Sylin.Koan.*`.
+- Current instructions use generated module composition and `await app.RunAsync()`.
+- Skills link to canonical product docs instead of duplicating full API inventories.
 
-### Maintainability
-- **Modular updates** - Change one skill without touching others
-- **Clear boundaries** - Each skill owns specific framework domain
-- **Testable** - Validate individual skills in isolation
+Run `pwsh scripts/skills-lint.ps1 -Strict` and `pwsh scripts/validate-code-examples.ps1` after changing
+skills. The public-document gate also treats every tracked skill asset as public narrative.
 
-## Relationship to Documentation
-
-Skills complement, don't replace, documentation:
-
-- **How-to Guides** (`/docs/guides/`) remain authoritative references
-- **Skills** provide curated excerpts and progressive learning paths
-- **ADRs** (`/docs/decisions/`) document canonical architectural decisions
-- **Samples** (`/samples/`) demonstrate patterns in working code
-
-Skills act as **intelligent indexes** into the full documentation, loading exactly what's needed for the current conversation.
-
-## Framework Version
-
-**Aligned with:** Koan Framework v0.6.3
-**Last Updated:** 2026-03-23
-
-## Migration Notes
-
-This skills structure represents a complete migration from monolithic instruction files to modular, progressive skills:
-- **CLAUDE.md** - Slimmed to meta-instructions only (65% reduction); all pattern content distributed to skills
-- **Previous instruction files** - Deprecated and removed; all coding guidelines now in domain-specific skills
-
-All content has been reorganized into focused, discoverable skills. See individual skill directories for specific guidance domains.
-
----
-
-**Quick Reference:** Browse skill directories below to see available guidance domains. Each SKILL.md file contains progressive instructions designed for AI-assisted development.
+Aligned with the Koan 0.20 preview on 2026-07-19.

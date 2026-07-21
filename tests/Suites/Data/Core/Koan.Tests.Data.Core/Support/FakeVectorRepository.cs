@@ -154,7 +154,7 @@ public sealed class FakeVectorRepository<TEntity, TKey> : IVectorSearchRepositor
 
         // Simple cosine similarity search
         var query = options.Query;
-        var topK = options.TopK ?? 10;
+        var topK = options.TopK;
 
         var results = _vectors
             .Select(kvp => new

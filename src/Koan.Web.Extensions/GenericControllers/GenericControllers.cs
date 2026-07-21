@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
@@ -12,25 +11,11 @@ namespace Koan.Web.Extensions.GenericControllers;
 /// </summary>
 public static class GenericControllers
 {
-    private static readonly ConcurrentDictionary<string, Registration> _registrations = new();
-
-    private static string Key(Type genericDef, Type entity, Type? key, string route)
-        => string.Join("|", genericDef.AssemblyQualifiedName, entity.AssemblyQualifiedName, key?.AssemblyQualifiedName ?? "", route);
-
     public static IServiceCollection AddEntityAuditController<TEntity>(this IServiceCollection services, string routePrefix)
         where TEntity : class
     {
         var genericDef = typeof(Controllers.EntityAuditController<>);
-        _registrations[Key(genericDef, typeof(TEntity), null, routePrefix)] = new Registration(genericDef, typeof(TEntity), null, routePrefix);
-        return services;
-    }
-
-    public static IServiceCollection AddEntitySoftDeleteController<TEntity, TKey>(this IServiceCollection services, string routePrefix)
-        where TEntity : class
-        where TKey : notnull
-    {
-        var genericDef = typeof(Controllers.EntitySoftDeleteController<,>);
-        _registrations[Key(genericDef, typeof(TEntity), typeof(TKey), routePrefix)] = new Registration(genericDef, typeof(TEntity), typeof(TKey), routePrefix);
+        GenericControllerRegistry.GetOrAdd(services).Register(genericDef, typeof(TEntity), null, routePrefix);
         return services;
     }
 
@@ -39,7 +24,7 @@ public static class GenericControllers
         where TKey : notnull
     {
         var genericDef = typeof(Controllers.EntityModerationController<,>);
-        _registrations[Key(genericDef, typeof(TEntity), typeof(TKey), routePrefix)] = new Registration(genericDef, typeof(TEntity), typeof(TKey), routePrefix);
+        GenericControllerRegistry.GetOrAdd(services).Register(genericDef, typeof(TEntity), typeof(TKey), routePrefix);
         return services;
     }
 
@@ -52,22 +37,32 @@ public static class GenericControllers
         if (genericControllerDefinition is null) throw new ArgumentNullException(nameof(genericControllerDefinition));
         if (!genericControllerDefinition.IsGenericTypeDefinition)
             throw new ArgumentException("Must be a generic type definition", nameof(genericControllerDefinition));
-        _registrations[Key(genericControllerDefinition, typeof(TEntity), null, routePrefix)] = new Registration(genericControllerDefinition, typeof(TEntity), null, routePrefix);
+        GenericControllerRegistry.GetOrAdd(services).Register(genericControllerDefinition, typeof(TEntity), null, routePrefix);
         return services;
     }
 
-    internal static IEnumerable<Registration> Registrations => _registrations.Values;
-
-    internal sealed record Registration(Type GenericDefinition, Type EntityType, Type? KeyType, string RoutePrefix);
+    /// <summary>
+    /// ARCH-0092 (§B): register the terse <see cref="RestEntityController{TEntity,TKey}"/> closure for an
+    /// entity discovered via <c>[RestEntity]</c>. Non-generic because the entity/key are runtime types
+    /// resolved by reflection during discovery.
+    /// </summary>
+    internal static IServiceCollection AddRestEntityController(this IServiceCollection services, Type entityType, Type keyType, string routePrefix)
+    {
+        if (entityType is null) throw new ArgumentNullException(nameof(entityType));
+        if (keyType is null) throw new ArgumentNullException(nameof(keyType));
+        var genericDef = typeof(RestEntityController<,>);
+        GenericControllerRegistry.GetOrAdd(services).Register(genericDef, entityType, keyType, routePrefix);
+        return services;
+    }
 
     /// <summary>
     /// Adds closed generic controller types for all registered entries.
     /// </summary>
-    internal sealed class FeatureProvider : IApplicationFeatureProvider<ControllerFeature>
+    internal sealed class FeatureProvider(GenericControllerRegistry registry) : IApplicationFeatureProvider<ControllerFeature>
     {
         public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature)
         {
-            foreach (var r in Registrations)
+            foreach (var r in registry.Registrations)
             {
                 Type closed;
                 if (r.KeyType is null)
@@ -89,7 +84,7 @@ public static class GenericControllers
     /// <summary>
     /// Applies route prefix to registered controllers.
     /// </summary>
-    internal sealed class RouteConvention : IControllerModelConvention
+    internal sealed class RouteConvention(GenericControllerRegistry registry) : IControllerModelConvention
     {
         public void Apply(ControllerModel controller)
         {
@@ -99,7 +94,7 @@ public static class GenericControllers
             var args = type.GetGenericArguments();
             var entity = args[0];
             var key = args.Length > 1 ? args[1] : null;
-            var match = Registrations.FirstOrDefault(r => r.GenericDefinition == genDef && r.EntityType == entity && r.KeyType == key);
+            var match = registry.Registrations.FirstOrDefault(r => r.GenericDefinition == genDef && r.EntityType == entity && r.KeyType == key);
             if (match is null) return;
 
             // Replace or add a selector with the route prefix

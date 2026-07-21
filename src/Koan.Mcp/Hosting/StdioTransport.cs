@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,6 +28,8 @@ public sealed class StdioTransport : BackgroundService
     private int _toolCount;
     private CancellationTokenSource? _sessionCts;
     private Task? _sessionTask;
+    private Stream? _input;
+    private Stream? _output;
 
     public StdioTransport(
         McpServer server,
@@ -49,10 +52,10 @@ public sealed class StdioTransport : BackgroundService
         var options = _optionsMonitor.CurrentValue;
         var transportLogger = _loggerFactory.CreateLogger(options.Transport.LoggerCategory ?? "Koan.Transport.Mcp");
 
-        var registrations = _server.GetRegistrationsForStdio();
+        var registrations = _server.Registrations;
         var globallyEnabled = options.EnableStdioTransport;
 
-        if (!globallyEnabled && registrations.Count == 0)
+        if (!globallyEnabled)
         {
             _logger.LogInformation("MCP STDIO transport disabled via configuration.");
             transportLogger.LogInformation("STDIO transport disabled by configuration.");
@@ -61,30 +64,30 @@ public sealed class StdioTransport : BackgroundService
             return;
         }
 
-        if (registrations.Count == 0)
+        var handler = _server.CreateHandler();
+        var toolCount = (await handler.ListTools(stoppingToken)).Tools.Count;
+        if (toolCount == 0)
         {
-            _logger.LogInformation("No MCP entities opted into STDIO transport. Transport will remain idle.");
-            transportLogger.LogInformation("STDIO transport idle: no registered entities.");
+            _logger.LogInformation("MCP STDIO transport has no exposed tools and will remain idle.");
+            transportLogger.LogInformation("STDIO transport idle: no exposed tools.");
             ResetMetrics();
-            PublishTransportHealth(HealthStatus.Healthy, "STDIO transport idle (no registered entities).", options, 0, 0);
+            PublishTransportHealth(HealthStatus.Healthy, "STDIO transport idle (no exposed tools).", options, registrations.Count, 0);
             return;
-        }
-
-        if (!globallyEnabled)
-        {
-            _logger.LogInformation("STDIO transport globally disabled but {EntityCount} entity/entities opted in; starting limited session.", registrations.Count);
-            transportLogger.LogInformation("STDIO transport limited mode with {EntityCount} entities.", registrations.Count);
         }
 
         Console.SetOut(Console.Error);
 
-        using var input = Console.OpenStandardInput();
-        using var output = Console.OpenStandardOutput();
+        // Hoist the std streams to fields (NOT `using`) so StopAsync can dispose stdin to unblock a pending
+        // read. A console/pipe read does not honor a CancellationToken, so cancellation alone cannot end the
+        // session — closing the input stream is what breaks the blocking ReadFile during shutdown. They are
+        // disposed in the finally below.
+        var input = _input = Console.OpenStandardInput();
+        var output = _output = Console.OpenStandardOutput();
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
 
         _sessionCts = linkedCts;
         _entityCount = registrations.Count;
-        _toolCount = registrations.Sum(r => r.Tools.Count);
+        _toolCount = toolCount;
         _startedAtUtc = DateTimeOffset.UtcNow;
         _lastHeartbeatUtc = _startedAtUtc;
 
@@ -94,7 +97,11 @@ public sealed class StdioTransport : BackgroundService
         transportLogger.LogInformation("STDIO transport online with {ToolCount} tools.", _toolCount);
         PublishTransportHealth(HealthStatus.Healthy, "STDIO transport online.", options, _entityCount, _toolCount);
 
-        var handler = _server.CreateHandler();
+        // AN3 local-trust invariant: STDIO binds the RAW handler with no McpToolAccessPolicy filter, by
+        // design. stdin/stdout is the same-machine process owner, so the local caller has full access —
+        // there is no remote principal to gate. Enforcement (auth ∩ scopes) is a remote-transport-edge
+        // concern (see McpRpcDispatcher). Any FUTURE remote transport that reuses this handler MUST wrap it
+        // with McpToolAccessPolicy; the local-trust assumption is pinned by EnforcementConsolidationSpec.
         var runTask = _server.Run(handler, input, output, linkedCts.Token);
         _sessionTask = runTask;
 
@@ -102,9 +109,20 @@ public sealed class StdioTransport : BackgroundService
         {
             await runTask;
         }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or IOException)
+        {
+            // Expected when StopAsync disposes stdin to unblock the read during shutdown.
+            transportLogger.LogDebug(ex, "STDIO session ended during shutdown.");
+        }
         finally
         {
             _sessionTask = null;
+            // Release the std streams (no longer scoped by `using`, so StopAsync can close stdin early). Disposal at
+            // shutdown is best-effort (a console stream can throw) — swallowed but LogDebug-observable (F2), not silent.
+            try { input.Dispose(); } catch (Exception ex) { transportLogger.LogDebug(ex, "Best-effort stdin dispose failed during shutdown."); }
+            try { output.Dispose(); } catch (Exception ex) { transportLogger.LogDebug(ex, "Best-effort stdout dispose failed during shutdown."); }
+            _input = null;
+            _output = null;
             var cts = Interlocked.Exchange(ref _sessionCts, null);
             if (cts is not null)
             {
@@ -139,7 +157,10 @@ public sealed class StdioTransport : BackgroundService
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        var timeout = _optionsMonitor.CurrentValue.Transport.ShutdownTimeout;
+        var configured = _optionsMonitor.CurrentValue.Transport.ShutdownTimeout;
+        // Never block host shutdown indefinitely: the session can be parked in an uncancellable stdin read,
+        // so always bound the wait (default 5s when unconfigured).
+        var timeout = configured > TimeSpan.Zero ? configured : TimeSpan.FromSeconds(5);
         var sessionTask = _sessionTask;
         var cts = _sessionCts;
 
@@ -155,25 +176,20 @@ public sealed class StdioTransport : BackgroundService
             }
         }
 
-        if (sessionTask is not null)
+        // Cancellation cannot interrupt a synchronous console ReadFile; disposing stdin closes the OS handle
+        // and forces the blocking read to return, which is what actually lets the session unwind.
+        try { _input?.Dispose(); } catch (Exception ex) { _logger.LogDebug(ex, "Best-effort stdin dispose failed during shutdown."); }
+
+        if (sessionTask is not null && !sessionTask.IsCompleted)
         {
-            if (timeout > TimeSpan.Zero && !sessionTask.IsCompleted)
+            var completed = await Task.WhenAny(sessionTask, Task.Delay(timeout, CancellationToken.None));
+            if (completed == sessionTask)
             {
-                var delayTask = Task.Delay(timeout, cancellationToken);
-                var completed = await Task.WhenAny(sessionTask, delayTask);
-                if (completed == sessionTask)
-                {
-                    await sessionTask;
-                }
-                else
-                {
-                    _logger.LogWarning("STDIO transport did not shut down within {Timeout}.", timeout);
-                    cancellationToken.ThrowIfCancellationRequested();
-                }
+                try { await sessionTask; } catch (Exception ex) { _logger.LogDebug(ex, "STDIO session faulted during shutdown."); }
             }
             else
             {
-                await sessionTask;
+                _logger.LogWarning("STDIO transport did not shut down within {Timeout}; abandoning the session.", timeout);
             }
         }
 

@@ -4,15 +4,15 @@ domain: jobs
 title: "Background Jobs How-To"
 audience: [developers, architects]
 status: current
-last_updated: 2026-06-04
-framework_version: v0.6.3
+last_updated: 2026-07-16
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-06-04
+  date_last_tested: 2026-07-16
   status: verified
-  scope: In-memory and SQLite tiers
+  scope: in-memory Jobs; focused SQLite submission transaction
 related_guides:
   - data-modeling.md
-  - building-apis.md
+  - ../reference/web/index.md
   - performance.md
 ---
 
@@ -26,28 +26,29 @@ Each section follows a gentle rhythm: **Concept** (what is this?), **Recipe** (h
 
 **Related Guides:**
 - Modeling the entity itself? → [Data Modeling](data-modeling.md)
-- Kicking jobs off from an API? → [Building APIs](building-apis.md)
+- Kicking jobs off from an API? → [Web reference](../reference/web/index.md)
 - Throughput and tuning? → [Performance](performance.md)
 
 ---
 
 ## 0. Prerequisites
 
-Add the Jobs package alongside the Koan baseline:
+Jobs belongs to the supported 0.20 extension surface. The package reference is the activation intent:
 
 ```xml
-<PackageReference Include="Koan.Core" Version="0.6.3" />
-<PackageReference Include="Koan.Data.Core" Version="0.6.3" />
-<PackageReference Include="Koan.Jobs" Version="0.6.3" />
+<PackageReference Include="Sylin.Koan.Jobs" />
 ```
 
-That's all the wiring there is. **Reference = Intent**: adding `Koan.Jobs` and implementing the job interface is enough—`AddKoan()` discovers your jobs and starts the orchestrator automatically.
+Public-feed publication follows the final package-only proof. From a source checkout, repository samples use the
+equivalent project reference without changing application code.
+
+That's all the wiring there is. **Reference = Intent**: adding Jobs and implementing the job interface is enough—`AddKoan()` activates your jobs and starts the orchestrator automatically.
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();   // discovers your jobs, starts the worker
 var app = builder.Build();
-app.Run();
+await app.RunAsync();
 ```
 
 With no data adapter referenced, jobs run in-memory (fast, ephemeral). Add a data adapter (SQLite, Postgres, Mongo, SQL Server) and the same jobs become **durable**—they survive restarts. You change nothing in your job code; see [§10](#10-durability-pick-your-tier).
@@ -200,6 +201,7 @@ public sealed class PresetPackage : Entity<PresetPackage>, IKoanJob<PresetPackag
 - **`MaxAttempts`** — failed runs retry with exponential backoff; once exhausted the job is **Failed**.
 - **`OnFailure`** — `Abort` (default) stops a chain on failure; `Continue` proceeds to the next stage anyway.
 - **`Lane` / `MaxConcurrency`** — a lane is a concurrency pool. By default each action is its own lane, so a slow `Fetch` never starves `Publish`. Set `Lane` to share a pool, `MaxConcurrency` to cap it.
+  - **Cross-lane fairness (JOBS-0008).** The worker multiplexes claims **fairly across all non-empty lanes** (weighted fair queuing): a perpetually-fed or older lane can no longer monopolize dispatch and starve another lane — including a downstream pipeline stage whose jobs are *newer* than a deep upstream backlog. You don't configure anything to get this; equal-share fairness is the default. To bias the split, use standard options configuration: `services.Configure<JobsOptions>(o => o.LaneWeights["translation"] = 3)` gives `translation` ~3× the dispatch share of a weight-1 lane. Weights are *relative*, never strict priority — a low-weight lane is throttled, never starved.
 
 **One entity, one job at a time.** Independently of lanes, Koan serializes jobs by work-item id: two different actions on the *same* entity (say `FetchPreview` and `DriftCheck` on one `Package`) never run concurrently—the entity is processed in order, like a FIFO group keyed by its id. Different entities still run fully in parallel. If a type's actions are genuinely independent and you want them to overlap on one instance, opt out with `[ParallelSafe]` on the class—an assertion that they don't conflict.
 
@@ -319,11 +321,14 @@ Pair a scheduled action with `[JobIdempotent]` (a stable key) so an overlapping 
 
 ---
 
-## 8. Batches and the type-level facade
+## 8. Pointwise sources and the type-level control plane
 
-**Concept.** `model.Job.X` operates on one instance; `MyModel.Jobs.X` is the **whole job subsystem** for the type—batch submit, trigger a type-level action, query, cancel by id.
+**Concept.** `model.Job.X` operates on one instance; `source.Submit(...)` repeats that same ledger
+acceptance pointwise for a finite selection or provider-bounded stream. `MyModel.Jobs.X` is the
+type-level **control plane**—trigger a singleton action, query, cancel, or inspect status by id.
 
-**Recipe.** Use the instance accessor for one item, the static facade for many (or for no instance at all).
+**Recipe.** Submit directly from the source. Use the static facade only for type-wide operations that
+do not have an ordinary source instance.
 
 **Sample.**
 
@@ -331,9 +336,14 @@ Pair a scheduled action with `[JobIdempotent]` (a stable key) so an overlapping 
 // one instance
 await pkg.Job.Submit(Stage.Fetch);
 
-// a thousand instances, one bulk enqueue
+// a thousand instances, pointwise ledger acceptance with a fixed-size summary
 List<PresetPackage> packages = …;
-await packages.Submit(Stage.Fetch);
+JobSubmission selected = await packages.Submit(Stage.Fetch);
+
+// the same intent over a lazy, provider-bounded Entity source
+JobSubmission streamed = await PresetPackage
+    .QueryStream(pkg => pkg.Ready)
+    .Submit(Stage.Fetch);
 
 // run a type-level action now, with no instance (the on-demand twin of a schedule)
 await PresetPackage.Jobs.Trigger(Stage.Discover);
@@ -344,13 +354,30 @@ var running = await PresetPackage.Jobs.WithStatus(JobStatus.Running);
 var mine    = await PresetPackage.Jobs.Query(new JobQuery(Action: Stage.Fetch));
 ```
 
-**`Trigger` vs `Submit`.** `instance.Job.Submit(action)` runs the action for *that* instance; `MyModel.Jobs.Trigger(action)` runs it at the **type level** against an auto-provisioned singleton—the manual counterpart to a `Schedule`. Both return a `JobHandle`, so you can `await (await …).Completion(timeout)` to run-and-wait.
+**What the result means.** Scalar `Submit` and type-level `Trigger` return a `JobHandle`, so you can
+`await (await …).Completion(timeout)` to run-and-wait. Source `Submit` returns a fixed-size
+`JobSubmission`: `Submitted` is new ledger acceptance, `Coalesced` is explicit declared-idempotency
+acceptance, and `Accepted` is their sum. It reports acceptance, not handler completion, and never
+retains one handle per source item. `PendingCommit` means new records are still contingent on the
+ambient transaction.
 
-**When to use it.** `list.Submit(action)` for fan-out; `Jobs.Trigger(action)` for "run the nightly sweep now" admin actions; `MyModel.Jobs` for dashboards and operating on jobs by id.
+If enumeration or an item submission fails, `JobSubmissionException` carries the confirmed prefix;
+cancellation uses `JobSubmissionCanceledException`, which is still an `OperationCanceledException`.
+There is no collection-atomicity claim. A provider call that throws is not counted as confirmed
+acceptance, so retry the failing item under the job's declared idempotency policy.
+
+**When to use it.** `source.Submit(action)` for bounded pointwise fan-out; `Jobs.Trigger(action)` for
+"run the nightly sweep now" admin actions; `MyModel.Jobs` for dashboards and operating on jobs by id.
 
 ### 8.1 Draining a large source: window, don't multiply
 
-**Concept.** `list.Submit(action)` mints one job *per item*. That's exactly right for hundreds or a few thousand. But reach for it on "import a million rows from an external feed" and you mint a million ledger rows — millions of writes, a saturated active set, and slow dashboards. The ledger is a **lifecycle/audit store** (durable claim, retry, per-row history); that machinery is worth paying for a *job* and pure overhead a million times over for homogeneous rows. The fix isn't a faster engine — it's a coarser **unit of work**: make the **window** the job, not the row.
+**Concept.** `source.Submit(action)` mints one job *per item*. Its async form keeps producer memory
+bounded and applies sequential backpressure, but it deliberately does not bound ledger growth. That's
+exactly right for hundreds or a few thousand. Reach for it on "import a million rows from an external
+feed" and you still mint a million ledger rows—millions of writes, a saturated active set, and slow
+dashboards. The ledger is a **lifecycle/audit store** (durable claim, retry, per-row history); that
+machinery is worth paying for a *job* and pure overhead a million times over for homogeneous rows. The
+fix isn't a faster engine—it's a coarser **unit of work**: make the **window** the job, not the row.
 
 **Recipe.** Model a *window* over the source as the work-item. Each run processes one window (a bulk `Save`), advances its own cursor, and re-queues itself at the next window with `ctx.ContinueWith`. At most one window is in flight, so the source drains through a handful of ledger rows instead of a million.
 
@@ -423,17 +450,28 @@ public sealed class PingJob : Entity<PingJob>, IKoanJob<PingJob> { … }
 
 `Auto` (default) follows your adapters; `InMemory` keeps a job's queue state volatile even when a store is present (the orchestration is ephemeral—handy for a torrent of fire-and-forget work you don't want touching the database); `DataStore` insists on durability. Mixed tiers coexist in one app: durable and in-memory jobs run side by side, and a cooperative gate (§6) set by one is honored by the other—so a 429 backoff still protects a shared host across tiers.
 
-**Claim strategy.** When several nodes compete for the same job, choose how they settle it in `JobsOptions`:
+`DataStore` is corrective rather than aspirational: when no durable Data adapter is available, host composition fails
+and names the affected work types. Koan never silently weakens that declaration to in-memory execution.
 
-```csharp
-builder.Services.AddKoanJobs(o => o.ClaimStrategy = ClaimStrategy.Ticket);
-```
+**Claim behavior.** When several nodes compete, Jobs automatically uses the selected Data adapter's conditional
+compare-and-set capability. SQLite, PostgreSQL, SQL Server, and MongoDB each mark a ready job `Running` atomically,
+so competing consumers cannot both win that ledger row. An adapter that does not declare conditional replace retains
+the constant at-least-once contract through an honest optimistic fallback; handler idempotency remains required on
+every tier. There is no claim-strategy setting or clock-skew-sensitive election protocol to choose.
 
-`Optimistic` (default) is cheapest; on durable adapters that support an atomic conditional claim (SQLite, Postgres, SqlServer, Mongo) it marks a job `Running` with a **compare-and-set** — so under competing consumers each ready job is claimed by **exactly one** node (no duplicate runs), with idempotency as the backstop where a store can't. `Ticket` runs a leaderless GUIDv7 election (each contender drops a ticket, the earliest wins). Both work on every adapter.
+**When to use which.** Single service or multiple replicas → use the automatic claim path. A torrent of
+fire-and-forget pings you do not want cluttering the store → `[JobPersistence(InMemory)]`.
 
-**When to use which.** Single service → defaults. Multiple replicas pulling the same queue → `Ticket`. A torrent of fire-and-forget pings you don't want cluttering the store → `[JobPersistence(InMemory)]`.
+**Lane fairness is per node.** Each worker fairly multiplexes the lanes *it* claims (§4), so no lane starves on any node. Lane weights are honored per node too — so across many nodes the global split tracks the weights when feed is balanced across them, and stays approximate (but never starving) under node-asymmetric feed. Exact global weight proportions are deliberately *not* bought with per-claim cross-node coordination; see ADR JOBS-0008.
 
-**Push dispatch (lower latency).** Out of the box a worker wakes the instant *it* submits a job and otherwise polls at `PollInterval`. Reference **`Koan.Jobs.Transport.Messaging`** and a submit on *any* node fans a lightweight "job ready" wake across the bus, so every node claims new work immediately instead of waiting out its poll interval. It's purely a latency upgrade—the ledger is still the truth, so a dropped signal costs at most one poll interval and never correctness.
+**Wake latency.** Out of the box, Jobs emits a bounded internal Communication wake
+hint and otherwise polls at `PollInterval`. The process-local provider requires no configuration. If
+the application directly references a Communication connector that claims framework signals, such as
+RabbitMQ, the same hint uses
+the elected mesh automatically—there is no Jobs transport package or bus registration. Replicas
+compete to wake and claim from the shared ledger. This is purely a latency upgrade: the ledger is
+still the truth, so a dropped or duplicated signal costs at most one poll interval and never
+correctness.
 
 **Transactional submit (outbox).** On the durable tier, a `Submit` inside an ambient transaction is part of that transaction—the job is enqueued **on commit** and **discarded on rollback**. So a job submitted as a side effect of saving an entity can never be "saved but never enqueued," and a rolled-back save never leaves a stray job:
 
@@ -441,7 +479,8 @@ builder.Services.AddKoanJobs(o => o.ClaimStrategy = ClaimStrategy.Ticket);
 using (EntityContext.Transaction("publish"))
 {
     await order.Save();
-    await order.Job.Submit(Stage.Notify);   // enqueued only if the transaction commits
+    var submission = await new[] { order }.Submit(Stage.Notify);
+    Debug.Assert(submission.PendingCommit); // accepted, but visible only if the transaction commits
     await EntityContext.Commit();
 }
 ```
@@ -459,19 +498,21 @@ Set any window to zero to disable it. For a high-throughput type, prefer a short
 **Throughput metrics (opt-in).** Active counts ("how many Queued/Running?") come straight from the indexed ledger and need nothing extra. For **throughput/trend history that survives retention** — completed/failed per period — turn on the rollup:
 
 ```csharp
-builder.Services.AddKoanJobs(o => o.MetricsEnabled = true);
+builder.Services.Configure<JobsOptions>(o => o.MetricsEnabled = true);
 ```
 
-Each node tallies terminal outcomes in memory and periodically flushes its own shard of a `JobMetric` rollup, so dashboards read pre-aggregated counts cheaply and they **outlive the rows they counted** (retention deletes the `JobRecord`s; the counts remain):
+Each node tallies terminal outcomes in memory and periodically flushes its own internal rollup shard, so dashboards read pre-aggregated counts cheaply and they **outlive the rows they counted** (retention deletes the `JobRecord`s; the counts remain):
 
 ```csharp
 var since = DateTimeOffset.UtcNow.AddDays(-1);
 IReadOnlyDictionary<string, long> byOutcome =
-    await JobMetric.Summary(typeof(ImportJob).FullName!, since, DateTimeOffset.UtcNow);
+    await JobMetrics.Summary(typeof(ImportJob).FullName!, since, DateTimeOffset.UtcNow);
 // { "Completed": 18234, "Failed": 12, … }
 ```
 
 Off by default (the zero-config path stays write-free); the flush cadence is `MetricsFlushInterval` and the rollup itself is trimmed by `MetricsRetention`.
+
+**Health signal (always on).** The Jobs pillar publishes an `IHealthContributor` (`Koan.Jobs`) to the standard `/health` surface: queued/running depth, reclaim backlog, and the **oldest-queued-age** — the cheap global signal that makes a stalled or starved queue self-evident instead of something you infer hours later. Set `o.QueueAgeWarning = TimeSpan.FromMinutes(5)` to flip the contributor to **Degraded** when the oldest job has waited past the budget (off by default — the facts are always published for scraping, the Degraded *signal* is opt-in).
 
 ---
 
@@ -482,7 +523,7 @@ Off by default (the zero-config path stays write-free); the flush cadence is `Me
 **Sample.**
 
 ```csharp
-services.AddKoanJobs(o => o.Mode = JobMode.Inline);
+services.Configure<JobsOptions>(o => o.Mode = JobMode.Inline);
 
 await new ThumbnailJob { SourceUrl = url }.Job.Submit();   // runs now, synchronously
 var saved = await ThumbnailJob.Get(id);
@@ -492,6 +533,82 @@ saved!.ThumbUrl.Should().NotBeNull();
 For schedules, timeouts, and deferrals, inject a `TimeProvider` (Koan uses the standard `System.TimeProvider`) and a fake clock to **advance time** instead of waiting—no flakiness, no real delays.
 
 **When to use it.** Always—assert your handler's logic and chain decisions in milliseconds.
+
+### Testing stage handlers in-process (JobStagePilot)
+
+When a job has multiple stages, `DrainAsync` runs all ready stages in one call. To assert the settle result and chain advancement of a **single stage** without triggering its successors, use `JobStagePilot` from `Koan.Jobs.TestKit`.
+
+`host.Pilot.RunStageAsync(workItem, action)` submits the work-item for that specific action and drives exactly one claim/settle cycle through the real production path. It returns a `StageRunResult`:
+
+| Field | What it holds |
+|---|---|
+| `result.Run.Signal` | The `JobSignal` the handler raised (`None`, `StopChain`, `ContinueWith`, `Reschedule`, `Backoff`) |
+| `result.Run.NextAction` | The action passed to `ctx.ContinueWith(...)`, if any |
+| `result.Run.DeferUntil` | The time the handler rescheduled to, if any |
+| `result.Settled` | The `JobRecord` after settle (inspect `Status`, `Attempt`, etc.) |
+| `result.Successor` | The next-stage `JobRecord` the chain appended, or null if stopped/rescheduled |
+
+**Sample — two-stage chain:**
+
+```csharp
+await using var host = await JobsHarness.StartInMemoryAsync();
+var pipeline = new Pipeline();
+
+var result = await host.Pilot.RunStageAsync(pipeline, Stage.Fetch);
+
+// Assert the control signal
+result.Run.Signal.Should().Be(JobSignal.None);   // default chain advance
+
+// Assert settle
+result.Settled.Status.Should().Be(JobStatus.Completed);
+
+// Assert chain advancement -- Parse was appended but NOT run yet
+result.Successor!.Action.Should().Be(Stage.Parse);
+result.Successor.Status.Should().Be(JobStatus.Queued);
+
+// Assert entity mutations (auto-save persisted the handler's writes)
+var saved = await Pipeline.Get(pipeline.Id);
+saved!.Fetched.Should().Be("raw");
+saved.Trail.Should().Equal(Stage.Fetch);   // Parse has NOT run
+```
+
+**Asserting explicit signals:**
+
+```csharp
+// StopChain -- no successor appended
+result.Run.Signal.Should().Be(JobSignal.StopChain);
+result.Successor.Should().BeNull();
+
+// ContinueWith -- branches to a named action
+result.Run.Signal.Should().Be(JobSignal.ContinueWith);
+result.Run.NextAction.Should().Be("MyBranchAction");
+result.Successor!.Action.Should().Be("MyBranchAction");
+
+// Reschedule -- same stage re-queued
+result.Run.Signal.Should().Be(JobSignal.Reschedule);
+result.Run.DeferUntil.Should().NotBeNull();
+result.Settled.Status.Should().Be(JobStatus.Queued);
+result.Successor.Should().BeNull();
+```
+
+**Real-storage pattern.** `JobStagePilot` works against any adapter. Pass your store settings to `JobsHarness.StartWithSettingsAsync`:
+
+```csharp
+await using var host = await JobsHarness.StartWithSettingsAsync(mongoSettings);
+var result = await host.Pilot.RunStageAsync(convergeJob, "Converge");
+```
+
+**Driving multiple stages sequentially.** Call `RunStageAsync` once per stage and assert intermediate state after each:
+
+```csharp
+var stage1 = await host.Pilot.RunStageAsync(pipeline, Stage.Fetch);
+stage1.Successor!.Action.Should().Be(Stage.Parse);
+
+// Reload the mutated entity and run the next stage
+var fetchedPipeline = await Pipeline.Get(pipeline.Id);
+var stage2 = await host.Pilot.RunStageAsync(fetchedPipeline!, Stage.Parse);
+stage2.Settled.Status.Should().Be(JobStatus.Completed);
+```
 
 ---
 
@@ -540,9 +657,11 @@ await MyJob.Jobs.Trigger(action);         // type-level action, no instance (sch
 ctx.Progress(0.4, "…");  ctx.ContinueWith(next);  ctx.StopChain();
 ctx.Reschedule(5.Minutes());  ctx.Backoff(retryAfter);  // (TimeSpan helpers are illustrative)
 
-// Tune — AddKoanJobs(o => …)
+// Tune — services.Configure<JobsOptions>(o => …)
 o.ArchiveAfter;  o.FailedAfter;  o.RetainPerWorkType;   // retention: completed/failed windows + per-type cap (§10)
-o.ClaimStrategy;  o.ClaimScanBatch;                     // claim: contention strategy + bounded scan window (§10)
+o.ClaimScanBatch;                                       // bounded per-lane claim seek window (§10)
+o.LaneWeights["translation"] = 3;                       // lane-fair dispatch: relative per-lane weight (default 1 = equal share, §4)
+o.QueueAgeWarning = TimeSpan.FromMinutes(5);            // health: oldest-queued-age tripwire → /health Degraded (default off, §10)
 o.JobPerRowWarnThreshold;                               // warn when a work-type looks like job-per-row (§8.1)
 ```
 

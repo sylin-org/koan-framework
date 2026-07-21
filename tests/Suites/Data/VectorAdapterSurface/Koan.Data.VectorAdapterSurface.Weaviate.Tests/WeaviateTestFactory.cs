@@ -44,7 +44,7 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
     public bool SupportsDynamicCollections   => true;
     public bool SupportsScoreNormalization   => true;  // cosine
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (_initialized) return;
         _initialized = true;
@@ -65,7 +65,7 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
             // pattern (WithImage) still functions — suppress the deprecation (warnings-as-errors).
 #pragma warning disable CS0618
             _container = new ContainerBuilder()
-                .WithImage("semitechnologies/weaviate:1.25.6")
+                .WithImage("cr.weaviate.io/semitechnologies/weaviate:1.37.6")
                 .WithEnvironment("QUERY_DEFAULTS_LIMIT", "25")
                 .WithEnvironment("AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED", "true")
                 .WithEnvironment("AUTOSCHEMA_ENABLED", "true") // auto-create metadata properties on insert (filterable)
@@ -95,7 +95,7 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _adminHttp?.Dispose();
         if (_sp is not null) await _sp.DisposeAsync();
@@ -151,13 +151,12 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddLogging();
         services.AddHttpClient();
-        services.AddKoanDataVector();
+        services.AddVectorAdapterTestRuntime();
 
         services.AddOptions<WeaviateOptions>().Configure(o =>
         {
             o.ConnectionString = _endpoint;
             o.Endpoint = _endpoint;
-            o.Dimension = EmbeddingDimension;
             o.Metric = "cosine";
         });
         services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();

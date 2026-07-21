@@ -1,4 +1,6 @@
 using AwesomeAssertions;
+using Koan.Core.Context;
+using Koan.Data.AI.Telemetry;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -26,6 +28,22 @@ public class Phase3_AsyncQueueTests
 
         // Assert
         jobId.Should().Be("embedjob:TestDocument:doc-123");
+        typeof(EmbedJob<TestDocument>).GetMethod(nameof(EmbedJob<TestDocument>.MakeId), [typeof(string)])
+            .Should().NotBeNull("the released 0.17 binary method shape remains available");
+    }
+
+    [Fact]
+    public void EmbedJob_MakeId_Isolates_Same_Entity_Id_By_Captured_Context()
+    {
+        var tenantA = new Dictionary<string, string> { ["koan:tenant"] = "v1:id:a" };
+        var tenantB = new Dictionary<string, string> { ["koan:tenant"] = "v1:id:b" };
+
+        var a = EmbedJob<TestDocument>.MakeId("shared-id", tenantA);
+        var b = EmbedJob<TestDocument>.MakeId("shared-id", tenantB);
+
+        a.Should().NotBe(b);
+        a.Should().StartWith("koan-context-embedjob:v1:").And.NotContain("v1:id:a");
+        b.Should().StartWith("koan-context-embedjob:v1:").And.NotContain("v1:id:b");
     }
 
     [Fact]
@@ -36,9 +54,7 @@ public class Phase3_AsyncQueueTests
         {
             Id = "test-job",
             EntityId = "doc-1",
-            EntityType = "TestDocument",
             ContentSignature = "abc123",
-            EmbeddingText = "test text",
             Status = EmbedJobStatus.Pending,
             CreatedAt = DateTimeOffset.UtcNow
         };
@@ -46,7 +62,6 @@ public class Phase3_AsyncQueueTests
         // Assert
         job.Status.Should().Be(EmbedJobStatus.Pending);
         job.RetryCount.Should().Be(0);
-        job.MaxRetries.Should().Be(3); // Default
     }
 
     [Fact]
@@ -107,7 +122,6 @@ public class Phase3_AsyncQueueTests
 
         // Assert
         metadata.Async.Should().BeTrue();
-        metadata.RateLimitPerMinute.Should().Be(30);
     }
 
 
@@ -119,11 +133,23 @@ public class Phase3_AsyncQueueTests
         // FQN: `Options` would otherwise bind to the Koan.Data.AI.Options namespace, not the M.E.Options static class.
         var options = Microsoft.Extensions.Options.Options.Create(new EmbeddingWorkerOptions());
 
+        var contextCarriers = new KoanContextCarrierRegistry(Array.Empty<IKoanContextCarrier>());
+
         // Act
-        var worker = new Workers.EmbeddingWorker(logger, options);
+        var worker = new Workers.EmbeddingWorker(logger, options, null, contextCarriers);
+#pragma warning disable CS0618 // compile-lock the exact released constructor, including an explicit null telemetry arg
+        var legacyWorker = new Workers.EmbeddingWorker(logger, options, null);
+#pragma warning restore CS0618
 
         // Assert
         worker.Should().NotBeNull();
+        legacyWorker.Should().NotBeNull();
+        typeof(Workers.EmbeddingWorker).GetConstructor(
+        [
+            typeof(ILogger<Workers.EmbeddingWorker>),
+            typeof(IOptions<EmbeddingWorkerOptions>),
+            typeof(EmbeddingTelemetry)
+        ]).Should().NotBeNull("the released 0.17 constructor shape remains available");
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions;
+using Koan.Data.Core.Axes;
 namespace Koan.Data.Core;
 
 /// <summary>
@@ -12,6 +13,15 @@ public interface IDataService
     /// Implementations may cache resolved repositories for performance.
     /// </summary>
     IDataRepository<TEntity, TKey> GetRepository<TEntity, TKey>()
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull;
+
+    /// <summary>
+    /// Resolve the <b>undecorated</b> read-scope diagnostic for an aggregate (ARCH-0101 §8/§9) — the facade itself,
+    /// the authority that holds the raw adapter for the capability / <c>IQueryRepository</c> inspection.
+    /// <see cref="DataAxis.Explain"/> uses it (and so does the §8 boot-refuses-leaky-axis pre-flight); not a hot path.
+    /// </summary>
+    IAxisScopeDiagnostics GetScopeDiagnostics<TEntity, TKey>()
         where TEntity : class, IEntity<TKey>
         where TKey : notnull;
 

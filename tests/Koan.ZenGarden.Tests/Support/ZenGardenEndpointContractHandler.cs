@@ -1,5 +1,5 @@
 using System.Text;
-using Koan.ZenGarden.Core;
+using Koan.ZenGarden;
 
 namespace Koan.ZenGarden.Tests.Support;
 

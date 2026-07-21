@@ -2,12 +2,14 @@
 id: MESS-0022
 slug: MESS-0022-mq-provisioning-aliases-and-dispatcher
 domain: MESS
-status: Accepted
+status: Retired
 date: 2025-08-17
 title: MQ provisioning defaults, type aliases/attributes, and dispatcher
 ---
 
 # 0022 - MQ provisioning defaults, type aliases/attributes, and dispatcher
+
+> **Status: Retired.** Describes a prior messaging generation; the inbox/alias/provisioning features no longer exist in code.
 
 ## Context
 

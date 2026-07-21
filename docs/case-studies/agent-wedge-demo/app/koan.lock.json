@@ -1,0 +1,156 @@
+{
+  "schema": 2,
+  "app": {
+    "name": "Recs",
+    "koan": "0.17",
+    "tfm": "net10.0"
+  },
+  "modules": [
+    {
+      "id": "Koan.AI",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.AI.Connector.Ollama",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.AI.Contracts",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.AI.Prompt",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Cache",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Cache.Abstractions",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Core",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Core.Adapters",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.AI",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Abstractions",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Connector.Postgres",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Connector.Sqlite",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Core",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Relational",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Vector",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Vector.Abstractions",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Vector.Connector.Weaviate",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Jobs",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Mcp",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Media.Abstractions",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Orchestration.Abstractions",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Security.Trust",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Storage",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Web",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Web.Sse",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.ZenGarden.Contracts",
+      "version": "0.17"
+    }
+  ],
+  "directReferences": [
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.AI.Connector.Ollama"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Cache"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Data.AI"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Data.Connector.Postgres"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Data.Connector.Sqlite"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Data.Vector"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Data.Vector.Connector.Weaviate"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Jobs"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Mcp"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Web"
+    }
+  ]
+}

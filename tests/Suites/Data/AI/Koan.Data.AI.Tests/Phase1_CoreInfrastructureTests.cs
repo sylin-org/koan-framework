@@ -62,7 +62,6 @@ public class Phase1_CoreInfrastructureTests
 
         // Assert
         metadata.Async.Should().BeTrue();
-        metadata.RateLimitPerMinute.Should().Be(30);
     }
 
     [Fact]

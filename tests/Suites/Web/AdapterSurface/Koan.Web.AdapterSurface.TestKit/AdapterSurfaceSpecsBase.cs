@@ -29,7 +29,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         Factory = factory;
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
         // Flow-scoped AppHost.Current override (Phase 1a). EntitySchemaGuard was deleted in
@@ -54,21 +54,21 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         }
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _scope?.Dispose();
         _scope = null;
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     protected void SkipIfUnavailable()
-        => Skip.If(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
+        => Assert.SkipWhen(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
 
     // ============================================================================================
     // GET /api/widgets — collection list
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task GetCollection_empty_returns_empty_array()
     {
         SkipIfUnavailable();
@@ -80,7 +80,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         items.Should().BeEmpty();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetCollection_after_upserts_returns_all_items()
     {
         SkipIfUnavailable();
@@ -95,7 +95,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
 
     // === Sort grammar (DATA-0092) ===
 
-    [SkippableFact]
+    [Fact]
     public async Task GetCollection_sort_minus_prefix_descends()
     {
         SkipIfUnavailable();
@@ -108,7 +108,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         items.Select(NameOf).Should().Equal("Charlie", "Bravo", "Alpha");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetCollection_sort_plus_prefix_ascends()
     {
         SkipIfUnavailable();
@@ -122,7 +122,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         items.Select(NameOf).Should().Equal("Alpha", "Bravo", "Charlie");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetCollection_sort_no_prefix_ascends()
     {
         SkipIfUnavailable();
@@ -135,7 +135,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         items.Select(NameOf).Should().Equal("Alpha", "Bravo", "Charlie");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetCollection_multi_field_sort_applies_in_order()
     {
         SkipIfUnavailable();
@@ -155,7 +155,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
 
     // === The original bug: deep-path collection sort ===
 
-    [SkippableFact]
+    [Fact]
     public async Task GetCollection_deep_path_sort_aggregates_max_for_desc()
     {
         SkipIfUnavailable();
@@ -169,7 +169,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         items.Select(IdOf).Should().Equal("d", "b", "c", "a", "e");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetCollection_deep_path_sort_and_pagination_returns_correct_window()
     {
         SkipIfUnavailable();
@@ -188,7 +188,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         (await ReadItems(page3)).Select(IdOf).Should().Equal("e");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetCollection_unresolvable_sort_field_returns_400()
     {
         SkipIfUnavailable();
@@ -203,7 +203,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
 
     // === Pagination + sort-after-paginate regression ===
 
-    [SkippableFact]
+    [Fact]
     public async Task GetCollection_page_one_sorted_asc_returns_globally_smallest_not_first_inserted()
     {
         SkipIfUnavailable();
@@ -221,7 +221,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         items.Select(NameOf).Should().Equal("WA", "WB", "WC");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetCollection_pagination_headers_present()
     {
         SkipIfUnavailable();
@@ -240,7 +240,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     // GET /api/widgets/{id}
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task GetById_returns_existing_entity()
     {
         SkipIfUnavailable();
@@ -254,7 +254,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         doc.GetProperty("name").GetString().Should().Be("Hello");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetById_missing_returns_404()
     {
         SkipIfUnavailable();
@@ -267,7 +267,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     // POST /api/widgets — upsert
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task Upsert_creates_new_entity_and_returns_it()
     {
         SkipIfUnavailable();
@@ -285,7 +285,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         (await got.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("name").GetString().Should().Be("Created");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Upsert_updates_existing_entity()
     {
         SkipIfUnavailable();
@@ -303,7 +303,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     // POST /api/widgets/bulk — upsertMany
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task UpsertMany_creates_multiple_entities()
     {
         SkipIfUnavailable();
@@ -324,7 +324,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     // DELETE /api/widgets/{id}
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task Delete_by_id_removes_entity()
     {
         SkipIfUnavailable();
@@ -341,7 +341,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     // POST /api/widgets/query — body-query (filter + sort + page)
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task BodyQuery_with_sort_array_applies_sort()
     {
         SkipIfUnavailable();
@@ -357,7 +357,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         items.Select(NameOf).Should().Equal("Charlie", "Bravo", "Alpha");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task BodyQuery_with_deep_path_sort_and_pagination()
     {
         SkipIfUnavailable();
@@ -375,7 +375,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         items.Select(IdOf).Should().Equal("d", "b");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task BodyQuery_with_unresolvable_sort_returns_400()
     {
         SkipIfUnavailable();
@@ -392,7 +392,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     // Sanity: full round-trip with deep-path collection (the original bug, end-to-end)
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task FullRoundTrip_deep_path_sort_pagination_matches_expected_order_for_every_page()
     {
         SkipIfUnavailable();
@@ -414,7 +414,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     // GET /api/widgets/new — entity template
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task GetNew_returns_empty_template()
     {
         SkipIfUnavailable();
@@ -431,10 +431,10 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     // GET /api/widgets?q=... — query-string filter
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task GetCollection_querystring_filter_returns_matching_subset()
     {
-        Skip.If(!Factory.SupportsQueryStringFilter, $"[{typeof(TFactory).Name}] does not support ?filter= query-string filter.");
+        Assert.SkipWhen(!Factory.SupportsQueryStringFilter, $"[{typeof(TFactory).Name}] does not support ?filter= query-string filter.");
         SkipIfUnavailable();
 
         await SeedAlphaBravoCharlie();
@@ -451,14 +451,60 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         NameOf(items[0]).Should().Be("Bravo");
     }
 
+    [Fact]
+    public async Task GetCollection_querystring_filter_composes_operators_and_mixed_case_fields()
+    {
+        Assert.SkipWhen(!Factory.SupportsQueryStringFilter, $"[{typeof(TFactory).Name}] does not support ?filter= query-string filter.");
+        SkipIfUnavailable();
+
+        await UpsertWidget("id1", name: "Alpha", priority: 1);
+        await UpsertWidget("id2", name: "Bravo", priority: 2);
+        await UpsertWidget("id3", name: "Charlie", priority: 3);
+        await UpsertWidget("id4", name: "Delta", priority: 4);
+
+        var filter = "{\"$or\":[{\"pRiOrItY\":{\"$gte\":3}},{\"name\":\"Alpha\"}]}";
+        var encoded = Uri.EscapeDataString(filter);
+        var response = await Client.GetAsync($"/api/widgets?filter={encoded}&sort=Priority");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var items = await ReadItems(response);
+        items.Select(NameOf).Should().Equal("Alpha", "Charlie", "Delta");
+    }
+
+    [Fact]
+    public async Task GetCollection_malformed_filter_returns_400_not_unfiltered_results()
+    {
+        Assert.SkipWhen(!Factory.SupportsQueryStringFilter, $"[{typeof(TFactory).Name}] does not support ?filter= query-string filter.");
+        SkipIfUnavailable();
+        await SeedAlphaBravoCharlie();
+
+        var encoded = Uri.EscapeDataString("{\"Name\":");
+        var response = await Client.GetAsync($"/api/widgets?filter={encoded}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task GetCollection_unknown_filter_field_returns_400_not_unfiltered_results()
+    {
+        Assert.SkipWhen(!Factory.SupportsQueryStringFilter, $"[{typeof(TFactory).Name}] does not support ?filter= query-string filter.");
+        SkipIfUnavailable();
+        await SeedAlphaBravoCharlie();
+
+        var encoded = Uri.EscapeDataString("{\"DoesNotExist\":\"Bravo\"}");
+        var response = await Client.GetAsync($"/api/widgets?filter={encoded}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ============================================================================================
     // DELETE /api/widgets/bulk — delete many by ids body
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task DeleteMany_by_ids_body_removes_only_listed()
     {
-        Skip.If(!Factory.SupportsBulkDelete, $"[{typeof(TFactory).Name}] does not support DELETE /bulk.");
+        Assert.SkipWhen(!Factory.SupportsBulkDelete, $"[{typeof(TFactory).Name}] does not support DELETE /bulk.");
         SkipIfUnavailable();
 
         await UpsertWidget("keep-a", name: "KeepA");
@@ -483,10 +529,10 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     // DELETE /api/widgets?q=... — delete by query
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task DeleteByQuery_removes_matching_entities()
     {
-        Skip.If(!Factory.SupportsDeleteByQuery, $"[{typeof(TFactory).Name}] does not support DELETE ?q=.");
+        Assert.SkipWhen(!Factory.SupportsDeleteByQuery, $"[{typeof(TFactory).Name}] does not support DELETE ?q=.");
         SkipIfUnavailable();
 
         await UpsertWidget("dq-a", name: "Match");
@@ -503,10 +549,10 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         IdOf(list[0]).Should().Be("dq-c");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DeleteByQuery_without_q_returns_400()
     {
-        Skip.If(!Factory.SupportsDeleteByQuery, $"[{typeof(TFactory).Name}] does not support DELETE ?q=.");
+        Assert.SkipWhen(!Factory.SupportsDeleteByQuery, $"[{typeof(TFactory).Name}] does not support DELETE ?q=.");
         SkipIfUnavailable();
 
         var del = await Client.DeleteAsync("/api/widgets");
@@ -517,10 +563,10 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     // DELETE /api/widgets/all — drop everything
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task DeleteAll_removes_every_entity()
     {
-        Skip.If(!Factory.SupportsDeleteAll, $"[{typeof(TFactory).Name}] does not support DELETE /all.");
+        Assert.SkipWhen(!Factory.SupportsDeleteAll, $"[{typeof(TFactory).Name}] does not support DELETE /all.");
         SkipIfUnavailable();
 
         await SeedAlphaBravoCharlie();
@@ -537,10 +583,10 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     // PATCH /api/widgets/{id} — JSON Patch (RFC 6902)
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task PatchJsonPatch_replace_updates_target_field()
     {
-        Skip.If(!Factory.SupportsJsonPatch, $"[{typeof(TFactory).Name}] does not support JSON Patch.");
+        Assert.SkipWhen(!Factory.SupportsJsonPatch, $"[{typeof(TFactory).Name}] does not support JSON Patch.");
         SkipIfUnavailable();
 
         await UpsertWidget("patch-jp", name: "Original", priority: 1);
@@ -566,10 +612,10 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     // PATCH /api/widgets/{id} — Merge Patch (RFC 7396)
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task PatchMergePatch_partial_object_merges_into_entity()
     {
-        Skip.If(!Factory.SupportsMergePatch, $"[{typeof(TFactory).Name}] does not support Merge Patch.");
+        Assert.SkipWhen(!Factory.SupportsMergePatch, $"[{typeof(TFactory).Name}] does not support Merge Patch.");
         SkipIfUnavailable();
 
         await UpsertWidget("patch-merge", name: "Before", priority: 5);
@@ -591,10 +637,10 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     // PATCH /api/widgets/{id} — Partial JSON (application/json fallback)
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task PatchPartialJson_partial_object_updates_listed_fields_only()
     {
-        Skip.If(!Factory.SupportsPartialPatch, $"[{typeof(TFactory).Name}] does not support Partial JSON Patch.");
+        Assert.SkipWhen(!Factory.SupportsPartialPatch, $"[{typeof(TFactory).Name}] does not support Partial JSON Patch.");
         SkipIfUnavailable();
 
         await UpsertWidget("patch-partial", name: "Initial", priority: 10);
@@ -613,10 +659,10 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         doc.GetProperty("name").GetString().Should().Be("Initial");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task PatchJsonPatch_against_missing_id_returns_404()
     {
-        Skip.If(!Factory.SupportsJsonPatch, $"[{typeof(TFactory).Name}] does not support JSON Patch.");
+        Assert.SkipWhen(!Factory.SupportsJsonPatch, $"[{typeof(TFactory).Name}] does not support JSON Patch.");
         SkipIfUnavailable();
 
         var ops = new[] { new { op = "replace", path = "/name", value = "Nope" } };

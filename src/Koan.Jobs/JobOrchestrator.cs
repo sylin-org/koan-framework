@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Koan.Data.Core;
+using Koan.Jobs.Semantics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,7 +14,7 @@ namespace Koan.Jobs;
 /// by design: <see cref="DrainAsync"/> processes all currently-ready work to completion (the test driver); the worker
 /// service drives the same loop continuously in production. All time comes from an injected <see cref="TimeProvider"/>.
 /// </summary>
-public sealed class JobOrchestrator
+internal sealed class JobOrchestrator
 {
     private readonly IJobLedger _ledger;
     private readonly JobTypeRegistry _registry;
@@ -20,6 +22,8 @@ public sealed class JobOrchestrator
     private readonly TimeProvider _clock;
     private readonly ILogger<JobOrchestrator> _logger;
     private readonly IServiceScopeFactory _scopes;
+    private readonly IReadOnlyList<IJobPoolResolver> _poolResolvers;
+    private readonly JobsContextPlan _contextPlan;
 
     private readonly string _owner = Guid.CreateVersion7().ToString("N");
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _lanes = new(StringComparer.Ordinal);
@@ -28,7 +32,8 @@ public sealed class JobOrchestrator
 
     public JobOrchestrator(
         IJobLedger ledger, JobTypeRegistry registry, IOptions<JobsOptions> options,
-        TimeProvider clock, ILogger<JobOrchestrator> logger, IServiceScopeFactory scopes)
+        TimeProvider clock, ILogger<JobOrchestrator> logger, IServiceScopeFactory scopes,
+        IEnumerable<IJobPoolResolver> poolResolvers, JobsContextPlan contextPlan)
     {
         _ledger = ledger;
         _registry = registry;
@@ -36,10 +41,12 @@ public sealed class JobOrchestrator
         _clock = clock;
         _logger = logger;
         _scopes = scopes;
+        _poolResolvers = poolResolvers.ToList();
+        _contextPlan = contextPlan;
         _metrics = new JobMetricsRecorder(_options.MetricsEnabled, _owner, _clock);
     }
 
-    /// <summary>Fold this node's accumulated throughput deltas into its <see cref="JobMetric"/> shard rows (§20.2).
+    /// <summary>Fold this node's accumulated throughput deltas into its internal metric shard rows (§20.2).
     /// No-op unless <see cref="JobsOptions.MetricsEnabled"/>. Driven by the worker on <c>MetricsFlushInterval</c>.</summary>
     public Task FlushMetricsAsync(CancellationToken ct = default) => _metrics.FlushAsync(ct);
 
@@ -54,8 +61,17 @@ public sealed class JobOrchestrator
         {
             while (!ct.IsCancellationRequested)
             {
+                // Global cap: don't claim more work than this node can run concurrently.
+                if (_options.WorkerConcurrency > 0 && inflight.Count >= _options.WorkerConcurrency)
+                {
+                    await Task.WhenAny(inflight);
+                    inflight.RemoveAll(t => t.IsCompleted);
+                    continue;
+                }
+
                 var now = _clock.GetUtcNow();
-                var rec = await _ledger.ClaimNext(_owner, now, now + _options.LeaseDuration, SaturatedLanes(), ct);
+                var pools = await ResolvePoolContextsAsync(ct);
+                var rec = await _ledger.ClaimNext(_owner, now, now + _options.LeaseDuration, SaturatedLanes(), ct, pools);
                 if (rec is not null)
                 {
                     var binding = _registry.Require(rec.WorkType);
@@ -102,12 +118,54 @@ public sealed class JobOrchestrator
         finally { lane.Release(); }
     }
 
-    private async Task ExecuteClaimedAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy, CancellationToken workerCt)
+    /// <summary>Claim and execute exactly one ready job through the same path as <see cref="DrainAsync"/>, returning
+    /// its execution result. Returns null when nothing is ready or when the work-item could not be loaded.
+    /// Designed for in-process stage-handler integration testing via <c>JobStagePilot</c>.</summary>
+    public async Task<JobRunResult?> ExecuteNextAsync(CancellationToken ct = default)
     {
+        var now = _clock.GetUtcNow();
+        var pools = await ResolvePoolContextsAsync(ct);
+        var rec = await _ledger.ClaimNext(_owner, now, now + _options.LeaseDuration, SaturatedLanes(), ct, pools);
+        if (rec is null) return null;
+
+        var binding = _registry.Require(rec.WorkType);
+        var policy = binding.ResolvePolicy(rec.Action, _options);
+        var sem = LaneSem(policy.Lane, policy.MaxConcurrency);
+        if (!sem.Wait(0)) await sem.WaitAsync(ct);
+        JobContext? ctx;
+        try
+        {
+            try { ctx = await ExecuteClaimedAsync(rec, binding, policy, ct); }
+            catch (Exception ex) { _logger.LogError(ex, "Unhandled error settling job {JobId}", rec.Id); ctx = null; }
+        }
+        finally { sem.Release(); }
+
+        return ctx is null ? null
+            : new JobRunResult(rec.Id, rec.WorkType, rec.Action, ctx.Signal, ctx.DeferUntil, ctx.NextAction, ctx.GateKeyOverride);
+    }
+
+    private async Task<JobContext?> ExecuteClaimedAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy, CancellationToken workerCt)
+    {
+        // Restore the Koan context captured at submit BEFORE loading the (possibly tenant-scoped)
+        // work-item, and keep them in scope across load + execute + settle (the conditional auto-save included) so
+        // every tenant-scoped read/write runs in the submitted tenant. A restore failure (an unregistered axis, or
+        // an unknown carrier format) is deterministic and non-retryable → dead-letter; the handler never runs
+        // fail-open in a wrong/absent context. A null/empty bag explicitly suppresses every registered axis (the §1b
+        // request guard owns the unscoped-write refusal under Closed; dev-fallback under Open).
+        IDisposable ambientScope;
+        try
+        {
+            ambientScope = _contextPlan.RestoreForExecution(binding.ClrType, rec.AmbientCarrier);
+        }
+        catch (Exception ex) { await SettleCarrierFailureAsync(rec, ex); return null; }
+        using var _ambient = ambientScope;
+
         object? workItem;
         try { workItem = await binding.Load(rec.WorkId, workerCt); }
-        catch (Exception ex) { await SettleFailureAsync(rec, binding, policy, ex); return; }
-        if (workItem is null) { await SettleFailureAsync(rec, binding, policy, new InvalidOperationException($"Work-item {rec.WorkType}/{rec.WorkId} not found.")); return; }
+        catch (Exception ex) { await SettleFailureAsync(rec, binding, policy, ex); return null; }
+        // Type-level triggers (TriggerAsync) use an ephemeral singleton that is never persisted; re-create it here.
+        workItem ??= rec.WorkId == Infrastructure.Constants.Work.SingletonId ? binding.NewSingleton(rec.WorkId) : null;
+        if (workItem is null) { await SettleFailureAsync(rec, binding, policy, new InvalidOperationException($"Work-item {rec.WorkType}/{rec.WorkId} not found.")); return null; }
 
         var snapshot = Snapshot(workItem);   // for conditional auto-save (§17.1): only persist if the handler mutates it
 
@@ -119,7 +177,16 @@ public sealed class JobOrchestrator
         if (rec.CancelRequestedAt is not null) { try { linked.Cancel(); } catch (ObjectDisposedException) { } }
 
         using var scope = _scopes.CreateScope();
-        var ctx = new JobContext(rec.Action, rec.Id, scope.ServiceProvider, _logger, ToState(rec), _clock, linked.Token, ProgressSink);
+        Task PersistProgress(string jobId, double fraction, string? message, CancellationToken ct)
+        {
+            // Progress is written immediately for live observers. Keep the claimed snapshot in sync too, otherwise
+            // the subsequent settle Update would overwrite that newer ledger row with its pre-handler values.
+            rec.ProgressFraction = fraction;
+            rec.ProgressMessage = message;
+            return ProgressSink(jobId, fraction, message, ct);
+        }
+
+        var ctx = new JobContext(rec.Action, rec.Id, scope.ServiceProvider, _logger, ToState(rec), _clock, linked.Token, PersistProgress);
         try
         {
             await binding.Execute(workItem, ctx, linked.Token);
@@ -147,6 +214,7 @@ public sealed class JobOrchestrator
         {
             _running.TryRemove(rec.Id, out _);
         }
+        return ctx;
     }
 
     // --- settle paths ---
@@ -173,6 +241,12 @@ public sealed class JobOrchestrator
             _ => binding.NextInChain(rec.Action),
         };
 
+        // Settle-window cancel check: CancelWorkAsync writes CancelRequestedAt to the durable ledger while the
+        // handler runs, but the orchestrator's rec clone was loaded at claim time (before that write). Re-read
+        // BEFORE overwriting the record with Completed — otherwise our Update below erases the marker and the
+        // subsequent check sees a clean record every time.
+        var cancelledInSettleWindow = next is not null && await IsCancelMarkerSet(rec.Id);
+
         rec.Owner = null;
         rec.LeaseUntil = null;
         rec.LastError = null;
@@ -183,11 +257,13 @@ public sealed class JobOrchestrator
         await _ledger.Update(rec, CancellationToken.None);
         _metrics.Record(rec.WorkType, JobStatus.Completed, now);
 
-        if (next is not null)
+        if (next is not null && !cancelledInSettleWindow)
         {
             var nextPolicy = binding.ResolvePolicy(next, _options);
-            // Chain stages inherit the gate key resolved at submit (the chain's gate pool is fixed — §18).
-            var nextRec = JobRecordFactory.Create(binding, nextPolicy, workItem, rec.WorkId, next, now, null, rec.CorrelationId, rec.GateKey);
+            // Chain stages inherit the gate key resolved at submit (the chain's gate pool is fixed — §18) and the
+            // ambient carrier (ARCH-0100 §7): the successor is appended here by the orchestrator, NOT the
+            // coordinator, so capture-at-submit never fires for it — propagate the parent's bag verbatim.
+            var nextRec = JobRecordFactory.Create(binding, nextPolicy, workItem, rec.WorkId, next, now, null, rec.CorrelationId, rec.GateKey, rec.AmbientCarrier);
             await _ledger.Append(nextRec, CancellationToken.None);
         }
     }
@@ -220,9 +296,26 @@ public sealed class JobOrchestrator
             if (wi is not null)
             {
                 var nextPolicy = binding.ResolvePolicy(next, _options);
-                await _ledger.Append(JobRecordFactory.Create(binding, nextPolicy, wi, rec.WorkId, next, now, null, rec.CorrelationId, rec.GateKey), CancellationToken.None);
+                await _ledger.Append(JobRecordFactory.Create(binding, nextPolicy, wi, rec.WorkId, next, now, null, rec.CorrelationId, rec.GateKey, rec.AmbientCarrier), CancellationToken.None);
             }
         }
+    }
+
+    /// <summary>The captured Koan context could not be restored (unknown axis, invalid format/version, or insufficient
+    /// trust). Deterministic — retrying would fail identically — so dead-letter immediately rather than run the handler
+    /// in a wrong/absent context. The work item is never loaded.</summary>
+    private async Task SettleCarrierFailureAsync(JobRecord rec, Exception ex)
+    {
+        var now = _clock.GetUtcNow();
+        rec.Owner = null;
+        rec.LeaseUntil = null;
+        rec.LastError = ex.Message;
+        rec.LastSettledAt = now;
+        rec.DeadReason = DeadReason.CarrierRestoreFailed.ToString();
+        rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
+        SetStatus(rec, JobStatus.Dead, now, $"ambient carrier restore failed: {ex.Message}");
+        await _ledger.Update(rec, CancellationToken.None);
+        _metrics.Record(rec.WorkType, JobStatus.Dead, now);
     }
 
     private async Task ApplyDeferralAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy,
@@ -312,7 +405,7 @@ public sealed class JobOrchestrator
                 if (active > _options.JobPerRowWarnThreshold)
                     _logger.LogWarning(
                         "[Koan.Jobs] WorkType '{WorkType}' has {Active:N0} active rows (> {Threshold:N0}) — this looks " +
-                        "like job-per-row. Window the source with a cursor-conveyor (jobs-howto §bulk; JOBS-0005 §19.4).",
+                        "like job-per-row. Window the source with a cursor-conveyor (jobs-howto §8.1; JOBS-0005 §19.4).",
                         binding.WorkType, active, _options.JobPerRowWarnThreshold);
             }
         return purged;
@@ -333,6 +426,18 @@ public sealed class JobOrchestrator
     }
 
     // --- helpers ---
+
+    private async Task<IReadOnlyDictionary<string, PoolDispatchContext>?> ResolvePoolContextsAsync(CancellationToken ct)
+    {
+        if (_poolResolvers.Count == 0) return null;
+        var dict = new Dictionary<string, PoolDispatchContext>(_poolResolvers.Count, StringComparer.Ordinal);
+        foreach (var resolver in _poolResolvers)
+        {
+            var members = await resolver.GetMembersAsync(ct);
+            dict[resolver.PoolName] = new PoolDispatchContext(resolver.PoolName, members, resolver.CapacityPerMember);
+        }
+        return dict;
+    }
 
     private IReadOnlyCollection<string> SaturatedLanes()
     {

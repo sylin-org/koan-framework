@@ -1,42 +1,38 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <KoanPackageKind>Kernel</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Core primitives for Koan: configuration helper, environment snapshot (KoanEnv), constants, foundational abstractions, and background services with fluent API.</Description>
-    <PackageTags>$(CommonPackageTags);core;configuration;options;environment;runtimesnapshot;constants;backgroundservices;fluentapi</PackageTags>
+    <Description>Composition and runtime substrate for Koan modules: lifecycle, context, provider catalogs, readiness, discovery, facts, and build provenance.</Description>
+    <PackageTags>$(CommonPackageTags);core;composition;modules;context;readiness;discovery;runtime-facts;provenance</PackageTags>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
-    <!-- OTel SDK bumped 1.13 -> 1.15 to clear 4 advisories on the OTLP
-         exporter (CVE-2026-40891, CVE-2026-40182, CVE-2026-42191) and the
-         baggage/B3/Jaeger header parser (CVE-2026-40894). Keep all OTel
-         packages on the matching 1.15.x line to avoid SDK version skew. -->
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <!-- OTel SDK extracted to the Koan.Observability package (ARCH-0088, Reference=Intent). -->
+    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
+  <!-- P1.1: ship the composition-lockfile target as a transitive build asset. Applications normally
+       reference a Koan bundle rather than Core directly; buildTransitive preserves Reference = Intent
+       across that dependency edge. Remove-then-Include avoids the default-None-glob duplicate. -->
   <ItemGroup>
-    <ProjectReference Include="..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
-  </ItemGroup>
-  <!-- Explicitly exclude adapter files to prevent Docker build conflicts -->
-  <ItemGroup>
-    <Compile Remove="Adapters/**/*.cs" />
-    <Compile Remove="**/Adapters/**/*.cs" />
-    <Compile Remove="../Koan.Core.Adapters/**/*.cs" />
-    <None Remove="Adapters/**/*" />
-    <None Remove="**/Adapters/**/*" />
+    <None Remove="build/Sylin.Koan.Core.targets" />
+    <None Include="build/Sylin.Koan.Core.targets" Pack="true" PackagePath="buildTransitive/Sylin.Koan.Core.targets" />
+    <None Remove="build/tools/Sylin.Koan.SemanticActivation.targets" />
+    <None Include="build/tools/Sylin.Koan.SemanticActivation.targets"
+          Pack="true"
+          PackagePath="buildTransitive/tools/Sylin.Koan.SemanticActivation.targets" />
+    <None Include="$(MSBuildProjectDirectory)\..\Koan.Core.Registry.Generators\bin\$(Configuration)\netstandard2.0\Koan.Core.Registry.Generators.dll"
+          Pack="true"
+          PackagePath="buildTransitive/tools/Koan.Core.Registry.Generators.dll"
+          Visible="false" />
   </ItemGroup>
 </Project>

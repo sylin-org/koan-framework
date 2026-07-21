@@ -4,12 +4,11 @@ domain: ai
 title: "AI & Vector Search How-To"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-11-09
-framework_version: v0.6.3
+last_updated: 2026-07-19
+framework_version: v0.20.0
 validation:
-  date_last_tested: 2025-11-09
-  status: verified
-  scope: all-examples-tested
+  status: not-yet-tested
+  scope: docs/guides/ai-vector-howto.md
 related_guides:
   - entity-capabilities-howto.md
   - patch-capabilities-howto.md
@@ -19,11 +18,12 @@ related_guides:
 
 # Koan AI & Vector Search – End-to-End How-To
 
-This guide walks through everything Koan offers for AI-powered semantic search, from generating your first embedding to production-ready hybrid search with personalization. Each section grows in sophistication, lists **concepts**, a **recipe** (packages/config), and usage **scenarios**. Examples draw from:
-
-- **S5.Recs** – Media recommendation engine with hybrid search and personalized vectors
-- **AI demos** – Sample applications showing embedding patterns and caching strategies
-- **Production patterns** – Real-world optimization and monitoring approaches
+This guide walks through Koan's AI-powered semantic-search surfaces, from a first embedding to hybrid
+and personalization patterns. [GardenCoop Chapter 2](../../samples/journeys/GardenCoop/02-LocalDiscovery/)
+proves the smallest local embed-save-search path. Standalone
+[Usagi Picks](https://github.com/lbotinelly/usagipicks) grows that path into a bounded, explainable personalization
+workflow. Neither application claims production-scale recommendation quality; advanced hybrid and tuning recipes
+remain compositional patterns.
 
 **Related Guides:**
 - [Entity Capabilities](entity-capabilities-howto.md) – Core entity patterns for data access
@@ -35,52 +35,38 @@ This guide walks through everything Koan offers for AI-powered semantic search, 
 
 ## 0. Prerequisites
 
-1. Add the Koan AI and Vector packages:
-   ```xml
-   <PackageReference Include="Koan.AI" Version="0.6.3" />
-   <PackageReference Include="Koan.AI.Contracts" Version="0.6.3" />
-   <PackageReference Include="Koan.Data.Vector" Version="0.6.3" />
-   <PackageReference Include="Koan.Data.Vector.Abstractions" Version="0.6.3" />
-   ```
+Reference one embedding provider and one vector provider. Provider packages bring their functional runtimes; do not
+manually assemble the abstraction packages.
 
-2. Reference at least one AI connector (Ollama example):
-   ```xml
-   <PackageReference Include="Koan.AI.Connector.Ollama" Version="0.6.3" />
-   ```
+```powershell
+dotnet add package Sylin.Koan.AI.Connector.Ollama
+dotnet add package Sylin.Koan.Data.Vector.Connector.Weaviate
+```
 
-3. Reference a vector database adapter (Weaviate example):
-   ```xml
-   <PackageReference Include="Koan.Data.Vector.Connector.Weaviate" Version="0.6.3" />
-   ```
+Then boot Koan once:
 
-4. Configure AI and vector services:
-   ```json
-   {
-     "Koan": {
-       "AI": {
-         "Providers": {
-           "Ollama": {
-             "Endpoint": "http://localhost:11434",
-             "DefaultModel": "llama3.2:latest",
-             "DefaultEmbeddingModel": "all-minilm:latest"
-           }
-         }
-       },
-       "Vector": {
-         "Providers": {
-           "Weaviate": {
-             "Endpoint": "http://localhost:8080",
-             "Dimension": 384
-           }
-         }
-       }
-     }
-   }
-   ```
+```csharp
+builder.Services.AddKoan();
+```
 
-5. Boot the runtime with `builder.Services.AddKoan();` in your `Program.cs`.
+Reference is intent. With Ollama and Weaviate on their local default endpoints, no vector-specific startup code is
+needed. Configure a non-default Weaviate deployment through the provider-owned section:
 
-With that in place, you can leverage AI embeddings and vector search as described below.
+```json
+{
+  "Koan": {
+    "Data": {
+      "Weaviate": {
+        "Endpoint": "https://weaviate.example.net",
+        "ApiKey": "use-a-secret-provider"
+      }
+    }
+  }
+}
+```
+
+The adapter derives vector dimension from the first write. Configure the chosen embedding provider according to its
+package README, and use the same model for indexing and queries.
 
 ---
 
@@ -88,7 +74,7 @@ With that in place, you can leverage AI embeddings and vector search as describe
 
 **Concepts**
 
-- `Ai.Embed(text)` generates vector embeddings from text using configured AI provider
+- `Koan.AI.Client.Embed(text)` generates vector embeddings from text using configured AI provider
 - Embeddings are `float[]` arrays representing semantic meaning in high-dimensional space
 - Provider-agnostic API - swap models by changing configuration
 - Manual embeddings (`vectorizer: "none"`) give you full control
@@ -96,7 +82,7 @@ With that in place, you can leverage AI embeddings and vector search as describe
 **Recipe**
 
 - Packages listed in prerequisites
-- AI provider configured in `Koan:AI:Providers`
+- AI provider configured under `Koan:Ai` (e.g. `Koan:Ai:Embed:Source`/`Model`)
 - No special entity setup required
 
 **Sample**
@@ -106,7 +92,7 @@ using Koan.AI;
 
 // Generate embedding from text
 var text = "A heartwarming story about friendship and courage";
-var embedding = await Ai.Embed(text, ct);
+var embedding = await Koan.AI.Client.Embed(text, ct);
 
 Console.WriteLine($"Generated {embedding.Length}-dimensional vector");
 // Output: Generated 384-dimensional vector
@@ -114,7 +100,8 @@ Console.WriteLine($"Generated {embedding.Length}-dimensional vector");
 
 **Usage scenarios & benefits**
 
-- *S5.Recs* generates embeddings from media titles and synopses for semantic search
+- *GardenCoop Chapter 2* generates embeddings from produce names and descriptions for local semantic search
+- *Usagi Picks* embeds a present-tense mood plus a bounded set of strongly rated anime
 - Developers can swap embedding models (all-minilm → nomic-embed → OpenAI) by changing config
 - Same embedding can be used across multiple vector databases
 
@@ -122,7 +109,7 @@ Console.WriteLine($"Generated {embedding.Length}-dimensional vector");
 
 ```csharp
 // Use specific model for domain-specific embeddings
-var embedding = await Ai.Embed(
+var embedding = await Koan.AI.Client.Embed(
     text,
     new AiOptions { Model = "nomic-embed-text:latest" },
     ct
@@ -137,12 +124,13 @@ var embedding = await Ai.Embed(
 
 - `Vector<T>.Save()` stores embeddings with entity IDs and optional metadata
 - Metadata enables hybrid search and filtering (titles, tags, categories)
-- Provider-transparent - works with Weaviate, Pinecone, Qdrant, ElasticSearch
+- Provider-transparent across the shipped Weaviate, Qdrant, Milvus, SQLite-vec, Elasticsearch,
+  OpenSearch, and InMemory connectors, subject to each connector's advertised capabilities
 - Supports bulk operations for efficient batch indexing
 
 **Recipe**
 
-- Vector provider configured in `Koan:Vector:Providers`
+- A vector provider package referenced; configure only when its local/discovered default is not the intended route
 - Entity must have string-based ID (GUID v7 recommended)
 - Optional metadata dictionary for hybrid search
 
@@ -161,7 +149,7 @@ public class Media : Entity<Media>
 // Generate embedding
 var media = await Media.Get(mediaId);
 var embeddingText = $"{media.Title}\n\n{media.Synopsis}\n\nGenres: {string.Join(", ", media.Genres)}";
-var embedding = await Ai.Embed(embeddingText, ct);
+var embedding = await Koan.AI.Client.Embed(embeddingText, ct);
 
 // Store with metadata
 await Vector<Media>.Save(
@@ -178,9 +166,10 @@ await Vector<Media>.Save(
 
 **Usage scenarios & benefits**
 
-- *S5.Recs* indexes 50,000+ media items with embeddings for instant semantic search
+- *GardenCoop Chapter 2* demonstrates Entity indexing for semantic search
 - Metadata enables hybrid keyword+semantic search (see section 4)
-- Provider transparency allows migrating from Weaviate to Pinecone without code changes
+- The same Vector API can target another shipped connector; verify capability and migration support
+  before changing providers
 
 **Batch indexing**
 
@@ -201,10 +190,10 @@ Console.WriteLine($"Indexed {count} items");
 
 **Concepts**
 
-- `Vector<T>.Search()` finds semantically similar items using cosine similarity
+- `Vector<T>.Search()` finds semantically similar items using the selected provider's configured metric
 - Pure vector search excels at conceptual queries ("cute but powerful characters")
 - Query embedding compared against all stored embeddings
-- Results ranked by similarity score (1.0 = identical, 0.0 = orthogonal)
+- Results are ranked by score; interpretation and normalization are provider/metric capabilities
 
 **Recipe**
 
@@ -217,7 +206,7 @@ Console.WriteLine($"Indexed {count} items");
 ```csharp
 // User searches for conceptual match
 var query = "heartwarming slice of life anime";
-var queryEmbedding = await Ai.Embed(query, ct);
+var queryEmbedding = await Koan.AI.Client.Embed(query, ct);
 
 // Semantic search
 var results = await Vector<Media>.Search(
@@ -262,12 +251,12 @@ if (capabilities.Has(VectorCaps.Knn))
 - Combines vector similarity (semantic) with BM25 keyword matching (lexical)
 - Solves exact title matching for non-English content
 - `alpha` parameter controls semantic vs keyword balance (0.0=keyword, 1.0=semantic)
-- Provider-native fusion (Weaviate, ElasticSearch) for optimal performance
+- Provider-native fusion (currently Weaviate and ElasticSearch) for optimal performance
 - Requires `VectorCaps.Hybrid` support
 
 **Recipe**
 
-- Vector provider supporting hybrid search (Weaviate, ElasticSearch, Qdrant)
+- Vector provider supporting hybrid search (currently Weaviate or ElasticSearch)
 - Metadata with `searchText` field indexed during save
 - Same embedding as pure vector search
 
@@ -276,7 +265,7 @@ if (capabilities.Has(VectorCaps.Knn))
 ```csharp
 // User searches for exact title
 var query = "Watashi no Kokoro wa Oji-san de Aru";
-var queryEmbedding = await Ai.Embed(query, ct);
+var queryEmbedding = await Koan.AI.Client.Embed(query, ct);
 
 // Hybrid search: semantic + keyword
 var results = await Vector<Media>.Search(
@@ -317,7 +306,7 @@ var balancedResults = await Vector<Media>.Search(
 
 **Usage scenarios & benefits**
 
-- *S5.Recs* handles both exact Japanese titles ("鬼滅の刃") and vague queries ("demon slayer anime")
+- One API can combine exact terms with semantic intent when the selected connector advertises both capabilities
 - Single API handles all search types - no separate keyword/semantic endpoints
 - Users control balance with UI slider (see section 8)
 
@@ -328,7 +317,7 @@ var balancedResults = await Vector<Media>.Search(
 var embeddingText = BuildEmbeddingText(media);  // Title + synopsis + genres
 var searchText = BuildSearchText(media);        // Just titles and synonyms
 
-var embedding = await Ai.Embed(embeddingText, ct);
+var embedding = await Koan.AI.Client.Embed(embeddingText, ct);
 
 await Vector<Media>.Save(
     id: media.Id,
@@ -387,7 +376,7 @@ var profile = await UserProfile.Get(userId);
 var userPrefVector = profile?.PrefVector;
 
 // Generate search intent vector
-var searchVector = await Ai.Embed("magic school anime", ct);
+var searchVector = await Koan.AI.Client.Embed("magic school anime", ct);
 
 // Blend: 66% search intent, 34% user preferences
 var blended = BlendVectors(searchVector, userPrefVector, weight: 0.66);
@@ -428,7 +417,7 @@ float[] BlendVectors(float[] vec1, float[] vec2, double weight1)
 
 **Usage scenarios & benefits**
 
-- *S5.Recs* personalizes search results based on user's historical preferences
+- Applications can blend explicit search with an application-owned preference vector
 - New users get pure search results; returning users get personalized blends
 - 66/34 split prioritizes explicit search intent over learned preferences
 
@@ -443,7 +432,7 @@ public async Task UpdateUserPreferences(string userId, string mediaId, int ratin
 
     // Generate embedding for rated media
     var mediaText = $"{media.Title}\n\n{media.Synopsis}";
-    var mediaVector = await Ai.Embed(mediaText);
+    var mediaVector = await Koan.AI.Client.Embed(mediaText);
 
     const double LEARNING_RATE = 0.3;
     var target = (rating - 1) / 4.0;  // Normalize 1-5 rating to 0-1
@@ -474,21 +463,21 @@ public async Task UpdateUserPreferences(string userId, string mediaId, int ratin
 
 **Concepts**
 
-- Cache embeddings by content hash to avoid redundant AI calls
-- Dramatically reduces embedding costs and latency (70-90% cache hit rate)
+- An application-owned cache can avoid repeated AI calls when the normalized content and model match
+- Its latency and cost benefit depends on how often the workload repeats identical inputs
 - Content-addressable storage - same text always produces same hash
 - Model-aware caching - different models have separate cache spaces
 
 **Recipe**
 
-- `Koan.AI` includes built-in `EmbeddingCache` abstraction
+- `EmbeddingCache` below is an **application pattern**, not a framework type; own its policy when measured repetition justifies it
 - Storage backend (file system, Redis, database)
 - SHA512 content hashing for deterministic keys
 
 **Sample**
 
 ```csharp
-using Koan.AI.Caching;
+// Application-owned example: Koan.AI does not ship this cache abstraction.
 
 public class EmbeddingService
 {
@@ -508,7 +497,7 @@ public class EmbeddingService
         }
 
         // Cache miss - generate new embedding
-        var embedding = await Ai.Embed(text, ct);
+        var embedding = await Koan.AI.Client.Embed(text, ct);
 
         // Store in cache
         await _cache.SetAsync(contentHash, MODEL_ID, embedding, "Media", ct);
@@ -520,9 +509,9 @@ public class EmbeddingService
 
 **Usage scenarios & benefits**
 
-- *S5.Recs* caches 50k+ embeddings, achieving 85% cache hit rate on re-indexing
 - Swapping embedding models invalidates only that model's cache (model-aware keys)
-- Reduces AI provider costs by 70-90% during development and re-indexing
+- Measure hit rate, latency, storage, and provider cost before deciding whether this app-owned pattern
+  is worth operating
 
 **Batch caching pattern**
 
@@ -544,7 +533,7 @@ foreach (var media in mediaItems)
     else
     {
         // Cache miss - generate and store
-        var embedding = await Ai.Embed(embeddingText, ct);
+        var embedding = await Koan.AI.Client.Embed(embeddingText, ct);
         await _cache.SetAsync(contentHash, modelId, embedding, typeof(Media).Name, ct);
         await Vector<Media>.Save(media.Id, embedding, BuildMetadata(media));
         cacheMisses++;
@@ -559,110 +548,80 @@ _logger.LogInformation(
 
 ---
 
-## 7. Flow Integration – Batch Processing
+## 7. Embedding Lifecycle and Explicit Backfills
 
 **Concepts**
 
-- Use Koan Flow for large-scale embedding generation pipelines
-- Stream entities in batches to avoid memory exhaustion
-- Built-in error handling and retry logic
-- Pipeline branching for success/failure paths
+- `[Embedding]` makes ordinary Entity saves the shortest path to vector indexing
+- `Async = true` defers embedding work without changing the application save operation
+- `EmbeddingMigrator.ReEmbed(...)` owns an explicit finite-set rebuild
+- `EmbeddingMigrator.ReEmbedAll<T>(...)` owns an intentional whole-collection model transition
+- Lifecycle, deferred work, and migration share one vector-only writer; none re-save the domain Entity
 
 **Recipe**
 
-- `Koan.Flow` package for pipeline DSL
-- Entity streaming (`AllStream`, `QueryStream`)
-- AI and Vector packages from previous sections
+- Add `[Embedding]` to the Entity and keep ordinary application code business-focused
+- Use the migrator only for operator-initiated backfills or model transitions
+- Inspect `MigrationResult`; migration is observable but not atomic and does not retry failures
+- Configure deferred throughput and retry once at the host through `EmbeddingWorkerOptions`
 
-**Sample – Embedding backfill pipeline**
+There is intentionally no `.Index()` alias or collection `.Embed()` terminal. Ordinary indexing is
+already the Entity lifecycle meaning, while explicit rebuilds have different outcomes and belong to
+the migration control plane.
+
+**Sample – ordinary writes**
 
 ```csharp
-using Koan.Flow;
-using Koan.AI.Flow;  // Extension methods for AI in pipelines
+[Embedding(Async = true, Template = "{Title}\n\n{Description}")]
+public sealed class Media : Entity<Media>
+{
+    public string Title { get; set; } = "";
+    public string Description { get; set; } = "";
+}
 
-await Media.AllStream(batchSize: 100)
-    .ToAsyncEnumerable()
-    .Tokenize(m => BuildEmbeddingText(m))  // Generate embeddings
-    .Branch(branch => branch
-        .OnSuccess(success => success
-            .Mutate(envelope =>
-            {
-                // Prepare metadata from entity
-                envelope.Features["vector:metadata"] = new
-                {
-                    title = envelope.Entity.Title,
-                    searchText = BuildSearchText(envelope.Entity),
-                    genres = envelope.Entity.Genres
-                };
-            })
-            .Do(async (envelope, ct) =>
-            {
-                // Extract embedding from pipeline
-                if (envelope.Features.TryGetValue("Embedding", out var embObj) &&
-                    embObj is float[] embedding)
-                {
-                    var metadata = envelope.Features["vector:metadata"]
-                        as IReadOnlyDictionary<string, object>;
-
-                    // Store in vector database
-                    await Vector<Media>.Save(
-                        id: envelope.Entity.Id,
-                        embedding: embedding,
-                        metadata: metadata
-                    );
-
-                    // Cache the embedding
-                    var embeddingText = BuildEmbeddingText(envelope.Entity);
-                    var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
-                    await _cache.SetAsync(contentHash, modelId, embedding, "Media", ct);
-                }
-            })
-        )
-        .OnFailure(failure => failure
-            .Do(async (envelope, ct) =>
-            {
-                _logger.LogWarning(
-                    "Failed to embed {MediaId}: {Error}",
-                    envelope.Entity.Id,
-                    envelope.Error?.Message
-                );
-            })
-        )
-    );
+await media.Save(ct); // persistence succeeds; embedding is lifecycle-owned and deferred
 ```
+
+Use synchronous `[Embedding]` when the save must wait for indexing. With `Async = true`, inspect the
+framework embedding ledger and logs for completion; the initial save is not a claim that the vector
+write has completed.
+
+**Sample – explicit subset backfill**
+
+```csharp
+var stale = await Media.Query(media => media.NeedsReindex, ct);
+var result = await EmbeddingMigrator.ReEmbed(
+    stale,
+    targetModel: "all-minilm",
+    batchSize: 100,
+    logger: logger,
+    ct: ct);
+
+logger.LogInformation(
+    "Indexed {Succeeded}/{Total}; failed={Failed}",
+    result.SuccessfulEntities,
+    result.TotalEntities,
+    result.FailedEntities);
+```
+
+`ReEmbed` materializes only the supplied finite set, processes it in batches, and performs vector-only
+writes so it does not recursively trigger persistence lifecycle. It reports partial success; it does
+not promise collection atomicity, retry, or rollback.
 
 **Usage scenarios & benefits**
 
-- *S5.Recs* processes 50k+ media embeddings in ~2 hours with full caching
-- Pipeline automatically retries transient AI failures
-- Memory-efficient streaming avoids loading entire dataset
+- Ordinary imports need only `Save`; the Entity declaration owns embedding intent
+- A selected subset can be re-indexed without touching unrelated entities
+- A whole-collection model change has a dedicated API that resets mixed-model protection deliberately
 
-**Advanced - Progress tracking**
+**Whole-collection model transition**
 
 ```csharp
-var total = await Media.Count();
-var processed = 0;
-
-await Media.AllStream(batchSize: 100)
-    .ToAsyncEnumerable()
-    .Tokenize(m => BuildEmbeddingText(m))
-    .Branch(branch => branch
-        .OnSuccess(success => success
-            .Do(async (envelope, ct) =>
-            {
-                // ... embedding logic ...
-
-                Interlocked.Increment(ref processed);
-                if (processed % 100 == 0)
-                {
-                    _logger.LogInformation(
-                        "Progress: {Processed}/{Total} ({Percent:P0})",
-                        processed, total, (double)processed / total
-                    );
-                }
-            })
-        )
-    );
+var result = await EmbeddingMigrator.ReEmbedAll<Media>(
+    targetModel: "text-embedding-3-large",
+    batchSize: 100,
+    logger: logger,
+    ct: ct);
 ```
 
 ---
@@ -717,7 +676,7 @@ public async Task ReindexWithNewModel(string newModelId, CancellationToken ct)
             else
             {
                 // Generate with new model
-                embedding = await Ai.Embed(
+                embedding = await Koan.AI.Client.Embed(
                     embeddingText,
                     new AiOptions { Model = newModelId },
                     ct
@@ -823,7 +782,7 @@ public async Task<List<Media>> Search(string query, double alpha, int topK)
     {
         try
         {
-            var embedding = await Ai.Embed(query);
+            var embedding = await Koan.AI.Client.Embed(query);
             var results = await Vector<Media>.Search(
                 vector: embedding,
                 text: query,
@@ -855,8 +814,8 @@ public async Task<List<Media>> Search(string query, double alpha, int topK)
 
 ```csharp
 // Search with multiple semantic dimensions
-var titleEmbedding = await Ai.Embed(media.Title);
-var synopsisEmbedding = await Ai.Embed(media.Synopsis);
+var titleEmbedding = await Koan.AI.Client.Embed(media.Title);
+var synopsisEmbedding = await Koan.AI.Client.Embed(media.Synopsis);
 
 // Store multiple vectors per entity (if provider supports it)
 if (Vector<Media>.GetCapabilities().Has(VectorCaps.MultiVectorPerEntity))
@@ -879,8 +838,8 @@ if (Vector<Media>.GetCapabilities().Has(VectorCaps.MultiVectorPerEntity))
 
 ```csharp
 // Multilingual embeddings work across languages
-var englishQuery = await Ai.Embed("cute magical girls");
-var japaneseQuery = await Ai.Embed("かわいい魔法少女");
+var englishQuery = await Koan.AI.Client.Embed("cute magical girls");
+var japaneseQuery = await Koan.AI.Client.Embed("かわいい魔法少女");
 
 // Both queries find similar results semantically
 var englishResults = await Vector<Media>.Search(vector: englishQuery, topK: 10);
@@ -895,14 +854,14 @@ var japaneseResults = await Vector<Media>.Search(vector: japaneseQuery, topK: 10
 // Export vectors from Weaviate to migrate to different provider
 var vectorRepo = serviceProvider.GetRequiredService<IVectorSearchRepository<Media, string>>();
 
-await foreach (var batch in vectorRepo.ExportAllAsync(batchSize: 100, ct))
+await foreach (var batch in vectorRepo.ExportAll(batchSize: 100, ct))
 {
     // batch.Id - Entity identifier
     // batch.Embedding - float[] vector
     // batch.Metadata - Optional metadata
 
     // Import to new provider
-    await newProviderRepo.UpsertAsync(batch.Id, batch.Embedding, batch.Metadata, ct);
+    await newProviderRepo.Upsert(batch.Id, batch.Embedding, batch.Metadata, ct);
 }
 ```
 
@@ -912,11 +871,14 @@ await foreach (var batch in vectorRepo.ExportAllAsync(batchSize: 100, ct))
 
 1. Start simple - embed a few entities and try semantic search (sections 1-3)
 2. Add hybrid search for exact matching (section 4)
-3. Implement embedding caching to reduce costs (section 6)
-4. Scale with Flow pipelines for batch processing (section 7)
+3. Add an app-owned embedding cache when measured input repetition justifies it (section 6)
+4. Use Entity lifecycle for ordinary indexing and explicit migrators for backfills (section 7)
 5. Add personalization for returning users (section 5)
 
-Explore the S5.Recs sample to see production patterns in action. The combination of semantic search, hybrid matching, and personalization creates powerful recommendation experiences that understand both explicit queries and implicit user preferences.
+Run [GardenCoop Chapter 2](../../samples/journeys/GardenCoop/02-LocalDiscovery/) for the smallest current local
+embed-save-search path. Run [Usagi Picks](https://github.com/lbotinelly/usagipicks) for the bounded ratings → intent
+→ vector candidates → explanation workflow. Treat hybrid matching, internet-scale
+recommendation quality, and production tuning as separate claims that need their own provider and workload evidence.
 
 **Related Guides:**
 - [Entity Capabilities](entity-capabilities-howto.md) – Learn core entity patterns for data access and CRUD operations

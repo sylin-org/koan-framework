@@ -31,7 +31,6 @@ public static class RecipeJsonSerializer
                 RecipeSource.AdHoc => "ad-hoc",
                 _ => "code",
             },
-            ["eager"] = recipe.Eager,
             ["fingerprint"] = recipe.Fingerprint(),
             ["steps"] = SerializeSteps(recipe.Steps),
             ["mutators"] = SerializeMutators(recipe.AllowedMutators),

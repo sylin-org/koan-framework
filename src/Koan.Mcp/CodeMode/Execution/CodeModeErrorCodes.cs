@@ -14,6 +14,7 @@ public static class CodeModeErrorCodes
     // Quotas / policy
     public const string SdkCallsExceeded = "sdk_calls_exceeded";   // bindings.Metrics.GetTotalCalls() > CodeModeOptions.MaxSdkCalls
     public const string MissingAnswer = "missing_answer";          // RequireAnswer enabled but SDK.Out.answer not called
+    public const string CodeModeDisabled = "code_mode_disabled";   // CodeModeOptions.Enabled=false, or the active exposure mode does not surface code, or no ICodeExecutor is registered
 
     // Execution runtime
     public const string JavaScriptError = "javascript_error";      // JavaScript runtime exception (syntax/runtime) with location

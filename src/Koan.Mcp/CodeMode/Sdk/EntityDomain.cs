@@ -73,6 +73,9 @@ internal sealed class EntityOperationsProxy
     private readonly EndpointToolExecutor _executor;
     private readonly MetricsDomain _metrics;
     private readonly IJsonFacade _json;
+    // SEC-0004 Phase 3.3: the caller's principal, captured from the scope's McpCallContext (set by the executor).
+    // Every entity operation in this sandbox runs AS this caller through the data-layer gate / constrain / projection.
+    private readonly System.Security.Claims.ClaimsPrincipal? _principal;
 
     public EntityOperationsProxy(McpEntityRegistration registration, IServiceProvider services, MetricsDomain metrics, IJsonFacade json)
     {
@@ -81,6 +84,7 @@ internal sealed class EntityOperationsProxy
         _executor = services.GetRequiredService<EndpointToolExecutor>();
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _json = json ?? throw new ArgumentNullException(nameof(json));
+        _principal = services.GetService<Koan.Mcp.Execution.McpCallContext>()?.Principal;
     }
 
     /// <summary>
@@ -144,7 +148,7 @@ internal sealed class EntityOperationsProxy
             }
         }
 
-        var result = _executor.Execute(tool.Name, args, default).GetAwaiter().GetResult();
+        var result = _executor.Execute(tool.Name, args, default, _principal).GetAwaiter().GetResult();
 
         return ConvertToJavaScriptObject(result);
     }
@@ -179,7 +183,7 @@ internal sealed class EntityOperationsProxy
             }
         }
 
-        var result = _executor.Execute(tool.Name, args, default).GetAwaiter().GetResult();
+        var result = _executor.Execute(tool.Name, args, default, _principal).GetAwaiter().GetResult();
 
         return ConvertToJavaScriptObject(result);
     }
@@ -211,7 +215,7 @@ internal sealed class EntityOperationsProxy
             }
         }
 
-        _executor.Execute(tool.Name, args, default).GetAwaiter().GetResult();
+        _executor.Execute(tool.Name, args, default, _principal).GetAwaiter().GetResult();
 
         return 1; // Successfully deleted
     }
@@ -262,7 +266,7 @@ internal sealed class EntityOperationsProxy
             }
         }
 
-        var result = _executor.Execute(tool.Name, args, default).GetAwaiter().GetResult();
+        var result = _executor.Execute(tool.Name, args, default, _principal).GetAwaiter().GetResult();
 
         // Extract count from result
         return ExtractCount(result);
@@ -296,7 +300,7 @@ internal sealed class EntityOperationsProxy
         _metrics.IncrementCalls();
         var tool = FindTool(EntityEndpointOperationKind.Collection);
         var argsObj = args != null ? _json.FromObject(args) : new JObject();
-        var result = _executor.Execute(tool.Name, (JObject)argsObj, default).GetAwaiter().GetResult();
+        var result = _executor.Execute(tool.Name, (JObject)argsObj, default, _principal).GetAwaiter().GetResult();
         return ConvertToJavaScriptObject(result);
     }
 

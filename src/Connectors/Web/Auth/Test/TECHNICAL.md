@@ -1,57 +1,38 @@
-# Koan.Web.Auth.Connector.Test - Technical reference
+# Sylin.Koan.Web.Auth.Connector.Test — technical contract
 
-Contract
+## Activation
 
-- Inputs: Optional query/UX-provided roles, permissions, and claims; ASP.NET Core auth pipeline.
-- Outputs: Deterministic ClaimsPrincipal under a test scheme (e.g., "Test"); userinfo contains roles/permissions/claims for dev mapping.
-- Errors: Misconfiguration of scheme names if mixed with real providers.
+The module registers two immutable automatic provider definitions when `TestProviderOptions.IsActive` is true:
 
-Configuration
+- `test-oidc`: OIDC, priority `26`, relative authority `/.testoauth`;
+- `test`: OAuth2, priority `25`, local authorize/token/userinfo endpoints.
 
-- Add authentication and controllers; register the Test provider handler.
-- Dev login UI is served at `/.testoauth/login.html` to keep controller code clean.
+Development activates them by default. Outside Development, set
+`Koan:Web:Auth:TestProvider:Enabled=true` only in controlled test environments. Web Auth still owns eligibility,
+default election, scheme seeding, discovery, and evidence.
 
-Example
+## Routes and protocol behavior
 
-```csharp
-var builder = WebApplication.CreateBuilder(args);
+Controllers use stable absolute attribute routes under `/.testoauth`; there is no startup filter or conventional route
+mapper. The OIDC simulator publishes an ES256 JWKS and signed ID token. OAuth2/OIDC code flow supports PKCE S256,
+state/nonce through the consuming ASP.NET handler, redirect-URI checks, and one-time code redemption.
 
-builder.Services.AddControllers();
+Userinfo emits `sub`, `id`, username, email, roles, permissions, and custom claims. Web Auth maps roles to
+`ClaimTypes.Role`, permissions to `Koan.permission`, and extra claims one-for-one.
 
-builder.Services
-    .AddAuthentication(o =>
-    {
-        o.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-        o.DefaultChallengeScheme = "Test";
-    })
-    .AddCookie();
+## Options
 
-// Extras via query: roles=admin,author&perms=content:write&claim.department=ENG
-// Or use the UI at /.testoauth/login.html (persists persona in LocalStorage).
+Configuration section: `Koan:Web:Auth:TestProvider`.
 
-var app = builder.Build();
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-app.Run();
-```
+- `Enabled`, `ClientId`, `ClientSecret`, `AllowedRedirectUris`;
+- persona caps and defaults;
+- optional JWT access-token settings;
+- optional client-credentials clients and allowed scopes.
 
-Edge cases
+## Failure and security posture
 
-- Ensure this provider is excluded from production builds/deployments.
+Inactive controllers return 404. Invalid clients, redirect URIs, grants, PKCE verifiers, codes, and bearer tokens are
+rejected. Empty redirect allow-lists permit only `/auth/{provider}/callback` shapes for local convenience.
 
-Operations
-
-- Gate this provider behind environment checks; never enable in production.
-- Add explicit health logging to prevent accidental reliance during tests.
-
-Claims mapping
-
-- UserInfo JSON may include `roles[]`, `permissions[]`, and `claims{}`; AuthController maps these into the cookie principal.
-- Roles -> ClaimTypes.Role; Permissions -> `Koan.permission`; Claims{} -> 1:1 (string or multi-value).
-
-References
-
-- Controllers only: `/docs/decisions/WEB-0035-entitycontroller-transformers.md`
-- Per-project docs: `/docs/decisions/ARCH-0042-per-project-companion-docs.md`
-
+This is not hardened for hostile callers, durable credentials, production availability, external federation, or
+multi-process token state. Its in-memory stores reset with the process.

@@ -20,12 +20,12 @@ internal static class JobLedgerPredicates
         return p ?? (static r => true);
     }
 
-    /// <summary>Non-terminal = Created/Queued/Running/Blocked, as an **equality set**, not <c>Status &lt; Completed</c>:
+    /// <summary>Non-terminal = Created/Queued/Running, as an **equality set**, not <c>Status &lt; Completed</c>:
     /// Mongo persists the enum by NAME, where ordering is lexicographic (not numeric), so an ordering comparison
     /// silently mismatches there. Equality translates on every store (JSON-number on relational, name on Mongo).</summary>
     public static Expression<Func<JobRecord, bool>> NonTerminal()
         => static r => r.Status == JobStatus.Created || r.Status == JobStatus.Queued
-                    || r.Status == JobStatus.Running || r.Status == JobStatus.Blocked;
+                    || r.Status == JobStatus.Running;
 
     /// <summary>Terminal = Completed/Failed/Cancelled/Dead, as an equality set (portable — see <see cref="NonTerminal"/>).</summary>
     public static Expression<Func<JobRecord, bool>> Terminal()

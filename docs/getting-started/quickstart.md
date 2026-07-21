@@ -1,79 +1,90 @@
 ---
 type: GUIDE
 domain: core
-title: "Koan Quickstart"
+title: "Koan quickstart"
 audience: [developers, ai-agents]
 status: current
-nav: true
+last_updated: 2026-07-19
+framework_version: v0.20.0
+validation:
+  date_last_tested: 2026-07-19
+  status: passed
+  scope: 0.20 package-first contract plus source-built FirstUse fallback
 ---
 
-# Quickstart
+# Koan quickstart
 
-Two paths. Until 1.0, **Path A (from source) is the recommended one** — published `Sylin.Koan.*`
-packages may lag the repo.
+Public-feed publication is still pending, so run the source-built FirstUse contract today:
 
-## Path A — clone and run (60 seconds)
-
-```bash
+```powershell
 git clone https://github.com/sylin-org/koan-framework
 cd koan-framework
-dotnet run --project samples/S1.Web
+dotnet run --project samples/FirstUse
 ```
 
-- Browse the printed URL; try `/api/todo` and `/api/health`.
-- Read the console **boot report** — it lists discovered modules, elected adapters, and boot
-  phases. It is the framework's primary self-description and debugging surface.
-- Next rungs: `samples/S0.ConsoleJsonRepo` (minimal console),
-  `samples/S10.DevPortal` (live multi-provider switching),
-  `samples/S14.AdapterBench` (jobs + cross-adapter benchmarks).
-  Ladder details: [samples/README.md](../../samples/README.md).
+In another shell:
 
-To explore the whole framework: open `Koan.sln`.
-
-## Path B — new project
-
-```bash
-dotnet new web -n MyApp
-cd MyApp
-dotnet add package Sylin.Koan.Core
-dotnet add package Sylin.Koan.Web
-dotnet add package Sylin.Koan.Data.Connector.Sqlite
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/approvals `
+  -ContentType application/json -Body '{"subject":"Approve supplier invoice"}'
+Invoke-RestMethod http://localhost:5000/api/approvals
+$filter = [uri]::EscapeDataString('{"subject":"Approve supplier invoice"}')
+Invoke-RestMethod "http://localhost:5000/api/approvals?filter=$filter"
+Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
 ```
 
-> Package IDs are prefixed `Sylin.` on NuGet; code namespaces are plain `Koan.*`.
-> `dotnet add package` takes one package per invocation.
+The URL printed by ASP.NET Core is authoritative if it differs. The POST persists an approval; the
+two reads prove ordinary and filtered Entity access; the facts response explains the modules and
+SQLite election that produced the result.
+
+## Package-first entry after publication
+
+After the first 0.20 wave is visible on NuGet, use the canonical template path:
+
+```powershell
+dotnet new install Sylin.Koan.Templates
+dotnet new koan-web -o TodoApi
+cd TodoApi
+dotnet run
+```
+
+That generated application uses `Todo` and `/api/todos`. The [template guide](../../templates/README.md)
+contains its exact result. Until publication, these commands describe the proved candidate rather than an
+installable public package.
+
+## Read the whole application
+
+Read [`samples/FirstUse`](../../samples/FirstUse/README.md) in this order:
+
+1. `Domain/Approval.cs` — business state and access policy.
+2. `Web/ApprovalsController.cs` — the governed HTTP surface.
+3. `Program.cs` — the complete host.
+
+The host is exactly:
 
 ```csharp
-// Program.cs — complete.
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
 var app = builder.Build();
-app.Run();
+await app.RunAsync();
 ```
 
-```csharp
-using Koan.Data.Core.Model;
-using Koan.Web.Controllers;
-using Microsoft.AspNetCore.Mvc;
+Storage, schema readiness, controller mechanics, health, startup reporting, runtime facts, and MCP
+hosting come from referenced capabilities. The application contains no repository, `DbContext`,
+database registration, schema script, MCP tool handler, or health plumbing.
 
-public sealed class Todo : Entity<Todo>
-{
-    public string Title { get; set; } = "";
-    public bool IsCompleted { get; set; }
-}
+## Know what is proved
 
-[Route("api/[controller]")]
-public sealed class TodoController : EntityController<Todo> { }
-```
+FirstUse is exercised through its real host. Focused evidence covers REST, SQLite persistence,
+filtered query, readiness, composition facts, MCP discovery, access policy, dry-run, and an agent
+write observed through REST. Its checked-in `koan.lock.json` records referenced composition.
 
-```bash
-dotnet run
-curl -X POST http://localhost:5000/api/todo -H "Content-Type: application/json" -d '{"title":"hello"}'
-curl http://localhost:5000/api/todo
-```
+The release tooling also rebuilds the templates and this application from the exact locally staged package closure.
+That proves the candidate path; only public-feed observation will make the install command externally available.
 
-You now have REST CRUD with pagination, GUID v7 ids, `/api/health`, structured logging, and a
-zero-config SQLite database at `./data/app.db`. JSON defaults: camelCase, nulls omitted.
+## Continue
 
-**Continue**: [the golden path](./overview.md) — the full concept-by-concept tour (database
-swap, caching, jobs, messaging, semantic search, agent tools).
+Run [`samples/GoldenJourney`](../../samples/GoldenJourney/README.md) next. It grows the same small host
+with a business rule, durable assessment job, bounded agent recommendation, and explained
+configuration failure. Then use the [golden path](overview.md) and only the
+[graduated sample portfolio](../../samples/README.md).

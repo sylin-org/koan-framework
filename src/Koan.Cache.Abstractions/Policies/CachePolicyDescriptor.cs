@@ -14,7 +14,6 @@ public sealed record CachePolicyDescriptor(
     CacheScope Scope,
     string KeyTemplate,
     CacheStrategy Strategy,
-    CacheConsistencyMode Consistency,
     CacheTier Tier,
     TimeSpan? AbsoluteTtl,
     TimeSpan? L1AbsoluteTtl,
@@ -23,8 +22,6 @@ public sealed record CachePolicyDescriptor(
     IReadOnlyList<string> Tags,
     string? Region,
     string? ScopeId,
-    string? LocalProvider,
-    string? RemoteProvider,
     bool ForceCoherenceBroadcast,
     IReadOnlyDictionary<string, string> Metadata,
     MemberInfo? TargetMember,
@@ -42,7 +39,7 @@ public sealed record CachePolicyDescriptor(
             L1AbsoluteTtl = L1AbsoluteTtl,
             SlidingTtl = SlidingTtl,
             AllowStaleFor = AllowStaleFor,
-            Consistency = Consistency,
+            Tier = Tier,
             ForceCoherenceBroadcast = ForceCoherenceBroadcast,
             Tags = new HashSet<string>(Tags, StringComparer.OrdinalIgnoreCase),
             Region = Region,
@@ -55,7 +52,6 @@ public sealed record CachePolicyDescriptor(
         => new(
             Region: Region,
             ScopeId: ScopeId,
-            Consistency: Consistency,
             AllowStaleFor: AllowStaleFor);
 
     /// <summary>Project the write-side options carried by this policy.</summary>

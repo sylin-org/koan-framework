@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -19,12 +19,19 @@ public class TypeScriptSdkSnapshotSpec : IClassFixture<TestPipelineFixture>
         if (string.IsNullOrWhiteSpace(raw)) return "";
         // Normalize line endings + strip footer line if present
         var cleaned = raw.Replace("\r", "");
-        var lines = cleaned.Split('\n');
+        var lines = cleaned.Split('\n')
+            .Select(line => line.TrimStart().StartsWith("// Generated:") ? "// Generated: STAMP" : line)
+            .ToArray();
+        // Trim trailing blank lines first to expose the integrity footer
+        while (lines.Length > 0 && string.IsNullOrWhiteSpace(lines[^1]))
+        {
+            lines = lines.Take(lines.Length - 1).ToArray();
+        }
         if (lines.Length > 0 && lines[^1].TrimStart().StartsWith("// integrity-sha256:"))
         {
             lines = lines.Take(lines.Length - 1).ToArray();
         }
-        // Remove any trailing blank lines for deterministic comparison
+        // Remove any remaining trailing blank lines for deterministic comparison
         while (lines.Length > 0 && string.IsNullOrWhiteSpace(lines[^1]))
         {
             lines = lines.Take(lines.Length - 1).ToArray();

@@ -1,5 +1,6 @@
 using Koan.Jobs;
 using Koan.Jobs.TestKit;
+using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.MsSql;
 using Xunit;
 
@@ -11,9 +12,9 @@ public sealed class SqlServerJobsFixture : IAsyncLifetime
     private MsSqlContainer? _container;
     public IReadOnlyDictionary<string, string?> Settings { get; private set; } = new Dictionary<string, string?>();
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
-        _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-CU6-GDR1-ubuntu-24.04").Build();
         await _container.StartAsync();
         var cs = _container.GetConnectionString();
         Settings = new Dictionary<string, string?>(StringComparer.Ordinal)
@@ -28,7 +29,7 @@ public sealed class SqlServerJobsFixture : IAsyncLifetime
         };
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_container is not null) await _container.DisposeAsync();
     }
@@ -40,6 +41,6 @@ public sealed class SqlServerBehaviors : JobBehaviorSuite, IClassFixture<SqlServ
     private readonly SqlServerJobsFixture _fx;
     public SqlServerBehaviors(SqlServerJobsFixture fx) => _fx = fx;
 
-    protected override Task<JobsHarness> CreateHostAsync(Action<JobsOptions>? configure = null)
-        => JobsHarness.StartWithSettingsAsync(_fx.Settings, configure);
+    protected override Task<JobsHarness> CreateHostAsync(Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
+        => JobsHarness.StartWithSettingsAsync(_fx.Settings, configure, configureServices);
 }

@@ -10,7 +10,7 @@ namespace Koan.Media.Web.Controllers;
 
 /// <summary>
 /// CRTP-style base controller that streams stored bytes for a
-/// <see cref="Koan.Media.Abstractions.Model.MediaEntity{TEntity}"/>-derived type with full
+/// <see cref="Koan.Media.MediaEntity{TEntity}"/>-derived type with full
 /// HTTP semantics: HEAD, GET, Range, ETag / If-None-Match,
 /// If-Modified-Since, Content-Disposition, Cache-Control.
 ///
@@ -25,6 +25,14 @@ namespace Koan.Media.Web.Controllers;
 /// <para>Derived controllers customise the route via attribute
 /// routing on the subclass. They are not auto-registered; the host
 /// app registers each one explicitly.</para>
+///
+/// <para><b>SECURITY — raw storage has no entity read context.</b> This controller streams bytes addressed by their storage
+/// <i>key</i> via <c>StorageEntity&lt;TEntity&gt;.OpenRead(key)</c>. That path applies STORAGE-layer isolation
+/// (the tenant particle, STOR-0011) but not request-contributed entity predicates, which fold in only on an entity
+/// read (<c>Data&lt;T&gt;.Get</c>/<c>Query</c>). Do <b>not</b> subclass this for media whose authorization is expressed
+/// as an entity predicate: a caller with a key would bypass that predicate (an IDOR). For context-aware serving use the recipe pipeline
+/// (<see cref="MediaController"/> + <see cref="Routing.MediaEntitySource{TEntity}"/>), which resolves through
+/// the entity layer. This controller is for raw-bytes access governed by storage and tenant boundaries alone.</para>
 /// </summary>
 [ApiController]
 [Route("api/media")]

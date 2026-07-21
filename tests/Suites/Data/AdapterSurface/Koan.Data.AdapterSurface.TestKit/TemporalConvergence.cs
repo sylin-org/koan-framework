@@ -84,7 +84,7 @@ public static class TemporalConvergence
     /// </summary>
     public static async Task AssertConvergesAsync()
     {
-        foreach (var existing in await Data<TemporalWidget, string>.Query("{}")) await existing.Delete();
+        foreach (var existing in await Data<TemporalWidget, string>.Query("{}")) await existing.Remove();
         await TemporalWidget.UpsertMany(Corpus);
 
         var failures = new List<string>();
@@ -155,6 +155,6 @@ public static class TemporalConvergence
         reloaded!.Ts.Should().Be(instant);                       // DateTimeOffset equality is by INSTANT
         reloaded.Ts.Offset.Should().Be(TimeSpan.Zero);           // contract: offset normalised to UTC on persist
         reloaded.Dur.Should().Be(TimeSpan.FromHours(25));        // duration round-trips exactly (ticks)
-        await reloaded.Delete();
+        await reloaded.Remove();
     }
 }

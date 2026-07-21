@@ -36,6 +36,14 @@ public interface IVectorAdapterCapabilities
     bool SupportsExportAll => true;
 
     /// <summary>
+    /// The <c>vector.index.stats</c> instruction (<c>Vector&lt;T&gt;.Stats()</c>) — count of stored vectors.
+    /// Implemented by the search-engine connectors (ES/OS, shared base), Weaviate, and the in-memory
+    /// reference; Qdrant and Milvus do not expose it through the instruction surface. (Distinct from
+    /// <see cref="SupportsExportAll"/> — an adapter can stream-export without implementing the count instruction.)
+    /// </summary>
+    bool SupportsIndexStats => true;
+
+    /// <summary>
     /// VectorQueryOptions.SearchText + Alpha — hybrid (semantic + BM25) search.
     /// Weaviate only.
     /// </summary>

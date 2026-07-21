@@ -1,36 +1,66 @@
 using Koan.Storage.Abstractions;
+using Koan.Storage.Abstractions.Capabilities;
 
 namespace Koan.Storage.Connector.Local;
 
+using Koan.Core;
+using Koan.Core.Capabilities;
+using Koan.Storage.Connector.Local.Infrastructure;
 using Microsoft.Extensions.Options;
 using Koan.Storage;
 using System.Security.Cryptography;
 using System.Text;
 
+[ProviderPriority(0)]
 public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IServerSideCopy, IListOperations
 {
-    private readonly IOptionsMonitor<LocalStorageOptions> _options;
+    private static readonly char[] PortableInvalidKeyCharacters = ['<', '>', ':', '"', '|', '?', '*'];
+    private readonly string _basePath;
 
-    public LocalStorageProvider(IOptionsMonitor<LocalStorageOptions> options)
+    public LocalStorageProvider(IOptions<LocalStorageOptions> options)
     {
-        _options = options;
+        ArgumentNullException.ThrowIfNull(options);
+        if (string.IsNullOrWhiteSpace(options.Value.BasePath))
+        {
+            throw new InvalidOperationException(
+                "Local storage requires Koan:Storage:Providers:Local:BasePath. Configure a directory path.");
+        }
+
+        _basePath = Path.GetFullPath(options.Value.BasePath);
+        Directory.CreateDirectory(_basePath);
     }
 
-    public string Name => "local";
+    public string Name => LocalStorageConstants.ProviderName;
+    public StorageProviderPlacement Placement => StorageProviderPlacement.Local;
 
-    public StorageProviderCapabilities Capabilities => new(true, true, false, true);
+    public void Describe(ICapabilities caps)
+        => caps.Add(StorageCaps.SequentialRead)
+            .Add(StorageCaps.Seek)
+            .Add(StorageCaps.ServerSideCopy)
+            .Add(StorageCaps.Stat)
+            .Add(StorageCaps.List);
 
     public async Task Write(string container, string key, Stream content, string? contentType, CancellationToken ct = default)
     {
         var path = GetPath(container, key);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var temp = path + ".tmp-" + Guid.CreateVersion7().ToString("N");
-        using (var fs = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
+        try
         {
-            await content.CopyToAsync(fs, ct);
+            await using (var fs = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                await content.CopyToAsync(fs, ct);
+                await fs.FlushAsync(ct);
+            }
+
+            File.Move(temp, path, overwrite: true);
         }
-        if (File.Exists(path)) File.Delete(path);
-        File.Move(temp, path);
+        finally
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); }
+            catch (IOException) { /* Preserve the primary write failure. */ }
+            catch (UnauthorizedAccessException) { /* Preserve the primary write failure. */ }
+        }
     }
 
     public Task<Stream> OpenRead(string container, string key, CancellationToken ct = default)
@@ -98,12 +128,13 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
 
     private string GetPath(string container, string key)
     {
-        var basePath = _options.CurrentValue.BasePath ?? throw new InvalidOperationException("Local storage BasePath not configured.");
         var safeKey = SanitizeKey(key);
-        var path = Path.Combine(basePath, container ?? "", Shard(safeKey), safeKey);
+        var path = Path.Combine(_basePath, container ?? "", Shard(safeKey), safeKey);
         var full = Path.GetFullPath(path);
-        var fullBase = Path.GetFullPath(basePath);
-        if (!full.StartsWith(fullBase, StringComparison.OrdinalIgnoreCase))
+        var relative = Path.GetRelativePath(_basePath, full);
+        if (Path.IsPathRooted(relative)
+            || relative.Equals("..", StringComparison.Ordinal)
+            || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("Path traversal detected.");
         }
@@ -123,8 +154,10 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
         {
             if (part == "." || part == "..")
                 throw new InvalidOperationException("Path traversal or invalid segment detected.");
-            // disallow path-breaking chars
-            if (part.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            // Keep the logical key language stable across hosts, then honor any additional filesystem restriction.
+            if (part.IndexOfAny(PortableInvalidKeyCharacters) >= 0
+                || part.Any(char.IsControl)
+                || part.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
                 throw new InvalidOperationException("Invalid characters in key.");
         }
         return string.Join('/', parts);
@@ -139,112 +172,63 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
 
     public async IAsyncEnumerable<StorageObjectInfo> ListObjects(string container, string? prefix = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        var basePath = _options.CurrentValue.BasePath ?? throw new InvalidOperationException("Local storage BasePath not configured.");
-        var containerPath = Path.Combine(basePath, container ?? "");
+        var containerPath = GetContainerPath(container);
 
         if (!Directory.Exists(containerPath))
             yield break;
 
-        var searchPath = containerPath;
-        var searchPattern = "*";
-
-        // Handle prefix filtering
-        if (!string.IsNullOrEmpty(prefix))
+        // Physical files live under an opaque shard directory. Enumerate below each shard, reconstruct the
+        // provider key relative to that shard, then apply the logical prefix. Prefixes therefore work for both
+        // flat and nested keys without exposing or depending on the sharding scheme.
+        foreach (var shardPath in Directory.EnumerateDirectories(containerPath))
         {
-            // Convert storage prefix to file system path
-            var prefixPath = prefix.Replace('/', Path.DirectorySeparatorChar);
-            var prefixDir = Path.GetDirectoryName(prefixPath);
-            var prefixFile = Path.GetFileName(prefixPath);
-
-            if (!string.IsNullOrEmpty(prefixDir))
+            foreach (var filePath in Directory.EnumerateFiles(shardPath, "*", SearchOption.AllDirectories))
             {
-                searchPath = Path.Combine(containerPath, prefixDir);
-                if (!Directory.Exists(searchPath))
-                    yield break;
-            }
+                ct.ThrowIfCancellationRequested();
 
-            if (!string.IsNullOrEmpty(prefixFile))
-            {
-                searchPattern = prefixFile.Contains('*') ? prefixFile : $"{prefixFile}*";
-            }
-        }
+                StorageObjectInfo? objectInfo = null;
+                try
+                {
+                    var fileInfo = new FileInfo(filePath);
+                    if (!fileInfo.Exists || fileInfo.Name.Contains(".tmp-", StringComparison.Ordinal)) continue;
 
-        // Enumerate files recursively
-        await foreach (var filePath in EnumerateFiles(searchPath, searchPattern, prefix, containerPath, ct))
-        {
-            ct.ThrowIfCancellationRequested();
+                    var relativePath = Path.GetRelativePath(shardPath, filePath);
+                    var storageKey = relativePath.Replace(Path.DirectorySeparatorChar, '/');
+                    if (!string.IsNullOrEmpty(prefix) &&
+                        !storageKey.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                        continue;
 
-            StorageObjectInfo? objectInfo = null;
-            try
-            {
-                var fileInfo = new FileInfo(filePath);
-                if (!fileInfo.Exists) continue;
+                    objectInfo = new StorageObjectInfo(
+                        Key: storageKey,
+                        Size: fileInfo.Length,
+                        LastModified: fileInfo.LastWriteTimeUtc,
+                        ContentType: null,
+                        ETag: $"\"{fileInfo.LastWriteTimeUtc.Ticks:X}-{fileInfo.Length:X}\"");
+                }
+                catch (IOException)
+                {
+                    // A concurrently removed or moved object is simply absent from this listing snapshot.
+                    continue;
+                }
 
-                // Convert absolute file path back to storage key
-                var relativePath = Path.GetRelativePath(containerPath, filePath);
-                var storageKey = relativePath.Replace(Path.DirectorySeparatorChar, '/');
-
-                objectInfo = new StorageObjectInfo(
-                    Key: storageKey,
-                    Size: fileInfo.Length,
-                    LastModified: fileInfo.LastWriteTimeUtc,
-                    ContentType: null, // Could be determined from extension if needed
-                    ETag: $"\"{fileInfo.LastWriteTimeUtc.Ticks:X}-{fileInfo.Length:X}\""
-                );
-            }
-            catch (Exception)
-            {
-                // Log warning but continue enumeration
-                // Note: In production, you might want to inject ILogger here
-                continue;
-            }
-
-            if (objectInfo != null)
-            {
-                yield return objectInfo;
+                if (objectInfo is not null) yield return objectInfo;
+                await Task.Yield();
             }
         }
     }
 
-    private async IAsyncEnumerable<string> EnumerateFiles(
-        string searchPath,
-        string searchPattern,
-        string? prefix,
-        string containerPath,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    private string GetContainerPath(string? container)
     {
-        if (!Directory.Exists(searchPath))
-            yield break;
-
-        // Get all subdirectories (shard directories)
-        var directories = Directory.GetDirectories(searchPath);
-
-        foreach (var directory in directories)
+        var full = Path.GetFullPath(Path.Combine(_basePath, container ?? ""));
+        var relative = Path.GetRelativePath(_basePath, full);
+        if (Path.IsPathRooted(relative)
+            || relative.Equals("..", StringComparison.Ordinal)
+            || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
         {
-            ct.ThrowIfCancellationRequested();
-
-            var files = Directory.GetFiles(directory, searchPattern, SearchOption.TopDirectoryOnly);
-
-            foreach (var file in files)
-            {
-                ct.ThrowIfCancellationRequested();
-
-                // Additional prefix validation if needed
-                if (!string.IsNullOrEmpty(prefix))
-                {
-                    var relativePath = Path.GetRelativePath(containerPath, file);
-                    var storageKey = relativePath.Replace(Path.DirectorySeparatorChar, '/');
-
-                    if (!storageKey.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                        continue;
-                }
-
-                yield return file;
-
-                // Yield control periodically for cancellation and other async operations
-                await Task.Yield();
-            }
+            throw new InvalidOperationException("Path traversal detected.");
         }
+
+        return full;
     }
 
     private static async Task CopyRange(Stream from, Stream to, long bytesToCopy, CancellationToken ct)

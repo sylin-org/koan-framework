@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Adapters;
-using Koan.Core.Adapters.Configuration;
+using Koan.Data.Adapters.Configuration;
 using Koan.Core.Infrastructure;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
@@ -44,40 +44,37 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
 
     protected override void ConfigureProviderSpecific(CouchbaseOptions options)
     {
-        Logger?.LogInformation("Couchbase Orchestration-Aware Configuration Started");
-        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
-            KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
-        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}'",
-            options.ConnectionString);
+        LogConfiguration(LogLevel.Debug, "initial",
+            ("environment", KoanEnv.EnvironmentName),
+            ("orchestrationMode", KoanEnv.OrchestrationMode),
+            ("connection", options.ConnectionString));
 
         // Couchbase-specific configuration
         var explicitConnectionString = ReadProviderConfiguration("",
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
             Infrastructure.Constants.Configuration.Keys.ConnectionStringsCouchbase,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+            Infrastructure.Constants.Configuration.Keys.DefaultSourceConnectionString);
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            Logger?.LogInformation("Using explicit connection string from configuration");
+            LogConfiguration(LogLevel.Information, "explicit");
             options.ConnectionString = NormalizeCouchbaseConnectionString(explicitConnectionString);
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            Logger?.LogInformation("Auto-detection mode - using autonomous service discovery");
-            options.ConnectionString = ResolveAutonomousConnection(options.Bucket, options.Username, options.Password, Logger);
+            LogConfiguration(LogLevel.Information, "auto");
+            options.ConnectionString = ResolveAutonomousConnection(options.Bucket, options.Username, options.Password);
         }
         else
         {
-            Logger?.LogInformation("Using pre-configured connection string");
+            LogConfiguration(LogLevel.Information, "preconfigured");
             options.ConnectionString = NormalizeCouchbaseConnectionString(options.ConnectionString);
         }
 
         options.Bucket = ReadProviderConfiguration(options.Bucket,
             Infrastructure.Constants.Configuration.Keys.Bucket,
-            Infrastructure.Constants.Configuration.Keys.AltBucket,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDatabase);
+            Infrastructure.Constants.Configuration.Keys.DefaultSourceBucket);
 
         options.Scope = ReadProviderConfiguration(options.Scope ?? "",
             Infrastructure.Constants.Configuration.Keys.Scope) ?? options.Scope;
@@ -87,11 +84,11 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
 
         options.Username = ReadProviderConfiguration(options.Username ?? "",
             Infrastructure.Constants.Configuration.Keys.Username,
-            Infrastructure.Constants.Configuration.Keys.AltUsername) ?? options.Username;
+            Infrastructure.Constants.Configuration.Keys.DefaultSourceUsername) ?? options.Username;
 
         options.Password = ReadProviderConfiguration(options.Password ?? "",
             Infrastructure.Constants.Configuration.Keys.Password,
-            Infrastructure.Constants.Configuration.Keys.AltPassword) ?? options.Password;
+            Infrastructure.Constants.Configuration.Keys.DefaultSourcePassword) ?? options.Password;
 
         var queryTimeoutSeconds = ReadProviderConfiguration(0,
             Infrastructure.Constants.Configuration.Keys.QueryTimeout);
@@ -110,29 +107,27 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
             options.ManagementUrl = managementUrl;
         }
 
-        Logger?.LogInformation("Final Couchbase Configuration");
-        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
-        Logger?.LogInformation("Bucket: {Bucket}", options.Bucket);
-        Logger?.LogInformation("Couchbase Orchestration-Aware Configuration Complete");
+        LogConfiguration(LogLevel.Information, "final",
+            ("connection", options.ConnectionString),
+            ("bucket", options.Bucket));
     }
 
     private string ResolveAutonomousConnection(
         string? bucketName,
         string? username,
-        string? password,
-        ILogger? logger)
+        string? password)
     {
         try
         {
             if (IsAutoDetectionDisabled())
             {
-                logger?.LogInformation("Auto-detection disabled via configuration - using localhost");
+                LogDiscovery(LogLevel.Information, "disabled", ("fallback", "couchbase://localhost"));
                 return "couchbase://localhost";
             }
 
             if (_discoveryCoordinator == null)
             {
-                logger?.LogWarning("Service discovery coordinator not available, falling back to localhost");
+                LogDiscovery(LogLevel.Warning, "coordinator-missing", ("fallback", "couchbase://localhost"));
                 return "couchbase://localhost";
             }
 
@@ -157,18 +152,18 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
 
             if (result.IsSuccessful)
             {
-                logger?.LogInformation("Couchbase discovered via autonomous discovery: {ServiceUrl}", result.ServiceUrl);
+                LogDiscovery(LogLevel.Information, "success", ("url", result.ServiceUrl));
                 return result.ServiceUrl;
             }
             else
             {
-                logger?.LogWarning("Autonomous Couchbase discovery failed, falling back to localhost");
+                LogDiscovery(LogLevel.Warning, "fallback", ("reason", result.ErrorMessage), ("fallback", "couchbase://localhost"));
                 return "couchbase://localhost";
             }
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Error in autonomous Couchbase discovery, falling back to localhost");
+            LogDiscovery(LogLevel.Error, "exception", ("error", ex), ("fallback", "couchbase://localhost"));
             return "couchbase://localhost";
         }
     }

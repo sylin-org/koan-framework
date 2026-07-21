@@ -8,7 +8,7 @@ namespace Koan.Jobs;
 /// <see cref="IKoanJob"/> implementors — load/save/execute delegates (no per-dispatch reflection), the chain,
 /// per-action policy, persistence mode, and the coalesce/gate accessors. JOBS-0005 §4.1.
 /// </summary>
-public sealed class JobTypeBinding
+internal sealed class JobTypeBinding
 {
     private readonly IReadOnlyDictionary<string, JobActionAttribute> _actions;
     private readonly PropertyInfo[] _coalesceProps;
@@ -25,12 +25,12 @@ public sealed class JobTypeBinding
         Func<string, object> newSingleton,
         string[] chain,
         JobPersistenceMode persistence,
-        string? pinnedProvider,
         bool parallelSafe,
         IReadOnlyDictionary<string, JobActionAttribute> actions,
         PropertyInfo[] coalesceProps,
         PropertyInfo? gateProp,
-        Func<object, IServiceProvider, CancellationToken, Task<string?>>? gateResolver)
+        Func<object, IServiceProvider, CancellationToken, Task<string?>>? gateResolver,
+        string? poolName)
     {
         WorkType = workType;
         ClrType = clrType;
@@ -41,12 +41,12 @@ public sealed class JobTypeBinding
         NewSingleton = newSingleton;
         Chain = chain;
         Persistence = persistence;
-        PinnedProvider = pinnedProvider;
         ParallelSafe = parallelSafe;
         _actions = actions;
         _coalesceProps = coalesceProps;
         _gateProp = gateProp;
         _gateResolver = gateResolver;
+        PoolName = poolName;
     }
 
     /// <summary>Stable type key (the work-item type's full name); stored on each <see cref="JobRecord.WorkType"/>.</summary>
@@ -61,11 +61,15 @@ public sealed class JobTypeBinding
     public Func<string, object> NewSingleton { get; }
     public string[] Chain { get; }
     public JobPersistenceMode Persistence { get; }
-    public string? PinnedProvider { get; }
 
     /// <summary>True when the type opts out of per-entity serialization (<c>[ParallelSafe]</c>): its actions may
     /// run concurrently on one instance. Default false — jobs for the same instance are serialized (JOBS-0005 §17.2).</summary>
     public bool ParallelSafe { get; }
+
+    /// <summary>Pool name when the type carries <c>[JobPool]</c> (JOBS-0007). Null for non-pool jobs.
+    /// The gate key is NOT resolved at submit — it is stamped at claim time by the ledger using a
+    /// live <see cref="IJobPoolResolver"/>. Mutually exclusive with <c>[JobGate]</c>.</summary>
+    public string? PoolName { get; }
 
     /// <summary>The next stage after <paramref name="action"/> in the declared <c>[JobChain]</c>, or null (terminal / not chained).</summary>
     public string? NextInChain(string action)
@@ -94,6 +98,17 @@ public sealed class JobTypeBinding
     /// <summary>Actions declared with a <c>Schedule</c> (level-triggered reconcile sweeps).</summary>
     public IEnumerable<ResolvedActionPolicy> ScheduledActions(JobsOptions o)
         => _actions.Values.Where(a => !string.IsNullOrWhiteSpace(a.Schedule)).Select(a => ResolvePolicy(a.Action, o));
+
+    /// <summary>The distinct lanes this type's work can land in — every declared action, every chain stage, and the
+    /// default single-action lane. Used to enumerate the lane universe for the JOBS-0008 lane-fair claim (lanes derive
+    /// from <c>[JobAction]</c>, so the registry is the authoritative lane set — no discovery scan).</summary>
+    public IEnumerable<string> Lanes(JobsOptions o)
+    {
+        var actions = new HashSet<string>(_actions.Keys, StringComparer.Ordinal);
+        foreach (var stage in Chain) actions.Add(stage);
+        actions.Add("");   // the default single-action lane (action token "")
+        return actions.Select(a => ResolvePolicy(a, o).Lane).Distinct(StringComparer.Ordinal);
+    }
 
     /// <summary>Compute the coalesce/idempotency key for a work-item + action, or null if the type has no <c>[JobIdempotent]</c>.</summary>
     public string? CoalesceKey(object workItem, string action)
@@ -144,6 +159,10 @@ internal static class JobTypeBinder
         var chain = clr.GetCustomAttribute<JobChainAttribute>(inherit: true)?.Stages ?? Array.Empty<string>();
         var idem = clr.GetCustomAttribute<JobIdempotentAttribute>(inherit: true);
         var gate = clr.GetCustomAttribute<JobGateAttribute>(inherit: true);
+        var pool = clr.GetCustomAttribute<JobPoolAttribute>(inherit: true);
+        if (gate is not null && pool is not null)
+            throw new InvalidOperationException(
+                $"{clr.Name} cannot have both [JobGate] and [JobPool]: use [JobPool] for runtime pools and [JobGate] for static resource keys.");
         var persist = clr.GetCustomAttribute<JobPersistenceAttribute>(inherit: true);
         var parallelSafe = clr.GetCustomAttribute<ParallelSafeAttribute>(inherit: true) is not null;
 
@@ -180,7 +199,7 @@ internal static class JobTypeBinder
 
         return new JobTypeBinding(
             clr.FullName!, clr, load, save, execute, getId, newSingleton, chain,
-            persist?.Mode ?? JobPersistenceMode.Auto, persist?.Provider, parallelSafe,
-            actions, coalesceProps, gateProp, gateResolver);
+            persist?.Mode ?? JobPersistenceMode.Auto, parallelSafe,
+            actions, coalesceProps, gateProp, gateResolver, pool?.PoolName);
     }
 }

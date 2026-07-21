@@ -13,9 +13,11 @@ using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Core.Semantics;
 using Koan.Data.Relational;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
@@ -40,11 +42,58 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     where TKey : notnull
 {
     public void Describe(ICapabilities caps) => caps
-        .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
+        .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String).Add(DataCaps.Query.ProviderBoundedPaging)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
         .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
+        // The AODB three-mode ledger (ARCH-0103 §6). Shared (DATA-0105 §3b): persists a framework-managed discriminator
+        // inside the [Json] envelope + pushes scalar equality (JSON_VALUE) + a MERGE-guarded upsert verifies ownership.
+        // Container: a distinct partition-suffixed table per ambient partition. Database: a per-source connection.
+        // Co-defined with the AodbConformanceSpecsBase cells that prove each.
+        .Add(DataCaps.Isolation.RowScoped)
+        .Add(DataCaps.Isolation.ContainerScoped)
+        .Add(DataCaps.Isolation.DatabaseScoped)
+        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Native))
         .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
+
+    // Managed-field conflict-aware upsert (DATA-0105 §3b — the write-verify half). When a managed write-scope is
+    // active, the [Json] already carries the managed keys (the ManagedFieldJsonInjector injected them) AND a
+    // MERGE updates the row ONLY when its existing managed fields match the scope — a guard mismatch leaves the row
+    // untouched (0 rows affected), which the caller treats as a rejected cross-scope write. Generic: reads the
+    // scope dict, never names tenant/classification. Unguarded ⇒ the existing UPDATE-then-INSERT path verbatim.
+    private static (bool Guarded, string MergeSql, KeyValuePair<string, object?>[] Managed) ManagedUpsert(string table)
+    {
+        var scope = ManagedFieldWriteScope.Current;
+        if (scope is null || scope.Count == 0) return (false, "", Array.Empty<KeyValuePair<string, object?>>());
+
+        var conds = new List<string>(scope.Count);
+        var prms = new List<KeyValuePair<string, object?>>(scope.Count);
+        var i = 0;
+        foreach (var kv in scope)
+        {
+            var p = "mf" + i++;
+            conds.Add($"JSON_VALUE(t.[Json], '$.{kv.Key}') = @{p}");
+            prms.Add(new KeyValuePair<string, object?>(p, kv.Value));
+        }
+        var sql =
+            $"MERGE [dbo].[{table}] AS t USING (SELECT @Id AS [Id], @Json AS [Json]) AS s ON t.[Id] = s.[Id] " +
+            $"WHEN MATCHED AND ({string.Join(" AND ", conds)}) THEN UPDATE SET t.[Json] = s.[Json] " +
+            $"WHEN NOT MATCHED THEN INSERT ([Id], [Json]) VALUES (s.[Id], s.[Json]);";
+        return (true, sql, prms.ToArray());
+    }
+
+    private static DynamicParameters UpsertParams(string id, string json, KeyValuePair<string, object?>[] managed)
+    {
+        var p = new DynamicParameters();
+        p.Add("Id", id);
+        p.Add("Json", json);
+        foreach (var kv in managed) p.Add(kv.Key, kv.Value);
+        return p;
+    }
+
+    private static InvalidOperationException CrossScopeWrite(string table, string id)
+        => new($"Rejected a cross-scope write to '{table}' id '{id}': the row is owned by a different managed scope " +
+               "(e.g. tenant/classification). A managed-field-scoped entity cannot overwrite another scope's row.");
 
     // Storage optimization support
     private readonly StorageOptimizationInfo _optimizationInfo;
@@ -55,9 +104,9 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private readonly IStorageNameResolver _nameResolver;
     private readonly StorageNameResolver.Convention _conv;
     private readonly ILinqSqlDialect _dialect = new MsSqlDialect();
-    private readonly int _defaultPageSize;
     private readonly ILogger _logger;
     private readonly JsonSerializerSettings _json;
+    private readonly RelationalSchemaPolicy _schemaPolicy;
     private static readonly CamelCaseNamingStrategy CamelCase = new();
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
 
@@ -76,7 +125,14 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                       ? lf.CreateLogger($"Koan.Data.Connector.SqlServer[{typeof(TEntity).FullName}]")
                       : NullLogger.Instance);
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
-        _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
+        _schemaPolicy = new RelationalSchemaPolicy
+        {
+            Projections = RelationalProjectionMode.ComputedProjections,
+            Ddl = options.DdlPolicy,
+            Matching = options.SchemaMatching,
+            AllowProductionDdl = options.AllowProductionDdl,
+            DefaultSchema = "dbo"
+        };
         _json = new JsonSerializerSettings
         {
             ContractResolver = new Newtonsoft.Json.Serialization.DefaultContractResolver
@@ -89,7 +145,9 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         // Comparable-encoding contract (DATA-0100): DateTimeOffset -> UTC-ISO text, TimeSpan -> ticks,
         // DateOnly/TimeOnly -> fixed text, so stored values are order-preserving and match the filter
         // comparand (which SqlFilterTranslator encodes identically).
-        ComparableScalarEncoding.Apply(_json);
+        ComparableScalarEncoding.Apply(
+            _json,
+            sp.GetRequiredService<DataSegmentationPlan>().For(typeof(TEntity)).Fields);
 
         // Log optimization strategy for diagnostics
         if (_optimizationInfo.IsOptimized)
@@ -179,12 +237,12 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                 var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                 var ddl = new MsSqlDdlExecutor(conn);
                 var feats = new MsSqlStoreFeatures();
-                var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, runCt);
+                var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, runCt);
                 var ddlAllowed = report.TryGetValue("DdlAllowed", out var da) && da is bool allowed && allowed;
                 var tableExists = report.TryGetValue("TableExists", out var te) && te is bool exists && exists;
                 if (ddlAllowed)
                 {
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, runCt);
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, runCt);
                     _healthyCache[cacheKey] = true;
                     return;
                 }
@@ -315,19 +373,22 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         if (query.HasPagination && sortFullyHandled)
         {
             var size = query.EffectivePageSize();
-            var offset = (query.EffectivePage() - 1) * size;
+            var offset = query.EffectiveOffset();
             sb.Append(" OFFSET ").Append(offset).Append(" ROWS FETCH NEXT ").Append(size).Append(" ROWS ONLY");
             paginationHandled = true;
         }
 
         await using var conn = Open();
         var dyn = ToDapper(parameters);
-        var rows = await conn.QueryAsync<(string Id, string Json)>(sb.ToString(), dyn);
+        var command = new CommandDefinition(sb.ToString(), dyn, cancellationToken: ct);
+        var rows = await conn.QueryAsync<(string Id, string Json)>(command);
         var items = rows.Select(FromRow).ToList();
 
-        long? totalCount = paginationHandled
-            ? await CountCore(whereSql, parameters, ct)
-            : items.Count;
+        long? totalCount = query.CountStrategy is null
+            ? null
+            : paginationHandled
+                ? await CountCore(whereSql, parameters, ct)
+                : items.Count;
 
         return new RepositoryQueryResult<TEntity>
         {
@@ -383,7 +444,8 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             ? $"SELECT COUNT(1) FROM [dbo].[{TableName}]"
             : $"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE {whereSql}";
         var dyn = ToDapper(parameters);
-        return await conn.ExecuteScalarAsync<long>(sql, dyn);
+        var command = new CommandDefinition(sql, dyn, cancellationToken: ct);
+        return await conn.ExecuteScalarAsync<long>(command);
     }
 
     /// <summary>Translates the (fully-pushable) filter to a WHERE fragment; null filter -> no WHERE.</summary>
@@ -403,7 +465,8 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private string ResolveColumnSql(FieldPath field, ResolvedField resolved)
     {
         var prop = field.Leaf;
-        if (string.Equals(prop, "Id", StringComparison.Ordinal)) return "[Id]";
+        if (string.Equals(prop, "Id", StringComparison.Ordinal))
+            return ApplyPortableScalarCast("[Id]", resolved?.ComparableType);
         if (string.Equals(prop, "Json", StringComparison.Ordinal)) return "[Json]";
         var camel = CamelCase.GetPropertyName(prop, hasSpecifiedName: false);
 
@@ -417,11 +480,32 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         // same lesson. (The optimiser can still match a computed-column index defined on the same
         // JSON_VALUE expression, so the optimisation is preserved when the column does exist.)
         var expr = $"JSON_VALUE([Json], '$.{camel}')";
-        // Comparable-encoding contract (DATA-0100): TimeSpan persists as Int64 ticks -> cast so it
-        // compares by duration. DateTimeOffset / DateOnly / TimeOnly persist as monotonic fixed-width
-        // UTC/ISO TEXT and compare correctly as nvarchar (no cast).
-        var leaf = Nullable.GetUnderlyingType(resolved?.ComparableType ?? typeof(object)) ?? resolved?.ComparableType;
-        return leaf == typeof(TimeSpan) ? $"CAST({expr} AS BIGINT)" : expr;
+        return ApplyPortableScalarCast(expr, resolved?.ComparableType);
+    }
+
+    /// <summary>
+    /// Applies the exact SQL Server representation used by DATA-0107's portable streaming floor.
+    /// JSON_VALUE returns nvarchar, so integral values must be converted before ORDER BY can truthfully
+    /// report the numeric sort as handled. Types outside the portable floor remain text here and are
+    /// rejected by the stream coordinator before provider I/O.
+    /// </summary>
+    private static string ApplyPortableScalarCast(string expr, Type? comparableType)
+    {
+        if (comparableType is null) return expr;
+
+        var type = Nullable.GetUnderlyingType(comparableType) ?? comparableType;
+        if (type.IsEnum) type = Enum.GetUnderlyingType(type);
+
+        if (type == typeof(ulong))
+            return $"TRY_CONVERT(DECIMAL(20, 0), {expr})";
+
+        if (type == typeof(byte) || type == typeof(sbyte) ||
+            type == typeof(short) || type == typeof(ushort) ||
+            type == typeof(int) || type == typeof(uint) ||
+            type == typeof(long) || type == typeof(TimeSpan))
+            return $"TRY_CONVERT(BIGINT, {expr})";
+
+        return expr;
     }
 
     /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable Id order.</summary>
@@ -500,9 +584,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         else
         {
             var whereSql = RewriteWhereForProjection(query);
-            var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
-            var offset = shaping.HasPagination ? (shaping.EffectivePage() - 1) * size : 0;
-            var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE {whereSql} {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {size} ROWS ONLY";
+            var paging = shaping.HasPagination
+                ? $" OFFSET {shaping.EffectiveOffset()} ROWS FETCH NEXT {shaping.EffectivePageSize()} ROWS ONLY"
+                : string.Empty;
+            var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE {whereSql} {OrderByIdClause}{paging}";
             var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
             return new RepositoryQueryResult<TEntity>
             {
@@ -532,15 +617,22 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     {
         await using var conn = Open();
         await using var tx = conn.BeginTransaction();
+        var (guarded, mergeSql, managed) = ManagedUpsert(TableName);
         var count = 0;
         foreach (var e in models)
         {
             ct.ThrowIfCancellationRequested();
             var row = ToRow(e);
-            var updated = await conn.ExecuteAsync($"UPDATE [dbo].[{TableName}] SET [Json] = @Json WHERE [Id] = @Id", new { row.Id, row.Json }, tx);
-            if (updated == 0)
+            if (guarded)
             {
-                await conn.ExecuteAsync($"INSERT INTO [dbo].[{TableName}] ([Id], [Json]) VALUES (@Id, @Json)", new { row.Id, row.Json }, tx);
+                var affected = await conn.ExecuteAsync(mergeSql, UpsertParams(row.Id, row.Json, managed), tx);
+                if (affected == 0) throw CrossScopeWrite(TableName, row.Id);
+            }
+            else
+            {
+                var updated = await conn.ExecuteAsync($"UPDATE [dbo].[{TableName}] SET [Json] = @Json WHERE [Id] = @Id", new { row.Id, row.Json }, tx);
+                if (updated == 0)
+                    await conn.ExecuteAsync($"INSERT INTO [dbo].[{TableName}] ([Id], [Json]) VALUES (@Id, @Json)", new { row.Id, row.Json }, tx);
             }
             count++;
         }
@@ -627,13 +719,22 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             await using var tx = conn.BeginTransaction();
             try
             {
+                var (guarded, mergeSql, managed) = ManagedUpsert(repo.TableName);
                 foreach (var e in upserts)
                 {
                     ct.ThrowIfCancellationRequested();
                     var row = repo.ToRow(e);
-                    var updatedRows = await conn.ExecuteAsync($"UPDATE [dbo].[{repo.TableName}] SET [Json] = @Json WHERE [Id] = @Id", new { row.Id, row.Json }, tx);
-                    if (updatedRows == 0)
-                        await conn.ExecuteAsync($"INSERT INTO [dbo].[{repo.TableName}] ([Id], [Json]) VALUES (@Id, @Json)", new { row.Id, row.Json }, tx);
+                    if (guarded)
+                    {
+                        var affected = await conn.ExecuteAsync(mergeSql, UpsertParams(row.Id, row.Json, managed), tx);
+                        if (affected == 0) throw CrossScopeWrite(repo.TableName, row.Id);
+                    }
+                    else
+                    {
+                        var updatedRows = await conn.ExecuteAsync($"UPDATE [dbo].[{repo.TableName}] SET [Json] = @Json WHERE [Id] = @Id", new { row.Id, row.Json }, tx);
+                        if (updatedRows == 0)
+                            await conn.ExecuteAsync($"INSERT INTO [dbo].[{repo.TableName}] ([Id], [Json]) VALUES (@Id, @Json)", new { row.Id, row.Json }, tx);
+                    }
                 }
                 var deleted = 0;
                 if (_deletes.Any())
@@ -680,7 +781,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new MsSqlDdlExecutor(conn);
                     var feats = new MsSqlStoreFeatures();
-                    var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
+                    var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, ct);
                     return (TResult)report;
                 }
             case DataInstructions.EnsureCreated:
@@ -693,7 +794,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                     var key = $"{conn.DataSource}/{conn.Database}::{TableName}";
                     await Singleflight.Run(key, async kct =>
                     {
-                        await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, kct);
+                        await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, kct);
                         _healthyCache[key] = true;
                     }, ct);
                     object ok = true; return (TResult)ok;

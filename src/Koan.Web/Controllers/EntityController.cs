@@ -13,7 +13,6 @@ using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
-using Koan.Data.Core.Extensions;
 using Koan.Web.Attributes;
 using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
@@ -46,9 +45,10 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         _endpointService = endpointService;
     }
 
-    protected virtual bool CanRead => true;
-    protected virtual bool CanWrite => true;
-    protected virtual bool CanRemove => true;
+    // ARCH-0092 (§D): the CanRead/CanWrite/CanRemove virtuals were hard-cut — authorization is no longer a
+    // REST-only controller toggle. Base CRUD is gated by the unified IAuthorize seam inside the shared
+    // IEntityEndpointService (so REST and MCP enforce the same declaration). Declare access on the entity with
+    // standard [Authorize]/[AllowAnonymous] + [RequireScope].
 
     protected IEntityEndpointService<TEntity, TKey> EndpointService =>
         _endpointService ?? HttpContext.RequestServices.GetRequiredService<IEntityEndpointService<TEntity, TKey>>();
@@ -64,7 +64,18 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         => ContextBuilder.Build(options, ct, HttpContext, HttpContext?.User);
 
     private IActionResult ResolveShortCircuit(EntityEndpointResult result)
-        => result.ShortCircuitResult ?? PrepareResponse(result.ShortCircuitPayload ?? result.Payload);
+    {
+        // ARCH-0092 (§D): a seam denial is carried as a transport-agnostic AuthorizeDecision — translate it to
+        // the REST status (Challenge → 401, Forbid → 403) here.
+        if (result.DeniedDecision is { } decision)
+        {
+            return decision is AuthorizeDecision.Challenge
+                ? Unauthorized()
+                : StatusCode(StatusCodes.Status403Forbidden);
+        }
+
+        return result.ShortCircuitResult ?? PrepareResponse(result.ShortCircuitPayload ?? result.Payload);
+    }
 
     private static Dictionary<string, string?> ToQueryDictionary(IQueryCollection query)
     {
@@ -148,9 +159,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     protected virtual ObjectResult PrepareResponse(object? content)
     {
         Response.Headers["Vary"] = "Accept";
-        Response.Headers["Koan-Access-Read"] = CanRead.ToString().ToLowerInvariant();
-        Response.Headers["Koan-Access-Write"] = CanWrite.ToString().ToLowerInvariant();
-        Response.Headers["Koan-Access-Remove"] = CanRemove.ToString().ToLowerInvariant();
+        // SEC-0004 (§C): the single Koan-Access list header (the permitted verbs for this principal) is computed
+        // from the seam inside the endpoint service and flows via result.Headers (ApplyResponseMetadata) — the
+        // single-item form of the per-row capability projection, not the old CanRead/CanWrite/CanRemove virtuals.
         return new ObjectResult(content);
     }
 
@@ -166,7 +177,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public virtual async Task<IActionResult> GetCollection(CancellationToken ct)
     {
-        if (!CanRead) return Forbid();
 
         var query = HttpContext.Request.Query;
         var policy = GetPaginationPolicy();
@@ -252,6 +262,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             AbsoluteMaxRecords = policy.AbsoluteMaxRecords,
             Accept = HttpContext.Request.Headers["Accept"].ToString(),
             BasePath = HttpContext.Request.Path.HasValue ? HttpContext.Request.Path.Value : "/",
+            // SEC-0004 (§C): ?access=true opts into the per-row `access` sidecar (decoupled from ?with= expansion).
+            IncludeAccess = GetBooleanQueryValue(query, Koan.Web.Authorization.AccessProjection.QueryToggle),
             QueryParameters = ToQueryDictionary(query)
         };
 
@@ -271,7 +283,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public virtual async Task<IActionResult> Query([FromBody] object body, CancellationToken ct)
     {
-        if (!CanRead) return Forbid();
 
         QueryOptions options;
         try
@@ -287,61 +298,77 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         string? filterJson = null;
         string? set = null;
         bool ignoreCase = false;
+
+        // X-entitycontroller-query-parse: parse the body explicitly and fail loud on bad input (GET-parity).
+        // The previous bare catch swallowed JObject.Parse + (int) cast failures and ran the query with
+        // DEFAULTS — silently dropping the filter and returning unfiltered results (200). A non-object body
+        // now 400s, page/size mirror the GET-list path (non-coercible -> ignored; negative page rejected),
+        // and coercion no longer throws.
+        JObject jobj;
         try
         {
-            var jobj = JObject.Parse(JsonConvert.SerializeObject(body));
-            if (jobj.TryGetValue("filter", out var f)) filterJson = f.ToString(Formatting.None);
-            if (jobj.TryGetValue("page", out var p) && (p.Type == JTokenType.Integer || p.Type == JTokenType.String)) options.Page = (int)p;
-            if (jobj.TryGetValue("size", out var s) && (s.Type == JTokenType.Integer || s.Type == JTokenType.String)) options.PageSize = (int)s;
-            if (jobj.TryGetValue("set", out var st) && st.Type == JTokenType.String) set = st.ToString();
-            // ADR-0093: body sort field. Accepts string array of URL-grammar specs (e.g. ["-createdAt", "+title"]).
-            // Body sort overrides any ?sort= query-string value to keep the schema unambiguous.
-            if (jobj.TryGetValue("sort", out var sortNode))
+            if (JToken.Parse(JsonConvert.SerializeObject(body)) is not JObject parsed)
             {
-                IEnumerable<string>? rawSpecs = null;
-                if (sortNode.Type == JTokenType.Array)
-                {
-                    rawSpecs = sortNode.Children<JToken>()
-                        .Where(t => t.Type == JTokenType.String)
-                        .Select(t => t.Value<string>()!)
-                        .Where(s => !string.IsNullOrWhiteSpace(s));
-                }
-                else if (sortNode.Type == JTokenType.String)
-                {
-                    var raw = sortNode.Value<string>();
-                    if (!string.IsNullOrWhiteSpace(raw)) rawSpecs = new[] { raw };
-                }
+                return BadRequest(new { error = "Request body must be a JSON object." });
+            }
+            jobj = parsed;
+        }
+        catch (JsonException)
+        {
+            return BadRequest(new { error = "Invalid request body." });
+        }
 
-                if (rawSpecs is not null)
+        if (jobj.TryGetValue("filter", out var f)) filterJson = f.ToString(Formatting.None);
+        if (jobj.TryGetValue("page", out var pageToken) && TryCoerceQueryInt(pageToken, out var pageValue))
+        {
+            if (pageValue < 0) return BadRequest(new { error = "page must be >= 0" });
+            options.Page = pageValue;
+        }
+        if (jobj.TryGetValue("size", out var sizeToken) && TryCoerceQueryInt(sizeToken, out var sizeValue))
+        {
+            options.PageSize = sizeValue;
+        }
+        if (jobj.TryGetValue("set", out var st) && st.Type == JTokenType.String) set = st.ToString();
+        // ADR-0093: body sort field. Accepts string array of URL-grammar specs (e.g. ["-createdAt", "+title"]).
+        // Body sort overrides any ?sort= query-string value to keep the schema unambiguous.
+        if (jobj.TryGetValue("sort", out var sortNode))
+        {
+            IEnumerable<string>? rawSpecs = null;
+            if (sortNode.Type == JTokenType.Array)
+            {
+                rawSpecs = sortNode.Children<JToken>()
+                    .Where(t => t.Type == JTokenType.String)
+                    .Select(t => t.Value<string>()!)
+                    .Where(s => !string.IsNullOrWhiteSpace(s));
+            }
+            else if (sortNode.Type == JTokenType.String)
+            {
+                var raw = sortNode.Value<string>();
+                if (!string.IsNullOrWhiteSpace(raw)) rawSpecs = new[] { raw };
+            }
+
+            if (rawSpecs is not null)
+            {
+                try
                 {
-                    try
+                    var collected = new List<SortSpec>();
+                    foreach (var spec in rawSpecs)
                     {
-                        var collected = new List<SortSpec>();
-                        foreach (var spec in rawSpecs)
-                        {
-                            collected.AddRange(Koan.Data.Core.Sorting.SortSpecParser.ParseStrict<TEntity>(spec));
-                        }
-                        options.Sort.Clear();
-                        options.Sort.AddRange(collected);
+                        collected.AddRange(Koan.Data.Core.Sorting.SortSpecParser.ParseStrict<TEntity>(spec));
                     }
-                    catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException ex)
-                    {
-                        return BadRequest(new { error = ex.Message, field = ex.Field });
-                    }
+                    options.Sort.Clear();
+                    options.Sort.AddRange(collected);
+                }
+                catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException ex)
+                {
+                    return BadRequest(new { error = ex.Message, field = ex.Field });
                 }
             }
-            if (jobj.TryGetValue("", out var opt) && opt.Type == JTokenType.Object)
-            {
-                var o = (JObject)opt;
-                if (o.TryGetValue("ignoreCase", out var ic) && ic.Type == JTokenType.Boolean && (bool)ic) ignoreCase = true;
-            }
         }
-        catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException)
+        if (jobj.TryGetValue("", out var opt) && opt.Type == JTokenType.Object)
         {
-            throw;  // already handled above; this catch prevents the bare catch from swallowing it
-        }
-        catch
-        {
+            var o = (JObject)opt;
+            if (o.TryGetValue("ignoreCase", out var ic) && ic.Type == JTokenType.Boolean && (bool)ic) ignoreCase = true;
         }
 
         var request = new EntityQueryRequest
@@ -362,10 +389,32 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         return PrepareResponse(result.Payload ?? result.Items);
     }
 
+    // Coerce a JSON token to an int for paging without throwing (GET-parity: non-coercible -> ignored,
+    // out-of-range integers treated as absent rather than overflowing).
+    private static bool TryCoerceQueryInt(JToken token, out int value)
+    {
+        value = 0;
+        switch (token.Type)
+        {
+            case JTokenType.Integer:
+                var l = token.Value<long>();
+                if (l < int.MinValue || l > int.MaxValue) return false;
+                value = (int)l;
+                return true;
+            case JTokenType.String:
+                return int.TryParse(
+                    token.Value<string>(),
+                    System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out value);
+            default:
+                return false;
+        }
+    }
+
     [HttpGet("new")]
     public virtual async Task<IActionResult> GetNew(CancellationToken ct)
     {
-        if (!CanRead) return Forbid();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var request = new EntityGetNewRequest
@@ -382,7 +431,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpGet("{id}")]
     public virtual async Task<IActionResult> GetById([FromRoute] TKey id, CancellationToken ct)
     {
-        if (!CanRead) return Forbid();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
@@ -404,7 +452,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> Upsert([FromBody][ValidateNever] TEntity model, CancellationToken ct)
     {
         if (model is null) return BadRequest(new { error = "Request body is required" });
-        if (!CanWrite) return Forbid();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
@@ -425,7 +472,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> UpsertMany([FromBody][ValidateNever] IEnumerable<TEntity> models, CancellationToken ct)
     {
         if (models is null) return BadRequest(new { error = "Request body is required" });
-        if (!CanWrite) return Forbid();
         var list = models.ToList();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
@@ -445,7 +491,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpDelete("{id}")]
     public virtual async Task<IActionResult> Delete([FromRoute] TKey id, CancellationToken ct)
     {
-        if (!CanRemove) return Forbid();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
@@ -465,7 +510,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpDelete("bulk")]
     public virtual async Task<IActionResult> DeleteMany([FromBody] IEnumerable<TKey> ids, CancellationToken ct)
     {
-        if (!CanRemove) return Forbid();
         var list = ids?.ToList() ?? new List<TKey>();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
@@ -485,7 +529,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpDelete("")]
     public virtual async Task<IActionResult> DeleteByQuery([FromQuery] string? q, CancellationToken ct)
     {
-        if (!CanRemove) return Forbid();
         if (string.IsNullOrWhiteSpace(q)) return BadRequest();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
@@ -505,7 +548,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpDelete("all")]
     public virtual async Task<IActionResult> DeleteAll(CancellationToken ct)
     {
-        if (!CanRemove) return Forbid();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
@@ -532,7 +574,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         Infrastructure.KoanWebConstants.ContentTypes.ApplicationJson)]
     public virtual async Task<IActionResult> Patch([FromRoute] TKey id, CancellationToken ct)
     {
-        if (!CanWrite) return Forbid();
 
         // Buffer the body so we can parse it with the right shape per Content-Type.
         Microsoft.AspNetCore.Http.HttpRequestRewindExtensions.EnableBuffering(HttpContext.Request);
@@ -580,7 +621,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
     private async Task<IActionResult> PatchNormalized(TKey id, Koan.Data.Abstractions.Instructions.PatchPayload<TKey> payload, CancellationToken ct)
     {
-        if (!CanWrite) return Forbid();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
