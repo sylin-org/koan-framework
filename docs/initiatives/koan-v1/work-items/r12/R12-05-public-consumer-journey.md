@@ -9,16 +9,16 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-20
   status: in-progress
-  scope: pre-freeze convergence complete; exact candidate commit and certification pending
+  scope: public-feed template journey works; clean-restore correction pending
 ---
 
 # R12-05 — Freeze and certify the first 0.20 candidate
 
 - Tranche: `T7B — public product maturity`
-- Status: `in-progress — pre-freeze convergence complete; exact candidate not yet frozen`
+- Status: `in-progress — public-feed journey works; clean-restore correction pending`
 - Depends on: passed R12-01 through R12-04
 - Unlocks: R12-06 publication and genuine public-feed consumer observation
-- Owner: the existing release compiler owns exact selection, versions, proof, artifacts, and local escrow
+- Owner: the shipped template source owns the package-first consumer expression; standard NuGet owns resolution
 
 ## Meaningful outcome
 
@@ -28,6 +28,87 @@ templates, FirstUse, GoldenJourney, and recovery evidence pass locally before an
 
 This is release-candidate engineering evidence, not public-consumer evidence. An isolated local feed can
 prove exact package behavior; only packages visible on NuGet can prove the public experience.
+
+## Public-feed observation checkpoint — 2026-07-21
+
+**Task:** Remove the warning from the live template journey and replace pre-publication copy with the
+current NuGet path.
+
+**Application intent:** A new developer installs Koan, generates an application, and receives the
+latest compatible 0.20 fixes with a clean restore.
+
+**Public expression:** `dotnet new install Sylin.Koan.Templates`, `dotnet new koan-web -o TodoApi`,
+and `dotnet run`. Generated Koan references use standard NuGet `0.20.*` patch-floating versions.
+
+**Guarantee/correction:** NuGet selects the latest available 0.20 patch and cannot cross into 0.21.
+If no 0.20 package exists, restore fails honestly; it does not approximate a nonexistent `0.20.0`
+lower bound with NU1603 warnings.
+
+**Complete intent surface:** No additional command, Koan API, decoration, configuration, context, or
+runtime prerequisite exists beyond the public expression.
+
+**Public concepts:** Only NuGet's standard floating patch version, which expresses “latest compatible
+fix within the supported 0.20 line.”
+
+**Docs read:** `docs/engineering/index.md` requires ordinary packaging and focused validation;
+`docs/architecture/principles.md` requires standard .NET and one current path; `README.md`,
+`docs/index.md`, `docs/getting-started/quickstart.md`, `docs/getting-started/overview.md`, and the
+template companions own the public entry but still describe publication as pending; ARCH-0110 keeps
+publication exclusively on the resulting `main` push.
+
+**Code read:** `templates/Sylin.Koan.Templates.csproj` is the content-only package owner;
+`templates/koan-web/KoanWebApp.csproj` and `templates/koan-console/KoanConsoleApp.csproj` contain the
+four stale ranges; `templates/Directory.Build.props` and `.targets` deliberately prevent hidden
+rewrite machinery; the template programs/models/controllers already express the intended four-line
+host and Entity-first application.
+
+**Reusing:** The existing content-only template pack, public 0.20 packages, standard NuGet resolution,
+the four-line `AddKoan()` host, `Entity<T>`, `EntityController<T>`, and SQLite's autonomous local
+default.
+
+**Creating new:** None. The shipped template source and its current public documentation are the
+existing owners.
+
+**Coalescence:** The closest pattern is the four direct template `PackageReference` entries. Keep the
+content-only package architecture; replace their stale bounded literals at the template source and
+delete pending-publication language. A release tool, token replacement phase, central version
+constant, Koan abstraction, or generated-app correction would add a second owner.
+
+**Ergonomics:** The developer still learns three ordinary .NET commands and no version choice. The
+generated project remains immediately readable in an IDE; `0.20.*` visibly communicates the patch
+policy without a Koan-specific concept or restore warning.
+
+**Constraints satisfied:** Business intent leads; standard .NET/NuGet owns the behavior; no runtime,
+data, controller, Entity, provider, options, constants, DTO, or shared-contract change exists; the
+controller-only and Entity-first guardrails remain intact; documentation becomes instruction-first
+and current; validation is limited to isolated public-feed install/generate/restore/build/runtime
+proofs.
+
+**Risks:** Floating restore is intentionally variable within the compatible 0.20 line. An application
+that requires exact reproducibility can use ordinary NuGet locking; the beginner template optimizes
+for receiving current fixes. The public feed may be eventually consistent immediately after a future
+publication.
+
+**Observed before correction:** `Sylin.Koan.Templates 0.20.5` installed and generated successfully.
+The web template restored and built against `Sylin.Koan.App 0.20.4` and
+`Sylin.Koan.Data.Connector.Sqlite 0.20.4`; REST create/read, SQLite persistence, and Koan facts passed.
+Both direct references emitted NU1603 because `[0.20.0,0.21.0)` names an unpublished minimum. A
+temporary `0.20.*` substitution restored cleanly and resolved both packages to `0.20.4`.
+
+**Focused correction evidence:** The corrected content-only template packed successfully. An isolated
+custom hive installed that exact nupkg and generated both public short names. Both generated projects
+contained only `0.20.*` Koan references and restored from NuGet.org with no warning. The web project
+built with zero warnings/errors. The console project selected local SQLite and passed Entity
+save/load/query. The earlier live web host passed SQLite-backed REST create/read and
+`/.well-known/Koan/facts`. No full release ratchet was run.
+
+**Separate observed rough edge:** SQLite's zero-configuration local fallback works, but startup first
+reports failed service discovery and a corrective endpoint diagnostic before selecting
+`.koan/data/Koan.sqlite`. This is not a template or persistence failure; it is a distinct startup
+explanation/delight issue for the discovery owner and is not folded into this package-range correction.
+
+This checkpoint supersedes the pre-publication release-compiler mechanics below. Those mechanisms
+were subsequently removed; R12-06 records the minimal successful main-boundary publication.
 
 ## Architecture checkpoint — one frozen local candidate
 

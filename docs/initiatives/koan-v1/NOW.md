@@ -2,7 +2,7 @@
 type: HANDOFF
 domain: koan-v1
 status: active
-last_updated: 2026-07-20
+last_updated: 2026-07-21
 framework_version: v0.20.0
 ---
 
@@ -13,7 +13,7 @@ framework_version: v0.20.0
 Finish the road to the 0.20 pre-release with product work and a coherent public narrative. Release
 automation is infrastructure, not a product capability, and must remain proportionate.
 
-## Active slice: R12-06 bare-bones publication
+## Active slice: public-feed first use observed; clean-template correction ready
 
 The maintainer rejected the automatic release compiler after multiple long validation cycles exposed
 failures in release orchestration rather than framework behavior. The later manual-from-`dev`
@@ -45,20 +45,29 @@ Focused implementation evidence:
   legacy release state;
 - `Sylin.Koan.Templates` is the one packable project outside `Koan.sln` and has one explicit standard
   pack command in the same job.
+- Public `Sylin.Koan.Templates 0.20.5` installs and generates successfully. The generated web app
+  builds and passes SQLite-backed REST create/read plus runtime facts, but its stale
+  `[0.20.0,0.21.0)` references emit NU1603 because the first published App/SQLite versions are
+  `0.20.4`.
+- The template source now uses standard `0.20.*` patch floats. An exact packed correction installed
+  in an isolated hive; both generated projects restored from NuGet.org without warnings, the web
+  project built cleanly, and the console passed SQLite Entity save/load/query.
+- A separate non-blocking startup-explanation rough edge remains: local SQLite fallback succeeds only
+  after logging a failed service-discovery correction. Keep it with the discovery/runtime owner.
 
 ## Remote/public state
 
-- `Sylin.Koan 0.20.4` was accepted by nuget.org from main-boundary run `29790423844`; registry indexing
-  may lag acceptance. The run then exposed and stopped on an invalid attempt to publish
-  non-guaranteed `Sylin.Koan.AI 0.18.10`. Release selection is now restricted to the guaranteed 0.20
-  closure.
-- NuGet ownership remains split across `sylin.org` and the historical `sylin-labs` owner. Eighteen
-  guaranteed existing IDs require ownership transfer or an old-owner credential; new IDs require
-  create-package permission. This is the current external prerequisite.
+- PR `#93` merged to `main` as `ad9d739199da809fa44efc9a4ce3db8059348b42`. Main-boundary run
+  `29792486934` succeeded: product-surface selection resolved the exact 38-package guaranteed 0.20
+  closure, packing completed, and NuGet accepted the publication set.
+- The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
+  Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
+  organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
+  search is eventually consistent and may temporarily report stale `sylin-labs` results.
 - No `automation/package-lineage-dev` branch, `release/dev/*` tag, release-wave escrow, or GitHub
   Release was created.
-- There is no manual dispatch path. Do not update `main` during local correction because a `main`
-  commit is now the publication event.
+- There is no manual dispatch path. Any future `main` commit is a publication event; work on `dev`
+  triggers nothing.
 
 ## Validation posture
 
@@ -71,17 +80,19 @@ Focused implementation evidence:
 
 ## Next actions
 
-1. Commit the corrected main-boundary workflow and documentation to `dev`; this triggers nothing.
-2. Open a pull request targeting `main`; the PR gate validates but does not publish.
-3. Merge only when publication is intended; observe ordinary pack/push results from that `main`
-   commit, correct only a concrete failing owner, and rerun the same workflow run if necessary.
-4. Resume product and public-documentation work. Do not expand release infrastructure.
+1. Commit the template-range correction and greenfield public-entry copy to `dev`; this publishes
+   nothing.
+2. Open a pull request to `main` for ordinary validation. Merge only when publishing the corrected
+   template and docs is intended.
+3. After that main-boundary publication, repeat only the clean public template restore and record the
+   result; then address the separate SQLite discovery/explanation rough edge.
+4. Resume product and coherent public-documentation work. Do not expand release infrastructure.
 
 ## Repository boundaries
 
 - Preserve unrelated worktree changes and untracked `tmp/`; never stage `tmp/`.
 - Do not inspect private dogfood applications.
-- Do not update `main`, publish from a workstation, tag, release, or mutate remote configuration while
-  correcting the workflow on `dev`.
+- Do not publish from a workstation, tag, create a GitHub Release, or mutate unrelated remote
+  configuration.
 - Full release certification belongs to an explicitly requested milestone, not normal development or
   a release plumbing correction.

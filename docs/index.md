@@ -4,12 +4,12 @@ domain: framework
 title: "Koan documentation"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-21
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-17
-  status: in-progress
-  scope: public documentation front door and executable FirstUse path
+  date_last_tested: 2026-07-21
+  status: passed
+  scope: public template install, generation, clean restore/build, SQLite Entity result, and runtime facts
 ---
 
 # Koan documentation
@@ -20,27 +20,7 @@ lifecycle, and explanation.
 
 ## Start with a result
 
-While public-feed publication is pending, start with the executable source contract:
-
-```powershell
-git clone https://github.com/sylin-org/koan-framework
-cd koan-framework
-dotnet run --project samples/FirstUse
-```
-
-Then create and inspect one approval:
-
-```powershell
-Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/approvals `
-  -ContentType application/json -Body '{"subject":"Approve supplier invoice"}'
-Invoke-RestMethod http://localhost:5000/api/approvals
-Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
-```
-
-Use the URL printed by the application if it differs. The [quickstart](getting-started/quickstart.md)
-explains the result; [FirstUse](../samples/FirstUse/README.md) is the executable contract.
-
-After the first 0.20 wave is visible on NuGet, the canonical entry becomes:
+Install the public template and create a persisted web API:
 
 ```powershell
 dotnet new install Sylin.Koan.Templates
@@ -49,8 +29,17 @@ cd TodoApi
 dotnet run
 ```
 
-The template's business result uses `Todo` and `/api/todos`; local candidate proof does not imply public
-package availability.
+Then create and inspect one Todo:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/todos `
+  -ContentType application/json -Body '{"title":"buy milk"}'
+Invoke-RestMethod http://localhost:5000/api/todos
+Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
+```
+
+Use the URL printed by the application if it differs. The [quickstart](getting-started/quickstart.md)
+explains the result; [FirstUse](../samples/FirstUse/README.md) is the richer repository-owned executable contract.
 
 ## Read business, not plumbing
 

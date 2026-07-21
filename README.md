@@ -6,33 +6,13 @@ code states business intent while the framework owns composition, backend negoti
 and explanation.
 
 > **Status:** Koan 0.20 is the preview line. Its supported foundation and extensions are explicit;
-> other available packages remain verified, demonstrated, experimental, specified, or unassessed. Public-feed
-> publication follows the final package-only proof. Until then, run the checkout directly and use the
-> [generated product surface](docs/reference/product-surface.md) as the maturity authority.
+> other available packages remain verified, demonstrated, experimental, specified, or unassessed. The supported
+> 0.20 package set is live on NuGet; use the [generated product surface](docs/reference/product-surface.md) as the
+> maturity authority.
 
 ## Reach a meaningful result
 
-Today, run the executable first-use contract from source:
-
-```powershell
-git clone https://github.com/sylin-org/koan-framework
-cd koan-framework
-dotnet run --project samples/FirstUse
-```
-
-In another shell, create a business request and inspect what composed it:
-
-```powershell
-Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/approvals `
-  -ContentType application/json -Body '{"subject":"Approve supplier invoice"}'
-Invoke-RestMethod http://localhost:5000/api/approvals
-Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
-```
-
-Use the URL printed by the application if it differs. The complete walkthrough is in
-[`samples/FirstUse`](samples/FirstUse/README.md).
-
-After the first 0.20 wave is visible on NuGet, the canonical entry becomes the ordinary template path:
+Install the template from NuGet and create a persisted web API:
 
 ```powershell
 dotnet new install Sylin.Koan.Templates
@@ -41,8 +21,18 @@ cd TodoApi
 dotnet run
 ```
 
-That template creates a `Todo` application and exposes `/api/todos`; its complete result is in
-[the template guide](templates/README.md). Candidate package evidence is not public-feed availability.
+In another shell, create and read a Todo and inspect what composed it:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/todos `
+  -ContentType application/json -Body '{"title":"buy milk"}'
+Invoke-RestMethod http://localhost:5000/api/todos
+Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
+```
+
+Use the URL printed by the application if it differs. The complete result is in
+[the template guide](templates/README.md); repository contributors can inspect the richer executable contract in
+[`samples/FirstUse`](samples/FirstUse/README.md).
 
 ## The application grammar
 

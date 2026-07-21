@@ -3,15 +3,14 @@
 Two `dotnet new` paths to a persisted Koan Entity application. The templates choose a proved package family; the
 generated application contains business code and ordinary .NET structure, not framework scaffolding.
 
-## Install after publication
+## Install from NuGet
 
 ```powershell
 dotnet new install Sylin.Koan.Templates
 ```
 
-This becomes the canonical Koan 0.20 preview entry after the first wave is visible on NuGet. Until then, run
-`dotnet run --project samples/FirstUse` from the repository checkout. Release validation already runs this template
-command against the exact locally compiled candidate, but local candidate evidence is not public availability.
+This is the canonical Koan 0.20 preview entry. The template package and its guaranteed dependencies are live on
+NuGet.
 
 ## First result
 
@@ -48,9 +47,9 @@ reference priority and uses `.koan/data/Koan.sqlite`; there is no generated `app
 schema script, repository, or version prompt. Add configuration only when the application intends to override a
 derived default.
 
-Each generated project carries an ordinary bounded NuGet range for the guaranteed 0.20 family:
-`[0.20.0,0.21.0)`. NuGet selects an available compatible 0.20 package and rejects a future breaking
-0.21 package. The application does not align Koan package versions itself.
+Each generated project uses the ordinary NuGet patch float `0.20.*`. NuGet selects the latest available
+compatible 0.20 fix and cannot cross into a future breaking 0.21 package. The application does not align
+independently versioned Koan packages itself.
 
 ## Inspectability and next steps
 

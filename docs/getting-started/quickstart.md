@@ -4,42 +4,17 @@ domain: core
 title: "Koan quickstart"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-07-19
+last_updated: 2026-07-21
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-19
+  date_last_tested: 2026-07-21
   status: passed
-  scope: 0.20 package-first contract plus source-built FirstUse fallback
+  scope: public 0.20 template install, clean restore/build, SQLite-backed REST create/read, and runtime facts
 ---
 
 # Koan quickstart
 
-Public-feed publication is still pending, so run the source-built FirstUse contract today:
-
-```powershell
-git clone https://github.com/sylin-org/koan-framework
-cd koan-framework
-dotnet run --project samples/FirstUse
-```
-
-In another shell:
-
-```powershell
-Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/approvals `
-  -ContentType application/json -Body '{"subject":"Approve supplier invoice"}'
-Invoke-RestMethod http://localhost:5000/api/approvals
-$filter = [uri]::EscapeDataString('{"subject":"Approve supplier invoice"}')
-Invoke-RestMethod "http://localhost:5000/api/approvals?filter=$filter"
-Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
-```
-
-The URL printed by ASP.NET Core is authoritative if it differs. The POST persists an approval; the
-two reads prove ordinary and filtered Entity access; the facts response explains the modules and
-SQLite election that produced the result.
-
-## Package-first entry after publication
-
-After the first 0.20 wave is visible on NuGet, use the canonical template path:
+Install the public template and create the application:
 
 ```powershell
 dotnet new install Sylin.Koan.Templates
@@ -48,13 +23,22 @@ cd TodoApi
 dotnet run
 ```
 
-That generated application uses `Todo` and `/api/todos`. The [template guide](../../templates/README.md)
-contains its exact result. Until publication, these commands describe the proved candidate rather than an
-installable public package.
+In another shell:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/todos `
+  -ContentType application/json -Body '{"title":"buy milk"}'
+Invoke-RestMethod http://localhost:5000/api/todos
+Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
+```
+
+The URL printed by ASP.NET Core is authoritative if it differs. The POST persists a Todo; the read proves
+ordinary Entity access; the facts response explains the modules and SQLite election that produced the result.
+The [template guide](../../templates/README.md) contains the exact generated shape.
 
 ## Read the whole application
 
-Read [`samples/FirstUse`](../../samples/FirstUse/README.md) in this order:
+Repository contributors can read [`samples/FirstUse`](../../samples/FirstUse/README.md) in this order:
 
 1. `Domain/Approval.cs` — business state and access policy.
 2. `Web/ApprovalsController.cs` — the governed HTTP surface.
@@ -79,8 +63,8 @@ FirstUse is exercised through its real host. Focused evidence covers REST, SQLit
 filtered query, readiness, composition facts, MCP discovery, access policy, dry-run, and an agent
 write observed through REST. Its checked-in `koan.lock.json` records referenced composition.
 
-The release tooling also rebuilds the templates and this application from the exact locally staged package closure.
-That proves the candidate path; only public-feed observation will make the install command externally available.
+The public-feed journey has been observed independently: template installation, generation, clean restore/build,
+SQLite-backed REST create/read, and runtime facts all pass without repository package sources.
 
 ## Continue
 
