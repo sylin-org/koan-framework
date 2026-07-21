@@ -27,10 +27,11 @@ Nerdbank.GitVersioning computes its public package version; the established `NUG
 only credential.
 
 **Guarantee/correction:** Only source present on `main` can receive the NuGet credential. The workflow
-evaluates the repository's packable projects, packs each with `PublicRelease=true`, and pushes the
-resulting packages to nuget.org. A missing API key, invalid or missing version owner, restore/pack
-failure, or NuGet push failure stops the single job. Existing immutable package identities are
-skipped by NuGet; rerun the failed `main` workflow after correcting the owner.
+evaluates the repository's product surface, packs with `PublicRelease=true`, and pushes only the
+guaranteed packages whose validated version intent is `0.20`. A missing API key, invalid or missing
+version owner, release-scope/artifact mismatch, restore/pack failure, or NuGet push failure stops the
+single job. Existing immutable package identities are skipped by NuGet; rerun the failed `main`
+workflow after correcting the owner.
 
 **Complete intent surface:** Change a package's major/minor in its own `version.json` only when its
 compatibility tier changes; open and merge a pull request to `main` (or deliberately commit directly
@@ -108,7 +109,8 @@ system inside Koan.
 
 1. Publish only on push to `main`; validate pull requests to `main`; trigger nothing from `dev`.
 2. Pack every evaluated packable project with its NBGV public version.
-3. Push the resulting nupkgs with the established API key and duplicate-safe NuGet semantics.
+3. Push only the product-surface packages whose supported promise and `0.20` version intent agree,
+   using the established API key and duplicate-safe NuGet semantics.
 4. Remove the unused lineage, escrow, coordinator, recovery, and clean-room release implementation.
 5. Realign current engineering guidance and mark the former compiler decision superseded.
 6. Build only `Koan.Packaging` and perform a static workflow check. Do not run the release ratchet.
@@ -116,7 +118,8 @@ system inside Koan.
 ## Acceptance
 
 1. Release is one `main`-push workflow, one job, and one API key; `dev` activity does nothing.
-2. Every packable project is discovered through evaluated MSBuild state and owns `version.json`.
+2. Every packable project is discovered through evaluated MSBuild state and owns `version.json`;
+   product-surface compilation selects exactly the guaranteed 0.20 closure for publication.
 3. NBGV remains the sole package/assembly version source and `PublicRelease=true` removes local
    build suffixes.
 4. The workflow restores, packs, and pushes; it does not test the repository, create Git history,
@@ -134,7 +137,47 @@ system inside Koan.
 - The packaging test project compiles after removal of the release-specific source set; tests were
   deliberately not executed.
 - Three manual-from-`dev` attempts failed before publication and one credential retry was cancelled
-  during packing; no attempt published a package. The manual path is now removed.
+  during packing. The first main-boundary run published `Sylin.Koan 0.20.4`, then exposed the blind
+  release-set bug by attempting non-guaranteed `Sylin.Koan.AI 0.18.10`; NuGet rejected that second
+  package. The manual path is removed and release selection is corrected below.
+
+## Guaranteed release-scope correction — 2026-07-20
+
+**Task:** Publish exactly the guaranteed 0.20 package closure rather than every package artifact.
+
+**Application intent:** A `main` commit publishes the packages Koan promises at 0.20—nothing merely
+present, demonstrated, experimental, specified, or unassessed.
+
+**Public expression:** Run the existing `Koan.Packaging product-surface` compiler, select its packages
+whose validated `versionIntent` is `0.20`, and push only the corresponding nupkgs with standard NuGet
+commands.
+
+**Guarantee/correction:** `ProductSurfaceCompiler` already enforces both directions: every package
+owned by a supported claim declares `0.20`, and every `0.20` package belongs to a supported claim.
+Publication rejects a selected ID unless packing produced exactly one matching 0.20 artifact.
+
+**Complete intent surface:** Maintain `product/claims.json` and project-local `version.json` files;
+merge to `main`; inspect the one workflow result. No hand-authored release list, second manifest, new
+command, or package-specific operator choice is added.
+
+**Public concepts:** Product claims own support, NBGV `version.json` owns compatibility intent, and
+NuGet owns immutable identities. No release-specific Koan concept is exposed.
+
+**Coalescence:** Keep product-surface compilation as the one support-selection owner, consume its
+ordinary JSON in the existing workflow, and delete blind “push every nupkg” behavior. A release
+manifest or package-selection command would duplicate the product surface; version-only selection is
+safe because the compiler already proves exact equivalence between supported ownership and 0.20.
+
+**Ergonomics:** The maintainer action remains merge-to-`main`. The job derives the release set, logs
+each selected identity, and fails with the exact missing/ambiguous artifact rather than publishing a
+lower-maturity package.
+
+**Observed external ownership:** The guaranteed closure contains 38 IDs. At observation time, 18
+existing packages were owned by `sylin-labs`, 17 IDs did not yet exist, two existing packages were
+owned by `sylin.org`, and one package page did not return a stable owner result. The current key
+successfully created `Sylin.Koan 0.20.4` but cannot update the old-owner packages. Repository selection
+is corrected independently; ownership transfer or an appropriately authorized credential remains a
+NuGet account prerequisite, not release code.
 
 ## Standard template-pack checkpoint — 2026-07-20
 

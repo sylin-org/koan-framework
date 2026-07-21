@@ -21,8 +21,8 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Require project-local versions
-        run: dotnet run --project tools/Koan.Packaging -- inventory --output artifacts/package-inventory.json
+      - name: Resolve guaranteed package scope
+        run: dotnet run --project tools/Koan.Packaging -- product-surface --output artifacts/product-surface.json
 
       - name: Pack
         shell: pwsh
@@ -45,10 +45,28 @@ jobs:
             throw 'Repository secret NUGET_API_KEY is required.'
           }
 
-          $packages = @(Get-ChildItem artifacts/packages -Recurse -Filter *.nupkg -File)
-          if ($packages.Count -eq 0) {
-            throw 'Pack produced no NuGet packages.'
+          $surface = Get-Content artifacts/product-surface.json -Raw | ConvertFrom-Json
+          $releaseIds = @($surface.packages |
+            Where-Object { $_.versionIntent -eq '0.20' } |
+            ForEach-Object { $_.packageId } |
+            Sort-Object)
+          if ($releaseIds.Count -eq 0) {
+            throw 'Product surface selected no guaranteed 0.20 packages.'
           }
+
+          $artifacts = @(Get-ChildItem artifacts/packages -Recurse -Filter *.nupkg -File)
+          $packages = @(
+            foreach ($packageId in $releaseIds) {
+              $prefix = "$packageId.0.20."
+              $matches = @($artifacts | Where-Object {
+                $_.Name.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)
+              })
+              if ($matches.Count -ne 1) {
+                throw "Guaranteed package '$packageId' matched $($matches.Count) packed 0.20 artifacts; expected exactly one."
+              }
+              $matches[0]
+            }
+          )
 
           foreach ($package in $packages) {
             dotnet nuget push $package.FullName `
