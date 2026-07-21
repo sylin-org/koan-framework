@@ -227,3 +227,14 @@ its existing local NBGV owner.
 The correction was committed to `dev`, validated by PR `#93`, and published only by the resulting
 `main` commit. Future `dev` work remains inert; every future `main` commit remains an intentional
 publication event.
+
+## Template correction publication — 2026-07-21
+
+- PR `#94` merged as `cfb60f848653686278a1976dcacc71386f4cb19e`; the PR itself only ran
+  validation.
+- The resulting push to `main` started `Release packages` run `29796113330`. Its single job resolved
+  the guaranteed scope, packed, and pushed successfully.
+- Unchanged immutable package versions were skipped safely. The changed template package published
+  as `Sylin.Koan.Templates 0.20.6` and became visible on NuGet.org.
+- A fresh public-feed proof installed 0.20.6 and verified the corrected generated references and
+  warning-free restore. R12-05 owns the consumer evidence.

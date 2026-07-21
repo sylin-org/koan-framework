@@ -13,7 +13,7 @@ framework_version: v0.20.0
 Finish the road to the 0.20 pre-release with product work and a coherent public narrative. Release
 automation is infrastructure, not a product capability, and must remain proportionate.
 
-## Active slice: public-feed first use observed; clean-template correction ready
+## Active slice: public template correction published and proved
 
 The maintainer rejected the automatic release compiler after multiple long validation cycles exposed
 failures in release orchestration rather than framework behavior. The later manual-from-`dev`
@@ -45,13 +45,9 @@ Focused implementation evidence:
   legacy release state;
 - `Sylin.Koan.Templates` is the one packable project outside `Koan.sln` and has one explicit standard
   pack command in the same job.
-- Public `Sylin.Koan.Templates 0.20.5` installs and generates successfully. The generated web app
-  builds and passes SQLite-backed REST create/read plus runtime facts, but its stale
-  `[0.20.0,0.21.0)` references emit NU1603 because the first published App/SQLite versions are
-  `0.20.4`.
-- The template source now uses standard `0.20.*` patch floats. An exact packed correction installed
-  in an isolated hive; both generated projects restored from NuGet.org without warnings, the web
-  project built cleanly, and the console passed SQLite Entity save/load/query.
+- Public `Sylin.Koan.Templates 0.20.6` now uses standard `0.20.*` patch floats. A fresh NuGet.org
+  install generated both templates; isolated restores completed without warnings, the web project
+  built with zero warnings/errors, and the console passed SQLite Entity save/load/query.
 - A separate non-blocking startup-explanation rough edge remains: local SQLite fallback succeeds only
   after logging a failed service-discovery correction. Keep it with the discovery/runtime owner.
 
@@ -60,6 +56,8 @@ Focused implementation evidence:
 - PR `#93` merged to `main` as `ad9d739199da809fa44efc9a4ce3db8059348b42`. Main-boundary run
   `29792486934` succeeded: product-surface selection resolved the exact 38-package guaranteed 0.20
   closure, packing completed, and NuGet accepted the publication set.
+- PR `#94` merged to `main` as `cfb60f848653686278a1976dcacc71386f4cb19e`. Main-boundary run
+  `29796113330` succeeded and NuGet.org indexed the corrected `Sylin.Koan.Templates 0.20.6`.
 - The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
   Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
   organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
@@ -80,13 +78,8 @@ Focused implementation evidence:
 
 ## Next actions
 
-1. Commit the template-range correction and greenfield public-entry copy to `dev`; this publishes
-   nothing.
-2. Open a pull request to `main` for ordinary validation. Merge only when publishing the corrected
-   template and docs is intended.
-3. After that main-boundary publication, repeat only the clean public template restore and record the
-   result; then address the separate SQLite discovery/explanation rough edge.
-4. Resume product and coherent public-documentation work. Do not expand release infrastructure.
+1. Address the separate SQLite discovery/explanation rough edge with focused runtime tests.
+2. Resume product and coherent public-documentation work. Do not expand release infrastructure.
 
 ## Repository boundaries
 
