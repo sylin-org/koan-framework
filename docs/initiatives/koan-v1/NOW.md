@@ -16,11 +16,13 @@ automation is infrastructure, not a product capability, and must remain proporti
 ## Active slice: R12-06 bare-bones publication
 
 The maintainer rejected the automatic release compiler after multiple long validation cycles exposed
-failures in release orchestration rather than framework behavior. The current decision is recorded in
-[R12-06](work-items/r12/R12-06-publish-and-observe-first-wave.md) and ARCH-0110:
+failures in release orchestration rather than framework behavior. The later manual-from-`dev`
+replacement also changed the integration boundary without explicit approval. The corrected decision
+is recorded in [R12-06](work-items/r12/R12-06-publish-and-observe-first-wave.md) and ARCH-0110:
 
-- development pushes do not publish;
-- release is one explicit manual GitHub Actions workflow from `dev`;
+- commits and pull requests targeting `dev` trigger no validation or publication workflow;
+- pull requests targeting `main` run the existing validation gate but cannot publish;
+- the resulting `main` commit automatically runs one package publication job;
 - each packable project keeps its local NBGV `version.json`;
 - the workflow evaluates inventory, runs `dotnet pack` with `PublicRelease=true`, and runs
   `dotnet nuget push --skip-duplicate` using the established `NUGET_API_KEY`;
@@ -38,18 +40,19 @@ Focused implementation evidence:
 - evaluated inventory: 93 independently versioned packages in 10.3 seconds;
 - declared product surface: 18 supported claims map to exactly 38 guaranteed package owners, all
   with `versionIntent=0.20`;
-- workflow: 58 lines, manual-only, one job, zero test commands, one API-key reference, and no Git
-  mutation or legacy release state;
+- workflow: one `main`-push job, zero test commands, one API-key reference, and no Git mutation or
+  legacy release state;
 - `Sylin.Koan.Templates` is the one packable project outside `Koan.sln` and has one explicit standard
   pack command in the same job.
 
 ## Remote/public state
 
-- No 0.20 package was staged or published by the abandoned release compiler.
+- No 0.20 package was published by the abandoned release compiler or the three failed/cancelled
+  bare-bones attempts. The cancelled credential retry skipped its publication step.
 - No `automation/package-lineage-dev` branch, `release/dev/*` tag, release-wave escrow, or GitHub
   Release was created.
-- Do not dispatch the new workflow, publish, push, tag, release, or change remote configuration during
-  local implementation.
+- There is no manual dispatch path. Do not update `main` during local correction because a `main`
+  commit is now the publication event.
 
 ## Validation posture
 
@@ -62,15 +65,17 @@ Focused implementation evidence:
 
 ## Next actions
 
-1. Review and commit the bare-bones release change as one architectural deletion.
-2. When the maintainer explicitly authorizes publication, run **Release packages** from `dev` once.
-3. Observe ordinary pack/push results; correct only a concrete failing owner and rerun.
+1. Commit the corrected main-boundary workflow and documentation to `dev`; this triggers nothing.
+2. Open a pull request targeting `main`; the PR gate validates but does not publish.
+3. Merge only when publication is intended; observe ordinary pack/push results from that `main`
+   commit, correct only a concrete failing owner, and rerun the same workflow run if necessary.
 4. Resume product and public-documentation work. Do not expand release infrastructure.
 
 ## Repository boundaries
 
 - Preserve unrelated worktree changes and untracked `tmp/`; never stage `tmp/`.
 - Do not inspect private dogfood applications.
-- Do not push, publish, tag, release, or mutate remote configuration.
+- Do not update `main`, publish from a workstation, tag, release, or mutate remote configuration while
+  correcting the workflow on `dev`.
 - Full release certification belongs to an explicitly requested milestone, not normal development or
   a release plumbing correction.

@@ -9,17 +9,17 @@
 #   B.  docs-lint  scripts/docs-lint.ps1                  (links / front-matter / anchors)
 #   C.  doc-code   scripts/validate-code-examples.ps1     (diff-scoped, opt-in <!-- validate --> blocks)
 #
-# Release config matches what release-on-dev.yml ships. Doc-code diffs against the
+# Release config matches what release-on-main.yml ships. Doc-code diffs against the
 # PR's target branch so only docs the PR actually touched are validated.
 #
-# Package publication remains owned by release-on-dev.yml.
+# Package publication remains owned by release-on-main.yml after merge.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: PR gate
 
 on:
   pull_request:
-    branches: [main, dev]
+    branches: [main]
 
 # One gate run per PR; a newer push cancels the older in-flight run.
 concurrency:

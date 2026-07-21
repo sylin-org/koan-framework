@@ -358,7 +358,7 @@ maintained ledger.
 
 - [NuGet publishing](../../../../engineering/nuget-publishing.md)
 - [Packaging policy](../../../../engineering/packaging.md)
-- [ARCH-0110 — dev release compiler](../../../../decisions/ARCH-0110-dev-release-compiler.md)
+- [ARCH-0110 — main-boundary package releases](../../../../decisions/ARCH-0110-main-release-boundary.md)
 - [ARCH-0119 — one console host lifecycle](../../../../decisions/ARCH-0119-one-console-host-lifecycle.md)
 - [R08-01 — durable release wave](R08-01-durable-release-wave.md)
 - [R08-04 — package-first templates](R08-04-package-first-templates.md)

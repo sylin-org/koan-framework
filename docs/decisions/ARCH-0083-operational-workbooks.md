@@ -113,8 +113,8 @@ These ship with this ADR:
 The documentation-category decision remains current. The initial `docs/workbooks/` surfaces were
 later consolidated into [versioning](../engineering/versioning.md) and
 [NuGet publishing](../engineering/nuget-publishing.md) under `docs/engineering/`. The named
-`release-on-main` flow is historical; [ARCH-0110](ARCH-0110-dev-release-compiler.md) supersedes its
-operating procedure with the serialized automatic `dev` release compiler.
+earlier `release-on-main` implementation is historical;
+[ARCH-0110](ARCH-0110-main-release-boundary.md) now owns the smaller main-boundary procedure.
 
 The existing `docs/guides/versioning-workbook.md` becomes a redirect stub pointing at the new location.
 

@@ -30,7 +30,7 @@ validation:
 - [Configuration provenance descriptors](provenance-configuration-descriptors.md)
 - [Architecture principles](../architecture/principles.md)
 - [Documentation posture (ARCH-0041)](../decisions/ARCH-0041-docs-posture-instructions-over-tutorials.md)
-- [Explicit package releases (ARCH-0110)](../decisions/ARCH-0110-dev-release-compiler.md)
+- [Main-boundary package releases (ARCH-0110)](../decisions/ARCH-0110-main-release-boundary.md)
 - [Runtime facts](runtime-facts.md)
 
 ## Prime Guardrails
@@ -56,7 +56,7 @@ validation:
 - Ensure `<Description>`, `<PackageTags>`, and `<GenerateDocumentationFile>true</GenerateDocumentationFile>` are set.
 - Write or update per-project `README.md` with controller/entity examples.
 - Run `dotnet run --project tools/Koan.Packaging -- inventory` and focused tests for the affected
-  package owner. Publication is an explicit manual workflow from `dev`.
+  package owner. Pull requests to `main` validate; the resulting `main` commit publishes.
 - Dotnet tools set `<PackAsTool>true</PackAsTool>` and document install commands; analyzers ship assets under `analyzers/dotnet/cs`.
 
 See the [NuGet packaging policy](packaging.md) for detailed expectations and follow-ups.

@@ -40,12 +40,13 @@ These commands inspect product/package shape. They do not stage or publish anyth
 
 ## Publish
 
-Run the manual **Release packages** workflow from `dev`. It packs the solution and the packable
-template project with `PublicRelease=true`, then pushes the produced nupkgs using the repository's `NUGET_API_KEY`. Existing
-immutable identities are skipped; any other failure stops the job.
+Merge the intended source into `main`. The resulting `main` commit runs **Release packages**, which
+packs the solution and the packable template project with `PublicRelease=true`, then pushes the
+produced nupkgs using the repository's `NUGET_API_KEY`. Existing immutable identities are skipped;
+any other failure stops the job. Development commits and open pull requests cannot publish.
 
 Do not maintain package checklists, hand-authored manifests, release branches, escrow formats, or
 recovery ledgers. NuGet owns immutable publication; Git and each local `version.json` own identity.
 
 See [Versioning](versioning.md), [NuGet publishing](nuget-publishing.md), and
-[ARCH-0110](../decisions/ARCH-0110-dev-release-compiler.md).
+[ARCH-0110](../decisions/ARCH-0110-main-release-boundary.md).

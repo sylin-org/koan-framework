@@ -15,27 +15,32 @@ automation must not become a second product.
 
 ## Bare-bones release checkpoint — 2026-07-20
 
-**Task:** Replace the automatic release compiler with one explicit, one-job NuGet publication path.
+**Task:** Replace the automatic release compiler with one explicit, one-job NuGet publication path
+owned by the `main` integration boundary.
 
-**Application intent:** A maintainer deliberately says, “Publish the repository's independently
-versioned packages now.”
+**Application intent:** A maintainer merges a pull request into `main` or commits directly to `main`;
+the resulting `main` commit publishes the repository's independently versioned packages.
 
-**Public expression:** Run the `Release packages` workflow from `dev`. Every packable project owns a
-local `version.json`; Nerdbank.GitVersioning computes its public package version; the established
-`NUGET_API_KEY` is the only credential.
+**Public expression:** GitHub validates pull requests targeting `main`; merging creates a `main` push
+that runs `Release packages`. Every packable project owns a local `version.json`;
+Nerdbank.GitVersioning computes its public package version; the established `NUGET_API_KEY` is the
+only credential.
 
-**Guarantee/correction:** The workflow evaluates the repository's packable projects, packs each with
-`PublicRelease=true`, and pushes the resulting packages to nuget.org. A missing API key, invalid or
-missing version owner, restore/pack failure, or NuGet push failure stops the single job. Existing
-immutable package identities are skipped by NuGet instead of being rebuilt into a recovery protocol.
+**Guarantee/correction:** Only source present on `main` can receive the NuGet credential. The workflow
+evaluates the repository's packable projects, packs each with `PublicRelease=true`, and pushes the
+resulting packages to nuget.org. A missing API key, invalid or missing version owner, restore/pack
+failure, or NuGet push failure stops the single job. Existing immutable package identities are
+skipped by NuGet; rerun the failed `main` workflow after correcting the owner.
 
 **Complete intent surface:** Change a package's major/minor in its own `version.json` only when its
-compatibility tier changes; dispatch the workflow from `dev`; read the ordinary job result. No branch
-advancement, package checklist, lineage seed, escrow preparation, tag operation, recovery state, or
-remote configuration is part of the release expression.
+compatibility tier changes; open and merge a pull request to `main` (or deliberately commit directly
+to `main`); read the ordinary job result. No manual dispatch, branch selector, package checklist,
+lineage seed, escrow preparation, tag operation, recovery state, or remote configuration is part of
+the release expression.
 
-**Public concepts:** Standard GitHub Actions manual dispatch, standard .NET restore/pack/NuGet push,
-and the existing NBGV `version.json` format. No release-specific Koan concept is exposed.
+**Public concepts:** Standard GitHub Actions pull-request and push events, standard .NET
+restore/pack/NuGet push, and the existing NBGV `version.json` format. No release-specific Koan
+concept is exposed.
 
 **Docs read:**
 
@@ -48,13 +53,13 @@ and the existing NBGV `version.json` format. No release-specific Koan concept is
   remains.
 - `docs/engineering/packaging.md` establishes evaluated packability and package metadata; those
   package-shape rules remain while release-wave policy is removed.
-- `docs/decisions/ARCH-0110-dev-release-compiler.md` owns the superseded release compiler decision and
-  will be amended to the simpler operator contract.
+- `docs/decisions/ARCH-0110-main-release-boundary.md` owns the corrected integration and publication
+  boundary.
 
 **Code read:**
 
-- `.github/workflows/release-on-dev.yml` was rebuilt from a 773-line, six-job state machine into one
-  manually dispatched job.
+- `.github/workflows/release-on-main.yml` is one `main`-push job; its predecessor was rebuilt from a
+  773-line, six-job state machine and briefly exposed an incorrect manual-from-`dev` boundary.
 - `tools/Koan.Packaging/Program.cs` exposes lineage, planning, clean-room packing, wave staging, and
   promotion commands; retain only inventory/product assessment commands.
 - `tools/Koan.Packaging/Services/RepositoryInspector.cs` evaluates packability and local version
@@ -81,9 +86,9 @@ release platform is wrong because NuGet already owns immutable package publicati
 per-package script is wrong because evaluated repository inventory already identifies the complete
 packable surface.
 
-**Ergonomics:** One deliberate workflow action, one job, one log, and one version file per package.
-There are no hidden remote prerequisites beyond the existing API key and no second Git history to
-understand.
+**Ergonomics:** One familiar action—merge to `main`—one job, one log, and one version file per
+package. There is no manual branch choice, hidden remote prerequisite beyond the existing API key, or
+second Git history to understand.
 
 **Constraints satisfied:**
 
@@ -101,7 +106,7 @@ system inside Koan.
 
 ## Work
 
-1. Replace automatic `dev` publication with manual workflow dispatch restricted to `dev`.
+1. Publish only on push to `main`; validate pull requests to `main`; trigger nothing from `dev`.
 2. Pack every evaluated packable project with its NBGV public version.
 3. Push the resulting nupkgs with the established API key and duplicate-safe NuGet semantics.
 4. Remove the unused lineage, escrow, coordinator, recovery, and clean-room release implementation.
@@ -110,7 +115,7 @@ system inside Koan.
 
 ## Acceptance
 
-1. Release is one explicit workflow, one job, and one API key.
+1. Release is one `main`-push workflow, one job, and one API key; `dev` activity does nothing.
 2. Every packable project is discovered through evaluated MSBuild state and owns `version.json`.
 3. NBGV remains the sole package/assembly version source and `PublicRelease=true` removes local
    build suffixes.
@@ -120,15 +125,16 @@ system inside Koan.
 
 ## Implementation evidence — 2026-07-20
 
-- The workflow is 58 lines, manual-only, and contains one job, one API-key reference, no test command,
-  no Git mutation, and no lineage/release-wave state.
+- The workflow contains one `main`-push job, one API-key reference, no test command, no Git mutation,
+  and no lineage/release-wave state. PR validation remains separate and cannot access publication.
 - The surviving package inventory tool builds cleanly and evaluates 93 independently versioned
   packages.
 - Eighteen supported product claims resolve to exactly 38 guaranteed package owners; all 38 declare
   `versionIntent=0.20`. The remaining 55 packages preserve their lower maturity versions.
 - The packaging test project compiles after removal of the release-specific source set; tests were
   deliberately not executed.
-- No workflow was dispatched and no package or remote state was changed.
+- Three manual-from-`dev` attempts failed before publication and one credential retry was cancelled
+  during packing; no attempt published a package. The manual path is now removed.
 
 ## Standard template-pack checkpoint — 2026-07-20
 
@@ -162,5 +168,6 @@ its existing local NBGV owner.
 
 ## Authorization boundary
 
-The maintainer authorized redesign and local implementation. Do not dispatch the workflow, publish a
-package, create a tag/Release, push, or change the remote API key/configuration during this work item.
+The maintainer authorized redesign and local implementation. Commit the correction to `dev`, where it
+triggers nothing. Do not update `main`, publish from a workstation, create a tag/Release, or change
+remote configuration while validating this correction; merging to `main` is the publication action.
