@@ -24,8 +24,9 @@ is recorded in [R12-06](work-items/r12/R12-06-publish-and-observe-first-wave.md)
 - pull requests targeting `main` run the existing validation gate but cannot publish;
 - the resulting `main` commit automatically runs one package publication job;
 - each packable project keeps its local NBGV `version.json`;
-- the workflow evaluates inventory, runs `dotnet pack` with `PublicRelease=true`, and runs
-  `dotnet nuget push --skip-duplicate` using the established `NUGET_API_KEY`;
+- the workflow compiles the product surface, runs `dotnet pack` with `PublicRelease=true`, and runs
+  `dotnet nuget push --skip-duplicate` only for the 38 guaranteed package owners validated at 0.20,
+  using the established `NUGET_API_KEY`;
 - no lineage branch, synthetic commits, manifests, escrow, tags, GitHub Releases, recovery ledger,
   duplicated proof lanes, or full test ratchet participates in publication.
 
@@ -47,8 +48,13 @@ Focused implementation evidence:
 
 ## Remote/public state
 
-- No 0.20 package was published by the abandoned release compiler or the three failed/cancelled
-  bare-bones attempts. The cancelled credential retry skipped its publication step.
+- `Sylin.Koan 0.20.4` was accepted by nuget.org from main-boundary run `29790423844`; registry indexing
+  may lag acceptance. The run then exposed and stopped on an invalid attempt to publish
+  non-guaranteed `Sylin.Koan.AI 0.18.10`. Release selection is now restricted to the guaranteed 0.20
+  closure.
+- NuGet ownership remains split across `sylin.org` and the historical `sylin-labs` owner. Eighteen
+  guaranteed existing IDs require ownership transfer or an old-owner credential; new IDs require
+  create-package permission. This is the current external prerequisite.
 - No `automation/package-lineage-dev` branch, `release/dev/*` tag, release-wave escrow, or GitHub
   Release was created.
 - There is no manual dispatch path. Do not update `main` during local correction because a `main`

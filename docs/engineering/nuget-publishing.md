@@ -28,13 +28,15 @@ state store is required.
 The one job:
 
 1. checks out full Git history from `main` so NBGV can calculate package versions;
-2. evaluates package inventory and requires a local `version.json` for every packable project;
+2. compiles the product surface, requiring local `version.json` ownership and exact agreement between
+   supported claims and the 0.20 package closure;
 3. packs the solution and the packable template project with `PublicRelease=true`; and
-4. pushes every resulting nupkg with `--skip-duplicate`.
+4. pushes only the selected 0.20 nupkgs with `--skip-duplicate`.
 
 NuGet package identities are immutable. Rerunning the failed workflow run skips identities already
 present and attempts the remaining packages. A missing key, invalid version owner, pack failure, or
-push failure stops the job.
+push failure stops the job. A selected package with zero or multiple matching artifacts also stops
+before that identity is pushed.
 
 ## Version changes
 

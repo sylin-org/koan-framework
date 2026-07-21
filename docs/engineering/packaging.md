@@ -42,8 +42,10 @@ These commands inspect product/package shape. They do not stage or publish anyth
 
 Merge the intended source into `main`. The resulting `main` commit runs **Release packages**, which
 packs the solution and the packable template project with `PublicRelease=true`, then pushes the
-produced nupkgs using the repository's `NUGET_API_KEY`. Existing immutable identities are skipped;
-any other failure stops the job. Development commits and open pull requests cannot publish.
+guaranteed product-surface packages whose validated version intent is `0.20`, using the repository's
+`NUGET_API_KEY`. Lower-maturity package artifacts are not published. Existing immutable identities
+are skipped; any other failure stops the job. Development commits and open pull requests cannot
+publish.
 
 Do not maintain package checklists, hand-authored manifests, release branches, escrow formats, or
 recovery ledgers. NuGet owns immutable publication; Git and each local `version.json` own identity.

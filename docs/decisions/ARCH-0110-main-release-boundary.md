@@ -28,8 +28,10 @@ single package release job on `push` to `main`. Commits and pull requests target
 neither path.
 
 **Guarantee/correction:** Only source present on `main` can receive the NuGet credential and reach
-publication. A rejected credential, invalid version owner, pack error, or registry failure stops the
-job; after correcting the cause, rerun the same `main` workflow run.
+publication. Product-surface compilation selects exactly the supported 0.20 package closure; lower
+maturity packages cannot be pushed by the job. A rejected credential, invalid version owner,
+release-scope/artifact mismatch, pack error, or registry failure stops the job; after correcting the
+cause, rerun the same `main` workflow run.
 
 **Complete intent surface:** Open and merge a pull request to `main`, or deliberately commit to
 `main`. No manual release dispatch, branch selector, release branch, tag, GitHub Release, package
@@ -61,10 +63,11 @@ repository job and uses only the established `NUGET_API_KEY` for nuget.org publi
 The job:
 
 1. checks out full Git history;
-2. verifies evaluated packable projects have local version owners;
+2. compiles the evaluated product surface, proving that supported claims and 0.20 version owners are
+   the same package set;
 3. runs standard `dotnet pack` with `PublicRelease=true` for the solution and the one packable
    template project intentionally outside it; and
-4. runs standard `dotnet nuget push --skip-duplicate` for the resulting packages.
+4. runs standard `dotnet nuget push --skip-duplicate` only for that guaranteed 0.20 set.
 
 The release job does not run the repository test ratchet, create Git commits or branches, create tags
 or GitHub Releases, stage escrow, or maintain recovery state. Validation belongs to the existing PR
@@ -81,6 +84,8 @@ stops the job and is corrected at its ordinary owner before rerunning.
 - A `dev` commit causes no validation or publication workflow activity.
 - A pull request targeting `main` validates but cannot publish.
 - The resulting `main` commit automatically invokes the one publication job.
+- Packing may produce lower-maturity artifacts for build completeness, but publication selects only
+  the product-surface package IDs validated at 0.20.
 - Version ownership remains local, explicit, and independently inspectable.
 - Multi-package publication is not atomic; short-lived partial availability is accepted for the
   pre-release rather than simulated through a Koan-owned transaction system.
