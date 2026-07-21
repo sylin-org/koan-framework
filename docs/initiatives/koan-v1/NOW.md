@@ -13,7 +13,7 @@ framework_version: v0.20.0
 Finish the road to the 0.20 pre-release with product work and a coherent public narrative. Release
 automation is infrastructure, not a product capability, and must remain proportionate.
 
-## Active slice: R12-06 published; public-feed observation next
+## Active slice: public-feed first use observed; clean-template correction ready
 
 The maintainer rejected the automatic release compiler after multiple long validation cycles exposed
 failures in release orchestration rather than framework behavior. The later manual-from-`dev`
@@ -45,6 +45,15 @@ Focused implementation evidence:
   legacy release state;
 - `Sylin.Koan.Templates` is the one packable project outside `Koan.sln` and has one explicit standard
   pack command in the same job.
+- Public `Sylin.Koan.Templates 0.20.5` installs and generates successfully. The generated web app
+  builds and passes SQLite-backed REST create/read plus runtime facts, but its stale
+  `[0.20.0,0.21.0)` references emit NU1603 because the first published App/SQLite versions are
+  `0.20.4`.
+- The template source now uses standard `0.20.*` patch floats. An exact packed correction installed
+  in an isolated hive; both generated projects restored from NuGet.org without warnings, the web
+  project built cleanly, and the console passed SQLite Entity save/load/query.
+- A separate non-blocking startup-explanation rough edge remains: local SQLite fallback succeeds only
+  after logging a failed service-discovery correction. Keep it with the discovery/runtime owner.
 
 ## Remote/public state
 
@@ -71,11 +80,13 @@ Focused implementation evidence:
 
 ## Next actions
 
-1. Perform one focused public-feed consumer observation against the live 0.20 packages: restore the
-   documented first-use path from NuGet and record only concrete failures.
-2. Reconcile R12-05's pre-publication language with the completed minimal release; do not revive the
-   removed release compiler or full certification bureaucracy.
-3. Resume product and coherent public-documentation work. Do not expand release infrastructure.
+1. Commit the template-range correction and greenfield public-entry copy to `dev`; this publishes
+   nothing.
+2. Open a pull request to `main` for ordinary validation. Merge only when publishing the corrected
+   template and docs is intended.
+3. After that main-boundary publication, repeat only the clean public template restore and record the
+   result; then address the separate SQLite discovery/explanation rough edge.
+4. Resume product and coherent public-documentation work. Do not expand release infrastructure.
 
 ## Repository boundaries
 

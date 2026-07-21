@@ -201,7 +201,7 @@ release compiler.
 and receive generated projects compatible with the guaranteed Koan 0.20 family.
 
 **Public expression:** Generated projects contain ordinary bounded NuGet `PackageReference` versions
-`[0.20.0,0.21.0)`.
+`0.20.*`, selecting the latest compatible fix without crossing into 0.21.
 
 **Guarantee/correction:** NuGet resolves an available compatible 0.20 package and rejects 0.21 or
 later. Template packing fails only for ordinary MSBuild/NuGet errors, not because a Koan-only compiler

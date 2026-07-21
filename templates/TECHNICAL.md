@@ -8,9 +8,9 @@ the provider reference and SQLite's autonomous local target are sufficient inten
 
 ## Preparation and packing
 
-Template source contains its standard NuGet compatibility ranges directly. Both generated projects target
-`[0.20.0,0.21.0)`, which accepts the guaranteed 0.20 family and rejects a future breaking 0.21 family. The
-content-only project packs directly with `dotnet pack`; there is no preparation or token-replacement phase.
+Template source contains its standard NuGet patch policy directly. Generated Koan references use `0.20.*`, which
+selects the latest available fix in the guaranteed 0.20 family and cannot cross into a future breaking 0.21 family.
+The content-only project packs directly with `dotnet pack`; there is no preparation or token-replacement phase.
 
 The packed artifact must contain both canonical `.template.config/template.json` files, `README.md`, and the exact
 repository `icon.png`. It must contain no `bin`, `obj`, generated `appsettings.json`, unresolved token, runtime

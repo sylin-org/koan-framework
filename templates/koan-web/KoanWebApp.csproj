@@ -7,8 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Sylin.Koan.App" Version="[0.20.0,0.21.0)" />
-    <PackageReference Include="Sylin.Koan.Data.Connector.Sqlite" Version="[0.20.0,0.21.0)" />
+    <PackageReference Include="Sylin.Koan.App" Version="0.20.*" />
+    <PackageReference Include="Sylin.Koan.Data.Connector.Sqlite" Version="0.20.*" />
   </ItemGroup>
 
 </Project>
