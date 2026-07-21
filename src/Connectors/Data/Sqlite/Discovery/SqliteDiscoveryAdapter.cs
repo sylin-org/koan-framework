@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Data.Sqlite;
 using Koan.Core;
 using Koan.Core.Logging;
+using Koan.Core.Services;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 
@@ -65,6 +66,16 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
         return Infrastructure.SqliteConnectionConfiguration.IsAuto(configured) ? null : configured;
     }
 
+    protected override IEnumerable<DiscoveryCandidate> BuildRuntimeCandidates(KoanServiceAttribute attribute)
+    {
+        var candidates = base.BuildRuntimeCandidates(attribute).ToList();
+        candidates.Add(new DiscoveryCandidate(
+            BuildSqliteConnectionString(Infrastructure.Constants.Configuration.DataFallback.DefaultSource),
+            "embedded-default",
+            DiscoveryCandidatePriority.LoopbackFallback));
+        return candidates;
+    }
+
     /// <summary>SQLite-specific environment variable handling</summary>
     protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
     {
@@ -90,7 +101,7 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
         try
         {
             var trimmed = value?.Trim() ?? "";
-            if (string.IsNullOrEmpty(trimmed)) return "Data Source=.koan/data/Koan.sqlite";
+            if (string.IsNullOrEmpty(trimmed)) return BuildSqliteConnectionString(Infrastructure.Constants.Configuration.DataFallback.DefaultSource);
 
             // If already properly formatted, return as-is
             if (trimmed.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase))
@@ -109,6 +120,9 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
             return value; // Return original value if normalization fails
         }
     }
+
+    private static string BuildSqliteConnectionString(string filePath)
+        => $"Data Source={filePath}";
 
     private static class LogActions
     {

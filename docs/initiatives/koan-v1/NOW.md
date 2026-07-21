@@ -13,7 +13,7 @@ framework_version: v0.20.0
 Finish the road to the 0.20 pre-release with product work and a coherent public narrative. Release
 automation is infrastructure, not a product capability, and must remain proportionate.
 
-## Active slice: public template correction published and proved
+## Active slice: SQLite discovery explanation correction completed; package-line alignment proposed
 
 The maintainer rejected the automatic release compiler after multiple long validation cycles exposed
 failures in release orchestration rather than framework behavior. The later manual-from-`dev`
@@ -48,8 +48,25 @@ Focused implementation evidence:
 - Public `Sylin.Koan.Templates 0.20.6` now uses standard `0.20.*` patch floats. A fresh NuGet.org
   install generated both templates; isolated restores completed without warnings, the web project
   built with zero warnings/errors, and the console passed SQLite Entity save/load/query.
-- A separate non-blocking startup-explanation rough edge remains: local SQLite fallback succeeds only
-  after logging a failed service-discovery correction. Keep it with the discovery/runtime owner.
+- SQLite startup explanation now follows adapter-owned fallback selection and no longer emits the
+  misleading correction path for local auto mode. The fix is tracked as complete in `R12-05`.
+
+## Proposed next slice: align active packages on 0.20
+
+The maintainer wants the next session to assess promoting the remaining non-0.20 projects. The
+current generated product surface contains 93 packable projects: 38 at `0.20` and 55 on earlier
+lines (one at `0.1`, 43 at `0.17`, ten at `0.18`, and one at `0.19`). Of those 55, 19 belong to
+`demonstrated` claims, two to `verified` claims, two to an `experimental` claim, and 32 are
+unassessed.
+
+This is a deliberate policy change, not a mechanical version edit. Current guidance, compiler
+validation, tests, and publication all equate `0.20` with the supported guarantee. The simplest
+candidate model is to make `0.20` the common preview release line for every active packable project
+while keeping product maturity independent: availability and a shared release cohort do not turn
+`demonstrated`, `verified`, `experimental`, or `unassessed` packages into supported promises. Before
+editing the 55 project-local `version.json` files, record and accept one concise architecture
+checkpoint for that decoupling, then update the existing product-surface compiler and one `main`
+publication job rather than adding another release mechanism.
 
 ## Remote/public state
 
@@ -78,8 +95,14 @@ Focused implementation evidence:
 
 ## Next actions
 
-1. Address the separate SQLite discovery/explanation rough edge with focused runtime tests.
-2. Resume product and coherent public-documentation work. Do not expand release infrastructure.
+1. Preserve the completed SQLite correction as one focused change before starting package-version
+   work; its six modified files are still uncommitted, and `tmp/` remains unrelated and untracked.
+2. Assess and record the proposed version-line/maturity decoupling. Do not silently interpret a
+   `0.20` version as a support promotion.
+3. If accepted, align the remaining 55 active package owners to `0.20`, update the existing
+   product-surface invariant and public narrative, and let the existing `main` workflow publish the
+   resulting package set. Keep validation to the focused packaging compiler/build/tests; do not
+   reintroduce release bureaucracy or run the full ratchet.
 
 ## Repository boundaries
 

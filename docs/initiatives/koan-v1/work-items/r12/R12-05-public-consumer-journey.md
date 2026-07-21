@@ -63,16 +63,77 @@ warning without adding a moving part.
 - The console project selected local SQLite and passed Entity save, load, and query.
 - The preceding live web proof passed SQLite-backed REST create/read and
   `/.well-known/Koan/facts`.
+- Focused verification for the fallback fix passed:
+  `SqliteConfigurationTruthSpec` (5/5) and `ServiceDiscoveryPlanSpec` (15/15).
 
 No full release ratchet was rerun. The evidence is intentionally limited to the affected public
 consumer path.
 
 ## Separate product rough edge
 
-SQLite's zero-configuration local fallback works, but startup first reports failed service discovery
-and an endpoint correction before selecting `.koan/data/Koan.sqlite`. This is not a template,
-restore, or persistence failure. It is a distinct discovery/runtime explanation issue and is the
-next focused product correction.
+Resolved in this tranche (2026-07-21): local SQLite auto-fallback now enters discovery as an
+adapter-owned candidate and no longer reports a misleading correction flow before selecting
+`.koan/data/Koan.sqlite`.
+
+## Architecture checkpoint — 2026-07-21
+
+**Task:** Make SQLite autonomous fallback selection truthful (selected and explained as local intent) while keeping startup behavior and ownership unchanged.
+
+**Application intent:** When auto-discovery is chosen for SQLite, startup should deterministically select the embedded file path as the fallback and report it as a legitimate path, without misleading configuration/correction errors.
+
+**Public expression:** A default SQLite host remains:
+
+```csharp
+KoanEnv: Test or Development
+Koan:Data:Sources:Default:sqlite:ConnectionString = auto
+```
+
+and resolves to `Data Source=.koan/data/Koan.sqlite` with no required external provider.
+
+**Guarantee/correction:** `SqliteDiscoveryAdapter` now contributes an embedded-file discovery candidate owned by the adapter. `ServiceDiscoveryCoordinator` can therefore report selection rather than rejection when all external candidates are unavailable. Fallback remains:
+
+- strict for explicitly configured required inputs,
+- local and automatic when no explicit path is selected,
+- and unchanged when discovery is explicitly disabled or coordinator unavailable.
+
+**Complete intent surface:** No API surface change. No runtime behavior changes outside SQLite autonomous selection. No changes to release tooling or core discovery semantics.
+
+**Public concepts:** Koan keeps startup as a pure .NET `AddKoan()` plus NuGet package reference; discovery explanation now follows ordinary "selected optional discovery candidate" behavior.
+
+**Docs read:**
+
+- `docs/initiatives/koan-v1/work-items/r12/R12-05-public-consumer-journey.md`
+- `docs/initiatives/koan-v1/work-items/r12/R12-06-publish-and-observe-first-wave.md`
+- `src/Koan.Core/Orchestration/ServiceDiscoveryAdapterBase.cs`
+- `src/Koan.Core/Orchestration/ServiceDiscoveryCoordinator.cs`
+- `src/Koan.Core/Orchestration/Composition/ServiceDiscoveryRuntime.cs`
+- `src/Connectors/Data/Sqlite/Discovery/SqliteDiscoveryAdapter.cs`
+- `src/Connectors/Data/Sqlite/SqliteOptionsConfigurator.cs`
+- `src/Connectors/Data/Sqlite/README.md`
+
+**Code read:** See list above.
+
+**Reusing:** Existing discovery model (`DiscoveryCandidate`, `DiscoveryCandidatePriority`, `ServiceDiscoveryCoordinator`) and existing SQLite connection builder in `SqliteOptionsConfigurator`.
+
+**Creating new:**
+
+| New code | Location | Why |
+| --- | --- | --- |
+| `embedded-default` runtime discovery candidate | `SqliteDiscoveryAdapter` | Makes fallback deterministic as a selected candidate without adding a new core choke point. |
+| `DefaultSource` fallback constant | `Sqlite` infrastructure constants | Removes duplicated hard-coded path literals in the same connector boundary. |
+
+**Coalescence:** Closest existing pattern was adapter-owned discovery candidates with adapter-specific normalization. SQLite now follows that pattern and removes the coordinator-level false-negative interpretation by making its local fallback part of discovery resolution rather than a configurator-side compensation.
+
+**Ergonomics:** No new user-facing settings, no new API, no new external dependency. Startup remains automatic and explainable from normal discovery facts.
+
+**Constraints satisfied:**
+
+- Standard .NET and existing Koan discovery contracts remain primary.
+- No changes to runtime contracts beyond SQLite selection path.
+- No new tests are added until you request suite execution.
+- `dev` changes remain non-publication scope.
+
+**Risks:** If an explicit coordinator implementation suppresses adapter-specific candidates or rewrites planned candidates, the fallback may not be selected. That is a coordinator integration risk, not SQLite-specific; this change makes that risk visible by requiring adapter ownership for fallback selection.
 
 ## Acceptance
 
@@ -82,5 +143,3 @@ next focused product correction.
 4. Web build and SQLite-backed Entity behavior pass.
 5. Publication remains exclusively owned by a resulting push to `main`; `dev` activity publishes
    nothing.
-
-All five conditions pass.
