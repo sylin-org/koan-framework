@@ -1,8 +1,8 @@
 ---
 type: WORK
 domain: release
-status: active
-last_updated: 2026-07-20
+status: completed
+last_updated: 2026-07-21
 framework_version: v0.20.0
 ---
 
@@ -172,12 +172,25 @@ safe because the compiler already proves exact equivalence between supported own
 each selected identity, and fails with the exact missing/ambiguous artifact rather than publishing a
 lower-maturity package.
 
-**Observed external ownership:** The guaranteed closure contains 38 IDs. At observation time, 18
-existing packages were owned by `sylin-labs`, 17 IDs did not yet exist, two existing packages were
-owned by `sylin.org`, and one package page did not return a stable owner result. The current key
-successfully created `Sylin.Koan 0.20.4` but cannot update the old-owner packages. Repository selection
-is corrected independently; ownership transfer or an appropriately authorized credential remains a
-NuGet account prerequisite, not release code.
+**Resolved external ownership:** The guaranteed closure contains 38 IDs. The historical ownership
+split was resolved without adding release code: all 166 indexed package identities owned by
+`sylin-labs` were preserved under `sylin.org`, and the old organization was deleted after its package
+count reached zero. The authenticated account reports `sylin.org` as its sole organization with 240
+packages. No package was deleted or unlisted; NuGet's public owner index may lag the authoritative
+account state.
+
+## Publication evidence — 2026-07-21
+
+- PR `#93` merged `dev` to `main` with merge commit
+  `ad9d739199da809fa44efc9a4ce3db8059348b42`, preserving version history.
+- `Release packages` run `29792486934` completed successfully in one job.
+- Product-surface resolution, packing, and NuGet publication all passed for the exact 38-package
+  guaranteed 0.20 closure; non-guaranteed packages were not selected.
+- `dev` pushes remained inert. No workstation publication, tag, GitHub Release, lineage branch,
+  escrow, or remote release configuration participated.
+- The first failed main run remains useful historical evidence: it published `Sylin.Koan 0.20.4`,
+  then proved why blind all-package publication was incorrect. The successful run validates the
+  corrected product-surface chokepoint.
 
 ## Standard template-pack checkpoint — 2026-07-20
 
@@ -209,8 +222,8 @@ it ships; release tooling is too broad and generated applications are too late.
 0.21 template deliberately changes its visible ranges and receives a new template identity through
 its existing local NBGV owner.
 
-## Authorization boundary
+## Completed boundary
 
-The maintainer authorized redesign and local implementation. Commit the correction to `dev`, where it
-triggers nothing. Do not update `main`, publish from a workstation, create a tag/Release, or change
-remote configuration while validating this correction; merging to `main` is the publication action.
+The correction was committed to `dev`, validated by PR `#93`, and published only by the resulting
+`main` commit. Future `dev` work remains inert; every future `main` commit remains an intentional
+publication event.
