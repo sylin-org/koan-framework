@@ -101,6 +101,15 @@
       "evidence": ["tests/Suites/Data/Connector.Redis", "docs/initiatives/koan-v1/work-items/r13/R13-11-redis-provider-promotion.md"]
     },
     {
+      "id": "cockroachdb-data-provider",
+      "title": "CockroachDB Entity persistence",
+      "summary": "CockroachDB preserves Koan Entity CRUD, native filtering, paging, provider-bounded streaming, source routing, additive schema policy, participation-owned readiness, and declared isolation semantics through a thin pg-wire delta over the supported relational foundation.",
+      "maturity": "supported-extension",
+      "packages": ["Sylin.Koan.Data.Connector.Cockroach"],
+      "documentation": ["src/Connectors/Data/Cockroach/README.md", "src/Connectors/Data/Cockroach/TECHNICAL.md", "docs/reference/data/index.md"],
+      "evidence": ["tests/Suites/Data/Connector.Cockroach", "docs/initiatives/koan-v1/work-items/r13/R13-12-cockroach-provider-promotion.md"]
+    },
+    {
       "id": "backend-negotiation",
       "title": "Backend discovery and negotiation",
       "summary": "Referenced adapters participate in capability-aware selection with inspectable decisions and corrective rejection.",

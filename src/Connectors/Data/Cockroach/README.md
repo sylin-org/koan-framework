@@ -1,6 +1,6 @@
 # Sylin.Koan.Data.Connector.Cockroach
 
-CockroachDB provider for Koan Entity persistence over the PostgreSQL wire protocol.
+Supported CockroachDB provider for Koan Entity persistence over the PostgreSQL wire protocol.
 
 ## Install
 
@@ -28,8 +28,14 @@ Set `ConnectionStrings:Cockroach` when autonomous discovery is not appropriate. 
 
 - Referencing Cockroach activates CockroachDB, not the PostgreSQL connector.
 - Shared Npgsql mechanics do not own discovery, configuration, election, or startup reporting.
-- Cockroach uses primary-key ordering where PostgreSQL would use `ctid`.
+- CRUD, native filters, explicit pages, provider-bounded Entity streams, and all three declared
+  isolation modes use the supported relational/Npgsql foundation.
+- Cockroach uses primary-key ordering where PostgreSQL would use `ctid`; streams are offset-based,
+  not snapshot-based, resumable, or mutation-safe.
 - Schema changes are additive; Koan is not a destructive migration engine.
-- A reachable CockroachDB service is required. Unsupported SQL/filter semantics reject rather than silently scanning.
+- Merely referencing the connector does not make an unused CockroachDB endpoint a readiness dependency.
+  Default election or runtime source use does.
+- A reachable selected CockroachDB service is required. Unsupported SQL/filter semantics reject rather
+  than silently scanning or substituting PostgreSQL.
 
 See [TECHNICAL.md](TECHNICAL.md) for configuration and provider boundaries.

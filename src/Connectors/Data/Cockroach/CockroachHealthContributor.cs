@@ -1,27 +1,35 @@
-using Microsoft.Extensions.Options;
 using Npgsql;
-using Koan.Core;
-using Koan.Core.Observability.Health;
+using Koan.Data.Core;
+using Koan.Data.Core.Diagnostics;
+using Koan.Data.Core.Routing;
 
 namespace Koan.Data.Connector.Cockroach;
 
-internal sealed class CockroachHealthContributor(IOptions<CockroachOptions> options) : IHealthContributor
+/// <summary>Reports readiness only for CockroachDB sources that participate in this application.</summary>
+internal sealed class CockroachHealthContributor : DataAdapterHealthContributorBase
 {
-    public string Name => "data:cockroach";
-    public bool IsCritical => true;
-    public async Task<HealthReport> Check(CancellationToken ct = default)
+    private const string ProviderName = Infrastructure.Constants.Provider.Name;
+    private readonly IServiceProvider _services;
+    private readonly CockroachAdapterFactory _factory;
+
+    public CockroachHealthContributor(
+        IServiceProvider services,
+        IDataDiagnostics diagnostics,
+        DataProviderCatalog providers,
+        DataDefaultProviderPlan defaultProvider)
+        : base(ProviderName, services, diagnostics, defaultProvider)
     {
-        try
-        {
-            await using var conn = new NpgsqlConnection(options.Value.ConnectionString);
-            await conn.OpenAsync(ct);
-            await using var cmd = new NpgsqlCommand("SELECT 1", conn);
-            _ = await cmd.ExecuteScalarAsync(ct);
-            return new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Healthy, null, null, null);
-        }
-        catch (Exception ex)
-        {
-            return new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Unhealthy, ex.Message, null, null);
-        }
+        _services = services;
+        _factory = providers.Find(ProviderName) as CockroachAdapterFactory
+            ?? throw new InvalidOperationException("The CockroachDB provider is absent from the host Data catalog.");
+    }
+
+    protected override async Task ProbeSource(string source, CancellationToken ct)
+    {
+        var options = _factory.ResolveOptions(_services, source);
+        await using var connection = new NpgsqlConnection(options.ConnectionString);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var command = new NpgsqlCommand("SELECT 1", connection);
+        _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
     }
 }
