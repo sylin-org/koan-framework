@@ -9,13 +9,13 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
   status: in-progress
-  scope: Entity through Local Storage/Media public and observed; external authentication promotion active
+  scope: Entity through external Auth public and observed; accepted migration assessment next
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — promote Google, Microsoft, and Discord authentication; S3 and Backup shelved`
+- Status: `in-progress — external Auth complete; assess accepted migrations; S3 and Backup shelved`
 - Depends on: passed R11, completed R12-06, and accepted
   [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) with validation corrected by
   [ARCH-0121](../../../decisions/ARCH-0121-claim-scoped-validation.md)
@@ -139,10 +139,10 @@ of all six exact `0.20.0` artifacts, and the fresh NuGet.org-only consumer. Thei
 are recorded centrally in R13-17, so baseline capture does not mint behaviorless package patches. S3
 and Backup remain shelved.
 
-[R13-17](r13/R13-17-external-auth-promotion.md) is active. Google, Microsoft, and Discord are the
-exact three-owner boundary over the shared Web Auth runtime; deterministic definition/protocol tests,
-exact packs, the staged consumer, product truth, API posture, and the 66.3-second lean no-tests gate
-are green. Public observation remains.
+[R13-17](r13/R13-17-external-auth-promotion.md) passed through PR `#107`, main commit
+`a12b2154907d9f75f8bdef77cf4470ecefa1aad8`, release run `29926734114`, public indexing of all
+three exact `0.20.0` artifacts, and the unchanged fresh NuGet.org-only consumer. Its immutable API floors
+are recorded centrally in this closure change. Existing Storage/Media versions were skipped unchanged.
 
 ## Execution
 
@@ -169,7 +169,8 @@ Status: complete. The seven owners are public and the clean external consumer pa
 
 ### R13-C onward — Promote provider families
 
-Status: active through R13-17 external authentication promotion; S3 and Backup shelved.
+Status: complete through R13-17 external authentication promotion; accepted migration assessment next;
+S3 and Backup shelved.
 
 Open one short family card only when implementation begins. Each card freezes its guarantee and
 limits, names the existing conformance owner, identifies the real provider boundary, and ends with a
