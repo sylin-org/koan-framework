@@ -18,6 +18,10 @@ Koan AI lets application code state an operation—chat, embed, OCR, image gener
 declared capability—while referenced providers own native protocol and model mechanics. `AddKoan()` compiles the
 provider topology and reports which providers and sources became active.
 
+> **Maturity:** The provider-neutral runtime/contracts and the Ollama, LM Studio, and ONNX providers are supported
+> on the 0.20 line within the capability and deployment boundaries below. Prompt persistence and the HTTP projection
+> remain separately demonstrated surfaces.
+
 ## Shortest path
 
 Install the runtime and one provider. Ollama is the smallest conventional local example:
@@ -30,13 +34,14 @@ dotnet add package Sylin.Koan.AI.Connector.Ollama
 ```csharp
 using Koan.AI;
 using Koan.Core;
+using Microsoft.Extensions.Hosting;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddKoan();
+using var app = builder.Build();
+await app.StartAsync();
 
-var app = builder.Build();
-app.MapGet("/summary", () => Client.Chat("Summarize today's orders."));
-await app.RunAsync();
+Console.WriteLine(await Client.Chat("Summarize today's orders."));
 ```
 
 With Ollama listening on its conventional endpoint, no provider registration or configuration is required. If the

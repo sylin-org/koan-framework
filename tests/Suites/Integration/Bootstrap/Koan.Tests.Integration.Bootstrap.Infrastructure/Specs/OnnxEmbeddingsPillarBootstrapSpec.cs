@@ -44,6 +44,10 @@ public sealed class OnnxEmbeddingsPillarBootstrapSpec
 
         await using var host = await KoanIntegrationHost.Configure()
             .WithSetting("Koan:Environment", "Test")
+            .WithSetting("Koan:Communication:TransportProvider", "in-process")
+            .WithSetting("Koan:Communication:EventsProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkSignalsProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkBroadcastsProvider", "in-process")
             .WithSetting("Koan:Ai:Onnx:ModelPath", modelPath!)
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
@@ -76,6 +80,10 @@ public sealed class OnnxEmbeddingsPillarBootstrapSpec
 
         await using var host = await KoanIntegrationHost.Configure()
             .WithSetting("Koan:Environment", "Test")
+            .WithSetting("Koan:Communication:TransportProvider", "in-process")
+            .WithSetting("Koan:Communication:EventsProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkSignalsProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkBroadcastsProvider", "in-process")
             .WithSetting("Koan:Ai:Onnx:ModelPath", modelPath!)
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
@@ -114,6 +122,10 @@ public sealed class OnnxEmbeddingsPillarBootstrapSpec
         // the provider the application asked Koan to activate.
         var builder = KoanIntegrationHost.Configure()
             .WithSetting("Koan:Environment", "Test")
+            .WithSetting("Koan:Communication:TransportProvider", "in-process")
+            .WithSetting("Koan:Communication:EventsProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkSignalsProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkBroadcastsProvider", "in-process")
             .WithSetting("Koan:Ai:Onnx:ModelPath", "does-not-exist.onnx")
             .ConfigureServices(services => services.AddKoan());
 

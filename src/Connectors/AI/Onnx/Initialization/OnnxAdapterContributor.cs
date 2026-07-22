@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using FastBertTokenizer;
+using Koan.AI.Connector.Onnx.Infrastructure;
 using Koan.AI.Contracts.Sources;
 using Koan.AI.Providers;
 using Koan.Core.Logging;
@@ -96,25 +97,25 @@ internal sealed class OnnxAdapterContributor : IAiProviderActivator
 
         var source = new AiSourceDefinition
         {
-            Name = "onnx",
+            Name = Constants.Adapter.Type,
             Provider = adapter.Id, // "onnx" — provider-level, so the router resolves the adapter by Get(Provider)
-            Priority = 50,
-            Policy = "Fallback",
+            Priority = Constants.Source.Priority,
+            Policy = Constants.Source.Policy,
             Members = new List<AiMemberDefinition>
             {
                 new()
                 {
-                    Name = "onnx::inproc",
-                    ConnectionString = "inproc://onnx",
+                    Name = Constants.Source.Member,
+                    ConnectionString = Constants.Source.ConnectionString,
                     Order = 0,
                     Capabilities = capabilities,
-                    Origin = "in-process",
+                    Origin = Constants.Source.Origin,
                     IsAutoDiscovered = false,
                     HealthState = MemberHealthState.Healthy,
                 },
             },
             Capabilities = capabilities,
-            Origin = "in-process",
+            Origin = Constants.Source.Origin,
             IsAutoDiscovered = false,
         };
 
@@ -124,5 +125,5 @@ internal sealed class OnnxAdapterContributor : IAiProviderActivator
     private static string Resolve(string path)
         => Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path);
 
-    private const string LogAction = "onnx.activation";
+    private const string LogAction = Constants.LogActions.Activation;
 }

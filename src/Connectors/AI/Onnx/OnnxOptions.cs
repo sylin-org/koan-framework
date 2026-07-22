@@ -8,7 +8,7 @@ namespace Koan.AI.Connector.Onnx;
 /// </summary>
 public sealed class OnnxOptions
 {
-    public const string Section = "Koan:Ai:Onnx";
+    public const string Section = Infrastructure.Constants.Section;
 
     /// <summary>Path to the ONNX model file. When unset, the adapter does not register (no model = nothing to embed).</summary>
     public string? ModelPath { get; set; }
