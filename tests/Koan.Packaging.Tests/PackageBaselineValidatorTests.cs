@@ -32,6 +32,8 @@ public sealed class PackageBaselineValidatorTests
 
         Assert.True(guard >= 0, "release-on-main must execute the real api-baselines command");
         Assert.True(pack > guard, "the API-baseline guard must pass before any package is packed");
+        Assert.DoesNotContain("dotnet test", workflow, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("green-ratchet", workflow, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

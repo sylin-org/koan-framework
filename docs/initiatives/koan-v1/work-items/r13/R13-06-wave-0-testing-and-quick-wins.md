@@ -3,7 +3,7 @@ type: WORK
 domain: framework
 title: "R13-06 - First value-led 0.20 promotion slice"
 status: passed
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
   status: verified
@@ -86,8 +86,8 @@ Focused validation for this slice comprises:
 4. `pwsh scripts/forge-verify.ps1 -DockerFree -Configuration Release`;
 5. `dotnet run --project tools/Koan.Packaging -- product-surface --check`;
 6. `dotnet run --project tools/Koan.Packaging -- api-baselines`;
-7. the direct PostgreSQL provider workflow for the sole `KoanLane=native` fact; and
-8. the repository green ratchet at the merge boundary.
+7. the direct PostgreSQL provider proof for the sole `KoanLane=native` fact; and
+8. the cheap repository-coherence check on the exact main PR commit.
 
 ## Exit state
 
@@ -112,4 +112,5 @@ sequence, the Mongo Web bridge preserves the original authentication database wh
 isolated test database, and the package-only consumer packs the complete evaluated project-reference
 closure rather than assuming newer dependencies already exist on nuget.org. Focused repair evidence
 passes the host failure oracle, Communication 44/44, the affected Data correction 1/1, and real Mongo
-Web behavior 52/52. The final connected PR ratchet owns clean external restore confirmation.
+Web behavior 52/52. Connected package-consumer and exact-ratchet runs passed as one-time evidence;
+future merges do not inherit either as a universal publication prerequisite.

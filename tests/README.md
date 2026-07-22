@@ -152,9 +152,10 @@ dotnet test tests/Suites/Data/Core/Koan.Tests.Data.Core/Koan.Tests.Data.Core.csp
 ```
 
 Use three execution rings: affected facts/project for ordinary changes, a named bounded consumer matrix
-for cross-package or architectural claims, and the complete solution/green ratchet only at a tranche,
-merge, or release-certification boundary. A red certification run is evidence to isolate; do not rerun
-the whole solution after each focused repair or for unrelated work.
+for cross-package or architectural claims, and the complete solution/green ratchet only for an
+explicitly requested whole-framework milestone. Ordinary PRs, package promotions, and publication are
+not certification boundaries. A red certification run is evidence to isolate; do not rerun the whole
+solution after each focused repair or for unrelated work.
 
 ```pwsh
 # Certification boundary only

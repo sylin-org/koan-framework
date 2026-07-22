@@ -39,10 +39,11 @@ development loop.
 2. **Capability ring — bounded minutes.** Run the smallest consumer/provider matrix that proves an
    architectural or cross-package claim. Name the matrix before running it; unrelated providers do not
    join merely because they exist in the solution.
-3. **Certification ring — tranche or release boundary.** Run `Koan.sln` and the exact green ratchet only
-   when closing a major work item, preparing a merge/release, or when explicitly requested. Record one
-   red certification result and return to focused diagnosis; do not repeatedly pay the complete gate
-   while developing unrelated repairs.
+3. **Certification ring — explicit whole-framework milestone.** Run `Koan.sln` and the exact green
+   ratchet only when the maintainer explicitly asks for portfolio-level evidence. Ordinary PRs,
+   package promotions, version calculation, and publication are not certification boundaries. Record
+   one red certification result and return to focused diagnosis; do not repeatedly pay the complete
+   gate while developing unrelated repairs.
 
 A larger ring complements the smaller evidence; it does not replace judgment about the current change.
 When certification is red, isolate each reported owner first. Rerun the complete certification only
@@ -119,5 +120,6 @@ expensive fixtures even when facts are filtered:
 - Did the public capability or surface ledger change with the behavior?
 
 Related: [ARCH-0079](../decisions/ARCH-0079-integration-tests-as-canon.md),
-[ARCH-0091](../decisions/ARCH-0091-integration-test-harness-redesign.md), and
+[ARCH-0091](../decisions/ARCH-0091-integration-test-harness-redesign.md),
+[ARCH-0121](../decisions/ARCH-0121-claim-scoped-validation.md), and
 [`tests/README.md`](../../tests/README.md).

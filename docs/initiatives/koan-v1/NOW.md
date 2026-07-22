@@ -2,7 +2,7 @@
 type: HANDOFF
 domain: koan-v1
 status: active
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 framework_version: v0.20.0
 ---
 
@@ -79,12 +79,13 @@ corrections. The terminal certificate, central exact-cell metadata, generic admi
 and native candidate-planning machinery have been removed under the amended ADR.
 
 The superseded machinery is gone, the PR narrative is value-led, and focused retained evidence is
-complete. The first complete PR ratchet exposed three evidence-owner defects: incomplete host startup
+complete. A one-time complete PR ratchet exposed three evidence-owner defects: incomplete host startup
 was stopped before disposal and masked the original correction, Mongo database isolation lost the
 container authentication source, and the clean consumer packed candidates without their newer local
-dependency closure. Those owner-local repairs are implemented and focused validation is green; the
-final PR ratchet is the remaining pre-merge check. Untracked `tmp/` is unrelated user-owned material
-and must remain untouched and unstaged.
+dependency closure. Those owner-local repairs are implemented and focused validation is green. The
+complete ratchet subsequently passed, but reassessment removed certification from merge/publication;
+the remaining pre-merge check is cheap repository coherence. Untracked `tmp/` is unrelated user-owned
+material and must remain untouched and unstaged.
 
 ## Remote/public state
 
@@ -110,15 +111,16 @@ and must remain untouched and unstaged.
   reusable family conformance, package-only consumption, and direct provider evidence.
 - Focused repairs pass the host failure oracle, Communication 44/44, the affected Data correction 1/1,
   and the real Mongo Web owner 52/52. The package consumer builds the complete local dependency closure;
-  the connected CI runner owns its final clean network restore.
-- The final PR ratchet is now proportionate because the draft is intentionally approaching a possible
-  main/publication decision. It does not authorize merge or publication.
+  its connected clean-network run passed.
+- The main PR now runs only product/API agreement, one Release build, lockfile and structural
+  documentation/tooling checks. Affected behavior and native evidence run at their owning family;
+  complete certification is never inferred from promotion or publication.
 
 ## Next actions
 
-1. Obtain a green final PR ratchet for the repaired seven-package promotion slice.
-2. Merge/publish only after the maintainer explicitly accepts that smaller boundary; then observe its public
-   consumer and R12-07 recovery evidence.
+1. Obtain green cheap PR coherence for the exact seven-package promotion commit.
+2. Merge under the maintainer's explicit authorization; observe the ordinary pack/push job and public
+   consumer evidence for R12-07.
 3. Open the first high-value provider-family slice, starting with Entity data providers rather than
    the former owner-number sequence.
 
@@ -128,5 +130,5 @@ and must remain untouched and unstaged.
 - Do not inspect private dogfood applications.
 - Do not publish from a workstation, tag, create a GitHub Release, or mutate unrelated remote
   configuration.
-- Full release certification belongs to an explicitly requested milestone, not normal development or
-  a release plumbing correction.
+- Full release certification belongs only to an explicitly requested whole-framework milestone, not
+  normal development, merge, promotion, version calculation, publication, or release plumbing.

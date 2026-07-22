@@ -31,6 +31,7 @@ validation:
 - [Architecture principles](../architecture/principles.md)
 - [Documentation posture (ARCH-0041)](../decisions/ARCH-0041-docs-posture-instructions-over-tutorials.md)
 - [Main-boundary package releases (ARCH-0110)](../decisions/ARCH-0110-main-release-boundary.md)
+- [Claim-scoped validation (ARCH-0121)](../decisions/ARCH-0121-claim-scoped-validation.md)
 - [Runtime facts](runtime-facts.md)
 
 ## Prime Guardrails

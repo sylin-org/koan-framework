@@ -4,20 +4,21 @@ domain: framework
 title: "R13 - Promote the Meaningful Public Surface to 0.20"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-21
   status: in-progress
-  scope: first lean promotion slice implemented and focused-green; final PR ratchet pending
+  scope: first lean promotion slice implemented and focused-green; cheap PR coherence pending
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — obtain a green final ratchet before any merge decision`
+- Status: `in-progress — obtain green PR coherence before the authorized merge`
 - Depends on: passed R11, completed R12-06, and accepted
-  [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md)
+  [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) with validation corrected by
+  [ARCH-0121](../../../decisions/ARCH-0121-claim-scoped-validation.md)
 - Coordinates with: [R12-07](r12/R12-07-preview-evolution.md); the first newly promoted public
   provider slice supplies its upgrade and recovery observation
 - Unlocks: a coherent 0.20 product whose intended providers are installable, supported, and explicit
@@ -51,12 +52,13 @@ The earlier 38/55 inventory remains useful historical discovery. It is not the e
 ## Promotion contract
 
 A package or cohesive family moves to a supported claim and project-local 0.20 intent atomically
-when one focused promotion slice proves:
+when one focused promotion slice proves only the claims it changes:
 
 1. a public user guarantee, explicit limits/non-claims, and corrective behavior;
 2. shared family semantics plus the provider-specific delta;
 3. a real container, runtime, or deterministic protocol boundary when external behavior matters;
-4. a clean package-only consumer reaching one meaningful result;
+4. a successful pack, plus a clean package-only consumer only for first publication or changed
+   package/dependency/activation shape;
 5. clean pack/API behavior, supported public dependency closure, and current generated product truth.
 
 The promotion PR records exact commands and outcomes. Durable product truth points to the owning
@@ -109,23 +111,24 @@ validation is green. The first final-ratchet attempt then exposed three direct e
 - the clean consumer packed seven candidates but not their locally newer public dependency closure.
 
 The repairs remain at those three owners. The host failure oracle, Communication 44/44, affected Data
-correction 1/1, and real Mongo Web owner 52/52 pass. The clean consumer now derives and packs the full
-closure through the existing package inspector and reaches its external restore boundary locally; the
-connected PR runner owns the final clean network proof. A green final ratchet is the only remaining
-R13-A check. Merge and publication still require an explicit maintainer decision.
+correction 1/1, and real Mongo Web owner 52/52 pass. The clean consumer derives and packs the full
+closure through the existing package inspector, and its connected run already passed. The prior exact
+ratchet also passed, but neither is a standing merge or publication prerequisite. The remaining R13-A
+check is cheap repository coherence on the exact commit. The maintainer has authorized merge and
+publication after that check.
 
 ## Execution
 
 ### R13-A — Simplify the first promotion slice
 
-Status: implementation and focused validation complete; final PR ratchet pending.
+Status: implementation and focused validation complete; cheap PR coherence pending.
 
 1. Map PR #95 changes to the retained/removal lists in ARCH-0120.
 2. Delete generic R13 coordination that has no smaller existing owner.
 3. Keep family conformance, lifecycle, consumer, API, compiler-drift, and actual package corrections.
 4. Simplify claims to capability ownership and durable evidence locations.
-5. Run focused owner/family tests, package consumers, product compilation, API checks, and the
-   required native provider proof.
+5. Run focused owner/family tests and required native proof; run a package consumer only when artifact
+   shape or first publication makes it meaningful; run product/API checks at PR coherence.
 6. Update the draft PR to describe value delivered rather than owner-count reconciliation.
 
 ### R13-B — Publish and observe the first lean slice
@@ -160,5 +163,6 @@ public consumer result. Do not create cards merely to reproduce inventory rows.
   public support claim.
 - Extend an existing family test owner before creating another framework-wide abstraction.
 - Keep publication exclusively on the existing resulting push to `main`.
-- Reserve the complete green ratchet for a deliberate certification/publication boundary.
+- Reserve the complete green ratchet for an explicitly requested whole-framework milestone; never
+  infer it from package promotion or publication.
 - Preserve untracked `tmp/` as unrelated user-owned material.
