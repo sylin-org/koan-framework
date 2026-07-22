@@ -179,7 +179,7 @@ signals rather than inheriting promotion from repository membership.
 - all public-facing content tells one present-tense greenfield narrative and is guarded against drift;
 - the recommended spine, advanced extensions, experiments, and non-claims are unmistakable;
 - the coherent preview packages and templates are published and clean-install verified;
-- an independent later wave proves upgrade and interrupted-publication recovery;
+- an independent later wave proves ordinary upgrade and mixed-state idempotent publication recovery;
 - production guidance covers schema, deployment, recovery, diagnostics, secrets, and security posture;
 - external public-context-only readers reproduce the intended journey and their anonymous feedback is triaged;
 - the architect receives an explicit go/no-go record for the next maturity band.

@@ -14,14 +14,28 @@ PostgreSQL provider for Koan relational data with safe defaults and pushdowns.
 
 ## Install
 
+> **0.20 preview:** PostgreSQL is a supported Koan Entity provider. The public guarantee covers the
+> behavior and limits below; it does not imply parity with every relational backend.
+
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Postgres
 ```
 
 ## Minimal setup
 
-- Configure connection via ConnectionStrings or Koan:Data first-win keys.
-- Bind options at startup; keep secrets out of source.
+- Keep the application's ordinary `services.AddKoan()` bootstrap.
+- For autonomous local discovery, run a reachable PostgreSQL service and omit explicit configuration.
+- Otherwise set `ConnectionStrings:Postgres` or `Koan:Data:Postgres:ConnectionString`; keep secrets
+  outside source control.
+
+```csharp
+builder.Services.AddKoan();
+
+public sealed class Order : Entity<Order>;
+
+var saved = await new Order().Save();
+var same = await Order.Get(saved.Id);
+```
 
 ## Usage - safe snippets
 

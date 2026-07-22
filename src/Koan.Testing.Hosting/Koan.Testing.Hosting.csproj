@@ -11,6 +11,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
+    <PackageValidationBaselineVersion>0.20.3</PackageValidationBaselineVersion>
     <Description>Koan test harness — the AddKoan() integration host (KoanIntegrationHost), xUnit-agnostic. Boot a real compiled Koan composition in your app's tests.</Description>
     <PackageTags>$(CommonPackageTags);testing;integration-testing;harness</PackageTags>
   </PropertyGroup>

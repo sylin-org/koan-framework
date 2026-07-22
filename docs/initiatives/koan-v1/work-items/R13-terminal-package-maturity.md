@@ -7,15 +7,15 @@ status: current
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-21
+  date_last_tested: 2026-07-22
   status: in-progress
-  scope: first lean promotion slice implemented and focused-green; cheap PR coherence pending
+  scope: first lean slice public and observed; PostgreSQL focused evidence green, publication pending
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — obtain green PR coherence before the authorized merge`
+- Status: `in-progress — promote PostgreSQL as the first networked Entity provider`
 - Depends on: passed R11, completed R12-06, and accepted
   [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) with validation corrected by
   [ARCH-0121](../../../decisions/ARCH-0121-claim-scoped-validation.md)
@@ -81,47 +81,25 @@ when no real prerequisite connects them.
 Grouped claims split when providers are not equally ready. A passing adapter does not wait for a
 failing sibling, and a failing sibling does not inherit the group's support label.
 
-## Current draft boundary — PR #95
+## Current boundary
 
-The local implementation and draft PR proved real value under the original plan:
+PR `#95` merged as `a8a1bb61b53195ce44bef00024d722862deb949d` after the lean gate passed.
+Release run `29891926990` published the 45-package supported closure, NuGet.org indexed all seven new
+owners, and a clean public consumer passed. The first slice's seven immutable API floors are now
+recorded at their owning projects.
 
-- host and container lifecycle corrections;
-- reusable Cache and Web adapter conformance;
-- clean package-only consumption;
-- API baseline and generated-surface drift protection;
-- seven evidence-backed package candidates for 0.20;
-- SQLite Cache and local discovery corrections.
-
-It also introduced machinery whose primary purpose was administering the former plan:
-
-- a fixed terminal-outcome certificate and reconciler;
-- central exact-cell declarations;
-- generic admission runner/result coordination;
-- native candidate planning and exact-candidate result orchestration;
-- multiple bootstrap cards and projections centered on owner-count progress.
-
-PR #95 remains draft. The superseded coordination machinery has been removed, the seven candidates
-retain only direct family/package evidence, and the PR narrative now describes user value. Focused
-validation is green. The first final-ratchet attempt then exposed three direct evidence-owner defects:
-
-- failed host startup cleanup attempted `StopAsync` on an incomplete generic host and masked the
-  original corrective exception;
-- the Mongo Web reset bridge changed the container URL's database without preserving its
-  authentication source; and
-- the clean consumer packed seven candidates but not their locally newer public dependency closure.
-
-The repairs remain at those three owners. The host failure oracle, Communication 44/44, affected Data
-correction 1/1, and real Mongo Web owner 52/52 pass. The clean consumer derives and packs the full
-closure through the existing package inspector, and its connected run already passed. The prior exact
-ratchet also passed, but neither is a standing merge or publication prerequisite. The remaining R13-A
-check is cheap repository coherence on the exact commit. The maintainer has authorized merge and
-publication after that check.
+[R13-07](r13/R13-07-postgresql-provider-promotion.md) is the active provider-family slice. It promotes
+the application-facing PostgreSQL connector together with its module-free shared Npgsql dependency.
+The existing 19-fact real provider suite, two focused packs, external Testcontainers consumer, product
+compiler, and API-floor guard are green. No production behavior changed and no sibling provider or
+whole-framework certification ran.
 
 ## Execution
 
 ### R13-A — Simplify the first promotion slice
 
-Status: implementation and focused validation complete; cheap PR coherence pending.
+Status: complete. PR `#95`, lean gate `29891719299`, publication run `29891926990`, public indexing,
+and the clean NuGet.org consumer are green.
 
 1. Map PR #95 changes to the retained/removal lists in ARCH-0120.
 2. Delete generic R13 coordination that has no smaller existing owner.
@@ -133,11 +111,15 @@ Status: implementation and focused validation complete; cheap PR coherence pendi
 
 ### R13-B — Publish and observe the first lean slice
 
+Status: complete. The seven owners are public and the clean external consumer passed.
+
 1. Merge only after the simplified draft is green and publication is intended.
 2. Observe the public packages through clean NuGet consumers.
 3. Complete R12-07's bounded upgrade and recovery evidence without adding release machinery.
 
 ### R13-C onward — Promote provider families
+
+Status: active through R13-07 PostgreSQL promotion.
 
 Open one short family card only when implementation begins. Each card freezes its guarantee and
 limits, names the existing conformance owner, identifies the real provider boundary, and ends with a
