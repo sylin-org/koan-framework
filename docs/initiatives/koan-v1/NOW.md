@@ -84,12 +84,14 @@ contract are separately supported while Cache Redis remains unassessed. R13-16 p
 staged and public consumers, product/API guards, lean coherence, and exact publication of its six owners.
 S3 and Data Backup are shelved; they are not 0.20 claims or blockers.
 
-The active slice is [R13-17](work-items/r13/R13-17-external-auth-promotion.md): promote Google,
-Microsoft, and Discord as definition-only integrations over the shared Web Auth runtime. The focused
-definition suite passes 41/41 and the existing deterministic OAuth2/OIDC authorization-code suite passes
-5/5 without live credentials. Exact packs, the staged package-only consumer, generated product truth,
-and API posture are green. Lean no-tests coherence passed all eight legs in 66.3 seconds; public
-observation remains.
+R13-17 is also complete: Google, Microsoft, and Discord are public at exact `0.20.0`, indexed, and
+public-consumer green. The focused definition suite passed 41/41 and the deterministic OAuth2/OIDC
+authorization-code suite passed 5/5 without live credentials. Release publication created only those
+three new identities; already-public Storage/Media packages were skipped at their existing versions.
+Their immutable API floors are now recorded centrally without touching package-owned version paths.
+
+The next R13 boundary is assessment of only the already-decided Agyo and Zen Garden ownership moves.
+No migration starts until its public destination evidence exists; this does not reopen S3 or Backup.
 Untracked `tmp/` is unrelated user-owned material and must remain untouched and unstaged.
 
 ## Remote/public state
@@ -143,6 +145,11 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
   six Local Storage/Media owners at exact `0.20.0`. All six are indexed and the fresh NuGet.org-only
   consumer passed. S3 and Backup remained unchanged and unpublished. Attempt 1 encountered a transient
   NuGet lookup miss before packing; rerunning the failed job succeeded without a code change.
+- PR `#107` passed lean gate `29926425619`, squash-merged as
+  `a12b2154907d9f75f8bdef77cf4470ecefa1aad8`, and release run `29926734114` published Google,
+  Microsoft, and Discord Auth connectors at exact `0.20.0`. All three are indexed and the unchanged
+  fresh NuGet.org-only consumer passed. Existing Storage/Media packages remained at `0.20.0` and were
+  skipped as duplicates, proving central baseline capture did not create patch churn.
 - The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
   Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
   organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
@@ -165,10 +172,10 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
 
 ## Next actions
 
-1. Pass the lean coherence gate and publish the three external Auth connectors through the existing main boundary.
-2. Observe their exact accepted/indexed versions and rerun the same consumer from NuGet.org only.
-3. Record their immutable API floors centrally, without editing already-published package projects, then
-   assess only the remaining accepted migrations.
+1. Validate and land the central immutable API floors for the three now-public Auth connectors without
+   editing package-owned paths.
+2. Assess the already-decided Agyo and Zen Garden moves against actual public destination evidence.
+3. Retire or redirect Koan owners only when destination packages preserve the current behavior and consumers.
 
 ## Repository boundaries
 

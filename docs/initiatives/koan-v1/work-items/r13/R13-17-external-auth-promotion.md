@@ -3,12 +3,12 @@ type: SPEC
 domain: web
 title: "R13-17 - Promote external authentication connectors"
 audience: [architects, maintainers, developers, ai-agents]
-status: current
+status: resolved
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
-  status: in-progress
+  status: passed
   scope: Google, Microsoft, and Discord connector definitions, shared authorization-code runtime, packages, consumer, product, and API evidence
 ---
 
@@ -86,4 +86,13 @@ behaviorless patch packages. Existing project-local floors remain valid; later p
   immutable floors; only these three legitimate first publications are pending. The six R13-16 floors
   are active centrally without changing those package versions.
 - Lean no-tests coherence passed all eight legs in 66.3 seconds.
-- Remaining: main publication, public indexing, and the unchanged NuGet.org-only consumer.
+- PR `#107` passed lean gate `29926425619` and squash-merged as
+  `a12b2154907d9f75f8bdef77cf4470ecefa1aad8`.
+- Release run `29926734114` accepted exactly the three `0.20.0` connector packages and symbols. The
+  already-public Storage/Media identities remained at `0.20.0` and were skipped as duplicates; no
+  behaviorless patch packages were created.
+- NuGet.org indexed all three exact versions. The unchanged application restored from NuGet.org only
+  into an empty cache, built with 0 warnings/errors, loaded all three modules, elected Google, and emitted
+  `EXTERNAL-AUTH|PACKAGE-CONSUMER|ADDKOAN|GOOGLE|MICROSOFT|DISCORD|PASS`.
+- All three immutable API floors are now recorded centrally without editing their package-owned paths;
+  the focused guard reports `76/76 configured, 0 first-publication pending, 3 content-only`.

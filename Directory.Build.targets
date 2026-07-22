@@ -9,6 +9,9 @@
     <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Media.Abstractions'">0.20.0</PackageValidationBaselineVersion>
     <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Media.Core'">0.20.0</PackageValidationBaselineVersion>
     <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Media.Web'">0.20.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Web.Auth.Connector.Google'">0.20.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Web.Auth.Connector.Microsoft'">0.20.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Web.Auth.Connector.Discord'">0.20.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <PropertyGroup>
