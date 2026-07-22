@@ -24,6 +24,6 @@ public sealed class InMemoryVectorModule : KoanModule
         module.Describe(Version);
         module.AddSetting("Vector", "InMemory (brute-force, System.Numerics.Tensors SIMD)");
         module.AddSetting("Storage", "in-process, ephemeral");
-        module.AddSetting("Priority", "-100 (fallback floor)");
+        module.AddSetting("Priority", $"{Infrastructure.Constants.Provider.Priority} (fallback floor)");
     }
 }

@@ -1,6 +1,6 @@
 # Sylin.Koan.Data.Vector.Connector.InMemory
 
-The zero-infrastructure vector floor for Koan: managed, process-local similarity search behind the ordinary Entity
+The supported zero-infrastructure vector floor for Koan: managed, process-local similarity search behind the ordinary Entity
 vector ring.
 
 - Target framework: net10.0

@@ -12,7 +12,8 @@ test project. Each adapter implements **one** interface
 
 | Cell | Status | Notes |
 |---|---|---|
-| `InMemory` | 24 pass / 1 skip | Reference adapter; matrix self-validation |
+| `InMemory` | 34/34 | Reference adapter; matrix self-validation |
+| `SqliteVec` | 29 pass / 5 capability skips | Embedded durable floor; no filters, hybrid, export, or stats |
 | `Weaviate` | 25/25 | Full coverage, including hybrid search + cursor continuation |
 | `ElasticSearch` | 29 pass / 4 skip | Native Elasticsearch dialect; embedding reads and hybrid search are not supported |
 | `OpenSearch` | 29 pass / 4 skip | Native OpenSearch dialect; embedding reads and hybrid search are not supported |

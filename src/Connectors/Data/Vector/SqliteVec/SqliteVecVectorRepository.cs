@@ -199,6 +199,37 @@ internal sealed class SqliteVecVectorRepository<TEntity, TKey>
         finally { _lock.Release(); }
     }
 
+    public async Task<Dictionary<TKey, float[]>> GetEmbeddings(
+        IEnumerable<TKey> ids,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        var requested = ids.ToList();
+        var result = new Dictionary<TKey, float[]>();
+        if (requested.Count == 0) return result;
+
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var conn = Connection();
+            var table = Table();
+            if (!TableExists(conn, table)) return result;
+
+            foreach (var id in requested)
+            {
+                ct.ThrowIfCancellationRequested();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = $"SELECT vec_to_json(embedding) FROM \"{table}\" WHERE id = $id";
+                cmd.Parameters.AddWithValue("$id", Key(id));
+                if (cmd.ExecuteScalar() is string json && JsonConvert.DeserializeObject<float[]>(json) is { } embedding)
+                    result[id] = embedding;
+            }
+
+            return result;
+        }
+        finally { _lock.Release(); }
+    }
+
     public async Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(options);

@@ -1,6 +1,6 @@
 # Sylin.Koan.Data.Vector.Connector.SqliteVec
 
-Durable, in-process vector search for Koan through the sqlite-vec `vec0` extension—no vector server required.
+Supported durable, in-process vector search for Koan through the sqlite-vec `vec0` extension—no vector server required.
 
 - Target framework: net10.0
 - License: Apache-2.0
@@ -65,9 +65,9 @@ facts show the effective de-identified store and whether it was explicit, paired
   closed; they never silently search across tenants. Partition and routed-source isolation remain supported.
 - The first vector fixes a collection's dimension. Mixing dimensions is invalid.
 - Hybrid search, continuation, export, and multiple vectors per entity are unsupported.
+- Single and bounded batch embedding retrieval are supported; unknown IDs are omitted from batch results.
 
 ## References
 
 - [Technical reference](./TECHNICAL.md)
 - [Vector runtime](../../../../Koan.Data.Vector/README.md)
-

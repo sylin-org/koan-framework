@@ -19,14 +19,14 @@ namespace Koan.Data.Vector.Connector.InMemory;
 /// This is also the cross-adapter convergence oracle — every native provider's pushdown is validated
 /// against the result this adapter produces in managed code.
 /// </remarks>
-[ProviderPriority(-100)]
+[ProviderPriority(Infrastructure.Constants.Provider.Priority)]
 public sealed class InMemoryVectorAdapterFactory : IVectorAdapterFactory
 {
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, (float[] Embedding, object? Metadata)>> _stores
         = new(StringComparer.Ordinal);
 
-    public string Provider => "inmemory";
-    public IReadOnlyCollection<string> Aliases => ["memory", "inproc"];
+    public string Provider => Infrastructure.Constants.Provider.Name;
+    public IReadOnlyCollection<string> Aliases => Infrastructure.Constants.Provider.Aliases;
     public bool IsAutomaticFloor => true;
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)
